@@ -439,7 +439,7 @@ export default function SearchPage() {
               <Card className="overflow-hidden p-3">
                 <ProviderMap
                   markers={markers}
-                  center={[mapCenter.lat, mapCenter.lng]}   {/* ← FIXED HERE */}
+                  center={[mapCenter.lat, mapCenter.lng]}
                   highlightedMarkerId={highlightedProviderId}
                 />
               </Card>
