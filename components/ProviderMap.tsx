@@ -11,7 +11,7 @@ export default function ProviderMap({
 }: {
   markers: any[];
   center?: [number, number];
-  highlightedMarkerId?: string;
+  highlightedMarkerId?: string | null;   // Allows null or string
 }) {
   return (
     <MapWithNoSSR 
