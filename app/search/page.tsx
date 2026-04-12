@@ -126,7 +126,7 @@ export default function SearchPage() {
       setError("");
 
       const { data, error } = await supabase
-        .from("gurus")                    // ← Fixed
+        .from("gurus")
         .select(`
           id,
           slug,
@@ -231,7 +231,7 @@ export default function SearchPage() {
       return { lat: markers[0].lat, lng: markers[0].lng };
     }
 
-    return { lat: 40.6084, lng: -75.4902 }; // Default to your area
+    return { lat: 39.9526, lng: -75.1652 }; // Default to Philadelphia area
   }, [markers, highlightedProviderId]);
 
   return (
@@ -439,7 +439,7 @@ export default function SearchPage() {
               <Card className="overflow-hidden p-3">
                 <ProviderMap
                   markers={markers}
-                  center={mapCenter}
+                  center={[mapCenter.lat, mapCenter.lng]}   {/* ← FIXED HERE */}
                   highlightedMarkerId={highlightedProviderId}
                 />
               </Card>
