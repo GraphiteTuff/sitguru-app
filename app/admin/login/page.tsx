@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,9 +30,10 @@ export default function AdminLoginPage() {
 
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (userError || !user) {
       setError("Login failed.");
       setLoading(false);
       return;
@@ -58,10 +60,10 @@ export default function AdminLoginPage() {
     <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-6">
-          <p className="text-sm font-semibold text-emerald-600">PawNecto Owner Access</p>
+          <p className="text-sm font-semibold text-emerald-600">SitGuru Owner Access</p>
           <h1 className="mt-2 text-3xl font-black text-slate-900">Admin Login</h1>
           <p className="mt-2 text-sm text-slate-600">
-            Secure login for PawNecto owner dashboard.
+            Secure login for the SitGuru owner dashboard.
           </p>
         </div>
 
@@ -72,10 +74,10 @@ export default function AdminLoginPage() {
             </label>
             <input
               type="email"
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="owner@pawnecto.com"
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
+              placeholder="owner@sitguru.com"
               required
             />
           </div>
@@ -86,9 +88,9 @@ export default function AdminLoginPage() {
             </label>
             <input
               type="password"
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
               placeholder="Enter password"
               required
             />

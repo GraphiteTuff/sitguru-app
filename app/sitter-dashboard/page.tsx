@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import MediaUpload from "@/components/MediaUpload";
 
 type DashboardSitter = {
   id: string;
@@ -19,6 +21,11 @@ type DashboardSitter = {
   services?: string[] | null;
   referral_points?: number | null;
   total_referrals?: number | null;
+  stripe_account_id?: string | null;
+  stripe_onboarding_complete?: boolean | null;
+  payouts_enabled?: boolean | null;
+  charges_enabled?: boolean | null;
+  is_active?: boolean | null;
 };
 
 type ReviewRow = {
@@ -52,6 +59,15 @@ type ActivityItem = {
 type ChartPoint = {
   label: string;
   value: number;
+};
+
+type ProviderMediaRow = {
+  id: string;
+  profile_id?: string | null;
+  file_url: string;
+  file_type?: string | null;
+  caption?: string | null;
+  created_at?: string | null;
 };
 
 function formatLocation(city?: string | null, state?: string | null) {
@@ -103,6 +119,38 @@ function statusClasses(status: BookingRow["status"]) {
   return "bg-blue-50 text-blue-700 border border-blue-200";
 }
 
+function stripeStatusClasses({
+  stripeAccountId,
+  onboardingComplete,
+  payoutsEnabled,
+}: {
+  stripeAccountId?: string | null;
+  onboardingComplete?: boolean | null;
+  payoutsEnabled?: boolean | null;
+}) {
+  if (payoutsEnabled) return "bg-green-50 text-green-700 border border-green-200";
+  if (stripeAccountId && onboardingComplete) {
+    return "bg-cyan-50 text-cyan-700 border border-cyan-200";
+  }
+  if (stripeAccountId) return "bg-amber-50 text-amber-700 border border-amber-200";
+  return "bg-slate-100 text-slate-700 border border-slate-200";
+}
+
+function stripeStatusLabel({
+  stripeAccountId,
+  onboardingComplete,
+  payoutsEnabled,
+}: {
+  stripeAccountId?: string | null;
+  onboardingComplete?: boolean | null;
+  payoutsEnabled?: boolean | null;
+}) {
+  if (payoutsEnabled) return "Payouts enabled";
+  if (stripeAccountId && onboardingComplete) return "Connected";
+  if (stripeAccountId) return "Setup in progress";
+  return "Not connected";
+}
+
 function Card({
   children,
   className = "",
@@ -131,7 +179,7 @@ function StatCard({
   return (
     <Card className="p-5 sm:p-6">
       <p className="text-sm font-semibold text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl sm:text-4xl font-black tracking-tight text-slate-900">{value}</p>
+      <p className="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">{value}</p>
       <p className={`mt-2 text-sm ${accent || "text-slate-600"}`}>{subtext}</p>
     </Card>
   );
@@ -191,7 +239,7 @@ function SimpleBarChart({
               <span className="font-medium text-slate-700">{item.label}</span>
               <span className="text-slate-500">{item.value}</span>
             </div>
-            <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
               <div className={`h-full rounded-full ${colorClass}`} style={{ width }} />
             </div>
           </div>
@@ -225,13 +273,20 @@ function RatioBar({
 }
 
 export default function SitterDashboardPage() {
+  const searchParams = useSearchParams();
+
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [sitter, setSitter] = useState<DashboardSitter | null>(null);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [providerMedia, setProviderMedia] = useState<ProviderMediaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [stripeMessage, setStripeMessage] = useState("");
+  const [stripeLoading, setStripeLoading] = useState(false);
 
   async function loadDashboard(authUserId?: string | null) {
     setLoading(true);
@@ -240,7 +295,7 @@ export default function SitterDashboardPage() {
     const activeUserId = authUserId ?? userId;
 
     if (!activeUserId) {
-      setError("You must be logged in to view the sitter dashboard.");
+      setError("You must be logged in to view the guru dashboard.");
       setLoading(false);
       return;
     }
@@ -262,7 +317,11 @@ export default function SitterDashboardPage() {
         services,
         referral_points,
         total_referrals,
-        is_active
+        is_active,
+        stripe_account_id,
+        stripe_onboarding_complete,
+        payouts_enabled,
+        charges_enabled
       `)
       .eq("profile_id", activeUserId)
       .eq("is_active", true)
@@ -281,34 +340,49 @@ export default function SitterDashboardPage() {
       setBookings([]);
       setReviews([]);
       setActivity([]);
+      setProviderMedia([]);
       setLoading(false);
       return;
     }
 
-    const [{ data: bookingRows, error: bookingError }, { data: reviewRows, error: reviewError }] =
-      await Promise.all([
-        supabase
-          .from("bookings")
-          .select("id, pet_name, service, booking_date, status, price, pet_type, city, state, customer_id")
-          .eq("sitter_id", activeSitter.id)
-          .order("booking_date", { ascending: true })
-          .limit(50),
-        supabase
-          .from("reviews")
-          .select("id, reviewer_name, rating, comment, created_at")
-          .eq("sitter_id", activeSitter.id)
-          .order("created_at", { ascending: false })
-          .limit(20),
-      ]);
+    const [
+      { data: bookingRows, error: bookingError },
+      { data: reviewRows, error: reviewError },
+      { data: providerMediaRows, error: providerMediaError },
+    ] = await Promise.all([
+      supabase
+        .from("bookings")
+        .select("id, pet_name, service, booking_date, status, price, pet_type, city, state, customer_id")
+        .eq("sitter_id", activeSitter.id)
+        .order("booking_date", { ascending: true })
+        .limit(50),
+
+      supabase
+        .from("reviews")
+        .select("id, reviewer_name, rating, comment, created_at")
+        .eq("sitter_id", activeSitter.id)
+        .order("created_at", { ascending: false })
+        .limit(20),
+
+      supabase
+        .from("provider_media")
+        .select("id, profile_id, file_url, file_type, caption, created_at")
+        .eq("profile_id", activeSitter.profile_id || activeUserId)
+        .order("created_at", { ascending: false })
+        .limit(12),
+    ]);
 
     if (bookingError) setError(bookingError.message);
     if (reviewError) setError(reviewError.message);
+    if (providerMediaError) setError(providerMediaError.message);
 
     const safeBookings = (bookingRows as BookingRow[]) || [];
     const safeReviews = (reviewRows as ReviewRow[]) || [];
+    const safeProviderMedia = (providerMediaRows as ProviderMediaRow[]) || [];
 
     setBookings(safeBookings);
     setReviews(safeReviews);
+    setProviderMedia(safeProviderMedia);
 
     const reviewActivity: ActivityItem[] = safeReviews.slice(0, 4).map((review) => ({
       id: `review-${review.id}`,
@@ -328,6 +402,124 @@ export default function SitterDashboardPage() {
     setLoading(false);
   }
 
+  async function refreshStripeStatus(accountId?: string | null, sitterId?: string | null) {
+    if (!accountId || !sitterId) return;
+
+    try {
+      const res = await fetch("/api/stripe/connect/account-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          accountId,
+          sitterId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to refresh Stripe account status.");
+      }
+
+      await loadDashboard(userId);
+      setStripeMessage(
+        data.payouts_enabled
+          ? "Stripe setup complete. Payouts are enabled."
+          : "Stripe account updated. Finish any remaining onboarding steps to enable payouts."
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to refresh Stripe account.";
+      setError(message);
+    }
+  }
+
+  async function handleConnectStripe() {
+    if (!sitter?.id || !userEmail) {
+      setError("Missing guru or user information for Stripe setup.");
+      return;
+    }
+
+    try {
+      setStripeLoading(true);
+      setStripeMessage("");
+      setError("");
+
+      let accountId = sitter.stripe_account_id || null;
+
+      if (!accountId) {
+        const createRes = await fetch("/api/stripe/connect/create-account", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sitterId: sitter.id,
+            email: userEmail,
+          }),
+        });
+
+        const createData = await createRes.json();
+
+        if (!createRes.ok) {
+          throw new Error(createData.error || "Unable to create Stripe account.");
+        }
+
+        accountId = createData.accountId;
+      }
+
+      const linkRes = await fetch("/api/stripe/connect/onboarding-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          accountId,
+        }),
+      });
+
+      const linkData = await linkRes.json();
+
+      if (!linkRes.ok) {
+        throw new Error(linkData.error || "Unable to create Stripe onboarding link.");
+      }
+
+      window.location.href = linkData.url;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to start Stripe onboarding.";
+      setError(message);
+      setStripeLoading(false);
+    }
+  }
+
+  async function saveProviderMedia(publicUrl: string) {
+    setUploadMessage("");
+    setError("");
+
+    if (!sitter?.profile_id && !userId) {
+      setError("No guru profile found for upload.");
+      return;
+    }
+
+    const profileIdToUse = sitter?.profile_id || userId;
+
+    const { error: insertError } = await supabase.from("provider_media").insert({
+      profile_id: profileIdToUse,
+      file_url: publicUrl,
+      file_type: "image",
+      caption: "Guru profile image",
+    });
+
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+
+    setUploadMessage("Photo uploaded successfully.");
+    await loadDashboard(userId);
+  }
+
   useEffect(() => {
     async function initialize() {
       const {
@@ -335,17 +527,25 @@ export default function SitterDashboardPage() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        setError("You must be logged in to view the sitter dashboard.");
+        setError("You must be logged in to view the guru dashboard.");
         setLoading(false);
         return;
       }
 
       setUserId(user.id);
+      setUserEmail(user.email || null);
       await loadDashboard(user.id);
     }
 
     initialize();
   }, []);
+
+  useEffect(() => {
+    if (!sitter?.id || !sitter?.stripe_account_id) return;
+    if (searchParams.get("stripe_return") !== "1") return;
+
+    refreshStripeStatus(sitter.stripe_account_id, sitter.id);
+  }, [searchParams, sitter?.id, sitter?.stripe_account_id]);
 
   useEffect(() => {
     if (!sitter?.id) return;
@@ -378,9 +578,7 @@ export default function SitterDashboardPage() {
     const totalRevenue = bookings.reduce((sum, booking) => sum + Number(booking.price || 0), 0);
     const totalBookings = bookings.length;
 
-    const uniqueCustomers = new Set(
-      bookings.map((b) => b.customer_id).filter(Boolean)
-    ).size;
+    const uniqueCustomers = new Set(bookings.map((b) => b.customer_id).filter(Boolean)).size;
 
     const avgSale = totalBookings > 0 ? totalRevenue / totalBookings : 0;
     const revenuePerCustomer = uniqueCustomers > 0 ? totalRevenue / uniqueCustomers : 0;
@@ -453,7 +651,13 @@ export default function SitterDashboardPage() {
     const referralPoints = sitter?.referral_points ?? 0;
     const totalReferrals = sitter?.total_referrals ?? 0;
     const referralTier =
-      referralPoints >= 500 ? "Gold" : referralPoints >= 250 ? "Silver" : referralPoints >= 100 ? "Bronze" : "Starter";
+      referralPoints >= 500
+        ? "Gold"
+        : referralPoints >= 250
+        ? "Silver"
+        : referralPoints >= 100
+        ? "Bronze"
+        : "Starter";
 
     return {
       revenue: formatMoney(totalRevenue),
@@ -484,7 +688,7 @@ export default function SitterDashboardPage() {
       <main className="min-h-screen bg-slate-100 px-4 py-10">
         <div className="mx-auto max-w-7xl">
           <Card className="p-8">
-            <p className="text-slate-900 text-lg font-semibold">Loading sitter dashboard...</p>
+            <p className="text-lg font-semibold text-slate-900">Loading guru dashboard...</p>
           </Card>
         </div>
       </main>
@@ -496,7 +700,7 @@ export default function SitterDashboardPage() {
       <main className="min-h-screen bg-slate-100 px-4 py-10">
         <div className="mx-auto max-w-7xl">
           <Card className="p-8">
-            <h1 className="text-3xl font-black text-slate-900">Sitter dashboard</h1>
+            <h1 className="text-3xl font-black text-slate-900">Guru dashboard</h1>
             <p className="mt-4 text-slate-600">{error}</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
@@ -509,7 +713,7 @@ export default function SitterDashboardPage() {
                 href="/become-a-sitter"
                 className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
-                Become a sitter
+                Become a guru
               </Link>
             </div>
           </Card>
@@ -523,16 +727,16 @@ export default function SitterDashboardPage() {
       <main className="min-h-screen bg-slate-100 px-4 py-10">
         <div className="mx-auto max-w-7xl">
           <Card className="p-8">
-            <h1 className="text-3xl font-black text-slate-900">No sitter profile found</h1>
+            <h1 className="text-3xl font-black text-slate-900">No guru profile found</h1>
             <p className="mt-4 text-slate-600">
-              Your account does not have an active sitter profile yet.
+              Your account does not have an active guru profile yet.
             </p>
             <div className="mt-6">
               <Link
                 href="/become-a-sitter"
                 className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
               >
-                Complete sitter setup
+                Complete guru setup
               </Link>
             </div>
           </Card>
@@ -541,16 +745,19 @@ export default function SitterDashboardPage() {
     );
   }
 
-  const sitterName = sitter.full_name || "Trusted Sitter";
-  const sitterTitle = sitter.title || "Pet Care Provider";
+  const sitterName = sitter.full_name || "Trusted Guru";
+  const sitterTitle = sitter.title || "Pet Care Guru";
   const sitterLocation = formatLocation(sitter.city, sitter.state);
   const services = sitter.services || [];
+  const stripeConnected = Boolean(sitter.stripe_account_id);
+  const stripeComplete = Boolean(sitter.stripe_onboarding_complete);
+  const payoutsEnabled = Boolean(sitter.payouts_enabled);
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6">
-          <p className="text-sm font-semibold text-emerald-600">PawNecto Dashboard</p>
+          <p className="text-sm font-semibold text-emerald-600">SitGuru Dashboard</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
             Welcome back, {sitterName}
           </h1>
@@ -558,6 +765,18 @@ export default function SitterDashboardPage() {
             {sitterTitle} · {sitterLocation}
           </p>
         </div>
+
+        {error ? (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        {stripeMessage ? (
+          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {stripeMessage}
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
@@ -594,7 +813,7 @@ export default function SitterDashboardPage() {
                   <p className="text-sm font-semibold text-slate-500">Revenue trend</p>
                   <h2 className="mt-2 text-2xl font-black text-slate-900">Sales over time</h2>
                 </div>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                   Live
                 </span>
               </div>
@@ -609,7 +828,7 @@ export default function SitterDashboardPage() {
                   <p className="text-sm font-semibold text-slate-500">Booking volume</p>
                   <h2 className="mt-2 text-2xl font-black text-slate-900">Bookings trend</h2>
                 </div>
-                <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 border border-cyan-200">
+                <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700">
                   Tracked
                 </span>
               </div>
@@ -677,6 +896,97 @@ export default function SitterDashboardPage() {
           </div>
 
           <div className="grid gap-6">
+            <Card className="p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-500">Payments and banking</p>
+                  <h3 className="mt-2 text-2xl font-black text-slate-900">Stripe Connect</h3>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${stripeStatusClasses({
+                    stripeAccountId: sitter.stripe_account_id,
+                    onboardingComplete: sitter.stripe_onboarding_complete,
+                    payoutsEnabled: sitter.payouts_enabled,
+                  })}`}
+                >
+                  {stripeStatusLabel({
+                    stripeAccountId: sitter.stripe_account_id,
+                    onboardingComplete: sitter.stripe_onboarding_complete,
+                    payoutsEnabled: sitter.payouts_enabled,
+                  })}
+                </span>
+              </div>
+
+              <p className="mt-3 text-sm text-slate-600">
+                Connect your bank account so SitGuru can send your guru payouts.
+              </p>
+
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-500">Account</p>
+                  <p className="mt-2 text-sm font-bold text-slate-900">
+                    {stripeConnected ? "Created" : "Not created"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-500">Onboarding</p>
+                  <p className="mt-2 text-sm font-bold text-slate-900">
+                    {stripeComplete ? "Complete" : "Not complete"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-500">Payouts</p>
+                  <p className="mt-2 text-sm font-bold text-slate-900">
+                    {payoutsEnabled ? "Enabled" : "Not enabled"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                {!stripeConnected ? (
+                  <button
+                    type="button"
+                    onClick={handleConnectStripe}
+                    disabled={stripeLoading}
+                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {stripeLoading ? "Starting Stripe..." : "Connect Bank Account"}
+                  </button>
+                ) : !payoutsEnabled ? (
+                  <button
+                    type="button"
+                    onClick={handleConnectStripe}
+                    disabled={stripeLoading}
+                    className="inline-flex items-center justify-center rounded-full bg-amber-500 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-60"
+                  >
+                    {stripeLoading ? "Opening Stripe..." : "Finish Stripe Setup"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => refreshStripeStatus(sitter.stripe_account_id, sitter.id)}
+                    disabled={stripeLoading}
+                    className="inline-flex items-center justify-center rounded-full bg-cyan-600 px-5 py-3 text-sm font-semibold text-white hover:bg-cyan-700 disabled:opacity-60"
+                  >
+                    {stripeLoading ? "Refreshing..." : "Refresh Stripe Status"}
+                  </button>
+                )}
+
+                <Link
+                  href="/bookings"
+                  className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  View bookings
+                </Link>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                Once connected, customer booking payments can be split so SitGuru keeps the platform fee and your remaining earnings are paid out to your bank account.
+              </div>
+            </Card>
+
             <Card className="p-6">
               <p className="text-sm font-semibold text-slate-500">Pet type ratio</p>
               <h3 className="mt-2 text-2xl font-black text-slate-900">Dogs vs cats</h3>
@@ -750,7 +1060,8 @@ export default function SitterDashboardPage() {
                 <p className="text-sm font-semibold text-amber-700">Current tier</p>
                 <p className="mt-1 text-xl font-black text-slate-900">{stats.referralTier}</p>
                 <p className="mt-2 text-sm text-slate-600">
-                  Suggested system: 100 points per sitter referral, 75 per walker referral, 50 per caretaker referral.
+                  Suggested system: 100 points per sitter referral, 75 per walker referral, 50 per
+                  caretaker referral.
                 </p>
               </div>
             </Card>
@@ -787,8 +1098,53 @@ export default function SitterDashboardPage() {
             </Card>
 
             <Card className="p-6">
+              <p className="text-sm font-semibold text-slate-500">Profile media</p>
+              <h3 className="mt-2 text-2xl font-black text-slate-900">Photos and gallery</h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Upload profile photos to make your guru page more personal and trusted.
+              </p>
+
+              <div className="mt-6">
+                <MediaUpload
+                  bucket="provider-media"
+                  folder={`provider-profile/${sitter.profile_id || sitter.id}`}
+                  label="Upload Guru Photo"
+                  accept="image/*"
+                  onUploaded={saveProviderMedia}
+                />
+              </div>
+
+              {uploadMessage ? (
+                <p className="mt-3 text-sm font-medium text-emerald-600">{uploadMessage}</p>
+              ) : null}
+
+              <div className="mt-6">
+                {providerMedia.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {providerMedia.map((item) => (
+                      <div
+                        key={item.id}
+                        className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+                      >
+                        <img
+                          src={item.file_url}
+                          alt={item.caption || "Guru photo"}
+                          className="h-32 w-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    No guru photos uploaded yet.
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card className="p-6">
               <p className="text-sm font-semibold text-slate-500">Profile overview</p>
-              <h3 className="mt-2 text-2xl font-black text-slate-900">Public sitter profile</h3>
+              <h3 className="mt-2 text-2xl font-black text-slate-900">Public guru profile</h3>
 
               <div className="mt-6 grid gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -808,13 +1164,13 @@ export default function SitterDashboardPage() {
                       services.map((service) => (
                         <span
                           key={service}
-                          className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200"
+                          className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
                         >
                           {service}
                         </span>
                       ))
                     ) : (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                      <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                         Pet care available
                       </span>
                     )}
@@ -833,7 +1189,7 @@ export default function SitterDashboardPage() {
                   href="/become-a-sitter"
                   className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  Edit sitter setup
+                  Edit guru setup
                 </Link>
               </div>
             </Card>

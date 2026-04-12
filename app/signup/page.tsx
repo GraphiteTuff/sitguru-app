@@ -13,13 +13,54 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [accountType, setAccountType] = useState("Pet Owner");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  function mapAccountTypeToRole(value: string) {
+    if (value === "Pet Owner") return "customer";
+    if (value === "Guru") return "guru";
+    if (value === "Sitter") return "sitter";
+    if (value === "Walker") return "walker";
+    if (value === "Caretaker") return "caretaker";
+    return "customer";
+  }
+
+  async function applyReferralIfPresent({
+    referralCode,
+    profileId,
+    role,
+  }: {
+    referralCode?: string;
+    profileId: string;
+    role: string;
+  }) {
+    if (!referralCode || !referralCode.trim()) {
+      return { success: true, skipped: true };
+    }
+
+    const { data, error } = await supabase.rpc("apply_signup_referral_code", {
+      p_referral_code: referralCode.trim().toUpperCase(),
+      p_referred_profile_id: profileId,
+      p_referred_role: role.toLowerCase(),
+    });
+
+    if (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+
+    return data;
+  }
 
   async function handleSignup(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    const normalizedRole = mapAccountTypeToRole(accountType);
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -29,6 +70,7 @@ export default function SignupPage() {
           first_name: firstName,
           last_name: lastName,
           account_type: accountType,
+          role: normalizedRole,
         },
       },
     });
@@ -47,12 +89,26 @@ export default function SignupPage() {
         first_name: firstName,
         last_name: lastName,
         account_type: accountType,
+        role: normalizedRole,
+        used_referral_code: referralCode.trim()
+          ? referralCode.trim().toUpperCase()
+          : null,
       });
 
       if (profileError) {
         setError(profileError.message);
         setLoading(false);
         return;
+      }
+
+      const referralResult = await applyReferralIfPresent({
+        referralCode,
+        profileId: user.id,
+        role: normalizedRole,
+      });
+
+      if (!referralResult?.success && !referralResult?.skipped) {
+        console.error("Referral code not applied:", referralResult?.message);
       }
     }
 
@@ -66,25 +122,25 @@ export default function SignupPage() {
         <div className="page-container">
           <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_520px] lg:items-start">
             <div className="panel hidden p-8 lg:block">
-              <div className="section-kicker">Join PawNecto</div>
+              <div className="section-kicker">Join SitGuru</div>
 
               <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
                 Create your account and get started with trusted pet care.
               </h1>
 
               <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
-                Sign up as a pet owner or begin your path as a sitter with a
-                cleaner, more modern experience built to grow with PawNecto.
+                Sign up as a pet owner or begin your path as a guru with a
+                cleaner, more modern experience built to grow with SitGuru.
               </p>
             </div>
 
             <div className="panel p-6 sm:p-8">
               <div className="section-kicker">Create account</div>
 
-              <h2 className="mt-4">Start using PawNecto</h2>
+              <h2 className="mt-4">Start using SitGuru</h2>
 
               <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
-                Create an account to book pet care, save favorite sitters, or
+                Create an account to book pet care, save favorite gurus, or
                 begin offering services.
               </p>
 
@@ -149,8 +205,24 @@ export default function SignupPage() {
                     onChange={(e) => setAccountType(e.target.value)}
                   >
                     <option value="Pet Owner">Pet Owner</option>
-                    <option value="Sitter / Walker">Sitter / Walker</option>
+                    <option value="Guru">Guru</option>
+                    <option value="Sitter">Sitter</option>
+                    <option value="Walker">Walker</option>
+                    <option value="Caretaker">Caretaker</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Referral Code (optional)
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter referral code"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  />
                 </div>
 
                 <div>

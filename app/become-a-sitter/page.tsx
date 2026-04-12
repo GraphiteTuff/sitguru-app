@@ -56,7 +56,15 @@ const US_STATES = [
   { code: "WY", name: "Wyoming" },
 ];
 
-export default function BecomeSitterPage() {
+type ProfileRow = {
+  full_name?: string | null;
+  bio?: string | null;
+  city?: string | null;
+  state_code?: string | null;
+  price?: number | null;
+};
+
+export default function BecomeGuruPage() {
   const [user, setUser] = useState<any>(null);
 
   const [fullName, setFullName] = useState("");
@@ -67,31 +75,31 @@ export default function BecomeSitterPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const getUser = async () => {
+    async function getUser() {
       const { data } = await supabase.auth.getUser();
       setUser(data.user);
 
-      if (data.user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", data.user.id)
-          .single();
+      if (!data.user) return;
 
-        if (profile) {
-          setFullName(profile.full_name || "");
-          setBio(profile.bio || "");
-          setCity(profile.city || "");
-          setStateCode(profile.state_code || "");
-          setPrice(profile.price ? String(profile.price) : "");
-        }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, bio, city, state_code, price")
+        .eq("id", data.user.id)
+        .single<ProfileRow>();
+
+      if (profile) {
+        setFullName(profile.full_name || "");
+        setBio(profile.bio || "");
+        setCity(profile.city || "");
+        setStateCode(profile.state_code || "");
+        setPrice(profile.price ? String(profile.price) : "");
       }
-    };
+    }
 
-    getUser();
+    void getUser();
   }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
@@ -118,7 +126,8 @@ export default function BecomeSitterPage() {
         state: selectedState.name,
         state_code: selectedState.code,
         price: Number(price),
-        role: "sitter",
+        role: "guru",
+        account_type: "Guru",
       })
       .eq("id", user.id);
 
@@ -126,16 +135,17 @@ export default function BecomeSitterPage() {
 
     if (error) {
       alert(error.message);
-    } else {
-      alert("Profile updated! 🎉");
+      return;
     }
-  };
+
+    alert("Guru profile updated! 🎉");
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto max-w-lg px-6 py-16">
         <div className="rounded-2xl border bg-white p-8 shadow-sm">
-          <h1 className="mb-6 text-2xl font-bold">Become a Sitter 🐾</h1>
+          <h1 className="mb-6 text-2xl font-bold">Become a Guru 🐾</h1>
 
           <form onSubmit={handleSave} className="space-y-4">
             <input
@@ -191,9 +201,9 @@ export default function BecomeSitterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded bg-slate-900 py-3 text-white hover:bg-black"
+              className="w-full rounded bg-slate-900 py-3 text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Saving..." : "Save Profile"}
+              {loading ? "Saving..." : "Save Guru Profile"}
             </button>
           </form>
         </div>

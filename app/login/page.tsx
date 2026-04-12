@@ -1,15 +1,30 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-export default function AdminLoginPage() {
+export default function LoginPage() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  function isProviderRole(role?: string | null, accountType?: string | null) {
+    const normalizedRole = String(role || "").toLowerCase();
+    const normalizedAccountType = String(accountType || "").toLowerCase();
+
+    return (
+      ["sitter", "walker", "caretaker"].includes(normalizedRole) ||
+      normalizedAccountType.includes("sitter") ||
+      normalizedAccountType.includes("walker") ||
+      normalizedAccountType.includes("caretaker") ||
+      normalizedAccountType.includes("provider")
+    );
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -29,9 +44,10 @@ export default function AdminLoginPage() {
 
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (userError || !user) {
       setError("Login failed.");
       setLoading(false);
       return;
@@ -39,28 +55,45 @@ export default function AdminLoginPage() {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, role")
+      .select("id, role, account_type")
       .eq("id", user.id)
       .single();
 
-    if (profileError || !profile || profile.role !== "admin") {
+    if (profileError || !profile) {
       await supabase.auth.signOut();
-      setError("You do not have admin access.");
+      setError("No customer profile was found for this account.");
       setLoading(false);
       return;
     }
 
-    router.replace("/admin");
+    if (profile.role === "admin") {
+      await supabase.auth.signOut();
+      setError("Please use the Admin Login page.");
+      setLoading(false);
+      return;
+    }
+
+    if (isProviderRole(profile.role, profile.account_type)) {
+      await supabase.auth.signOut();
+      setError("This account is a provider account. Please use Provider Login.");
+      setLoading(false);
+      return;
+    }
+
+    router.push("/dashboard");
+    router.refresh();
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-6">
-          <p className="text-sm font-semibold text-emerald-600">PawNecto Owner Access</p>
-          <h1 className="mt-2 text-3xl font-black text-slate-900">Admin Login</h1>
+          <p className="text-sm font-semibold text-emerald-600">SitGuru Customer Access</p>
+          <h1 className="mt-2 text-3xl font-black text-slate-900">
+            Customer Login
+          </h1>
           <p className="mt-2 text-sm text-slate-600">
-            Secure login for PawNecto owner dashboard.
+            Log in to manage bookings, pet details, messages, and your customer dashboard.
           </p>
         </div>
 
@@ -71,10 +104,10 @@ export default function AdminLoginPage() {
             </label>
             <input
               type="email"
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="owner@pawnecto.com"
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
+              placeholder="you@example.com"
               required
             />
           </div>
@@ -85,12 +118,28 @@ export default function AdminLoginPage() {
             </label>
             <input
               type="password"
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
               placeholder="Enter password"
               required
             />
+          </div>
+
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <Link
+              href="/forgot-password"
+              className="font-semibold text-emerald-600 hover:underline"
+            >
+              Forgot password?
+            </Link>
+
+            <Link
+              href="/phone-login"
+              className="font-semibold text-emerald-600 hover:underline"
+            >
+              Log in with phone code
+            </Link>
           </div>
 
           {error ? (
@@ -104,9 +153,41 @@ export default function AdminLoginPage() {
             disabled={loading}
             className="w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
           >
-            {loading ? "Signing in..." : "Log in to Admin Dashboard"}
+            {loading ? "Signing in..." : "Log in as Customer"}
           </button>
         </form>
+
+        <div className="mt-6 space-y-2 text-sm">
+          <p className="text-slate-600">
+            Are you a provider?{" "}
+            <Link
+              href="/provider/login"
+              className="font-semibold text-emerald-600 hover:text-emerald-700"
+            >
+              Go to Provider Login
+            </Link>
+          </p>
+
+          <p className="text-slate-600">
+            Need an account?{" "}
+            <Link
+              href="/signup"
+              className="font-semibold text-emerald-600 hover:text-emerald-700"
+            >
+              Get started
+            </Link>
+          </p>
+
+          <p className="text-slate-600">
+            Admin access?{" "}
+            <Link
+              href="/admin/login"
+              className="font-semibold text-slate-900 hover:text-emerald-700"
+            >
+              Go to Admin Login
+            </Link>
+          </p>
+        </div>
       </div>
     </main>
   );

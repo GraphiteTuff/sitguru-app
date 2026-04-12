@@ -1,82 +1,78 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
-const bookingSummary = [
-  {
-    label: "Upcoming",
-    value: "3",
-    note: "Confirmed and pending reservations",
-  },
-  {
-    label: "Completed",
-    value: "12",
-    note: "Past care services and stays",
-  },
-  {
-    label: "Pending",
-    value: "1",
-    note: "Waiting on confirmation",
-  },
-];
+type BookingRow = {
+  id: string;
+  provider_profile_id?: string | null;
+  sitter_id?: string | null;
+  pet_name?: string | null;
+  service?: string | null;
+  booking_date?: string | null;
+  status?: string | null;
+  price?: number | null;
+  pet_type?: string | null;
+  city?: string | null;
+  state?: string | null;
+};
 
-const upcomingBookings = [
-  {
-    id: "bk-101",
-    sitter: "Sarah J.",
-    service: "Dog Walking",
-    date: "Tomorrow · 10:00 AM",
-    location: "Quakertown, Pennsylvania",
-    status: "Confirmed",
-    price: "$35",
-  },
-  {
-    id: "bk-102",
-    sitter: "Emily R.",
-    service: "Drop-In Visit",
-    date: "Apr 14 · 2:00 PM",
-    location: "Allentown, Pennsylvania",
-    status: "Pending",
-    price: "$28",
-  },
-  {
-    id: "bk-103",
-    sitter: "Marcus T.",
-    service: "Boarding",
-    date: "Apr 18 · 9:00 AM",
-    location: "Bethlehem, Pennsylvania",
-    status: "Confirmed",
-    price: "$95",
-  },
-];
+type ProfileRow = {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+};
 
-const bookingHistory = [
-  {
-    id: "bk-090",
-    sitter: "Olivia M.",
-    service: "Pet Sitting",
-    date: "Apr 2 · Completed",
-    location: "Doylestown, Pennsylvania",
-    status: "Completed",
-    price: "$80",
-  },
-  {
-    id: "bk-087",
-    sitter: "Noah C.",
-    service: "Dog Walking",
-    date: "Mar 27 · Completed",
-    location: "Quakertown, Pennsylvania",
-    status: "Completed",
-    price: "$30",
-  },
-  {
-    id: "bk-082",
-    sitter: "Chloe B.",
-    service: "House Sitting",
-    date: "Mar 14 · Completed",
-    location: "Allentown, Pennsylvania",
-    status: "Completed",
-    price: "$140",
-  },
-];
+function normalizeStatus(status?: string | null) {
+  const value = String(status || "").toLowerCase();
+
+  if (value === "confirmed") return "Confirmed";
+  if (value === "pending") return "Pending";
+  if (value === "completed") return "Completed";
+  if (value === "approved") return "Approved";
+  if (value === "paid") return "Paid";
+
+  return status || "Pending";
+}
+
+function formatMoney(value?: number | null) {
+  return `$${Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatDateLabel(value?: string | null, status?: string | null) {
+  if (!value) return "Date not set";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  const normalizedStatus = String(status || "").toLowerCase();
+
+  if (normalizedStatus === "completed") {
+    return `${date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    })} · Completed`;
+  }
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function buildLocation(city?: string | null, state?: string | null) {
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  if (state) return state;
+  return "Location not provided";
+}
 
 function StatusBadge({ status }: { status: string }) {
   const classes =
@@ -84,7 +80,9 @@ function StatusBadge({ status }: { status: string }) {
       ? "inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
       : status === "Pending"
         ? "inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700"
-        : "inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700";
+        : status === "Completed"
+          ? "inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+          : "inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700";
 
   return <span className={classes}>{status}</span>;
 }
@@ -155,6 +153,135 @@ function BookingCard({
 }
 
 export default function BookingsPage() {
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [providerMap, setProviderMap] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadBookings() {
+      setLoading(true);
+      setError("");
+
+      const { data: bookingData, error: bookingError } = await supabase
+        .from("bookings")
+        .select(
+          "id, provider_profile_id, sitter_id, pet_name, service, booking_date, status, price, pet_type, city, state"
+        )
+        .order("booking_date", { ascending: true });
+
+      if (bookingError) {
+        setError(bookingError.message);
+        setLoading(false);
+        return;
+      }
+
+      const safeBookings = (bookingData as BookingRow[]) || [];
+      setBookings(safeBookings);
+
+      const providerIds = Array.from(
+        new Set(
+          safeBookings
+            .map((item) => item.provider_profile_id)
+            .filter((value): value is string => Boolean(value))
+        )
+      );
+
+      if (providerIds.length > 0) {
+        const { data: providerData, error: providerError } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .in("id", providerIds);
+
+        if (!providerError && providerData) {
+          const map: Record<string, string> = {};
+
+          (providerData as ProfileRow[]).forEach((provider) => {
+            const fullName = `${provider.first_name || ""} ${provider.last_name || ""}`.trim();
+            map[provider.id] = fullName || "Provider";
+          });
+
+          setProviderMap(map);
+        }
+      }
+
+      setLoading(false);
+    }
+
+    loadBookings();
+  }, []);
+
+  const summary = useMemo(() => {
+    const upcomingStatuses = new Set(["confirmed", "pending"]);
+    const completedStatuses = new Set(["completed"]);
+    const pendingStatuses = new Set(["pending"]);
+
+    const upcoming = bookings.filter((item) =>
+      upcomingStatuses.has(String(item.status || "").toLowerCase())
+    ).length;
+
+    const completed = bookings.filter((item) =>
+      completedStatuses.has(String(item.status || "").toLowerCase())
+    ).length;
+
+    const pending = bookings.filter((item) =>
+      pendingStatuses.has(String(item.status || "").toLowerCase())
+    ).length;
+
+    return [
+      {
+        label: "Upcoming",
+        value: String(upcoming),
+        note: "Confirmed and pending reservations",
+      },
+      {
+        label: "Completed",
+        value: String(completed),
+        note: "Past care services and stays",
+      },
+      {
+        label: "Pending",
+        value: String(pending),
+        note: "Waiting on confirmation",
+      },
+    ];
+  }, [bookings]);
+
+  const upcomingBookings = useMemo(() => {
+    return bookings
+      .filter((item) => {
+        const status = String(item.status || "").toLowerCase();
+        return status === "confirmed" || status === "pending";
+      })
+      .map((item) => ({
+        id: item.id,
+        sitter:
+          (item.provider_profile_id && providerMap[item.provider_profile_id]) ||
+          "Provider",
+        service: item.service || "Pet Care",
+        date: formatDateLabel(item.booking_date, item.status),
+        location: buildLocation(item.city, item.state),
+        status: normalizeStatus(item.status),
+        price: formatMoney(item.price),
+      }));
+  }, [bookings, providerMap]);
+
+  const bookingHistory = useMemo(() => {
+    return bookings
+      .filter((item) => String(item.status || "").toLowerCase() === "completed")
+      .map((item) => ({
+        id: item.id,
+        sitter:
+          (item.provider_profile_id && providerMap[item.provider_profile_id]) ||
+          "Provider",
+        service: item.service || "Pet Care",
+        date: formatDateLabel(item.booking_date, item.status),
+        location: buildLocation(item.city, item.state),
+        status: normalizeStatus(item.status),
+        price: formatMoney(item.price),
+      }));
+  }, [bookings, providerMap]);
+
   return (
     <main className="page-shell">
       <section className="border-b border-slate-200 bg-white">
@@ -173,7 +300,7 @@ export default function BookingsPage() {
       <section className="section-space">
         <div className="page-container">
           <div className="card-grid-3">
-            {bookingSummary.map((item) => (
+            {summary.map((item) => (
               <div key={item.label} className="panel p-5 sm:p-6">
                 <p className="text-sm font-semibold text-slate-500">{item.label}</p>
                 <p className="mt-3 text-4xl font-black tracking-tight text-slate-900">
@@ -188,6 +315,12 @@ export default function BookingsPage() {
 
       <section className="section-space pt-0">
         <div className="page-container">
+          {error ? (
+            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+              {error}
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_380px]">
             <div className="grid gap-6">
               <div className="panel p-6 sm:p-7">
@@ -198,14 +331,24 @@ export default function BookingsPage() {
                 </p>
 
                 <div className="mt-6 grid gap-4">
-                  {upcomingBookings.map((booking) => (
-                    <BookingCard
-                      key={booking.id}
-                      booking={booking}
-                      primaryAction={{ href: "/dashboard", label: "View details" }}
-                      secondaryAction={{ href: "/search", label: "Find more care" }}
-                    />
-                  ))}
+                  {loading ? (
+                    <div className="muted-panel p-4 text-sm text-slate-500">
+                      Loading bookings...
+                    </div>
+                  ) : upcomingBookings.length > 0 ? (
+                    upcomingBookings.map((booking) => (
+                      <BookingCard
+                        key={booking.id}
+                        booking={booking}
+                        primaryAction={{ href: "/dashboard", label: "View details" }}
+                        secondaryAction={{ href: "/search", label: "Find more care" }}
+                      />
+                    ))
+                  ) : (
+                    <div className="muted-panel p-4 text-sm text-slate-500">
+                      No upcoming bookings yet.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -217,14 +360,24 @@ export default function BookingsPage() {
                 </p>
 
                 <div className="mt-6 grid gap-4">
-                  {bookingHistory.map((booking) => (
-                    <BookingCard
-                      key={booking.id}
-                      booking={booking}
-                      primaryAction={{ href: "/search", label: "Book again" }}
-                      secondaryAction={{ href: "/dashboard", label: "Account details" }}
-                    />
-                  ))}
+                  {loading ? (
+                    <div className="muted-panel p-4 text-sm text-slate-500">
+                      Loading history...
+                    </div>
+                  ) : bookingHistory.length > 0 ? (
+                    bookingHistory.map((booking) => (
+                      <BookingCard
+                        key={booking.id}
+                        booking={booking}
+                        primaryAction={{ href: "/search", label: "Book again" }}
+                        secondaryAction={{ href: "/dashboard", label: "Account details" }}
+                      />
+                    ))
+                  ) : (
+                    <div className="muted-panel p-4 text-sm text-slate-500">
+                      No completed bookings yet.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -283,7 +436,7 @@ export default function BookingsPage() {
                 Consistent booking UI makes the whole app easier to trust and use.
               </h2>
               <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                Standardized cards, status badges, and actions help PawNecto feel organized and user-friendly across every flow.
+                Standardized cards, status badges, and actions help SitGuru feel organized and user-friendly across every flow.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/search" className="btn-primary w-full sm:w-auto">
