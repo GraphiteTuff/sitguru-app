@@ -61,7 +61,7 @@ function getDisplayName(profile?: {
   );
 }
 
-async function getProfileById(userId: string) {
+async function getProfileById(userId: string): Promise<ProfileLookupRow | null> {
   if (!userId) return null;
 
   const { data, error } = await supabaseAdmin
@@ -494,7 +494,7 @@ export async function POST(req: NextRequest) {
       recipientUserId: target.userId,
       conversationId,
       senderName:
-        getDisplayName(currentProfile) ||
+        getDisplayName(currentProfile ?? undefined) ||
         safeString(user.user_metadata?.full_name) ||
         safeString(user.email) ||
         "SitGuru User",

@@ -6,6 +6,11 @@ export const dynamic = "force-dynamic";
 
 type GenericRow = Record<string, any>;
 
+type QueryResult = {
+  data: GenericRow[] | null;
+  error: any;
+};
+
 function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -155,6 +160,13 @@ async function getCustomerProfile(userId: string): Promise<GenericRow | null> {
   return data[0] as GenericRow;
 }
 
+function createPetQueryResultPromise(query: PromiseLike<any>): Promise<QueryResult> {
+  return Promise.resolve(query).then((result: any) => ({
+    data: (result?.data ?? null) as GenericRow[] | null,
+    error: result?.error ?? null,
+  }));
+}
+
 async function findMatchingPet({
   explicitPetId,
   petName,
@@ -177,43 +189,51 @@ async function findMatchingPet({
 
   const normalizedPetName = normalizeText(petName);
   const candidates: GenericRow[] = [];
-  const queries: Array<Promise<{ data: GenericRow[] | null; error: any }>> = [];
+  const queries: Promise<QueryResult>[] = [];
 
   if (userId) {
     queries.push(
-      supabaseAdmin
-        .from("pets")
-        .select("*")
-        .eq("owner_id", userId)
-        .ilike("name", petName)
-        .limit(20)
+      createPetQueryResultPromise(
+        supabaseAdmin
+          .from("pets")
+          .select("*")
+          .eq("owner_id", userId)
+          .ilike("name", petName)
+          .limit(20)
+      )
     );
 
     queries.push(
-      supabaseAdmin
-        .from("pets")
-        .select("*")
-        .eq("owner_id", userId)
-        .limit(50)
+      createPetQueryResultPromise(
+        supabaseAdmin
+          .from("pets")
+          .select("*")
+          .eq("owner_id", userId)
+          .limit(50)
+      )
     );
   }
 
   if (profileId) {
     queries.push(
-      supabaseAdmin
-        .from("pets")
-        .select("*")
-        .eq("owner_profile_id", profileId)
-        .ilike("name", petName)
-        .limit(20)
+      createPetQueryResultPromise(
+        supabaseAdmin
+          .from("pets")
+          .select("*")
+          .eq("owner_profile_id", profileId)
+          .ilike("name", petName)
+          .limit(20)
+      )
     );
 
     queries.push(
-      supabaseAdmin
-        .from("pets")
-        .select("*")
-        .eq("owner_profile_id", profileId)
-        .limit(50)
+      createPetQueryResultPromise(
+        supabaseAdmin
+          .from("pets")
+          .select("*")
+          .eq("owner_profile_id", profileId)
+          .limit(50)
+      )
     );
   }
 
