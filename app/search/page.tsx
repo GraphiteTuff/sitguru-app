@@ -1,13 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
+import { useSearchParams } from "next/navigation";
 import ProviderMap from "@/components/ProviderMap";
 import { supabase } from "@/lib/supabase";
 
 type GuruRow = {
-  id: string;
+  id: number;
+  user_id?: string | null;
   slug?: string | null;
+  display_name?: string | null;
   full_name?: string | null;
   title?: string | null;
   bio?: string | null;
@@ -15,28 +24,49 @@ type GuruRow = {
   state?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  hourly_rate?: number | null;
   rate?: number | null;
   experience_years?: number | null;
   is_verified?: boolean | null;
-  is_active?: boolean | null;
-  services?: string[] | null;
-  image_url?: string | null;
+  rating_avg?: number | null;
   rating?: number | null;
   review_count?: number | null;
-  response_time?: string | null;
+  profile_photo_url?: string | null;
+  image_url?: string | null;
+  is_public?: boolean | null;
+  is_active?: boolean | null;
+  services?: string[] | null;
 };
+
+type Marker = {
+  id: string;
+  lat: number;
+  lng: number;
+};
+
+const SERVICE_OPTIONS = [
+  "Dog Walking",
+  "Pet Sitting",
+  "Boarding",
+  "Doggy Day Care",
+  "Drop-In Visits",
+  "House Sitting",
+  "Training Support",
+  "Medication Help",
+  "Custom Care",
+];
 
 function Card({
   children,
   className = "",
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & {
-  children: React.ReactNode;
+}: HTMLAttributes<HTMLDivElement> & {
+  children: ReactNode;
   className?: string;
 }) {
   return (
     <div
-      className={`rounded-3xl border border-slate-200 bg-white shadow-sm ${className}`}
+      className={`rounded-[28px] border border-slate-200 bg-white shadow-sm ${className}`}
       {...props}
     >
       {children}
@@ -51,74 +81,76 @@ function formatLocation(city?: string | null, state?: string | null) {
   return "Location not listed";
 }
 
-function getLocationLabel(guru: GuruRow) {
-  return formatLocation(guru.city, guru.state);
+function formatRate(rate?: number | null) {
+  if (typeof rate !== "number") return "Rate not listed";
+  return `$${rate}/hr`;
 }
 
-function getStarFillPercent(index: number, rating?: number | null) {
-  if (typeof rating !== "number") return 0;
-  const safeRating = Math.max(0, Math.min(5, rating));
-  const starStart = index;
-  const fill = Math.max(0, Math.min(1, safeRating - starStart));
-  return fill * 100;
+function getGuruName(guru: GuruRow) {
+  return guru.display_name || guru.full_name || "Guru";
 }
 
-function StarIcon({
-  fillPercent,
-  size = 16,
-  uniqueId,
-}: {
-  fillPercent: number;
-  size?: number;
-  uniqueId: string;
-}) {
-  const starPath =
-    "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
+function getGuruPhotoUrl(guru: GuruRow) {
+  return guru.profile_photo_url || guru.image_url || "";
+}
 
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      className="shrink-0"
-      aria-hidden="true"
-    >
-      <defs>
-        <clipPath id={uniqueId}>
-          <rect x="0" y="0" width={`${fillPercent}%`} height="24" />
-        </clipPath>
-      </defs>
-      <path d={starPath} fill="#e2e8f0" />
-      <path d={starPath} fill="#f59e0b" clipPath={`url(#${uniqueId})`} />
-    </svg>
+function getGuruHref(guru: GuruRow) {
+  if (guru.slug) return `/guru/${guru.slug}`;
+  return `/guru/${guru.id}`;
+}
+
+function getGuruRating(guru: GuruRow) {
+  if (typeof guru.rating_avg === "number") return guru.rating_avg;
+  if (typeof guru.rating === "number") return guru.rating;
+  return 0;
+}
+
+function getGuruRate(guru: GuruRow) {
+  if (typeof guru.hourly_rate === "number") return guru.hourly_rate;
+  if (typeof guru.rate === "number") return guru.rate;
+  return null;
+}
+
+function matchesService(guru: GuruRow, selectedService: string) {
+  if (!selectedService) return true;
+
+  const services = guru.services || [];
+  if (!services.length) return false;
+
+  return services.some(
+    (service) => service.toLowerCase() === selectedService.toLowerCase()
   );
 }
 
-function Stars({ rating, providerId }: { rating?: number | null; providerId: string }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {[0, 1, 2, 3, 4].map((index) => (
-        <StarIcon
-          key={index}
-          fillPercent={getStarFillPercent(index, rating)}
-          uniqueId={`star-${providerId}-${index}`}
-        />
-      ))}
-    </div>
-  );
-}
-
-function isTopRated(rating?: number | null) {
-  return typeof rating === "number" && rating >= 4.8;
+function normalizeText(value?: string | null) {
+  return (value || "").trim().toLowerCase();
 }
 
 export default function SearchPage() {
+  const searchParams = useSearchParams();
+
+  const initialService = searchParams.get("service") || "";
+  const initialCity = searchParams.get("city") || "";
+  const initialState = searchParams.get("state") || "";
+
   const [gurus, setGurus] = useState<GuruRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [serviceFilter, setServiceFilter] = useState(initialService);
+  const [cityFilter, setCityFilter] = useState(initialCity);
+  const [stateFilter, setStateFilter] = useState(initialState);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState("all");
-  const [highlightedProviderId, setHighlightedProviderId] = useState<string | null>(null);
+
+  const [highlightedGuruId, setHighlightedGuruId] = useState<string | undefined>(
+    undefined
+  );
+
+  useEffect(() => {
+    setServiceFilter(initialService);
+    setCityFilter(initialCity);
+    setStateFilter(initialState);
+  }, [initialService, initialCity, initialState]);
 
   useEffect(() => {
     async function loadGurus() {
@@ -127,30 +159,36 @@ export default function SearchPage() {
 
       const { data, error } = await supabase
         .from("gurus")
-        .select(`
-          id,
-          slug,
-          full_name,
-          title,
-          bio,
-          city,
-          state,
-          latitude,
-          longitude,
-          rate,
-          experience_years,
-          is_verified,
-          is_active,
-          services,
-          image_url,
-          rating,
-          review_count,
-          response_time
-        `)
-        .eq("is_active", true)
-        .not("latitude", "is", null)
-        .not("longitude", "is", null)
-        .order("rating", { ascending: false });
+        .select(
+          `
+            id,
+            user_id,
+            slug,
+            display_name,
+            full_name,
+            title,
+            bio,
+            city,
+            state,
+            latitude,
+            longitude,
+            hourly_rate,
+            rate,
+            experience_years,
+            is_verified,
+            rating_avg,
+            rating,
+            review_count,
+            profile_photo_url,
+            image_url,
+            is_public,
+            is_active,
+            services
+          `
+        )
+        .or("is_public.eq.true,is_active.eq.true")
+        .order("is_verified", { ascending: false })
+        .order("rating_avg", { ascending: false, nullsFirst: false });
 
       if (error) {
         setError(error.message);
@@ -165,288 +203,382 @@ export default function SearchPage() {
     loadGurus();
   }, []);
 
-  const locationOptions = useMemo(() => {
-    const uniqueLocations = Array.from(
-      new Set(
-        gurus
-          .map((guru) => getLocationLabel(guru))
-          .filter((location) => location && location !== "Location not listed"),
-      ),
-    ).sort((a, b) => a.localeCompare(b));
-
-    return uniqueLocations;
-  }, [gurus]);
-
   const filteredGurus = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
+    const query = normalizeText(searchTerm);
+    const city = normalizeText(cityFilter);
+    const state = normalizeText(stateFilter);
 
     return gurus.filter((guru) => {
-      const matchesSearch = !q
-        ? true
-        : [
-            guru.full_name,
-            guru.title,
-            guru.bio,
-            guru.city,
-            guru.state,
-            ...(guru.services || []),
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(q);
+      const guruName = normalizeText(getGuruName(guru));
+      const guruCity = normalizeText(guru.city);
+      const guruState = normalizeText(guru.state);
+      const guruBio = normalizeText(guru.bio);
+      const guruTitle = normalizeText(guru.title);
+      const guruServices = (guru.services || []).join(" ").toLowerCase();
 
-      const matchesLocation =
-        selectedLocation === "all" ? true : getLocationLabel(guru) === selectedLocation;
+      const matchesText =
+        !query ||
+        [guruName, guruCity, guruState, guruBio, guruTitle, guruServices]
+          .join(" ")
+          .includes(query);
 
-      return matchesSearch && matchesLocation;
+      const matchesCityFilter = !city || guruCity.includes(city);
+      const matchesStateFilter = !state || guruState.includes(state);
+      const matchesSelectedService = matchesService(guru, serviceFilter);
+
+      return (
+        matchesText &&
+        matchesCityFilter &&
+        matchesStateFilter &&
+        matchesSelectedService
+      );
     });
-  }, [gurus, searchTerm, selectedLocation]);
+  }, [gurus, searchTerm, cityFilter, stateFilter, serviceFilter]);
 
-  const markers = useMemo(
-    () =>
-      filteredGurus
-        .filter(
-          (guru) =>
-            typeof guru.latitude === "number" && typeof guru.longitude === "number",
-        )
-        .map((guru) => ({
-          id: guru.id,
-          lat: Number(guru.latitude),
-          lng: Number(guru.longitude),
-          title: guru.full_name || "Provider",
-          subtitle: getLocationLabel(guru),
-        })),
-    [filteredGurus],
-  );
+  const markers: Marker[] = filteredGurus
+    .filter(
+      (guru) =>
+        typeof guru.latitude === "number" && typeof guru.longitude === "number"
+    )
+    .map((guru) => ({
+      id: String(guru.id),
+      lat: guru.latitude as number,
+      lng: guru.longitude as number,
+    }));
 
-  const mapCenter = useMemo(() => {
-    const highlighted = markers.find((marker) => marker.id === highlightedProviderId);
+  const mapCenter =
+    markers.length > 0
+      ? { lat: markers[0].lat, lng: markers[0].lng }
+      : { lat: 39.9526, lng: -75.1652 };
 
-    if (highlighted) {
-      return { lat: highlighted.lat, lng: highlighted.lng };
-    }
-
-    if (markers.length > 0) {
-      return { lat: markers[0].lat, lng: markers[0].lng };
-    }
-
-    return { lat: 39.9526, lng: -75.1652 }; // Default to Philadelphia area
-  }, [markers, highlightedProviderId]);
+  const activeFilterCount = [
+    serviceFilter,
+    cityFilter.trim(),
+    stateFilter.trim(),
+    searchTerm.trim(),
+  ].filter(Boolean).length;
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="rounded-3xl bg-gradient-to-r from-emerald-700 via-emerald-600 to-cyan-600 px-6 py-8 text-white shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-100">
-            SitGuru Search
-          </p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-            Find trusted pet care near you
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm text-emerald-50 sm:text-base">
-            Browse active SitGuru providers and see where they are located on the map.
-          </p>
-
-          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by provider, service, city, or state"
-              className="w-full rounded-2xl border border-white/20 bg-white px-4 py-3 text-slate-900 outline-none focus:border-white"
-            />
-
-            <select
-              value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
-              className="w-full rounded-2xl border border-white/20 bg-white px-4 py-3 text-slate-900 outline-none focus:border-white"
-            >
-              <option value="all">All locations</option>
-              {locationOptions.map((location) => (
-                <option key={location} value={location}>
-                  {location}
-                </option>
-              ))}
-            </select>
-          </div>
+    <main className="min-h-screen bg-slate-50">
+      <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
+          <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-slate-200/40 blur-3xl" />
         </div>
 
-        {error ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+        <div className="relative mx-auto max-w-7xl px-6 py-10 sm:py-12">
+          <div className="max-w-4xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-700">
+              Find a Guru
+            </p>
+
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+              Search trusted local pet care with more confidence
+            </h1>
+
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700 sm:text-lg">
+              Browse SitGuru providers by service, city, state, and profile
+              details. Compare Gurus in a cleaner, more modern search experience
+              built for pet parents.
+            </p>
           </div>
+
+          <Card className="mt-8 p-5 sm:p-6">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_1fr_1fr_1.25fr_auto]">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-800">
+                  Service
+                </label>
+                <select
+                  value={serviceFilter}
+                  onChange={(e) => setServiceFilter(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500"
+                >
+                  <option value="">All services</option>
+                  {SERVICE_OPTIONS.map((service) => (
+                    <option key={service} value={service}>
+                      {service}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-800">
+                  City
+                </label>
+                <input
+                  type="text"
+                  value={cityFilter}
+                  onChange={(e) => setCityFilter(e.target.value)}
+                  placeholder="Quakertown"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-800">
+                  State
+                </label>
+                <input
+                  type="text"
+                  value={stateFilter}
+                  onChange={(e) => setStateFilter(e.target.value)}
+                  placeholder="Pennsylvania"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-800">
+                  Search profile details
+                </label>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Name, bio, title, services"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setServiceFilter("");
+                    setCityFilter("");
+                    setStateFilter("");
+                    setSearchTerm("");
+                  }}
+                  className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 xl:w-auto"
+                >
+                  Clear filters
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
+                {filteredGurus.length} Guru{filteredGurus.length === 1 ? "" : "s"} found
+              </span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
+                {activeFilterCount} active filter{activeFilterCount === 1 ? "" : "s"}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
+                Mobile-friendly search
+              </span>
+            </div>
+          </Card>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-8 sm:py-10">
+        {error ? (
+          <Card className="p-6">
+            <p className="font-medium text-red-600">{error}</p>
+          </Card>
         ) : null}
 
         {loading ? (
-          <Card className="p-8">
-            <p className="text-lg font-semibold text-slate-900">Loading providers...</p>
+          <Card className="p-6">
+            <p className="text-slate-600">Loading Gurus...</p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-            <div className="space-y-4">
-              <Card className="p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-500">Active providers</p>
-                    <h2 className="text-2xl font-black text-slate-900">
-                      {filteredGurus.length}
-                    </h2>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-                      Map synced
-                    </div>
-                    {selectedLocation !== "all" ? (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedLocation("all")}
-                        className="rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        Clear location
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              </Card>
-
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+            <div className="space-y-5">
               {filteredGurus.length === 0 ? (
-                <Card className="p-6">
-                  <p className="text-sm text-slate-600">
-                    No providers matched your current search or location filter.
+                <Card className="p-7">
+                  <h2 className="text-xl font-bold text-slate-900">
+                    No Gurus found
+                  </h2>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
+                    Try changing the service, city, state, or profile search.
+                    You can also clear the filters and browse all available
+                    Gurus.
                   </p>
+
+                  <div className="mt-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setServiceFilter("");
+                        setCityFilter("");
+                        setStateFilter("");
+                        setSearchTerm("");
+                      }}
+                      className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      Reset Search
+                    </button>
+                  </div>
                 </Card>
               ) : (
                 filteredGurus.map((guru) => {
-                  const href = guru.slug ? `/guru/${guru.slug}` : `/guru/${guru.id}`;
-                  const isHighlighted = highlightedProviderId === guru.id;
+                  const photoUrl = getGuruPhotoUrl(guru);
+                  const guruName = getGuruName(guru);
+                  const guruRate = getGuruRate(guru);
+                  const guruRating = getGuruRating(guru);
+                  const services = guru.services || [];
 
                   return (
-                    <Link key={guru.id} href={href} className="block">
-                      <Card
-                        className={`overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md ${
-                          isHighlighted ? "ring-2 ring-emerald-500" : ""
-                        }`}
-                        onMouseEnter={() => setHighlightedProviderId(guru.id)}
-                        onMouseLeave={() => setHighlightedProviderId(null)}
-                      >
-                        <div className="p-5">
-                          <div className="flex gap-4">
-                            <div className="h-20 w-20 overflow-hidden rounded-3xl bg-slate-100">
-                              {guru.image_url ? (
-                                <img
-                                  src={guru.image_url}
-                                  alt={guru.full_name || "Provider"}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-2xl font-black text-slate-400">
-                                  {(guru.full_name || "P").slice(0, 1).toUpperCase()}
+                    <Card
+                      key={guru.id}
+                      className="overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                      onMouseEnter={() => setHighlightedGuruId(String(guru.id))}
+                      onMouseLeave={() => setHighlightedGuruId(undefined)}
+                    >
+                      <div className="flex h-full flex-col md:flex-row">
+                        <div className="h-64 w-full shrink-0 overflow-hidden bg-slate-100 md:h-[320px] md:w-72">
+                          {photoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={photoUrl}
+                              alt={guruName}
+                              className="h-full w-full object-cover object-center"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-sm font-medium text-slate-400">
+                              No Image
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex min-w-0 flex-1 flex-col justify-between p-6">
+                          <div>
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl">
+                                    {guruName}
+                                  </h2>
+
+                                  {guru.is_verified ? (
+                                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                      Verified
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                                      Trusted
+                                    </span>
+                                  )}
                                 </div>
-                              )}
+
+                                <p className="mt-2 text-base text-slate-600">
+                                  {guru.title || "Pet Care Guru"}
+                                </p>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {formatLocation(guru.city, guru.state)}
+                                </p>
+                              </div>
+
+                              <div className="grid shrink-0 grid-cols-2 gap-2 sm:min-w-[180px]">
+                                <div className="rounded-2xl bg-slate-50 px-3 py-3 text-center">
+                                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Rating
+                                  </div>
+                                  <div className="mt-1 text-lg font-bold text-slate-900">
+                                    {guruRating > 0 ? guruRating.toFixed(1) : "New"}
+                                  </div>
+                                </div>
+
+                                <div className="rounded-2xl bg-slate-50 px-3 py-3 text-center">
+                                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Reviews
+                                  </div>
+                                  <div className="mt-1 text-lg font-bold text-slate-900">
+                                    {guru.review_count || 0}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="text-lg font-black text-slate-900">
-                                      {guru.full_name || "Provider"}
-                                    </h3>
-                                    {isTopRated(guru.rating) ? (
-                                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-700">
-                                        Top Rated
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <p className="text-sm font-semibold text-emerald-700">
-                                    {guru.title || "Trusted pet caregiver"}
-                                  </p>
-                                </div>
+                            <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-700">
+                              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-medium">
+                                {formatRate(guruRate)}
+                              </span>
 
-                                {guru.is_verified ? (
-                                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                    Verified
-                                  </span>
-                                ) : null}
-                              </div>
+                              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-medium">
+                                {guru.experience_years
+                                  ? `${guru.experience_years}+ years experience`
+                                  : "Experience not listed"}
+                              </span>
+                            </div>
 
-                              <p className="mt-2 text-sm text-slate-500">
-                                {formatLocation(guru.city, guru.state)}
-                              </p>
-
-                              <div className="mt-2 flex items-center gap-2">
-                                <Stars rating={guru.rating} providerId={guru.id} />
-                                <span className="text-sm font-semibold text-slate-700">
-                                  {typeof guru.rating === "number"
-                                    ? guru.rating.toFixed(1)
-                                    : "--"}
-                                </span>
-                                <span className="text-xs text-slate-500">
-                                  ({typeof guru.review_count === "number" ? guru.review_count : 0})
-                                </span>
-                              </div>
-
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {(guru.services || []).slice(0, 3).map((service) => (
+                            {services.length > 0 ? (
+                              <div className="mt-5 flex flex-wrap gap-2">
+                                {services.slice(0, 5).map((service) => (
                                   <span
                                     key={service}
-                                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700"
+                                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
                                   >
                                     {service}
                                   </span>
                                 ))}
                               </div>
+                            ) : null}
 
-                              <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-                                <div className="rounded-2xl bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    From
-                                  </p>
-                                  <p className="mt-1 font-black text-slate-900">
-                                    {typeof guru.rate === "number" ? `$${guru.rate}` : "--"}
-                                  </p>
-                                </div>
-
-                                <div className="rounded-2xl bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold text-slate-500">Rating</p>
-                                  <p className="mt-1 font-black text-slate-900">
-                                    {typeof guru.rating === "number"
-                                      ? guru.rating.toFixed(1)
-                                      : "--"}
-                                  </p>
-                                </div>
-
-                                <div className="rounded-2xl bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold text-slate-500">Response</p>
-                                  <p className="mt-1 truncate font-black text-slate-900">
-                                    {guru.response_time || "--"}
-                                  </p>
-                                </div>
-                              </div>
+                            <div className="mt-5">
+                              {guru.bio ? (
+                                <p className="line-clamp-4 text-sm leading-7 text-slate-600 sm:text-base">
+                                  {guru.bio}
+                                </p>
+                              ) : (
+                                <p className="text-sm leading-7 text-slate-500 sm:text-base">
+                                  This Guru has not added a bio yet.
+                                </p>
+                              )}
                             </div>
                           </div>
+
+                          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                            <Link
+                              href={getGuruHref(guru)}
+                              className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                            >
+                              View Guru Profile
+                            </Link>
+
+                            <Link
+                              href={getGuruHref(guru)}
+                              className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                            >
+                              Book or Learn More
+                            </Link>
+                          </div>
                         </div>
-                      </Card>
-                    </Link>
+                      </div>
+                    </Card>
                   );
                 })
               )}
             </div>
 
             <div className="xl:sticky xl:top-6 xl:self-start">
-              <Card className="overflow-hidden p-3">
-                <ProviderMap
-                  markers={markers}
-                  center={[mapCenter.lat, mapCenter.lng]}
-                  highlightedMarkerId={highlightedProviderId}
-                />
-              </Card>
+              <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-5 py-4">
+                  <h2 className="text-lg font-bold text-slate-900">Map view</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Hover over a Guru card to highlight their location.
+                  </p>
+                </div>
+
+                <div className="min-h-[420px] sm:min-h-[520px] xl:min-h-[900px]">
+                  <ProviderMap
+                    markers={markers}
+                    center={[mapCenter.lat, mapCenter.lng]}
+                    highlightedMarkerId={highlightedGuruId}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
-      </div>
+      </section>
     </main>
   );
 }

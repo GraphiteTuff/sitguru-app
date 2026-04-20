@@ -1,8 +1,5 @@
-export default function AdminBookingsPage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">Admin Bookings</h1>
-      <p>Bookings management page (coming soon)</p>
-    </div>
-  );
+import { redirect } from "next/navigation";
+
+export default function BookingsPage() {
+  redirect("/bookings/new");
 }

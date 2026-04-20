@@ -1,0 +1,39 @@
+.platform-dark-surface h1,
+.platform-dark-surface h2,
+.platform-dark-surface h3,
+.platform-dark-surface h4,
+.platform-dark-surface h5,
+.platform-dark-surface h6 {
+  color: #ffffff !important;
+}
+
+.platform-dark-surface .text-slate-900,
+.platform-dark-surface .text-slate-800,
+.platform-dark-surface .text-slate-700 {
+  color: #ffffff !important;
+}
+
+.platform-dark-surface .text-slate-600,
+.platform-dark-surface .text-slate-500,
+.platform-dark-surface .text-slate-400 {
+  color: #e2e8f0 !important;
+}
+
+.platform-dark-surface .text-slate-300 {
+  color: #f1f5f9 !important;
+}
+
+.platform-dark-surface label {
+  color: #f8fafc !important;
+}
+
+.platform-dark-surface input,
+.platform-dark-surface textarea,
+.platform-dark-surface select {
+  color: #ffffff !important;
+}
+
+.platform-dark-surface input::placeholder,
+.platform-dark-surface textarea::placeholder {
+  color: #94a3b8 !important;
+}

@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix default Leaflet marker icons (Next.js + Leaflet common issue)
+// Fix default Leaflet icons (very common issue in Next.js)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
@@ -13,8 +13,8 @@ L.Icon.Default.mergeOptions({
 });
 
 export default function MapContent({
-  markers,
-  center = [39.9526, -75.1652], // Default to Philadelphia
+  markers = [],
+  center = [39.9526, -75.1652], // Default: Philadelphia
   highlightedMarkerId,
 }: {
   markers: any[];
@@ -25,7 +25,7 @@ export default function MapContent({
     <MapContainer
       center={center}
       zoom={12}
-      style={{ height: "100%", width: "100%", minHeight: "400px" }}
+      style={{ height: "100%", width: "100%", minHeight: "420px", borderRadius: "24px" }}
       className="rounded-3xl"
     >
       <TileLayer
@@ -33,25 +33,13 @@ export default function MapContent({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {markers.map((marker) => (
+      {markers.map((marker: any) => (
         <Marker
           key={marker.id}
-          position={[marker.latitude, marker.longitude]}
-          // Use default icon or create a simple custom one
-          icon={
-            highlightedMarkerId === marker.id
-              ? new L.Icon({
-                  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-                  iconSize: [25, 41],
-                  iconAnchor: [12, 41],
-                })
-              : undefined // Let Leaflet use default
-          }
+          position={[marker.latitude || 0, marker.longitude || 0]}
         >
           <Popup>
-            <strong>{marker.full_name || "Guru"}</strong>
-            <br />
-            {marker.title}
+            <strong>{marker.full_name || marker.title || "Guru"}</strong>
             <br />
             {marker.city}, {marker.state}
           </Popup>

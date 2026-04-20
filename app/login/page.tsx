@@ -1,192 +1,177 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { login } from "@/app/auth/actions";
 
 export default function LoginPage() {
-  const router = useRouter();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  function isProviderRole(role?: string | null, accountType?: string | null) {
-    const normalizedRole = String(role || "").toLowerCase();
-    const normalizedAccountType = String(accountType || "").toLowerCase();
-
-    return (
-      ["sitter", "walker", "caretaker"].includes(normalizedRole) ||
-      normalizedAccountType.includes("sitter") ||
-      normalizedAccountType.includes("walker") ||
-      normalizedAccountType.includes("caretaker") ||
-      normalizedAccountType.includes("provider")
-    );
-  }
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError) {
-      setError(signInError.message);
-      setLoading(false);
-      return;
-    }
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      setError("Login failed.");
-      setLoading(false);
-      return;
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, role, account_type")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      await supabase.auth.signOut();
-      setError("No customer profile was found for this account.");
-      setLoading(false);
-      return;
-    }
-
-    if (profile.role === "admin") {
-      await supabase.auth.signOut();
-      setError("Please use the Admin Login page.");
-      setLoading(false);
-      return;
-    }
-
-    if (isProviderRole(profile.role, profile.account_type)) {
-      await supabase.auth.signOut();
-      setError("This account is a provider account. Please use Provider Login.");
-      setLoading(false);
-      return;
-    }
-
-    router.push("/dashboard");
-    router.refresh();
-  }
-
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-6">
-          <p className="text-sm font-semibold text-emerald-600">SitGuru Customer Access</p>
-          <h1 className="mt-2 text-3xl font-black text-slate-900">
-            Customer Login
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Log in to manage bookings, pet details, messages, and your customer dashboard.
-          </p>
-        </div>
+    <main className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-emerald-50 px-4 py-8 md:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-[80vh] w-full max-w-6xl items-center justify-center">
+        <div className="grid w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl md:grid-cols-2">
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
-              placeholder="you@example.com"
-              required
-            />
-          </div>
+          {/* LEFT SIDE */}
+          <div className="flex flex-col justify-between border-b border-slate-200 bg-gradient-to-br from-emerald-400 via-emerald-300 to-sky-200 p-8 md:border-b-0 md:border-r">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-900">
+                SitGuru
+              </p>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
-              placeholder="Enter password"
-              required
-            />
-          </div>
+              <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
+                Customer Login
+              </h1>
 
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <Link
-              href="/forgot-password"
-              className="font-semibold text-emerald-600 hover:underline"
-            >
-              Forgot password?
-            </Link>
-
-            <Link
-              href="/phone-login"
-              className="font-semibold text-emerald-600 hover:underline"
-            >
-              Log in with phone code
-            </Link>
-          </div>
-
-          {error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
+              <p className="mt-4 max-w-md text-sm leading-6 text-slate-700">
+                Log in to manage bookings, pet details, messages, and your
+                dashboard in one easy place.
+              </p>
             </div>
-          ) : null}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-          >
-            {loading ? "Signing in..." : "Log in as Customer"}
-          </button>
-        </form>
+            <div className="mt-8 grid gap-4">
+              <div className="rounded-2xl bg-white/70 p-4 backdrop-blur-sm">
+                <p className="text-sm font-semibold text-slate-900">
+                  🐾 Manage bookings
+                </p>
+                <p className="mt-1 text-sm text-slate-700">
+                  View upcoming services and care details.
+                </p>
+              </div>
 
-        <div className="mt-6 space-y-2 text-sm">
-          <p className="text-slate-600">
-            Are you a provider?{" "}
-            <Link
-              href="/provider/login"
-              className="font-semibold text-emerald-600 hover:text-emerald-700"
-            >
-              Go to Provider Login
-            </Link>
-          </p>
+              <div className="rounded-2xl bg-white/70 p-4 backdrop-blur-sm">
+                <p className="text-sm font-semibold text-slate-900">
+                  💬 Message your Guru
+                </p>
+                <p className="mt-1 text-sm text-slate-700">
+                  Stay connected with updates and notes.
+                </p>
+              </div>
 
-          <p className="text-slate-600">
-            Need an account?{" "}
-            <Link
-              href="/signup"
-              className="font-semibold text-emerald-600 hover:text-emerald-700"
-            >
-              Get started
-            </Link>
-          </p>
+              <div className="rounded-2xl bg-white/70 p-4 backdrop-blur-sm">
+                <p className="text-sm font-semibold text-slate-900">
+                  🐶 Keep pet info ready
+                </p>
+                <p className="mt-1 text-sm text-slate-700">
+                  Faster booking with saved pet profiles.
+                </p>
+              </div>
+            </div>
+          </div>
 
-          <p className="text-slate-600">
-            Admin access?{" "}
-            <Link
-              href="/admin/login"
-              className="font-semibold text-slate-900 hover:text-emerald-700"
-            >
-              Go to Admin Login
-            </Link>
-          </p>
+          {/* RIGHT SIDE */}
+          <div className="p-8 md:p-10">
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-900">
+                Welcome back
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Sign in to your customer account.
+              </p>
+            </div>
+
+            <form action={login} className="mt-8 space-y-5">
+              <input type="hidden" name="next" value="/dashboard" />
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Email
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="customer@sitguru.com"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <Link
+                  href="/forgot-password"
+                  className="text-emerald-700 hover:text-emerald-600"
+                >
+                  Forgot password?
+                </Link>
+
+                <Link
+                  href="/phone-login"
+                  className="text-emerald-700 hover:text-emerald-600"
+                >
+                  Log in with phone code
+                </Link>
+              </div>
+
+              <button
+                type="submit"
+                className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
+              >
+                Log in to Customer Portal
+              </button>
+            </form>
+
+            {/* 🔥 NEW GURU CTA */}
+            <div className="mt-8 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 p-5">
+              <p className="text-sm font-semibold text-slate-900">
+                Want to earn with SitGuru?
+              </p>
+
+              <h3 className="mt-1 text-lg font-bold text-slate-900">
+                Become a Guru Today 🚀
+              </h3>
+
+              <p className="mt-2 text-sm text-slate-600">
+                Set your own rates, manage your schedule, and grow your pet care
+                business.
+              </p>
+
+              <Link
+                href="/become-a-guru"
+                className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-400"
+              >
+                Start Your Guru Profile
+              </Link>
+            </div>
+
+            {/* Switch login */}
+            <div className="mt-4 text-sm text-slate-600">
+              Need guru access?{" "}
+              <Link
+                href="/guru/login"
+                className="font-medium text-emerald-700 hover:text-emerald-600"
+              >
+                Go to guru login
+              </Link>
+            </div>
+
+            <div className="mt-2 text-sm text-slate-600">
+              Need an account?{" "}
+              <Link
+                href="/signup"
+                className="font-medium text-emerald-700 hover:text-emerald-600"
+              >
+                Get started
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </main>

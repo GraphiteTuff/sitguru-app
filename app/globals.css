@@ -384,8 +384,9 @@ p {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
 /* =========================================
-   🎯 ROLE-BASED THEME SYSTEM (NEW)
+   ROLE-BASED THEME SYSTEM
 ========================================= */
 
 /* Default (Customer / Public) */
@@ -406,7 +407,7 @@ p {
   color: #e2e8f0;
 }
 
-/* 🔥 DARK MODE CARD SYSTEM */
+/* DARK MODE CARD SYSTEM */
 .admin-theme .panel,
 .guru-theme .panel {
   background: linear-gradient(180deg, #020617 0%, #020617 100%);
@@ -426,7 +427,7 @@ p {
   border: 1px solid #1e293b;
 }
 
-/* 🔥 TEXT ADJUSTMENTS */
+/* DARK TYPOGRAPHY ONLY FOR TRUE DARK SURFACES */
 .admin-theme h1,
 .admin-theme h2,
 .admin-theme h3,
@@ -446,7 +447,7 @@ p {
   color: #94a3b8;
 }
 
-/* 🔥 BUTTON ADJUSTMENTS */
+/* DARK BUTTON ADJUSTMENTS */
 .admin-theme .btn-secondary,
 .guru-theme .btn-secondary {
   background: #020617;
@@ -460,7 +461,7 @@ p {
   border-color: #475569;
 }
 
-/* 🔥 INPUTS */
+/* DARK INPUTS */
 .admin-theme .input,
 .guru-theme .input,
 .admin-theme .select,
@@ -473,20 +474,204 @@ p {
 }
 
 .admin-theme .input::placeholder,
-.guru-theme .input::placeholder {
+.guru-theme .input::placeholder,
+.admin-theme .textarea::placeholder,
+.guru-theme .textarea::placeholder {
   color: #64748b;
 }
 
-/* 🔥 GLASS / UI */
+/* DARK GLASS / UI */
 .admin-theme .glass,
 .guru-theme .glass {
   background: rgba(2, 6, 23, 0.7);
   border: 1px solid #1e293b;
 }
 
-/* 🔥 HEADER OVERRIDE (IMPORTANT) */
+/* HEADER OVERRIDE */
 .admin-theme header,
 .guru-theme header {
   background: #020617 !important;
   border-bottom: 1px solid #1e293b !important;
+}
+
+/* =========================================
+   PUBLIC PAGE LOCK
+   Keeps marketing pages readable without
+   destroying intentionally dark sections/cards
+========================================= */
+
+.public-page,
+.site-shell.public-page,
+.page-shell.public-page {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 45%, #f1f5f9 100%);
+  color: #0f172a;
+}
+
+/* Only restore light public pages when nested inside dark wrappers */
+.admin-theme .public-page,
+.guru-theme .public-page {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 45%, #f1f5f9 100%) !important;
+  color: #0f172a !important;
+}
+
+/* Preserve standard light-page text utilities inside public pages */
+.admin-theme .public-page .text-slate-950,
+.guru-theme .public-page .text-slate-950 {
+  color: #020617 !important;
+}
+
+.admin-theme .public-page .text-slate-900,
+.guru-theme .public-page .text-slate-900 {
+  color: #0f172a !important;
+}
+
+.admin-theme .public-page .text-slate-800,
+.guru-theme .public-page .text-slate-800 {
+  color: #1e293b !important;
+}
+
+.admin-theme .public-page .text-slate-700,
+.guru-theme .public-page .text-slate-700 {
+  color: #334155 !important;
+}
+
+.admin-theme .public-page .text-slate-600,
+.guru-theme .public-page .text-slate-600 {
+  color: #475569 !important;
+}
+
+.admin-theme .public-page .text-slate-500,
+.guru-theme .public-page .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Preserve explicit dark-card / dark-section text on public pages */
+.public-page .text-white,
+.admin-theme .public-page .text-white,
+.guru-theme .public-page .text-white {
+  color: #ffffff !important;
+}
+
+.public-page .text-slate-50,
+.admin-theme .public-page .text-slate-50,
+.guru-theme .public-page .text-slate-50 {
+  color: #f8fafc !important;
+}
+
+.public-page .text-slate-100,
+.admin-theme .public-page .text-slate-100,
+.guru-theme .public-page .text-slate-100 {
+  color: #f1f5f9 !important;
+}
+
+.public-page .text-slate-200,
+.admin-theme .public-page .text-slate-200,
+.guru-theme .public-page .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+
+.public-page .text-slate-300,
+.admin-theme .public-page .text-slate-300,
+.guru-theme .public-page .text-slate-300 {
+  color: #cbd5e1 !important;
+}
+
+.public-page .text-slate-400,
+.admin-theme .public-page .text-slate-400,
+.guru-theme .public-page .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+.public-page .text-emerald-300,
+.admin-theme .public-page .text-emerald-300,
+.guru-theme .public-page .text-emerald-300 {
+  color: #6ee7b7 !important;
+}
+
+.public-page .text-emerald-400,
+.admin-theme .public-page .text-emerald-400,
+.guru-theme .public-page .text-emerald-400 {
+  color: #34d399 !important;
+}
+
+.public-page .text-emerald-800,
+.admin-theme .public-page .text-emerald-800,
+.guru-theme .public-page .text-emerald-800 {
+  color: #065f46 !important;
+}
+
+/* Keep public light cards light when nested inside dark themes */
+.admin-theme .public-page .panel,
+.admin-theme .public-page .panel-soft,
+.admin-theme .public-page .muted-panel,
+.guru-theme .public-page .panel,
+.guru-theme .public-page .panel-soft,
+.guru-theme .public-page .muted-panel {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 10px 30px rgba(15, 23, 42, 0.04) !important;
+}
+
+/* Keep public form controls readable */
+.admin-theme .public-page .input,
+.admin-theme .public-page .select,
+.admin-theme .public-page .textarea,
+.guru-theme .public-page .input,
+.guru-theme .public-page .select,
+.guru-theme .public-page .textarea {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.admin-theme .public-page .input::placeholder,
+.admin-theme .public-page .textarea::placeholder,
+.guru-theme .public-page .input::placeholder,
+.guru-theme .public-page .textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Explicitly dark sections/cards inside public pages */
+.public-dark-section,
+.public-dark-section h1,
+.public-dark-section h2,
+.public-dark-section h3,
+.public-dark-section h4,
+.public-dark-section h5,
+.public-dark-section h6 {
+  color: #ffffff !important;
+}
+
+.public-dark-section p {
+  color: #e2e8f0 !important;
+}
+
+.public-dark-section .text-white {
+  color: #ffffff !important;
+}
+
+.public-dark-section .text-slate-100 {
+  color: #f1f5f9 !important;
+}
+
+.public-dark-section .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+
+.public-dark-section .text-slate-300 {
+  color: #cbd5e1 !important;
+}
+
+.public-dark-section .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+.public-dark-section .text-emerald-300 {
+  color: #6ee7b7 !important;
+}
+
+.public-dark-section .text-emerald-400 {
+  color: #34d399 !important;
 }
