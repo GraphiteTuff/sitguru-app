@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  Suspense,
   useEffect,
   useMemo,
   useState,
@@ -126,7 +127,7 @@ function normalizeText(value?: string | null) {
   return (value || "").trim().toLowerCase();
 }
 
-export default function SearchPage() {
+function SearchPageContent() {
   const searchParams = useSearchParams();
 
   const initialService = searchParams.get("service") || "";
@@ -580,5 +581,77 @@ export default function SearchPage() {
         )}
       </section>
     </main>
+  );
+}
+
+function SearchPageFallback() {
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
+          <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-slate-200/40 blur-3xl" />
+        </div>
+
+        <div className="relative mx-auto max-w-7xl px-6 py-10 sm:py-12">
+          <div className="max-w-4xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-700">
+              Find a Guru
+            </p>
+
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+              Search trusted local pet care with more confidence
+            </h1>
+
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700 sm:text-lg">
+              Browse SitGuru providers by service, city, state, and profile
+              details. Compare Gurus in a cleaner, more modern search experience
+              built for pet parents.
+            </p>
+          </div>
+
+          <Card className="mt-8 p-5 sm:p-6">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_1fr_1fr_1.25fr_auto]">
+              <div className="h-[72px] rounded-2xl bg-slate-100" />
+              <div className="h-[72px] rounded-2xl bg-slate-100" />
+              <div className="h-[72px] rounded-2xl bg-slate-100" />
+              <div className="h-[72px] rounded-2xl bg-slate-100" />
+              <div className="h-[72px] rounded-2xl bg-slate-100" />
+            </div>
+          </Card>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-8 sm:py-10">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="space-y-5">
+            <Card className="p-7">
+              <p className="text-slate-600">Loading Gurus...</p>
+            </Card>
+          </div>
+
+          <div className="xl:sticky xl:top-6 xl:self-start">
+            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <h2 className="text-lg font-bold text-slate-900">Map view</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Loading locations...
+                </p>
+              </div>
+
+              <div className="min-h-[420px] bg-slate-100 sm:min-h-[520px] xl:min-h-[900px]" />
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchPageFallback />}>
+      <SearchPageContent />
+    </Suspense>
   );
 }

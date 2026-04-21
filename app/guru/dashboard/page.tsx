@@ -441,8 +441,10 @@ async function getGuruBookings(guruId: string | number) {
   return [];
 }
 
-async function enrichBookingsWithPetMedia(bookings: BookingRow[]) {
-  if (!bookings.length) return [] as EnrichedBookingRow[];
+async function enrichBookingsWithPetMedia(
+  bookings: BookingRow[]
+): Promise<EnrichedBookingRow[]> {
+  if (!bookings.length) return [];
 
   const petIds = Array.from(
     new Set(
@@ -453,7 +455,7 @@ async function enrichBookingsWithPetMedia(bookings: BookingRow[]) {
   );
 
   if (petIds.length === 0) {
-    return bookings.map((booking) => ({
+    return bookings.map<EnrichedBookingRow>((booking) => ({
       ...booking,
       resolved_pet_photo_url: booking.pet_photo_url || null,
     }));
@@ -466,7 +468,7 @@ async function enrichBookingsWithPetMedia(bookings: BookingRow[]) {
     .order("created_at", { ascending: false });
 
   if (error || !data) {
-    return bookings.map((booking) => ({
+    return bookings.map<EnrichedBookingRow>((booking) => ({
       ...booking,
       resolved_pet_photo_url: booking.pet_photo_url || null,
     }));
@@ -485,7 +487,7 @@ async function enrichBookingsWithPetMedia(bookings: BookingRow[]) {
     petImageMap.set(petId, row.file_url);
   }
 
-  return bookings.map((booking) => {
+  return bookings.map<EnrichedBookingRow>((booking) => {
     const petId = String(booking.pet_id || "").trim();
 
     return {
@@ -621,13 +623,11 @@ async function getGuruConversations(
   });
 
   const adminConversations = mapped.filter(
-    (conversation) =>
-      conversation.otherUserRole.toLowerCase() === "admin"
+    (conversation) => conversation.otherUserRole.toLowerCase() === "admin"
   );
 
   const customerConversations = mapped.filter(
-    (conversation) =>
-      conversation.otherUserRole.toLowerCase() !== "admin"
+    (conversation) => conversation.otherUserRole.toLowerCase() !== "admin"
   );
 
   return {
@@ -770,32 +770,31 @@ export default async function GuruDashboardPage() {
                   {guruProfile?.state || ""}
                 </p>
                 <p className="mt-3 text-sm leading-6 text-slate-300">
-                  Changes you make to your public profile should feed the
-                  customer-facing experience and remain visible to Admin.
+                  Changes you make to your public profile should appear on the
+                  customer-facing Guru page and remain aligned with Admin review.
                 </p>
               </div>
 
               <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                  Profile completion
-                </p>
-                <div className="mt-3 flex items-end justify-between gap-4">
-                  <p className="text-3xl font-black text-white">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+                    Profile completion
+                  </p>
+                  <span className="text-sm font-bold text-white">
                     {profileCompletion}%
-                  </p>
-                  <p className="text-sm font-medium text-slate-300">
-                    Customer-side ready
-                  </p>
+                  </span>
                 </div>
+
                 <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full rounded-full bg-emerald-500"
                     style={{ width: `${profileCompletion}%` }}
                   />
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-300">
-                  The stronger your profile, the better it can present on the
-                  customer side and inside admin review.
+
+                <p className="mt-4 text-sm leading-6 text-slate-300">
+                  The stronger your profile, the better it presents to customers
+                  and Admin alike.
                 </p>
               </div>
             </div>
@@ -803,18 +802,6 @@ export default async function GuruDashboardPage() {
         </section>
 
         <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-              Total bookings
-            </p>
-            <p className="mt-3 text-3xl font-black text-white">
-              {enrichedBookings.length}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Live booking records attached to your Guru dashboard.
-            </p>
-          </div>
-
           <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">
               Pending
@@ -848,6 +835,18 @@ export default async function GuruDashboardPage() {
             </p>
             <p className="mt-2 text-sm leading-6 text-slate-300">
               Finished services that still feed reporting and admin oversight.
+            </p>
+          </div>
+
+          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+              Services
+            </p>
+            <p className="mt-3 text-3xl font-black text-white">
+              {services.length}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Public service categories currently visible on your Guru profile.
             </p>
           </div>
         </section>
@@ -888,10 +887,14 @@ export default async function GuruDashboardPage() {
                   {recentBookings.map((booking, index) => {
                     const status = String(getBookingStatus(booking));
                     const petName = getPetName(booking);
+                    const bookingKey =
+                      typeof booking.id === "string" || typeof booking.id === "number"
+                        ? String(booking.id)
+                        : `${getCustomerName(booking)}-${index}`;
 
                     return (
                       <div
-                        key={booking.id || `${getCustomerName(booking)}-${index}`}
+                        key={bookingKey}
                         className="min-h-[132px] rounded-[22px] border border-white/10 bg-slate-950/40 p-5"
                       >
                         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

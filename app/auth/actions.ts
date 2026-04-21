@@ -73,7 +73,7 @@ function getSafeNextPath(value: FormDataEntryValue | null, fallback: string) {
   return raw;
 }
 
-function redirectWithError(loginPage: string, message: string) {
+function redirectWithError(loginPage: string, message: string): never {
   redirect(`${loginPage}?error=${encodeURIComponent(message)}`);
 }
 
@@ -203,11 +203,7 @@ export async function login(formData: FormData) {
       ? String(formData.get("password"))
       : "";
 
-  const next = getSafeNextPath(
-    formData.get("next"),
-    "/customer/dashboard"
-  );
-
+  const next = getSafeNextPath(formData.get("next"), "/customer/dashboard");
   const fallbackLoginPage = getLoginPageFromNext(next);
 
   if (!email || !password) {
@@ -240,12 +236,13 @@ export async function login(formData: FormData) {
     redirectWithError(fallbackLoginPage, "Unable to load user");
   }
 
+  const userId = user.id;
   const roleSet = new Set<string>();
 
   const { data: roleRows } = await supabase
     .from("user_roles")
     .select("role")
-    .eq("user_id", user.id);
+    .eq("user_id", userId);
 
   for (const row of roleRows || []) {
     if (typeof row.role === "string" && row.role.trim()) {
@@ -256,7 +253,7 @@ export async function login(formData: FormData) {
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   if (profile?.role && typeof profile.role === "string") {
@@ -266,7 +263,7 @@ export async function login(formData: FormData) {
   const { data: guruRow } = await supabase
     .from("gurus")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (guruRow?.id) {
