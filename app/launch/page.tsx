@@ -4,45 +4,41 @@ import { useMemo, useState } from "react";
 import confetti from "canvas-confetti";
 
 function fireLaunchConfetti() {
-  const duration = 1800;
-  const animationEnd = Date.now() + duration;
+  const end = Date.now() + 2200;
 
-  const defaults = {
-    startVelocity: 38,
-    spread: 360,
-    ticks: 90,
-    zIndex: 9999,
-    scalar: 1.15,
+  const frame = () => {
+    confetti({
+      particleCount: 28,
+      angle: 60,
+      spread: 80,
+      origin: { x: 0, y: 0.55 },
+      scalar: 1.2,
+      zIndex: 9999,
+    });
+
+    confetti({
+      particleCount: 28,
+      angle: 120,
+      spread: 80,
+      origin: { x: 1, y: 0.55 },
+      scalar: 1.2,
+      zIndex: 9999,
+    });
+
+    confetti({
+      particleCount: 24,
+      spread: 110,
+      origin: { x: 0.5, y: 0.18 },
+      scalar: 1.1,
+      zIndex: 9999,
+    });
+
+    if (Date.now() < end) {
+      requestAnimationFrame(frame);
+    }
   };
 
-  const interval = window.setInterval(() => {
-    const timeLeft = animationEnd - Date.now();
-
-    if (timeLeft <= 0) {
-      window.clearInterval(interval);
-      return;
-    }
-
-    const particleCount = Math.max(18, Math.floor((timeLeft / duration) * 55));
-
-    confetti({
-      ...defaults,
-      particleCount,
-      origin: { x: 0.2, y: 0.25 },
-    });
-
-    confetti({
-      ...defaults,
-      particleCount,
-      origin: { x: 0.8, y: 0.25 },
-    });
-
-    confetti({
-      ...defaults,
-      particleCount: Math.max(12, Math.floor(particleCount * 0.8)),
-      origin: { x: 0.5, y: 0.18 },
-    });
-  }, 220);
+  frame();
 }
 
 export default function LaunchPage() {
@@ -110,6 +106,28 @@ export default function LaunchPage() {
       );
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleShare() {
+    const shareData = {
+      title: "SitGuru",
+      text: "Something New is Coming to Pet Care. Join the SitGuru waitlist.",
+      url: typeof window !== "undefined" ? window.location.href : "",
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareData.url);
+        alert("Launch page link copied.");
+      }
+    } catch {
+      // ignore cancel/share failures
     }
   }
 
@@ -196,6 +214,12 @@ export default function LaunchPage() {
                   {error}
                 </div>
               ) : null}
+
+              {success ? (
+                <div className="mt-3 rounded-[16px] border border-emerald-200 bg-white/95 px-4 py-3 text-sm font-medium text-emerald-700 shadow-md">
+                  {success}
+                </div>
+              ) : null}
             </form>
           </div>
         </div>
@@ -204,8 +228,24 @@ export default function LaunchPage() {
       {showSuccessModal ? (
         <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-900/45 px-4">
           <div className="w-full max-w-md rounded-[32px] border border-emerald-100 bg-white p-8 text-center shadow-[0_30px_80px_rgba(15,23,42,0.28)]">
+            <div className="mx-auto mb-4 flex justify-center">
+              <img
+                src="/images/sitguru-logo-cropped.png"
+                alt="SitGuru logo"
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+
             <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 shadow-inner">
-              <span className="text-4xl">🎉</span>
+              <svg
+                viewBox="0 0 24 24"
+                className="h-10 w-10 text-emerald-600"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="m5 13 4 4L19 7" />
+              </svg>
             </div>
 
             <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-600">
@@ -226,13 +266,32 @@ export default function LaunchPage() {
               Fresh, trusted pet care for Pet Parents and Gurus.
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowSuccessModal(false)}
-              className="mt-7 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-3.5 text-base font-bold text-white transition hover:bg-emerald-700"
-            >
-              Awesome
-            </button>
+            <div className="mt-7 grid gap-3">
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-3.5 text-base font-bold text-white transition hover:bg-emerald-700"
+              >
+                Follow us on Instagram
+              </a>
+
+              <button
+                type="button"
+                onClick={handleShare}
+                className="inline-flex w-full items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3.5 text-base font-bold text-emerald-700 transition hover:bg-emerald-50"
+              >
+                Share with a Pet Parent
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowSuccessModal(false)}
+                className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-6 py-3.5 text-base font-bold text-white transition hover:bg-slate-800"
+              >
+                Awesome
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
