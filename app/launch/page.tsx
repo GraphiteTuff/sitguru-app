@@ -77,10 +77,12 @@ export default function LaunchPage() {
       }
 
       setSuccess("You're on the list. We'll let you know when SitGuru launches.");
+      setError("");
       setName("");
       setEmail("");
       fireLaunchConfetti();
     } catch (err) {
+      setSuccess("");
       setError(
         err instanceof Error
           ? err.message
@@ -92,97 +94,96 @@ export default function LaunchPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7faf8] px-4 py-6 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f7faf8] px-3 py-4 sm:px-4 sm:py-6">
       <div className="mx-auto max-w-[1143px]">
-        <div className="overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-[0_20px_70px_rgba(16,185,129,0.08)]">
+        <div className="relative w-full overflow-hidden rounded-[24px] bg-white shadow-[0_20px_70px_rgba(16,185,129,0.08)]">
           <img
             src="/images/pre-launch-page.png"
             alt="SitGuru pre-launch page"
-            className="h-auto w-full object-contain"
+            className="block h-auto w-full select-none object-contain"
+            draggable={false}
           />
-        </div>
 
-        <section className="mx-auto mt-8 max-w-3xl rounded-[32px] border border-emerald-100 bg-white p-6 shadow-[0_20px_70px_rgba(16,185,129,0.10)] sm:p-8">
-          <div className="mb-6 text-center">
-            <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
-              Join the Waitlist
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              Be first in line for launch news.
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label
-                htmlFor="launch-name"
-                className="mb-2 block text-sm font-semibold text-slate-700"
-              >
-                Name
-              </label>
-              <input
-                id="launch-name"
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Your name"
-                autoComplete="name"
-                className="w-full rounded-[22px] border border-emerald-100 bg-white px-4 py-4 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="launch-email"
-                className="mb-2 block text-sm font-semibold text-slate-700"
-              >
-                Email Address
-              </label>
-              <input
-                id="launch-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="Email Address"
-                autoComplete="email"
-                className="w-full rounded-[22px] border border-emerald-100 bg-white px-4 py-4 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-              />
-            </div>
-
-            {error ? (
-              <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                {error}
-              </div>
-            ) : null}
-
-            {success ? (
-              <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                {success}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="inline-flex w-full items-center justify-center rounded-[24px] bg-emerald-600 px-6 py-4 text-xl font-black text-white shadow-[0_16px_30px_rgba(16,185,129,0.24)] transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+          <div className="absolute inset-0">
+            <form
+              onSubmit={handleSubmit}
+              className="absolute"
+              style={{
+                top: "39.8%",
+                right: "8.9%",
+                width: "34.5%",
+              }}
             >
-              {buttonLabel}
-            </button>
+              <div className="space-y-6">
+                <div>
+                  <label htmlFor="launch-name" className="sr-only">
+                    Name
+                  </label>
+                  <input
+                    id="launch-name"
+                    type="text"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    autoComplete="name"
+                    placeholder="Name"
+                    className="block w-full rounded-[18px] border border-transparent bg-transparent px-4 text-slate-800 outline-none"
+                    style={{
+                      height: "clamp(40px, 5vw, 60px)",
+                      paddingLeft: "clamp(42px, 4.7vw, 58px)",
+                      fontSize: "clamp(16px, 1.7vw, 18px)",
+                    }}
+                  />
+                </div>
 
-            <p className="text-center text-base leading-7 text-slate-500">
-              For <span className="font-semibold text-slate-700">Pet Parents</span> and{" "}
-              <span className="font-semibold text-slate-700">Gurus*</span>.
-            </p>
-          </form>
-        </section>
+                <div>
+                  <label htmlFor="launch-email" className="sr-only">
+                    Email Address
+                  </label>
+                  <input
+                    id="launch-email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    autoComplete="email"
+                    placeholder="Email Address"
+                    className="block w-full rounded-[18px] border border-transparent bg-transparent px-4 text-slate-800 outline-none"
+                    style={{
+                      height: "clamp(40px, 5vw, 60px)",
+                      paddingLeft: "clamp(42px, 4.7vw, 58px)",
+                      fontSize: "clamp(16px, 1.7vw, 18px)",
+                    }}
+                  />
+                </div>
 
-        <div className="mx-auto mt-8 max-w-4xl text-center">
-          <p className="text-sm leading-7 text-slate-600">
-            <span className="font-bold text-emerald-700">*What is a Guru?</span>{" "}
-            A Guru is a trusted pet care provider on the SitGuru network offering
-            services like pet sitting, dog walking, boarding, daycare, drop-ins,
-            and more.
-          </p>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="block w-full rounded-[22px] font-extrabold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+                  style={{
+                    height: "clamp(54px, 6.1vw, 82px)",
+                    fontSize: "clamp(22px, 2.3vw, 28px)",
+                    background:
+                      "linear-gradient(180deg, rgb(32, 191, 78) 0%, rgb(14, 170, 72) 100%)",
+                    boxShadow: "0 12px 30px rgba(16, 185, 129, 0.22)",
+                  }}
+                >
+                  {buttonLabel}
+                </button>
+              </div>
+
+              {error ? (
+                <div className="mt-3 rounded-[16px] border border-rose-200 bg-white/95 px-4 py-3 text-sm font-medium text-rose-700 shadow-md">
+                  {error}
+                </div>
+              ) : null}
+
+              {success ? (
+                <div className="mt-3 rounded-[16px] border border-emerald-200 bg-white/95 px-4 py-3 text-sm font-medium text-emerald-700 shadow-md">
+                  {success}
+                </div>
+              ) : null}
+            </form>
+          </div>
         </div>
       </div>
     </main>
