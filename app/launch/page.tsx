@@ -4,27 +4,45 @@ import { useMemo, useState } from "react";
 import confetti from "canvas-confetti";
 
 function fireLaunchConfetti() {
-  const count = 180;
+  const duration = 1800;
+  const animationEnd = Date.now() + duration;
+
   const defaults = {
-    origin: { y: 0.72 },
+    startVelocity: 38,
+    spread: 360,
+    ticks: 90,
+    zIndex: 9999,
+    scalar: 1.15,
   };
 
-  function fire(
-    particleRatio: number,
-    options: Record<string, number | boolean | { y: number }>
-  ) {
+  const interval = window.setInterval(() => {
+    const timeLeft = animationEnd - Date.now();
+
+    if (timeLeft <= 0) {
+      window.clearInterval(interval);
+      return;
+    }
+
+    const particleCount = Math.max(18, Math.floor((timeLeft / duration) * 55));
+
     confetti({
       ...defaults,
-      ...options,
-      particleCount: Math.floor(count * particleRatio),
+      particleCount,
+      origin: { x: 0.2, y: 0.25 },
     });
-  }
 
-  fire(0.25, { spread: 26, startVelocity: 55 });
-  fire(0.2, { spread: 60 });
-  fire(0.25, { spread: 100, decay: 0.92, scalar: 0.95 });
-  fire(0.15, { spread: 120, startVelocity: 30, decay: 0.91, scalar: 1.08 });
-  fire(0.15, { spread: 135, startVelocity: 45 });
+    confetti({
+      ...defaults,
+      particleCount,
+      origin: { x: 0.8, y: 0.25 },
+    });
+
+    confetti({
+      ...defaults,
+      particleCount: Math.max(12, Math.floor(particleCount * 0.8)),
+      origin: { x: 0.5, y: 0.18 },
+    });
+  }, 220);
 }
 
 export default function LaunchPage() {
@@ -33,6 +51,7 @@ export default function LaunchPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const buttonLabel = useMemo(() => {
     if (isSubmitting) return "Joining...";
@@ -76,11 +95,12 @@ export default function LaunchPage() {
         throw new Error(data?.error || "Unable to join the waitlist right now.");
       }
 
-      setSuccess("You're on the list. We'll let you know when SitGuru launches.");
+      setSuccess("You're on the list.");
       setError("");
       setName("");
       setEmail("");
       fireLaunchConfetti();
+      setShowSuccessModal(true);
     } catch (err) {
       setSuccess("");
       setError(
@@ -176,16 +196,46 @@ export default function LaunchPage() {
                   {error}
                 </div>
               ) : null}
-
-              {success ? (
-                <div className="mt-3 rounded-[16px] border border-emerald-200 bg-white/95 px-4 py-3 text-sm font-medium text-emerald-700 shadow-md">
-                  {success}
-                </div>
-              ) : null}
             </form>
           </div>
         </div>
       </div>
+
+      {showSuccessModal ? (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-900/45 px-4">
+          <div className="w-full max-w-md rounded-[32px] border border-emerald-100 bg-white p-8 text-center shadow-[0_30px_80px_rgba(15,23,42,0.28)]">
+            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 shadow-inner">
+              <span className="text-4xl">🎉</span>
+            </div>
+
+            <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-600">
+              You&apos;re In
+            </p>
+
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-900">
+              Welcome to SitGuru.com!
+            </h2>
+
+            <p className="mt-4 text-base leading-7 text-slate-600">
+              You&apos;re officially on the list.
+              <br />
+              We&apos;ll let you know as soon as SitGuru launches.
+            </p>
+
+            <div className="mt-6 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+              Fresh, trusted pet care for Pet Parents and Gurus.
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowSuccessModal(false)}
+              className="mt-7 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-3.5 text-base font-bold text-white transition hover:bg-emerald-700"
+            >
+              Awesome
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
