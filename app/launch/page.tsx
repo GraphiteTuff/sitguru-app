@@ -67,7 +67,6 @@ type LaunchFormCardProps = {
   onEmailChange: (value: string) => void;
   onInterestChange: (value: InterestType) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-  className?: string;
 };
 
 function LaunchFormCard({
@@ -80,12 +79,9 @@ function LaunchFormCard({
   onEmailChange,
   onInterestChange,
   onSubmit,
-  className = "",
 }: LaunchFormCardProps) {
   return (
-    <section
-      className={`rounded-[30px] border border-emerald-100 bg-white/95 p-5 shadow-[0_24px_60px_rgba(16,185,129,0.14)] backdrop-blur-sm sm:p-6 ${className}`}
-    >
+    <section className="rounded-[30px] border border-emerald-100 bg-white/95 p-5 shadow-[0_24px_60px_rgba(16,185,129,0.14)] backdrop-blur-sm sm:p-6">
       <div className="mb-5 text-center">
         <p className="text-[14px] font-black uppercase tracking-[0.28em] text-emerald-700 sm:text-[15px]">
           Join the Waitlist
@@ -273,13 +269,12 @@ export default function LaunchPage() {
       <div className="mx-auto max-w-[1180px]">
         <div className="relative overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_rgba(16,185,129,0.10)]">
           <img
-            src="/images/pre-launch-page.png"
+            src="/images/pre-launch-page-clean.png"
             alt="SitGuru pre-launch page"
             className="block h-auto w-full select-none object-contain"
             draggable={false}
           />
 
-          {/* Desktop: replace the top-right signup area */}
           <div className="pointer-events-none absolute inset-0 hidden lg:block">
             <div className="pointer-events-auto absolute right-[5.2%] top-[11.2%] w-[36.5%]">
               <LaunchFormCard
@@ -297,7 +292,6 @@ export default function LaunchPage() {
           </div>
         </div>
 
-        {/* Mobile / tablet: single live form below image */}
         <div className="mx-auto mt-6 max-w-2xl lg:hidden">
           <LaunchFormCard
             fullName={fullName}
