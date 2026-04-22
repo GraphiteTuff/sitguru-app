@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import confetti from "canvas-confetti";
 
 function fireLaunchConfetti() {
@@ -45,21 +45,13 @@ export default function LaunchPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-  const buttonLabel = useMemo(() => {
-    if (isSubmitting) return "Joining...";
-    if (success) return "You're In 🎉";
-    return "Join the Waitlist";
-  }, [isSubmitting, success]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setError("");
-    setSuccess("");
 
     const trimmedName = name.trim();
     const trimmedEmail = email.trim().toLowerCase();
@@ -91,14 +83,11 @@ export default function LaunchPage() {
         throw new Error(data?.error || "Unable to join the waitlist right now.");
       }
 
-      setSuccess("You're on the list.");
-      setError("");
       setName("");
       setEmail("");
       fireLaunchConfetti();
       setShowSuccessModal(true);
     } catch (err) {
-      setSuccess("");
       setError(
         err instanceof Error
           ? err.message
@@ -127,7 +116,7 @@ export default function LaunchPage() {
         alert("Launch page link copied.");
       }
     } catch {
-      // ignore cancel/share failures
+      // ignore
     }
   }
 
@@ -205,19 +194,13 @@ export default function LaunchPage() {
                     boxShadow: "0 12px 30px rgba(16, 185, 129, 0.22)",
                   }}
                 >
-                  {buttonLabel}
+                  {isSubmitting ? "Joining..." : "Join the Waitlist"}
                 </button>
               </div>
 
               {error ? (
                 <div className="mt-3 rounded-[16px] border border-rose-200 bg-white/95 px-4 py-3 text-sm font-medium text-rose-700 shadow-md">
                   {error}
-                </div>
-              ) : null}
-
-              {success ? (
-                <div className="mt-3 rounded-[16px] border border-emerald-200 bg-white/95 px-4 py-3 text-sm font-medium text-emerald-700 shadow-md">
-                  {success}
                 </div>
               ) : null}
             </form>
