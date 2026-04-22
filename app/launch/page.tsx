@@ -276,7 +276,7 @@ export default function LaunchPage() {
           />
 
           <div className="pointer-events-none absolute inset-0 hidden lg:block">
-            <div className="pointer-events-auto absolute right-[6.5%] top-[17.5%] w-[31.5%]">
+            <div className="pointer-events-auto absolute right-[6.8%] top-[20.5%] w-[31.2%]">
               <LaunchFormCard
                 fullName={fullName}
                 email={email}
