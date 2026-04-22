@@ -18,7 +18,7 @@ function normalizeInterestType(value: string) {
 function normalizeSource(value: string) {
   const normalized = value.toLowerCase();
 
-  if (!normalized) return "direct";
+  if (!normalized) return "launch-page";
   if (normalized.length > 50) return normalized.slice(0, 50);
 
   return normalized;
@@ -121,7 +121,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
 
-    const fullName = safeString(body?.fullName);
+    const fullName =
+      safeString(body?.fullName) || safeString(body?.name);
     const email = safeString(body?.email).toLowerCase();
     const phone = safeString(body?.phone);
     const zipCode = safeString(body?.zipCode);
@@ -129,11 +130,13 @@ export async function POST(req: NextRequest) {
     const petTypes = safeString(body?.petTypes);
     const servicesOffered = safeString(body?.servicesOffered);
     const notes = safeString(body?.notes);
-    const source = normalizeSource(safeString(body?.source));
+    const source = normalizeSource(
+      safeString(body?.source) || "launch-page"
+    );
 
     if (!fullName || !email) {
       return NextResponse.json(
-        { error: "Full name and email are required." },
+        { error: "Name and email are required." },
         { status: 400 }
       );
     }
