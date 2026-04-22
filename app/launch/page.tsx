@@ -3,33 +3,35 @@
 import { useState } from "react";
 import confetti from "canvas-confetti";
 
+type InterestType = "customer" | "guru" | "both" | "";
+
 function fireLaunchConfetti() {
   const end = Date.now() + 1800;
 
   const frame = () => {
     confetti({
-      particleCount: 22,
+      particleCount: 24,
       angle: 60,
-      spread: 78,
+      spread: 82,
       origin: { x: 0, y: 0.55 },
-      scalar: 1.08,
+      scalar: 1.1,
       zIndex: 9999,
     });
 
     confetti({
-      particleCount: 22,
+      particleCount: 24,
       angle: 120,
-      spread: 78,
+      spread: 82,
       origin: { x: 1, y: 0.55 },
-      scalar: 1.08,
+      scalar: 1.1,
       zIndex: 9999,
     });
 
     confetti({
-      particleCount: 18,
-      spread: 100,
+      particleCount: 20,
+      spread: 110,
       origin: { x: 0.5, y: 0.18 },
-      scalar: 1.02,
+      scalar: 1.05,
       zIndex: 9999,
     });
 
@@ -41,10 +43,147 @@ function fireLaunchConfetti() {
   frame();
 }
 
-type InterestType = "customer" | "guru" | "both" | "";
+function interestButtonClasses(
+  selectedValue: InterestType,
+  value: Exclude<InterestType, "">
+) {
+  const selected = selectedValue === value;
+
+  return [
+    "inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-sm font-bold transition",
+    selected
+      ? "border-emerald-600 bg-emerald-600 text-white shadow-md"
+      : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50",
+  ].join(" ");
+}
+
+type LaunchFormCardProps = {
+  fullName: string;
+  email: string;
+  interestType: InterestType;
+  isSubmitting: boolean;
+  error: string;
+  onNameChange: (value: string) => void;
+  onEmailChange: (value: string) => void;
+  onInterestChange: (value: InterestType) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  className?: string;
+};
+
+function LaunchFormCard({
+  fullName,
+  email,
+  interestType,
+  isSubmitting,
+  error,
+  onNameChange,
+  onEmailChange,
+  onInterestChange,
+  onSubmit,
+  className = "",
+}: LaunchFormCardProps) {
+  return (
+    <section
+      className={`rounded-[30px] border border-emerald-100 bg-white/95 p-5 shadow-[0_24px_60px_rgba(16,185,129,0.14)] backdrop-blur-sm sm:p-6 ${className}`}
+    >
+      <div className="mb-5 text-center">
+        <p className="text-[14px] font-black uppercase tracking-[0.28em] text-emerald-700 sm:text-[15px]">
+          Join the Waitlist
+        </p>
+        <p className="mt-2 text-[14px] font-medium text-slate-500 sm:text-[16px]">
+          Be first in line for launch news.
+        </p>
+      </div>
+
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <label
+            htmlFor="launch-full-name"
+            className="mb-2 block text-sm font-semibold text-slate-700"
+          >
+            Name
+          </label>
+          <input
+            id="launch-full-name"
+            type="text"
+            value={fullName}
+            onChange={(event) => onNameChange(event.target.value)}
+            placeholder="Your name"
+            autoComplete="name"
+            className="w-full rounded-[18px] border border-emerald-100 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="launch-email"
+            className="mb-2 block text-sm font-semibold text-slate-700"
+          >
+            Email Address
+          </label>
+          <input
+            id="launch-email"
+            type="email"
+            value={email}
+            onChange={(event) => onEmailChange(event.target.value)}
+            placeholder="Email Address"
+            autoComplete="email"
+            className="w-full rounded-[18px] border border-emerald-100 bg-white px-4 py-3.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+          />
+        </div>
+
+        <div>
+          <p className="mb-3 text-sm font-semibold text-slate-700">I’m joining as</p>
+          <div className="flex flex-wrap justify-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => onInterestChange("customer")}
+              className={interestButtonClasses(interestType, "customer")}
+            >
+              Pet Parent
+            </button>
+            <button
+              type="button"
+              onClick={() => onInterestChange("guru")}
+              className={interestButtonClasses(interestType, "guru")}
+            >
+              Guru
+            </button>
+            <button
+              type="button"
+              onClick={() => onInterestChange("both")}
+              className={interestButtonClasses(interestType, "both")}
+            >
+              Both
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="inline-flex w-full items-center justify-center rounded-[22px] bg-emerald-600 px-6 py-4 text-lg font-black text-white shadow-[0_16px_30px_rgba(16,185,129,0.24)] transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70 sm:text-xl"
+        >
+          {isSubmitting ? "Joining..." : "Join the Waitlist"}
+        </button>
+
+        {error ? (
+          <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-sm">
+            {error}
+          </div>
+        ) : null}
+
+        <p className="text-center text-sm leading-6 text-slate-500">
+          For <span className="font-semibold text-slate-700">Pet Parents</span> and{" "}
+          <span className="font-semibold text-slate-700">Gurus*</span>.
+        </p>
+      </form>
+    </section>
+  );
+}
 
 export default function LaunchPage() {
-  const [name, setName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [interestType, setInterestType] = useState<InterestType>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +195,7 @@ export default function LaunchPage() {
 
     setError("");
 
-    const trimmedName = name.trim();
+    const trimmedName = fullName.trim();
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!trimmedName || !trimmedEmail) {
@@ -78,7 +217,7 @@ export default function LaunchPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: trimmedName,
+          fullName: trimmedName,
           email: trimmedEmail,
           source: "social-launch",
           interestType,
@@ -91,7 +230,7 @@ export default function LaunchPage() {
         throw new Error(data?.error || "Unable to join the waitlist right now.");
       }
 
-      setName("");
+      setFullName("");
       setEmail("");
       setInterestType("");
       fireLaunchConfetti();
@@ -129,133 +268,48 @@ export default function LaunchPage() {
     }
   }
 
-  function interestButtonClasses(value: Exclude<InterestType, "">) {
-    const selected = interestType === value;
-
-    return [
-      "inline-flex items-center justify-center rounded-full border px-5 py-3 text-sm font-bold transition",
-      selected
-        ? "border-emerald-600 bg-emerald-600 text-white shadow-md"
-        : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50",
-    ].join(" ");
-  }
-
   return (
-    <main className="min-h-screen bg-[#f7faf8] px-3 py-4 sm:px-4 sm:py-6">
-      <div className="mx-auto max-w-[1143px]">
-        <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_20px_70px_rgba(16,185,129,0.08)]">
+    <main className="min-h-screen bg-[#f4faf7] px-3 py-4 sm:px-4 sm:py-6">
+      <div className="mx-auto max-w-[1180px]">
+        <div className="relative overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_rgba(16,185,129,0.10)]">
           <img
             src="/images/pre-launch-page.png"
             alt="SitGuru pre-launch page"
             className="block h-auto w-full select-none object-contain"
             draggable={false}
           />
+
+          {/* Desktop: replace the top-right signup area */}
+          <div className="pointer-events-none absolute inset-0 hidden lg:block">
+            <div className="pointer-events-auto absolute right-[5.2%] top-[11.2%] w-[36.5%]">
+              <LaunchFormCard
+                fullName={fullName}
+                email={email}
+                interestType={interestType}
+                isSubmitting={isSubmitting}
+                error={error}
+                onNameChange={setFullName}
+                onEmailChange={setEmail}
+                onInterestChange={setInterestType}
+                onSubmit={handleSubmit}
+              />
+            </div>
+          </div>
         </div>
 
-        <section className="mx-auto mt-8 max-w-3xl rounded-[32px] border border-emerald-100 bg-white p-6 shadow-[0_20px_70px_rgba(16,185,129,0.10)] sm:p-8">
-          <div className="mb-6 text-center">
-            <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
-              Join the Waitlist
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              Be first in line for launch news.
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label
-                htmlFor="launch-name"
-                className="mb-2 block text-sm font-semibold text-slate-700"
-              >
-                Name
-              </label>
-              <input
-                id="launch-name"
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Your name"
-                autoComplete="name"
-                className="w-full rounded-[22px] border border-emerald-100 bg-white px-4 py-4 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="launch-email"
-                className="mb-2 block text-sm font-semibold text-slate-700"
-              >
-                Email Address
-              </label>
-              <input
-                id="launch-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="Email Address"
-                autoComplete="email"
-                className="w-full rounded-[22px] border border-emerald-100 bg-white px-4 py-4 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-              />
-            </div>
-
-            <div>
-              <p className="mb-3 text-sm font-semibold text-slate-700">
-                I’m joining as
-              </p>
-              <div className="flex flex-wrap justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setInterestType("customer")}
-                  className={interestButtonClasses("customer")}
-                >
-                  Pet Parent
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInterestType("guru")}
-                  className={interestButtonClasses("guru")}
-                >
-                  Guru
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInterestType("both")}
-                  className={interestButtonClasses("both")}
-                >
-                  Both
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="inline-flex w-full items-center justify-center rounded-[24px] bg-emerald-600 px-6 py-4 text-xl font-black text-white shadow-[0_16px_30px_rgba(16,185,129,0.24)] transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {isSubmitting ? "Joining..." : "Join the Waitlist"}
-            </button>
-
-            {error ? (
-              <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-sm">
-                {error}
-              </div>
-            ) : null}
-
-            <p className="text-center text-base leading-7 text-slate-500">
-              For <span className="font-semibold text-slate-700">Pet Parents</span> and{" "}
-              <span className="font-semibold text-slate-700">Gurus*</span>.
-            </p>
-          </form>
-        </section>
-
-        <div className="mx-auto mt-8 max-w-4xl text-center">
-          <p className="text-sm leading-7 text-slate-600">
-            <span className="font-bold text-emerald-700">*What is a Guru?</span>{" "}
-            A Guru is a trusted pet care provider on the SitGuru network offering
-            services like pet sitting, dog walking, boarding, daycare, drop-ins,
-            and more.
-          </p>
+        {/* Mobile / tablet: single live form below image */}
+        <div className="mx-auto mt-6 max-w-2xl lg:hidden">
+          <LaunchFormCard
+            fullName={fullName}
+            email={email}
+            interestType={interestType}
+            isSubmitting={isSubmitting}
+            error={error}
+            onNameChange={setFullName}
+            onEmailChange={setEmail}
+            onInterestChange={setInterestType}
+            onSubmit={handleSubmit}
+          />
         </div>
       </div>
 
