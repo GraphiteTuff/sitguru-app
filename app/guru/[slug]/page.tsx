@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import GuruBookingCard from "./GuruBookingCard";
+import GuruProfileAnalytics from "./GuruProfileAnalytics";
 
 type PageProps = {
   params: Promise<{
@@ -618,11 +618,11 @@ export default async function GuruProfilePage({ params }: PageProps) {
   const hasLiveReviews =
     typeof guru.review_count === "number" && guru.review_count > 0;
 
-const publicSlug = createGuruSlug(guru);
-const bookingPageHref = `/bookings/new?guru_slug=${encodeURIComponent(publicSlug)}`;
-const messageHref = `/messages/new?guru=${encodeURIComponent(publicSlug)}`;
-const primaryService = services[0] || "General care";
-const numericRate = getRateValue(guru);
+  const publicSlug = createGuruSlug(guru);
+  const bookingPageHref = `/bookings/new?guru_slug=${encodeURIComponent(publicSlug)}`;
+  const messageHref = `/messages/new?guru=${encodeURIComponent(publicSlug)}`;
+  const primaryService = services[0] || "General care";
+  const numericRate = getRateValue(guru);
 
   const responseStyle = guru.response_time?.trim() || "Fast replies";
   const profileStatus =
@@ -635,6 +635,15 @@ const numericRate = getRateValue(guru);
 
   return (
     <main className="min-h-screen bg-slate-50 !text-slate-900">
+      <GuruProfileAnalytics
+        guruId={guru.id}
+        guruSlug={publicSlug}
+        guruName={displayName}
+        guruLocation={location || "Serving your area"}
+        primaryService={primaryService}
+        hourlyRate={numericRate}
+        isFallback={isFallback}
+      />
       <section className="relative overflow-hidden border-b border-slate-200 bg-[linear-gradient(135deg,#05244f_0%,#0b356c_42%,#0f172a_100%)]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.22),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.10),transparent_22%)]" />
 

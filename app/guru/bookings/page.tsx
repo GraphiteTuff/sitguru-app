@@ -25,8 +25,10 @@ type BookingRow = {
   status?: string | null;
   payment_status?: string | null;
   booking_date?: string | null;
+  start_time?: string | null;
   created_at?: string | null;
   customer_id?: string | null;
+  pet_owner_id?: string | null;
   customer_name?: string | null;
   customer_email?: string | null;
   customer_phone?: string | null;
@@ -39,6 +41,7 @@ type BookingRow = {
   price?: number | null;
   total_amount?: number | null;
   sitter_id?: string | number | null;
+  guru_id?: string | number | null;
 };
 
 type PetRow = {
@@ -65,6 +68,10 @@ type EnrichedBooking = BookingRow & {
   resolved_breed?: string | null;
   resolved_size?: string | null;
 };
+
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 function formatDate(value?: string | null) {
   if (!value) return "Not set";
@@ -169,6 +176,26 @@ function sectionKicker(text: string) {
   );
 }
 
+function normalizeName(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getBookingServiceDate(booking: BookingRow) {
+  return booking.booking_date || booking.start_time || booking.created_at || null;
+}
+
+function getGuruLookupIds(guru: GuruRow) {
+  return Array.from(
+    new Set(
+      [
+        guru.id != null ? String(guru.id) : "",
+        guru.user_id || "",
+        guru.slug || "",
+      ].filter(Boolean)
+    )
+  );
+}
+
 async function getGuruProfile(userId: string, email?: string | null) {
   const byUserId = await supabaseAdmin
     .from("gurus")
@@ -195,37 +222,63 @@ async function getGuruProfile(userId: string, email?: string | null) {
   return null;
 }
 
-async function getGuruBookings(guruId: string | number) {
-  const byCreatedAt = await supabaseAdmin
-    .from("bookings")
-    .select("*")
-    .eq("sitter_id", guruId)
-    .order("created_at", { ascending: false });
+async function getGuruBookings(guru: GuruRow) {
+  const guruIds = getGuruLookupIds(guru);
 
-  if (!byCreatedAt.error && byCreatedAt.data) {
-    return byCreatedAt.data as BookingRow[];
+  if (guruIds.length === 0) {
+    return [];
   }
 
-  const byBookingDate = await supabaseAdmin
+  const bySitterId = await supabaseAdmin
     .from("bookings")
     .select("*")
-    .eq("sitter_id", guruId)
+    .in("sitter_id", guruIds)
+    .order("created_at", { ascending: false });
+
+  if (!bySitterId.error && bySitterId.data) {
+    return bySitterId.data as BookingRow[];
+  }
+
+  const byGuruId = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .in("guru_id", guruIds)
+    .order("created_at", { ascending: false });
+
+  if (!byGuruId.error && byGuruId.data) {
+    return byGuruId.data as BookingRow[];
+  }
+
+  const byBookingDateSitter = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .in("sitter_id", guruIds)
     .order("booking_date", { ascending: false });
 
-  if (!byBookingDate.error && byBookingDate.data) {
-    return byBookingDate.data as BookingRow[];
+  if (!byBookingDateSitter.error && byBookingDateSitter.data) {
+    return byBookingDateSitter.data as BookingRow[];
+  }
+
+  const byBookingDateGuru = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .in("guru_id", guruIds)
+    .order("booking_date", { ascending: false });
+
+  if (!byBookingDateGuru.error && byBookingDateGuru.data) {
+    return byBookingDateGuru.data as BookingRow[];
   }
 
   console.error(
     "Guru bookings fetch error:",
-    byCreatedAt.error?.message || byBookingDate.error?.message || "Unknown error"
+    bySitterId.error?.message ||
+      byGuruId.error?.message ||
+      byBookingDateSitter.error?.message ||
+      byBookingDateGuru.error?.message ||
+      "Unknown error"
   );
 
   return [];
-}
-
-function normalizeName(value?: string | null) {
-  return String(value || "").trim().toLowerCase();
 }
 
 async function enrichBookingsWithPetMedia(
@@ -246,7 +299,10 @@ async function enrichBookingsWithPetMedia(
   const customerIds = Array.from(
     new Set(
       bookings
-        .map((booking) => String(booking.customer_id || "").trim())
+        .flatMap((booking) => [
+          String(booking.customer_id || "").trim(),
+          String(booking.pet_owner_id || "").trim(),
+        ])
         .filter(Boolean)
     )
   );
@@ -279,6 +335,7 @@ async function enrichBookingsWithPetMedia(
           if (!petsById.has(String(pet.id))) {
             petsById.set(String(pet.id), pet);
           }
+
           ownerPets.push(pet);
         }
       }
@@ -320,16 +377,22 @@ async function enrichBookingsWithPetMedia(
       pet = petsById.get(bookingPetId) || null;
     }
 
-    if (!pet && booking.customer_id && booking.pet_name) {
-      const customerId = String(booking.customer_id);
+    if (!pet && (booking.customer_id || booking.pet_owner_id) && booking.pet_name) {
+      const customerIdsToCheck = [
+        String(booking.customer_id || "").trim(),
+        String(booking.pet_owner_id || "").trim(),
+      ].filter(Boolean);
+
       const petName = normalizeName(booking.pet_name);
 
       pet =
         ownerPets.find(
           (row) =>
-            (String(row.owner_id || "") === customerId ||
-              String(row.owner_profile_id || "") === customerId) &&
-            normalizeName(row.name) === petName
+            customerIdsToCheck.some(
+              (customerId) =>
+                String(row.owner_id || "") === customerId ||
+                String(row.owner_profile_id || "") === customerId
+            ) && normalizeName(row.name) === petName
         ) || null;
     }
 
@@ -395,7 +458,7 @@ export default async function GuruBookingsPage() {
     redirect("/guru/login");
   }
 
-  const bookings = await getGuruBookings(guru.id);
+  const bookings = await getGuruBookings(guru);
   const enrichedBookings = await enrichBookingsWithPetMedia(bookings);
 
   const pendingBookings = enrichedBookings.filter(
@@ -411,9 +474,7 @@ export default async function GuruBookingsPage() {
   );
 
   const guruName =
-    guru?.display_name ||
-    guru?.full_name ||
-    "Your Guru Account";
+    guru.display_name || guru.full_name || "Your Guru Account";
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_26%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-8 sm:px-6 lg:px-8">
@@ -513,7 +574,9 @@ export default async function GuruBookingsPage() {
           {enrichedBookings.length === 0 ? (
             <div className="p-6">
               <div className="rounded-[28px] border border-white/10 bg-slate-950/40 p-10 text-center">
-                <div className="text-3xl font-black text-white">No bookings yet</div>
+                <div className="text-3xl font-black text-white">
+                  No bookings yet
+                </div>
                 <p className="mt-3 text-base font-medium text-white/70">
                   New customer requests assigned to you will appear here.
                 </p>
@@ -571,7 +634,7 @@ export default async function GuruBookingsPage() {
                             Service date
                           </div>
                           <div className="mt-1 text-sm font-bold text-white">
-                            {formatDate(booking.booking_date)}
+                            {formatDate(getBookingServiceDate(booking))}
                           </div>
                         </div>
 

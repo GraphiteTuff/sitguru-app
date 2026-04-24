@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
 const heroServiceOptions = [
@@ -381,13 +382,52 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
 
   const goToSlide = (index: number) => {
     if (total === 0) return;
+
     const safeIndex = (index + total) % total;
+    const item = displayItems[safeIndex];
+
     setActiveIndex(safeIndex);
     scrollToIndex(safeIndex);
+
+    trackEvent({
+      eventName: "homepage_carousel_slide_selected",
+      eventType: "engagement",
+      source: detectSourceFromUrl(),
+      guruId: item?.id?.startsWith("fallback") ? undefined : item?.id,
+      metadata: {
+        selected_index: safeIndex,
+        guru_name: item?.name || "",
+        guru_role: item?.role || "",
+        location: item?.location || "",
+      },
+    });
   };
 
-  const nextSlide = () => goToSlide(activeIndex + 1);
-  const prevSlide = () => goToSlide(activeIndex - 1);
+  const nextSlide = () => {
+    trackEvent({
+      eventName: "homepage_carousel_next_clicked",
+      eventType: "engagement",
+      source: detectSourceFromUrl(),
+      metadata: {
+        active_index: activeIndex,
+      },
+    });
+
+    goToSlide(activeIndex + 1);
+  };
+
+  const prevSlide = () => {
+    trackEvent({
+      eventName: "homepage_carousel_previous_clicked",
+      eventType: "engagement",
+      source: detectSourceFromUrl(),
+      metadata: {
+        active_index: activeIndex,
+      },
+    });
+
+    goToSlide(activeIndex - 1);
+  };
 
   useEffect(() => {
     if (total <= 1 || isPaused) return;
@@ -515,10 +555,40 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
                   <p className="mt-3 text-sm text-slate-600">{item.location}</p>
 
                   <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                    <Link href={item.href} className="btn-primary w-full sm:w-auto">
+                    <Link
+                      href={item.href}
+                      className="btn-primary w-full sm:w-auto"
+                      onClick={() =>
+                        trackEvent({
+                          eventName: "guru_profile_view_clicked",
+                          eventType: "profile",
+                          source: detectSourceFromUrl(),
+                          guruId: item.id.startsWith("fallback") ? undefined : item.id,
+                          metadata: {
+                            location: "homepage_carousel",
+                            guru_name: item.name,
+                            guru_role: item.role,
+                            destination: item.href,
+                          },
+                        })
+                      }
+                    >
                       View Profile
                     </Link>
-                    <Link href="/search" className="btn-secondary w-full sm:w-auto">
+                    <Link
+                      href="/search"
+                      className="btn-secondary w-full sm:w-auto"
+                      onClick={() =>
+                        trackEvent({
+                          eventName: "browse_all_clicked",
+                          eventType: "navigation",
+                          source: detectSourceFromUrl(),
+                          metadata: {
+                            location: "homepage_carousel",
+                          },
+                        })
+                      }
+                    >
                       Browse All
                     </Link>
                   </div>
@@ -580,6 +650,18 @@ export default function HomePage() {
       ...prev,
       source,
     }));
+
+    trackEvent({
+      eventName: "homepage_visit",
+      eventType: "traffic",
+      source,
+      metadata: {
+        referrer: document.referrer || "",
+        url: window.location.href,
+        search: window.location.search,
+        pathname: window.location.pathname,
+      },
+    });
   }, []);
 
   useEffect(() => {
@@ -607,10 +689,30 @@ export default function HomePage() {
 
       if (error) {
         console.error("Homepage carousel load error:", error.message);
+
+        trackEvent({
+          eventName: "homepage_guru_carousel_load_error",
+          eventType: "system",
+          source: detectSourceFromUrl(),
+          metadata: {
+            error: error.message,
+          },
+        });
+
         return;
       }
 
       const gurus = (data || []) as Guru[];
+
+      trackEvent({
+        eventName: "homepage_guru_carousel_loaded",
+        eventType: "system",
+        source: detectSourceFromUrl(),
+        metadata: {
+          guru_count: gurus.length,
+          using_fallback: gurus.length === 0,
+        },
+      });
 
       if (gurus.length > 0) {
         setCarouselItems(mapGurusToCarouselItems(gurus));
@@ -630,6 +732,20 @@ export default function HomePage() {
     }));
   }
 
+  function trackHomepageClick(label: string, location: string, destination?: string) {
+    trackEvent({
+      eventName: "homepage_cta_clicked",
+      eventType: "navigation",
+      source: launchForm.source || detectSourceFromUrl(),
+      role: launchForm.interestType,
+      metadata: {
+        label,
+        location,
+        destination: destination || "",
+      },
+    });
+  }
+
   function scrollToLaunchForm(nextAudience?: InterestType) {
     if (nextAudience) {
       setLaunchForm((prev) => ({
@@ -638,10 +754,38 @@ export default function HomePage() {
       }));
     }
 
+    trackEvent({
+      eventName: "launch_form_opened",
+      eventType: "lead",
+      source: launchForm.source || detectSourceFromUrl(),
+      role: nextAudience || launchForm.interestType,
+      metadata: {
+        location: "homepage",
+        selected_audience: nextAudience || launchForm.interestType,
+      },
+    });
+
     const section = document.getElementById("launch-list");
     if (section) {
       section.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+  }
+
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    const formData = new FormData(event.currentTarget);
+
+    trackEvent({
+      eventName: "search_started",
+      eventType: "search",
+      source: launchForm.source || detectSourceFromUrl(),
+      role: "customer",
+      metadata: {
+        location: "homepage_quick_search",
+        service: String(formData.get("service") || ""),
+        city: String(formData.get("city") || ""),
+        state: String(formData.get("state") || ""),
+      },
+    });
   }
 
   async function handleLaunchSubmit(event: FormEvent<HTMLFormElement>) {
@@ -649,6 +793,20 @@ export default function HomePage() {
     setIsSubmittingLaunch(true);
     setLaunchError("");
     setLaunchSuccess("");
+
+    trackEvent({
+      eventName: "launch_signup_started",
+      eventType: "lead",
+      source: launchForm.source || detectSourceFromUrl(),
+      role: launchForm.interestType,
+      metadata: {
+        has_phone: Boolean(launchForm.phone.trim()),
+        has_zip_code: Boolean(launchForm.zipCode.trim()),
+        has_pet_types: Boolean(launchForm.petTypes.trim()),
+        has_services_offered: Boolean(launchForm.servicesOffered.trim()),
+        has_notes: Boolean(launchForm.notes.trim()),
+      },
+    });
 
     try {
       const response = await fetch("/api/launch-signup", {
@@ -665,6 +823,21 @@ export default function HomePage() {
         throw new Error(payload?.error || "Unable to join the launch list right now.");
       }
 
+      trackEvent({
+        eventName: "launch_signup_completed",
+        eventType: "lead",
+        source: launchForm.source || detectSourceFromUrl(),
+        role: launchForm.interestType,
+        metadata: {
+          interest_type: launchForm.interestType,
+          has_phone: Boolean(launchForm.phone.trim()),
+          has_zip_code: Boolean(launchForm.zipCode.trim()),
+          has_pet_types: Boolean(launchForm.petTypes.trim()),
+          has_services_offered: Boolean(launchForm.servicesOffered.trim()),
+          has_notes: Boolean(launchForm.notes.trim()),
+        },
+      });
+
       setLaunchSuccess(
         "You’re officially on the SitGuru launch list. We’ll share early access and launch updates soon."
       );
@@ -674,11 +847,22 @@ export default function HomePage() {
         source: prev.source || "direct",
       }));
     } catch (error) {
-      setLaunchError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Something went wrong while submitting your information."
-      );
+          : "Something went wrong while submitting your information.";
+
+      trackEvent({
+        eventName: "launch_signup_failed",
+        eventType: "lead",
+        source: launchForm.source || detectSourceFromUrl(),
+        role: launchForm.interestType,
+        metadata: {
+          error: message,
+        },
+      });
+
+      setLaunchError(message);
     } finally {
       setIsSubmittingLaunch(false);
     }
@@ -722,7 +906,13 @@ export default function HomePage() {
               </div>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <Link href="/search" className="btn-primary w-full sm:w-auto">
+                <Link
+                  href="/search"
+                  className="btn-primary w-full sm:w-auto"
+                  onClick={() =>
+                    trackHomepageClick("Find a Guru", "hero", "/search")
+                  }
+                >
                   Find a Guru
                 </Link>
 
@@ -737,6 +927,9 @@ export default function HomePage() {
                 <Link
                   href="/guru/login"
                   className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 sm:w-auto"
+                  onClick={() =>
+                    trackHomepageClick("Guru Login", "hero", "/guru/login")
+                  }
                 >
                   Guru Login
                 </Link>
@@ -770,6 +963,9 @@ export default function HomePage() {
                 <Link
                   href="/login"
                   className="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
+                  onClick={() =>
+                    trackHomepageClick("Customer Login", "hero", "/login")
+                  }
                 >
                   Customer Login
                 </Link>
@@ -871,7 +1067,20 @@ export default function HomePage() {
                         <button
                           key={option.value}
                           type="button"
-                          onClick={() => updateLaunchField("interestType", option.value)}
+                          onClick={() => {
+                            updateLaunchField("interestType", option.value);
+
+                            trackEvent({
+                              eventName: "launch_interest_selected",
+                              eventType: "lead",
+                              source: launchForm.source || detectSourceFromUrl(),
+                              role: option.value,
+                              metadata: {
+                                selected_interest: option.value,
+                                location: "homepage_launch_form",
+                              },
+                            });
+                          }}
                           className={`rounded-3xl border p-4 text-left transition ${
                             selected
                               ? "border-emerald-500 bg-emerald-50 shadow-sm ring-4 ring-emerald-100"
@@ -1020,7 +1229,11 @@ export default function HomePage() {
             </p>
           </div>
 
-          <form action="/search" className="panel mx-auto mt-8 max-w-5xl p-6 sm:p-8">
+          <form
+            action="/search"
+            onSubmit={handleSearchSubmit}
+            className="panel mx-auto mt-8 max-w-5xl p-6 sm:p-8"
+          >
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr_1fr_auto]">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-800">
@@ -1148,7 +1361,17 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <Link href="/search" className="btn-secondary w-full lg:w-auto">
+              <Link
+                href="/search"
+                className="btn-secondary w-full lg:w-auto"
+                onClick={() =>
+                  trackHomepageClick(
+                    "Browse Services Through Search",
+                    "premium_specialty_care",
+                    "/search"
+                  )
+                }
+              >
                 Browse Services Through Search
               </Link>
             </div>
@@ -1268,7 +1491,17 @@ export default function HomePage() {
                 <li>• Book with more confidence</li>
               </ul>
               <div className="mt-6">
-                <Link href="/search" className="btn-primary w-full sm:w-auto">
+                <Link
+                  href="/search"
+                  className="btn-primary w-full sm:w-auto"
+                  onClick={() =>
+                    trackHomepageClick(
+                      "Search for a Guru",
+                      "for_pet_parents",
+                      "/search"
+                    )
+                  }
+                >
                   Search for a Guru
                 </Link>
               </div>
@@ -1464,7 +1697,13 @@ export default function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-                <Link href="/search" className="btn-primary w-full sm:w-auto">
+                <Link
+                  href="/search"
+                  className="btn-primary w-full sm:w-auto"
+                  onClick={() =>
+                    trackHomepageClick("Find a Guru", "final_cta", "/search")
+                  }
+                >
                   Find a Guru
                 </Link>
 

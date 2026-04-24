@@ -5,12 +5,14 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type HTMLAttributes,
   type ReactNode,
 } from "react";
 import { useSearchParams } from "next/navigation";
 import ProviderMap from "@/components/ProviderMap";
+import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
 type GuruRow = {
@@ -112,6 +114,10 @@ function getGuruRate(guru: GuruRow) {
   return null;
 }
 
+function getGuruAnalyticsId(guru: GuruRow) {
+  return String(guru.user_id || guru.id || "");
+}
+
 function matchesService(guru: GuruRow, selectedService: string) {
   if (!selectedService) return true;
 
@@ -125,6 +131,28 @@ function matchesService(guru: GuruRow, selectedService: string) {
 
 function normalizeText(value?: string | null) {
   return (value || "").trim().toLowerCase();
+}
+
+function detectSourceFromUrl() {
+  if (typeof window === "undefined") return "direct";
+
+  const params = new URLSearchParams(window.location.search);
+  const sourceParam =
+    params.get("source") ||
+    params.get("utm_source") ||
+    params.get("ref") ||
+    "";
+
+  const normalized = sourceParam.trim().toLowerCase();
+
+  if (!normalized) return "direct";
+  if (normalized.includes("instagram") || normalized === "ig") return "instagram";
+  if (normalized.includes("facebook") || normalized === "fb") return "facebook";
+  if (normalized.includes("tiktok") || normalized === "tt") return "tiktok";
+  if (normalized.includes("referral")) return "referral";
+  if (normalized.includes("email")) return "email";
+
+  return normalized;
 }
 
 function SearchPageContent() {
@@ -147,10 +175,35 @@ function SearchPageContent() {
     undefined
   );
 
+  const hasTrackedSearchPageVisit = useRef(false);
+  const lastTrackedSearchKey = useRef("");
+  const hoveredGuruIds = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     setServiceFilter(initialService);
     setCityFilter(initialCity);
     setStateFilter(initialState);
+  }, [initialService, initialCity, initialState]);
+
+  useEffect(() => {
+    if (hasTrackedSearchPageVisit.current) return;
+
+    hasTrackedSearchPageVisit.current = true;
+
+    trackEvent({
+      eventName: "search_page_visit",
+      eventType: "traffic",
+      source: detectSourceFromUrl(),
+      metadata: {
+        referrer: document.referrer || "",
+        url: window.location.href,
+        search: window.location.search,
+        pathname: window.location.pathname,
+        initial_service: initialService,
+        initial_city: initialCity,
+        initial_state: initialState,
+      },
+    });
   }, [initialService, initialCity, initialState]);
 
   useEffect(() => {
@@ -194,15 +247,39 @@ function SearchPageContent() {
       if (error) {
         setError(error.message);
         setLoading(false);
+
+        trackEvent({
+          eventName: "search_gurus_load_failed",
+          eventType: "system",
+          source: detectSourceFromUrl(),
+          metadata: {
+            error: error.message,
+          },
+        });
+
         return;
       }
 
-      setGurus((data || []) as GuruRow[]);
+      const guruRows = (data || []) as GuruRow[];
+
+      setGurus(guruRows);
       setLoading(false);
+
+      trackEvent({
+        eventName: "search_gurus_loaded",
+        eventType: "system",
+        source: detectSourceFromUrl(),
+        metadata: {
+          guru_count: guruRows.length,
+          has_initial_service: Boolean(initialService),
+          has_initial_city: Boolean(initialCity),
+          has_initial_state: Boolean(initialState),
+        },
+      });
     }
 
     loadGurus();
-  }, []);
+  }, [initialService, initialCity, initialState]);
 
   const filteredGurus = useMemo(() => {
     const query = normalizeText(searchTerm);
@@ -236,6 +313,57 @@ function SearchPageContent() {
     });
   }, [gurus, searchTerm, cityFilter, stateFilter, serviceFilter]);
 
+  useEffect(() => {
+    if (loading) return;
+
+    const searchKey = JSON.stringify({
+      serviceFilter,
+      cityFilter: cityFilter.trim(),
+      stateFilter: stateFilter.trim(),
+      searchTerm: searchTerm.trim(),
+      resultCount: filteredGurus.length,
+    });
+
+    const hasSearchInput =
+      Boolean(serviceFilter) ||
+      Boolean(cityFilter.trim()) ||
+      Boolean(stateFilter.trim()) ||
+      Boolean(searchTerm.trim());
+
+    if (!hasSearchInput) return;
+    if (lastTrackedSearchKey.current === searchKey) return;
+
+    const timer = window.setTimeout(() => {
+      lastTrackedSearchKey.current = searchKey;
+
+      trackEvent({
+        eventName: "search_started",
+        eventType: "search",
+        source: detectSourceFromUrl(),
+        role: "customer",
+        metadata: {
+          location: "search_page",
+          service: serviceFilter,
+          city: cityFilter.trim(),
+          state: stateFilter.trim(),
+          query: searchTerm.trim(),
+          result_count: filteredGurus.length,
+          total_gurus_loaded: gurus.length,
+        },
+      });
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    loading,
+    serviceFilter,
+    cityFilter,
+    stateFilter,
+    searchTerm,
+    filteredGurus.length,
+    gurus.length,
+  ]);
+
   const markers: Marker[] = filteredGurus
     .filter(
       (guru) =>
@@ -258,6 +386,110 @@ function SearchPageContent() {
     stateFilter.trim(),
     searchTerm.trim(),
   ].filter(Boolean).length;
+
+  function clearFilters(location: string) {
+    trackEvent({
+      eventName: "search_filters_cleared",
+      eventType: "search",
+      source: detectSourceFromUrl(),
+      role: "customer",
+      metadata: {
+        location,
+        previous_service: serviceFilter,
+        previous_city: cityFilter.trim(),
+        previous_state: stateFilter.trim(),
+        previous_query: searchTerm.trim(),
+        previous_result_count: filteredGurus.length,
+      },
+    });
+
+    setServiceFilter("");
+    setCityFilter("");
+    setStateFilter("");
+    setSearchTerm("");
+  }
+
+  function trackGuruHover(guru: GuruRow) {
+    const guruId = String(guru.id);
+
+    if (hoveredGuruIds.current.has(guruId)) return;
+
+    hoveredGuruIds.current.add(guruId);
+
+    trackEvent({
+      eventName: "search_result_hovered",
+      eventType: "engagement",
+      source: detectSourceFromUrl(),
+      guruId: getGuruAnalyticsId(guru),
+      metadata: {
+        location: "search_results",
+        guru_id: guru.id,
+        guru_name: getGuruName(guru),
+        guru_city: guru.city || "",
+        guru_state: guru.state || "",
+        selected_service: serviceFilter,
+        result_count: filteredGurus.length,
+      },
+    });
+  }
+
+  function trackGuruProfileClick(guru: GuruRow, label: string) {
+    trackEvent({
+      eventName: "search_result_clicked",
+      eventType: "profile",
+      source: detectSourceFromUrl(),
+      role: "customer",
+      guruId: getGuruAnalyticsId(guru),
+      metadata: {
+        label,
+        location: "search_results",
+        destination: getGuruHref(guru),
+        guru_id: guru.id,
+        guru_name: getGuruName(guru),
+        guru_city: guru.city || "",
+        guru_state: guru.state || "",
+        selected_service: serviceFilter,
+        city_filter: cityFilter.trim(),
+        state_filter: stateFilter.trim(),
+        query: searchTerm.trim(),
+        result_count: filteredGurus.length,
+      },
+    });
+
+    trackEvent({
+      eventName: "guru_profile_view_clicked",
+      eventType: "profile",
+      source: detectSourceFromUrl(),
+      role: "customer",
+      guruId: getGuruAnalyticsId(guru),
+      metadata: {
+        location: "search_results",
+        destination: getGuruHref(guru),
+        guru_name: getGuruName(guru),
+      },
+    });
+  }
+
+  function trackBookingCtaClick(guru: GuruRow) {
+    trackEvent({
+      eventName: "booking_cta_clicked",
+      eventType: "booking",
+      source: detectSourceFromUrl(),
+      role: "customer",
+      guruId: getGuruAnalyticsId(guru),
+      metadata: {
+        location: "search_results",
+        destination: getGuruHref(guru),
+        guru_id: guru.id,
+        guru_name: getGuruName(guru),
+        selected_service: serviceFilter,
+        city_filter: cityFilter.trim(),
+        state_filter: stateFilter.trim(),
+        query: searchTerm.trim(),
+        result_count: filteredGurus.length,
+      },
+    });
+  }
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -346,12 +578,7 @@ function SearchPageContent() {
               <div className="flex items-end">
                 <button
                   type="button"
-                  onClick={() => {
-                    setServiceFilter("");
-                    setCityFilter("");
-                    setStateFilter("");
-                    setSearchTerm("");
-                  }}
+                  onClick={() => clearFilters("top_filter_bar")}
                   className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 xl:w-auto"
                 >
                   Clear filters
@@ -402,12 +629,7 @@ function SearchPageContent() {
                   <div className="mt-5">
                     <button
                       type="button"
-                      onClick={() => {
-                        setServiceFilter("");
-                        setCityFilter("");
-                        setStateFilter("");
-                        setSearchTerm("");
-                      }}
+                      onClick={() => clearFilters("no_results_reset")}
                       className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                     >
                       Reset Search
@@ -426,7 +648,10 @@ function SearchPageContent() {
                     <Card
                       key={guru.id}
                       className="overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                      onMouseEnter={() => setHighlightedGuruId(String(guru.id))}
+                      onMouseEnter={() => {
+                        setHighlightedGuruId(String(guru.id));
+                        trackGuruHover(guru);
+                      }}
                       onMouseLeave={() => setHighlightedGuruId(undefined)}
                     >
                       <div className="flex h-full flex-col md:flex-row">
@@ -539,6 +764,9 @@ function SearchPageContent() {
                           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                             <Link
                               href={getGuruHref(guru)}
+                              onClick={() =>
+                                trackGuruProfileClick(guru, "View Guru Profile")
+                              }
                               className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                             >
                               View Guru Profile
@@ -546,6 +774,10 @@ function SearchPageContent() {
 
                             <Link
                               href={getGuruHref(guru)}
+                              onClick={() => {
+                                trackBookingCtaClick(guru);
+                                trackGuruProfileClick(guru, "Book or Learn More");
+                              }}
                               className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
                             >
                               Book or Learn More

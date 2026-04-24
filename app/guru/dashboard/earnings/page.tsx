@@ -1,6 +1,5 @@
-"use client";
-
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
   BadgeDollarSign,
@@ -11,41 +10,31 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
-const earningsSummary = {
-  totalEarnings: 0,
-  pendingPayouts: 0,
-  paidOut: 0,
-  thisMonth: 0,
-  completedBookings: 0,
-  sitguruFees: 0,
+export const dynamic = "force-dynamic";
+
+const SITGURU_FEE_PERCENT = 0.08;
+
+type GuruProfile = {
+  id?: string | number | null;
+  user_id?: string | null;
+  email?: string | null;
 };
 
-const recentEarnings = [
-  {
-    id: "BK-0000",
-    date: "—",
-    service: "No completed bookings yet",
-    petParent: "—",
-    gross: 0,
-    fee: 0,
-    net: 0,
-    status: "Pending",
-  },
-];
+type BookingRow = Record<string, unknown>;
 
-const referralPreview = [
-  {
-    title: "Refer a Guru",
-    description:
-      "Invite another great Guru to SitGuru. When they join and complete their first qualified booking, you may be eligible for a referral reward.",
-  },
-  {
-    title: "Referral Tracking",
-    description:
-      "As SitGuru grows, you’ll be able to track referrals, reward status, and growth opportunities directly from your dashboard.",
-  },
-];
+type EarningsRow = {
+  id: string;
+  date: string;
+  service: string;
+  petParent: string;
+  gross: number;
+  fee: number;
+  net: number;
+  status: string;
+};
 
 function currency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -54,20 +43,296 @@ function currency(value: number) {
   }).format(value);
 }
 
-function statusClasses(status: string) {
-  switch (status) {
-    case "Paid":
-      return "bg-emerald-100 text-emerald-700";
-    case "Pending":
-      return "bg-amber-100 text-amber-700";
-    case "Processing":
-      return "bg-sky-100 text-sky-700";
-    default:
-      return "bg-slate-100 text-slate-700";
-  }
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
-export default function GuruDashboardEarningsPage() {
+function toNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function roundMoney(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function startOfCurrentMonth() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+function statusClasses(status: string) {
+  const normalized = status.toLowerCase();
+
+  if (normalized.includes("paid")) {
+    return "bg-emerald-100 text-emerald-700";
+  }
+
+  if (normalized.includes("processing")) {
+    return "bg-sky-100 text-sky-700";
+  }
+
+  if (normalized.includes("adjust")) {
+    return "bg-rose-100 text-rose-700";
+  }
+
+  return "bg-amber-100 text-amber-700";
+}
+
+function getBookingStatus(booking: BookingRow) {
+  return (
+    asTrimmedString(booking.payout_status) ||
+    asTrimmedString(booking.payment_status) ||
+    asTrimmedString(booking.status) ||
+    asTrimmedString(booking.booking_status) ||
+    asTrimmedString(booking.state) ||
+    "pending"
+  );
+}
+
+function getServiceName(booking: BookingRow) {
+  return (
+    asTrimmedString(booking.service) ||
+    asTrimmedString(booking.service_name) ||
+    asTrimmedString(booking.service_type) ||
+    asTrimmedString(booking.booking_type) ||
+    "Pet Care"
+  );
+}
+
+function getPetParentName(booking: BookingRow) {
+  return (
+    asTrimmedString(booking.customer_name) ||
+    asTrimmedString(booking.pet_parent_name) ||
+    asTrimmedString(booking.owner_name) ||
+    asTrimmedString(booking.parent_name) ||
+    asTrimmedString(booking.user_name) ||
+    asTrimmedString(booking.customer_email) ||
+    "Customer"
+  );
+}
+
+function getBookingDateValue(booking: BookingRow) {
+  return (
+    asTrimmedString(booking.booking_date) ||
+    asTrimmedString(booking.start_date) ||
+    asTrimmedString(booking.start_time) ||
+    asTrimmedString(booking.created_at) ||
+    ""
+  );
+}
+
+function getGrossAmount(booking: BookingRow) {
+  const subtotal = toNumber(booking.subtotal_amount);
+  if (subtotal > 0) return roundMoney(subtotal);
+
+  const fallback =
+    toNumber(booking.total_amount) ||
+    toNumber(booking.amount) ||
+    toNumber(booking.price) ||
+    toNumber(booking.hourly_rate);
+
+  return roundMoney(fallback);
+}
+
+function getFeeAmount(booking: BookingRow, gross: number) {
+  const storedFee = toNumber(booking.sitguru_fee_amount);
+  if (storedFee > 0) return roundMoney(storedFee);
+
+  return roundMoney(gross * SITGURU_FEE_PERCENT);
+}
+
+function getNetAmount(booking: BookingRow, gross: number, fee: number) {
+  const storedNet = toNumber(booking.guru_net_amount);
+  if (storedNet > 0) return roundMoney(storedNet);
+
+  return roundMoney(gross - fee);
+}
+
+function isCompletedForEarnings(booking: BookingRow) {
+  const status = getBookingStatus(booking).toLowerCase();
+  return (
+    status.includes("complete") ||
+    status.includes("paid") ||
+    status.includes("processing") ||
+    status.includes("pending")
+  );
+}
+
+async function getGuruProfile(userId: string, email?: string | null) {
+  const byUserId = await supabaseAdmin
+    .from("gurus")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!byUserId.error && byUserId.data) {
+    return byUserId.data as GuruProfile;
+  }
+
+  if (email) {
+    const byEmail = await supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (!byEmail.error && byEmail.data) {
+      return byEmail.data as GuruProfile;
+    }
+  }
+
+  return null;
+}
+
+async function getGuruBookings(guruId: string | number) {
+  const byCreatedAt = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .eq("sitter_id", guruId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (!byCreatedAt.error && byCreatedAt.data) {
+    return byCreatedAt.data as BookingRow[];
+  }
+
+  const byBookingDate = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .eq("sitter_id", guruId)
+    .order("booking_date", { ascending: false })
+    .limit(100);
+
+  if (!byBookingDate.error && byBookingDate.data) {
+    return byBookingDate.data as BookingRow[];
+  }
+
+  return [];
+}
+
+export default async function GuruDashboardEarningsPage() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    redirect("/guru/login");
+  }
+
+  const guruProfile = await getGuruProfile(user.id, user.email);
+
+  if (!guruProfile?.id) {
+    redirect("/guru/login");
+  }
+
+  const bookings = await getGuruBookings(guruProfile.id);
+
+  const earningsBookings = bookings.filter(isCompletedForEarnings);
+
+  const normalizedRows: EarningsRow[] = earningsBookings.map((booking, index) => {
+    const gross = getGrossAmount(booking);
+    const fee = getFeeAmount(booking, gross);
+    const net = getNetAmount(booking, gross, fee);
+
+    return {
+      id:
+        asTrimmedString(booking.id) ||
+        `BK-${String(index + 1).padStart(4, "0")}`,
+      date: formatDate(getBookingDateValue(booking)),
+      service: getServiceName(booking),
+      petParent: getPetParentName(booking),
+      gross,
+      fee,
+      net,
+      status: getBookingStatus(booking),
+    };
+  });
+
+  const totalEarnings = roundMoney(
+    normalizedRows.reduce((sum, row) => sum + row.net, 0)
+  );
+
+  const pendingPayouts = roundMoney(
+    normalizedRows
+      .filter((row) => {
+        const status = row.status.toLowerCase();
+        return !status.includes("paid") && !status.includes("adjust");
+      })
+      .reduce((sum, row) => sum + row.net, 0)
+  );
+
+  const paidOut = roundMoney(
+    normalizedRows
+      .filter((row) => row.status.toLowerCase().includes("paid"))
+      .reduce((sum, row) => sum + row.net, 0)
+  );
+
+  const sitguruFees = roundMoney(
+    normalizedRows.reduce((sum, row) => sum + row.fee, 0)
+  );
+
+  const completedBookings = normalizedRows.length;
+
+  const monthStart = startOfCurrentMonth();
+  const thisMonth = roundMoney(
+    normalizedRows
+      .filter((row) => {
+        const parsed = new Date(row.date);
+        return !Number.isNaN(parsed.getTime()) && parsed >= monthStart;
+      })
+      .reduce((sum, row) => sum + row.net, 0)
+  );
+
+  const recentEarnings =
+    normalizedRows.length > 0
+      ? normalizedRows.slice(0, 10)
+      : [
+          {
+            id: "BK-0000",
+            date: "—",
+            service: "No completed bookings yet",
+            petParent: "—",
+            gross: 0,
+            fee: 0,
+            net: 0,
+            status: "Pending",
+          },
+        ];
+
+  const referralPreview = [
+    {
+      title: "Refer a Guru",
+      description:
+        "Invite another great Guru to SitGuru. When they join and complete their first qualified booking, you may be eligible for a referral reward.",
+    },
+    {
+      title: "Referral Tracking",
+      description:
+        "As SitGuru grows, you’ll be able to track referrals, reward status, and growth opportunities directly from your dashboard.",
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-8 text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-8">
@@ -119,7 +384,7 @@ export default function GuruDashboardEarningsPage() {
               </span>
             </div>
             <p className="mt-4 text-3xl font-black text-white">
-              {currency(earningsSummary.totalEarnings)}
+              {currency(totalEarnings)}
             </p>
             <p className="mt-2 text-sm text-slate-400">
               Net earnings from completed bookings
@@ -136,7 +401,7 @@ export default function GuruDashboardEarningsPage() {
               </span>
             </div>
             <p className="mt-4 text-3xl font-black text-white">
-              {currency(earningsSummary.pendingPayouts)}
+              {currency(pendingPayouts)}
             </p>
             <p className="mt-2 text-sm text-slate-400">
               Awaiting payout processing
@@ -151,7 +416,7 @@ export default function GuruDashboardEarningsPage() {
               </span>
             </div>
             <p className="mt-4 text-3xl font-black text-white">
-              {currency(earningsSummary.paidOut)}
+              {currency(paidOut)}
             </p>
             <p className="mt-2 text-sm text-slate-400">
               Successfully paid to you
@@ -168,7 +433,7 @@ export default function GuruDashboardEarningsPage() {
               </span>
             </div>
             <p className="mt-4 text-3xl font-black text-white">
-              {currency(earningsSummary.thisMonth)}
+              {currency(thisMonth)}
             </p>
             <p className="mt-2 text-sm text-slate-400">
               Net earnings this month
@@ -185,7 +450,7 @@ export default function GuruDashboardEarningsPage() {
               </span>
             </div>
             <p className="mt-4 text-3xl font-black text-white">
-              {earningsSummary.completedBookings}
+              {completedBookings}
             </p>
             <p className="mt-2 text-sm text-slate-400">
               Qualified completed services
@@ -202,7 +467,7 @@ export default function GuruDashboardEarningsPage() {
               </span>
             </div>
             <p className="mt-4 text-3xl font-black text-white">
-              {currency(earningsSummary.sitguruFees)}
+              {currency(sitguruFees)}
             </p>
             <p className="mt-2 text-sm text-slate-400">
               Total 8% platform fees deducted
@@ -291,7 +556,7 @@ export default function GuruDashboardEarningsPage() {
                 <div className="rounded-2xl border border-emerald-300/20 bg-white/5 p-4">
                   <p className="font-semibold text-white">Gross booking total</p>
                   <p className="mt-1">
-                    The full amount paid for the completed service.
+                    The full service subtotal tied to the completed booking.
                   </p>
                 </div>
 

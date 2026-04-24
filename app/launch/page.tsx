@@ -1,9 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import confetti from "canvas-confetti";
+import { trackEvent } from "@/lib/analytics/track";
 
 type InterestType = "customer" | "guru" | "both" | "";
+
+function getLaunchSource() {
+  if (typeof window === "undefined") return "social-launch";
+
+  const params = new URLSearchParams(window.location.search);
+  const source =
+    params.get("source") ||
+    params.get("utm_source") ||
+    params.get("ref") ||
+    "social-launch";
+
+  const normalized = source.trim().toLowerCase();
+
+  if (!normalized) return "social-launch";
+  if (normalized === "ig" || normalized.includes("instagram")) return "instagram";
+  if (normalized === "fb" || normalized.includes("facebook")) return "facebook";
+  if (normalized === "tt" || normalized.includes("tiktok")) return "tiktok";
+  if (normalized.includes("email")) return "email";
+  if (normalized.includes("referral")) return "referral";
+
+  return normalized;
+}
 
 function fireLaunchConfetti() {
   const end = Date.now() + 1800;
@@ -185,6 +208,40 @@ export default function LaunchPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [launchSource, setLaunchSource] = useState("social-launch");
+
+  useEffect(() => {
+    const source = getLaunchSource();
+
+    setLaunchSource(source);
+
+    trackEvent({
+      eventName: "launch_page_visit",
+      eventType: "traffic",
+      source,
+      metadata: {
+        referrer: document.referrer || "",
+        url: window.location.href,
+        search: window.location.search,
+        pathname: window.location.pathname,
+      },
+    });
+  }, []);
+
+  function handleInterestChange(value: InterestType) {
+    setInterestType(value);
+
+    trackEvent({
+      eventName: "launch_interest_selected",
+      eventType: "lead",
+      source: launchSource || getLaunchSource(),
+      role: value,
+      metadata: {
+        selected_interest: value,
+        location: "launch_page_form",
+      },
+    });
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -193,18 +250,58 @@ export default function LaunchPage() {
 
     const trimmedName = fullName.trim();
     const trimmedEmail = email.trim().toLowerCase();
+    const source = launchSource || getLaunchSource();
 
     if (!trimmedName || !trimmedEmail) {
-      setError("Please enter your name and email address.");
+      const message = "Please enter your name and email address.";
+      setError(message);
+
+      trackEvent({
+        eventName: "launch_signup_validation_failed",
+        eventType: "lead",
+        source,
+        role: interestType || "",
+        metadata: {
+          reason: "missing_name_or_email",
+          has_name: Boolean(trimmedName),
+          has_email: Boolean(trimmedEmail),
+        },
+      });
+
       return;
     }
 
     if (!interestType) {
-      setError("Please choose Pet Parent, Guru, or Both.");
+      const message = "Please choose Pet Parent, Guru, or Both.";
+      setError(message);
+
+      trackEvent({
+        eventName: "launch_signup_validation_failed",
+        eventType: "lead",
+        source,
+        metadata: {
+          reason: "missing_interest_type",
+          has_name: Boolean(trimmedName),
+          has_email: Boolean(trimmedEmail),
+        },
+      });
+
       return;
     }
 
     setIsSubmitting(true);
+
+    trackEvent({
+      eventName: "launch_signup_started",
+      eventType: "lead",
+      source,
+      role: interestType,
+      metadata: {
+        location: "launch_page",
+        has_name: Boolean(trimmedName),
+        has_email: Boolean(trimmedEmail),
+      },
+    });
 
     try {
       const response = await fetch("/api/launch-signup", {
@@ -215,7 +312,7 @@ export default function LaunchPage() {
         body: JSON.stringify({
           fullName: trimmedName,
           email: trimmedEmail,
-          source: "social-launch",
+          source,
           interestType,
         }),
       });
@@ -226,42 +323,132 @@ export default function LaunchPage() {
         throw new Error(data?.error || "Unable to join the waitlist right now.");
       }
 
+      trackEvent({
+        eventName: "launch_signup_completed",
+        eventType: "lead",
+        source,
+        role: interestType,
+        metadata: {
+          location: "launch_page",
+          interest_type: interestType,
+        },
+      });
+
       setFullName("");
       setEmail("");
       setInterestType("");
       fireLaunchConfetti();
       setShowSuccessModal(true);
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Something went wrong. Please try again."
-      );
+          : "Something went wrong. Please try again.";
+
+      trackEvent({
+        eventName: "launch_signup_failed",
+        eventType: "lead",
+        source,
+        role: interestType,
+        metadata: {
+          location: "launch_page",
+          error: message,
+        },
+      });
+
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleShare() {
+    const source = launchSource || getLaunchSource();
+
     const shareData = {
       title: "SitGuru",
       text: "Something New is Coming to Pet Care. Join the SitGuru waitlist.",
       url: typeof window !== "undefined" ? window.location.href : "",
     };
 
+    trackEvent({
+      eventName: "launch_share_clicked",
+      eventType: "referral",
+      source,
+      metadata: {
+        location: "launch_success_modal",
+        share_url: shareData.url,
+      },
+    });
+
     try {
       if (navigator.share) {
         await navigator.share(shareData);
+
+        trackEvent({
+          eventName: "referral_shared",
+          eventType: "referral",
+          source,
+          metadata: {
+            location: "launch_success_modal",
+            method: "native_share",
+          },
+        });
+
         return;
       }
 
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(shareData.url);
+
+        trackEvent({
+          eventName: "referral_shared",
+          eventType: "referral",
+          source,
+          metadata: {
+            location: "launch_success_modal",
+            method: "clipboard",
+          },
+        });
+
         alert("Launch page link copied.");
       }
     } catch {
-      // ignore
+      trackEvent({
+        eventName: "referral_share_cancelled",
+        eventType: "referral",
+        source,
+        metadata: {
+          location: "launch_success_modal",
+        },
+      });
     }
+  }
+
+  function handleInstagramClick() {
+    trackEvent({
+      eventName: "launch_cta_clicked",
+      eventType: "navigation",
+      source: launchSource || getLaunchSource(),
+      metadata: {
+        label: "Follow us on Instagram",
+        location: "launch_success_modal",
+        destination: "https://instagram.com",
+      },
+    });
+  }
+
+  function handleModalClose() {
+    trackEvent({
+      eventName: "launch_success_modal_closed",
+      eventType: "lead",
+      source: launchSource || getLaunchSource(),
+      metadata: {
+        location: "launch_success_modal",
+      },
+    });
+
+    setShowSuccessModal(false);
   }
 
   return (
@@ -285,7 +472,7 @@ export default function LaunchPage() {
                 error={error}
                 onNameChange={setFullName}
                 onEmailChange={setEmail}
-                onInterestChange={setInterestType}
+                onInterestChange={handleInterestChange}
                 onSubmit={handleSubmit}
               />
             </div>
@@ -301,7 +488,7 @@ export default function LaunchPage() {
             error={error}
             onNameChange={setFullName}
             onEmailChange={setEmail}
-            onInterestChange={setInterestType}
+            onInterestChange={handleInterestChange}
             onSubmit={handleSubmit}
           />
         </div>
@@ -347,6 +534,7 @@ export default function LaunchPage() {
                 href="https://instagram.com"
                 target="_blank"
                 rel="noreferrer"
+                onClick={handleInstagramClick}
                 className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
               >
                 Follow us on Instagram
@@ -362,7 +550,7 @@ export default function LaunchPage() {
 
               <button
                 type="button"
-                onClick={() => setShowSuccessModal(false)}
+                onClick={handleModalClose}
                 className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
               >
                 Close

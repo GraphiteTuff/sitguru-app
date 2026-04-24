@@ -8,12 +8,14 @@ export const dynamic = "force-dynamic";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
 if (!stripeSecretKey) {
-  throw new Error("Missing STRIPE_SECRET_KEY in .env.local");
+  throw new Error("Missing STRIPE_SECRET_KEY in environment");
 }
 
 const stripe = new Stripe(stripeSecretKey, {
   apiVersion: "2026-03-25.dahlia",
 });
+
+const SITGURU_FEE_PERCENT = 0.08;
 
 type BookingRow = Record<string, unknown>;
 
@@ -75,6 +77,10 @@ function toStripeAmount(value: unknown) {
   return 2500;
 }
 
+function centsToDollars(cents: number) {
+  return Number((cents / 100).toFixed(2));
+}
+
 function getBookingOwnerId(booking: BookingRow) {
   const possibleOwnerFields = [
     "pet_owner_id",
@@ -119,12 +125,29 @@ async function fetchBookingById(bookingId: string) {
   };
 }
 
-async function updateCheckoutStarted(bookingId: string, stripeSessionId: string) {
+async function updateCheckoutStarted(
+  bookingId: string,
+  values: {
+    stripeSessionId: string;
+    subtotalAmount: number;
+    sitguruFeeAmount: number;
+    guruNetAmount: number;
+    totalCustomerPaid: number;
+  }
+) {
   const primaryUpdate = await supabaseAdmin
     .from("bookings")
     .update({
       payment_status: "checkout_started",
-      stripe_session_id: stripeSessionId,
+      stripe_session_id: values.stripeSessionId,
+      stripe_checkout_session_id: values.stripeSessionId,
+      currency: "usd",
+      subtotal_amount: values.subtotalAmount,
+      sitguru_fee_amount: values.sitguruFeeAmount,
+      guru_net_amount: values.guruNetAmount,
+      total_customer_paid: values.totalCustomerPaid,
+      tax_status: "not_calculated",
+      payout_status: "pending",
     })
     .eq("id", bookingId);
 
@@ -136,6 +159,12 @@ async function updateCheckoutStarted(bookingId: string, stripeSessionId: string)
 
   if (
     message.includes("stripe_session_id") ||
+    message.includes("stripe_checkout_session_id") ||
+    message.includes("subtotal_amount") ||
+    message.includes("sitguru_fee_amount") ||
+    message.includes("guru_net_amount") ||
+    message.includes("total_customer_paid") ||
+    message.includes("tax_status") ||
     message.includes("column") ||
     message.includes("schema cache")
   ) {
@@ -232,7 +261,7 @@ export async function POST(req: NextRequest) {
       asTrimmedString(booking.booking_type) ||
       "General care";
 
-    const unitAmount = toStripeAmount(
+    const subtotalCents = toStripeAmount(
       booking.total_amount ??
         booking.amount ??
         booking.price ??
@@ -240,10 +269,16 @@ export async function POST(req: NextRequest) {
         25
     );
 
+    const sitguruFeeCents = Math.round(subtotalCents * SITGURU_FEE_PERCENT);
+    const guruNetCents = subtotalCents - sitguruFeeCents;
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       customer_email: user.email ?? undefined,
+      automatic_tax: {
+        enabled: true,
+      },
       line_items: [
         {
           price_data: {
@@ -252,11 +287,26 @@ export async function POST(req: NextRequest) {
               name: `SitGuru Booking - ${petName}`,
               description: serviceName,
             },
-            unit_amount: unitAmount,
+            unit_amount: subtotalCents,
           },
           quantity: 1,
         },
       ],
+      payment_intent_data: {
+        application_fee_amount: sitguruFeeCents,
+        metadata: {
+          booking_id: String(booking.id),
+          booking_owner_id: ownerId || user.id,
+          guru_id: asTrimmedString(booking.guru_id),
+          guru_slug: asTrimmedString(booking.guru_slug),
+          pet_id: asTrimmedString(booking.pet_id),
+          pet_name: petName,
+          service: serviceName,
+          subtotal_cents: String(subtotalCents),
+          sitguru_fee_cents: String(sitguruFeeCents),
+          guru_net_cents: String(guruNetCents),
+        },
+      },
       success_url: `${baseUrl}/bookings/success?bookingId=${String(
         booking.id
       )}&session_id={CHECKOUT_SESSION_ID}`,
@@ -269,10 +319,19 @@ export async function POST(req: NextRequest) {
         pet_id: asTrimmedString(booking.pet_id),
         pet_name: petName,
         service: serviceName,
+        subtotal_cents: String(subtotalCents),
+        sitguru_fee_cents: String(sitguruFeeCents),
+        guru_net_cents: String(guruNetCents),
       },
     });
 
-    await updateCheckoutStarted(String(booking.id), session.id);
+    await updateCheckoutStarted(String(booking.id), {
+      stripeSessionId: session.id,
+      subtotalAmount: centsToDollars(subtotalCents),
+      sitguruFeeAmount: centsToDollars(sitguruFeeCents),
+      guruNetAmount: centsToDollars(guruNetCents),
+      totalCustomerPaid: centsToDollars(subtotalCents),
+    });
 
     if (!session.url) {
       return NextResponse.json(
@@ -283,6 +342,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       url: session.url,
+      financialPreview: {
+        subtotalAmount: centsToDollars(subtotalCents),
+        sitguruFeeAmount: centsToDollars(sitguruFeeCents),
+        guruNetAmount: centsToDollars(guruNetCents),
+        taxAmount: 0,
+        totalCustomerPaid: centsToDollars(subtotalCents),
+      },
     });
   } catch (error) {
     console.error("Stripe checkout error:", error);
