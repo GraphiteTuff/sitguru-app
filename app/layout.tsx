@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import RouteShell from "@/components/RouteShell";
 
 export const metadata: Metadata = {
   title: "SitGuru | Trusted Pet Care. Simplified.",
@@ -17,9 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="site-shell min-h-screen text-slate-900 antialiased">
-        <Header />
-        <main className="site-main min-h-[80vh]">{children}</main>
-        <Footer />
+        <RouteShell>{children}</RouteShell>
       </body>
     </html>
   );

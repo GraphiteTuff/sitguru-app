@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -368,11 +369,7 @@ function ConversationAvatar({
     return (
       <div className="h-14 w-14 overflow-hidden rounded-[18px] border border-white/10 bg-white/5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageUrl}
-          alt={name}
-          className="h-full w-full object-cover"
-        />
+        <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
       </div>
     );
   }
@@ -636,6 +633,121 @@ async function getGuruConversations(
   };
 }
 
+function GuruDarkLogo({
+  className = "",
+  imageClassName = "",
+}: {
+  className?: string;
+  imageClassName?: string;
+}) {
+  return (
+    <Link
+      href="/guru/dashboard"
+      className={`inline-flex shrink-0 items-center ${className}`}
+      aria-label="Go to SitGuru Guru dashboard"
+    >
+      <Image
+        src="/images/sitguru-logo-dark.png"
+        alt="SitGuru"
+        width={300}
+        height={112}
+        priority
+        className={`h-auto w-[170px] sm:w-[210px] lg:w-[240px] ${imageClassName}`}
+      />
+    </Link>
+  );
+}
+
+function GuruDarkHeader() {
+  return (
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/95 px-4 py-4 text-white shadow-[0_10px_30px_rgba(0,0,0,0.25)] backdrop-blur sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+        <GuruDarkLogo />
+
+        <nav className="hidden items-center gap-2 md:flex">
+          <Link
+            href="/guru/dashboard"
+            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
+          >
+            Dashboard
+          </Link>
+          <Link
+            href="/messages"
+            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
+          >
+            Messages
+          </Link>
+          <Link
+            href="/guru/bookings"
+            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
+          >
+            Bookings
+          </Link>
+          <Link
+            href="/guru/profile"
+            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
+          >
+            Profile
+          </Link>
+          <Link
+            href="/guru/dashboard/earnings"
+            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
+          >
+            Earnings
+          </Link>
+        </nav>
+
+        <Link
+          href="/logout"
+          className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950 shadow-[0_10px_25px_rgba(16,185,129,0.22)] transition hover:bg-emerald-300"
+        >
+          Logout
+        </Link>
+      </div>
+    </header>
+  );
+}
+
+function GuruDarkFooter() {
+  return (
+    <footer className="border-t border-white/10 bg-slate-950 px-4 py-8 text-white sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-3">
+          <GuruDarkLogo imageClassName="w-[165px] sm:w-[190px] lg:w-[210px]" />
+
+          <p className="max-w-md text-sm leading-6 text-slate-400">
+            Trusted Pet Care. Simplified.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 text-sm text-slate-400 sm:flex-row sm:items-center">
+          <Link href="/guru/dashboard" className="transition hover:text-white">
+            Guru Dashboard
+          </Link>
+          <Link href="/messages" className="transition hover:text-white">
+            Messages
+          </Link>
+          <Link href="/guru/bookings" className="transition hover:text-white">
+            Bookings
+          </Link>
+          <Link href="/guru/profile" className="transition hover:text-white">
+            Profile
+          </Link>
+          <Link
+            href="/guru/dashboard/earnings"
+            className="transition hover:text-white"
+          >
+            Earnings
+          </Link>
+          <span className="text-slate-500">
+            © {new Date().getFullYear()} SitGuru
+          </span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 export default async function GuruDashboardPage() {
   const supabase = await createClient();
 
@@ -695,12 +807,13 @@ export default async function GuruDashboardPage() {
   }).length;
 
   const recentBookings = enrichedBookings.slice(0, 6);
-
   const services =
     normalizeServices(guruProfile?.services) || ["Pet Sitting", "Dog Walking"];
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_20%),linear-gradient(180deg,#020617_0%,#0b1220_46%,#020617_100%)] text-white">
+      <GuruDarkHeader />
+
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(17,24,39,0.94),rgba(15,23,42,0.96))] shadow-[0_30px_80px_rgba(2,6,23,0.45)]">
           <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.1fr_0.9fr] lg:p-10">
@@ -806,9 +919,7 @@ export default async function GuruDashboardPage() {
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">
               Pending
             </p>
-            <p className="mt-3 text-3xl font-black text-white">
-              {pendingCount}
-            </p>
+            <p className="mt-3 text-3xl font-black text-white">{pendingCount}</p>
             <p className="mt-2 text-sm leading-6 text-slate-300">
               Requests or bookings still waiting on action or confirmation.
             </p>
@@ -818,9 +929,7 @@ export default async function GuruDashboardPage() {
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-300">
               Active
             </p>
-            <p className="mt-3 text-3xl font-black text-white">
-              {activeCount}
-            </p>
+            <p className="mt-3 text-3xl font-black text-white">{activeCount}</p>
             <p className="mt-2 text-sm leading-6 text-slate-300">
               Confirmed or active care that requires ongoing visibility.
             </p>
@@ -888,7 +997,8 @@ export default async function GuruDashboardPage() {
                     const status = String(getBookingStatus(booking));
                     const petName = getPetName(booking);
                     const bookingKey =
-                      typeof booking.id === "string" || typeof booking.id === "number"
+                      typeof booking.id === "string" ||
+                      typeof booking.id === "number"
                         ? String(booking.id)
                         : `${getCustomerName(booking)}-${index}`;
 
@@ -977,11 +1087,9 @@ export default async function GuruDashboardPage() {
                     Starting rate
                   </p>
                   <p className="mt-2 text-lg font-bold text-white">
-                    {guruProfile?.rate || guruProfile?.rate === 0
-                      ? `$${guruProfile.rate}`
-                      : guruProfile?.hourly_rate || guruProfile?.hourly_rate === 0
-                      ? `$${guruProfile.hourly_rate}`
-                      : "Rate pending"}
+                    {guruProfile?.rate || guruProfile?.hourly_rate
+                      ? `$${guruProfile?.rate ?? guruProfile?.hourly_rate}`
+                      : "$25"}
                   </p>
                 </div>
               </div>
@@ -1015,11 +1123,71 @@ export default async function GuruDashboardPage() {
           </div>
 
           <div className="space-y-6">
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="rounded-[28px] border border-emerald-400/20 bg-emerald-400/10 p-6 shadow-[0_10px_30px_rgba(16,185,129,0.08)]">
+              <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                    Message board
+                    Earnings Snapshot
+                  </p>
+                  <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+                    Keep more with SitGuru
+                  </h2>
+                </div>
+
+                <span className="rounded-full border border-emerald-300/20 bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-200">
+                  8% Fee
+                </span>
+              </div>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-[20px] border border-white/10 bg-slate-950/35 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    This Month
+                  </p>
+                  <p className="mt-2 text-2xl font-black text-white">$0.00</p>
+                  <p className="mt-1 text-sm text-slate-300">
+                    Net earnings this month
+                  </p>
+                </div>
+
+                <div className="rounded-[20px] border border-white/10 bg-slate-950/35 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    Pending
+                  </p>
+                  <p className="mt-2 text-2xl font-black text-white">$0.00</p>
+                  <p className="mt-1 text-sm text-slate-300">
+                    Awaiting payout processing
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-5 text-sm leading-7 text-slate-200">
+                SitGuru currently takes an introductory 8% platform fee on
+                completed bookings, helping Gurus keep more of what they earn.
+              </p>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/guru/dashboard/earnings"
+                  className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+                >
+                  View Earnings
+                </Link>
+
+                <Link
+                  href="/guru/bookings"
+                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+                >
+                  Open Bookings
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+                    Message Board
                   </p>
                   <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
                     Direct customer conversations
@@ -1028,29 +1196,30 @@ export default async function GuruDashboardPage() {
 
                 <Link
                   href="/messages"
-                  className="text-sm font-semibold text-emerald-300 transition hover:text-emerald-200"
+                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getConversationStatusClasses(
+                    customerConversations[0]?.status || "open"
+                  )}`}
                 >
                   Open inbox
                 </Link>
               </div>
 
               {customerConversations.length === 0 ? (
-                <div className="mt-6 rounded-[22px] border border-dashed border-white/10 bg-slate-950/35 p-6">
+                <div className="mt-6 rounded-[22px] border border-dashed border-white/10 bg-slate-950/35 p-5">
                   <p className="text-base font-semibold text-white">
-                    No customer threads yet
+                    No customer messages yet
                   </p>
                   <p className="mt-2 text-sm leading-7 text-slate-300">
-                    When customers message you, their conversations will appear
-                    here for quick access and fast replies.
+                    Customer conversation threads will appear here once direct
+                    messaging begins on your account.
                   </p>
                 </div>
               ) : (
                 <div className="mt-6 space-y-4">
-                  {customerConversations.slice(0, 4).map((conversation) => (
-                    <Link
+                  {customerConversations.slice(0, 2).map((conversation) => (
+                    <div
                       key={conversation.id}
-                      href={conversation.href}
-                      className="block rounded-[22px] border border-white/10 bg-slate-950/40 p-4 transition hover:border-emerald-400/25 hover:bg-slate-950/55"
+                      className="rounded-[22px] border border-white/10 bg-slate-950/40 p-5"
                     >
                       <div className="flex items-start gap-4">
                         <ConversationAvatar
@@ -1059,94 +1228,95 @@ export default async function GuruDashboardPage() {
                         />
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-base font-bold text-white">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p className="text-sm font-bold text-white">
                                 {conversation.otherUserName}
                               </p>
-                              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                                 {conversation.otherUserRole}
                               </p>
                             </div>
 
-                            <div
-                              className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold capitalize ${getConversationStatusClasses(
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${getConversationStatusClasses(
                                 conversation.status
                               )}`}
                             >
                               {conversation.status}
-                            </div>
+                            </span>
                           </div>
 
-                          <p className="mt-3 truncate text-sm font-semibold text-slate-100">
+                          <p className="mt-3 text-sm font-semibold text-emerald-200">
                             {conversation.subject}
                           </p>
-                          <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-300">
+                          <p className="mt-2 text-sm leading-7 text-slate-300">
                             {conversation.preview}
                           </p>
-
-                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                            <p className="text-xs font-medium text-slate-400">
+                          <div className="mt-3 flex items-center justify-between gap-4">
+                            <p className="text-xs text-slate-400">
                               {formatDateTime(conversation.lastActivity)}
                             </p>
-
-                            <span className="text-sm font-semibold text-emerald-300">
+                            <Link
+                              href={conversation.href}
+                              className="text-xs font-semibold text-emerald-300 transition hover:text-emerald-200"
+                            >
                               Open thread →
-                            </span>
+                            </Link>
                           </div>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Link
+                      href="/messages"
+                      className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      View All Messages
+                    </Link>
+
+                    <Link
+                      href="/guru/bookings"
+                      className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+                    >
+                      Open Booking Threads
+                    </Link>
+                  </div>
                 </div>
               )}
-
-              <div className="mt-6 flex flex-col gap-3">
-                <Link
-                  href="/messages"
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                >
-                  View All Messages
-                </Link>
-
-                <Link
-                  href="/guru/bookings"
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
-                >
-                  Open Booking Threads
-                </Link>
-              </div>
             </div>
 
             <div className="rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(5,150,105,0.14),rgba(15,23,42,0.78))] p-6">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                    Admin support
+                    Admin Support
                   </p>
                   <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
                     Private thread with Admin only
                   </h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-200">
-                    Use this space for platform issues, approvals, account help,
-                    or operational questions. Customers are not part of this card
-                    or this thread.
-                  </p>
                 </div>
 
-                {adminConversation ? (
-                  <div
-                    className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold capitalize ${getConversationStatusClasses(
-                      adminConversation.status
-                    )}`}
-                  >
-                    {adminConversation.status}
-                  </div>
-                ) : null}
+                <Link
+                  href="/messages/admin"
+                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getConversationStatusClasses(
+                    adminConversation?.status || "open"
+                  )}`}
+                >
+                  Open
+                </Link>
               </div>
 
+              <p className="mt-3 text-sm leading-7 text-slate-200">
+                Use this space for platform issues, approvals, account help, or
+                operational questions. Customer messages are not part of this
+                card or this thread.
+              </p>
+
               {adminConversation ? (
-                <div className="mt-6 rounded-[22px] border border-white/10 bg-slate-950/35 p-4">
+                <div className="mt-6 rounded-[22px] border border-white/10 bg-slate-950/40 p-5">
                   <div className="flex items-start gap-4">
                     <ConversationAvatar
                       name={adminConversation.otherUserName}
@@ -1154,19 +1324,32 @@ export default async function GuruDashboardPage() {
                     />
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-bold text-white">
-                        {adminConversation.otherUserName}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        {adminConversation.otherUserRole}
-                      </p>
-                      <p className="mt-3 truncate text-sm font-semibold text-slate-100">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-white">
+                            {adminConversation.otherUserName}
+                          </p>
+                          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                            {adminConversation.otherUserRole}
+                          </p>
+                        </div>
+
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${getConversationStatusClasses(
+                            adminConversation.status
+                          )}`}
+                        >
+                          {adminConversation.status}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 text-sm font-semibold text-emerald-200">
                         {adminConversation.subject}
                       </p>
-                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-300">
+                      <p className="mt-2 text-sm leading-7 text-slate-300">
                         {adminConversation.preview}
                       </p>
-                      <p className="mt-3 text-xs font-medium text-slate-400">
+                      <p className="mt-3 text-xs text-slate-400">
                         {formatDateTime(adminConversation.lastActivity)}
                       </p>
                     </div>
@@ -1175,20 +1358,21 @@ export default async function GuruDashboardPage() {
               ) : (
                 <div className="mt-6 rounded-[22px] border border-dashed border-white/10 bg-slate-950/35 p-5">
                   <p className="text-base font-semibold text-white">
-                    No Admin thread started yet
+                    No Admin thread yet
                   </p>
                   <p className="mt-2 text-sm leading-7 text-slate-300">
-                    Click below to open a direct Admin-only message thread.
+                    Start a direct thread with Admin when you need platform help
+                    or account guidance.
                   </p>
                 </div>
               )}
 
-              <div className="mt-6 flex flex-col gap-3">
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/messages/admin"
                   className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                 >
-                  {adminConversation ? "Open Admin Thread" : "Start Admin Message"}
+                  Open Admin Thread
                 </Link>
 
                 <Link
@@ -1202,39 +1386,35 @@ export default async function GuruDashboardPage() {
 
             <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                Profile actions
+                Profile Actions
               </p>
               <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
                 Keep your Guru profile strong
               </h2>
 
-              {missingProfileItems.length === 0 ? (
-                <div className="mt-6 rounded-[22px] border border-emerald-400/20 bg-emerald-400/10 p-5">
-                  <p className="text-base font-bold text-white">
-                    Your profile looks strong
-                  </p>
-                  <p className="mt-2 text-sm leading-7 text-slate-200">
-                    Your main display information is filled out and ready for the
-                    customer-facing experience.
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-6 space-y-3">
-                  {missingProfileItems.map((item, index) => (
+              <div className="mt-6 space-y-3">
+                {(missingProfileItems.length > 0
+                  ? missingProfileItems
+                  : [
+                      "Add a service title",
+                      "Write your Guru bio",
+                      "Upload a profile image",
+                      "Select your services",
+                    ]
+                )
+                  .slice(0, 4)
+                  .map((item, index) => (
                     <div
                       key={item}
-                      className="flex items-start gap-4 rounded-[20px] border border-white/10 bg-slate-950/40 px-4 py-4"
+                      className="flex items-center gap-3 rounded-[18px] border border-white/10 bg-slate-950/40 px-4 py-4 text-sm font-medium text-slate-200"
                     >
-                      <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-slate-950">
                         {index + 1}
-                      </div>
-                      <p className="pt-1 text-sm font-medium leading-6 text-slate-200">
-                        {item}
-                      </p>
+                      </span>
+                      <span>{item}</span>
                     </div>
                   ))}
-                </div>
-              )}
+              </div>
 
               <div className="mt-6 flex flex-col gap-3">
                 <Link
@@ -1312,6 +1492,8 @@ export default async function GuruDashboardPage() {
           </div>
         </section>
       </div>
+
+      <GuruDarkFooter />
     </main>
   );
 }
