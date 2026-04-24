@@ -98,7 +98,7 @@ const sections = [
   {
     title: "13. Disclaimers",
     body: [
-      "SitGuru is provided on an “as is” and “as available” basis, to the fullest extent permitted by law. SitGuru does not guarantee uninterrupted access, error-free functionality, or that the platform will always be secure or available.",
+      'SitGuru is provided on an "as is" and "as available" basis, to the fullest extent permitted by law. SitGuru does not guarantee uninterrupted access, error-free functionality, or that the platform will always be secure or available.',
       "To the fullest extent permitted by law, SitGuru disclaims warranties of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose, non-infringement, and course of dealing.",
     ],
   },
@@ -139,7 +139,7 @@ const sections = [
   {
     title: "19. Contact Us",
     body: [
-      "If you have questions about these Terms and Conditions, please contact SitGuru through the support or contact information provided on the platform.",
+      "If you have questions about these Terms and Conditions, please contact us at support@sitguru.com.",
       "Because SitGuru values human communication, we want users to know they can reach out with questions and receive support from a real person.",
     ],
   },
@@ -302,7 +302,8 @@ export default function TermsPage() {
 
           <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-600">
             If you have questions about platform rules, responsibilities, or how
-            SitGuru works, we want you to feel informed and supported.
+            SitGuru works, email support@sitguru.com and a real person will get
+            back to you.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -313,12 +314,12 @@ export default function TermsPage() {
               Visit Help Center
             </Link>
 
-            <Link
-              href="/"
+            <a
+              href="mailto:support@sitguru.com"
               className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
             >
-              Return to SitGuru
-            </Link>
+              Email Support
+            </a>
           </div>
         </div>
       </section>

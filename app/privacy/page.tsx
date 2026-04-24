@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Heart, PawPrint, ShieldCheck, Lock, Mail, Eye } from "lucide-react";
 
@@ -84,7 +85,7 @@ const sections = [
   {
     title: "12. Contact Us",
     body: [
-      "If you have questions, concerns, or privacy-related requests, please contact SitGuru through the support or contact information provided on the platform.",
+      "If you have questions, concerns, or privacy-related requests, please contact us at support@sitguru.com.",
       "Because SitGuru believes in human communication, we want users to know they can reach out with privacy questions and receive support from a real person.",
     ],
   },
@@ -247,8 +248,8 @@ export default function PrivacyPage() {
           </h2>
 
           <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-600">
-            If you have a concern about how your information is handled, SitGuru
-            wants you to feel supported and informed.
+            If you have a concern about how your information is handled, email
+            support@sitguru.com and a real person will get back to you.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -259,12 +260,12 @@ export default function PrivacyPage() {
               Visit Help Center
             </Link>
 
-            <Link
-              href="/"
+            <a
+              href="mailto:support@sitguru.com"
               className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
             >
-              Return to SitGuru
-            </Link>
+              Email Support
+            </a>
           </div>
         </div>
       </section>

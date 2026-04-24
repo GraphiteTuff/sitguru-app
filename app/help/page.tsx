@@ -8,6 +8,7 @@ import {
   CircleHelp,
   ShieldCheck,
   Search,
+  Mail,
 } from "lucide-react";
 
 const helpSections = [
@@ -22,7 +23,7 @@ const helpSections = [
       {
         question: "What should I do if I cannot log in?",
         answer:
-          "Double-check your email address and password first. If you are still unable to access your account, use any available reset or recovery tools, or contact SitGuru for support.",
+          "Double-check your email address and password first. If you are still unable to access your account, use any available reset or recovery tools, or contact SitGuru at support@sitguru.com for help.",
       },
       {
         question: "Can I update my profile information later?",
@@ -97,7 +98,7 @@ const helpSections = [
       {
         question: "How do I contact SitGuru for help?",
         answer:
-          "If you need support, use any contact, support, or help tools provided on the platform. SitGuru believes important questions and concerns deserve real communication.",
+          "If you need support, email support@sitguru.com. SitGuru believes important questions and concerns deserve real communication.",
       },
       {
         question: "Will I be talking to a real person?",
@@ -107,7 +108,7 @@ const helpSections = [
       {
         question: "What if I need help with privacy, terms, or account concerns?",
         answer:
-          "You can review the applicable Privacy Policy and Terms & Conditions pages and reach out through SitGuru support channels if you need clarification or assistance.",
+          "You can review the applicable Privacy Policy and Terms & Conditions pages and email support@sitguru.com if you need clarification or assistance.",
       },
     ],
   },
@@ -264,7 +265,7 @@ export default function HelpPage() {
               Still Need Help?
             </p>
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <MessageCircle className="h-4 w-4" />
+              <Mail className="h-4 w-4" />
             </span>
           </div>
 
@@ -273,24 +274,23 @@ export default function HelpPage() {
           </h2>
 
           <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-600">
-            If you need more help, SitGuru wants users to feel supported — not
-            left on their own. We believe a real person should be available when
-            questions or concerns matter.
+            If you need more help, email support@sitguru.com and a real person
+            will get back to you.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              href="/privacy"
+            <a
+              href="mailto:support@sitguru.com"
               className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
             >
-              Review Privacy Policy
-            </Link>
+              Email Support
+            </a>
 
             <Link
-              href="/terms"
+              href="/privacy"
               className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
             >
-              Review Terms
+              Review Privacy Policy
             </Link>
           </div>
         </div>
