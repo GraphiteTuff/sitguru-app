@@ -12,12 +12,22 @@ function isProtectedAdminPath(pathname: string) {
 const ALLOWED_EXACT_PATHS = new Set([
   "/launch",
   "/about",
+  "/privacy",
+  "/terms",
+  "/help",
   "/favicon.ico",
   "/robots.txt",
   "/sitemap.xml",
 ]);
 
-const ALLOWED_PREFIXES = ["/api/launch-signup", "/_next", "/about/"];
+const ALLOWED_PREFIXES = [
+  "/api/launch-signup",
+  "/_next",
+  "/about/",
+  "/privacy/",
+  "/terms/",
+  "/help/",
+];
 
 const ALLOWED_PUBLIC_FILES = new Set(["/sitguru-logo-cropped.png.png"]);
 
