@@ -13,7 +13,7 @@ const sections = [
   {
     title: "2. Information We Collect",
     body: [
-      "We may collect information you provide directly to us, including your name, email address, phone number, mailing address, account information, profile details, pet information, booking details, payment-related information, messages sent through the platform, and any other information you choose to submit.",
+      "We may collect information you provide directly to us, including your name, email address, phone number, mailing address, account information, profile details, pet information, booking details, payment-related information, payout-related information, support or dispute records, messages sent through the platform, and any other information you choose to submit.",
       "We may also collect certain information automatically, such as your IP address, browser type, device information, referring pages, pages viewed, dates and times of access, and interactions with our website.",
       "If you join a waitlist, fill out a contact form, submit support requests, or communicate with SitGuru, we may collect and retain those communications.",
     ],

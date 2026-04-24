@@ -833,6 +833,11 @@ export default async function GuruDashboardPage() {
                 profile information that appears on the customer side.
               </p>
 
+              <div className="mt-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4">
+                <p className="text-sm font-black text-emerald-100">Reliable payouts after completed care</p>
+                <p className="mt-2 text-sm leading-6 text-emerald-50/90">Guru payouts are released 48 hours after completed care, unless a support case, refund request, chargeback, or trust and safety review is open.</p>
+              </div>
+
               <div className="mt-6 flex flex-wrap gap-2">
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
                   Customer-facing profile controls

@@ -373,6 +373,13 @@ export default async function GuruDashboardEarningsPage() {
           </div>
         </section>
 
+        <section className="rounded-[32px] border border-emerald-400/20 bg-emerald-400/10 p-6 shadow-[0_10px_40px_rgba(16,185,129,0.1)] backdrop-blur-sm">
+          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div><p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-200">Payout Review Window</p><h2 className="mt-3 text-3xl font-black tracking-tight text-white">Payouts become eligible 48 hours after completed care.</h2></div>
+            <p className="text-sm leading-7 text-emerald-50/90 sm:text-base">SitGuru releases Guru payouts 48 hours after completed care, as long as there are no open support cases, refund requests, chargebacks, or trust and safety reviews. If a case is opened, the related payout may be placed on hold while SitGuru reviews it fairly.</p>
+          </div>
+        </section>
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-sm">
             <div className="flex items-center justify-between">
@@ -404,7 +411,7 @@ export default async function GuruDashboardEarningsPage() {
               {currency(pendingPayouts)}
             </p>
             <p className="mt-2 text-sm text-slate-400">
-              Awaiting payout processing
+              Eligible after the 48-hour review window unless a support case is open
             </p>
           </div>
 

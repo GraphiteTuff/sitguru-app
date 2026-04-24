@@ -41,12 +41,6 @@ type GuruRow = {
   services?: string[] | null;
 };
 
-type Marker = {
-  id: string;
-  lat: number;
-  lng: number;
-};
-
 const SERVICE_OPTIONS = [
   "Dog Walking",
   "Pet Sitting",
@@ -58,6 +52,19 @@ const SERVICE_OPTIONS = [
   "Medication Help",
   "Custom Care",
 ];
+
+const DEFAULT_MAP_CENTER: [number, number] = [39.9526, -75.1652];
+
+const CITY_COORDINATES: Record<string, [number, number]> = {
+  "philadelphia,pa": [39.9526, -75.1652],
+  "philadelphia,pennsylvania": [39.9526, -75.1652],
+  "pittsburgh,pa": [40.4406, -79.9959],
+  "pittsburgh,pennsylvania": [40.4406, -79.9959],
+  "quakertown,pa": [40.4418, -75.3416],
+  "quakertown,pennsylvania": [40.4418, -75.3416],
+  "cromwell,mn": [46.6766, -92.8802],
+  "cromwell,minnesota": [46.6766, -92.8802],
+};
 
 function Card({
   children,
@@ -131,6 +138,74 @@ function matchesService(guru: GuruRow, selectedService: string) {
 
 function normalizeText(value?: string | null) {
   return (value || "").trim().toLowerCase();
+}
+
+function normalizeLocationKey(city?: string | null, state?: string | null) {
+  return `${city || ""},${state || ""}`.toLowerCase().replace(/\s+/g, "");
+}
+
+function hasValidCoordinates(guru: GuruRow) {
+  return (
+    typeof guru.latitude === "number" &&
+    typeof guru.longitude === "number" &&
+    Number.isFinite(guru.latitude) &&
+    Number.isFinite(guru.longitude) &&
+    guru.latitude >= -90 &&
+    guru.latitude <= 90 &&
+    guru.longitude >= -180 &&
+    guru.longitude <= 180 &&
+    guru.latitude !== 0 &&
+    guru.longitude !== 0
+  );
+}
+
+function getGuruFallbackCoordinates(guru: GuruRow) {
+  return CITY_COORDINATES[normalizeLocationKey(guru.city, guru.state)] || null;
+}
+
+function hasMapLocation(guru: GuruRow) {
+  return hasValidCoordinates(guru) || Boolean(getGuruFallbackCoordinates(guru));
+}
+
+function getSearchMapCenter({
+  filteredGurus,
+  cityFilter,
+  stateFilter,
+}: {
+  filteredGurus: GuruRow[];
+  cityFilter: string;
+  stateFilter: string;
+}): [number, number] {
+  const firstExactGuru = filteredGurus.find(hasValidCoordinates);
+
+  if (
+    firstExactGuru &&
+    typeof firstExactGuru.latitude === "number" &&
+    typeof firstExactGuru.longitude === "number"
+  ) {
+    return [firstExactGuru.latitude, firstExactGuru.longitude];
+  }
+
+  const firstFallbackGuru = filteredGurus.find((guru) =>
+    Boolean(getGuruFallbackCoordinates(guru))
+  );
+
+  if (firstFallbackGuru) {
+    const fallback = getGuruFallbackCoordinates(firstFallbackGuru);
+
+    if (fallback) {
+      return fallback;
+    }
+  }
+
+  const searchedLocation =
+    CITY_COORDINATES[normalizeLocationKey(cityFilter, stateFilter)];
+
+  if (searchedLocation) {
+    return searchedLocation;
+  }
+
+  return DEFAULT_MAP_CENTER;
 }
 
 function detectSourceFromUrl() {
@@ -271,6 +346,7 @@ function SearchPageContent() {
         source: detectSourceFromUrl(),
         metadata: {
           guru_count: guruRows.length,
+          guru_count_with_map_location: guruRows.filter(hasMapLocation).length,
           has_initial_service: Boolean(initialService),
           has_initial_city: Boolean(initialCity),
           has_initial_state: Boolean(initialState),
@@ -313,6 +389,13 @@ function SearchPageContent() {
     });
   }, [gurus, searchTerm, cityFilter, stateFilter, serviceFilter]);
 
+  const mapReadyGuruCount = useMemo(
+    () => filteredGurus.filter(hasMapLocation).length,
+    [filteredGurus]
+  );
+
+  const mapMissingLocationCount = filteredGurus.length - mapReadyGuruCount;
+
   useEffect(() => {
     if (loading) return;
 
@@ -348,6 +431,7 @@ function SearchPageContent() {
           state: stateFilter.trim(),
           query: searchTerm.trim(),
           result_count: filteredGurus.length,
+          map_ready_result_count: mapReadyGuruCount,
           total_gurus_loaded: gurus.length,
         },
       });
@@ -361,24 +445,19 @@ function SearchPageContent() {
     stateFilter,
     searchTerm,
     filteredGurus.length,
+    mapReadyGuruCount,
     gurus.length,
   ]);
 
-  const markers: Marker[] = filteredGurus
-    .filter(
-      (guru) =>
-        typeof guru.latitude === "number" && typeof guru.longitude === "number"
-    )
-    .map((guru) => ({
-      id: String(guru.id),
-      lat: guru.latitude as number,
-      lng: guru.longitude as number,
-    }));
-
-  const mapCenter =
-    markers.length > 0
-      ? { lat: markers[0].lat, lng: markers[0].lng }
-      : { lat: 39.9526, lng: -75.1652 };
+  const mapCenter = useMemo(
+    () =>
+      getSearchMapCenter({
+        filteredGurus,
+        cityFilter,
+        stateFilter,
+      }),
+    [filteredGurus, cityFilter, stateFilter]
+  );
 
   const activeFilterCount = [
     serviceFilter,
@@ -427,6 +506,7 @@ function SearchPageContent() {
         guru_name: getGuruName(guru),
         guru_city: guru.city || "",
         guru_state: guru.state || "",
+        guru_has_map_location: hasMapLocation(guru),
         selected_service: serviceFilter,
         result_count: filteredGurus.length,
       },
@@ -591,6 +671,10 @@ function SearchPageContent() {
                 {filteredGurus.length} Guru{filteredGurus.length === 1 ? "" : "s"} found
               </span>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
+                {mapReadyGuruCount} map pin
+                {mapReadyGuruCount === 1 ? "" : "s"} ready
+              </span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
                 {activeFilterCount} active filter{activeFilterCount === 1 ? "" : "s"}
               </span>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
@@ -643,6 +727,7 @@ function SearchPageContent() {
                   const guruRate = getGuruRate(guru);
                   const guruRating = getGuruRating(guru);
                   const services = guru.services || [];
+                  const guruHasMapLocation = hasMapLocation(guru);
 
                   return (
                     <Card
@@ -689,6 +774,16 @@ function SearchPageContent() {
                                   ) : (
                                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                                       Trusted
+                                    </span>
+                                  )}
+
+                                  {guruHasMapLocation ? (
+                                    <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                                      Map ready
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                                      Location pending
                                     </span>
                                   )}
                                 </div>
@@ -798,12 +893,26 @@ function SearchPageContent() {
                   <p className="mt-1 text-sm text-slate-600">
                     Hover over a Guru card to highlight their location.
                   </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                      {mapReadyGuruCount} map pin
+                      {mapReadyGuruCount === 1 ? "" : "s"}
+                    </span>
+
+                    {mapMissingLocationCount > 0 ? (
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                        {mapMissingLocationCount} missing location
+                        {mapMissingLocationCount === 1 ? "" : "s"}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="min-h-[420px] sm:min-h-[520px] xl:min-h-[900px]">
                   <ProviderMap
-                    markers={markers}
-                    center={[mapCenter.lat, mapCenter.lng]}
+                    markers={filteredGurus as unknown as Record<string, unknown>[]}
+                    center={mapCenter}
                     highlightedMarkerId={highlightedGuruId}
                   />
                 </div>
