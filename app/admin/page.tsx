@@ -509,14 +509,56 @@ async function safeAdminQuery(
     const result = await query;
 
     if (result.error) {
-      console.error(`Admin overview query failed for ${label}:`, result.error);
+      console.warn(`Admin overview query skipped for ${label}:`, result.error);
+      return { data: [], error: null };
     }
 
     return result;
   } catch (error) {
-    console.error(`Admin overview query threw for ${label}:`, error);
+    console.warn(`Admin overview query skipped for ${label}:`, error);
     return { data: [], error: null };
   }
+}
+
+
+function getLaunchSignupIdentity(row: LaunchSignupRow) {
+  return (
+    asTrimmedString(row.id) ||
+    asTrimmedString(row.email).toLowerCase() ||
+    asTrimmedString(row.user_id) ||
+    asTrimmedString(row.created_at)
+  );
+}
+
+function mergeLaunchSignupRows(...groups: LaunchSignupRow[][]) {
+  const merged: LaunchSignupRow[] = [];
+  const seen = new Set<string>();
+
+  for (const group of groups) {
+    for (const row of group) {
+      const key = getLaunchSignupIdentity(row);
+
+      if (key && seen.has(key)) {
+        continue;
+      }
+
+      if (key) {
+        seen.add(key);
+      }
+
+      merged.push(row);
+    }
+  }
+
+  return merged.sort((a, b) => {
+    const aDate = new Date(asTrimmedString(a.created_at)).getTime();
+    const bDate = new Date(asTrimmedString(b.created_at)).getTime();
+
+    return (
+      (Number.isFinite(bDate) ? bDate : 0) -
+      (Number.isFinite(aDate) ? aDate : 0)
+    );
+  });
 }
 
 async function getAdminOverviewData() {
@@ -525,6 +567,7 @@ async function getAdminOverviewData() {
     gurusResult,
     profilesResult,
     launchResult,
+    launchWaitlistResult,
     conversationsResult,
     messagesResult,
   ] = await Promise.all([
@@ -550,6 +593,14 @@ async function getAdminOverviewData() {
     ),
     safeAdminQuery(
       supabaseAdmin
+        .from("launch_waitlist")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(500),
+      "launch_waitlist"
+    ),
+    safeAdminQuery(
+      supabaseAdmin
         .from("conversations")
         .select("*")
         .order("created_at", { ascending: false })
@@ -568,7 +619,10 @@ async function getAdminOverviewData() {
   const bookings = (bookingsResult.data || []) as BookingRow[];
   const gurus = (gurusResult.data || []) as GuruRow[];
   const profiles = (profilesResult.data || []) as ProfileRow[];
-  const launchSignups = (launchResult.data || []) as LaunchSignupRow[];
+  const launchSignups = mergeLaunchSignupRows(
+    (launchResult.data || []) as LaunchSignupRow[],
+    (launchWaitlistResult.data || []) as LaunchSignupRow[]
+  );
   const conversations = (conversationsResult.data || []) as ConversationRow[];
   const messages = (messagesResult.data || []) as MessageRow[];
 
@@ -844,10 +898,13 @@ async function getAdminOverviewData() {
     name:
       asTrimmedString(signup.name) ||
       asTrimmedString(signup.full_name) ||
+      asTrimmedString(signup.fullName) ||
       "New signup",
     email: asTrimmedString(signup.email) || "—",
     role:
       asTrimmedString(signup.role) ||
+      asTrimmedString(signup.interest_type) ||
+      asTrimmedString(signup.interestType) ||
       asTrimmedString(signup.joining_as) ||
       "Customer",
     source:

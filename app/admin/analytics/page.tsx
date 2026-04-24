@@ -262,13 +262,13 @@ async function safeRows<T>(
     const result = await query;
 
     if (result.error) {
-      console.error(`Analytics query failed for ${label}:`, result.error);
+      console.warn(`Analytics query skipped for ${label}:`, result.error);
       return [];
     }
 
     return Array.isArray(result.data) ? (result.data as T[]) : [];
   } catch (error) {
-    console.error(`Analytics query threw for ${label}:`, error);
+    console.warn(`Analytics query skipped for ${label}:`, error);
     return [];
   }
 }

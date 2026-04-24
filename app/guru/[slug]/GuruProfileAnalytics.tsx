@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { trackEvent } from "@/lib/analytics/track";
+
+function safeString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function safeNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 function detectSourceFromUrl() {
   if (typeof window === "undefined") return "direct";
@@ -42,29 +51,52 @@ export default function GuruProfileAnalytics({
   hourlyRate: number;
   isFallback: boolean;
 }) {
+  const hasTrackedProfileView = useRef(false);
+
   useEffect(() => {
+    if (hasTrackedProfileView.current) return;
+
+    hasTrackedProfileView.current = true;
+
     const source = detectSourceFromUrl();
+    const resolvedGuruId = safeString(guruId);
+    const resolvedGuruSlug = safeString(guruSlug);
+    const resolvedGuruName = safeString(guruName) || "Guru";
+    const resolvedGuruLocation = safeString(guruLocation) || "Serving your area";
+    const resolvedPrimaryService = safeString(primaryService) || "Pet Care";
+    const resolvedHourlyRate = safeNumber(hourlyRate);
 
     trackEvent({
       eventName: "guru_profile_view",
       eventType: "profile",
       source,
       role: "customer",
-      guruId,
+      guruId: resolvedGuruId,
+      pagePath: window.location.pathname,
       metadata: {
-        guru_slug: guruSlug,
-        guru_name: guruName,
-        guru_location: guruLocation,
-        primary_service: primaryService,
-        hourly_rate: hourlyRate,
-        is_fallback: isFallback,
+        location: "guru_profile_page",
+        guru_id: resolvedGuruId,
+        guru_slug: resolvedGuruSlug,
+        guru_name: resolvedGuruName,
+        guru_location: resolvedGuruLocation,
+        primary_service: resolvedPrimaryService,
+        hourly_rate: resolvedHourlyRate,
+        is_fallback: Boolean(isFallback),
         referrer: document.referrer || "",
         url: window.location.href,
         search: window.location.search,
         pathname: window.location.pathname,
       },
     });
-  }, [guruId, guruSlug, guruName, guruLocation, primaryService, hourlyRate, isFallback]);
+  }, [
+    guruId,
+    guruSlug,
+    guruName,
+    guruLocation,
+    primaryService,
+    hourlyRate,
+    isFallback,
+  ]);
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -80,21 +112,28 @@ export default function GuruProfileAnalytics({
       const label = link.textContent?.replace(/\s+/g, " ").trim() || "link";
       const source = detectSourceFromUrl();
 
+      const resolvedGuruId = safeString(guruId);
+      const resolvedGuruSlug = safeString(guruSlug);
+      const resolvedGuruName = safeString(guruName) || "Guru";
+      const resolvedPrimaryService = safeString(primaryService) || "Pet Care";
+      const resolvedHourlyRate = safeNumber(hourlyRate);
+
       if (href.includes("/bookings/new")) {
         trackEvent({
           eventName: "booking_started",
           eventType: "booking",
           source,
           role: "customer",
-          guruId,
+          guruId: resolvedGuruId,
+          pagePath: window.location.pathname,
           metadata: {
             label,
             destination: href,
             location: "guru_profile",
-            guru_slug: guruSlug,
-            guru_name: guruName,
-            primary_service: primaryService,
-            hourly_rate: hourlyRate,
+            guru_slug: resolvedGuruSlug,
+            guru_name: resolvedGuruName,
+            primary_service: resolvedPrimaryService,
+            hourly_rate: resolvedHourlyRate,
           },
         });
 
@@ -103,13 +142,14 @@ export default function GuruProfileAnalytics({
           eventType: "booking",
           source,
           role: "customer",
-          guruId,
+          guruId: resolvedGuruId,
+          pagePath: window.location.pathname,
           metadata: {
             label,
             destination: href,
             location: "guru_profile",
-            guru_slug: guruSlug,
-            guru_name: guruName,
+            guru_slug: resolvedGuruSlug,
+            guru_name: resolvedGuruName,
           },
         });
       }
@@ -120,13 +160,14 @@ export default function GuruProfileAnalytics({
           eventType: "message",
           source,
           role: "customer",
-          guruId,
+          guruId: resolvedGuruId,
+          pagePath: window.location.pathname,
           metadata: {
             label,
             destination: href,
             location: "guru_profile",
-            guru_slug: guruSlug,
-            guru_name: guruName,
+            guru_slug: resolvedGuruSlug,
+            guru_name: resolvedGuruName,
           },
         });
       }
@@ -137,19 +178,21 @@ export default function GuruProfileAnalytics({
           eventType: "navigation",
           source,
           role: "customer",
-          guruId,
+          guruId: resolvedGuruId,
+          pagePath: window.location.pathname,
           metadata: {
             label,
             destination: href,
             location: "guru_profile",
-            guru_slug: guruSlug,
-            guru_name: guruName,
+            guru_slug: resolvedGuruSlug,
+            guru_name: resolvedGuruName,
           },
         });
       }
     }
 
     document.addEventListener("click", handleClick);
+
     return () => document.removeEventListener("click", handleClick);
   }, [guruId, guruSlug, guruName, primaryService, hourlyRate]);
 
