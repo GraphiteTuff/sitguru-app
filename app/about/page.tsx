@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, PawPrint } from "lucide-react";
@@ -94,23 +95,6 @@ const audience = [
   },
 ];
 
-const founders = [
-  {
-    name: "Jason L. Graff, MBA",
-    title: "Founder & CEO",
-    image: "/about/jason-graff.jpeg",
-    alt: "Jason L. Graff, MBA",
-    bio: "Jason leads the vision, technical development, and platform experience behind SitGuru. His focus is on building a trusted, modern foundation for Pet Parents and Gurus alike — one that feels organized, thoughtful, and centered on real care relationships rather than impersonal transactions.",
-  },
-  {
-    name: "Danette M. Graff",
-    title: "Co-Founder & Head of Marketing",
-    image: "/about/danette-graff.jpeg",
-    alt: "Danette M. Graff",
-    bio: "Danette leads SitGuru’s marketing, social media, advertising, and brand outreach. Her work helps shape how SitGuru connects with the community and communicates its mission in a way that feels warm, approachable, and deeply rooted in compassion for pets and the people who love them.",
-  },
-];
-
 const pets = [
   {
     name: "Scout",
@@ -149,7 +133,7 @@ function SectionEyebrow({
   children,
 }: {
   icon?: "paw" | "heart";
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -427,65 +411,27 @@ export default function AboutPage() {
       </section>
 
       <section className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl text-center">
-          <div className="flex items-center justify-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <Heart className="h-4 w-4" />
-            </span>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-emerald-700">
-              The People Behind SitGuru
+        <div className="rounded-[32px] border border-emerald-100 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-6 lg:p-8">
+          <div className="sr-only">
+            <h2>The People Behind SitGuru</h2>
+            <p>
+              Built by pet parents who believe care should feel more human.
+              SitGuru is being built by husband-and-wife founders Jason and
+              Danette. Their shared vision is to create a more trusted,
+              thoughtful, and community-centered experience for pet care — one
+              where pets come first, communication matters, and people who
+              truly care can stand out.
             </p>
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <PawPrint className="h-4 w-4" />
-            </span>
           </div>
 
-          <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Built by pet parents who believe care should feel more human.
-          </h2>
-          <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-slate-600">
-            SitGuru is being built by husband-and-wife founders Jason L. Graff,
-            MBA and Danette M. Graff. Their shared vision is to create a more
-            trusted, thoughtful, and community-centered experience for pet care
-            — one where pets come first, communication matters, and people who
-            truly care can stand out.
-          </p>
-        </div>
-
-        <div className="mt-12 grid gap-6 lg:grid-cols-2">
-          {founders.map((founder) => (
-            <div
-              key={founder.name}
-              className="overflow-hidden rounded-[32px] border border-emerald-100 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
-            >
-              <div className="grid h-full lg:grid-cols-[240px_1fr]">
-                <div className="relative min-h-[360px] bg-emerald-50 lg:min-h-[320px]">
-                  <Image
-                    src={founder.image}
-                    alt={founder.alt}
-                    fill
-                    className="object-contain object-top p-4 lg:object-cover lg:object-center lg:p-0"
-                    sizes="(max-width: 1024px) 100vw, 240px"
-                  />
-                </div>
-
-                <div className="p-8">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
-                    Founder
-                  </p>
-                  <h3 className="mt-3 text-2xl font-black text-slate-950">
-                    {founder.name}
-                  </h3>
-                  <p className="mt-2 text-sm font-semibold text-emerald-700">
-                    {founder.title}
-                  </p>
-                  <p className="mt-5 text-sm leading-7 text-slate-600">
-                    {founder.bio}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
+          <Image
+            src="/about/people-behind-sitguru.png"
+            alt="The People Behind SitGuru graphic featuring founders Jason and Danette, their roles, and the SitGuru mission."
+            width={1600}
+            height={1000}
+            priority
+            className="h-auto w-full rounded-[24px] border border-emerald-100"
+          />
         </div>
       </section>
 
