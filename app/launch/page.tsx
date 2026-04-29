@@ -518,7 +518,7 @@ export default function LaunchPage() {
             </div>
 
             <p className="text-[11px] font-black uppercase tracking-[0.26em] text-emerald-600">
-              You're In
+              You&apos;re In
             </p>
 
             <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">

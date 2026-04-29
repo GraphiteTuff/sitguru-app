@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -29,6 +36,21 @@ function getName(profile?: Profile | null) {
   return full || profile.account_type || profile.role || "User";
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return "Something went wrong.";
+}
+
 function isVisibleContact(profile: Profile) {
   const accountType = String(profile.account_type || "").toLowerCase();
   const role = String(profile.role || "").toLowerCase();
@@ -54,7 +76,9 @@ function sortConversationPartners(
 
   for (const message of safeMessages) {
     const partnerId =
-      message.sender_id === activeUserId ? message.recipient_id : message.sender_id;
+      message.sender_id === activeUserId
+        ? message.recipient_id
+        : message.sender_id;
 
     const messageTime = new Date(message.created_at).getTime();
     const current = lastMessageTimeByPartner.get(partnerId) || 0;
@@ -85,113 +109,125 @@ export default function MessagesPage() {
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  async function loadData(preferredSelectedUser?: string | null) {
-    try {
-      setLoading(true);
-      setError("");
+  const loadData = useCallback(
+    async (preferredSelectedUser?: string | null) => {
+      try {
+        setLoading(true);
+        setError("");
 
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
 
-      if (authError) {
-        router.push("/login");
+        if (authError || !user) {
+          router.push("/login");
+          return;
+        }
+
+        setUserId(user.id);
+
+        const [
+          { data: profilesData, error: profilesError },
+          { data: messagesData, error: messagesError },
+        ] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("id, first_name, last_name, account_type, role")
+            .neq("id", user.id),
+          supabase
+            .from("messages")
+            .select(
+              "id, sender_id, recipient_id, content, created_at, is_read, read_at"
+            )
+            .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+            .order("created_at", { ascending: true }),
+        ]);
+
+        if (profilesError) throw profilesError;
+        if (messagesError) throw messagesError;
+
+        const safeProfiles = ((profilesData || []) as Profile[]).filter(
+          isVisibleContact
+        );
+        const safeMessages = (messagesData || []) as Message[];
+
+        const sortedProfiles = sortConversationPartners(
+          safeProfiles,
+          safeMessages,
+          user.id
+        );
+
+        setProfiles(sortedProfiles);
+        setMessages(safeMessages);
+
+        if (
+          preferredSelectedUser &&
+          sortedProfiles.some((p) => p.id === preferredSelectedUser)
+        ) {
+          setSelectedUser(preferredSelectedUser);
+        } else if (sortedProfiles.length > 0) {
+          const existingConversationPartner = [...safeMessages]
+            .reverse()
+            .map((m) =>
+              m.sender_id === user.id ? m.recipient_id : m.sender_id
+            )
+            .find((id) => sortedProfiles.some((p) => p.id === id));
+
+          setSelectedUser(existingConversationPartner || sortedProfiles[0].id);
+        } else {
+          setSelectedUser(null);
+        }
+      } catch (err: unknown) {
+        setError(getErrorMessage(err) || "Failed to load messages.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [router]
+  );
+
+  const markConversationAsRead = useCallback(
+    async (activeUserId: string, partnerId: string) => {
+      const unreadIncoming = messages.filter(
+        (m) =>
+          m.sender_id === partnerId &&
+          m.recipient_id === activeUserId &&
+          m.is_read === false
+      );
+
+      if (unreadIncoming.length === 0) return;
+
+      const unreadIds = unreadIncoming.map((m) => m.id);
+      const readTimestamp = new Date().toISOString();
+
+      const { error: updateError } = await supabase
+        .from("messages")
+        .update({
+          is_read: true,
+          read_at: readTimestamp,
+        })
+        .in("id", unreadIds);
+
+      if (updateError) {
+        console.error("Failed to mark messages as read:", updateError.message);
         return;
       }
 
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      setUserId(user.id);
-
-      const [
-        { data: profilesData, error: profilesError },
-        { data: messagesData, error: messagesError },
-      ] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, first_name, last_name, account_type, role")
-          .neq("id", user.id),
-        supabase
-          .from("messages")
-          .select("id, sender_id, recipient_id, content, created_at, is_read, read_at")
-          .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-          .order("created_at", { ascending: true }),
-      ]);
-
-      if (profilesError) throw profilesError;
-      if (messagesError) throw messagesError;
-
-      const safeProfiles = ((profilesData || []) as Profile[]).filter(isVisibleContact);
-      const safeMessages = (messagesData || []) as Message[];
-
-      const sortedProfiles = sortConversationPartners(safeProfiles, safeMessages, user.id);
-
-      setProfiles(sortedProfiles);
-      setMessages(safeMessages);
-
-      const currentSelected = preferredSelectedUser ?? selectedUser;
-
-      if (currentSelected && sortedProfiles.some((p) => p.id === currentSelected)) {
-        setSelectedUser(currentSelected);
-      } else if (sortedProfiles.length > 0) {
-        const existingConversationPartner = [...safeMessages]
-          .reverse()
-          .map((m) => (m.sender_id === user.id ? m.recipient_id : m.sender_id))
-          .find((id) => sortedProfiles.some((p) => p.id === id));
-
-        setSelectedUser(existingConversationPartner || sortedProfiles[0].id);
-      } else {
-        setSelectedUser(null);
-      }
-    } catch (err: any) {
-      setError(err?.message || "Failed to load messages.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function markConversationAsRead(activeUserId: string, partnerId: string) {
-    const unreadIncoming = messages.filter(
-      (m) =>
-        m.sender_id === partnerId &&
-        m.recipient_id === activeUserId &&
-        m.is_read === false
-    );
-
-    if (unreadIncoming.length === 0) return;
-
-    const unreadIds = unreadIncoming.map((m) => m.id);
-    const readTimestamp = new Date().toISOString();
-
-    const { error: updateError } = await supabase
-      .from("messages")
-      .update({
-        is_read: true,
-        read_at: readTimestamp,
-      })
-      .in("id", unreadIds);
-
-    if (updateError) {
-      console.error("Failed to mark messages as read:", updateError.message);
-      return;
-    }
-
-    setMessages((prev) =>
-      prev.map((m) =>
-        unreadIds.includes(m.id)
-          ? { ...m, is_read: true, read_at: readTimestamp }
-          : m
-      )
-    );
-  }
+      setMessages((prev) =>
+        prev.map((m) =>
+          unreadIds.includes(m.id)
+            ? { ...m, is_read: true, read_at: readTimestamp }
+            : m
+        )
+      );
+    },
+    [messages]
+  );
 
   useEffect(() => {
-    loadData();
-  }, []);
+    void loadData();
+  }, [loadData]);
 
   useEffect(() => {
     if (!userId) return;
@@ -218,7 +254,8 @@ export default function MessagesPage() {
 
             return [...prev, incoming].sort(
               (a, b) =>
-                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                new Date(a.created_at).getTime() -
+                new Date(b.created_at).getTime()
             );
           });
         }
@@ -281,8 +318,12 @@ export default function MessagesPage() {
       })
       .filter((item) => item.thread.length > 0 || item.profile.role === "admin")
       .sort((a, b) => {
-        const aTime = a.lastMessage ? new Date(a.lastMessage.created_at).getTime() : 0;
-        const bTime = b.lastMessage ? new Date(b.lastMessage.created_at).getTime() : 0;
+        const aTime = a.lastMessage
+          ? new Date(a.lastMessage.created_at).getTime()
+          : 0;
+        const bTime = b.lastMessage
+          ? new Date(b.lastMessage.created_at).getTime()
+          : 0;
         return bTime - aTime;
       });
   }, [profiles, messages, userId]);
@@ -303,8 +344,8 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!userId || !selectedUser) return;
-    markConversationAsRead(userId, selectedUser);
-  }, [userId, selectedUser, activeMessages.length]);
+    void markConversationAsRead(userId, selectedUser);
+  }, [userId, selectedUser, activeMessages.length, markConversationAsRead]);
 
   async function sendMessage(e: FormEvent) {
     e.preventDefault();
@@ -331,8 +372,8 @@ export default function MessagesPage() {
       }
 
       setNewMessage("");
-    } catch (err: any) {
-      setError(err?.message || "Failed to send message.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Failed to send message.");
     } finally {
       setSending(false);
     }
@@ -355,7 +396,9 @@ export default function MessagesPage() {
         <div className="mb-6 flex items-center justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Messages</h1>
-            <p className="mt-2 text-slate-600">Chat with providers and support.</p>
+            <p className="mt-2 text-slate-600">
+              Chat with providers and support.
+            </p>
           </div>
 
           <Link
@@ -374,7 +417,9 @@ export default function MessagesPage() {
 
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           <aside className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="mb-4 text-lg font-bold text-slate-900">Conversations</h2>
+            <h2 className="mb-4 text-lg font-bold text-slate-900">
+              Conversations
+            </h2>
 
             <div className="space-y-2">
               {conversationItems.map(({ profile, lastMessage, unreadCount }) => (
@@ -386,13 +431,15 @@ export default function MessagesPage() {
                     selectedUser === profile.id
                       ? "border border-emerald-300 bg-emerald-100"
                       : unreadCount > 0
-                      ? "border border-red-200 bg-red-50 hover:bg-red-100"
-                      : "border border-slate-200 bg-slate-50 hover:bg-slate-100"
+                        ? "border border-red-200 bg-red-50 hover:bg-red-100"
+                        : "border border-slate-200 bg-slate-50 hover:bg-slate-100"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-semibold text-slate-900">{getName(profile)}</div>
+                      <div className="font-semibold text-slate-900">
+                        {getName(profile)}
+                      </div>
                       <div className="mt-1 text-xs text-slate-500">
                         {profile.account_type || profile.role || "Member"}
                       </div>
@@ -406,7 +453,9 @@ export default function MessagesPage() {
                   </div>
 
                   <div className="mt-2 line-clamp-2 text-xs text-slate-500">
-                    {lastMessage ? lastMessage.content : "Start a new conversation"}
+                    {lastMessage
+                      ? lastMessage.content
+                      : "Start a new conversation"}
                   </div>
                 </button>
               ))}
@@ -422,7 +471,9 @@ export default function MessagesPage() {
           <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 p-5">
               <h2 className="text-xl font-bold text-slate-900">
-                {selectedProfile ? getName(selectedProfile) : "Select a conversation"}
+                {selectedProfile
+                  ? getName(selectedProfile)
+                  : "Select a conversation"}
               </h2>
             </div>
 
@@ -436,7 +487,8 @@ export default function MessagesPage() {
 
                 {selectedUser && activeMessages.length === 0 ? (
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                    No messages yet. Type a message below and press Send message.
+                    No messages yet. Type a message below and press Send
+                    message.
                   </div>
                 ) : null}
 
@@ -444,14 +496,17 @@ export default function MessagesPage() {
                   const mine = msg.sender_id === userId;
 
                   return (
-                    <div key={msg.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                    <div
+                      key={msg.id}
+                      className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                    >
                       <div
                         className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
                           mine
                             ? "bg-emerald-600 text-white"
                             : msg.is_read === false
-                            ? "border border-red-200 bg-red-50 text-slate-900"
-                            : "border border-slate-200 bg-slate-100 text-slate-900"
+                              ? "border border-red-200 bg-red-50 text-slate-900"
+                              : "border border-slate-200 bg-slate-100 text-slate-900"
                         }`}
                       >
                         <div>{msg.content}</div>
@@ -470,7 +525,10 @@ export default function MessagesPage() {
                 <div ref={bottomRef} />
               </div>
 
-              <form onSubmit={sendMessage} className="border-t border-slate-200 p-5">
+              <form
+                onSubmit={sendMessage}
+                className="border-t border-slate-200 p-5"
+              >
                 <div className="flex flex-col gap-3 md:flex-row">
                   <textarea
                     value={newMessage}

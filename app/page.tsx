@@ -1,9 +1,17 @@
 "use client";
 
+import { Open_Sans } from "next/font/google";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import ReferralRewardsSection from "@/components/ReferralRewardsSection";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
+
+const openSans = Open_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+});
 
 const heroServiceOptions = [
   "Dog Walking",
@@ -869,7 +877,10 @@ export default function HomePage() {
   }
 
   return (
-    <main className="page-shell bg-white text-slate-950">
+    <main
+      className={`${openSans.className} page-shell bg-white text-slate-950 font-light`}
+      style={{ fontWeight: 300 }}
+    >
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50">
         <div className="pointer-events-none absolute inset-0">
@@ -935,6 +946,19 @@ export default function HomePage() {
                 </Link>
               </div>
 
+              <p className="mt-5 text-sm text-slate-700">
+                Already have an account?{" "}
+                <Link
+                  href="/login"
+                  className="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
+                  onClick={() =>
+                    trackHomepageClick("Customer Login", "hero_login_prompt", "/login")
+                  }
+                >
+                  Customer Login
+                </Link>
+              </p>
+
               <div className="mt-5 flex flex-wrap gap-2">
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
                   Browse local care
@@ -958,18 +982,13 @@ export default function HomePage() {
                 ))}
               </div>
 
-              <p className="mt-5 text-sm text-slate-700">
-                Already have an account?{" "}
-                <Link
-                  href="/login"
-                  className="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
-                  onClick={() =>
-                    trackHomepageClick("Customer Login", "hero", "/login")
-                  }
-                >
-                  Customer Login
-                </Link>
-              </p>
+              <div className="mt-8 overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+                <img
+                  src="/images/homepage/sitguru-dog-walking-hero.jpg"
+                  alt="SitGuru caregiver walking two happy dogs"
+                  className="h-auto w-full object-cover"
+                />
+              </div>
             </div>
 
             <div
@@ -1214,6 +1233,23 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+
+          <ReferralRewardsSection
+            source={launchForm.source || detectSourceFromUrl()}
+            onShare={(platform, referralType) => {
+              trackEvent({
+                eventName: "homepage_referral_share_clicked",
+                eventType: "referral",
+                source: launchForm.source || detectSourceFromUrl(),
+                role: referralType,
+                metadata: {
+                  platform,
+                  referral_type: referralType,
+                  location: "homepage_rewards_section",
+                },
+              });
+            }}
+          />
         </div>
       </section>
 
@@ -1410,14 +1446,14 @@ export default function HomePage() {
               </ul>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-900 p-7 text-white shadow-sm sm:p-8">
-              <div className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-300">
+            <div className="rounded-[28px] border border-slate-800 bg-[#0f172a] p-7 !text-white shadow-sm sm:p-8">
+              <div className="inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-400/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] !text-emerald-200">
                 Better than generic booking
               </div>
-              <h2 className="mt-4 text-white">
+              <h2 className="mt-4 !text-white">
                 SitGuru can feel smarter without feeling harder
               </h2>
-              <p className="mt-4 text-base leading-7 text-slate-300">
+              <p className="mt-4 text-base leading-7 !text-slate-100">
                 The booking journey should stay simple while collecting the right
                 information to help Gurus understand the pet and the requested care.
               </p>
@@ -1431,7 +1467,7 @@ export default function HomePage() {
                 ].map((step, index) => (
                   <div
                     key={step}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white"
+                    className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold !text-white shadow-sm"
                   >
                     {index + 1}. {step}
                   </div>
@@ -1507,18 +1543,18 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-900 p-7 text-white shadow-sm sm:p-8">
-              <div className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-300">
+            <div className="rounded-[28px] border border-slate-800 bg-[#0f172a] p-7 !text-white shadow-sm sm:p-8">
+              <div className="inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-400/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] !text-emerald-200">
                 For Gurus
               </div>
-              <h2 className="mt-4 text-white">
+              <h2 className="mt-4 !text-white">
                 Offer services through a stronger local marketplace identity
               </h2>
-              <p className="mt-4 text-base leading-7 text-slate-300">
+              <p className="mt-4 text-base leading-7 !text-slate-100">
                 SitGuru gives care providers a more modern way to show services,
                 build trust, and connect with local pet owners looking for help.
               </p>
-              <ul className="mt-6 space-y-3 text-sm text-slate-200">
+              <ul className="mt-6 space-y-3 text-sm leading-7 !text-slate-100">
                 <li>• Explain what makes you different</li>
                 <li>• Offer multiple services</li>
                 <li>• Build trust through profile clarity</li>
@@ -1528,7 +1564,7 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => scrollToLaunchForm("guru")}
-                  className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
                 >
                   Join as a Guru
                 </button>

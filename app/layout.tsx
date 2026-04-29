@@ -15,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="site-shell min-h-screen text-slate-900 antialiased">
+      <body className="site-shell min-h-screen bg-[#f8fcfd] text-slate-900 antialiased">
         <RouteShell>{children}</RouteShell>
       </body>
     </html>

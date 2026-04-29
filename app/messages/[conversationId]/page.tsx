@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import MessageThreadComposer from "@/components/MessageThreadComposer";
+import MessageAutoRefresh from "@/components/MessageAutoRefresh";
 
 export const dynamic = "force-dynamic";
+
+const SITGURU_MESSAGE_AVATAR_URL = "/images/sitguru-message-avatar.jpg";
 
 type ConversationRow = {
   id: string;
@@ -12,6 +15,7 @@ type ConversationRow = {
   guru_id?: string | null;
   booking_id?: string | null;
   subject?: string | null;
+  topic?: string | null;
   status?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -27,6 +31,8 @@ type MessageRow = {
   content?: string | null;
   body?: string | null;
   created_at?: string | null;
+  topic?: string | null;
+  message_type?: string | null;
 };
 
 type ProfileRow = {
@@ -41,7 +47,49 @@ type ProfileRow = {
   avatar_url?: string | null;
   image_url?: string | null;
   role?: string | null;
+  account_type?: string | null;
 };
+
+type GuruProfileRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  email?: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
+  name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  profile_photo_url?: string | null;
+  avatar_url?: string | null;
+  image_url?: string | null;
+  photo_url?: string | null;
+  profile_image_url?: string | null;
+};
+
+type ConversationParticipantRow = {
+  conversation_id?: string | null;
+  user_id?: string | null;
+  role?: string | null;
+};
+
+function normalizeRole(role?: string | null) {
+  const value = String(role || "").trim().toLowerCase();
+
+  if (!value) return "";
+  if (value === "provider" || value === "sitter") return "guru";
+
+  return value;
+}
+
+function getReadableRole(role?: string | null) {
+  const normalized = normalizeRole(role);
+
+  if (normalized === "admin") return "Admin";
+  if (normalized === "guru") return "Guru";
+  if (normalized === "customer") return "Customer";
+
+  return "User";
+}
 
 function getProfileName(profile?: ProfileRow | null) {
   if (!profile) return "SitGuru User";
@@ -61,54 +109,120 @@ function getProfileName(profile?: ProfileRow | null) {
   return String(candidate).trim() || "SitGuru User";
 }
 
+function getDisplayNameForRole(profile: ProfileRow | null, role?: string | null) {
+  const normalized = normalizeRole(role);
+
+  if (normalized === "admin") return "SitGuru Admin";
+
+  return getProfileName(profile);
+}
+
 function getProfilePhotoUrl(profile?: ProfileRow | null) {
   if (!profile) return null;
 
-  const candidate =
-    profile.profile_photo_url || profile.avatar_url || profile.image_url || null;
+  return (
+    profile.profile_photo_url || profile.avatar_url || profile.image_url || null
+  );
+}
 
-  return candidate ? String(candidate) : null;
+function getMessageAvatarUrl({
+  senderRole,
+  profileImageUrl,
+}: {
+  senderRole?: string | null;
+  profileImageUrl?: string | null;
+}) {
+  const normalized = normalizeRole(senderRole);
+
+  if (normalized === "admin") {
+    return SITGURU_MESSAGE_AVATAR_URL;
+  }
+
+  return profileImageUrl || null;
+}
+
+function getGuruProfilePhotoUrl(guru?: GuruProfileRow | null) {
+  if (!guru) return null;
+
+  return (
+    guru.profile_photo_url ||
+    guru.avatar_url ||
+    guru.image_url ||
+    guru.photo_url ||
+    guru.profile_image_url ||
+    null
+  );
+}
+
+function mergeGuruProfilePhoto(
+  profile: ProfileRow | null,
+  guru?: GuruProfileRow | null
+): ProfileRow | null {
+  if (!profile && !guru?.user_id) return profile;
+
+  const guruPhotoUrl = getGuruProfilePhotoUrl(guru);
+
+  if (!guru) return profile;
+
+  return {
+    id: String(profile?.id || guru.user_id || ""),
+    full_name:
+      profile?.full_name ||
+      guru.full_name ||
+      guru.display_name ||
+      guru.name ||
+      [guru.first_name, guru.last_name].filter(Boolean).join(" ").trim() ||
+      guru.email?.split("@")[0] ||
+      "SitGuru User",
+    display_name:
+      profile?.display_name ||
+      guru.display_name ||
+      guru.full_name ||
+      guru.name ||
+      null,
+    name: profile?.name || guru.name || guru.full_name || guru.display_name || null,
+    first_name: profile?.first_name || guru.first_name || null,
+    last_name: profile?.last_name || guru.last_name || null,
+    email: profile?.email || guru.email || null,
+    profile_photo_url: profile?.profile_photo_url || guruPhotoUrl,
+    avatar_url: profile?.avatar_url || guru.avatar_url || null,
+    image_url: profile?.image_url || guru.image_url || null,
+    role: profile?.role || "guru",
+    account_type: profile?.account_type || "guru",
+  };
+}
+
+function getFirstName(name?: string | null) {
+  const safeName = String(name || "").trim();
+
+  if (!safeName) return "Guru";
+
+  return safeName.split(/\s+/)[0] || "Guru";
 }
 
 function getInitials(name: string) {
-  return name
+  const initials = name
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("");
+
+  return initials || "SU";
 }
 
 function getMessageContent(message?: MessageRow | null) {
-  const value = message?.content || message?.body || "";
-  return String(value).trim();
-}
-
-function normalizeRoleValue(role?: string | null) {
-  const value = String(role || "").trim().toLowerCase();
-
-  if (!value) return "";
-  if (value === "provider" || value === "sitter") return "guru";
-
-  return value;
-}
-
-function normalizeRoleLabel(role?: string | null) {
-  const value = normalizeRoleValue(role);
-
-  if (!value) return "User";
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  return String(message?.content || message?.body || "").trim();
 }
 
 function formatMessageTime(value?: string | null) {
   if (!value) return "";
 
   const parsed = new Date(value);
+
   if (Number.isNaN(parsed.getTime())) return "";
 
   return parsed.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
@@ -118,6 +232,7 @@ function formatLongDateTime(value?: string | null) {
   if (!value) return "No recent activity";
 
   const parsed = new Date(value);
+
   if (Number.isNaN(parsed.getTime())) return "No recent activity";
 
   return parsed.toLocaleString("en-US", {
@@ -129,100 +244,149 @@ function formatLongDateTime(value?: string | null) {
   });
 }
 
+function getDashboardHref(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "guru") return "/guru/dashboard";
+  if (normalizedRole === "admin") return "/admin";
+
+  return "/customer/dashboard";
+}
+
+function getConversationLabel(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "guru") return "Guru Conversation";
+  if (normalizedRole === "admin") return "Admin Support";
+  if (normalizedRole === "customer") return "Customer Conversation";
+
+  return "Conversation";
+}
+
 function getStatusClasses(status?: string | null) {
   const normalized = String(status || "").trim().toLowerCase();
 
   if (normalized === "pending") {
-    return "border-amber-300/30 bg-amber-400/10 text-amber-100";
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
-  if (normalized === "confirmed") {
-    return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
+  if (normalized === "confirmed" || normalized === "open") {
+    return "border-emerald-200 bg-emerald-500 text-white";
   }
 
-  if (normalized === "completed") {
-    return "border-sky-300/30 bg-sky-400/10 text-sky-100";
+  if (
+    normalized === "completed" ||
+    normalized === "resolved" ||
+    normalized === "closed"
+  ) {
+    return "border-sky-200 bg-sky-50 text-sky-700";
   }
 
-  return "border-white/20 bg-white/10 text-white";
+  return "border-slate-200 bg-white text-slate-700";
 }
 
-function getPetLabel(subject?: string | null, preview?: string | null) {
-  const combined = `${String(subject || "")} ${String(preview || "")}`.trim();
-  if (!combined) return null;
+function getSmsBubbleClasses({
+  viewerRole,
+  senderRole,
+  isCurrentUserMessage,
+}: {
+  viewerRole?: string | null;
+  senderRole?: string | null;
+  isCurrentUserMessage: boolean;
+}) {
+  const viewer = normalizeRole(viewerRole);
+  const sender = normalizeRole(senderRole);
+  const isAdminView = viewer === "admin";
 
-  const patterns = [
-    /\babout\s+([A-Z][a-zA-Z'-]+)/,
-    /\bfor\s+([A-Z][a-zA-Z'-]+)/,
-    /\bpet\s*:\s*([A-Z][a-zA-Z'-]+)/i,
-    /\bregarding\s+([A-Z][a-zA-Z'-]+)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = combined.match(pattern);
-    if (match?.[1]) {
-      return match[1];
+  if (isCurrentUserMessage) {
+    if (sender === "admin") {
+      return {
+        bubble:
+          "bg-teal-600 text-white rounded-[1.35rem] rounded-br-md shadow-[0_8px_18px_rgba(13,148,136,0.22)]",
+        meta: "text-teal-700",
+        body: "text-white",
+      };
     }
+
+    if (sender === "guru") {
+      return {
+        bubble:
+          "bg-blue-600 text-white rounded-[1.35rem] rounded-br-md shadow-[0_8px_18px_rgba(37,99,235,0.20)]",
+        meta: "text-blue-700",
+        body: "text-white",
+      };
+    }
+
+    return {
+      bubble:
+        "bg-emerald-500 text-white rounded-[1.35rem] rounded-br-md shadow-[0_8px_18px_rgba(16,185,129,0.22)]",
+      meta: "text-emerald-700",
+      body: "text-white",
+    };
   }
 
-  return null;
-}
-
-function getThreadKind(conversation: ConversationRow, otherProfile?: ProfileRow | null) {
-  const subjectText = String(conversation.subject || "").trim().toLowerCase();
-  const otherRole = normalizeRoleValue(otherProfile?.role);
-
-  const looksLikeAdmin =
-    subjectText.includes("admin") ||
-    subjectText.includes("support") ||
-    subjectText.includes("refund") ||
-    subjectText.includes("escalation") ||
-    subjectText.includes("payout");
-
-  if (otherRole === "admin" || looksLikeAdmin) {
-    return "admin";
+  if (isAdminView && sender === "customer") {
+    return {
+      bubble:
+        "bg-purple-600 text-white rounded-[1.35rem] rounded-bl-md shadow-[0_8px_18px_rgba(147,51,234,0.18)]",
+      meta: "text-purple-700",
+      body: "text-white",
+    };
   }
 
-  if (otherRole === "guru") {
-    return "guru";
+  if (sender === "admin") {
+    return {
+      bubble:
+        "bg-slate-900 text-white rounded-[1.35rem] rounded-bl-md shadow-[0_8px_18px_rgba(15,23,42,0.20)]",
+      meta: "text-slate-700",
+      body: "text-white",
+    };
   }
 
-  return "conversation";
-}
-
-function getThreadKindLabel(kind: "admin" | "guru" | "conversation") {
-  if (kind === "admin") return "Admin Support";
-  if (kind === "guru") return "Guru Conversation";
-  return "Conversation";
-}
-
-function getThreadKindClasses(kind: "admin" | "guru" | "conversation") {
-  if (kind === "admin") {
-    return "border-amber-300/30 bg-amber-400/10 text-amber-100";
+  if (sender === "guru") {
+    return {
+      bubble:
+        "bg-blue-600 text-white rounded-[1.35rem] rounded-bl-md shadow-[0_8px_18px_rgba(37,99,235,0.18)]",
+      meta: "text-blue-700",
+      body: "text-white",
+    };
   }
 
-  if (kind === "guru") {
-    return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
+  if (sender === "customer") {
+    return {
+      bubble:
+        "bg-emerald-500 text-white rounded-[1.35rem] rounded-bl-md shadow-[0_8px_18px_rgba(16,185,129,0.18)]",
+      meta: "text-emerald-700",
+      body: "text-white",
+    };
   }
 
-  return "border-white/20 bg-white/10 text-white";
-}
-
-function getBookingLabel(conversation: ConversationRow) {
-  if (!conversation.booking_id) return null;
-  return `Booking #${String(conversation.booking_id)}`;
+  return {
+    bubble:
+      "bg-slate-100 text-slate-900 rounded-[1.35rem] rounded-bl-md shadow-sm",
+    meta: "text-slate-600",
+    body: "text-slate-900",
+  };
 }
 
 function Avatar({
   name,
   imageUrl,
+  compact = false,
 }: {
   name: string;
   imageUrl?: string | null;
+  compact?: boolean;
 }) {
+  const sizeClasses = compact
+    ? "h-8 w-8 rounded-full text-[11px]"
+    : "h-14 w-14 rounded-full text-lg";
+
   if (imageUrl) {
     return (
-      <div className="h-14 w-14 overflow-hidden rounded-[18px] border border-white/20 bg-white/10">
+      <div
+        className={`${sizeClasses} shrink-0 overflow-hidden border-2 border-white bg-white shadow-[0_8px_18px_rgba(15,23,42,0.14)] ring-1 ring-emerald-100`}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
       </div>
@@ -230,87 +394,60 @@ function Avatar({
   }
 
   return (
-    <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/20 bg-white/10 text-lg font-black text-white">
+    <div
+      className={`flex ${sizeClasses} shrink-0 items-center justify-center border-2 border-white bg-emerald-50 font-black text-emerald-700 shadow-[0_8px_18px_rgba(15,23,42,0.14)] ring-1 ring-emerald-100`}
+    >
       {getInitials(name)}
     </div>
   );
 }
 
-async function resolveDashboardHref(userId: string, fallbackRole?: string | null) {
-  const [guruByUserId, guruById] = await Promise.all([
-    supabaseAdmin.from("gurus").select("id, user_id").eq("user_id", userId).limit(1),
-    supabaseAdmin.from("gurus").select("id, user_id").eq("id", userId).limit(1),
-  ]);
-
-  const hasGuruRecord =
-    (guruByUserId.data?.length ?? 0) > 0 || (guruById.data?.length ?? 0) > 0;
-
-  if (hasGuruRecord) {
-    return "/guru/dashboard";
-  }
-
-  const normalizedRole = String(fallbackRole || "").toLowerCase().trim();
-
-  if (normalizedRole === "admin") {
-    return "/admin";
-  }
-
-  return "/customer/dashboard";
+function DetailCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-600">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-sm font-black text-slate-900">
+        {value}
+      </p>
+    </div>
+  );
 }
 
-async function sendConversationMessage(formData: FormData) {
-  "use server";
+function isMessageFromCurrentUser({
+  message,
+  currentUserId,
+}: {
+  message: MessageRow;
+  currentUserId: string;
+}) {
+  const senderId = String(message.sender_id || "").trim();
+  const recipientId = String(message.recipient_id || "").trim();
 
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/customer/login");
+  if (senderId) {
+    return senderId === currentUserId;
   }
 
-  const conversationId = String(formData.get("conversationId") || "").trim();
-  const recipientId = String(formData.get("recipientId") || "").trim();
-  const body = String(formData.get("body") || "").trim();
-
-  if (!conversationId || !recipientId || !body) {
-    return;
+  if (recipientId) {
+    return recipientId !== currentUserId;
   }
 
-  const { error: insertError } = await supabaseAdmin.from("messages").insert({
-    conversation_id: conversationId,
-    sender_id: user.id,
-    recipient_id: recipientId,
-    body,
-    content: body,
-  });
-
-  if (insertError) {
-    console.error("Conversation send message error:", insertError.message);
-    return;
-  }
-
-  await supabaseAdmin
-    .from("conversations")
-    .update({
-      last_message_at: new Date().toISOString(),
-      last_message_preview: body,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", conversationId);
-
-  revalidatePath("/messages");
-  revalidatePath(`/messages/${conversationId}`);
+  return false;
 }
 
 export default async function MessageConversationPage({
   params,
 }: {
-  params: Promise<{ conversationId: string }>;
+  params: Promise<{
+    conversationId?: string;
+    conversationid?: string;
+    id?: string;
+  }>;
 }) {
-  const { conversationId } = await params;
+  const routeParams = await params;
+  const conversationId =
+    routeParams.conversationId || routeParams.conversationid || routeParams.id || "";
 
   if (!conversationId) {
     notFound();
@@ -320,381 +457,462 @@ export default async function MessageConversationPage({
 
   const {
     data: { user },
-    error: userError,
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) {
+  if (authError || !user) {
     redirect("/customer/login");
   }
 
-  const { data: currentProfileData } = await supabaseAdmin
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const currentProfile = (currentProfileData ?? null) as ProfileRow | null;
-  const dashboardHref = await resolveDashboardHref(user.id, currentProfile?.role);
-
-  const { data: conversationData, error: conversationError } = await supabaseAdmin
+  const { data: conversation, error: conversationError } = await supabaseAdmin
     .from("conversations")
-    .select("*")
+    .select(
+      "id, customer_id, guru_id, booking_id, subject, topic, status, created_at, updated_at, last_message_at, last_message_preview"
+    )
     .eq("id", conversationId)
-    .maybeSingle();
+    .maybeSingle<ConversationRow>();
 
   if (conversationError) {
-    console.error("Conversation detail error:", conversationError.message);
+    console.error("Conversation load error:", conversationError.message);
   }
-
-  const conversation = (conversationData ?? null) as ConversationRow | null;
 
   if (!conversation) {
     notFound();
   }
 
-  const isParticipant =
-    String(conversation.customer_id || "") === user.id ||
-    String(conversation.guru_id || "") === user.id;
+  const [{ data: messages }, { data: participants }] = await Promise.all([
+    supabaseAdmin
+      .from("messages")
+      .select(
+        "id, conversation_id, sender_id, recipient_id, content, body, created_at, topic, message_type"
+      )
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true }),
+    supabaseAdmin
+      .from("conversation_participants")
+      .select("conversation_id, user_id, role")
+      .eq("conversation_id", conversationId),
+  ]);
 
-  if (!isParticipant) {
-    redirect("/messages");
+  const safeMessages = (messages || []) as MessageRow[];
+  const safeParticipants = (participants || []) as ConversationParticipantRow[];
+
+  const participantRoleMap = new Map<string, string>();
+  safeParticipants.forEach((participant) => {
+    const participantId = String(participant.user_id || "").trim();
+
+    if (!participantId) return;
+
+    participantRoleMap.set(participantId, normalizeRole(participant.role || ""));
+  });
+
+  const allowedUserIds = new Set(
+    [
+      conversation.customer_id || "",
+      conversation.guru_id || "",
+      ...safeParticipants.map((participant) => participant.user_id || ""),
+    ].filter(Boolean)
+  );
+
+  if (!allowedUserIds.has(user.id)) {
+    redirect("/dashboard");
   }
 
-  const otherUserId =
-    String(conversation.customer_id || "") === user.id
-      ? String(conversation.guru_id || "").trim()
-      : String(conversation.customer_id || "").trim();
+  const profileIds = Array.from(
+    new Set(
+      [
+        user.id,
+        conversation.customer_id || "",
+        conversation.guru_id || "",
+        ...safeParticipants.map((participant) => participant.user_id || ""),
+        ...safeMessages.flatMap((message) => [
+          message.sender_id || "",
+          message.recipient_id || "",
+        ]),
+      ].filter(Boolean)
+    )
+  );
 
-  const idsToLoad = [user.id, otherUserId].filter(Boolean);
+  const { data: profiles } = profileIds.length
+    ? await supabaseAdmin
+        .from("profiles")
+        .select(
+          "id, full_name, first_name, last_name, email, profile_photo_url, avatar_url, image_url, role, account_type"
+        )
+        .in("id", profileIds)
+    : { data: [] as ProfileRow[] };
 
-  const { data: profileRowsData, error: profilesError } =
-    idsToLoad.length > 0
-      ? await supabaseAdmin.from("profiles").select("*").in("id", idsToLoad)
-      : { data: [], error: null as { message?: string } | null };
+  const { data: guruProfiles } = profileIds.length
+    ? await supabaseAdmin.from("gurus").select("*").in("user_id", profileIds)
+    : { data: [] as GuruProfileRow[] };
 
-  if (profilesError) {
-    console.error("Conversation profiles error:", profilesError.message);
-  }
+  const guruProfileMap = new Map<string, GuruProfileRow>();
+  ((guruProfiles || []) as GuruProfileRow[]).forEach((guruProfile) => {
+    const guruUserId = String(guruProfile.user_id || "").trim();
+
+    if (guruUserId) {
+      guruProfileMap.set(guruUserId, guruProfile);
+    }
+  });
 
   const profileMap = new Map<string, ProfileRow>();
-  for (const profile of (profileRowsData ?? []) as ProfileRow[]) {
-    profileMap.set(String(profile.id), profile);
-  }
+  ((profiles || []) as ProfileRow[]).forEach((profile) => {
+    const guruProfile = guruProfileMap.get(profile.id) || null;
+    const mergedProfile = mergeGuruProfilePhoto(profile, guruProfile);
 
-  const otherUserProfile = otherUserId ? profileMap.get(otherUserId) ?? null : null;
-  const currentUserProfile = profileMap.get(user.id) ?? currentProfile;
-  const otherUserName = getProfileName(otherUserProfile);
-  const otherUserRole = normalizeRoleLabel(otherUserProfile?.role);
-  const currentUserName = getProfileName(currentUserProfile);
+    if (mergedProfile?.id) {
+      profileMap.set(mergedProfile.id, mergedProfile);
+    }
+  });
 
-  const { data: messagesData, error: messagesError } = await supabaseAdmin
-    .from("messages")
-    .select("*")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true });
+  guruProfileMap.forEach((guruProfile, guruUserId) => {
+    if (!profileMap.has(guruUserId)) {
+      const mergedProfile = mergeGuruProfilePhoto(null, guruProfile);
 
-  if (messagesError) {
-    console.error("Conversation messages error:", messagesError.message);
-  }
+      if (mergedProfile?.id) {
+        profileMap.set(mergedProfile.id, mergedProfile);
+      }
+    }
+  });
 
-  const messages = (messagesData ?? []) as MessageRow[];
-
-  const petLabel = getPetLabel(
-    conversation.subject,
-    conversation.last_message_preview || messages.at(-1)?.body || messages.at(-1)?.content
+  const currentUserProfile = profileMap.get(user.id) || null;
+  const currentUserRole = normalizeRole(
+    participantRoleMap.get(user.id) ||
+      currentUserProfile?.role ||
+      currentUserProfile?.account_type ||
+      (user.id === conversation.customer_id
+        ? "customer"
+        : user.id === conversation.guru_id
+          ? "guru"
+          : "")
   );
-  const bookingLabel = getBookingLabel(conversation);
-  const threadKind = getThreadKind(conversation, otherUserProfile);
+
+  const otherParticipantId =
+    Array.from(allowedUserIds).find((participantId) => participantId !== user.id) ||
+    "";
+
+  const otherProfile = otherParticipantId
+    ? profileMap.get(otherParticipantId) || null
+    : null;
+
+  const otherRole = normalizeRole(
+    participantRoleMap.get(otherParticipantId) ||
+      otherProfile?.role ||
+      otherProfile?.account_type ||
+      (otherParticipantId === conversation.customer_id
+        ? "customer"
+        : otherParticipantId === conversation.guru_id
+          ? "guru"
+          : "")
+  );
+
+  const otherName = getDisplayNameForRole(otherProfile, otherRole);
+  const otherProfileImageUrl = getProfilePhotoUrl(otherProfile);
+  const otherImageUrl = getMessageAvatarUrl({
+    senderRole: otherRole,
+    profileImageUrl: otherProfileImageUrl,
+  });
+
   const subject =
+    String(conversation.topic || "").trim() ||
     String(conversation.subject || "").trim() ||
-    (threadKind === "admin" ? "Admin support conversation" : "Care conversation");
+    "Conversation";
+
+  const topic = String(conversation.topic || subject || "Other").trim();
+  const status = String(conversation.status || "open").trim();
+  const dashboardHref = getDashboardHref(currentUserRole);
+  const conversationLabel = getConversationLabel(otherRole);
+
+  const lastActivity =
+    conversation.last_message_at ||
+    safeMessages[safeMessages.length - 1]?.created_at ||
+    conversation.updated_at ||
+    conversation.created_at ||
+    null;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_22%),linear-gradient(180deg,#020617_0%,#0b1220_46%,#020617_100%)] text-white">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/15 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(17,24,39,0.97),rgba(15,23,42,0.98))] shadow-[0_30px_80px_rgba(2,6,23,0.45)]">
-          <div className="p-6 sm:p-8 lg:p-10">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_30%),linear-gradient(180deg,#ffffff,#f2fbf7_48%,#ffffff)] text-slate-950">
+      <MessageAutoRefresh intervalMs={1000} />
+
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.10)]">
+          <div className="bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.22),transparent_30%),linear-gradient(135deg,#ffffff,#ecfdf5)] p-6 sm:p-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <Link
                   href="/messages"
-                  className="inline-flex items-center text-sm font-semibold text-white transition hover:text-white/80"
+                  className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
                 >
                   ← Back to inbox
                 </Link>
 
-                <p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-white/80">
-                  Conversation
+                <p className="mt-5 text-xs font-black uppercase tracking-[0.28em] text-emerald-600">
+                  {conversationLabel}
                 </p>
 
-                <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
+                <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
                   {subject}
                 </h1>
 
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85 sm:text-base">
-                  Keep pet care details, timing, routines, medications, and booking
-                  questions clear in one thread.
+                <p className="mt-4 max-w-4xl text-base font-semibold leading-8 text-slate-700">
+                  Keep pet care details, timing, routines, medications, booking
+                  questions, application updates, and account support clear in one
+                  thread.
                 </p>
+
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700">
+                    {otherRole === "admin" ? "Admin Support" : conversationLabel}
+                  </span>
+
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700">
+                    Topic: {topic}
+                  </span>
+
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700">
+                    Last activity: {formatLongDateTime(lastActivity)}
+                  </span>
+                </div>
               </div>
 
-              <div
-                className={`inline-flex items-center rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] ${getStatusClasses(
-                  conversation.status
-                )}`}
-              >
-                {String(conversation.status || "open")}
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
               <span
-                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getThreadKindClasses(
-                  threadKind
+                className={`inline-flex w-fit rounded-full border px-5 py-2 text-sm font-black uppercase tracking-[0.18em] shadow-sm ${getStatusClasses(
+                  status
                 )}`}
               >
-                {getThreadKindLabel(threadKind)}
-              </span>
-
-              <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white/85">
-                {otherUserRole}: {otherUserName}
-              </span>
-
-              {petLabel ? (
-                <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white/85">
-                  Pet: {petLabel}
-                </span>
-              ) : null}
-
-              {bookingLabel ? (
-                <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white/85">
-                  {bookingLabel}
-                </span>
-              ) : null}
-
-              <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white/85">
-                Last activity:{" "}
-                <span className="ml-1 text-white">
-                  {formatLongDateTime(
-                    conversation.last_message_at ||
-                      conversation.updated_at ||
-                      conversation.created_at
-                  )}
-                </span>
+                {status}
               </span>
             </div>
           </div>
-        </section>
 
-        <section className="mt-8 grid gap-6 xl:grid-cols-[0.72fr_0.28fr]">
-          <div className="rounded-[28px] border border-white/15 bg-slate-900/90 p-6 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">
-                  Thread
-                </p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-white">
-                  Message history
-                </h2>
-              </div>
-
-              <Link
-                href={dashboardHref}
-                className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-              >
-                Dashboard
-              </Link>
-            </div>
-
-            <div className="mt-6 rounded-[24px] border border-white/10 bg-slate-950/95 p-4 sm:p-5">
-              {messages.length === 0 ? (
-                <div className="rounded-[20px] border border-dashed border-white/15 bg-white/[0.03] px-6 py-10 text-center">
-                  <h3 className="text-xl font-bold text-white">No messages yet</h3>
-                  <p className="mt-2 text-sm leading-7 text-white/75">
-                    Start the conversation with clear care details so your Guru or
-                    Admin can help faster.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {messages.map((message) => {
-                    const senderId = String(message.sender_id || "").trim();
-                    const senderProfile = profileMap.get(senderId) ?? null;
-                    const senderName =
-                      senderId === user.id ? currentUserName : getProfileName(senderProfile);
-                    const senderRole =
-                      senderId === user.id
-                        ? normalizeRoleLabel(currentUserProfile?.role)
-                        : normalizeRoleLabel(senderProfile?.role);
-
-                    const isCurrentUser = senderId === user.id;
-
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`max-w-3xl rounded-[24px] border px-5 py-4 shadow-sm ${
-                            isCurrentUser
-                              ? "border-emerald-300/30 bg-emerald-400/10"
-                              : "border-white/12 bg-white/[0.05]"
-                          }`}
-                        >
-                          <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-bold text-white">
-                              {senderName}
-                            </span>
-                            <span className="text-[11px] uppercase tracking-[0.18em] text-white/60">
-                              {senderRole}
-                            </span>
-                            <span className="text-[11px] text-white/50">
-                              {formatMessageTime(message.created_at)}
-                            </span>
-                          </div>
-
-                          <p className="whitespace-pre-wrap text-sm leading-7 text-white/90 sm:text-base">
-                            {getMessageContent(message)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {otherUserId ? (
-              <form action={sendConversationMessage} className="mt-6">
-                <input type="hidden" name="conversationId" value={conversation.id} />
-                <input type="hidden" name="recipientId" value={otherUserId} />
-
-                <div className="rounded-[24px] border border-white/15 bg-slate-950/95 p-5">
-                  <label
-                    htmlFor="body"
-                    className="mb-3 block text-xs font-bold uppercase tracking-[0.2em] text-white/80"
-                  >
-                    Reply
-                  </label>
-
-                  <textarea
-                    id="body"
-                    name="body"
-                    rows={5}
-                    placeholder={
-                      threadKind === "admin"
-                        ? "Describe the issue clearly so support can help faster..."
-                        : "Share care details, timing, routines, medications, or questions..."
-                    }
-                    className="w-full rounded-[20px] border border-white/12 bg-white/[0.05] px-4 py-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-emerald-400/40 sm:text-base"
-                    required
-                  />
-
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs leading-6 text-white/65">
-                      Tip: the clearest care happens when you mention the pet, the
-                      schedule, and anything your Guru should know.
+          <div className="grid gap-6 bg-[#f7fcfa] p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_330px]">
+            <section className="space-y-6">
+              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
+                      Thread
                     </p>
 
-                    <button
-                      type="submit"
-                      className="inline-flex min-h-[52px] items-center justify-center rounded-[18px] bg-emerald-500 px-6 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
+                    <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                      Message history
+                    </h2>
+                  </div>
+
+                  <Link
+                    href={dashboardHref}
+                    className="inline-flex rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+                  >
+                    Dashboard
+                  </Link>
+                </div>
+
+                <div className="mt-6 rounded-[1.5rem] border border-emerald-100 bg-[#eefaf4] p-4 sm:p-5">
+                  {safeMessages.length === 0 ? (
+                    <div className="rounded-[1.5rem] border border-dashed border-emerald-200 bg-white px-6 py-12 text-center">
+                      <h3 className="text-2xl font-black text-slate-950">
+                        No messages yet
+                      </h3>
+
+                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                        Start the conversation with clear details so SitGuru can
+                        help faster.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {safeMessages.map((message) => {
+                        const senderId = String(message.sender_id || "").trim();
+                        const fallbackSenderProfile = senderId
+                          ? profileMap.get(senderId) || null
+                          : null;
+
+                        const isCurrentUserMessage = isMessageFromCurrentUser({
+                          message,
+                          currentUserId: user.id,
+                        });
+
+                        const senderRole = isCurrentUserMessage
+                          ? currentUserRole ||
+                            normalizeRole(fallbackSenderProfile?.role)
+                          : otherRole || normalizeRole(fallbackSenderProfile?.role);
+
+                        const senderProfile = isCurrentUserMessage
+                          ? currentUserProfile || fallbackSenderProfile
+                          : otherProfile || fallbackSenderProfile;
+
+                        const senderName = getDisplayNameForRole(
+                          senderProfile,
+                          senderRole
+                        );
+
+                        const senderProfileImageUrl =
+                          getProfilePhotoUrl(senderProfile);
+
+                        const senderImageUrl = getMessageAvatarUrl({
+                          senderRole,
+                          profileImageUrl: senderProfileImageUrl,
+                        });
+
+                        const senderRoleLabel =
+                      normalizeRole(senderRole) === "guru"
+                        ? `${getFirstName(senderName)} · Guru`
+                        : getReadableRole(senderRole);
+
+                        const styles = getSmsBubbleClasses({
+                          viewerRole: currentUserRole,
+                          senderRole,
+                          isCurrentUserMessage,
+                        });
+
+                        return (
+                          <article
+                            key={message.id}
+                            className={`flex w-full flex-col ${
+                              isCurrentUserMessage ? "items-end" : "items-start"
+                            }`}
+                          >
+                            <div
+                              className={`mb-1 flex max-w-[82%] items-center gap-2 px-10 text-[11px] font-black uppercase tracking-[0.12em] ${
+                                isCurrentUserMessage
+                                  ? "justify-end text-right"
+                                  : "justify-start"
+                              } ${styles.meta}`}
+                            >
+                              <span>{senderRoleLabel}</span>
+                              <span className="font-bold opacity-70">
+                                {formatMessageTime(message.created_at)}
+                              </span>
+                            </div>
+
+                            <div
+                              className={`flex max-w-[82%] items-end gap-2 ${
+                                isCurrentUserMessage
+                                  ? "flex-row-reverse"
+                                  : "flex-row"
+                              }`}
+                            >
+                              <Avatar
+                                name={senderName}
+                                imageUrl={senderImageUrl}
+                                compact
+                              />
+
+                              <div className={`px-4 py-2.5 ${styles.bubble}`}>
+                                <p
+                                  className={`whitespace-pre-wrap text-[15px] leading-6 ${
+                                    styles.body
+                                  } ${
+                                    isCurrentUserMessage ? "text-right" : ""
+                                  }`}
+                                >
+                                  {getMessageContent(message) ||
+                                    "Message content unavailable."}
+                                </p>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
+                  Reply
+                </p>
+
+                <div className="mt-4">
+                  <MessageThreadComposer
+                    conversationId={conversation.id}
+                    currentUserId={user.id}
+                    currentTopic={topic}
+                  />
+                </div>
+              </section>
+            </section>
+
+            <aside className="space-y-6">
+              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
+                  Participant
+                </p>
+
+                <div className="mt-5 flex items-center gap-4">
+                  <Avatar name={otherName} imageUrl={otherImageUrl} />
+
+                  <div>
+                    <p className="text-lg font-black text-slate-950">
+                      {otherName}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">
+                      {getReadableRole(otherRole)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-3">
+                  <Link
+                    href="/messages"
+                    className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
+                  >
+                    Back to inbox
+                  </Link>
+
+                  <Link
+                    href={dashboardHref}
+                    className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+                  >
+                    Back to dashboard
+                  </Link>
+                </div>
+              </section>
+
+              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
+                  Care Clarity
+                </p>
+
+                <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950">
+                  Keep messages useful
+                </h2>
+
+                <div className="mt-5 space-y-3">
+                  {[
+                    "Mention the pet name, care dates, and what kind of help you need.",
+                    "Share medications, routines, feeding notes, and anything safety-related.",
+                    "Use Admin support for platform, booking, refund, or account questions.",
+                  ].map((tip) => (
+                    <div
+                      key={tip}
+                      className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold leading-7 text-slate-700"
                     >
-                      Send message
-                    </button>
-                  </div>
+                      {tip}
+                    </div>
+                  ))}
                 </div>
-              </form>
-            ) : null}
+              </section>
+
+              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
+                  Thread Details
+                </p>
+
+                <div className="mt-5 grid gap-3">
+                  <DetailCard label="Topic" value={topic} />
+                  <DetailCard
+                    label="Subject"
+                    value={conversation.subject || "Direct Admin Support"}
+                  />
+                  <DetailCard label="Status" value={status} />
+                </div>
+              </section>
+            </aside>
           </div>
-
-          <aside className="space-y-6">
-            <section className="rounded-[28px] border border-white/15 bg-slate-900/90 p-6 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
-              <div className="flex items-start gap-4">
-                <Avatar
-                  name={otherUserName}
-                  imageUrl={getProfilePhotoUrl(otherUserProfile)}
-                />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">
-                    Participant
-                  </p>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight text-white">
-                    {otherUserName}
-                  </h2>
-                  <p className="mt-2 text-sm text-white/80">{otherUserRole}</p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3">
-                <Link
-                  href="/messages"
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
-                >
-                  Back to inbox
-                </Link>
-
-                <Link
-                  href={dashboardHref}
-                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  Back to dashboard
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-white/15 bg-[linear-gradient(135deg,rgba(5,150,105,0.18),rgba(15,23,42,0.94))] p-6 shadow-[0_20px_50px_rgba(2,6,23,0.35)]">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">
-                Care clarity
-              </p>
-
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                Keep messages useful
-              </h2>
-
-              <div className="mt-5 space-y-3">
-                <div className="rounded-[18px] border border-white/15 bg-slate-950/95 px-4 py-4 text-sm leading-7 text-white/90">
-                  Mention the pet name, care dates, and what kind of help you need.
-                </div>
-                <div className="rounded-[18px] border border-white/15 bg-slate-950/95 px-4 py-4 text-sm leading-7 text-white/90">
-                  Share medications, routines, feeding notes, and anything safety-related.
-                </div>
-                <div className="rounded-[18px] border border-white/15 bg-slate-950/95 px-4 py-4 text-sm leading-7 text-white/90">
-                  Use Admin support for platform, booking, refund, or account questions.
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-white/15 bg-slate-900/90 p-6 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">
-                Thread details
-              </p>
-
-              <div className="mt-5 space-y-3">
-                <div className="rounded-[18px] border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/90">
-                  <span className="font-semibold text-white">Subject:</span> {subject}
-                </div>
-
-                <div className="rounded-[18px] border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/90">
-                  <span className="font-semibold text-white">Status:</span>{" "}
-                  {String(conversation.status || "open")}
-                </div>
-
-                {petLabel ? (
-                  <div className="rounded-[18px] border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/90">
-                    <span className="font-semibold text-white">Pet:</span> {petLabel}
-                  </div>
-                ) : null}
-
-                {bookingLabel ? (
-                  <div className="rounded-[18px] border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/90">
-                    <span className="font-semibold text-white">Booking:</span> {bookingLabel}
-                  </div>
-                ) : null}
-              </div>
-            </section>
-          </aside>
         </section>
-      </div>
+      </section>
     </main>
   );
 }

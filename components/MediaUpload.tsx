@@ -11,6 +11,21 @@ type MediaUploadProps = {
   label?: string;
 };
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return "Upload failed.";
+}
+
 export default function MediaUpload({
   bucket,
   folder,
@@ -32,8 +47,10 @@ export default function MediaUpload({
     setSuccess("");
 
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+      const fileExt = file.name.split(".").pop() || "file";
+      const fileName = `${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}.${fileExt}`;
       const filePath = `${folder}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -53,8 +70,8 @@ export default function MediaUpload({
 
       await onUploaded(data.publicUrl);
       setSuccess("Upload successful.");
-    } catch (err: any) {
-      setError(err.message || "Upload failed.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

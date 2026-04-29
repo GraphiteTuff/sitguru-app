@@ -1,51 +1,75 @@
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
+import GuruDashboardHeader from "@/components/guru/GuruDashboardHeader";
 
 export const dynamic = "force-dynamic";
+
+
+const SITE_FONT_STYLE = {
+  fontFamily:
+    '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontWeight: 300,
+};
 
 type GuruProfile = {
   id?: string | number | null;
   user_id?: string | null;
-  slug?: string | null;
+  email?: string | null;
   full_name?: string | null;
   display_name?: string | null;
+  name?: string | null;
   title?: string | null;
   bio?: string | null;
   city?: string | null;
   state?: string | null;
+  image_url?: string | null;
+  avatar_url?: string | null;
+  photo_url?: string | null;
+  profile_photo_url?: string | null;
+  video_url?: string | null;
+  profile_video_url?: string | null;
+  intro_video_url?: string | null;
   rate?: number | null;
   hourly_rate?: number | null;
-  image_url?: string | null;
+  price?: number | null;
   services?: string[] | string | null;
-  email?: string | null;
+  application_status?: string | null;
+  status?: string | null;
+  is_bookable?: boolean | null;
+  profile_completion?: number | null;
 };
 
-type BookingRow = Record<string, any>;
-
-type PetMediaRow = {
-  pet_id?: string | null;
-  file_url?: string | null;
-  file_type?: string | null;
-  visibility?: string | null;
+type BookingRow = {
+  id?: string | number | null;
+  customer_id?: string | null;
+  sitter_id?: string | number | null;
+  guru_id?: string | number | null;
+  status?: string | null;
+  booking_status?: string | null;
+  payment_status?: string | null;
+  service?: string | null;
+  service_type?: string | null;
+  booking_type?: string | null;
+  pet_name?: string | null;
+  customer_name?: string | null;
+  pet_parent_name?: string | null;
+  start_time?: string | null;
+  start_date?: string | null;
+  booking_date?: string | null;
   created_at?: string | null;
-};
-
-type EnrichedBookingRow = BookingRow & {
-  resolved_pet_photo_url?: string | null;
 };
 
 type ConversationRow = {
   id: string;
   customer_id?: string | null;
   guru_id?: string | null;
-  booking_id?: string | null;
   subject?: string | null;
   status?: string | null;
-  created_at?: string | null;
   updated_at?: string | null;
+  created_at?: string | null;
   last_message_at?: string | null;
   last_message_preview?: string | null;
 };
@@ -68,223 +92,57 @@ type ProfileRow = {
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
+  role?: string | null;
+  account_type?: string | null;
   profile_photo_url?: string | null;
   avatar_url?: string | null;
   image_url?: string | null;
-  role?: string | null;
-  [key: string]: unknown;
+  video_url?: string | null;
+  profile_video_url?: string | null;
+  intro_video_url?: string | null;
 };
 
 type DashboardConversation = {
   id: string;
-  otherUserId: string | null;
-  otherUserName: string;
-  otherUserRole: string;
-  otherUserPhotoUrl: string | null;
+  name: string;
+  role: string;
   subject: string;
   preview: string;
-  status: string;
   lastActivity: string | null;
   href: string;
 };
 
-function getDisplayName(email?: string | null) {
+type GuruTier = {
+  label: string;
+  shortLabel: string;
+  description: string;
+  icon: string;
+  stars: number;
+  badgeClassName: string;
+  cardClassName: string;
+};
+
+function normalizeRole(value?: string | null) {
+  const role = String(value || "").trim().toLowerCase();
+
+  if (role === "provider" || role === "sitter") return "guru";
+
+  return role;
+}
+
+function getDisplayNameFromEmail(email?: string | null) {
   if (!email) return "Guru";
 
-  const local = email.split("@")[0] ?? "Guru";
-
-  return local
+  return email
+    .split("@")[0]
     .split(/[._-]/g)
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "Date pending";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "No recent activity";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "No recent activity";
-
-  return parsed.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function getBookingStatus(booking: BookingRow) {
-  return (
-    booking.status ||
-    booking.booking_status ||
-    booking.state ||
-    booking.payment_status ||
-    "pending"
-  );
-}
-
-function getCustomerName(booking: BookingRow) {
-  return (
-    booking.customer_name ||
-    booking.pet_parent_name ||
-    booking.owner_name ||
-    booking.parent_name ||
-    booking.user_name ||
-    booking.customer_email ||
-    "Customer"
-  );
-}
-
-function getPetName(booking: BookingRow) {
-  return booking.pet_name || booking.petName || booking.animal_name || "Pet";
-}
-
-function getServiceName(booking: BookingRow) {
-  return (
-    booking.service ||
-    booking.service_type ||
-    booking.booking_type ||
-    "Service"
-  );
-}
-
-function getBookingDate(booking: BookingRow) {
-  return (
-    booking.booking_date ||
-    booking.date ||
-    booking.start_date ||
-    booking.start_time ||
-    booking.created_at
-  );
-}
-
-function getStatusClasses(status: string) {
-  const normalized = status.toLowerCase();
-
-  if (normalized.includes("complete")) {
-    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
-  }
-
-  if (
-    normalized.includes("confirm") ||
-    normalized.includes("active") ||
-    normalized === "paid"
-  ) {
-    return "border-sky-400/20 bg-sky-400/10 text-sky-300";
-  }
-
-  if (normalized.includes("cancel")) {
-    return "border-rose-400/20 bg-rose-400/10 text-rose-300";
-  }
-
-  return "border-amber-400/20 bg-amber-400/10 text-amber-300";
-}
-
-function getConversationStatusClasses(status: string) {
-  const normalized = status.toLowerCase();
-
-  if (normalized.includes("closed")) {
-    return "border-rose-400/20 bg-rose-400/10 text-rose-200";
-  }
-
-  if (normalized.includes("archived")) {
-    return "border-amber-400/20 bg-amber-400/10 text-amber-200";
-  }
-
-  return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
-}
-
-function normalizeServices(value: GuruProfile["services"]) {
-  if (Array.isArray(value)) return value;
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function calculateProfileCompletion(profile: GuruProfile | null) {
-  if (!profile) return 10;
-
-  const checks = [
-    Boolean(profile.full_name || profile.display_name),
-    Boolean(profile.title),
-    Boolean(profile.bio),
-    Boolean(profile.city),
-    Boolean(profile.state),
-    Boolean(
-      profile.rate ||
-        profile.rate === 0 ||
-        profile.hourly_rate ||
-        profile.hourly_rate === 0
-    ),
-    Boolean(profile.image_url),
-    Boolean(normalizeServices(profile.services).length > 0),
-  ];
-
-  const completed = checks.filter(Boolean).length;
-  return Math.max(10, Math.round((completed / checks.length) * 100));
-}
-
-function getMissingProfileItems(profile: GuruProfile | null) {
-  const missing: string[] = [];
-  const services = normalizeServices(profile?.services ?? null);
-
-  if (!profile?.full_name && !profile?.display_name) {
-    missing.push("Add your display name");
-  }
-
-  if (!profile?.title) {
-    missing.push("Add a service title");
-  }
-
-  if (!profile?.bio) {
-    missing.push("Write your Guru bio");
-  }
-
-  if (!profile?.city || !profile?.state) {
-    missing.push("Set your location");
-  }
-
-  if (
-    !profile?.rate &&
-    profile?.rate !== 0 &&
-    !profile?.hourly_rate &&
-    profile?.hourly_rate !== 0
-  ) {
-    missing.push("Add your pricing");
-  }
-
-  if (!profile?.image_url) {
-    missing.push("Upload a profile image");
-  }
-
-  if (services.length === 0) {
-    missing.push("Select your services");
-  }
-
-  return missing;
-}
-
-function getPetInitial(name?: string | null) {
-  const value = String(name || "P").trim();
-  return value.charAt(0).toUpperCase() || "P";
+function getFirstName(name?: string | null) {
+  return String(name || "Guru").trim().split(/\s+/)[0] || "Guru";
 }
 
 function getProfileName(profile?: ProfileRow | null) {
@@ -305,83 +163,274 @@ function getProfileName(profile?: ProfileRow | null) {
   return String(candidate).trim() || "SitGuru User";
 }
 
-function getProfilePhotoUrl(profile?: ProfileRow | null) {
-  if (!profile) return null;
-
-  const candidate =
-    profile.profile_photo_url ||
-    profile.avatar_url ||
-    profile.image_url ||
-    null;
-
-  return candidate ? String(candidate) : null;
+function getGuruName(
+  profile: GuruProfile | null,
+  fallbackEmail?: string | null
+) {
+  return (
+    profile?.full_name ||
+    profile?.display_name ||
+    profile?.name ||
+    getDisplayNameFromEmail(profile?.email || fallbackEmail)
+  );
 }
 
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
+function getGuruTitle(profile: GuruProfile | null) {
+  return profile?.title || "Trusted Pet Care Guru";
+}
+
+function getGuruLocation(profile: GuruProfile | null) {
+  const city = String(profile?.city || "").trim();
+  const state = String(profile?.state || "").trim();
+
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  if (state) return state;
+
+  return "Service area pending";
+}
+
+function getGuruImage(profile: GuruProfile | null) {
+  return (
+    profile?.image_url ||
+    profile?.avatar_url ||
+    profile?.photo_url ||
+    profile?.profile_photo_url ||
+    null
+  );
+}
+
+
+function normalizeServices(value: GuruProfile["services"]) {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getRate(profile: GuruProfile | null) {
+  const value = profile?.rate ?? profile?.hourly_rate ?? profile?.price ?? null;
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `$${value}/hr`;
+  }
+
+  return "Rate pending";
+}
+
+function normalizeApplicationStatus(profile: GuruProfile | null) {
+  const raw = String(profile?.application_status || profile?.status || "")
+    .trim()
+    .toLowerCase();
+
+  if (profile?.is_bookable || raw === "bookable" || raw === "active") {
+    return "Bookable";
+  }
+
+  if (raw === "approved") return "Approved";
+  if (raw === "reviewing") return "Under Review";
+  if (raw === "submitted") return "Submitted";
+  if (raw === "needs_info" || raw === "needs-info") return "Needs Info";
+  if (raw === "rejected") return "Not Approved";
+  if (raw === "suspended" || raw === "paused") return "Paused";
+
+  return "Profile Setup";
+}
+
+function isBookable(profile: GuruProfile | null) {
+  const status = normalizeApplicationStatus(profile).toLowerCase();
+
+  return Boolean(profile?.is_bookable) || status === "bookable";
+}
+
+function calculateProfileCompletion(profile: GuruProfile | null) {
+  if (!profile) return 10;
+
+  if (
+    typeof profile.profile_completion === "number" &&
+    profile.profile_completion > 0
+  ) {
+    return Math.max(0, Math.min(100, profile.profile_completion));
+  }
+
+  const checks = [
+    Boolean(profile.full_name || profile.display_name || profile.name),
+    Boolean(profile.title),
+    Boolean(profile.bio),
+    Boolean(profile.city || profile.state),
+    Boolean(getGuruImage(profile)),
+    Boolean(profile.rate || profile.hourly_rate || profile.price),
+    normalizeServices(profile.services).length > 0,
+  ];
+
+  return Math.max(
+    10,
+    Math.round((checks.filter(Boolean).length / checks.length) * 100)
+  );
+}
+
+function getBookingStatus(booking: BookingRow) {
+  return String(
+    booking.status ||
+      booking.booking_status ||
+      booking.payment_status ||
+      "pending"
+  );
+}
+
+function getBookingService(booking: BookingRow) {
+  return String(
+    booking.service ||
+      booking.service_type ||
+      booking.booking_type ||
+      "Pet Care"
+  );
+}
+
+function getPetName(booking: BookingRow) {
+  return String(booking.pet_name || "Pet");
+}
+
+function getCustomerName(booking: BookingRow) {
+  return String(
+    booking.customer_name || booking.pet_parent_name || "Pet Parent"
+  );
+}
+
+function getBookingDate(booking: BookingRow) {
+  const value =
+    booking.start_time ||
+    booking.start_date ||
+    booking.booking_date ||
+    booking.created_at ||
+    null;
+
+  if (!value) return "Date pending";
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) return "Date pending";
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatActivity(value?: string | null) {
+  if (!value) return "No recent activity";
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) return "No recent activity";
+
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function getMessagePreview(message?: MessageRow | null) {
-  const value = message?.content || message?.body || "";
-  return String(value).trim();
+  return String(message?.content || message?.body || "").trim();
 }
 
-function PetAvatar({
-  imageUrl,
-  petName,
-}: {
-  imageUrl?: string | null;
-  petName?: string | null;
-}) {
-  if (imageUrl) {
-    return (
-      <div className="h-24 w-24 overflow-hidden rounded-[22px] border border-white/10 bg-white/5 shadow-sm sm:h-28 sm:w-28">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageUrl}
-          alt={petName ? `${petName} photo` : "Pet photo"}
-          className="h-full w-full object-cover"
-        />
-      </div>
-    );
+function getGuruTier(
+  completedBookingsCount: number,
+  profileCompletion: number,
+  bookable: boolean
+): GuruTier {
+  if (completedBookingsCount >= 25 && profileCompletion >= 90 && bookable) {
+    return {
+      label: "Elite Guru",
+      shortLabel: "Elite",
+      description:
+        "You are in the top SitGuru pack — a polished, highly active Guru trusted by pet families for reliable, loving care.",
+      icon: "🏆",
+      stars: 5,
+      badgeClassName: "border-amber-200 bg-amber-50 text-amber-800",
+      cardClassName:
+        "border-amber-200 bg-[linear-gradient(180deg,#fffaf0_0%,#ffffff_100%)]",
+    };
   }
 
-  return (
-    <div className="flex h-24 w-24 items-center justify-center rounded-[22px] border border-white/10 bg-white/5 text-3xl font-black text-emerald-200 shadow-sm sm:h-28 sm:w-28">
-      {getPetInitial(petName)}
-    </div>
-  );
-}
-
-function ConversationAvatar({
-  name,
-  imageUrl,
-}: {
-  name: string;
-  imageUrl?: string | null;
-}) {
-  if (imageUrl) {
-    return (
-      <div className="h-14 w-14 overflow-hidden rounded-[18px] border border-white/10 bg-white/5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
-      </div>
-    );
+  if (completedBookingsCount >= 10 && profileCompletion >= 75 && bookable) {
+    return {
+      label: "Super Guru",
+      shortLabel: "Super",
+      description:
+        "You are building a strong SitGuru reputation with more completed care, a stronger profile, and growing trust from pet families.",
+      icon: "⭐",
+      stars: 4,
+      badgeClassName: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800",
+      cardClassName:
+        "border-fuchsia-200 bg-[linear-gradient(180deg,#fff7ff_0%,#ffffff_100%)]",
+    };
   }
 
-  return (
-    <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 bg-white/5 text-lg font-black text-emerald-200">
-      {getInitials(name)}
-    </div>
-  );
+  if (bookable) {
+    return {
+      label: "Trusted Guru",
+      shortLabel: "Trusted",
+      description:
+        "You are approved, bookable, and ready to help pets feel safe, loved, and cared for through SitGuru.",
+      icon: "🛡️",
+      stars: 3,
+      badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      cardClassName:
+        "border-emerald-200 bg-[linear-gradient(180deg,#f2fffb_0%,#ffffff_100%)]",
+    };
+  }
+
+  return {
+    label: "Rising Guru",
+    shortLabel: "Rising",
+    description:
+      "You are on the path to becoming bookable. Finish your profile and keep building trust so pet families can choose you with confidence.",
+    icon: "🐾",
+    stars: 2,
+    badgeClassName: "border-cyan-200 bg-cyan-50 text-cyan-800",
+    cardClassName:
+      "border-cyan-200 bg-[linear-gradient(180deg,#f3fbff_0%,#ffffff_100%)]",
+  };
 }
 
-async function getGuruProfile(userId: string, email?: string | null) {
+function getEliteProgress({
+  completedBookingsCount,
+  profileCompletion,
+  bookable,
+}: {
+  completedBookingsCount: number;
+  profileCompletion: number;
+  bookable: boolean;
+}) {
+  const bookingProgress = Math.min(
+    100,
+    Math.round((completedBookingsCount / 25) * 100)
+  );
+
+  const profileProgress = Math.min(
+    100,
+    Math.round((profileCompletion / 90) * 100)
+  );
+
+  const bookableProgress = bookable ? 100 : 0;
+
+  return Math.round((bookingProgress + profileProgress + bookableProgress) / 3);
+}
+
+async function getGuruProfile(
+  userId: string,
+  email?: string | null
+): Promise<GuruProfile | null> {
   const byUserId = await supabaseAdmin
     .from("gurus")
     .select("*")
@@ -404,211 +453,189 @@ async function getGuruProfile(userId: string, email?: string | null) {
     }
   }
 
+  const profileFallback = await supabaseAdmin
+    .from("profiles")
+    .select(
+      "id, full_name, display_name, name, email, role, account_type, profile_photo_url, avatar_url, image_url"
+    )
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!profileFallback.error && profileFallback.data) {
+    const role = normalizeRole(
+      profileFallback.data.role || profileFallback.data.account_type
+    );
+
+    if (role === "guru") {
+      return {
+        id: profileFallback.data.id,
+        user_id: userId,
+        email: profileFallback.data.email || email,
+        full_name:
+          profileFallback.data.full_name ||
+          profileFallback.data.display_name ||
+          profileFallback.data.name,
+        profile_photo_url: profileFallback.data.profile_photo_url,
+        avatar_url: profileFallback.data.avatar_url,
+        image_url: profileFallback.data.image_url,
+        video_url: null,
+        profile_video_url: null,
+        intro_video_url: null,
+        services: null,
+        rate: null,
+        hourly_rate: null,
+        price: null,
+        profile_completion: null,
+        application_status: "profile_incomplete",
+        status: "profile_incomplete",
+        is_bookable: false,
+      };
+    }
+  }
+
   return null;
 }
 
-async function getGuruBookings(guruId: string | number) {
-  const byCreatedAt = await supabaseAdmin
-    .from("bookings")
-    .select("*")
-    .eq("sitter_id", guruId)
-    .order("created_at", { ascending: false })
-    .limit(25);
-
-  if (!byCreatedAt.error && byCreatedAt.data) {
-    return byCreatedAt.data as BookingRow[];
-  }
-
-  const byBookingDate = await supabaseAdmin
-    .from("bookings")
-    .select("*")
-    .eq("sitter_id", guruId)
-    .order("booking_date", { ascending: false })
-    .limit(25);
-
-  if (!byBookingDate.error && byBookingDate.data) {
-    return byBookingDate.data as BookingRow[];
-  }
-
-  console.error(
-    "Guru dashboard bookings fetch error:",
-    byCreatedAt.error?.message || byBookingDate.error?.message || "Unknown error"
-  );
-
-  return [];
-}
-
-async function enrichBookingsWithPetMedia(
-  bookings: BookingRow[]
-): Promise<EnrichedBookingRow[]> {
-  if (!bookings.length) return [];
-
-  const petIds = Array.from(
-    new Set(
-      bookings
-        .map((booking) => String(booking.pet_id || "").trim())
-        .filter(Boolean)
-    )
-  );
-
-  if (petIds.length === 0) {
-    return bookings.map<EnrichedBookingRow>((booking) => ({
-      ...booking,
-      resolved_pet_photo_url: booking.pet_photo_url || null,
-    }));
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("pet_media")
-    .select("pet_id, file_url, file_type, visibility, created_at")
-    .in("pet_id", petIds)
-    .order("created_at", { ascending: false });
-
-  if (error || !data) {
-    return bookings.map<EnrichedBookingRow>((booking) => ({
-      ...booking,
-      resolved_pet_photo_url: booking.pet_photo_url || null,
-    }));
-  }
-
-  const petImageMap = new Map<string, string>();
-
-  for (const row of data as PetMediaRow[]) {
-    const petId = String(row.pet_id || "").trim();
-    if (!petId || petImageMap.has(petId)) continue;
-
-    const fileType = String(row.file_type || "").toLowerCase();
-    if (!fileType.includes("image")) continue;
-    if (!row.file_url) continue;
-
-    petImageMap.set(petId, row.file_url);
-  }
-
-  return bookings.map<EnrichedBookingRow>((booking) => {
-    const petId = String(booking.pet_id || "").trim();
-
-    return {
-      ...booking,
-      resolved_pet_photo_url:
-        booking.pet_photo_url || (petId ? petImageMap.get(petId) || null : null),
-    };
-  });
-}
-
-async function getGuruConversations(
-  userId: string,
-  guruProfile: GuruProfile | null
+async function getGuruBookings(
+  guruProfile: GuruProfile | null,
+  userId: string
 ) {
   const guruIds = Array.from(
     new Set(
-      [userId, guruProfile?.user_id, guruProfile?.id]
+      [guruProfile?.id, guruProfile?.user_id, userId]
         .map((value) => String(value ?? "").trim())
         .filter(Boolean)
     )
   );
 
-  if (guruIds.length === 0) {
-    return {
-      customerConversations: [] as DashboardConversation[],
-      adminConversations: [] as DashboardConversation[],
-    };
+  if (!guruIds.length) return [] as BookingRow[];
+
+  const bySitter = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .in("sitter_id", guruIds)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (!bySitter.error && bySitter.data) {
+    return bySitter.data as BookingRow[];
   }
 
-  const { data: conversationsData, error: conversationsError } = await supabaseAdmin
+  const byGuru = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .in("guru_id", guruIds)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (!byGuru.error && byGuru.data) {
+    return byGuru.data as BookingRow[];
+  }
+
+  return [] as BookingRow[];
+}
+
+async function getGuruConversations(
+  guruProfile: GuruProfile | null,
+  userId: string
+) {
+  const guruIds = Array.from(
+    new Set(
+      [guruProfile?.id, guruProfile?.user_id, userId]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (!guruIds.length) return [] as DashboardConversation[];
+
+  const { data: conversations } = await supabaseAdmin
     .from("conversations")
     .select("*")
     .in("guru_id", guruIds)
-    .order("last_message_at", { ascending: false })
-    .limit(20);
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .limit(12);
 
-  if (conversationsError || !conversationsData) {
-    console.error(
-      "Guru dashboard conversations fetch error:",
-      conversationsError?.message || "Unknown error"
-    );
+  const safeConversations = (conversations || []) as ConversationRow[];
 
-    return {
-      customerConversations: [] as DashboardConversation[],
-      adminConversations: [] as DashboardConversation[],
-    };
-  }
+  if (!safeConversations.length) return [] as DashboardConversation[];
 
-  const conversations = conversationsData as ConversationRow[];
+  const conversationIds = safeConversations.map(
+    (conversation) => conversation.id
+  );
 
-  if (!conversations.length) {
-    return {
-      customerConversations: [] as DashboardConversation[],
-      adminConversations: [] as DashboardConversation[],
-    };
-  }
-
-  const conversationIds = conversations.map((conversation) => conversation.id);
-
-  const { data: messagesData, error: messagesError } = await supabaseAdmin
+  const { data: messages } = await supabaseAdmin
     .from("messages")
     .select("*")
     .in("conversation_id", conversationIds)
     .order("created_at", { ascending: false });
 
-  if (messagesError) {
-    console.error("Guru dashboard messages fetch error:", messagesError.message);
-  }
-
+  const safeMessages = (messages || []) as MessageRow[];
   const latestMessageByConversation = new Map<string, MessageRow>();
 
-  for (const message of (messagesData ?? []) as MessageRow[]) {
+  safeMessages.forEach((message) => {
     const conversationId = String(message.conversation_id || "").trim();
-    if (!conversationId || latestMessageByConversation.has(conversationId)) {
-      continue;
+
+    if (conversationId && !latestMessageByConversation.has(conversationId)) {
+      latestMessageByConversation.set(conversationId, message);
     }
+  });
 
-    latestMessageByConversation.set(conversationId, message);
-  }
-
-  const otherUserIds = Array.from(
+  const profileIds = Array.from(
     new Set(
-      conversations
-        .map((conversation) => String(conversation.customer_id || "").trim())
+      safeConversations
+        .flatMap((conversation) => [
+          conversation.customer_id || "",
+          ...safeMessages
+            .filter((message) => message.conversation_id === conversation.id)
+            .flatMap((message) => [
+              message.sender_id || "",
+              message.recipient_id || "",
+            ]),
+        ])
         .filter(Boolean)
+        .filter((id) => !guruIds.includes(id))
     )
   );
 
-  const { data: profilesData, error: profilesError } =
-    otherUserIds.length > 0
-      ? await supabaseAdmin.from("profiles").select("*").in("id", otherUserIds)
-      : { data: [], error: null as { message?: string } | null };
-
-  if (profilesError) {
-    console.error("Guru dashboard profiles fetch error:", profilesError.message);
-  }
+  const { data: profiles } = profileIds.length
+    ? await supabaseAdmin
+        .from("profiles")
+        .select(
+          "id, full_name, display_name, name, first_name, last_name, email, role, account_type, profile_photo_url, avatar_url, image_url"
+        )
+        .in("id", profileIds)
+    : { data: [] as ProfileRow[] };
 
   const profileMap = new Map<string, ProfileRow>();
-  for (const profile of (profilesData ?? []) as ProfileRow[]) {
-    profileMap.set(String(profile.id), profile);
-  }
 
-  const mapped = conversations.map((conversation) => {
-    const otherUserId = String(conversation.customer_id || "").trim() || null;
-    const otherUserProfile = otherUserId ? profileMap.get(otherUserId) ?? null : null;
-    const latestMessage = latestMessageByConversation.get(conversation.id) ?? null;
-    const rawRole =
-      typeof otherUserProfile?.role === "string" &&
-      otherUserProfile.role.trim().length > 0
-        ? otherUserProfile.role.trim()
-        : "Customer";
+  ((profiles || []) as ProfileRow[]).forEach((profile) => {
+    profileMap.set(profile.id, profile);
+  });
+
+  return safeConversations.map((conversation) => {
+    const latestMessage = latestMessageByConversation.get(conversation.id);
+    const otherUserId =
+      conversation.customer_id ||
+      latestMessage?.sender_id ||
+      latestMessage?.recipient_id ||
+      "";
+
+    const otherProfile = profileMap.get(otherUserId) || null;
+    const role = normalizeRole(
+      otherProfile?.role || otherProfile?.account_type || "customer"
+    );
 
     return {
       id: conversation.id,
-      otherUserId,
-      otherUserName: getProfileName(otherUserProfile),
-      otherUserRole: rawRole,
-      otherUserPhotoUrl: getProfilePhotoUrl(otherUserProfile),
-      subject: conversation.subject?.trim() || "Direct conversation",
+      name: getProfileName(otherProfile),
+      role: role === "admin" ? "Admin" : role === "guru" ? "Guru" : "Customer",
+      subject: conversation.subject || "Care conversation",
       preview:
-        conversation.last_message_preview?.trim() ||
+        conversation.last_message_preview ||
         getMessagePreview(latestMessage) ||
-        "Open this thread to confirm details and respond.",
-      status: conversation.status?.trim() || "open",
+        "Open this thread to review the details.",
       lastActivity:
         conversation.last_message_at ||
         latestMessage?.created_at ||
@@ -618,133 +645,285 @@ async function getGuruConversations(
       href: `/messages/${conversation.id}`,
     };
   });
-
-  const adminConversations = mapped.filter(
-    (conversation) => conversation.otherUserRole.toLowerCase() === "admin"
-  );
-
-  const customerConversations = mapped.filter(
-    (conversation) => conversation.otherUserRole.toLowerCase() !== "admin"
-  );
-
-  return {
-    customerConversations,
-    adminConversations,
-  };
 }
 
-function GuruDarkLogo({
-  className = "",
-  imageClassName = "",
+function GuruAvatar({
+  name,
+  imageUrl,
 }: {
-  className?: string;
-  imageClassName?: string;
+  name: string;
+  imageUrl?: string | null;
+}) {
+  if (imageUrl) {
+    return (
+      <div className="h-40 w-40 overflow-hidden rounded-full border-[7px] border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.16)] lg:h-48 lg:w-48">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-40 w-40 items-center justify-center rounded-full border-[7px] border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-6xl font-black text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.16)] lg:h-48 lg:w-48">
+      {getFirstName(name).charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
+function GuruPawCrest({ className = "h-9 w-9" }: { className?: string }) {
+  return (
+    <span
+      className={`relative inline-flex shrink-0 items-center justify-center ${className}`}
+      aria-hidden="true"
+    >
+      <svg
+        viewBox="0 0 96 108"
+        className="h-full w-full drop-shadow-[0_9px_16px_rgba(5,150,105,0.22)]"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M48 4.8C57.4 13.7 71.2 17.5 84.5 18.3C86.8 18.4 88.7 20.2 88.8 22.5C91.1 61.2 77.3 88.2 50.1 103.2C48.8 103.9 47.2 103.9 45.9 103.2C18.7 88.2 4.9 61.2 7.2 22.5C7.3 20.2 9.2 18.4 11.5 18.3C24.8 17.5 38.6 13.7 48 4.8Z"
+          fill="url(#guruShieldGradient)"
+        />
+        <path
+          d="M48 12.8C56 19.2 67.1 22.7 80.1 23.8C81.2 55.7 70.4 80.2 48 93.9C25.6 80.2 14.8 55.7 15.9 23.8C28.9 22.7 40 19.2 48 12.8Z"
+          fill="url(#guruInnerGradient)"
+          stroke="rgba(255,255,255,0.72)"
+          strokeWidth="4"
+        />
+        <path
+          d="M48 48.5C40.4 48.5 34.3 54.6 34.3 62.1C34.3 69.4 40 74.7 48 74.7C56 74.7 61.7 69.4 61.7 62.1C61.7 54.6 55.6 48.5 48 48.5Z"
+          fill="white"
+        />
+        <path
+          d="M32.4 45.4C35.8 44.5 37.7 40.2 36.7 35.9C35.7 31.6 32.1 28.8 28.7 29.7C25.3 30.6 23.4 34.9 24.4 39.2C25.4 43.5 29 46.3 32.4 45.4Z"
+          fill="white"
+        />
+        <path
+          d="M43.1 41.5C46.7 41.1 49.1 37 48.6 32.4C48.1 27.8 44.8 24.4 41.2 24.8C37.6 25.2 35.2 29.3 35.7 33.9C36.2 38.5 39.5 41.9 43.1 41.5Z"
+          fill="white"
+        />
+        <path
+          d="M52.9 41.5C56.5 41.9 59.8 38.5 60.3 33.9C60.8 29.3 58.4 25.2 54.8 24.8C51.2 24.4 47.9 27.8 47.4 32.4C46.9 37 49.3 41.1 52.9 41.5Z"
+          fill="white"
+        />
+        <path
+          d="M63.6 45.4C67 46.3 70.6 43.5 71.6 39.2C72.6 34.9 70.7 30.6 67.3 29.7C63.9 28.8 60.3 31.6 59.3 35.9C58.3 40.2 60.2 44.5 63.6 45.4Z"
+          fill="white"
+        />
+        <defs>
+          <linearGradient
+            id="guruShieldGradient"
+            x1="7"
+            y1="4"
+            x2="90"
+            y2="104"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#01D59B" />
+            <stop offset="0.54" stopColor="#27C6B7" />
+            <stop offset="1" stopColor="#78C7FF" />
+          </linearGradient>
+          <linearGradient
+            id="guruInnerGradient"
+            x1="18"
+            y1="15"
+            x2="82"
+            y2="93"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#0B1534" />
+            <stop offset="1" stopColor="#10B981" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </span>
+  );
+}
+
+function TierStars({ stars }: { stars: number }) {
+  return (
+    <div
+      className="flex items-center gap-1"
+      aria-label={`${stars} out of 5 stars`}
+    >
+      {Array.from({ length: 5 }).map((_, index) => (
+        <span
+          key={index}
+          className={`text-base ${
+            index < stars ? "text-amber-400" : "text-slate-300"
+          }`}
+        >
+          ★
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string | number;
+  icon?: string;
+}) {
+  return (
+    <div className="rounded-[1.65rem] border border-slate-200 bg-white px-6 py-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-black !text-slate-800">{label}</p>
+          <p className="mt-2 text-5xl font-black tracking-tight !text-slate-900">
+            {value}
+          </p>
+        </div>
+
+        {icon ? (
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-cyan-50 text-2xl ring-1 ring-cyan-100">
+            {icon}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function BookingCard({ booking }: { booking: BookingRow }) {
+  const status = getBookingStatus(booking);
+
+  return (
+    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-700">
+            {getBookingService(booking)}
+          </p>
+          <h3 className="mt-2 text-xl font-black !text-slate-900">
+            {getPetName(booking)}
+          </h3>
+          <p className="mt-1 text-sm font-bold !text-slate-700">
+            {getCustomerName(booking)}
+          </p>
+        </div>
+
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase !text-emerald-800">
+          {status}
+        </span>
+      </div>
+
+      <p className="mt-4 text-sm font-bold !text-slate-700">
+        {getBookingDate(booking)}
+      </p>
+    </div>
+  );
+}
+
+function ConversationCard({
+  conversation,
+}: {
+  conversation: DashboardConversation;
 }) {
   return (
     <Link
-      href="/guru/dashboard"
-      className={`inline-flex shrink-0 items-center ${className}`}
-      aria-label="Go to SitGuru Guru dashboard"
+      href={conversation.href}
+      className="block rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
     >
-      <Image
-        src="/images/sitguru-logo-dark.png"
-        alt="SitGuru"
-        width={300}
-        height={112}
-        priority
-        className={`h-auto w-[170px] sm:w-[210px] lg:w-[240px] ${imageClassName}`}
-      />
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-black !text-slate-900">
+            {conversation.name}
+          </p>
+          <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] !text-slate-700">
+            {conversation.role}
+          </p>
+        </div>
+
+        <span className="text-xs font-bold !text-slate-700">
+          {formatActivity(conversation.lastActivity)}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm font-black !text-slate-900">
+        {conversation.subject}
+      </p>
+      <p className="mt-2 line-clamp-2 text-sm font-bold leading-6 !text-slate-700">
+        {conversation.preview}
+      </p>
     </Link>
   );
 }
 
-function GuruDarkHeader() {
+function EmptyState({
+  title,
+  body,
+  actionHref,
+  actionLabel,
+}: {
+  title: string;
+  body: string;
+  actionHref?: string;
+  actionLabel?: string;
+}) {
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/95 px-4 py-4 text-white shadow-[0_10px_30px_rgba(0,0,0,0.25)] backdrop-blur sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-        <GuruDarkLogo />
+    <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+      <h3 className="text-xl font-black !text-slate-900">{title}</h3>
 
-        <nav className="hidden items-center gap-2 md:flex">
-          <Link
-            href="/guru/dashboard"
-            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/messages"
-            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
-          >
-            Messages
-          </Link>
-          <Link
-            href="/guru/bookings"
-            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
-          >
-            Bookings
-          </Link>
-          <Link
-            href="/guru/profile"
-            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
-          >
-            Profile
-          </Link>
-          <Link
-            href="/guru/dashboard/earnings"
-            className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-300/50 hover:bg-white/10 hover:text-white"
-          >
-            Earnings
-          </Link>
-        </nav>
+      <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 !text-slate-700">
+        {body}
+      </p>
 
+      {actionHref && actionLabel ? (
         <Link
-          href="/logout"
-          className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950 shadow-[0_10px_25px_rgba(16,185,129,0.22)] transition hover:bg-emerald-300"
+          href={actionHref}
+          className="mt-5 inline-flex rounded-full bg-emerald-500 px-6 py-3 text-sm font-black !text-white transition hover:bg-emerald-600"
         >
-          Logout
+          {actionLabel}
         </Link>
-      </div>
-    </header>
+      ) : null}
+    </div>
   );
 }
 
-function GuruDarkFooter() {
+function EliteProgressRow({
+  label,
+  value,
+  goal,
+  percent,
+  icon,
+}: {
+  label: string;
+  value: string;
+  goal: string;
+  percent: number;
+  icon: string;
+}) {
   return (
-    <footer className="border-t border-white/10 bg-slate-950 px-4 py-8 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-3">
-          <GuruDarkLogo imageClassName="w-[165px] sm:w-[190px] lg:w-[210px]" />
-
-          <p className="max-w-md text-sm leading-6 text-slate-400">
-            Trusted Pet Care. Simplified.
+    <div className="rounded-[1rem] border border-slate-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-black !text-slate-900">
+            {icon} {label}
+          </p>
+          <p className="mt-1 text-xs font-bold !text-slate-600">
+            Current: {value}
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 text-sm text-slate-400 sm:flex-row sm:items-center">
-          <Link href="/guru/dashboard" className="transition hover:text-white">
-            Guru Dashboard
-          </Link>
-          <Link href="/messages" className="transition hover:text-white">
-            Messages
-          </Link>
-          <Link href="/guru/bookings" className="transition hover:text-white">
-            Bookings
-          </Link>
-          <Link href="/guru/profile" className="transition hover:text-white">
-            Profile
-          </Link>
-          <Link
-            href="/guru/dashboard/earnings"
-            className="transition hover:text-white"
-          >
-            Earnings
-          </Link>
-          <span className="text-slate-500">
-            © {new Date().getFullYear()} SitGuru
-          </span>
-        </div>
+        <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-black !text-slate-900 ring-1 ring-cyan-100">
+          Goal: {goal}
+        </span>
       </div>
-    </footer>
+
+      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-[linear-gradient(90deg,#39c8b4_0%,#49aaf0_100%)]"
+          style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -762,743 +941,514 @@ export default async function GuruDashboardPage() {
 
   const guruProfile = await getGuruProfile(user.id, user.email);
 
-  if (!guruProfile?.id) {
-    redirect("/guru/login");
+  if (!guruProfile) {
+    redirect("/guru/application");
   }
 
-  const [bookings, conversationBuckets] = await Promise.all([
-    getGuruBookings(guruProfile.id),
-    getGuruConversations(user.id, guruProfile),
+  const [bookings, conversations] = await Promise.all([
+    getGuruBookings(guruProfile, user.id),
+    getGuruConversations(guruProfile, user.id),
   ]);
 
-  const enrichedBookings = await enrichBookingsWithPetMedia(bookings);
-
-  const customerConversations = conversationBuckets.customerConversations;
-  const adminConversations = conversationBuckets.adminConversations;
-  const adminConversation = adminConversations[0] ?? null;
-
-  const displayName =
-    guruProfile?.full_name ||
-    guruProfile?.display_name ||
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    getDisplayName(user.email);
-
+  const displayName = getGuruName(guruProfile, user.email);
+  const welcomeName = getFirstName(displayName);
+  const imageUrl = getGuruImage(guruProfile);
+  const services = normalizeServices(guruProfile.services);
   const profileCompletion = calculateProfileCompletion(guruProfile);
-  const missingProfileItems = getMissingProfileItems(guruProfile);
+  const status = normalizeApplicationStatus(guruProfile);
+  const bookable = isBookable(guruProfile);
 
-  const pendingCount = enrichedBookings.filter((booking) => {
-    const status = String(getBookingStatus(booking)).toLowerCase();
-    return status.includes("pending");
-  }).length;
+  const upcomingBookings = bookings.filter((booking) => {
+    const statusText = getBookingStatus(booking).toLowerCase();
 
-  const activeCount = enrichedBookings.filter((booking) => {
-    const status = String(getBookingStatus(booking)).toLowerCase();
     return (
-      status.includes("confirm") ||
-      status.includes("active") ||
-      status === "paid"
+      statusText.includes("pending") ||
+      statusText.includes("confirm") ||
+      statusText.includes("active") ||
+      statusText === "paid"
     );
-  }).length;
+  });
 
-  const completedCount = enrichedBookings.filter((booking) => {
-    const status = String(getBookingStatus(booking)).toLowerCase();
-    return status.includes("complete");
-  }).length;
+  const completedBookings = bookings.filter((booking) =>
+    getBookingStatus(booking).toLowerCase().includes("complete")
+  );
 
-  const recentBookings = enrichedBookings.slice(0, 6);
-  const services =
-    normalizeServices(guruProfile?.services) || ["Pet Sitting", "Dog Walking"];
+  const completedBookingsCount = completedBookings.length;
+
+  const guruTier = getGuruTier(
+    completedBookingsCount,
+    profileCompletion,
+    bookable
+  );
+
+  const eliteProgress = getEliteProgress({
+    completedBookingsCount,
+    profileCompletion,
+    bookable,
+  });
+
+  const completedCarePercent = Math.min(
+    100,
+    Math.round((completedBookingsCount / 25) * 100)
+  );
+
+  const profilePercent = Math.min(
+    100,
+    Math.round((profileCompletion / 90) * 100)
+  );
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_20%),linear-gradient(180deg,#020617_0%,#0b1220_46%,#020617_100%)] text-white">
-      <GuruDarkHeader />
+    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light text-slate-900" style={SITE_FONT_STYLE}>
+      <GuruDashboardHeader
+        active="dashboard"
+        displayName={displayName}
+        imageUrl={imageUrl}
+        tierLabel={guruTier.label}
+        profileCompletion={profileCompletion}
+      />
 
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(17,24,39,0.94),rgba(15,23,42,0.96))] shadow-[0_30px_80px_rgba(2,6,23,0.45)]">
-          <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.1fr_0.9fr] lg:p-10">
+      <section className="mx-auto max-w-[1440px] px-5 py-8 sm:px-6 lg:px-8">
+        <section className="overflow-hidden rounded-[2.3rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)]">
+          <div className="grid gap-8 p-8 lg:grid-cols-[1.15fr_340px] lg:items-center lg:p-10">
             <div>
-              <div className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-300">
-                Guru Control Center
-              </div>
+              <p className="text-sm font-semibold uppercase tracking-[0.34em] !text-[#07132f]">
+                SitGuru Guru Portal
+              </p>
 
-              <h1 className="mt-5 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
-                Welcome back, {displayName}.
+              <h1 className="mt-4 text-5xl font-extrabold leading-[0.98] tracking-[-0.055em] !text-[#07132f] sm:text-6xl lg:text-7xl">
+                Welcome back, {welcomeName} 👋
               </h1>
 
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200 sm:text-base">
-                This dashboard is your operational center. It should feel similar
-                to the Admin dashboard in structure, but focused on your own
-                customer interactions, bookings, service visibility, and the
-                profile information that appears on the customer side.
+              <p className="mt-5 max-w-3xl text-xl font-light leading-9 !text-slate-700">
+                Manage bookings, messages, availability, earnings, and profile photos —
+                all in one polished Guru workspace.
               </p>
 
-              <div className="mt-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4">
-                <p className="text-sm font-black text-emerald-100">Reliable payouts after completed care</p>
-                <p className="mt-2 text-sm leading-6 text-emerald-50/90">Guru payouts are released 48 hours after completed care, unless a support case, refund request, chargeback, or trust and safety review is open.</p>
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-2">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
-                  Customer-facing profile controls
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
-                  Live booking visibility
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
-                  Admin feed alignment
-                </span>
-              </div>
-
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <Link
-                  href="/guru/profile"
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-black ${guruTier.badgeClassName}`}
                 >
-                  Update Guru Profile
-                </Link>
+                  <GuruPawCrest className="h-6 w-6" />
+                  <span>{guruTier.label}</span>
+                </div>
 
-                <Link
-                  href="/guru/bookings"
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-6 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
-                >
-                  Open Bookings
-                </Link>
-
-                <Link
-                  href="/messages/admin"
-                  className="inline-flex items-center justify-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-6 py-3 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/15"
-                >
-                  Message Admin
-                </Link>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                  Guru account
-                </p>
-                <p className="mt-3 text-lg font-bold text-white">
-                  {guruProfile?.title || "Pet Care Guru"}
-                </p>
-                <p className="mt-1 text-sm text-slate-300">
-                  {guruProfile?.city || "City pending"}
-                  {guruProfile?.city && guruProfile?.state ? ", " : ""}
-                  {guruProfile?.state || ""}
-                </p>
-                <p className="mt-3 text-sm leading-6 text-slate-300">
-                  Changes you make to your public profile should appear on the
-                  customer-facing Guru page and remain aligned with Admin review.
-                </p>
-              </div>
-
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                    Profile completion
-                  </p>
-                  <span className="text-sm font-bold text-white">
-                    {profileCompletion}%
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2">
+                  <TierStars stars={guruTier.stars} />
+                  <span className="text-sm font-black !text-slate-900">
+                    {eliteProgress}% to Elite Guru
                   </span>
                 </div>
+              </div>
 
-                <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-emerald-500"
-                    style={{ width: `${profileCompletion}%` }}
-                  />
-                </div>
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link
+                  href="/guru/bookings"
+                  className="rounded-[1.2rem] bg-[#07132f] px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
+                >
+                  My Bookings
+                </Link>
 
-                <p className="mt-4 text-sm leading-6 text-slate-300">
-                  The stronger your profile, the better it presents to customers
-                  and Admin alike.
+                <Link
+                  href="/guru/messages"
+                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Open Messages
+                </Link>
+
+                <Link
+                  href="/guru/availability"
+                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Availability
+                </Link>
+
+                <Link
+                  href="/guru/dashboard/profile"
+                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  My Profile
+                </Link>
+
+                <Link
+                  href="/guru/dashboard/earnings"
+                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Earnings
+                </Link>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center text-center">
+              <GuruAvatar name={displayName} imageUrl={imageUrl} />
+
+              <h2 className="mt-5 text-4xl font-extrabold tracking-[-0.04em] !text-[#07132f] lg:text-5xl">
+                {displayName}
+              </h2>
+
+              <div className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-white/70 px-4 py-2 shadow-sm ring-1 ring-white/80">
+                <GuruPawCrest className="h-8 w-8" />
+                <p className="text-2xl font-extrabold !text-slate-900">
+                  {guruTier.label}
                 </p>
               </div>
+
+              <div className="mt-2">
+                <TierStars stars={guruTier.stars} />
+              </div>
+
+              <p className="mt-3 text-lg font-semibold !text-slate-700">
+                {getGuruTitle(guruProfile)}
+              </p>
+
+              <p className="mt-1 text-lg font-semibold !text-slate-700">
+                {getGuruLocation(guruProfile)}
+              </p>
+
+              <GuruMediaUploader
+                userId={user.id}
+                guruProfileId={String(guruProfile.id ?? "")}
+                displayName={displayName}
+                initialPhotoUrl={imageUrl}
+              />
             </div>
           </div>
         </section>
 
-        <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">
-              Pending
-            </p>
-            <p className="mt-3 text-3xl font-black text-white">{pendingCount}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Requests or bookings still waiting on action or confirmation.
-            </p>
-          </div>
-
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-300">
-              Active
-            </p>
-            <p className="mt-3 text-3xl font-black text-white">{activeCount}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Confirmed or active care that requires ongoing visibility.
-            </p>
-          </div>
-
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-              Completed
-            </p>
-            <p className="mt-3 text-3xl font-black text-white">
-              {completedCount}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Finished services that still feed reporting and admin oversight.
-            </p>
-          </div>
-
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-              Services
-            </p>
-            <p className="mt-3 text-3xl font-black text-white">
-              {services.length}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Public service categories currently visible on your Guru profile.
-            </p>
-          </div>
+        <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard label="Bookings" value={bookings.length} icon="🗓️" />
+          <StatCard label="Upcoming" value={upcomingBookings.length} icon="🕘" />
+          <StatCard
+            label="Completed"
+            value={completedBookings.length}
+            icon="✅"
+          />
+          <StatCard label="Unread" value={conversations.length} icon="💬" />
+          <StatCard label="Profile" value={`${profileCompletion}%`} icon="⭐" />
         </section>
 
-        <section className="mt-8 grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
-          <div className="space-y-6">
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <section className="mt-8 grid gap-6 lg:grid-cols-2">
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
+                Bookings
+              </p>
+
+              <Link
+                href="/guru/bookings"
+                className="rounded-full border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm font-black !text-slate-900 transition hover:bg-cyan-100"
+              >
+                View all bookings
+              </Link>
+            </div>
+
+            <div className="mt-6">
+              {upcomingBookings.slice(0, 4).length ? (
+                <div className="grid gap-4">
+                  {upcomingBookings.slice(0, 4).map((booking, index) => (
+                    <BookingCard
+                      key={String(booking.id || index)}
+                      booking={booking}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No upcoming bookings yet"
+                  body="Once customers book you, upcoming care will appear here."
+                />
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
+                Messages
+              </p>
+
+              <Link
+                href="/guru/messages"
+                className="rounded-full border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm font-black !text-slate-900 transition hover:bg-cyan-100"
+              >
+                Open inbox
+              </Link>
+            </div>
+
+            <div className="mt-6">
+              {conversations.slice(0, 4).length ? (
+                <div className="grid gap-4">
+                  {conversations.slice(0, 4).map((conversation) => (
+                    <ConversationCard
+                      key={conversation.id}
+                      conversation={conversation}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No messages yet"
+                  body="Customer and Admin messages will appear here."
+                />
+              )}
+            </div>
+          </section>
+        </section>
+
+        <section className="mt-8 grid gap-6 lg:grid-cols-3">
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)] lg:col-span-2">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
+                  Guru Recognition
+                </p>
+
+                <h3 className="mt-3 text-4xl font-black leading-tight !text-slate-900">
+                  Become an Elite Guru 🐾
+                </h3>
+
+                <p className="mt-3 max-w-3xl text-base font-bold leading-7 !text-slate-700">
+                  Elite Guru is SitGuru’s top recognition for Gurus who build
+                  trust one happy pet, one safe walk, and one completed booking
+                  at a time. Think of it like earning your place at the front of
+                  the pack.
+                </p>
+              </div>
+
+              <div
+                className={`inline-flex w-fit items-center gap-2 rounded-full border px-4 py-2 text-sm font-black ${guruTier.badgeClassName}`}
+              >
+                <GuruPawCrest className="h-6 w-6" />
+                <span>{guruTier.label}</span>
+              </div>
+            </div>
+
+            <div
+              className={`mt-6 rounded-[1.5rem] border p-5 ${guruTier.cardClassName}`}
+            >
+              <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                    Recent customer activity
+                  <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white bg-white shadow-sm">
+                    <GuruPawCrest className="h-20 w-20" />
+                  </div>
+
+                  <p className="mt-5 text-2xl font-black !text-slate-900">
+                    Current crest: {guruTier.label}
                   </p>
-                  <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                    Bookings connected to your account
-                  </h2>
+
+                  <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
+                    {guruTier.description}
+                  </p>
+
+                  <div className="mt-5 flex items-center gap-3 rounded-[1rem] border border-slate-200 bg-white px-4 py-3">
+                    <TierStars stars={guruTier.stars} />
+                    <span className="text-sm font-black !text-slate-900">
+                      {guruTier.shortLabel} Level
+                    </span>
+                  </div>
                 </div>
 
+                <div className="rounded-[1.25rem] border border-slate-200 bg-white p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
+                        Elite Guru Progress
+                      </p>
+                      <p className="mt-1 text-3xl font-black !text-slate-900">
+                        {eliteProgress}%
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-amber-50 px-4 py-2 text-sm font-black !text-amber-800 ring-1 ring-amber-200">
+                      Goal: Elite Guru
+                    </span>
+                  </div>
+
+                  <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-[linear-gradient(90deg,#39c8b4_0%,#49aaf0_50%,#f59e0b_100%)]"
+                      style={{ width: `${eliteProgress}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-5 grid gap-3">
+                    <EliteProgressRow
+                      icon="🐕"
+                      label="Complete happy pet care bookings"
+                      value={`${completedBookingsCount} completed`}
+                      goal="25 completed"
+                      percent={completedCarePercent}
+                    />
+
+                    <EliteProgressRow
+                      icon="🐾"
+                      label="Keep your Guru profile polished"
+                      value={`${profileCompletion}% complete`}
+                      goal="90% complete"
+                      percent={profilePercent}
+                    />
+
+                    <EliteProgressRow
+                      icon="🦴"
+                      label="Stay bookable for pet parents"
+                      value={bookable ? "Bookable" : "Not bookable yet"}
+                      goal="Bookable"
+                      percent={bookable ? 100 : 0}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-5">
+                <p className="text-lg font-black !text-slate-900">
+                  How to move up the pack
+                </p>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-[1rem] bg-white p-4 ring-1 ring-emerald-100">
+                    <p className="text-sm font-black !text-slate-900">
+                      🐶 Give pet parents confidence
+                    </p>
+                    <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
+                      Keep your bio, services, location, rate, and photo updated.
+                    </p>
+                  </div>
+
+                  <div className="rounded-[1rem] bg-white p-4 ring-1 ring-emerald-100">
+                    <p className="text-sm font-black !text-slate-900">
+                      🐕 Complete more care
+                    </p>
+                    <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
+                      The more confirmed care you complete, the stronger your
+                      SitGuru reputation becomes.
+                    </p>
+                  </div>
+
+                  <div className="rounded-[1rem] bg-white p-4 ring-1 ring-emerald-100">
+                    <p className="text-sm font-black !text-slate-900">
+                      💬 Be responsive and friendly
+                    </p>
+                    <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
+                      Quick, kind updates help families feel their pets are in
+                      good hands.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+            <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
+              Public Profile
+            </p>
+
+            <div className="mt-8 h-3 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(90deg,#39c8c1_0%,#66a8f4_100%)]"
+                style={{ width: `${profileCompletion}%` }}
+              />
+            </div>
+
+            <p className="mt-3 text-sm font-black !text-slate-800">
+              {profileCompletion}% complete
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              {(services.length
+                ? services
+                : ["Dog Walking", "Drop-In Visits", "Pet Sitting"]
+              )
+                .slice(0, 6)
+                .map((service) => (
+                  <span
+                    key={service}
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black !text-slate-900"
+                  >
+                    {service}
+                  </span>
+                ))}
+            </div>
+
+            <div className="mt-5 rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
+                Current Booking Status
+              </p>
+              <p className="mt-2 text-lg font-black !text-slate-900">
+                {status}
+              </p>
+            </div>
+
+            <div className="mt-5 rounded-[1rem] border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-700">
+                Profile Photo
+              </p>
+              <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
+                Use the upload button in your hero card to add a polished profile photo customers can recognize.
+              </p>
+            </div>
+
+            <Link
+              href="/guru/dashboard/profile"
+              className="mt-8 inline-flex w-full items-center justify-center rounded-[1rem] bg-[#020826] px-6 py-4 text-base font-black !text-white transition hover:bg-[#0b1436]"
+            >
+              Update Profile
+            </Link>
+          </section>
+        </section>
+
+        <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
+                Availability & Earnings
+              </p>
+
+              <h3 className="mt-5 text-4xl font-black leading-tight !text-slate-900">
+                Stay ready to book
+              </h3>
+
+              <p className="mt-4 text-base font-black leading-7 !text-slate-800">
+                Keep your calendar current and make it easy for pet parents to
+                trust and choose you.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
+                  Availability
+                </p>
+                <p className="mt-2 text-lg font-black !text-slate-900">
+                  Keep your schedule updated
+                </p>
+
                 <Link
-                  href="/guru/bookings"
-                  className="text-sm font-semibold text-emerald-300 transition hover:text-emerald-200"
+                  href="/guru/availability"
+                  className="mt-5 inline-flex w-full items-center justify-center rounded-[1rem] bg-[linear-gradient(90deg,#39c8b4_0%,#49aaf0_100%)] px-6 py-4 text-base font-black !text-white transition hover:opacity-95"
                 >
-                  View all bookings
+                  Manage Availability
                 </Link>
               </div>
 
-              {recentBookings.length === 0 ? (
-                <div className="mt-6 rounded-[22px] border border-dashed border-white/10 bg-slate-950/35 p-6">
-                  <p className="text-base font-semibold text-white">
-                    No live bookings found yet
-                  </p>
-                  <p className="mt-2 text-sm leading-7 text-slate-300">
-                    Once customers book you, those records should appear here and
-                    also remain visible to Admin for platform oversight.
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-6 space-y-4">
-                  {recentBookings.map((booking, index) => {
-                    const status = String(getBookingStatus(booking));
-                    const petName = getPetName(booking);
-                    const bookingKey =
-                      typeof booking.id === "string" ||
-                      typeof booking.id === "number"
-                        ? String(booking.id)
-                        : `${getCustomerName(booking)}-${index}`;
-
-                    return (
-                      <div
-                        key={bookingKey}
-                        className="min-h-[132px] rounded-[22px] border border-white/10 bg-slate-950/40 p-5"
-                      >
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                          <div className="flex items-center gap-4">
-                            <PetAvatar
-                              imageUrl={booking.resolved_pet_photo_url || null}
-                              petName={petName}
-                            />
-
-                            <div>
-                              <p className="text-lg font-bold text-white">
-                                {getCustomerName(booking)}
-                              </p>
-                              <p className="mt-1 text-sm text-slate-300">
-                                {petName} • {getServiceName(booking)}
-                              </p>
-                              <p className="mt-2 text-sm text-slate-400">
-                                {formatDate(getBookingDate(booking))}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div
-                            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                              status
-                            )}`}
-                          >
-                            {status}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                Customer-facing display
-              </p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                Information pushed to the customer side
-              </h2>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="rounded-[22px] border border-white/10 bg-slate-950/40 p-5">
-                  <p className="text-sm font-semibold text-slate-300">
-                    Display name
-                  </p>
-                  <p className="mt-2 text-lg font-bold text-white">
-                    {guruProfile?.full_name ||
-                      guruProfile?.display_name ||
-                      displayName}
-                  </p>
-                </div>
-
-                <div className="rounded-[22px] border border-white/10 bg-slate-950/40 p-5">
-                  <p className="text-sm font-semibold text-slate-300">
-                    Public title
-                  </p>
-                  <p className="mt-2 text-lg font-bold text-white">
-                    {guruProfile?.title || "Pet Care Guru"}
-                  </p>
-                </div>
-
-                <div className="rounded-[22px] border border-white/10 bg-slate-950/40 p-5">
-                  <p className="text-sm font-semibold text-slate-300">
-                    Service area
-                  </p>
-                  <p className="mt-2 text-lg font-bold text-white">
-                    {guruProfile?.city || "City pending"}
-                    {guruProfile?.city && guruProfile?.state ? ", " : ""}
-                    {guruProfile?.state || ""}
-                  </p>
-                </div>
-
-                <div className="rounded-[22px] border border-white/10 bg-slate-950/40 p-5">
-                  <p className="text-sm font-semibold text-slate-300">
-                    Starting rate
-                  </p>
-                  <p className="mt-2 text-lg font-bold text-white">
-                    {guruProfile?.rate || guruProfile?.hourly_rate
-                      ? `$${guruProfile?.rate ?? guruProfile?.hourly_rate}`
-                      : "$25"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-[22px] border border-white/10 bg-slate-950/40 p-5">
-                <p className="text-sm font-semibold text-slate-300">
-                  Bio shown to customers
+              <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
+                  Rate
                 </p>
-                <p className="mt-2 text-sm leading-7 text-slate-200">
-                  {guruProfile?.bio ||
-                    "Your bio has not been added yet. Add it so customers and Admin both see a stronger professional presentation."}
+                <p className="mt-2 text-lg font-black !text-slate-900">
+                  {getRate(guruProfile)}
                 </p>
-              </div>
 
-              <div className="mt-4 rounded-[22px] border border-white/10 bg-slate-950/40 p-5">
-                <p className="text-sm font-semibold text-slate-300">
-                  Services shown publicly
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {services.map((service) => (
-                    <span
-                      key={service}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200"
-                    >
-                      {service}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="rounded-[28px] border border-emerald-400/20 bg-emerald-400/10 p-6 shadow-[0_10px_30px_rgba(16,185,129,0.08)]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                    Earnings Snapshot
-                  </p>
-                  <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                    Keep more with SitGuru
-                  </h2>
-                </div>
-
-                <span className="rounded-full border border-emerald-300/20 bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-200">
-                  8% Fee
-                </span>
-              </div>
-
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[20px] border border-white/10 bg-slate-950/35 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                    This Month
-                  </p>
-                  <p className="mt-2 text-2xl font-black text-white">$0.00</p>
-                  <p className="mt-1 text-sm text-slate-300">
-                    Net earnings this month
-                  </p>
-                </div>
-
-                <div className="rounded-[20px] border border-white/10 bg-slate-950/35 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                    Pending
-                  </p>
-                  <p className="mt-2 text-2xl font-black text-white">$0.00</p>
-                  <p className="mt-1 text-sm text-slate-300">
-                    Awaiting payout processing
-                  </p>
-                </div>
-              </div>
-
-              <p className="mt-5 text-sm leading-7 text-slate-200">
-                SitGuru currently takes an introductory 8% platform fee on
-                completed bookings, helping Gurus keep more of what they earn.
-              </p>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/guru/dashboard/earnings"
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+                  className="mt-5 inline-flex w-full items-center justify-center rounded-[1rem] border border-cyan-200 bg-cyan-50 px-6 py-4 text-base font-black !text-slate-900 transition hover:bg-cyan-100"
                 >
                   View Earnings
                 </Link>
-
-                <Link
-                  href="/guru/bookings"
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
-                >
-                  Open Bookings
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                    Message Board
-                  </p>
-                  <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                    Direct customer conversations
-                  </h2>
-                </div>
-
-                <Link
-                  href="/messages"
-                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getConversationStatusClasses(
-                    customerConversations[0]?.status || "open"
-                  )}`}
-                >
-                  Open inbox
-                </Link>
-              </div>
-
-              {customerConversations.length === 0 ? (
-                <div className="mt-6 rounded-[22px] border border-dashed border-white/10 bg-slate-950/35 p-5">
-                  <p className="text-base font-semibold text-white">
-                    No customer messages yet
-                  </p>
-                  <p className="mt-2 text-sm leading-7 text-slate-300">
-                    Customer conversation threads will appear here once direct
-                    messaging begins on your account.
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-6 space-y-4">
-                  {customerConversations.slice(0, 2).map((conversation) => (
-                    <div
-                      key={conversation.id}
-                      className="rounded-[22px] border border-white/10 bg-slate-950/40 p-5"
-                    >
-                      <div className="flex items-start gap-4">
-                        <ConversationAvatar
-                          name={conversation.otherUserName}
-                          imageUrl={conversation.otherUserPhotoUrl}
-                        />
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <p className="text-sm font-bold text-white">
-                                {conversation.otherUserName}
-                              </p>
-                              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                                {conversation.otherUserRole}
-                              </p>
-                            </div>
-
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${getConversationStatusClasses(
-                                conversation.status
-                              )}`}
-                            >
-                              {conversation.status}
-                            </span>
-                          </div>
-
-                          <p className="mt-3 text-sm font-semibold text-emerald-200">
-                            {conversation.subject}
-                          </p>
-                          <p className="mt-2 text-sm leading-7 text-slate-300">
-                            {conversation.preview}
-                          </p>
-                          <div className="mt-3 flex items-center justify-between gap-4">
-                            <p className="text-xs text-slate-400">
-                              {formatDateTime(conversation.lastActivity)}
-                            </p>
-                            <Link
-                              href={conversation.href}
-                              className="text-xs font-semibold text-emerald-300 transition hover:text-emerald-200"
-                            >
-                              Open thread →
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <Link
-                      href="/messages"
-                      className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                    >
-                      View All Messages
-                    </Link>
-
-                    <Link
-                      href="/guru/bookings"
-                      className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
-                    >
-                      Open Booking Threads
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(5,150,105,0.14),rgba(15,23,42,0.78))] p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                    Admin Support
-                  </p>
-                  <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                    Private thread with Admin only
-                  </h2>
-                </div>
-
-                <Link
-                  href="/messages/admin"
-                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getConversationStatusClasses(
-                    adminConversation?.status || "open"
-                  )}`}
-                >
-                  Open
-                </Link>
-              </div>
-
-              <p className="mt-3 text-sm leading-7 text-slate-200">
-                Use this space for platform issues, approvals, account help, or
-                operational questions. Customer messages are not part of this
-                card or this thread.
-              </p>
-
-              {adminConversation ? (
-                <div className="mt-6 rounded-[22px] border border-white/10 bg-slate-950/40 p-5">
-                  <div className="flex items-start gap-4">
-                    <ConversationAvatar
-                      name={adminConversation.otherUserName}
-                      imageUrl={adminConversation.otherUserPhotoUrl}
-                    />
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <p className="text-sm font-bold text-white">
-                            {adminConversation.otherUserName}
-                          </p>
-                          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                            {adminConversation.otherUserRole}
-                          </p>
-                        </div>
-
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${getConversationStatusClasses(
-                            adminConversation.status
-                          )}`}
-                        >
-                          {adminConversation.status}
-                        </span>
-                      </div>
-
-                      <p className="mt-3 text-sm font-semibold text-emerald-200">
-                        {adminConversation.subject}
-                      </p>
-                      <p className="mt-2 text-sm leading-7 text-slate-300">
-                        {adminConversation.preview}
-                      </p>
-                      <p className="mt-3 text-xs text-slate-400">
-                        {formatDateTime(adminConversation.lastActivity)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-6 rounded-[22px] border border-dashed border-white/10 bg-slate-950/35 p-5">
-                  <p className="text-base font-semibold text-white">
-                    No Admin thread yet
-                  </p>
-                  <p className="mt-2 text-sm leading-7 text-slate-300">
-                    Start a direct thread with Admin when you need platform help
-                    or account guidance.
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/messages/admin"
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                >
-                  Open Admin Thread
-                </Link>
-
-                <Link
-                  href="/messages"
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
-                >
-                  Open Full Inbox
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                Profile Actions
-              </p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                Keep your Guru profile strong
-              </h2>
-
-              <div className="mt-6 space-y-3">
-                {(missingProfileItems.length > 0
-                  ? missingProfileItems
-                  : [
-                      "Add a service title",
-                      "Write your Guru bio",
-                      "Upload a profile image",
-                      "Select your services",
-                    ]
-                )
-                  .slice(0, 4)
-                  .map((item, index) => (
-                    <div
-                      key={item}
-                      className="flex items-center gap-3 rounded-[18px] border border-white/10 bg-slate-950/40 px-4 py-4 text-sm font-medium text-slate-200"
-                    >
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-slate-950">
-                        {index + 1}
-                      </span>
-                      <span>{item}</span>
-                    </div>
-                  ))}
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3">
-                <Link
-                  href="/guru/profile"
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                >
-                  Edit Public Guru Profile
-                </Link>
-
-                <Link
-                  href="/messages"
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
-                >
-                  View Public Guru Messaging
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                Admin alignment
-              </p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                What feeds the Admin dashboard
-              </h2>
-
-              <div className="mt-6 space-y-3">
-                {[
-                  "Booking activity tied directly to your Guru record",
-                  "Customer request visibility and service status updates",
-                  "Profile display details that appear publicly",
-                  "Service offerings, pricing, and location information",
-                  "Operational transparency between Guru and Admin views",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-[18px] border border-white/10 bg-slate-950/40 px-4 py-4 text-sm font-medium text-slate-200"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(5,150,105,0.14),rgba(15,23,42,0.78))] p-6">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                Guru workflow
-              </p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                Built to interact directly with customers
-              </h2>
-              <p className="mt-3 text-sm leading-7 text-slate-200">
-                This dashboard should remain Guru-focused: manage your own
-                bookings, maintain your public profile, keep customer interactions
-                organized, and maintain a direct private line with Admin when
-                needed.
-              </p>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/guru/bookings"
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                >
-                  Manage Customer Bookings
-                </Link>
-
-                <Link
-                  href="/messages/admin"
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
-                >
-                  Contact Admin
-                </Link>
               </div>
             </div>
           </div>
         </section>
-      </div>
-
-      <GuruDarkFooter />
+      </section>
     </main>
   );
 }

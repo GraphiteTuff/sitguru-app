@@ -70,21 +70,25 @@ export default function WelcomeConfetti({
     }
 
     hasFiredRef.current = true;
-    setVisible(true);
-    fireConfettiBurst();
 
-    if (onCelebrate) {
-      startTransition(() => {
-        void onCelebrate();
-      });
-    }
+    const showTimer = window.setTimeout(() => {
+      setVisible(true);
+      fireConfettiBurst();
 
-    const timeout = window.setTimeout(() => {
+      if (onCelebrate) {
+        startTransition(() => {
+          void onCelebrate();
+        });
+      }
+    }, 0);
+
+    const hideTimer = window.setTimeout(() => {
       setVisible(false);
     }, 4200);
 
     return () => {
-      window.clearTimeout(timeout);
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
     };
   }, [shouldCelebrate, hasSeenWelcomeConfetti, onCelebrate]);
 

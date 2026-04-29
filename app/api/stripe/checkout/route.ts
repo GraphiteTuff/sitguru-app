@@ -17,6 +17,11 @@ const stripe = new Stripe(stripeSecretKey, {
 
 const SITGURU_FEE_PERCENT = 0.08;
 
+// Stripe Tax code for general services.
+// This keeps Stripe automatic tax from failing during checkout.
+// Confirm final tax category before live production launch.
+const SITGURU_STRIPE_TAX_CODE = "txcd_20030000";
+
 type BookingRow = Record<string, unknown>;
 
 function normalizeUrl(value: string) {
@@ -61,6 +66,7 @@ function firstNonEmpty(...values: unknown[]) {
     const cleaned = asTrimmedString(value);
     if (cleaned) return cleaned;
   }
+
   return "";
 }
 
@@ -91,6 +97,7 @@ function getBookingOwnerId(booking: BookingRow) {
 
   for (const field of possibleOwnerFields) {
     const value = booking[field];
+
     if (typeof value === "string" && value.trim()) {
       return value.trim();
     }
@@ -146,7 +153,7 @@ async function updateCheckoutStarted(
       sitguru_fee_amount: values.sitguruFeeAmount,
       guru_net_amount: values.guruNetAmount,
       total_customer_paid: values.totalCustomerPaid,
-      tax_status: "not_calculated",
+      tax_status: "stripe_automatic_tax_enabled",
       payout_status: "pending",
     })
     .eq("id", bookingId);
@@ -257,6 +264,7 @@ export async function POST(req: NextRequest) {
 
     const serviceName =
       asTrimmedString(booking.service) ||
+      asTrimmedString(booking.service_type) ||
       asTrimmedString(booking.service_name) ||
       asTrimmedString(booking.booking_type) ||
       "General care";
@@ -272,32 +280,55 @@ export async function POST(req: NextRequest) {
     const sitguruFeeCents = Math.round(subtotalCents * SITGURU_FEE_PERCENT);
     const guruNetCents = subtotalCents - sitguruFeeCents;
 
+    const bookingIdString = String(booking.id);
+    const bookingOwnerId = ownerId || user.id;
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       customer_email: user.email ?? undefined,
+
       automatic_tax: {
         enabled: true,
       },
+
       line_items: [
         {
           price_data: {
             currency: "usd",
+            unit_amount: subtotalCents,
+
+            // Required for Stripe automatic tax with inline prices.
+            // "exclusive" means tax is added on top of the booking price.
+            tax_behavior: "exclusive",
+
             product_data: {
               name: `SitGuru Booking - ${petName}`,
               description: serviceName,
+              tax_code: SITGURU_STRIPE_TAX_CODE,
             },
-            unit_amount: subtotalCents,
           },
           quantity: 1,
         },
       ],
+
       payment_intent_data: {
-        application_fee_amount: sitguruFeeCents,
+        /*
+          Do not add application_fee_amount here yet.
+
+          Stripe only allows application_fee_amount for Connect direct charges
+          or destination charges. SitGuru is currently creating a normal platform
+          Checkout Session, so the SitGuru fee is tracked in Supabase and metadata
+          for now. Later, when connected Guru Stripe accounts are wired, add:
+          transfer_data: { destination: guruStripeAccountId }
+          application_fee_amount: sitguruFeeCents
+        */
         metadata: {
-          booking_id: String(booking.id),
-          booking_owner_id: ownerId || user.id,
+          booking_id: bookingIdString,
+          booking_owner_id: bookingOwnerId,
           guru_id: asTrimmedString(booking.guru_id),
+          sitter_id: asTrimmedString(booking.sitter_id),
+          provider_profile_id: asTrimmedString(booking.provider_profile_id),
           guru_slug: asTrimmedString(booking.guru_slug),
           pet_id: asTrimmedString(booking.pet_id),
           pet_name: petName,
@@ -305,16 +336,20 @@ export async function POST(req: NextRequest) {
           subtotal_cents: String(subtotalCents),
           sitguru_fee_cents: String(sitguruFeeCents),
           guru_net_cents: String(guruNetCents),
+          tax_behavior: "exclusive",
+          tax_code: SITGURU_STRIPE_TAX_CODE,
         },
       },
-      success_url: `${baseUrl}/bookings/success?bookingId=${String(
-        booking.id
-      )}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/bookings/cancel?bookingId=${String(booking.id)}`,
+
+      success_url: `${baseUrl}/bookings/success?bookingId=${bookingIdString}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/bookings/cancel?bookingId=${bookingIdString}`,
+
       metadata: {
-        booking_id: String(booking.id),
-        booking_owner_id: ownerId || user.id,
+        booking_id: bookingIdString,
+        booking_owner_id: bookingOwnerId,
         guru_id: asTrimmedString(booking.guru_id),
+        sitter_id: asTrimmedString(booking.sitter_id),
+        provider_profile_id: asTrimmedString(booking.provider_profile_id),
         guru_slug: asTrimmedString(booking.guru_slug),
         pet_id: asTrimmedString(booking.pet_id),
         pet_name: petName,
@@ -322,10 +357,12 @@ export async function POST(req: NextRequest) {
         subtotal_cents: String(subtotalCents),
         sitguru_fee_cents: String(sitguruFeeCents),
         guru_net_cents: String(guruNetCents),
+        tax_behavior: "exclusive",
+        tax_code: SITGURU_STRIPE_TAX_CODE,
       },
     });
 
-    await updateCheckoutStarted(String(booking.id), {
+    await updateCheckoutStarted(bookingIdString, {
       stripeSessionId: session.id,
       subtotalAmount: centsToDollars(subtotalCents),
       sitguruFeeAmount: centsToDollars(sitguruFeeCents),
@@ -346,7 +383,10 @@ export async function POST(req: NextRequest) {
         subtotalAmount: centsToDollars(subtotalCents),
         sitguruFeeAmount: centsToDollars(sitguruFeeCents),
         guruNetAmount: centsToDollars(guruNetCents),
+
+        // Stripe calculates automatic tax during Checkout.
         taxAmount: 0,
+
         totalCustomerPaid: centsToDollars(subtotalCents),
       },
     });

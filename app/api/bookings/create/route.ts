@@ -1,197 +1,174 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-import { supabaseAdmin } from "@/utils/supabase/admin";
+import Stripe from "stripe";
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 type BookingCreateBody = {
-  guruId?: string;
-  guru_id?: string;
-  guruSlug?: string;
-  guru_slug?: string;
-
-  petId?: string;
-  pet_id?: string;
-  petName?: string;
-  pet_name?: string;
-  petPhotoUrl?: string;
-  pet_photo_url?: string;
-
-  date?: string;
-  booking_date?: string;
-
-  service?: string;
-  service_name?: string;
-
-  notes?: string;
-  sessionId?: string;
-};
-
-type GuruRow = {
-  id?: string | number | null;
-  profile_id?: string | null;
-  user_id?: string | null;
+  guruId?: string | number | null;
+  guruSlug?: string | null;
   slug?: string | null;
-  display_name?: string | null;
-  full_name?: string | null;
-  hourly_rate?: number | string | null;
-  rate?: number | string | null;
-  stripe_account_id?: string | null;
+  guruName?: string | null;
+
+  petId?: string | null;
+  petName?: string | null;
+
+  serviceType?: string | null;
+  requestedDate?: string | null;
+  bookingDate?: string | null;
+  timeWindow?: string | null;
+  visitLength?: string | null;
+
+  servicePrice?: number | string | null;
+  platformFee?: number | string | null;
+  total?: number | string | null;
+
+  customerName?: string | null;
+  customerEmail?: string | null;
+
+  notes?: string | null;
+
+  bookingType?: string | null;
+  complianceAccepted?: boolean | null;
+  termsAccepted?: boolean | null;
 };
 
-function safeString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
+function jsonError(message: string, status = 400, details?: unknown) {
+  console.error("BOOKING CREATE ERROR:", {
+    message,
+    status,
+    details,
+  });
 
-function safeNumber(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
+  return NextResponse.json(
+    {
+      success: false,
+      error: message,
+      details,
+    },
+    { status }
   );
 }
 
-function uuidOrNull(value: string) {
-  return isUuid(value) ? value : null;
-}
+function toNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
 
-function toIsoDate(date: string) {
-  return `${date}T12:00:00`;
-}
-
-function normalizeDate(value: string) {
-  const trimmed = value.trim();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    return trimmed;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
   }
 
-  const parsed = new Date(trimmed);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return trimmed;
-  }
-
-  return parsed.toISOString().slice(0, 10);
+  return fallback;
 }
 
-function getGuruDisplayName(guru: GuruRow) {
-  return (
-    safeString(guru.display_name) ||
-    safeString(guru.full_name) ||
-    "Selected Guru"
+function toText(value: unknown, fallback = "") {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number") return String(value);
+  return fallback;
+}
+
+function getMissingColumnName(errorMessage: string) {
+  const quotedColumnMatch = errorMessage.match(/'([^']+)' column/i);
+  if (quotedColumnMatch?.[1]) return quotedColumnMatch[1];
+
+  const columnDoesNotExistMatch = errorMessage.match(
+    /column "([^"]+)" does not exist/i
   );
+  if (columnDoesNotExistMatch?.[1]) return columnDoesNotExistMatch[1];
+
+  return null;
 }
 
-function getGuruAmount(guru: GuruRow) {
-  const hourlyRate = safeNumber(guru.hourly_rate);
-  if (hourlyRate > 0) return hourlyRate;
+async function insertBookingWithMissingColumnRetry(
+  payload: Record<string, unknown>
+) {
+  let insertPayload = { ...payload };
 
-  const rate = safeNumber(guru.rate);
-  if (rate > 0) return rate;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data, error } = await supabaseAdmin
+      .from("bookings")
+      .insert(insertPayload)
+      .select("*")
+      .single();
 
-  return 25;
-}
-
-async function trackBookingEvent({
-  userId,
-  sessionId,
-  eventName,
-  guruId,
-  bookingId,
-  metadata,
-}: {
-  userId?: string | null;
-  sessionId?: string | null;
-  eventName: string;
-  guruId?: string | null;
-  bookingId?: string | null;
-  metadata?: Record<string, unknown>;
-}) {
-  try {
-    await supabaseAdmin.from("analytics_events").insert({
-      user_id: userId || null,
-      session_id: sessionId || null,
-      event_name: eventName,
-      event_type: "booking",
-      role: "customer",
-      source: "booking_create_api",
-      page_path: "/bookings/new",
-      guru_id: guruId ? uuidOrNull(guruId) : null,
-      booking_id: bookingId ? uuidOrNull(bookingId) : null,
-      metadata: metadata || {},
-    });
-  } catch (error) {
-    console.error("Booking analytics tracking failed:", error);
-  }
-}
-
-async function findGuruById(guruId: string) {
-  const byProfileId = await supabaseAdmin
-    .from("gurus")
-    .select("*")
-    .eq("profile_id", guruId)
-    .maybeSingle<GuruRow>();
-
-  if (byProfileId.data) return byProfileId;
-
-  const byUserId = await supabaseAdmin
-    .from("gurus")
-    .select("*")
-    .eq("user_id", guruId)
-    .maybeSingle<GuruRow>();
-
-  if (byUserId.data) return byUserId;
-
-  const byId = await supabaseAdmin
-    .from("gurus")
-    .select("*")
-    .eq("id", guruId)
-    .maybeSingle<GuruRow>();
-
-  return byId;
-}
-
-async function findGuruBySlug(guruSlug: string) {
-  return supabaseAdmin
-    .from("gurus")
-    .select("*")
-    .eq("slug", guruSlug)
-    .maybeSingle<GuruRow>();
-}
-
-async function findGuru({
-  guruId,
-  guruSlug,
-}: {
-  guruId: string;
-  guruSlug: string;
-}) {
-  if (guruId) {
-    const byId = await findGuruById(guruId);
-
-    if (byId.data || byId.error) {
-      return byId;
+    if (!error) {
+      return { data, error: null };
     }
-  }
 
-  if (guruSlug) {
-    return findGuruBySlug(guruSlug);
+    console.error("BOOKING INSERT ERROR:", error);
+
+    const message = error.message || "";
+    const missingColumn = getMissingColumnName(message);
+
+    if (missingColumn && missingColumn in insertPayload) {
+      console.warn("Removing missing booking column and retrying:", missingColumn);
+      delete insertPayload[missingColumn];
+      continue;
+    }
+
+    return { data: null, error };
   }
 
   return {
     data: null,
-    error: new Error("Missing guru identifier"),
+    error: {
+      message:
+        "Could not create booking because too many booking columns are missing from the database.",
+    },
   };
 }
 
-export async function POST(req: NextRequest) {
-  let userId: string | null = null;
+async function safeUpdateBooking(
+  bookingId: string | number,
+  payload: Record<string, unknown>
+) {
+  let updatePayload = { ...payload };
 
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabaseAdmin
+      .from("bookings")
+      .update(updatePayload)
+      .eq("id", bookingId);
+
+    if (!error) return;
+
+    console.error("BOOKING UPDATE ERROR:", error);
+
+    const missingColumn = getMissingColumnName(error.message || "");
+
+    if (missingColumn && missingColumn in updatePayload) {
+      console.warn("Removing missing update column and retrying:", missingColumn);
+      delete updatePayload[missingColumn];
+      continue;
+    }
+
+    return;
+  }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    message: "SitGuru booking create API route is working.",
+  });
+}
+
+export async function POST(req: NextRequest) {
   try {
+    let body: BookingCreateBody;
+
+    try {
+      body = await req.json();
+    } catch {
+      return jsonError(
+        "Invalid booking request. The request body was not valid JSON.",
+        400
+      );
+    }
+
+    console.log("BOOKING CREATE BODY:", body);
+
     const supabase = await createClient();
 
     const {
@@ -199,248 +176,213 @@ export async function POST(req: NextRequest) {
       error: userError,
     } = await supabase.auth.getUser();
 
-    userId = user?.id || null;
-
     if (userError || !user) {
-      await trackBookingEvent({
-        eventName: "booking_request_failed",
-        metadata: {
-          location: "api_bookings_create",
-          reason: "unauthorized",
-        },
-      });
-
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return jsonError("You must be signed in to create a booking.", 401, userError);
     }
 
-    const body = (await req.json().catch(() => null)) as BookingCreateBody | null;
+    const guruSlug = toText(body.guruSlug || body.slug);
+    const guruId = body.guruId ?? null;
 
-    const guruId = safeString(body?.guruId || body?.guru_id);
-    const guruSlug = safeString(body?.guruSlug || body?.guru_slug);
+    const petId = body.petId || null;
+    const petName = toText(body.petName);
+    const serviceType = toText(body.serviceType, "Drop-In Visit");
+    const requestedDate = toText(body.requestedDate || body.bookingDate);
+    const timeWindow = toText(body.timeWindow, "Morning");
+    const visitLength = toText(body.visitLength, "30 minutes");
+    const notes = toText(body.notes);
 
-    const petId = safeString(body?.petId || body?.pet_id);
-    const petName = safeString(body?.petName || body?.pet_name);
-    const petPhotoUrl = safeString(body?.petPhotoUrl || body?.pet_photo_url);
+    const servicePrice = toNumber(body.servicePrice, 25);
+    const platformFee = toNumber(body.platformFee, 5);
+    const total = toNumber(body.total, servicePrice + platformFee);
 
-    const date = normalizeDate(safeString(body?.date || body?.booking_date));
-    const service = safeString(body?.service || body?.service_name);
-    const notes = safeString(body?.notes);
-    const sessionId = safeString(body?.sessionId);
+    const customerName = toText(body.customerName, "SitGuru Customer");
+    const customerEmail = toText(body.customerEmail || user.email);
 
-    if (!guruId && !guruSlug) {
-      await trackBookingEvent({
-        userId,
-        sessionId,
-        eventName: "booking_request_failed",
-        metadata: {
-          location: "api_bookings_create",
-          reason: "missing_guru_information",
-          guru_id: guruId,
-          guru_slug: guruSlug,
-          pet_id: petId,
-          pet_name: petName,
-          service,
-        },
-      });
-
-      return NextResponse.json(
-        { error: "Guru ID is required" },
-        { status: 400 }
-      );
+    if (!guruSlug && !guruId) {
+      return jsonError("Missing Guru information for this booking.", 400);
     }
 
     if (!petName) {
-      await trackBookingEvent({
-        userId,
-        sessionId,
-        eventName: "booking_request_failed",
-        guruId,
-        metadata: {
-          location: "api_bookings_create",
-          reason: "missing_pet_name",
-          guru_id: guruId,
-          guru_slug: guruSlug,
-          pet_id: petId,
-          service,
-        },
-      });
-
-      return NextResponse.json(
-        { error: "Pet name is required" },
-        { status: 400 }
-      );
+      return jsonError("Missing pet name for this booking.", 400);
     }
 
-    if (!date) {
-      await trackBookingEvent({
-        userId,
-        sessionId,
-        eventName: "booking_request_failed",
-        guruId,
-        metadata: {
-          location: "api_bookings_create",
-          reason: "missing_date",
-          guru_id: guruId,
-          guru_slug: guruSlug,
-          pet_id: petId,
-          pet_name: petName,
-          service,
-        },
-      });
-
-      return NextResponse.json({ error: "Date is required" }, { status: 400 });
+    if (!requestedDate) {
+      return jsonError("Missing requested booking date.", 400);
     }
 
-    const { data: guru, error: guruError } = await findGuru({
-      guruId,
-      guruSlug,
-    });
-
-    if (guruError || !guru) {
-      console.error("Guru lookup failed:", guruError);
-
-      await trackBookingEvent({
-        userId,
-        sessionId,
-        eventName: "booking_request_failed",
-        guruId: guruId || guruSlug,
-        metadata: {
-          location: "api_bookings_create",
-          reason: "guru_not_found",
-          error: guruError?.message || "Guru not found",
-          guru_id: guruId,
-          guru_slug: guruSlug,
-          pet_id: petId,
-          pet_name: petName,
-          service,
-        },
-      });
-
-      return NextResponse.json({ error: "Guru not found" }, { status: 404 });
+    if (!customerEmail) {
+      return jsonError("Missing customer email for checkout.", 400);
     }
 
-    const resolvedGuruId =
-      safeString(guru.profile_id) ||
-      safeString(guru.user_id) ||
-      safeString(guru.id) ||
-      guruId ||
-      guruSlug;
+    if (!total || total <= 0) {
+      return jsonError("Missing valid checkout total for this booking.", 400);
+    }
 
-    const totalAmount = getGuruAmount(guru);
-    const guruName = getGuruDisplayName(guru);
+    const now = new Date().toISOString();
 
-    await trackBookingEvent({
-      userId,
-      sessionId,
-      eventName: "booking_request_received",
-      guruId: resolvedGuruId,
-      metadata: {
-        location: "api_bookings_create",
-        guru_id: guruId,
-        guru_slug: guruSlug,
-        resolved_guru_id: resolvedGuruId,
-        guru_name: guruName,
-        pet_id: petId,
-        pet_name: petName,
-        pet_photo_url: petPhotoUrl,
-        booking_date: date,
-        service,
-        has_notes: Boolean(notes),
-        total_amount: totalAmount,
-      },
-    });
+    const bookingPayload: Record<string, unknown> = {
+      customer_id: user.id,
+      user_id: user.id,
+      pet_parent_id: user.id,
 
-    const { data: booking, error: bookingError } = await supabaseAdmin
-      .from("bookings")
-      .insert({
-        pet_owner_id: user.id,
-        guru_id: resolvedGuruId,
-        status: "pending",
-        payment_status: "unpaid",
-        total_amount: totalAmount,
-        pet_name: petName,
-        notes,
-        start_time: toIsoDate(date),
-      })
-      .select("*")
-      .single();
+      guru_id: guruId,
+      guru_slug: guruSlug,
+
+      pet_id: petId,
+      pet_name: petName,
+
+      customer_name: customerName,
+      customer_email: customerEmail,
+
+      service_type: serviceType,
+      requested_date: requestedDate,
+      booking_date: requestedDate,
+      time_window: timeWindow,
+      visit_length: visitLength,
+
+      notes,
+
+      service_price: servicePrice,
+      platform_fee: platformFee,
+      total,
+      amount_total: total,
+      total_amount: total,
+
+      booking_type: body.bookingType || "instant_booking",
+
+      compliance_accepted: body.complianceAccepted ?? true,
+      compliance_accepted_at: now,
+
+      terms_accepted: body.termsAccepted ?? true,
+      terms_accepted_at: now,
+
+      status: "pending_checkout",
+      payment_status: "checkout_started",
+
+      created_at: now,
+      updated_at: now,
+    };
+
+    const { data: booking, error: bookingError } =
+      await insertBookingWithMissingColumnRetry(bookingPayload);
 
     if (bookingError || !booking) {
-      console.error("Booking insert failed:", bookingError);
-
-      await trackBookingEvent({
-        userId,
-        sessionId,
-        eventName: "booking_request_failed",
-        guruId: resolvedGuruId,
-        metadata: {
-          location: "api_bookings_create",
-          reason: "booking_insert_failed",
-          error: bookingError?.message || "Failed to create booking",
-          guru_id: guruId,
-          guru_slug: guruSlug,
-          resolved_guru_id: resolvedGuruId,
-          guru_name: guruName,
-          pet_id: petId,
-          pet_name: petName,
-          booking_date: date,
-          service,
-          total_amount: totalAmount,
-        },
-      });
-
-      return NextResponse.json(
-        { error: bookingError?.message || "Failed to create booking" },
-        { status: 500 }
+      return jsonError(
+        bookingError?.message || "Could not create the booking.",
+        500,
+        bookingError
       );
     }
 
-    const bookingId = safeString((booking as Record<string, unknown>).id);
+    const origin =
+      req.headers.get("origin") ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      "http://localhost:3000";
 
-    await trackBookingEvent({
-      userId,
-      sessionId,
-      eventName: "booking_request_created",
-      guruId: resolvedGuruId,
-      bookingId,
-      metadata: {
-        location: "api_bookings_create",
-        booking_id: bookingId,
-        guru_id: guruId,
-        guru_slug: guruSlug,
-        resolved_guru_id: resolvedGuruId,
-        guru_name: guruName,
-        pet_id: petId,
-        pet_name: petName,
-        pet_photo_url: petPhotoUrl,
-        booking_date: date,
-        service,
-        has_notes: Boolean(notes),
-        total_amount: totalAmount,
-      },
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+    if (!stripeSecretKey) {
+      const fallbackUrl = `/customer/dashboard?booking=created&guru=${encodeURIComponent(
+        guruSlug
+      )}`;
+
+      return NextResponse.json({
+        success: true,
+        booking,
+        bookingId: String(booking.id),
+        checkoutUrl: fallbackUrl,
+        checkout_url: fallbackUrl,
+        url: fallbackUrl,
+        warning:
+          "Booking was created, but STRIPE_SECRET_KEY is missing so Stripe checkout was not started.",
+      });
+    }
+
+    const stripe = new Stripe(stripeSecretKey);
+
+    const bookingId = String(booking.id);
+
+    let session: Stripe.Checkout.Session;
+
+    try {
+      session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: customerEmail,
+        success_url: `${origin}/customer/dashboard?booking=confirmed&booking_id=${encodeURIComponent(
+          bookingId
+        )}&guru=${encodeURIComponent(guruSlug)}`,
+        cancel_url: `${origin}/book/${encodeURIComponent(
+          guruSlug
+        )}?checkout=cancelled`,
+        metadata: {
+          booking_id: bookingId,
+          customer_id: user.id,
+          guru_id: guruId ? String(guruId) : "",
+          guru_slug: guruSlug,
+          pet_id: petId || "",
+          pet_name: petName,
+          service_type: serviceType,
+          requested_date: requestedDate,
+        },
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: "usd",
+              unit_amount: Math.round(total * 100),
+              product_data: {
+                name: `SitGuru ${serviceType}`,
+                description: `${petName} • ${requestedDate} • ${timeWindow} • ${visitLength}`,
+              },
+            },
+          },
+        ],
+      });
+    } catch (stripeError) {
+      return jsonError(
+        stripeError instanceof Error
+          ? stripeError.message
+          : "Stripe checkout session could not be created.",
+        500,
+        stripeError
+      );
+    }
+
+    if (!session.url) {
+      return jsonError(
+        "Stripe checkout session was created, but no checkout URL was returned.",
+        500,
+        {
+          stripeSessionId: session.id,
+        }
+      );
+    }
+
+    await safeUpdateBooking(bookingId, {
+      stripe_checkout_session_id: session.id,
+      checkout_session_id: session.id,
+      stripe_payment_status: session.payment_status,
+      payment_status: "checkout_started",
+      checkout_url: session.url,
+      updated_at: new Date().toISOString(),
     });
 
     return NextResponse.json({
       success: true,
-      bookingId,
       booking,
+      bookingId,
+      checkoutUrl: session.url,
+      checkout_url: session.url,
+      url: session.url,
+      stripeSessionId: session.id,
     });
   } catch (error) {
-    console.error("Booking create route error:", error);
-
-    await trackBookingEvent({
-      userId,
-      eventName: "booking_request_failed",
-      metadata: {
-        location: "api_bookings_create",
-        reason: "unexpected_error",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-    });
-
-    return NextResponse.json(
-      { error: "Failed to create booking" },
-      { status: 500 }
+    return jsonError(
+      error instanceof Error
+        ? error.message
+        : "Something went wrong while creating the booking.",
+      500,
+      error
     );
   }
 }

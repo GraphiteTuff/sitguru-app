@@ -5,6 +5,12 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+type PageProps = {
+  searchParams?: Promise<{
+    filter?: string;
+  }>;
+};
+
 type ConversationRow = {
   id: string;
   customer_id?: string | null;
@@ -25,6 +31,7 @@ type MessageRow = {
   recipient_id?: string | null;
   content?: string | null;
   body?: string | null;
+  topic?: string | null;
   created_at?: string | null;
 };
 
@@ -40,13 +47,19 @@ type ProfileRow = {
   avatar_url?: string | null;
   image_url?: string | null;
   role?: string | null;
-  [key: string]: unknown;
+  account_type?: string | null;
 };
 
 type ConversationParticipantRow = {
-  conversation_id: string;
-  user_id: string;
+  id?: string | null;
+  conversation_id?: string | null;
+  user_id?: string | null;
   role?: string | null;
+  last_read_at?: string | null;
+  is_muted?: boolean | null;
+  is_archived?: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type InboxConversation = {
@@ -62,9 +75,28 @@ type InboxConversation = {
   unread: boolean;
   href: string;
   threadKind: "guru" | "admin" | "customer" | "mixed";
-  petLabel: string | null;
   bookingLabel: string | null;
+  topicLabel: string | null;
 };
+
+function normalizeRoleValue(role?: string | null) {
+  const value = String(role || "").trim().toLowerCase();
+
+  if (!value) return "";
+  if (value === "provider" || value === "sitter") return "guru";
+
+  return value;
+}
+
+function normalizeRoleLabel(role?: string | null) {
+  const value = normalizeRoleValue(role);
+
+  if (value === "admin") return "Admin";
+  if (value === "guru") return "Guru";
+  if (value === "customer") return "Customer";
+
+  return "User";
+}
 
 function getProfileName(profile?: ProfileRow | null) {
   if (!profile) return "SitGuru User";
@@ -87,19 +119,20 @@ function getProfileName(profile?: ProfileRow | null) {
 function getProfilePhotoUrl(profile?: ProfileRow | null) {
   if (!profile) return null;
 
-  const candidate =
-    profile.profile_photo_url || profile.avatar_url || profile.image_url || null;
-
-  return candidate ? String(candidate) : null;
+  return (
+    profile.profile_photo_url || profile.avatar_url || profile.image_url || null
+  );
 }
 
 function getInitials(name: string) {
-  return name
+  const initials = name
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("");
+
+  return initials || "SU";
 }
 
 function getMessagePreview(message?: MessageRow | null) {
@@ -121,57 +154,53 @@ function formatDateTime(value?: string | null) {
   });
 }
 
-function normalizeRoleValue(role?: string | null) {
-  const value = String(role || "").trim().toLowerCase();
+function isAfterDate(dateA?: string | null, dateB?: string | null) {
+  if (!dateA) return false;
+  if (!dateB) return true;
 
-  if (!value) return "";
-  if (value === "provider" || value === "sitter") return "guru";
+  const parsedA = new Date(dateA);
+  const parsedB = new Date(dateB);
 
-  return value;
+  if (Number.isNaN(parsedA.getTime())) return false;
+  if (Number.isNaN(parsedB.getTime())) return true;
+
+  return parsedA.getTime() > parsedB.getTime();
 }
 
-function normalizeRoleLabel(role?: string | null) {
-  const value = normalizeRoleValue(role);
+function getThreadKind({
+  otherParticipants,
+  conversation,
+  profilesById,
+}: {
+  otherParticipants: ConversationParticipantRow[];
+  conversation: ConversationRow;
+  profilesById: Map<string, ProfileRow>;
+}): InboxConversation["threadKind"] {
+  const participantRoles = otherParticipants.map((participant) => {
+    const profile = participant.user_id
+      ? profilesById.get(participant.user_id)
+      : null;
 
-  if (!value) return "User";
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
+    return normalizeRoleValue(
+      participant.role || profile?.role || profile?.account_type || ""
+    );
+  });
 
-function getStatusClasses(status?: string | null) {
-  const normalized = String(status || "").trim().toLowerCase();
-
-  if (normalized === "pending") {
-    return "border-amber-300/30 bg-amber-400/10 text-amber-100";
-  }
-
-  if (normalized === "confirmed") {
-    return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
-  }
-
-  if (normalized === "completed") {
-    return "border-sky-300/30 bg-sky-400/10 text-sky-100";
-  }
-
-  return "border-white/20 bg-white/10 text-white";
-}
-
-function getThreadKind(
-  otherParticipants: ConversationParticipantRow[],
-  conversation: ConversationRow
-): InboxConversation["threadKind"] {
-  const roles = otherParticipants.map((row) => normalizeRoleValue(row.role));
-
-  const hasAdmin = roles.includes("admin");
-  const hasGuru = roles.includes("guru") || Boolean(conversation.guru_id);
-  const hasCustomer = roles.includes("customer") || Boolean(conversation.customer_id);
+  const hasAdmin = participantRoles.includes("admin");
+  const hasGuru = participantRoles.includes("guru") || Boolean(conversation.guru_id);
+  const hasCustomer =
+    participantRoles.includes("customer") || Boolean(conversation.customer_id);
 
   const subjectText = String(conversation.subject || "").trim().toLowerCase();
+
   const looksLikeAdmin =
     subjectText.includes("admin") ||
     subjectText.includes("support") ||
     subjectText.includes("refund") ||
     subjectText.includes("escalation") ||
-    subjectText.includes("payout");
+    subjectText.includes("payout") ||
+    subjectText.includes("verification") ||
+    subjectText.includes("background");
 
   if (hasAdmin || looksLikeAdmin) return "admin";
   if (hasGuru) return "guru";
@@ -189,44 +218,69 @@ function getThreadKindLabel(kind: InboxConversation["threadKind"]) {
 
 function getThreadKindClasses(kind: InboxConversation["threadKind"]) {
   if (kind === "admin") {
-    return "border-amber-300/30 bg-amber-400/10 text-amber-100";
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
   if (kind === "guru") {
-    return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
   if (kind === "customer") {
-    return "border-sky-300/30 bg-sky-400/10 text-sky-100";
+    return "border-sky-200 bg-sky-50 text-sky-700";
   }
 
-  return "border-white/20 bg-white/10 text-white";
+  return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-function getPetLabel(subject?: string | null, preview?: string | null) {
-  const combined = `${String(subject || "")} ${String(preview || "")}`.trim();
-  if (!combined) return null;
+function getStatusClasses(status?: string | null) {
+  const normalized = String(status || "").trim().toLowerCase();
 
-  const patterns = [
-    /\babout\s+([A-Z][a-zA-Z'-]+)/,
-    /\bfor\s+([A-Z][a-zA-Z'-]+)/,
-    /\bpet\s*:\s*([A-Z][a-zA-Z'-]+)/i,
-    /\bregarding\s+([A-Z][a-zA-Z'-]+)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = combined.match(pattern);
-    if (match?.[1]) {
-      return match[1];
-    }
+  if (normalized === "pending") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
-  return null;
+  if (normalized === "confirmed" || normalized === "open") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (
+    normalized === "completed" ||
+    normalized === "resolved" ||
+    normalized === "closed"
+  ) {
+    return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
 function getBookingLabel(conversation: ConversationRow) {
   if (!conversation.booking_id) return null;
   return `Booking #${String(conversation.booking_id)}`;
+}
+
+function getConversationSubject(conversation: ConversationRow, kind: string) {
+  const subject = String(conversation.subject || "").trim();
+
+  if (subject) return subject;
+
+  if (kind === "admin") return "Direct Admin Support";
+  if (kind === "guru") return "Guru Conversation";
+  if (kind === "customer") return "Customer Conversation";
+
+  return "SitGuru Conversation";
+}
+
+function getTopicLabel(conversation: ConversationRow, latestMessage?: MessageRow | null) {
+  const topic = String(latestMessage?.topic || "").trim();
+
+  if (topic) return topic;
+
+  const subject = String(conversation.subject || "").trim();
+
+  if (subject) return subject;
+
+  return null;
 }
 
 function Avatar({
@@ -238,7 +292,7 @@ function Avatar({
 }) {
   if (imageUrl) {
     return (
-      <div className="h-14 w-14 overflow-hidden rounded-[18px] border border-white/20 bg-white/10">
+      <div className="h-14 w-14 overflow-hidden rounded-[18px] border border-emerald-100 bg-white shadow-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
       </div>
@@ -246,560 +300,627 @@ function Avatar({
   }
 
   return (
-    <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/20 bg-white/10 text-lg font-black text-white">
+    <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-emerald-100 bg-emerald-50 text-lg font-black text-emerald-700 shadow-sm">
       {getInitials(name)}
     </div>
   );
 }
 
-async function resolveDashboardHref(userId: string, fallbackRole?: string | null) {
-  const [guruByUserId, guruById] = await Promise.all([
-    supabaseAdmin.from("gurus").select("id, user_id").eq("user_id", userId).limit(1),
-    supabaseAdmin.from("gurus").select("id, user_id").eq("id", userId).limit(1),
-  ]);
+async function safeRows<T>(
+  request: PromiseLike<{ data: unknown; error: unknown }>,
+  label: string
+): Promise<T[]> {
+  try {
+    const result = await request;
 
-  const hasGuruRecord =
-    (guruByUserId.data?.length ?? 0) > 0 || (guruById.data?.length ?? 0) > 0;
+    if (result.error) {
+      console.warn(`Messages inbox query skipped for ${label}:`, result.error);
+      return [];
+    }
 
-  if (hasGuruRecord) {
-    return "/guru/dashboard";
+    return Array.isArray(result.data) ? (result.data as T[]) : [];
+  } catch (error) {
+    console.warn(`Messages inbox query failed for ${label}:`, error);
+    return [];
   }
+}
 
-  const normalizedRole = String(fallbackRole || "").toLowerCase().trim();
+function getDashboardHref(role?: string | null) {
+  const normalized = normalizeRoleValue(role);
 
-  if (normalizedRole === "admin") {
-    return "/admin";
-  }
+  if (normalized === "guru") return "/guru/dashboard";
+  if (normalized === "admin") return "/admin";
 
   return "/customer/dashboard";
 }
 
-export default async function MessagesInboxPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ filter?: string }>;
-}) {
-  const params = (await searchParams) || {};
-  const activeFilter =
-    params.filter === "admin" ||
-    params.filter === "guru" ||
-    params.filter === "unread"
-      ? params.filter
-      : "all";
+function getActiveFilterClasses(isActive: boolean) {
+  if (isActive) {
+    return "border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/20";
+  }
+
+  return "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700";
+}
+
+function SidebarMetric({ value }: { value: string }) {
+  return (
+    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-slate-800">
+      {value}
+    </div>
+  );
+}
+
+export default async function MessagesPage({ searchParams }: PageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const activeFilter = String(resolvedSearchParams?.filter || "all").toLowerCase();
 
   const supabase = await createClient();
 
   const {
     data: { user },
-    error: userError,
+    error,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) {
+  if (error || !user) {
     redirect("/customer/login");
   }
 
-  const { data: currentProfileData } = await supabaseAdmin
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const currentProfile = (currentProfileData ?? null) as ProfileRow | null;
-  const dashboardHref = await resolveDashboardHref(user.id, currentProfile?.role);
-
-  const { data: myParticipantRows, error: myParticipantRowsError } = await supabaseAdmin
-    .from("conversation_participants")
-    .select("conversation_id, user_id, role")
-    .eq("user_id", user.id)
-    .returns<ConversationParticipantRow[]>();
-
-  if (myParticipantRowsError) {
-    console.error(
-      "Messages inbox participant query error:",
-      myParticipantRowsError.message
-    );
-  }
-
-  const conversationIds = Array.from(
-    new Set((myParticipantRows ?? []).map((row) => row.conversation_id).filter(Boolean))
+  const currentProfileRows = await safeRows<ProfileRow>(
+    supabaseAdmin
+      .from("profiles")
+      .select(
+        "id, full_name, display_name, name, first_name, last_name, email, profile_photo_url, avatar_url, image_url, role, account_type"
+      )
+      .eq("id", user.id),
+    "current profile"
   );
 
-  const { data: conversationsData, error: conversationsError } =
-    conversationIds.length > 0
-      ? await supabaseAdmin
-          .from("conversations")
-          .select("*")
-          .in("id", conversationIds)
-          .order("last_message_at", { ascending: false })
-          .returns<ConversationRow[]>()
-      : { data: [], error: null as { message?: string } | null };
+  const currentProfile = currentProfileRows[0] || null;
+  const currentUserRole = normalizeRoleValue(
+    currentProfile?.role || currentProfile?.account_type || ""
+  );
+  const dashboardHref = getDashboardHref(currentUserRole);
 
-  if (conversationsError) {
-    console.error("Messages inbox conversations error:", conversationsError.message);
+  const myParticipantRows = await safeRows<ConversationParticipantRow>(
+    supabaseAdmin
+      .from("conversation_participants")
+      .select("*")
+      .eq("user_id", user.id),
+    "my conversation participants"
+  );
+
+  const participantConversationIds = myParticipantRows
+    .map((participant) => participant.conversation_id || "")
+    .filter(Boolean);
+
+  const conversationsById = new Map<string, ConversationRow>();
+
+  if (participantConversationIds.length > 0) {
+    const participantConversations = await safeRows<ConversationRow>(
+      supabaseAdmin
+        .from("conversations")
+        .select(
+          "id, customer_id, guru_id, booking_id, subject, status, created_at, updated_at, last_message_at, last_message_preview"
+        )
+        .in("id", participantConversationIds),
+      "participant conversations"
+    );
+
+    participantConversations.forEach((conversation) => {
+      conversationsById.set(conversation.id, conversation);
+    });
   }
 
-  const conversations = (conversationsData ?? []).sort((a, b) => {
-    const aTime = new Date(
+  const ownedConversations = await safeRows<ConversationRow>(
+    supabaseAdmin
+      .from("conversations")
+      .select(
+        "id, customer_id, guru_id, booking_id, subject, status, created_at, updated_at, last_message_at, last_message_preview"
+      )
+      .or(`customer_id.eq.${user.id},guru_id.eq.${user.id}`),
+    "owned conversations"
+  );
+
+  ownedConversations.forEach((conversation) => {
+    conversationsById.set(conversation.id, conversation);
+  });
+
+  const conversations = Array.from(conversationsById.values()).sort((a, b) => {
+    const aDate = new Date(
       a.last_message_at || a.updated_at || a.created_at || 0
     ).getTime();
-    const bTime = new Date(
+    const bDate = new Date(
       b.last_message_at || b.updated_at || b.created_at || 0
     ).getTime();
 
-    return bTime - aTime;
+    return bDate - aDate;
   });
 
-  const { data: allParticipantRows, error: allParticipantRowsError } =
-    conversationIds.length > 0
-      ? await supabaseAdmin
-          .from("conversation_participants")
-          .select("conversation_id, user_id, role")
-          .in("conversation_id", conversationIds)
-          .returns<ConversationParticipantRow[]>()
-      : { data: [], error: null as { message?: string } | null };
+  const conversationIds = conversations.map((conversation) => conversation.id);
 
-  if (allParticipantRowsError) {
-    console.error(
-      "Messages inbox all participants error:",
-      allParticipantRowsError.message
-    );
-  }
+  const [allParticipants, allMessages] = await Promise.all([
+    conversationIds.length
+      ? safeRows<ConversationParticipantRow>(
+          supabaseAdmin
+            .from("conversation_participants")
+            .select("*")
+            .in("conversation_id", conversationIds),
+          "all conversation participants"
+        )
+      : Promise.resolve([]),
+    conversationIds.length
+      ? safeRows<MessageRow>(
+          supabaseAdmin
+            .from("messages")
+            .select(
+              "id, conversation_id, sender_id, recipient_id, content, body, topic, created_at"
+            )
+            .in("conversation_id", conversationIds)
+            .order("created_at", { ascending: true }),
+          "all messages"
+        )
+      : Promise.resolve([]),
+  ]);
 
-  const { data: latestMessagesData, error: latestMessagesError } =
-    conversationIds.length > 0
-      ? await supabaseAdmin
-          .from("messages")
-          .select("*")
-          .in("conversation_id", conversationIds)
-          .order("created_at", { ascending: false })
-          .returns<MessageRow[]>()
-      : { data: [], error: null as { message?: string } | null };
-
-  if (latestMessagesError) {
-    console.error(
-      "Messages inbox latest messages error:",
-      latestMessagesError.message
-    );
-  }
-
-  const latestMessageByConversation = new Map<string, MessageRow>();
-
-  for (const message of (latestMessagesData ?? []) as MessageRow[]) {
-    const conversationId = String(message.conversation_id || "").trim();
-    if (!conversationId || latestMessageByConversation.has(conversationId)) {
-      continue;
-    }
-    latestMessageByConversation.set(conversationId, message);
-  }
-
-  const participantIds = Array.from(
-    new Set((allParticipantRows ?? []).map((row) => row.user_id).filter(Boolean))
+  const profileIds = Array.from(
+    new Set(
+      [
+        user.id,
+        ...conversations.flatMap((conversation) => [
+          conversation.customer_id || "",
+          conversation.guru_id || "",
+        ]),
+        ...allParticipants.map((participant) => participant.user_id || ""),
+        ...allMessages.flatMap((message) => [
+          message.sender_id || "",
+          message.recipient_id || "",
+        ]),
+      ].filter(Boolean)
+    )
   );
 
-  const { data: profileRowsData, error: profilesError } =
-    participantIds.length > 0
-      ? await supabaseAdmin.from("profiles").select("*").in("id", participantIds)
-      : { data: [], error: null as { message?: string } | null };
+  const profileRows = profileIds.length
+    ? await safeRows<ProfileRow>(
+        supabaseAdmin
+          .from("profiles")
+          .select(
+            "id, full_name, display_name, name, first_name, last_name, email, profile_photo_url, avatar_url, image_url, role, account_type"
+          )
+          .in("id", profileIds),
+        "profiles"
+      )
+    : [];
 
-  if (profilesError) {
-    console.error("Messages inbox profiles error:", profilesError.message);
+  const profilesById = new Map<string, ProfileRow>();
+  profileRows.forEach((profile) => {
+    profilesById.set(profile.id, profile);
+  });
+
+  if (currentProfile) {
+    profilesById.set(currentProfile.id, currentProfile);
   }
 
-  const profileMap = new Map<string, ProfileRow>();
-  for (const profile of (profileRowsData ?? []) as ProfileRow[]) {
-    profileMap.set(String(profile.id), profile);
-  }
+  const messagesByConversationId = new Map<string, MessageRow[]>();
+  allMessages.forEach((message) => {
+    const conversationId = message.conversation_id || "";
 
-  const participantsByConversation = new Map<string, ConversationParticipantRow[]>();
-  for (const row of (allParticipantRows ?? []) as ConversationParticipantRow[]) {
-    const list = participantsByConversation.get(row.conversation_id) ?? [];
-    list.push(row);
-    participantsByConversation.set(row.conversation_id, list);
-  }
+    if (!conversationId) return;
 
-  const allInboxConversations: InboxConversation[] = conversations.map((conversation) => {
-    const participantRows = participantsByConversation.get(conversation.id) ?? [];
-    const otherParticipants = participantRows.filter((row) => row.user_id !== user.id);
+    const list = messagesByConversationId.get(conversationId) || [];
+    list.push(message);
+    messagesByConversationId.set(conversationId, list);
+  });
 
-    const otherUserIds = otherParticipants.map((row) => row.user_id);
-    const otherUserNames = otherParticipants.map((row) =>
-      getProfileName(profileMap.get(row.user_id) ?? null)
+  const participantsByConversationId = new Map<string, ConversationParticipantRow[]>();
+  allParticipants.forEach((participant) => {
+    const conversationId = participant.conversation_id || "";
+
+    if (!conversationId) return;
+
+    const list = participantsByConversationId.get(conversationId) || [];
+    list.push(participant);
+    participantsByConversationId.set(conversationId, list);
+  });
+
+  const inboxConversations: InboxConversation[] = conversations.map((conversation) => {
+    const participants = participantsByConversationId.get(conversation.id) || [];
+    const otherParticipants = participants.filter(
+      (participant) => participant.user_id && participant.user_id !== user.id
     );
-    const otherUserRoles = otherParticipants.map((row) =>
-      normalizeRoleLabel(row.role)
+
+    const messages = messagesByConversationId.get(conversation.id) || [];
+    const latestMessage = messages[messages.length - 1] || null;
+
+    const fallbackOtherIds = [
+      conversation.customer_id || "",
+      conversation.guru_id || "",
+    ].filter((id) => id && id !== user.id);
+
+    const otherUserIds = Array.from(
+      new Set(
+        [
+          ...otherParticipants.map((participant) => participant.user_id || ""),
+          ...fallbackOtherIds,
+        ].filter(Boolean)
+      )
     );
+
+    const kind = getThreadKind({
+      otherParticipants,
+      conversation,
+      profilesById,
+    });
+
     const firstOtherProfile =
-      otherParticipants.length > 0
-        ? profileMap.get(otherParticipants[0].user_id) ?? null
-        : null;
+      otherUserIds.length > 0 ? profilesById.get(otherUserIds[0]) || null : null;
 
-    const latestMessage = latestMessageByConversation.get(conversation.id) ?? null;
+    const otherUserName =
+      kind === "admin"
+        ? "SitGuru Admin"
+        : getProfileName(firstOtherProfile);
+
+    const otherUserRole =
+      kind === "admin"
+        ? "Admin"
+        : normalizeRoleLabel(
+            otherParticipants[0]?.role ||
+              firstOtherProfile?.role ||
+              firstOtherProfile?.account_type ||
+              kind
+          );
+
+    const otherUserPhotoUrl =
+      kind === "admin" ? null : getProfilePhotoUrl(firstOtherProfile);
+
+    const currentParticipant = participants.find(
+      (participant) => participant.user_id === user.id
+    );
+
+    const lastActivity =
+      conversation.last_message_at ||
+      latestMessage?.created_at ||
+      conversation.updated_at ||
+      conversation.created_at ||
+      null;
+
     const unread =
-      !!latestMessage?.recipient_id &&
-      String(latestMessage.recipient_id) === user.id;
-
-    const threadKind = getThreadKind(otherParticipants, conversation);
-    const subject =
-      conversation.subject?.trim() ||
-      (threadKind === "admin"
-        ? "Admin support conversation"
-        : "Direct conversation");
+      Boolean(latestMessage?.sender_id && latestMessage.sender_id !== user.id) &&
+      isAfterDate(lastActivity, currentParticipant?.last_read_at);
 
     const preview =
-      conversation.last_message_preview?.trim() ||
+      conversation.last_message_preview ||
       getMessagePreview(latestMessage) ||
-      "Open this conversation to continue messaging.";
+      "Conversation started.";
+
+    const topicLabel = getTopicLabel(conversation, latestMessage);
+    const subject = getConversationSubject(conversation, kind);
 
     return {
       id: conversation.id,
       otherUserIds,
-      otherUserName:
-        otherUserNames.length > 0 ? otherUserNames.join(", ") : "SitGuru User",
-      otherUserRole:
-        otherUserRoles.length > 0 ? otherUserRoles.join(" • ") : "User",
-      otherUserPhotoUrl: getProfilePhotoUrl(firstOtherProfile),
+      otherUserName,
+      otherUserRole,
+      otherUserPhotoUrl,
       subject,
       preview,
-      status: conversation.status?.trim() || "open",
-      lastActivity:
-        conversation.last_message_at ||
-        latestMessage?.created_at ||
-        conversation.updated_at ||
-        conversation.created_at ||
-        null,
+      status: String(conversation.status || "open"),
+      lastActivity,
       unread,
       href: `/messages/${conversation.id}`,
-      threadKind,
-      petLabel: getPetLabel(subject, preview),
+      threadKind: kind,
       bookingLabel: getBookingLabel(conversation),
+      topicLabel,
     };
   });
 
-  const inboxConversations = allInboxConversations.filter((conversation) => {
+  const filteredConversations = inboxConversations.filter((conversation) => {
+    if (activeFilter === "unread") return conversation.unread;
     if (activeFilter === "guru") return conversation.threadKind === "guru";
     if (activeFilter === "admin") return conversation.threadKind === "admin";
-    if (activeFilter === "unread") return conversation.unread;
+    if (activeFilter === "customer") return conversation.threadKind === "customer";
+
     return true;
   });
 
-  const unreadCount = allInboxConversations.filter((item) => item.unread).length;
-  const guruCount = allInboxConversations.filter((item) => item.threadKind === "guru").length;
-  const adminCount = allInboxConversations.filter((item) => item.threadKind === "admin").length;
+  const totalConversations = inboxConversations.length;
+  const unreadCount = inboxConversations.filter((conversation) => conversation.unread).length;
+  const guruCount = inboxConversations.filter((conversation) => conversation.threadKind === "guru").length;
+  const adminCount = inboxConversations.filter((conversation) => conversation.threadKind === "admin").length;
+
+  const adminThread = inboxConversations.find(
+    (conversation) => conversation.threadKind === "admin"
+  );
+
+  const filterLinks = [
+    { label: "All", value: "all", href: "/messages" },
+    { label: "Guru", value: "guru", href: "/messages?filter=guru" },
+    { label: "Admin", value: "admin", href: "/messages?filter=admin" },
+    { label: "Unread", value: "unread", href: "/messages?filter=unread" },
+  ];
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_22%),linear-gradient(180deg,#020617_0%,#0b1220_46%,#020617_100%)] text-white">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/15 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(17,24,39,0.97),rgba(15,23,42,0.98))] shadow-[0_30px_80px_rgba(2,6,23,0.45)]">
-          <div className="p-6 sm:p-8 lg:p-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <Link
-                  href={dashboardHref}
-                  className="inline-flex items-center text-sm font-semibold text-white transition hover:text-white/80"
-                >
-                  ← Back to dashboard
-                </Link>
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_28%),linear-gradient(180deg,#ffffff,#f2fbf7_48%,#ffffff)] text-slate-950">
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.10)]">
+          <div className="bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.22),transparent_30%),linear-gradient(135deg,#ffffff,#ecfdf5)] p-6 sm:p-8">
+            <Link
+              href={dashboardHref}
+              className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+            >
+              ← Back to dashboard
+            </Link>
 
-                <p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-white/80">
-                  SitGuru Messaging
+            <p className="mt-5 text-xs font-black uppercase tracking-[0.28em] text-emerald-600">
+              SitGuru Messaging
+            </p>
+
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
+              Message Center
+            </h1>
+
+            <p className="mt-4 max-w-4xl text-base font-semibold leading-8 text-slate-700">
+              Keep care details, booking questions, and support conversations
+              organized in one place. Choose a conversation below to continue
+              messaging SitGuru Admin, a Guru, or a customer.
+            </p>
+
+            <div className="mt-7 flex flex-wrap gap-3">
+              <div className="rounded-[1.3rem] border border-emerald-100 bg-white px-6 py-4 shadow-sm">
+                <p className="text-3xl font-black text-slate-950">
+                  {totalConversations}
                 </p>
-
-                <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
-                  Clear communication for every pet
-                </h1>
-
-                <p className="mt-4 max-w-3xl text-base leading-8 text-white/90">
-                  Keep care details, booking questions, and support conversations
-                  organized in one place. The best experience starts with clear
-                  pet-centered communication.
+                <p className="mt-1 text-sm font-black text-slate-600">
+                  conversations
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <div className="rounded-[18px] border border-white/20 bg-white/10 px-5 py-4 text-center">
-                  <p className="text-2xl font-black text-white">
-                    {allInboxConversations.length}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-white/85">
-                    conversations
-                  </p>
-                </div>
-
-                <div className="rounded-[18px] border border-white/20 bg-white/10 px-5 py-4 text-center">
-                  <p className="text-2xl font-black text-white">{unreadCount}</p>
-                  <p className="mt-1 text-sm font-semibold text-white/85">unread</p>
-                </div>
-
-                <Link
-                  href="/search"
-                  className="inline-flex items-center justify-center rounded-[18px] bg-emerald-500 px-6 py-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
-                >
-                  Find a Guru
-                </Link>
+              <div className="rounded-[1.3rem] border border-emerald-100 bg-white px-6 py-4 shadow-sm">
+                <p className="text-3xl font-black text-slate-950">
+                  {unreadCount}
+                </p>
+                <p className="mt-1 text-sm font-black text-slate-600">
+                  unread
+                </p>
               </div>
+
+              <Link
+                href="/search?intent=message-guru"
+                className="inline-flex min-h-[86px] items-center justify-center rounded-[1.3rem] bg-emerald-500 px-7 text-base font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-600"
+              >
+                Find a Guru
+              </Link>
             </div>
           </div>
-        </section>
 
-        <section className="mt-8 grid gap-6 xl:grid-cols-[0.72fr_0.28fr]">
-          <div className="rounded-[28px] border border-white/15 bg-slate-900/90 p-6 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">
-                  Inbox
+          <div className="grid gap-6 bg-[#f7fcfa] p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
+                    Inbox
+                  </p>
+
+                  <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                    Your conversations
+                  </h2>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {filterLinks.map((filter) => (
+                    <Link
+                      key={filter.value}
+                      href={filter.href}
+                      className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${getActiveFilterClasses(
+                        activeFilter === filter.value ||
+                          (!resolvedSearchParams?.filter && filter.value === "all")
+                      )}`}
+                    >
+                      {filter.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4 sm:p-5">
+                {filteredConversations.length ? (
+                  <div className="space-y-4">
+                    {filteredConversations.map((conversation) => (
+                      <article
+                        key={conversation.id}
+                        className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:p-5"
+                      >
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="flex gap-4">
+                            <Avatar
+                              name={conversation.otherUserName}
+                              imageUrl={conversation.otherUserPhotoUrl}
+                            />
+
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-xl font-black text-slate-950">
+                                  {conversation.otherUserName}
+                                </h3>
+
+                                {conversation.unread ? (
+                                  <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
+                                    New
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <span
+                                  className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${getThreadKindClasses(
+                                    conversation.threadKind
+                                  )}`}
+                                >
+                                  {getThreadKindLabel(conversation.threadKind)}
+                                </span>
+
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-700">
+                                  {conversation.otherUserRole}
+                                </span>
+
+                                <span
+                                  className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${getStatusClasses(
+                                    conversation.status
+                                  )}`}
+                                >
+                                  {conversation.status}
+                                </span>
+
+                                {conversation.bookingLabel ? (
+                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-700">
+                                    {conversation.bookingLabel}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <p className="mt-3 text-base font-black text-slate-950">
+                                {conversation.subject}
+                              </p>
+
+                              <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+                                {conversation.preview}
+                              </p>
+
+                              <p className="mt-4 text-xs font-bold text-slate-500">
+                                {formatDateTime(conversation.lastActivity)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <Link
+                            href={conversation.href}
+                            className="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
+                          >
+                            Open thread →
+                          </Link>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-[1.5rem] border border-dashed border-emerald-200 bg-white px-6 py-12 text-center">
+                    <h3 className="text-2xl font-black text-slate-950">
+                      No conversations found
+                    </h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-slate-600">
+                      Your message center will show conversations with SitGuru
+                      Admin, Gurus, and booking contacts as they are created.
+                    </p>
+                    <div className="mt-6 flex flex-wrap justify-center gap-3">
+                      <Link
+                        href="/search?intent=message-guru"
+                        className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
+                      >
+                        Find a Guru
+                      </Link>
+                      <Link
+                        href={dashboardHref}
+                        className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+                      >
+                        Back to dashboard
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <aside className="space-y-6">
+              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
+                  Communication Center
                 </p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                  Your active message threads
+
+                <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950">
+                  Need help or care?
                 </h2>
-              </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href="/messages"
-                  className={`rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] transition ${
-                    activeFilter === "all"
-                      ? "border-white/25 bg-white/15 text-white"
-                      : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
-                  }`}
-                >
-                  All
-                </Link>
-                <Link
-                  href="/messages?filter=guru"
-                  className={`rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] transition ${
-                    activeFilter === "guru"
-                      ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100"
-                      : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
-                  }`}
-                >
-                  Guru
-                </Link>
-                <Link
-                  href="/messages?filter=admin"
-                  className={`rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] transition ${
-                    activeFilter === "admin"
-                      ? "border-amber-300/30 bg-amber-400/10 text-amber-100"
-                      : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
-                  }`}
-                >
-                  Admin
-                </Link>
-                <Link
-                  href="/messages?filter=unread"
-                  className={`rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] transition ${
-                    activeFilter === "unread"
-                      ? "border-sky-300/30 bg-sky-400/10 text-sky-100"
-                      : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
-                  }`}
-                >
-                  Unread
-                </Link>
-              </div>
-            </div>
-
-            {inboxConversations.length === 0 ? (
-              <div className="mt-6 rounded-[24px] border border-dashed border-white/20 bg-slate-950/90 p-6">
-                <p className="text-lg font-bold text-white">No conversations yet</p>
-                <p className="mt-2 text-sm leading-7 text-white/85">
-                  Once you start messaging a Guru or open an Admin support thread,
-                  your conversations will appear here.
+                <p className="mt-4 text-sm font-semibold leading-7 text-slate-600">
+                  Start with SitGuru Admin for account, safety, booking, or
+                  platform support. To message a Guru, choose the Guru first from
+                  Find Care.
                 </p>
 
-                <div className="mt-5 flex flex-wrap gap-3">
+                <div className="mt-6 grid gap-3">
                   <Link
-                    href="/search"
-                    className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
-                  >
-                    Find a Guru
-                  </Link>
-                  <Link
-                    href="/messages/admin"
-                    className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                    href={adminThread?.href || "/messages?filter=admin"}
+                    className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
                   >
                     Message Admin
                   </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-6 space-y-4">
-                {inboxConversations.map((conversation) => (
+
                   <Link
-                    key={conversation.id}
-                    href={conversation.href}
-                    className="block rounded-[24px] border border-white/15 bg-slate-950/95 p-5 transition hover:border-white/30 hover:bg-slate-950"
+                    href="/customer/pets"
+                    className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
                   >
-                    <div className="flex items-start gap-4">
-                      <Avatar
-                        name={conversation.otherUserName}
-                        imageUrl={conversation.otherUserPhotoUrl}
-                      />
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate text-lg font-bold text-white">
-                                {conversation.otherUserName}
-                              </p>
-
-                              {conversation.unread ? (
-                                <span className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white">
-                                  New
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <span
-                                className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold ${getThreadKindClasses(
-                                  conversation.threadKind
-                                )}`}
-                              >
-                                {getThreadKindLabel(conversation.threadKind)}
-                              </span>
-
-                              <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/85">
-                                {conversation.otherUserRole}
-                              </span>
-
-                              {conversation.petLabel ? (
-                                <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/85">
-                                  Pet: {conversation.petLabel}
-                                </span>
-                              ) : null}
-
-                              {conversation.bookingLabel ? (
-                                <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/85">
-                                  {conversation.bookingLabel}
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div
-                            className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold capitalize ${getStatusClasses(
-                              conversation.status
-                            )}`}
-                          >
-                            {conversation.status}
-                          </div>
-                        </div>
-
-                        <p className="mt-4 text-sm font-semibold text-white">
-                          {conversation.subject}
-                        </p>
-
-                        <p className="mt-1 line-clamp-2 text-sm leading-7 text-white/85">
-                          {conversation.preview}
-                        </p>
-
-                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                          <p className="text-xs font-medium text-white/75">
-                            {formatDateTime(conversation.lastActivity)}
-                          </p>
-
-                          <span className="text-sm font-semibold text-white">
-                            Open thread →
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    Go to My Pets
                   </Link>
-                ))}
-              </div>
-            )}
+
+                  <Link
+                    href="/search?intent=message-guru"
+                    className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+                  >
+                    Find a Guru
+                  </Link>
+                </div>
+              </section>
+
+              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
+                  Messaging Overview
+                </p>
+
+                <div className="mt-5 grid gap-3">
+                  <SidebarMetric
+                    value={`${guruCount} Guru conversation${
+                      guruCount === 1 ? "" : "s"
+                    } active`}
+                  />
+                  <SidebarMetric
+                    value={`${adminCount} Admin support thread${
+                      adminCount === 1 ? "" : "s"
+                    }`}
+                  />
+                  <SidebarMetric
+                    value={`${unreadCount} unread update${
+                      unreadCount === 1 ? "" : "s"
+                    } waiting`}
+                  />
+                </div>
+              </section>
+
+              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
+                  Helpful Reminder
+                </p>
+
+                <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950">
+                  Clear messages save time
+                </h2>
+
+                <div className="mt-5 space-y-3">
+                  {[
+                    "Include pet names, care dates, and the kind of help you need.",
+                    "Use Admin for account, booking, refund, verification, or safety questions.",
+                    "Use Find Care first if you want to message a specific Guru.",
+                  ].map((tip) => (
+                    <div
+                      key={tip}
+                      className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold leading-7 text-slate-700"
+                    >
+                      {tip}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </aside>
           </div>
-
-          <aside className="space-y-6">
-            <section className="rounded-[28px] border border-white/15 bg-slate-900/90 p-6 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">
-                Communication center
-              </p>
-
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                Keep care clear and easy
-              </h2>
-
-              <p className="mt-3 text-sm leading-7 text-white/85">
-                The best customer experience starts with a pet profile, a clear
-                care request, and the right conversation with your Guru or Admin.
-              </p>
-
-              <div className="mt-6 flex flex-col gap-3">
-                <Link
-                  href="/messages/admin"
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
-                >
-                  Message Admin
-                </Link>
-
-                <Link
-                  href="/customer/dashboard"
-                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  Go to My Pets
-                </Link>
-
-                <Link
-                  href="/search"
-                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  Find a Guru
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-white/15 bg-[linear-gradient(135deg,rgba(5,150,105,0.18),rgba(15,23,42,0.94))] p-6 shadow-[0_20px_50px_rgba(2,6,23,0.35)]">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">
-                Messaging overview
-              </p>
-
-              <div className="mt-6 space-y-3">
-                <div className="rounded-[18px] border border-white/15 bg-slate-950/95 px-4 py-4 text-sm font-medium text-white">
-                  {guruCount} Guru conversation{guruCount === 1 ? "" : "s"} active
-                </div>
-                <div className="rounded-[18px] border border-white/15 bg-slate-950/95 px-4 py-4 text-sm font-medium text-white">
-                  {adminCount} Admin support thread{adminCount === 1 ? "" : "s"}
-                </div>
-                <div className="rounded-[18px] border border-white/15 bg-slate-950/95 px-4 py-4 text-sm font-medium text-white">
-                  {unreadCount} unread update{unreadCount === 1 ? "" : "s"} waiting
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-white/15 bg-slate-900/90 p-6 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">
-                Helpful reminder
-              </p>
-
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                Talk about the pet, not just the booking
-              </h2>
-
-              <p className="mt-3 text-sm leading-7 text-white/85">
-                Share routines, medications, timing, behavior, and anything your
-                Guru should know. Strong pet details lead to smoother care.
-              </p>
-
-              <div className="mt-6 flex flex-col gap-3">
-                <Link
-                  href="/customer/dashboard"
-                  className="inline-flex items-center justify-center rounded-full bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  Update My Pets
-                </Link>
-
-                <Link
-                  href={dashboardHref}
-                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  Back to dashboard
-                </Link>
-              </div>
-            </section>
-          </aside>
         </section>
-      </div>
+      </section>
     </main>
   );
 }

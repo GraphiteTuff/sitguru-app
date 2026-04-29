@@ -3,8 +3,21 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+type AuthUser = {
+  id: string;
+  email?: string;
+};
+
+type GuruProfile = {
+  display_name?: string | null;
+  bio?: string | null;
+  city?: string | null;
+  state?: string | null;
+  hourly_rate?: number | null;
+};
+
 export default function BecomeGuruPage() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -18,16 +31,22 @@ export default function BecomeGuruPage() {
     async function load() {
       const { data } = await supabase.auth.getUser();
       const currentUser = data.user;
-      setUser(currentUser);
 
-      if (!currentUser) return;
+      if (!currentUser) {
+        setUser(null);
+        return;
+      }
 
-      // Load existing guru profile if exists
+      setUser({
+        id: currentUser.id,
+        email: currentUser.email,
+      });
+
       const { data: guru } = await supabase
         .from("gurus")
-        .select("*")
+        .select("display_name, bio, city, state, hourly_rate")
         .eq("user_id", currentUser.id)
-        .maybeSingle();
+        .maybeSingle<GuruProfile>();
 
       if (guru) {
         setDisplayName(guru.display_name || "");
@@ -38,10 +57,10 @@ export default function BecomeGuruPage() {
       }
     }
 
-    load();
+    void load();
   }, []);
 
-  async function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
 
@@ -51,18 +70,18 @@ export default function BecomeGuruPage() {
       return;
     }
 
-    // 1. Update profile (light)
-    await supabase.from("profiles").update({
-      role: "sitter", // keep compatibility
-    }).eq("id", user.id);
+    await supabase
+      .from("profiles")
+      .update({
+        role: "sitter",
+      })
+      .eq("id", user.id);
 
-    // 2. Ensure role exists in user_roles
     await supabase.from("user_roles").upsert({
       user_id: user.id,
       role: "guru",
     });
 
-    // 3. Create/update Guru profile (MAIN TABLE)
     const { error } = await supabase.from("gurus").upsert({
       user_id: user.id,
       display_name: displayName,
@@ -88,12 +107,9 @@ export default function BecomeGuruPage() {
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto max-w-lg px-6 py-16">
         <div className="rounded-2xl border bg-white p-8 shadow-sm">
-          <h1 className="mb-6 text-2xl font-bold">
-            Become a Guru 🐾
-          </h1>
+          <h1 className="mb-6 text-2xl font-bold">Become a Guru 🐾</h1>
 
           <form onSubmit={handleSave} className="space-y-4">
-
             <input
               type="text"
               placeholder="Display Name"
@@ -146,7 +162,6 @@ export default function BecomeGuruPage() {
             >
               {loading ? "Saving..." : "Save Guru Profile"}
             </button>
-
           </form>
         </div>
       </div>

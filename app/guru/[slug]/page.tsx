@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import GuruProfileAnalytics from "./GuruProfileAnalytics";
+import GuruQuickBookingForm from "./GuruQuickBookingForm";
 
 type PageProps = {
   params: Promise<{
@@ -305,7 +306,10 @@ async function loadGurusTable(): Promise<GuruRecord[]> {
 }
 
 async function getAllGuruRecords(): Promise<GuruRecord[]> {
-  const [gurus, profiles] = await Promise.all([loadGurusTable(), loadProfilesTable()]);
+  const [gurus, profiles] = await Promise.all([
+    loadGurusTable(),
+    loadProfilesTable(),
+  ]);
   const merged = [...gurus, ...profiles];
   const map = new Map<string, GuruRecord>();
 
@@ -424,7 +428,8 @@ function createFallbackGuruFromSlug(routeSlug: string): GuruRecord {
 
   const headlineMap: Record<string, string> = {
     poundpuppy: "Loving Dog Sitters",
-    "sitguru-pro": "Trusted premium pet care with a polished customer experience.",
+    "sitguru-pro":
+      "Trusted premium pet care with a polished customer experience.",
   };
 
   const bioMap: Record<string, string> = {
@@ -472,11 +477,7 @@ function createFallbackGuruFromSlug(routeSlug: string): GuruRecord {
     rating_avg: null,
     review_count: null,
 
-    specialties: [
-      "Puppy Care",
-      "Senior Pet Care",
-      "Multi-Pet Homes",
-    ],
+    specialties: ["Puppy Care", "Senior Pet Care", "Multi-Pet Homes"],
     services: ["Dog Walking", "Pet Sitting", "Cat Care", "Drop-In Visits"],
     certifications: ["Background checked", "SitGuru reviewed"],
 
@@ -561,6 +562,10 @@ function getReviewText(guru: GuruRecord) {
   return "Building reviews";
 }
 
+function getTodayInputValue() {
+  return new Date().toISOString().split("T")[0];
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -619,11 +624,13 @@ export default async function GuruProfilePage({ params }: PageProps) {
     typeof guru.review_count === "number" && guru.review_count > 0;
 
   const publicSlug = createGuruSlug(guru);
-  const bookingPageHref = `/bookings/new?guru_slug=${encodeURIComponent(publicSlug)}`;
+  const bookingPageHref = "#book-guru";
   const messageHref = `/messages/new?guru=${encodeURIComponent(publicSlug)}`;
   const primaryService = services[0] || "General care";
+  const bookingServices = Array.from(
+    new Set([primaryService, ...services, "General care"])
+  );
   const numericRate = getRateValue(guru);
-
   const responseStyle = guru.response_time?.trim() || "Fast replies";
   const profileStatus =
     guru.status?.trim() && guru.status.toLowerCase() !== "draft"
@@ -634,7 +641,7 @@ export default async function GuruProfilePage({ params }: PageProps) {
   const primaryPhoto = getPrimaryPhoto(guru);
 
   return (
-    <main className="min-h-screen bg-slate-50 !text-slate-900">
+    <main className="min-h-screen bg-slate-50 pb-24 !text-slate-900 sm:pb-0">
       <GuruProfileAnalytics
         guruId={guru.id}
         guruSlug={publicSlug}
@@ -644,6 +651,7 @@ export default async function GuruProfilePage({ params }: PageProps) {
         hourlyRate={numericRate}
         isFallback={isFallback}
       />
+
       <section className="relative overflow-hidden border-b border-slate-200 bg-[linear-gradient(135deg,#05244f_0%,#0b356c_42%,#0f172a_100%)]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.22),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.10),transparent_22%)]" />
 
@@ -735,14 +743,14 @@ export default async function GuruProfilePage({ params }: PageProps) {
                   <div className="mt-7 flex flex-wrap gap-3">
                     <Link
                       href={bookingPageHref}
-                      className="inline-flex min-h-[56px] items-center justify-center whitespace-nowrap rounded-2xl !bg-white px-7 py-3.5 text-lg font-black !text-slate-950 shadow-xl transition hover:!bg-slate-100"
+                      className="inline-flex min-h-[56px] w-full items-center justify-center whitespace-nowrap rounded-2xl !bg-white px-7 py-3.5 text-lg font-black !text-slate-950 shadow-xl transition hover:!bg-slate-100 sm:w-auto"
                     >
                       Book this Guru
                     </Link>
 
                     <Link
                       href={messageHref}
-                      className="inline-flex min-h-[56px] items-center justify-center whitespace-nowrap rounded-2xl border border-white/25 bg-white/10 px-7 py-3.5 text-lg font-black !text-white transition hover:bg-white/20"
+                      className="inline-flex min-h-[56px] w-full items-center justify-center whitespace-nowrap rounded-2xl border border-white/25 bg-white/10 px-7 py-3.5 text-lg font-black !text-white transition hover:bg-white/20 sm:w-auto"
                     >
                       Message Guru
                     </Link>
@@ -815,14 +823,18 @@ export default async function GuruProfilePage({ params }: PageProps) {
                 <p className="!text-slate-500 text-sm font-semibold">
                   Starting rate
                 </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">{rate}/hr</p>
+                <p className="mt-2 !text-slate-950 text-2xl font-black">
+                  {rate}/hr
+                </p>
               </div>
 
               <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
                 <p className="!text-slate-500 text-sm font-semibold">
                   Experience
                 </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">{years}</p>
+                <p className="mt-2 !text-slate-950 text-2xl font-black">
+                  {years}
+                </p>
               </div>
 
               <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
@@ -880,8 +892,8 @@ export default async function GuruProfilePage({ params }: PageProps) {
                     Trusted platform presence
                   </p>
                   <p className="mt-3 !text-slate-700 text-sm leading-7">
-                    This Guru has a live SitGuru profile with service and identity
-                    details visible to customers.
+                    This Guru has a live SitGuru profile with service and
+                    identity details visible to customers.
                   </p>
                 </div>
 
@@ -992,8 +1004,8 @@ export default async function GuruProfilePage({ params }: PageProps) {
 
                 <p className="mt-3 !text-slate-700 text-base leading-7">
                   This section is currently designed as a confidence and trust
-                  area. Live customer reviews will appear here once review data is
-                  connected to SitGuru.
+                  area. Live customer reviews will appear here once review data
+                  is connected to SitGuru.
                 </p>
               </div>
 
@@ -1005,11 +1017,13 @@ export default async function GuruProfilePage({ params }: PageProps) {
             <div className="mt-6 space-y-4 border-t border-slate-200 pt-5">
               {hasLiveReviews ? (
                 <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                  <p className="!text-slate-950 text-lg font-bold">Customer reviews</p>
+                  <p className="!text-slate-950 text-lg font-bold">
+                    Customer reviews
+                  </p>
                   <p className="mt-3 !text-slate-700 text-base leading-8">
-                    This Guru currently shows {reviewText} with an average rating
-                    of {ratingValue}. A richer live review feed can be added once
-                    the platform review system is connected.
+                    This Guru currently shows {reviewText} with an average
+                    rating of {ratingValue}. A richer live review feed can be
+                    added once the platform review system is connected.
                   </p>
                 </div>
               ) : null}
@@ -1020,7 +1034,8 @@ export default async function GuruProfilePage({ params }: PageProps) {
                 </p>
                 <p className="mt-3 !text-slate-700 text-base leading-8">
                   This Guru has completed a public-facing profile with service
-                  details, pricing, location visibility, and booking entry points.
+                  details, pricing, location visibility, and booking entry
+                  points.
                 </p>
               </div>
 
@@ -1029,8 +1044,8 @@ export default async function GuruProfilePage({ params }: PageProps) {
                   Clear booking direction
                 </p>
                 <p className="mt-3 !text-slate-700 text-base leading-8">
-                  Customers can quickly understand what this Guru offers and move
-                  into the booking flow with more confidence.
+                  Customers can quickly understand what this Guru offers and
+                  move into the booking flow with more confidence.
                 </p>
               </div>
 
@@ -1039,8 +1054,8 @@ export default async function GuruProfilePage({ params }: PageProps) {
                   Better trust presentation
                 </p>
                 <p className="mt-3 !text-slate-700 text-base leading-8">
-                  Services, profile image, credentials, and portfolio placement are
-                  all helping the page feel more premium and trustworthy.
+                  Services, profile image, credentials, and portfolio placement
+                  are all helping the page feel more premium and trustworthy.
                 </p>
               </div>
             </div>
@@ -1067,14 +1082,18 @@ export default async function GuruProfilePage({ params }: PageProps) {
                 <p className="!text-slate-500 text-sm font-semibold">
                   Starting rate
                 </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">{rate}/hr</p>
+                <p className="mt-2 !text-slate-950 text-2xl font-black">
+                  {rate}/hr
+                </p>
               </div>
 
               <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
                 <p className="!text-slate-500 text-sm font-semibold">
                   Experience
                 </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">{years}</p>
+                <p className="mt-2 !text-slate-950 text-2xl font-black">
+                  {years}
+                </p>
               </div>
 
               <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
@@ -1089,113 +1108,39 @@ export default async function GuruProfilePage({ params }: PageProps) {
           </section>
         </div>
 
-        <aside className="space-y-6">
-          <section className="rounded-[2rem] border border-slate-200 !bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between gap-4">
-              <span className="rounded-full border border-emerald-200 !bg-emerald-50 px-3 py-1 !text-emerald-700 text-xs font-bold uppercase tracking-[0.22em]">
-                Book this Guru
-              </span>
-              <span className="rounded-full border border-slate-200 !bg-slate-50 px-3 py-1 !text-slate-700 text-xs font-bold">
-                Request Booking
-              </span>
-            </div>
-
-            <div className="mt-6 rounded-[1.5rem] border border-slate-200 !bg-slate-50 p-5">
-              <div className="flex items-start gap-4">
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-slate-200 !bg-white shadow-sm">
-                  {primaryPhoto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={primaryPhoto}
-                      alt={displayName}
-                      className="h-full w-full object-cover object-center"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center !text-slate-900 text-sm font-bold">
-                      {initialsFromName(displayName)}
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate !text-slate-950 text-lg font-black">
-                    {displayName}
-                  </p>
-                  <p className="mt-1 line-clamp-2 !text-slate-600 text-sm font-semibold leading-6">
-                    {headline}
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-full border border-slate-200 !bg-white px-3 py-1 !text-slate-900 text-xs font-bold">
-                      {rate}/hr
-                    </span>
-                    {guru.is_verified ? (
-                      <span className="rounded-full border border-emerald-200 !bg-emerald-50 px-3 py-1 !text-emerald-700 text-xs font-bold">
-                        Verified
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <form className="mt-5 space-y-4">
-              <div>
-                <label
-                  htmlFor="pet-name"
-                  className="mb-2 block !text-slate-900 text-sm font-bold"
-                >
-                  Pet name
-                </label>
-                <input
-                  id="pet-name"
-                  type="text"
-                  placeholder="Ex. Scout"
-                  className="w-full rounded-2xl border border-slate-300 !bg-white px-4 py-3.5 !text-slate-900 text-base font-semibold placeholder:!text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15"
-                />
+        <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+          <section id="book-guru" className="scroll-mt-28 overflow-hidden rounded-[2rem] border border-emerald-200 !bg-white shadow-[0_20px_60px_rgba(15,118,110,0.10)]">
+            <div className="border-b border-emerald-100 bg-emerald-50 p-5 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="rounded-full border border-emerald-200 !bg-white px-3 py-1 !text-emerald-700 text-xs font-black uppercase tracking-[0.22em]">
+                  Step 1 of 2
+                </span>
+                <span className="rounded-full border border-slate-200 !bg-white px-3 py-1 !text-slate-700 text-xs font-bold">
+                  Request Booking
+                </span>
               </div>
 
-              <div>
-                <label
-                  htmlFor="booking-date"
-                  className="mb-2 block !text-slate-900 text-sm font-bold"
-                >
-                  Requested date
-                </label>
-                <input
-                  id="booking-date"
-                  type="date"
-                  className="w-full rounded-2xl border border-slate-300 !bg-white px-4 py-3.5 !text-slate-900 text-base font-semibold outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="booking-notes"
-                  className="mb-2 block !text-slate-900 text-sm font-bold"
-                >
-                  Care notes
-                </label>
-                <textarea
-                  id="booking-notes"
-                  rows={5}
-                  placeholder="Share pet routine, temperament, medications, goals, timing, or home-access notes."
-                  className="w-full rounded-2xl border border-slate-300 !bg-white px-4 py-3.5 !text-slate-900 text-base font-semibold placeholder:!text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15"
-                />
-              </div>
-
-              <Link
-                href={bookingPageHref}
-                className="inline-flex min-h-[60px] w-full items-center justify-center rounded-2xl !bg-emerald-500 px-6 py-4 text-lg font-black tracking-tight !text-slate-950 transition hover:!bg-emerald-400"
-              >
-                Continue to Booking Request
-              </Link>
-
-              <p className="!text-slate-500 text-xs font-medium leading-6">
-                You will review and confirm your booking request details on the
-                next step.
+              <h2 className="mt-4 !text-slate-950 text-3xl font-black tracking-tight sm:text-4xl">
+                Book the Guru
+              </h2>
+              <p className="mt-2 !text-slate-700 text-sm font-semibold leading-7">
+                Add the care basics now. You will review the full request before
+                checkout.
               </p>
-            </form>
+            </div>
+
+                          <GuruQuickBookingForm
+                guruId={guru.id}
+                guruSlug={publicSlug}
+                guruName={displayName}
+                guruHeadline={headline}
+                guruPhotoUrl={primaryPhoto}
+                serviceOptions={bookingServices}
+                primaryService={primaryService}
+                hourlyRate={numericRate}
+                defaultCity={guru.city || ""}
+                defaultState={guru.state || ""}
+              />
           </section>
 
           <section className="rounded-[2rem] border border-slate-200 !bg-white p-5 shadow-sm sm:p-6">
@@ -1240,8 +1185,8 @@ export default async function GuruProfilePage({ params }: PageProps) {
                   Booking readiness
                 </p>
                 <p className="mt-2 !text-slate-700 text-sm font-medium leading-7">
-                  Service details, rate visibility, messaging, and booking access
-                  are all available from this public profile.
+                  Service details, rate visibility, messaging, and booking
+                  access are all available from this public profile.
                 </p>
               </div>
             </div>
@@ -1282,8 +1227,8 @@ export default async function GuruProfilePage({ params }: PageProps) {
                   Submit your request
                 </p>
                 <p className="mt-2 !text-slate-700 text-sm font-medium leading-7">
-                  SitGuru guides you into the booking page with the selected Guru
-                  already attached.
+                  SitGuru guides you into the booking page with the selected
+                  Guru already attached.
                 </p>
               </div>
 
@@ -1309,6 +1254,23 @@ export default async function GuruProfilePage({ params }: PageProps) {
           </section>
         </aside>
       </section>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-100 bg-white/95 px-4 py-3 shadow-[0_-16px_40px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden">
+        <div className="mx-auto flex max-w-7xl gap-3">
+          <Link
+            href={bookingPageHref}
+            className="flex min-h-[52px] flex-1 items-center justify-center rounded-2xl !bg-emerald-500 px-4 text-sm font-black !text-slate-950"
+          >
+            Book Guru
+          </Link>
+          <Link
+            href={messageHref}
+            className="flex min-h-[52px] flex-1 items-center justify-center rounded-2xl border border-emerald-200 !bg-white px-4 text-sm font-black !text-emerald-700"
+          >
+            Message
+          </Link>
+        </div>
+      </div>
     </main>
   );
 }

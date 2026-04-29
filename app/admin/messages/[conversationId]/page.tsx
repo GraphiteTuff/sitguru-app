@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AdminMessageComposer from "@/components/AdminMessageComposer";
+import MessageAutoRefresh from "@/components/MessageAutoRefresh";
 
 export const dynamic = "force-dynamic";
+
+const SITGURU_MESSAGE_AVATAR_URL = "/images/sitguru-message-avatar.jpg";
 
 type ConversationRow = {
   id: string;
@@ -12,6 +15,7 @@ type ConversationRow = {
   guru_id?: string | null;
   booking_id?: string | null;
   subject?: string | null;
+  topic?: string | null;
   status?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -27,6 +31,8 @@ type MessageRow = {
   content?: string | null;
   body?: string | null;
   created_at?: string | null;
+  topic?: string | null;
+  message_type?: string | null;
 };
 
 type ProfileRow = {
@@ -41,13 +47,49 @@ type ProfileRow = {
   avatar_url?: string | null;
   image_url?: string | null;
   role?: string | null;
+  account_type?: string | null;
+};
+
+type GuruProfileRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  email?: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
+  name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  profile_photo_url?: string | null;
+  avatar_url?: string | null;
+  image_url?: string | null;
+  photo_url?: string | null;
+  profile_image_url?: string | null;
 };
 
 type ConversationParticipantRow = {
-  conversation_id: string;
-  user_id: string;
+  conversation_id?: string | null;
+  user_id?: string | null;
   role?: string | null;
 };
+
+function normalizeRole(role?: string | null) {
+  const value = String(role || "").trim().toLowerCase();
+
+  if (!value) return "";
+  if (value === "provider" || value === "sitter") return "guru";
+
+  return value;
+}
+
+function getReadableRole(role?: string | null) {
+  const normalized = normalizeRole(role);
+
+  if (normalized === "admin") return "Admin";
+  if (normalized === "guru") return "Guru";
+  if (normalized === "customer") return "Customer";
+
+  return "User";
+}
 
 function getProfileName(profile?: ProfileRow | null) {
   if (!profile) return "SitGuru User";
@@ -67,40 +109,117 @@ function getProfileName(profile?: ProfileRow | null) {
   return String(candidate).trim() || "SitGuru User";
 }
 
+function getDisplayNameForRole(profile: ProfileRow | null, role?: string | null) {
+  const normalized = normalizeRole(role);
+
+  if (normalized === "admin") return "SitGuru Admin";
+
+  return getProfileName(profile);
+}
+
 function getProfilePhotoUrl(profile?: ProfileRow | null) {
   if (!profile) return null;
 
-  const candidate =
-    profile.profile_photo_url || profile.avatar_url || profile.image_url || null;
+  return (
+    profile.profile_photo_url || profile.avatar_url || profile.image_url || null
+  );
+}
 
-  return candidate ? String(candidate) : null;
+function getMessageAvatarUrl({
+  senderRole,
+  profileImageUrl,
+}: {
+  senderRole?: string | null;
+  profileImageUrl?: string | null;
+}) {
+  const normalized = normalizeRole(senderRole);
+
+  if (normalized === "admin") {
+    return SITGURU_MESSAGE_AVATAR_URL;
+  }
+
+  return profileImageUrl || null;
+}
+
+function getGuruProfilePhotoUrl(guru?: GuruProfileRow | null) {
+  if (!guru) return null;
+
+  return (
+    guru.profile_photo_url ||
+    guru.avatar_url ||
+    guru.image_url ||
+    guru.photo_url ||
+    guru.profile_image_url ||
+    null
+  );
+}
+
+function mergeGuruProfilePhoto(
+  profile: ProfileRow | null,
+  guru?: GuruProfileRow | null
+): ProfileRow | null {
+  if (!profile && !guru?.user_id) return profile;
+
+  const guruPhotoUrl = getGuruProfilePhotoUrl(guru);
+
+  if (!guru) return profile;
+
+  return {
+    id: String(profile?.id || guru.user_id || ""),
+    full_name:
+      profile?.full_name ||
+      guru.full_name ||
+      guru.display_name ||
+      guru.name ||
+      [guru.first_name, guru.last_name].filter(Boolean).join(" ").trim() ||
+      guru.email?.split("@")[0] ||
+      "SitGuru User",
+    display_name:
+      profile?.display_name ||
+      guru.display_name ||
+      guru.full_name ||
+      guru.name ||
+      null,
+    name: profile?.name || guru.name || guru.full_name || guru.display_name || null,
+    first_name: profile?.first_name || guru.first_name || null,
+    last_name: profile?.last_name || guru.last_name || null,
+    email: profile?.email || guru.email || null,
+    profile_photo_url: profile?.profile_photo_url || guruPhotoUrl,
+    avatar_url: profile?.avatar_url || guru.avatar_url || null,
+    image_url: profile?.image_url || guru.image_url || null,
+    role: profile?.role || "guru",
+    account_type: profile?.account_type || "guru",
+  };
+}
+
+function getFirstName(name?: string | null) {
+  const safeName = String(name || "").trim();
+
+  if (!safeName) return "Guru";
+
+  return safeName.split(/\s+/)[0] || "Guru";
 }
 
 function getInitials(name: string) {
-  return name
+  const initials = name
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("");
+
+  return initials || "SU";
 }
 
 function getMessageContent(message?: MessageRow | null) {
-  const value = message?.content || message?.body || "";
-  return String(value).trim();
-}
-
-function normalizeRole(role?: string | null) {
-  const value = String(role || "").trim().toLowerCase();
-  if (!value) return "";
-  if (value === "provider" || value === "sitter") return "guru";
-  return value;
+  return String(message?.content || message?.body || "").trim();
 }
 
 function formatMessageTime(value?: string | null) {
   if (!value) return "";
 
   const parsed = new Date(value);
+
   if (Number.isNaN(parsed.getTime())) return "";
 
   return parsed.toLocaleString("en-US", {
@@ -115,6 +234,7 @@ function formatLongDateTime(value?: string | null) {
   if (!value) return "No recent activity";
 
   const parsed = new Date(value);
+
   if (Number.isNaN(parsed.getTime())) return "No recent activity";
 
   return parsed.toLocaleString("en-US", {
@@ -126,16 +246,96 @@ function formatLongDateTime(value?: string | null) {
   });
 }
 
+function getTopicLabel(topic?: string | null) {
+  return String(topic || "").trim();
+}
+
+function getSenderRole({
+  senderId,
+  currentAdminId,
+  conversation,
+  participantRoleMap,
+  profile,
+}: {
+  senderId: string;
+  currentAdminId: string;
+  conversation: ConversationRow;
+  participantRoleMap: Map<string, string>;
+  profile?: ProfileRow | null;
+}) {
+  if (senderId === currentAdminId) return "admin";
+
+  const participantRole = normalizeRole(participantRoleMap.get(senderId));
+  if (participantRole) return participantRole;
+
+  const profileRole = normalizeRole(profile?.role);
+  if (profileRole) return profileRole;
+
+  const profileAccountType = normalizeRole(profile?.account_type);
+  if (profileAccountType) return profileAccountType;
+
+  if (senderId && senderId === conversation.customer_id) return "customer";
+  if (senderId && senderId === conversation.guru_id) return "guru";
+
+  return "customer";
+}
+
+function getAdminBubbleStyles(role?: string | null) {
+  const normalized = normalizeRole(role);
+
+  if (normalized === "admin") {
+    return {
+      bubble:
+        "border-emerald-400/30 bg-emerald-500/15 text-white shadow-[0_18px_40px_rgba(16,185,129,0.12)]",
+      badge: "border-emerald-300/30 bg-emerald-400/10 text-emerald-200",
+      topic: "border-white/15 bg-white/10 text-slate-100",
+      time: "text-white/70",
+      body: "text-white/95",
+      tail: "rounded-br-md",
+    };
+  }
+
+  if (normalized === "guru") {
+    return {
+      bubble:
+        "border-sky-400/30 bg-sky-500/15 text-white shadow-[0_18px_40px_rgba(14,165,233,0.10)]",
+      badge: "border-sky-300/30 bg-sky-400/10 text-sky-200",
+      topic: "border-white/15 bg-white/10 text-slate-100",
+      time: "text-white/70",
+      body: "text-white/95",
+      tail: "rounded-bl-md",
+    };
+  }
+
+  return {
+    bubble:
+      "border-violet-400/30 bg-violet-500/15 text-white shadow-[0_18px_40px_rgba(139,92,246,0.10)]",
+    badge: "border-violet-300/30 bg-violet-400/10 text-violet-200",
+    topic: "border-white/15 bg-white/10 text-slate-100",
+    time: "text-white/70",
+    body: "text-white/95",
+    tail: "rounded-bl-md",
+  };
+}
+
 function Avatar({
   name,
   imageUrl,
+  compact = false,
 }: {
   name: string;
   imageUrl?: string | null;
+  compact?: boolean;
 }) {
+  const sizeClasses = compact
+    ? "h-11 w-11 rounded-[16px] text-sm"
+    : "h-14 w-14 rounded-[18px] text-lg";
+
   if (imageUrl) {
     return (
-      <div className="h-14 w-14 overflow-hidden rounded-[18px] border border-white/20 bg-white/10">
+      <div
+        className={`${sizeClasses} overflow-hidden border border-white/20 bg-white/10`}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
       </div>
@@ -143,113 +343,64 @@ function Avatar({
   }
 
   return (
-    <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/20 bg-white/10 text-lg font-black text-white">
+    <div
+      className={`flex ${sizeClasses} shrink-0 items-center justify-center border border-white/20 bg-white/10 font-black text-white`}
+    >
       {getInitials(name)}
     </div>
   );
 }
 
-async function sendAdminMessage(formData: FormData) {
-  "use server";
-
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/customer/login");
-  }
-
-  const { data: currentProfile } = await supabaseAdmin
-    .from("profiles")
-    .select("id, role")
-    .eq("id", user.id)
-    .maybeSingle<{ id: string; role?: string | null }>();
-
-  if (normalizeRole(currentProfile?.role) !== "admin") {
-    redirect("/customer/dashboard");
-  }
-
-  const conversationId = String(formData.get("conversationId") || "").trim();
-  const body = String(formData.get("body") || "").trim();
-
-  if (!conversationId || !body) {
-    return;
-  }
-
-  const { data: participants } = await supabaseAdmin
-    .from("conversation_participants")
-    .select("conversation_id, user_id, role")
-    .eq("conversation_id", conversationId);
-
-  const safeParticipants = (participants || []) as ConversationParticipantRow[];
-
-  const recipientIds = safeParticipants
-    .map((participant) => participant.user_id)
-    .filter((participantUserId) => participantUserId && participantUserId !== user.id);
-
-  const primaryRecipientId = recipientIds[0] || null;
-
-  const { error: insertError } = await supabaseAdmin.from("messages").insert({
-    conversation_id: conversationId,
-    sender_id: user.id,
-    recipient_id: primaryRecipientId,
-    body,
-    content: body,
-  });
-
-  if (insertError) {
-    console.error("Admin message send error:", insertError.message);
-    return;
-  }
-
-  await supabaseAdmin
-    .from("conversations")
-    .update({
-      last_message_at: new Date().toISOString(),
-      last_message_preview: body,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", conversationId);
-
-  revalidatePath("/admin/messages");
-  revalidatePath(`/admin/messages/${conversationId}`);
-}
-
 export default async function AdminMessageConversationPage({
   params,
 }: {
-  params: Promise<{ conversationId: string }>;
+  params: Promise<{
+    conversationId?: string;
+    conversationid?: string;
+    id?: string;
+  }>;
 }) {
-  const { conversationId } = await params;
+  const routeParams = await params;
+  const conversationId =
+    routeParams.conversationId || routeParams.conversationid || routeParams.id || "";
+
+  if (!conversationId) {
+    notFound();
+  }
 
   const supabase = await createClient();
 
   const {
     data: { user },
-    error: userError,
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) {
+  if (authError || !user) {
     redirect("/customer/login");
   }
 
   const { data: adminProfile } = await supabaseAdmin
     .from("profiles")
-    .select("id, role")
+    .select("id, role, account_type")
     .eq("id", user.id)
-    .maybeSingle<{ id: string; role?: string | null }>();
+    .maybeSingle<{
+      id: string;
+      role?: string | null;
+      account_type?: string | null;
+    }>();
 
-  if (normalizeRole(adminProfile?.role) !== "admin") {
-    redirect("/customer/dashboard");
+  const normalizedAdminRole = normalizeRole(
+    adminProfile?.role || adminProfile?.account_type || null
+  );
+
+  if (normalizedAdminRole !== "admin") {
+    redirect("/dashboard");
   }
 
   const { data: conversation, error: conversationError } = await supabaseAdmin
     .from("conversations")
     .select(
-      "id, customer_id, guru_id, booking_id, subject, status, created_at, updated_at, last_message_at, last_message_preview"
+      "id, customer_id, guru_id, booking_id, subject, topic, status, created_at, updated_at, last_message_at, last_message_preview"
     )
     .eq("id", conversationId)
     .maybeSingle<ConversationRow>();
@@ -265,7 +416,9 @@ export default async function AdminMessageConversationPage({
   const [{ data: messages }, { data: participants }] = await Promise.all([
     supabaseAdmin
       .from("messages")
-      .select("id, conversation_id, sender_id, recipient_id, content, body, created_at")
+      .select(
+        "id, conversation_id, sender_id, recipient_id, content, body, created_at, topic, message_type"
+      )
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true }),
     supabaseAdmin
@@ -277,9 +430,19 @@ export default async function AdminMessageConversationPage({
   const safeMessages = (messages || []) as MessageRow[];
   const safeParticipants = (participants || []) as ConversationParticipantRow[];
 
+  const participantRoleMap = new Map<string, string>();
+  safeParticipants.forEach((participant) => {
+    const participantId = String(participant.user_id || "").trim();
+
+    if (!participantId) return;
+
+    participantRoleMap.set(participantId, normalizeRole(participant.role || ""));
+  });
+
   const profileIds = Array.from(
     new Set(
       [
+        user.id,
         conversation.customer_id || "",
         conversation.guru_id || "",
         ...safeParticipants.map((participant) => participant.user_id || ""),
@@ -295,53 +458,103 @@ export default async function AdminMessageConversationPage({
     ? await supabaseAdmin
         .from("profiles")
         .select(
-          "id, full_name, display_name, name, first_name, last_name, email, profile_photo_url, avatar_url, image_url, role"
+          "id, full_name, first_name, last_name, email, profile_photo_url, avatar_url, image_url, role, account_type"
         )
         .in("id", profileIds)
     : { data: [] as ProfileRow[] };
 
+  const { data: guruProfiles } = profileIds.length
+    ? await supabaseAdmin.from("gurus").select("*").in("user_id", profileIds)
+    : { data: [] as GuruProfileRow[] };
+
+  const guruProfileMap = new Map<string, GuruProfileRow>();
+  ((guruProfiles || []) as GuruProfileRow[]).forEach((guruProfile) => {
+    const guruUserId = String(guruProfile.user_id || "").trim();
+
+    if (guruUserId) {
+      guruProfileMap.set(guruUserId, guruProfile);
+    }
+  });
+
   const profileMap = new Map<string, ProfileRow>();
   ((profiles || []) as ProfileRow[]).forEach((profile) => {
-    profileMap.set(profile.id, profile);
+    const guruProfile = guruProfileMap.get(profile.id) || null;
+    const mergedProfile = mergeGuruProfilePhoto(profile, guruProfile);
+
+    if (mergedProfile?.id) {
+      profileMap.set(mergedProfile.id, mergedProfile);
+    }
   });
 
-  const participantProfiles = safeParticipants.map((participant) => {
-    const profile = profileMap.get(participant.user_id) || null;
-    return {
-      userId: participant.user_id,
-      role: normalizeRole(participant.role || profile?.role || null),
-      profile,
-      name: getProfileName(profile),
-      imageUrl: getProfilePhotoUrl(profile),
-    };
+  guruProfileMap.forEach((guruProfile, guruUserId) => {
+    if (!profileMap.has(guruUserId)) {
+      const mergedProfile = mergeGuruProfilePhoto(null, guruProfile);
+
+      if (mergedProfile?.id) {
+        profileMap.set(mergedProfile.id, mergedProfile);
+      }
+    }
   });
 
-  const subjectText = String(conversation.subject || "").trim().toLowerCase();
-  const looksLikeAdminSupport =
-    subjectText.includes("admin") ||
-    subjectText.includes("support") ||
-    subjectText.includes("payout") ||
-    subjectText.includes("refund") ||
-    subjectText.includes("escalation");
+  const participantProfiles = safeParticipants
+    .filter((participant) => participant.user_id !== user.id)
+    .map((participant) => {
+      const profile = participant.user_id
+        ? profileMap.get(participant.user_id) || null
+        : null;
 
-  const hasAdminParticipant = participantProfiles.some(
-    (participant) => participant.role === "admin"
-  );
+      const role = normalizeRole(
+        participant.role || profile?.role || profile?.account_type || null
+      );
 
-  const threadType =
-    hasAdminParticipant || looksLikeAdminSupport ? "Guru ↔ Admin" : "Guru ↔ Customer";
+      return {
+        userId: participant.user_id || "",
+        role,
+        profile,
+        name: getDisplayNameForRole(profile, role),
+        imageUrl: getMessageAvatarUrl({
+          senderRole: role,
+          profileImageUrl: getProfilePhotoUrl(profile),
+        }),
+      };
+    });
 
   const subject =
+    String(conversation.topic || "").trim() ||
     String(conversation.subject || "").trim() ||
-    (hasAdminParticipant || looksLikeAdminSupport
-      ? "Admin support conversation"
-      : "Customer care conversation");
+    "Conversation";
+
+  const topic = String(conversation.topic || subject || "Other").trim();
+  const status = String(conversation.status || "open").trim();
+
+  const hasGuru = participantProfiles.some(
+    (participant) => normalizeRole(participant.role) === "guru"
+  );
+
+  const hasCustomer = participantProfiles.some(
+    (participant) => normalizeRole(participant.role) === "customer"
+  );
+
+  const threadType = hasGuru
+    ? "Guru ↔ Admin"
+    : hasCustomer
+      ? "Customer ↔ Admin"
+      : "Admin Conversation";
+
+  const lastActivity =
+    conversation.last_message_at ||
+    safeMessages[safeMessages.length - 1]?.created_at ||
+    conversation.updated_at ||
+    conversation.created_at ||
+    null;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#1f3158_0%,_#0b1220_55%,_#060b16_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
+    <main className="min-h-screen !text-white">
+      <MessageAutoRefresh intervalMs={1000} />
+
+      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="overflow-hidden rounded-[36px] border border-white/10 bg-white/[0.04] shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur">
-          <section className="border-b border-white/10 px-6 py-8 sm:px-8 lg:px-10">
+          <section className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,211,160,0.16),transparent_28%),linear-gradient(135deg,#1e293b,#0f172a)] px-6 py-8 sm:px-8 lg:px-10">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <Link
@@ -351,7 +564,7 @@ export default async function AdminMessageConversationPage({
                   ← Back to Admin Messages
                 </Link>
 
-                <p className="mt-4 text-xs font-semibold uppercase tracking-[0.35em] text-white/70">
+                <p className="mt-4 text-xs font-semibold uppercase tracking-[0.35em] text-emerald-300">
                   {threadType}
                 </p>
 
@@ -362,14 +575,14 @@ export default async function AdminMessageConversationPage({
                 <p className="mt-4 text-base text-white/75">
                   Last activity:{" "}
                   <span className="font-semibold text-white">
-                    {formatLongDateTime(
-                      conversation.last_message_at ||
-                        conversation.updated_at ||
-                        conversation.created_at
-                    )}
+                    {formatLongDateTime(lastActivity)}
                   </span>
                 </p>
               </div>
+
+              <span className="inline-flex w-fit rounded-full border border-emerald-300/30 bg-emerald-400/10 px-5 py-2 text-sm font-black uppercase tracking-[0.18em] text-emerald-100">
+                {status}
+              </span>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -378,11 +591,18 @@ export default async function AdminMessageConversationPage({
                   key={participant.userId}
                   className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/[0.05] px-4 py-3"
                 >
-                  <Avatar name={participant.name} imageUrl={participant.imageUrl} />
+                  <Avatar
+                    name={participant.name}
+                    imageUrl={participant.imageUrl}
+                  />
                   <div>
-                    <p className="text-base font-bold text-white">{participant.name}</p>
-                    <p className="text-sm capitalize text-white/70">
-                      {participant.role || "user"}
+                    <p className="text-base font-bold text-white">
+                      {participant.name}
+                    </p>
+                    <p className="text-sm text-white/70">
+                      {normalizeRole(participant.role) === "guru"
+                        ? `${getFirstName(participant.name)} · Guru`
+                        : getReadableRole(participant.role)}
                     </p>
                   </div>
                 </div>
@@ -392,85 +612,142 @@ export default async function AdminMessageConversationPage({
 
           <section className="px-6 py-8 sm:px-8 lg:px-10">
             <div className="rounded-[30px] border border-white/10 bg-[#06112c] p-5 sm:p-6">
-              <div className="space-y-4">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-300">
+                Message History
+              </p>
+
+              <div className="mt-5 space-y-5">
                 {safeMessages.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-white/15 bg-white/[0.03] px-6 py-10 text-center">
-                    <h2 className="text-xl font-bold text-white">No messages yet</h2>
+                    <h2 className="text-xl font-bold text-white">
+                      No messages yet
+                    </h2>
                     <p className="mt-2 text-white/70">
                       This thread exists, but no messages have been sent yet.
                     </p>
                   </div>
                 ) : (
                   safeMessages.map((message) => {
-                    const senderProfile = message.sender_id
-                      ? profileMap.get(message.sender_id)
+                    const senderId = String(message.sender_id || "").trim();
+                    const senderProfile = senderId
+                      ? profileMap.get(senderId) || null
                       : null;
-                    const senderName = getProfileName(senderProfile);
-                    const senderRole = normalizeRole(senderProfile?.role);
-                    const isAdminSender = senderRole === "admin";
+
+                    const senderRole = getSenderRole({
+                      senderId,
+                      currentAdminId: user.id,
+                      conversation,
+                      participantRoleMap,
+                      profile: senderProfile,
+                    });
+
+                    const senderName = getDisplayNameForRole(
+                      senderProfile,
+                      senderRole
+                    );
+                    const senderProfileImageUrl = getProfilePhotoUrl(senderProfile);
+                    const senderImageUrl = getMessageAvatarUrl({
+                      senderRole,
+                      profileImageUrl: senderProfileImageUrl,
+                    });
+                    const senderRoleLabel =
+                      normalizeRole(senderRole) === "guru"
+                        ? `${getFirstName(senderName)} · Guru`
+                        : getReadableRole(senderRole);
+                    const topicLabel = getTopicLabel(message.topic || topic);
+                    const isAdminMessage =
+                      senderId === user.id || normalizeRole(senderRole) === "admin";
+                    const styles = getAdminBubbleStyles(senderRole);
 
                     return (
-                      <div
+                      <article
                         key={message.id}
-                        className={`max-w-3xl rounded-[26px] border px-5 py-4 ${
-                          isAdminSender
-                            ? "ml-auto border-emerald-400/25 bg-emerald-400/10"
-                            : "mr-auto border-white/12 bg-white/[0.05]"
+                        className={`flex w-full items-end gap-3 ${
+                          isAdminMessage ? "justify-end" : "justify-start"
                         }`}
                       >
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-bold text-white">{senderName}</span>
-                          <span className="text-xs uppercase tracking-[0.22em] text-white/60">
-                            {senderRole || "user"}
-                          </span>
-                          <span className="text-xs text-white/50">
-                            {formatMessageTime(message.created_at)}
-                          </span>
+                        {!isAdminMessage ? (
+                          <Avatar
+                            name={senderName}
+                            imageUrl={senderImageUrl}
+                            compact
+                          />
+                        ) : null}
+
+                        <div
+                          className={`max-w-[88%] rounded-[26px] border px-5 py-4 sm:max-w-[82%] ${
+                            styles.bubble
+                          } ${isAdminMessage ? styles.tail : "rounded-bl-md"}`}
+                        >
+                          <div
+                            className={`mb-2 flex flex-wrap items-center gap-2 ${
+                              isAdminMessage ? "justify-end text-right" : ""
+                            }`}
+                          >
+                            <span className="text-sm font-black text-white">
+                              {senderName}
+                            </span>
+
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${styles.badge}`}
+                            >
+                              {senderRoleLabel}
+                            </span>
+
+                            {topicLabel ? (
+                              <span
+                                className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${styles.topic}`}
+                              >
+                                {topicLabel}
+                              </span>
+                            ) : null}
+
+                            <span
+                              className={`text-xs font-semibold ${styles.time}`}
+                            >
+                              {formatMessageTime(message.created_at)}
+                            </span>
+                          </div>
+
+                          <p
+                            className={`whitespace-pre-wrap text-base leading-7 ${
+                              styles.body
+                            } ${isAdminMessage ? "text-right" : ""}`}
+                          >
+                            {getMessageContent(message) ||
+                              "Message content unavailable."}
+                          </p>
                         </div>
 
-                        <p className="whitespace-pre-wrap text-base leading-7 text-white/90">
-                          {getMessageContent(message)}
-                        </p>
-                      </div>
+                        {isAdminMessage ? (
+                          <Avatar
+                            name={senderName}
+                            imageUrl={senderImageUrl}
+                            compact
+                          />
+                        ) : null}
+                      </article>
                     );
                   })
                 )}
               </div>
             </div>
 
-            <form action={sendAdminMessage} className="mt-6">
-              <input type="hidden" name="conversationId" value={conversation.id} />
+            <section className="mt-6 rounded-[30px] border border-emerald-400/20 bg-emerald-400/10 p-5 sm:p-6">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-300">
+                Send Admin Message
+              </p>
 
-              <div className="rounded-[30px] border border-white/10 bg-[#08152f] p-5 sm:p-6">
-                <label
-                  htmlFor="body"
-                  className="mb-3 block text-sm font-semibold uppercase tracking-[0.25em] text-white/70"
-                >
-                  Send Admin Message
-                </label>
-
-                <textarea
-                  id="body"
-                  name="body"
-                  rows={5}
-                  placeholder="Reply inside this thread as Admin..."
-                  className="w-full rounded-[22px] border border-white/12 bg-white/[0.05] px-5 py-4 text-base text-white outline-none placeholder:text-white/35"
-                  required
+              <div className="mt-4">
+                <AdminMessageComposer
+                  conversationId={conversation.id}
+                  currentTopic={topic}
                 />
-
-                <div className="mt-4 flex justify-end">
-                  <button
-                    type="submit"
-                    className="inline-flex min-h-[58px] items-center justify-center rounded-[20px] bg-[#10d3a0] px-8 text-lg font-bold text-[#03131c] transition hover:translate-y-[-1px] hover:brightness-105"
-                  >
-                    Send Message
-                  </button>
-                </div>
               </div>
-            </form>
+            </section>
           </section>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

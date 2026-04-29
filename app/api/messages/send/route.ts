@@ -4,27 +4,293 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+type ProfileRow = {
+  id?: string | null;
+  email?: string | null;
+  role?: string | null;
+  account_type?: string | null;
+};
+
 type ConversationRow = {
   id: string;
   customer_id?: string | null;
   guru_id?: string | null;
+  subject?: string | null;
+  topic?: string | null;
   status?: string | null;
 };
 
 type ConversationParticipantRow = {
-  conversation_id: string;
-  user_id: string;
+  id?: string | null;
+  conversation_id?: string | null;
+  user_id?: string | null;
+  profile_id?: string | null;
   role?: string | null;
-  last_read_at?: string | null;
-  updated_at?: string | null;
 };
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeMessageBody(value: string) {
-  return value.replace(/\r\n/g, "\n").trim();
+function normalizeRole(value?: string | null) {
+  const role = String(value || "").trim().toLowerCase();
+
+  if (role === "provider" || role === "sitter") return "guru";
+
+  return role;
+}
+
+function isAdminRole(role?: string | null) {
+  const normalized = normalizeRole(role);
+
+  return (
+    normalized === "admin" ||
+    normalized === "owner" ||
+    normalized === "super_admin"
+  );
+}
+
+function getMissingColumnFromError(message?: string) {
+  if (!message) return "";
+
+  const match = message.match(/Could not find the '([^']+)' column/i);
+  return match?.[1] || "";
+}
+
+function getParticipantUserId(participant: ConversationParticipantRow) {
+  return safeString(participant.user_id || participant.profile_id || "");
+}
+
+async function getCurrentProfile({
+  userId,
+  email,
+}: {
+  userId: string;
+  email?: string | null;
+}) {
+  const byId = await supabaseAdmin
+    .from("profiles")
+    .select("id, email, role, account_type")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!byId.error && byId.data) {
+    return byId.data as ProfileRow;
+  }
+
+  if (email) {
+    const byEmail = await supabaseAdmin
+      .from("profiles")
+      .select("id, email, role, account_type")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (!byEmail.error && byEmail.data) {
+      return byEmail.data as ProfileRow;
+    }
+  }
+
+  return null;
+}
+
+async function insertMessageWithColumnFallback(payload: Record<string, unknown>) {
+  const workingPayload = { ...payload };
+  const removedColumns: string[] = [];
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const { data, error } = await supabaseAdmin
+      .from("messages")
+      .insert(workingPayload)
+      .select("*")
+      .single();
+
+    if (!error) {
+      if (removedColumns.length > 0) {
+        console.warn(
+          "Message insert succeeded after removing missing optional columns:",
+          removedColumns
+        );
+      }
+
+      return { data, error: null };
+    }
+
+    const missingColumn = getMissingColumnFromError(error.message);
+
+    if (
+      missingColumn &&
+      Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)
+    ) {
+      delete workingPayload[missingColumn];
+      removedColumns.push(missingColumn);
+      continue;
+    }
+
+    return { data: null, error };
+  }
+
+  return {
+    data: null,
+    error: {
+      message: "Unable to insert message after removing optional missing columns.",
+    },
+  };
+}
+
+async function updateConversationWithColumnFallback({
+  conversationId,
+  payload,
+}: {
+  conversationId: string;
+  payload: Record<string, unknown>;
+}) {
+  const workingPayload = { ...payload };
+  const removedColumns: string[] = [];
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const { error } = await supabaseAdmin
+      .from("conversations")
+      .update(workingPayload)
+      .eq("id", conversationId);
+
+    if (!error) {
+      if (removedColumns.length > 0) {
+        console.warn(
+          "Conversation update succeeded after removing missing optional columns:",
+          removedColumns
+        );
+      }
+
+      return null;
+    }
+
+    const missingColumn = getMissingColumnFromError(error.message);
+
+    if (
+      missingColumn &&
+      Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)
+    ) {
+      delete workingPayload[missingColumn];
+      removedColumns.push(missingColumn);
+      continue;
+    }
+
+    return error;
+  }
+
+  return {
+    message: "Unable to update conversation after removing optional missing columns.",
+  };
+}
+
+function getParticipantRoleForUser({
+  participants,
+  userId,
+}: {
+  participants: ConversationParticipantRow[];
+  userId: string;
+}) {
+  const participant = participants.find(
+    (item) => getParticipantUserId(item) === userId
+  );
+
+  return normalizeRole(participant?.role || null);
+}
+
+function getSenderRole({
+  senderId,
+  profile,
+  participants,
+  conversation,
+}: {
+  senderId: string;
+  profile?: ProfileRow | null;
+  participants: ConversationParticipantRow[];
+  conversation: ConversationRow;
+}) {
+  const participantRole = getParticipantRoleForUser({
+    participants,
+    userId: senderId,
+  });
+
+  if (participantRole) return participantRole;
+
+  const profileRole = normalizeRole(profile?.role);
+  if (profileRole) return profileRole;
+
+  const accountType = normalizeRole(profile?.account_type);
+  if (accountType) return accountType;
+
+  if (senderId === safeString(conversation.customer_id)) return "customer";
+  if (senderId === safeString(conversation.guru_id)) return "guru";
+
+  return "customer";
+}
+
+function getPrimaryRecipient({
+  participants,
+  conversation,
+  senderId,
+}: {
+  participants: ConversationParticipantRow[];
+  conversation: ConversationRow;
+  senderId: string;
+}) {
+  const participantRecipients = participants
+    .map((participant) => ({
+      id: getParticipantUserId(participant),
+      role: normalizeRole(participant.role),
+    }))
+    .filter((participant) => participant.id && participant.id !== senderId);
+
+  const adminRecipient = participantRecipients.find((item) =>
+    isAdminRole(item.role)
+  );
+
+  if (adminRecipient?.id) {
+    return {
+      recipientId: adminRecipient.id,
+      recipientRole: "admin",
+    };
+  }
+
+  const firstParticipantRecipient = participantRecipients[0];
+
+  if (firstParticipantRecipient?.id) {
+    return {
+      recipientId: firstParticipantRecipient.id,
+      recipientRole: firstParticipantRecipient.role || "",
+    };
+  }
+
+  const fallbackRecipients = [
+    {
+      id: safeString(conversation.guru_id),
+      role: "guru",
+    },
+    {
+      id: safeString(conversation.customer_id),
+      role: "customer",
+    },
+  ].filter((candidate) => candidate.id && candidate.id !== senderId);
+
+  const fallbackRecipient = fallbackRecipients[0];
+
+  return {
+    recipientId: fallbackRecipient?.id || "",
+    recipientRole: fallbackRecipient?.role || "",
+  };
+}
+
+export async function GET() {
+  return NextResponse.json(
+    {
+      ok: true,
+      route: "/api/messages/send",
+      message: "Customer/Guru message send API route is active.",
+    },
+    { status: 200 }
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -43,26 +309,21 @@ export async function POST(req: NextRequest) {
     const payload = await req.json().catch(() => null);
 
     const conversationId = safeString(payload?.conversationId);
-    const senderId = safeString(payload?.senderId);
-    const requestedRecipientId = safeString(payload?.recipientId);
-    const messageText = normalizeMessageBody(safeString(payload?.body));
+    const body = safeString(payload?.body);
+    const requestedTopic = safeString(payload?.topic);
 
-    if (!conversationId || !senderId || !messageText) {
+    if (!conversationId || !body) {
       return NextResponse.json(
         { error: "Missing required message fields." },
         { status: 400 }
       );
     }
 
-    if (senderId !== user.id) {
-      return NextResponse.json({ error: "Sender mismatch." }, { status: 403 });
-    }
-
     const { data: conversation, error: conversationError } = await supabaseAdmin
       .from("conversations")
-      .select("id, customer_id, guru_id, status")
+      .select("id, customer_id, guru_id, subject, topic, status")
       .eq("id", conversationId)
-      .maybeSingle<ConversationRow>();
+      .maybeSingle();
 
     if (conversationError || !conversation) {
       return NextResponse.json(
@@ -71,101 +332,130 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: participantRows, error: participantError } = await supabaseAdmin
+    const safeConversation = conversation as ConversationRow;
+
+    const { data: participants, error: participantsError } = await supabaseAdmin
       .from("conversation_participants")
-      .select("conversation_id, user_id, role, last_read_at, updated_at")
-      .eq("conversation_id", conversationId)
-      .returns<ConversationParticipantRow[]>();
+      .select("*")
+      .eq("conversation_id", conversationId);
 
-    if (participantError) {
-      console.error("Conversation participants lookup error:", participantError.message);
-
+    if (participantsError) {
       return NextResponse.json(
-        { error: "Unable to validate conversation participants." },
+        {
+          error: `Unable to load conversation participants: ${participantsError.message}`,
+        },
         { status: 500 }
       );
     }
 
-    const participants = (participantRows ?? []) as ConversationParticipantRow[];
-    const isParticipant = participants.some((row) => row.user_id === user.id);
+    const safeParticipants =
+      (participants || []) as ConversationParticipantRow[];
 
-    if (!isParticipant) {
+    const senderId = user.id;
+
+    const senderIsAllowed =
+      senderId === safeString(safeConversation.customer_id) ||
+      senderId === safeString(safeConversation.guru_id) ||
+      safeParticipants.some(
+        (participant) => getParticipantUserId(participant) === senderId
+      );
+
+    if (!senderIsAllowed) {
       return NextResponse.json(
-        { error: "Not allowed to send to this conversation." },
+        { error: "You are not a participant in this conversation." },
         { status: 403 }
       );
     }
 
-    const otherParticipantIds = participants
-      .map((row) => row.user_id)
-      .filter((participantUserId) => participantUserId !== user.id);
+    const currentProfile = await getCurrentProfile({
+      userId: user.id,
+      email: user.email,
+    });
 
-    const recipientUserId =
-      (requestedRecipientId &&
-      otherParticipantIds.includes(requestedRecipientId)
-        ? requestedRecipientId
-        : otherParticipantIds[0]) || null;
+    const senderRole = getSenderRole({
+      senderId,
+      profile: currentProfile,
+      participants: safeParticipants,
+      conversation: safeConversation,
+    });
 
-    if (!recipientUserId) {
+    if (isAdminRole(senderRole)) {
       return NextResponse.json(
-        { error: "No valid recipient found for this conversation." },
+        {
+          error: "Admin messages must be sent from /api/admin/messages/send.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const { recipientId, recipientRole } = getPrimaryRecipient({
+      participants: safeParticipants,
+      conversation: safeConversation,
+      senderId,
+    });
+
+    if (!recipientId) {
+      return NextResponse.json(
+        {
+          error:
+            "Unable to send message. No recipient was found for this conversation.",
+        },
         { status: 400 }
       );
     }
 
+    const topic =
+      requestedTopic ||
+      safeString(safeConversation.topic) ||
+      safeString(safeConversation.subject) ||
+      "Other";
+
     const nowIso = new Date().toISOString();
 
-    const { data: insertedMessage, error: insertError } = await supabaseAdmin
-      .from("messages")
-      .insert({
+    const { data: insertedMessage, error: insertError } =
+      await insertMessageWithColumnFallback({
         conversation_id: conversationId,
-        sender_id: user.id,
-        recipient_id: recipientUserId,
-        content: messageText,
-        body: messageText,
+        sender_id: senderId,
+        recipient_id: recipientId,
+        sender_role: senderRole || "customer",
+        recipient_role: recipientRole || "admin",
+        content: body,
+        body,
+        topic,
         message_type: "text",
         is_deleted: false,
+        is_read: false,
         created_at: nowIso,
         updated_at: nowIso,
-      })
-      .select("*")
-      .single();
+      });
 
     if (insertError) {
-      console.error("Send message insert error:", insertError.message);
-
       return NextResponse.json(
-        { error: insertError.message || "Unable to send message." },
+        {
+          error:
+            insertError.message ||
+            "Unable to send message because the database insert failed.",
+        },
         { status: 500 }
       );
     }
 
-    const { error: conversationUpdateError } = await supabaseAdmin
-      .from("conversations")
-      .update({
+    const conversationUpdateError = await updateConversationWithColumnFallback({
+      conversationId,
+      payload: {
+        topic,
+        subject: safeString(safeConversation.subject) || topic,
+        status: safeString(safeConversation.status) || "open",
         last_message_at: nowIso,
-        last_message_preview: messageText.slice(0, 180),
+        last_message_preview: body.slice(0, 180),
         updated_at: nowIso,
-      })
-      .eq("id", conversationId);
+      },
+    });
 
     if (conversationUpdateError) {
-      console.error("Conversation update error:", conversationUpdateError.message);
-    }
-
-    const { error: senderParticipantUpdateError } = await supabaseAdmin
-      .from("conversation_participants")
-      .update({
-        last_read_at: nowIso,
-        updated_at: nowIso,
-      })
-      .eq("conversation_id", conversationId)
-      .eq("user_id", user.id);
-
-    if (senderParticipantUpdateError) {
       console.error(
-        "Sender participant update error:",
-        senderParticipantUpdateError.message
+        "Conversation update error:",
+        conversationUpdateError.message
       );
     }
 
@@ -173,6 +463,8 @@ export async function POST(req: NextRequest) {
       {
         ok: true,
         message: insertedMessage,
+        conversationId,
+        topic,
       },
       { status: 200 }
     );
@@ -182,9 +474,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? error.message
-            : "Unable to send message.",
+          error instanceof Error ? error.message : "Unable to send message.",
       },
       { status: 500 }
     );

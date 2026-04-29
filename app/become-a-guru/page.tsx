@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+const guruApplyLink = "/signup?type=guru";
+
 const guruTypes = [
   "Pet sitters",
   "Dog walkers",
@@ -29,50 +31,50 @@ const benefits = [
     icon: "✨",
     title: "Grow with better visibility",
     description:
-      "SitGuru is designed to help trusted caregivers stand out with clearer profiles, trust signals, and a stronger first impression.",
+      "SitGuru helps trusted caregivers stand out with clearer profiles, trust signals, reviews, and a stronger first impression.",
   },
   {
     icon: "💻",
     title: "Work within a modern platform",
     description:
-      "Use a cleaner experience that supports your services, bookings, and professionalism as SitGuru grows.",
+      "Use a cleaner experience that supports your services, bookings, profile, and professionalism as SitGuru grows.",
   },
 ];
 
 const steps = [
   {
     step: "01",
-    title: "Learn what it means to be a Guru",
+    title: "Apply Free",
     description:
-      "Explore how SitGuru works and decide whether the platform fits the type of care you want to offer.",
+      "Start your SitGuru Guru application at no cost. Share your experience, services, location, and basic profile details.",
   },
   {
     step: "02",
-    title: "Create your Guru account",
+    title: "Get Approved",
     description:
-      "Sign up, begin your profile, and prepare the information pet parents need to understand your services.",
+      "SitGuru reviews your profile and guides you through the trust and safety steps needed before accepting bookings.",
   },
   {
     step: "03",
-    title: "Build trust through your profile",
+    title: "Complete verification",
     description:
-      "Add your services, care style, location details, and the information that helps people feel confident choosing you.",
+      "Before becoming bookable, approved Gurus may complete identity verification, background screening, and safety agreement approval.",
   },
   {
     step: "04",
-    title: "Log in and manage your Guru dashboard",
+    title: "Get Booked",
     description:
-      "Once you are inside SitGuru, use your Guru dashboard to manage your activity, bookings, and account experience.",
+      "Once approved and active, manage your Guru dashboard, receive booking activity, and begin caring for pets in your area.",
   },
 ];
 
 const trustPoints = [
-  "Trusted local care, presented professionally",
-  "Flexible role definition across multiple pet care services",
-  "A platform built for both visibility and trust",
-  "Designed to help Gurus feel credible from first impression",
-  "Supports growth without losing the personal side of care",
-  "Better structure for modern pet care providers",
+  "Apply free with no upfront application cost",
+  "No upfront screening fee to start your application",
+  "Screening costs may be deducted from your first completed booking",
+  "Identity and background screening before accepting bookings",
+  "Trust badges help approved Gurus stand out",
+  "A cleaner profile experience for modern pet care providers",
 ];
 
 const warmGallery = [
@@ -113,33 +115,42 @@ export default function BecomeAGuruPage() {
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
             <div className="relative z-10">
               <div className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-4 py-1.5 text-sm font-semibold !text-emerald-800 shadow-sm">
-                Become a Guru on SitGuru
+                Founding Guru Program
               </div>
 
               <h1 className="mt-5 max-w-3xl text-4xl font-bold leading-tight !text-slate-950 sm:text-5xl">
-                Turn trusted pet care into a stronger local presence.
+                Apply Free. Get Approved. Get Booked.
               </h1>
 
               <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 !text-slate-800 sm:text-xl">
-                A Guru is SitGuru’s trusted local pet care provider. That can
-                mean a sitter, walker, boarding provider, trainer, or another
-                dependable caregiver who wants to offer real support to pet
-                parents.
+                Turn your love for pets into extra income. Join SitGuru as a
+                trusted local pet care Guru and start building your pet care
+                profile at no cost.
               </p>
 
               <p className="mt-4 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg sm:leading-8">
-                This page is where potential Gurus learn what SitGuru is, who
-                this is for, how it works, and why joining can be a meaningful
-                opportunity. Once signed up, Gurus can log in and manage their
-                work from the Guru dashboard.
+                Apply free today. Once your profile is reviewed and
+                pre-approved, SitGuru will guide you through verification so you
+                can begin accepting pet care bookings in your area.
               </p>
+
+              <div className="mt-5 rounded-[26px] border border-emerald-200 bg-white/90 p-5 shadow-sm">
+                <p className="text-sm font-bold uppercase tracking-[0.18em] !text-emerald-700">
+                  No upfront screening fee
+                </p>
+                <p className="mt-2 text-base leading-7 !text-slate-700">
+                  No upfront screening fee to apply. If approved, screening
+                  costs may be deducted from your first completed SitGuru
+                  booking.
+                </p>
+              </div>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Link
-                  href="/signup"
+                  href={guruApplyLink}
                   className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
                 >
-                  Sign Up as a Guru
+                  Apply Free
                 </Link>
 
                 <Link
@@ -159,16 +170,16 @@ export default function BecomeAGuruPage() {
 
               <div className="mt-5 flex flex-wrap gap-2">
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold !text-slate-700 shadow-sm">
+                  Apply at no cost
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold !text-slate-700 shadow-sm">
+                  Founding Guru badge
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold !text-slate-700 shadow-sm">
                   Flexible services
                 </span>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold !text-slate-700 shadow-sm">
                   Built for trust
-                </span>
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold !text-slate-700 shadow-sm">
-                  Better first impression
-                </span>
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold !text-slate-700 shadow-sm">
-                  Guru dashboard access after login
                 </span>
               </div>
             </div>
@@ -191,10 +202,10 @@ export default function BecomeAGuruPage() {
               <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <p className="text-sm font-semibold !text-white">
-                    Professional presentation
+                    Apply free
                   </p>
                   <p className="mt-1 text-sm !text-slate-300">
-                    Show your services clearly and build confidence fast.
+                    Start your application without an upfront application cost.
                   </p>
                 </div>
 
@@ -212,26 +223,26 @@ export default function BecomeAGuruPage() {
                     Built for trust
                   </p>
                   <p className="mt-1 text-sm !text-slate-300">
-                    Stronger first impression for local pet parents.
+                    Verification and stronger first impressions for pet parents.
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <p className="text-sm font-semibold !text-white">
-                    Guru dashboard access
+                    Get booked
                   </p>
                   <p className="mt-1 text-sm !text-slate-300">
-                    Log in and manage your activity once registered.
+                    Approved Gurus can manage activity from the Guru dashboard.
                   </p>
                 </div>
               </div>
 
               <div className="mt-6 border-t border-white/10 pt-5">
                 <Link
-                  href="/signup"
+                  href={guruApplyLink}
                   className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
                 >
-                  Start Your Guru Profile
+                  Start Free Application
                 </Link>
               </div>
             </div>
@@ -252,9 +263,9 @@ export default function BecomeAGuruPage() {
             </h2>
 
             <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-              The Guru experience should feel human from the first glance.
-              Warm visuals help pet parents connect faster and help providers
-              feel more approachable and trustworthy.
+              The Guru experience should feel human from the first glance. Warm
+              visuals help pet parents connect faster and help providers feel
+              more approachable and trustworthy.
             </p>
           </div>
 
@@ -371,21 +382,31 @@ export default function BecomeAGuruPage() {
               </div>
 
               <h2 className="mt-5 text-3xl font-bold tracking-tight !text-slate-950 sm:text-4xl">
-                Clear path from interest to dashboard access
+                Clear path from free application to first booking
               </h2>
 
               <p className="mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-                The Guru journey should feel simple. Learn about the role, sign
-                up, build your profile, then log in and manage your Guru account
-                from inside SitGuru.
+                The Guru journey should feel simple and low-friction. Apply
+                free, get reviewed, complete verification when approved, then
+                manage your Guru activity inside SitGuru.
               </p>
+
+              <div className="mt-5 rounded-[26px] border border-emerald-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-bold uppercase tracking-[0.18em] !text-emerald-700">
+                  Option B built in
+                </p>
+                <p className="mt-2 text-sm leading-7 !text-slate-700 sm:text-base">
+                  No upfront screening fee to apply. If approved, screening
+                  costs may be deducted from your first completed booking.
+                </p>
+              </div>
 
               <div className="mt-8">
                 <Link
-                  href="/signup"
+                  href={guruApplyLink}
                   className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
                 >
-                  Sign Up as a Guru
+                  Apply Free
                 </Link>
               </div>
             </div>
@@ -462,23 +483,26 @@ export default function BecomeAGuruPage() {
               </div>
 
               <h2 className="mt-5 text-3xl font-bold leading-tight !text-slate-950 sm:text-4xl">
-                Learn the role, sign up, then manage everything from your Guru
-                dashboard
+                Apply Free. Get Approved. Get Booked.
               </h2>
 
               <p className="mx-auto mt-4 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-                SitGuru’s public Guru page should explain the opportunity
-                clearly. From there, providers can sign up, log in through Guru
-                Login, and access their operational dashboard once inside the
-                platform.
+                Start your SitGuru Guru application at no cost. Once reviewed
+                and approved, complete verification and begin accepting pet care
+                bookings through your Guru dashboard.
+              </p>
+
+              <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 !text-slate-600 sm:text-base">
+                No upfront screening fee to apply. If approved, screening costs
+                may be deducted from your first completed SitGuru booking.
               </p>
 
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
                 <Link
-                  href="/signup"
+                  href={guruApplyLink}
                   className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
                 >
-                  Sign Up as a Guru
+                  Apply Free
                 </Link>
 
                 <Link

@@ -164,7 +164,8 @@ function isGuruApproved(guru: GuruRow) {
     Boolean(guru.is_approved || guru.approved) ||
     status.includes("approved") ||
     status.includes("active") ||
-    status.includes("verified")
+    status.includes("verified") ||
+    status.includes("bookable")
   );
 }
 
@@ -299,6 +300,10 @@ function adminGuruHref(params: Record<string, string>) {
   return `/admin/gurus?${search.toString()}`;
 }
 
+function adminGuruReviewHref(id: string) {
+  return id ? `/admin/gurus/${encodeURIComponent(id)}` : "/admin/gurus";
+}
+
 function statusClasses(status: string) {
   switch (status) {
     case "Ready":
@@ -314,6 +319,76 @@ function statusClasses(status: string) {
     default:
       return "bg-slate-400/10 text-slate-300 ring-slate-400/20";
   }
+}
+
+function AdminNavButton({
+  href,
+  label,
+  primary = false,
+}: {
+  href: string;
+  label: string;
+  primary?: boolean;
+}) {
+  if (primary) {
+    return (
+      <Link
+        href={href}
+        className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-emerald-400"
+      >
+        {label}
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+    >
+      {label}
+    </Link>
+  );
+}
+
+function AdminNavigationPanel() {
+  return (
+    <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+        Admin Navigation
+      </p>
+
+      <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+        Move between Guru approval pages
+      </h2>
+
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
+        Use these shortcuts to move between the Guru review center, filtered
+        application lists, and the main Admin dashboard.
+      </p>
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <AdminNavButton href="/admin" label="Admin Home" />
+        <AdminNavButton href="/admin/guru-approvals" label="Guru Approvals" />
+        <AdminNavButton href="/admin/gurus" label="All Guru Records" />
+        <AdminNavButton href="/admin/gurus?status=new" label="New Applications" />
+        <AdminNavButton
+          href="/admin/gurus?status=pending"
+          label="Pending Reviews"
+        />
+        <AdminNavButton href="/admin/gurus?status=needs-info" label="Needs Info" />
+        <AdminNavButton
+          href="/admin/gurus?status=verification"
+          label="Verification"
+        />
+        <AdminNavButton
+          href="/admin/gurus?status=bookable"
+          label="Bookable Gurus"
+          primary
+        />
+      </div>
+    </section>
+  );
 }
 
 async function getGuruApprovalData() {
@@ -382,7 +457,7 @@ async function getGuruApprovalData() {
       experience: getGuruExperience(guru),
       status,
       joined: formatDateShort(asTrimmedString(guru.created_at)),
-      href: adminGuruHref({ guru: id || "guru" }),
+      href: adminGuruReviewHref(id),
     };
   });
 
@@ -419,7 +494,8 @@ async function getGuruApprovalData() {
   );
 
   const pendingReviews =
-    pendingApplications.length || Math.max(0, gurus.length - readyApplications.length);
+    pendingApplications.length ||
+    Math.max(0, gurus.length - readyApplications.length);
 
   const tableRows =
     pendingApplications.length > 0
@@ -517,6 +593,8 @@ export default async function AdminGuruApprovalsPage() {
 
   return (
     <main className="space-y-8">
+      <AdminNavigationPanel />
+
       <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_24%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] p-6 sm:p-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
@@ -535,22 +613,22 @@ export default async function AdminGuruApprovalsPage() {
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/admin/users"
+              href="/admin/gurus"
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
             >
-              All users
+              All Guru Records
             </Link>
             <Link
-              href="/admin/moderation"
+              href="/admin/gurus?status=new"
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
             >
-              Moderation
+              New Applications
             </Link>
             <Link
-              href="/admin/analytics"
+              href="/admin/gurus?status=bookable"
               className="rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
             >
-              Growth analytics
+              Bookable Gurus
             </Link>
           </div>
         </div>
@@ -710,6 +788,9 @@ export default async function AdminGuruApprovalsPage() {
                   <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                     Joined
                   </th>
+                  <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Review
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10 bg-slate-950/40">
@@ -738,7 +819,11 @@ export default async function AdminGuruApprovalsPage() {
                       </td>
                       <td className="px-5 py-4 text-sm">
                         <Link
-                          href={adminGuruHref({ status: application.status.toLowerCase().replace(/\s+/g, "-") })}
+                          href={adminGuruHref({
+                            status: application.status
+                              .toLowerCase()
+                              .replace(/\s+/g, "-"),
+                          })}
                           className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition hover:opacity-80 ${statusClasses(
                             application.status
                           )}`}
@@ -749,12 +834,20 @@ export default async function AdminGuruApprovalsPage() {
                       <td className="px-5 py-4 text-sm text-slate-400">
                         {application.joined}
                       </td>
+                      <td className="px-5 py-4 text-right">
+                        <Link
+                          href={application.href}
+                          className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-emerald-400"
+                        >
+                          Review Guru
+                        </Link>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-5 py-8 text-center text-sm text-slate-400"
                     >
                       No Guru applications found yet.
@@ -766,6 +859,8 @@ export default async function AdminGuruApprovalsPage() {
           </div>
         </div>
       </section>
+
+      <AdminNavigationPanel />
     </main>
   );
 }

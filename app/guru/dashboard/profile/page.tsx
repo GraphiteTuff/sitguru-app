@@ -1,8 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -34,10 +41,18 @@ type GuruProfile = {
   experience_years?: number | null;
   profile_photo_url?: string | null;
   image_url?: string | null;
+  avatar_url?: string | null;
+  photo_url?: string | null;
   services?: string[] | string | null;
   is_public?: boolean | null;
   onboarding_completed?: boolean | null;
   profile_completed?: boolean | null;
+};
+
+type UploadResult = {
+  bucket: string;
+  path: string;
+  publicUrl: string;
 };
 
 const SERVICE_OPTIONS = [
@@ -50,6 +65,21 @@ const SERVICE_OPTIONS = [
   "Pet Taxi",
   "Medication Help",
 ];
+
+const PHOTO_BUCKETS = [
+  "guru-photos",
+  "profile-photos",
+  "avatars",
+  "guru-profile-photos",
+];
+
+const routes = {
+  dashboard: "/guru/dashboard",
+  messages: "/guru/messages",
+  bookings: "/guru/bookings",
+  settings: "/guru/dashboard/settings",
+  login: "/guru/login",
+};
 
 function slugify(value: string) {
   return value
@@ -84,8 +114,124 @@ function normalizeServices(value: GuruProfile["services"]): string[] {
   return [];
 }
 
+function getFileExtension(file: File) {
+  const nameExtension = file.name.split(".").pop()?.toLowerCase();
+
+  if (nameExtension) return nameExtension === "jpeg" ? "jpg" : nameExtension;
+  if (file.type === "image/jpeg") return "jpg";
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+
+  return "jpg";
+}
+
+function isValidPhoto(file: File) {
+  return ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(
+    file.type,
+  );
+}
+
+async function uploadToFirstAvailableBucket(file: File, userId: string) {
+  const extension = getFileExtension(file);
+  const path = `${userId}/guru-profile-${Date.now()}.${extension}`;
+  let lastError = "Could not upload photo.";
+
+  for (const bucket of PHOTO_BUCKETS) {
+    const { error } = await supabase.storage.from(bucket).upload(path, file, {
+      cacheControl: "3600",
+      upsert: true,
+    });
+
+    if (!error) {
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      return { bucket, path, publicUrl: data.publicUrl } satisfies UploadResult;
+    }
+
+    lastError = error.message || lastError;
+  }
+
+  throw new Error(lastError);
+}
+
+async function updateProfileAvatar(userId: string, uploaded: UploadResult) {
+  const timestamp = new Date().toISOString();
+  const attempts = [
+    {
+      avatar_url: uploaded.publicUrl,
+      avatar_path: `${uploaded.bucket}/${uploaded.path}`,
+      avatar_updated_at: timestamp,
+    },
+    { profile_photo_url: uploaded.publicUrl },
+    { image_url: uploaded.publicUrl },
+    { avatar_url: uploaded.publicUrl },
+  ];
+
+  for (const payload of attempts) {
+    const { error } = await supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", userId);
+    if (!error) return;
+  }
+}
+
+async function saveGuruPayload({
+  userId,
+  profileExists,
+  payload,
+}: {
+  userId: string;
+  profileExists: boolean;
+  payload: Record<string, unknown>;
+}) {
+  const leanPayload = {
+    user_id: payload.user_id,
+    display_name: payload.display_name,
+    full_name: payload.full_name,
+    slug: payload.slug,
+    bio: payload.bio,
+    city: payload.city,
+    state: payload.state,
+    hourly_rate: payload.hourly_rate,
+    rate: payload.rate,
+    profile_photo_url: payload.profile_photo_url,
+    image_url: payload.image_url,
+    services: payload.services,
+    is_public: payload.is_public,
+  };
+
+  const basicPayload = {
+    user_id: payload.user_id,
+    display_name: payload.display_name,
+    full_name: payload.full_name,
+    slug: payload.slug,
+    bio: payload.bio,
+    city: payload.city,
+    state: payload.state,
+    hourly_rate: payload.hourly_rate,
+    profile_photo_url: payload.profile_photo_url,
+    image_url: payload.image_url,
+    is_public: payload.is_public,
+  };
+
+  const attempts = [payload, leanPayload, basicPayload];
+  let lastError = "Could not save your guru profile.";
+
+  for (const attempt of attempts) {
+    const response = profileExists
+      ? await supabase.from("gurus").update(attempt).eq("user_id", userId)
+      : await supabase.from("gurus").insert(attempt);
+
+    if (!response.error) return;
+    lastError = response.error.message || lastError;
+  }
+
+  throw new Error(lastError);
+}
+
 export default function GuruDashboardProfilePage() {
   const router = useRouter();
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -129,7 +275,7 @@ export default function GuruDashboardProfilePage() {
         if (!mounted) return;
 
         if (authError || !user) {
-          router.replace("/guru/login");
+          router.replace(routes.login);
           return;
         }
 
@@ -147,7 +293,7 @@ export default function GuruDashboardProfilePage() {
         const { data, error } = await supabase
           .from("gurus")
           .select(
-            "id, user_id, display_name, full_name, slug, bio, city, state, hourly_rate, rate, profile_photo_url, image_url, headline, years_experience, experience_years, services, is_public, onboarding_completed, profile_completed"
+            "id, user_id, display_name, full_name, slug, bio, city, state, hourly_rate, rate, profile_photo_url, image_url, avatar_url, photo_url, headline, years_experience, experience_years, services, is_public, onboarding_completed, profile_completed",
           )
           .eq("user_id", user.id)
           .limit(1);
@@ -169,7 +315,7 @@ export default function GuruDashboardProfilePage() {
           setServices([]);
           setIsPublic(false);
           setErrorMessage(
-            `We could not read an existing guru profile yet: ${stringifyError(error)}`
+            `We could not read an existing guru profile yet: ${stringifyError(error)}`,
           );
           setLoading(false);
           return;
@@ -197,7 +343,9 @@ export default function GuruDashboardProfilePage() {
 
         setProfileExists(true);
         setExistingProfileId(profile.id ?? "");
-        setDisplayName(profile.display_name || profile.full_name || fallbackDisplayName);
+        setDisplayName(
+          profile.display_name || profile.full_name || fallbackDisplayName,
+        );
         setSlug(profile.slug || fallbackSlug);
         setHeadline(profile.headline || "");
         setBio(profile.bio || "");
@@ -208,23 +356,32 @@ export default function GuruDashboardProfilePage() {
             ? String(profile.hourly_rate)
             : profile.rate !== null && profile.rate !== undefined
               ? String(profile.rate)
-              : ""
+              : "",
         );
         setYearsExperience(
-          profile.years_experience !== null && profile.years_experience !== undefined
+          profile.years_experience !== null &&
+            profile.years_experience !== undefined
             ? String(profile.years_experience)
             : profile.experience_years !== null &&
                 profile.experience_years !== undefined
               ? String(profile.experience_years)
-              : ""
+              : "",
         );
-        setProfilePhotoUrl(profile.profile_photo_url || profile.image_url || "");
+        setProfilePhotoUrl(
+          profile.profile_photo_url ||
+            profile.image_url ||
+            profile.avatar_url ||
+            profile.photo_url ||
+            "",
+        );
         setServices(normalizeServices(profile.services));
         setIsPublic(Boolean(profile.is_public));
         setLoading(false);
       } catch (error) {
         if (!mounted) return;
-        setErrorMessage(`Could not load your guru profile: ${stringifyError(error)}`);
+        setErrorMessage(
+          `Could not load your guru profile: ${stringifyError(error)}`,
+        );
         setLoading(false);
       }
     }
@@ -240,7 +397,7 @@ export default function GuruDashboardProfilePage() {
     setServices((current) =>
       current.includes(service)
         ? current.filter((item) => item !== service)
-        : [...current, service]
+        : [...current, service],
     );
   }
 
@@ -253,32 +410,29 @@ export default function GuruDashboardProfilePage() {
     setSuccessMessage("");
 
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const filePath = `${userId}/${Date.now()}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("guru-profile-photos")
-        .upload(filePath, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
-
-      if (uploadError) {
-        setErrorMessage(uploadError.message || "Could not upload photo.");
+      if (!isValidPhoto(file)) {
+        setErrorMessage("Please upload a JPG, PNG, or WEBP profile photo.");
         setUploadingPhoto(false);
         return;
       }
 
-      const { data } = supabase.storage
-        .from("guru-profile-photos")
-        .getPublicUrl(filePath);
+      if (file.size > 8 * 1024 * 1024) {
+        setErrorMessage("Profile photos must be 8MB or smaller.");
+        setUploadingPhoto(false);
+        return;
+      }
 
-      setProfilePhotoUrl(data.publicUrl);
-      setUploadingPhoto(false);
-      setSuccessMessage("Photo uploaded. Save profile to publish changes.");
+      const uploaded = await uploadToFirstAvailableBucket(file, userId);
+      setProfilePhotoUrl(uploaded.publicUrl);
+      await updateProfileAvatar(userId, uploaded);
+      setSuccessMessage(
+        "Photo uploaded. Save profile to publish changes everywhere.",
+      );
     } catch (error) {
       setErrorMessage(`Could not upload photo: ${stringifyError(error)}`);
+    } finally {
       setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
     }
   }
 
@@ -324,7 +478,9 @@ export default function GuruDashboardProfilePage() {
       parsedExperience !== null &&
       (Number.isNaN(parsedExperience) || parsedExperience < 0)
     ) {
-      setErrorMessage("Years of experience must be a valid non-negative number.");
+      setErrorMessage(
+        "Years of experience must be a valid non-negative number.",
+      );
       setSaving(false);
       return;
     }
@@ -353,6 +509,8 @@ export default function GuruDashboardProfilePage() {
       experience_years: parsedExperience,
       profile_photo_url: cleanPhotoUrl || null,
       image_url: cleanPhotoUrl || null,
+      avatar_url: cleanPhotoUrl || null,
+      photo_url: cleanPhotoUrl || null,
       services: cleanServices,
       is_public: isPublic,
       onboarding_completed: onboardingCompleted,
@@ -360,57 +518,26 @@ export default function GuruDashboardProfilePage() {
     };
 
     try {
-      if (profileExists) {
-        const { error: updateError } = await supabase
-          .from("gurus")
-          .update(payload)
-          .eq("user_id", userId);
+      await saveGuruPayload({ userId, profileExists, payload });
 
-        if (updateError) {
-          setErrorMessage(updateError.message || "Could not save your guru profile.");
-          setSaving(false);
-          return;
-        }
-      } else {
-        const { error: insertError } = await supabase.from("gurus").insert(payload);
-
-        if (insertError) {
-          setErrorMessage(
-            insertError.message ||
-              "Could not create your guru profile. This account may not yet have permission to insert its own guru row."
-          );
-          setSaving(false);
-          return;
-        }
-
-        setProfileExists(true);
-      }
-
-      const { data: freshRows, error: refreshError } = await supabase
+      const { data: freshRows } = await supabase
         .from("gurus")
         .select(
-          "id, user_id, display_name, full_name, slug, bio, city, state, hourly_rate, rate, profile_photo_url, image_url, headline, years_experience, experience_years, services, is_public, onboarding_completed, profile_completed"
+          "id, user_id, display_name, full_name, slug, bio, city, state, hourly_rate, rate, profile_photo_url, image_url, avatar_url, photo_url, headline, years_experience, experience_years, services, is_public, onboarding_completed, profile_completed",
         )
         .eq("user_id", userId)
         .limit(1);
-
-      if (refreshError) {
-        setErrorMessage(
-          `Profile saved, but reloading the latest row failed: ${refreshError.message}`
-        );
-        setSaving(false);
-        router.refresh();
-        return;
-      }
 
       const refreshed = (freshRows?.[0] as GuruProfile | undefined) ?? null;
 
       if (refreshed) {
         setExistingProfileId(refreshed.id ?? existingProfileId);
         setProfileExists(true);
-        setDisplayName(refreshed.display_name || refreshed.full_name || cleanDisplayName);
+        setDisplayName(
+          refreshed.display_name || refreshed.full_name || cleanDisplayName,
+        );
         setSlug(refreshed.slug || cleanSlug);
-        setHeadline(refreshed.headline || "");
+        setHeadline(refreshed.headline || cleanHeadline);
         setBio(refreshed.bio || "");
         setCity(refreshed.city || "");
         setStateValue(refreshed.state || "");
@@ -419,7 +546,7 @@ export default function GuruDashboardProfilePage() {
             ? String(refreshed.hourly_rate)
             : refreshed.rate !== null && refreshed.rate !== undefined
               ? String(refreshed.rate)
-              : ""
+              : "",
         );
         setYearsExperience(
           refreshed.years_experience !== null &&
@@ -428,21 +555,30 @@ export default function GuruDashboardProfilePage() {
             : refreshed.experience_years !== null &&
                 refreshed.experience_years !== undefined
               ? String(refreshed.experience_years)
-              : ""
+              : "",
         );
-        setProfilePhotoUrl(refreshed.profile_photo_url || refreshed.image_url || "");
+        setProfilePhotoUrl(
+          refreshed.profile_photo_url ||
+            refreshed.image_url ||
+            refreshed.avatar_url ||
+            refreshed.photo_url ||
+            "",
+        );
         setServices(normalizeServices(refreshed.services));
         setIsPublic(Boolean(refreshed.is_public));
       } else {
         setSlug(cleanSlug);
         setServices(cleanServices);
+        setProfileExists(true);
       }
 
       setSuccessMessage("Guru profile saved successfully.");
-      setSaving(false);
       router.refresh();
     } catch (error) {
-      setErrorMessage(`Could not save your guru profile: ${stringifyError(error)}`);
+      setErrorMessage(
+        `Could not save your guru profile: ${stringifyError(error)}`,
+      );
+    } finally {
       setSaving(false);
     }
   }
@@ -461,7 +597,40 @@ export default function GuruDashboardProfilePage() {
 
     const completeCount = checks.filter(Boolean).length;
     return Math.max(10, Math.round((completeCount / checks.length) * 100));
-  }, [displayName, slug, headline, bio, city, stateValue, profilePhotoUrl, services]);
+  }, [
+    displayName,
+    slug,
+    headline,
+    bio,
+    city,
+    stateValue,
+    profilePhotoUrl,
+    services,
+  ]);
+
+  const missingItems = useMemo(() => {
+    const items = [
+      { label: "Display name", complete: Boolean(displayName.trim()) },
+      { label: "Public slug", complete: Boolean(slugify(slug || displayName)) },
+      { label: "Headline", complete: Boolean(headline.trim()) },
+      { label: "Bio", complete: Boolean(bio.trim()) },
+      { label: "City", complete: Boolean(city.trim()) },
+      { label: "State", complete: Boolean(stateValue.trim()) },
+      { label: "Profile photo", complete: Boolean(profilePhotoUrl.trim()) },
+      { label: "Services", complete: services.length > 0 },
+    ];
+
+    return items.filter((item) => !item.complete).map((item) => item.label);
+  }, [
+    displayName,
+    slug,
+    headline,
+    bio,
+    city,
+    stateValue,
+    profilePhotoUrl,
+    services,
+  ]);
 
   const publicPreviewName = displayName.trim() || "Your Guru Name";
   const publicPreviewSlug = slugify(slug || displayName || "guru");
@@ -472,7 +641,7 @@ export default function GuruDashboardProfilePage() {
       : "Location pending";
   const publicPreviewBio =
     bio.trim() ||
-    "Your customer-facing bio will appear here once added. This is where pet parents begin deciding whether they trust you and whether you feel like the right fit.";
+    "Your customer-facing bio will appear here once added. Share how you care for pets, what makes you trustworthy, and the kind of families you are best suited to help.";
   const publicPreviewRate = hourlyRate.trim()
     ? `$${hourlyRate.trim()}/hr`
     : "Rate pending";
@@ -481,119 +650,235 @@ export default function GuruDashboardProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-10 text-white">
-        <div className="mx-auto max-w-6xl rounded-[28px] border border-white/15 bg-white/[0.07] p-8 backdrop-blur-sm">
-          <div className="flex items-center gap-3 text-slate-200">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Loading guru profile...
+      <main
+        className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 font-light !text-slate-950 md:px-6 lg:px-8"
+        style={{
+          fontFamily:
+            '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontWeight: 300,
+        }}
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-center">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
+            <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-600" />
+            <p className="mt-3 text-base font-semibold !text-slate-700">
+              Loading guru profile...
+            </p>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-8 text-white">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <section className="rounded-[32px] border border-white/15 bg-gradient-to-br from-emerald-500/12 via-slate-950 to-sky-500/12 p-6 shadow-[0_12px_60px_rgba(0,0,0,0.28)]">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="mb-4">
+    <main
+      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light !text-slate-950"
+      style={{
+        fontFamily:
+          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontWeight: 300,
+      }}
+    >
+      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
+        <div className="mb-5 overflow-x-auto rounded-[1.5rem] border border-emerald-100 bg-white/95 p-2 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav className="flex min-w-max items-center gap-2">
+            {[
+              { label: "Dashboard", href: routes.dashboard },
+              {
+                label: "Profile",
+                href: "/guru/dashboard/profile",
+                active: true,
+              },
+              { label: "Bookings", href: routes.bookings },
+              { label: "Messages", href: routes.messages },
+              { label: "Settings", href: routes.settings },
+            ].map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                  item.active
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-slate-800 hover:bg-emerald-50 hover:text-emerald-700"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+            <div>
+              <div className="mb-5 flex flex-wrap items-center gap-3">
                 <Link
-                  href="/guru/dashboard"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.10]"
+                  href={routes.dashboard}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-white/85 px-4 py-2 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/70 transition hover:bg-white"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Back to Guru Dashboard
                 </Link>
+
+                <span className="inline-flex items-center gap-2 rounded-2xl bg-white/80 px-4 py-2 text-sm font-extrabold text-emerald-800 shadow-sm ring-1 ring-white/70">
+                  <ShieldCheck className="h-4 w-4" />
+                  Guru Profile Editor
+                </span>
               </div>
 
-              <div className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-300">
-                Guru Profile Editor
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.2em] text-emerald-800 shadow-sm ring-1 ring-white/70">
+                <ShieldCheck className="h-4 w-4" />
+                Guru Portal
               </div>
 
-              <h1 className="mt-5 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
-                Update the profile customers will see
+              <h1
+                className="max-w-4xl text-4xl font-extrabold tracking-[-0.045em] !text-slate-950 md:text-6xl lg:text-7xl"
+                style={{ color: "#07112f" }}
+              >
+                Make your Guru profile customer-ready
               </h1>
 
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200 sm:text-base">
-                This page controls the public-facing Guru information that can be
-                shown to customers and referenced by Admin. Keep your profile
-                clear, modern, and trustworthy so your marketplace presence stays
-                strong.
+              <p
+                className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-slate-800 md:text-xl"
+                style={{ color: "#1f2937" }}
+              >
+                Update the profile customers see, upload your photo, choose
+                services, and complete the details that help SitGuru match you
+                with the right pet families.
               </p>
 
-              <div className="mt-6 flex flex-wrap gap-2">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
-                  Customer-facing display
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
-                  Admin-visible updates
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
-                  Marketplace-ready profile
-                </span>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="inline-flex min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-4 text-sm font-extrabold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {uploadingPhoto ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+                  Upload photo
+                </button>
+
+                <Link
+                  href={publicProfileHref}
+                  className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Preview profile
+                </Link>
+
+                <Link
+                  href={routes.messages}
+                  className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Messages
+                </Link>
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:w-[360px] lg:grid-cols-1">
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="h-5 w-5 text-emerald-300" />
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                    Signed in
-                  </p>
+            <div className="flex flex-col items-center text-center">
+              <div className="relative">
+                <div className="absolute -inset-4 rounded-full bg-white/30 blur-xl" />
+                <div className="relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full border-[8px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl md:h-56 md:w-56">
+                  {profilePhotoUrl ? (
+                    <Image
+                      src={profilePhotoUrl}
+                      alt={`${publicPreviewName} profile photo`}
+                      fill
+                      sizes="224px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    publicPreviewName.charAt(0).toUpperCase()
+                  )}
                 </div>
-                <p className="mt-3 break-all text-lg font-bold text-white">
-                  {signedInEmail || "Guru account"}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  Your updates here should feed your Guru dashboard, customer
-                  display, and admin visibility.
-                </p>
+                <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
+                  🐾
+                </div>
               </div>
 
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                <div className="flex items-center gap-3">
-                  <Sparkles className="h-5 w-5 text-emerald-300" />
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                    Completion
-                  </p>
-                </div>
-                <div className="mt-3 flex items-end justify-between gap-4">
-                  <p className="text-3xl font-black text-white">{completionPercent}%</p>
-                  <p className="text-sm font-medium text-slate-300">Profile strength</p>
-                </div>
-                <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-emerald-500"
-                    style={{ width: `${completionPercent}%` }}
-                  />
+              <h2
+                className="mt-6 text-3xl font-extrabold tracking-tight !text-slate-950 md:text-4xl"
+                style={{ color: "#07112f" }}
+              >
+                {publicPreviewName}
+              </h2>
+              <p
+                className="mt-2 text-lg font-semibold !text-slate-700"
+                style={{ color: "#334155" }}
+              >
+                {publicPreviewHeadline}
+              </p>
+              <p
+                className="mt-1 max-w-xs text-sm font-semibold leading-6 !text-slate-600"
+                style={{ color: "#475569" }}
+              >
+                {publicPreviewLocation}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-4 md:px-8">
+            {[
+              { label: "Complete", value: `${completionPercent}%`, icon: "⭐" },
+              { label: "Services", value: services.length, icon: "🐾" },
+              { label: "Public", value: isPublic ? "Yes" : "No", icon: "👀" },
+              { label: "Rate", value: publicPreviewRate, icon: "💚" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold !text-slate-500">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-3xl font-extrabold !text-slate-950">
+                      {item.value}
+                    </p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
+                    {item.icon}
+                  </div>
                 </div>
               </div>
-            </div>
+            ))}
           </div>
         </section>
 
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/webp"
+          className="hidden"
+          onChange={handlePhotoUpload}
+        />
+
         {!!errorMessage && (
-          <div className="rounded-[24px] border border-rose-400/20 bg-rose-500/10 px-5 py-4 text-rose-100">
+          <div className="mt-6 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-5 py-4 text-rose-800 shadow-sm">
             <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-300" />
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
               <div>
-                <p className="font-semibold text-white">Profile error</p>
-                <p className="mt-1 text-sm leading-6 text-rose-100">{errorMessage}</p>
+                <p className="font-extrabold text-rose-900">Profile error</p>
+                <p className="mt-1 text-sm font-semibold leading-6">
+                  {errorMessage}
+                </p>
               </div>
             </div>
           </div>
         )}
 
         {!!successMessage && (
-          <div className="rounded-[24px] border border-emerald-400/20 bg-emerald-500/10 px-5 py-4 text-emerald-100">
+          <div className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-800 shadow-sm">
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
               <div>
-                <p className="font-semibold text-white">Success</p>
-                <p className="mt-1 text-sm leading-6 text-emerald-100">
+                <p className="font-extrabold text-emerald-900">Success</p>
+                <p className="mt-1 text-sm font-semibold leading-6">
                   {successMessage}
                 </p>
               </div>
@@ -601,337 +886,420 @@ export default function GuruDashboardProfilePage() {
           </div>
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-          <section className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-            <div className="mb-6">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                Edit profile
-              </p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                Keep your Guru profile current
-              </h2>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-5 md:grid-cols-2">
+        <section className="mt-6 grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+          <div className="space-y-6">
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <label
-                    htmlFor="display_name"
-                    className="mb-2 block text-sm font-semibold text-slate-200"
-                  >
-                    Display name
-                  </label>
-                  <input
-                    id="display_name"
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                    placeholder="Your public display name"
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
-                  />
+                  <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-600">
+                    Edit profile
+                  </p>
+                  <h2 className="mt-2 text-3xl font-extrabold tracking-tight !text-slate-950">
+                    Keep your Guru profile current
+                  </h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 !text-slate-600">
+                    These fields power your Guru dashboard, Admin visibility,
+                    and customer-facing profile.
+                  </p>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="slug"
-                    className="mb-2 block text-sm font-semibold text-slate-200"
-                  >
-                    Public slug
-                  </label>
-                  <input
-                    id="slug"
-                    value={slug}
-                    onChange={(event) => setSlug(slugify(event.target.value))}
-                    placeholder="your-public-slug"
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="headline"
-                    className="mb-2 block text-sm font-semibold text-slate-200"
-                  >
-                    Headline
-                  </label>
-                  <input
-                    id="headline"
-                    value={headline}
-                    onChange={(event) => setHeadline(event.target.value)}
-                    placeholder="Ex: Trusted Pet Care Guru"
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="hourly_rate"
-                    className="mb-2 block text-sm font-semibold text-slate-200"
-                  >
-                    Hourly rate
-                  </label>
-                  <input
-                    id="hourly_rate"
-                    value={hourlyRate}
-                    onChange={(event) => setHourlyRate(event.target.value)}
-                    placeholder="45"
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="city"
-                    className="mb-2 block text-sm font-semibold text-slate-200"
-                  >
-                    City
-                  </label>
-                  <input
-                    id="city"
-                    value={city}
-                    onChange={(event) => setCity(event.target.value)}
-                    placeholder="Quakertown"
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="state"
-                    className="mb-2 block text-sm font-semibold text-slate-200"
-                  >
-                    State
-                  </label>
-                  <input
-                    id="state"
-                    value={stateValue}
-                    onChange={(event) => setStateValue(event.target.value.toUpperCase())}
-                    placeholder="PA"
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="years_experience"
-                    className="mb-2 block text-sm font-semibold text-slate-200"
-                  >
-                    Years of experience
-                  </label>
-                  <input
-                    id="years_experience"
-                    value={yearsExperience}
-                    onChange={(event) => setYearsExperience(event.target.value)}
-                    placeholder="3"
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="profile_photo_url"
-                    className="mb-2 block text-sm font-semibold text-slate-200"
-                  >
-                    Profile image URL
-                  </label>
-                  <input
-                    id="profile_photo_url"
-                    value={profilePhotoUrl}
-                    onChange={(event) => setProfilePhotoUrl(event.target.value)}
-                    placeholder="https://..."
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
-                  />
+                <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-800 ring-1 ring-emerald-100">
+                  {signedInEmail || "Guru account"}
                 </div>
               </div>
 
-              <div>
-                <label
-                  htmlFor="bio"
-                  className="mb-2 block text-sm font-semibold text-slate-200"
-                >
-                  Bio
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="display_name"
+                      className="mb-2 block text-sm font-extrabold !text-slate-950"
+                    >
+                      Display name
+                    </label>
+                    <input
+                      id="display_name"
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                      placeholder="Your public display name"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="slug"
+                      className="mb-2 block text-sm font-extrabold !text-slate-950"
+                    >
+                      Public slug
+                    </label>
+                    <input
+                      id="slug"
+                      value={slug}
+                      onChange={(event) => setSlug(slugify(event.target.value))}
+                      placeholder="your-public-slug"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="headline"
+                      className="mb-2 block text-sm font-extrabold !text-slate-950"
+                    >
+                      Headline
+                    </label>
+                    <input
+                      id="headline"
+                      value={headline}
+                      onChange={(event) => setHeadline(event.target.value)}
+                      placeholder="Ex: Trusted Pet Care Guru"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="hourly_rate"
+                      className="mb-2 block text-sm font-extrabold !text-slate-950"
+                    >
+                      Hourly rate
+                    </label>
+                    <input
+                      id="hourly_rate"
+                      value={hourlyRate}
+                      onChange={(event) => setHourlyRate(event.target.value)}
+                      placeholder="45"
+                      inputMode="decimal"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="city"
+                      className="mb-2 block text-sm font-extrabold !text-slate-950"
+                    >
+                      City
+                    </label>
+                    <input
+                      id="city"
+                      value={city}
+                      onChange={(event) => setCity(event.target.value)}
+                      placeholder="Quakertown"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="state"
+                      className="mb-2 block text-sm font-extrabold !text-slate-950"
+                    >
+                      State
+                    </label>
+                    <input
+                      id="state"
+                      value={stateValue}
+                      onChange={(event) =>
+                        setStateValue(event.target.value.toUpperCase())
+                      }
+                      placeholder="PA"
+                      maxLength={2}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="years_experience"
+                      className="mb-2 block text-sm font-extrabold !text-slate-950"
+                    >
+                      Years of experience
+                    </label>
+                    <input
+                      id="years_experience"
+                      value={yearsExperience}
+                      onChange={(event) =>
+                        setYearsExperience(event.target.value)
+                      }
+                      placeholder="3"
+                      inputMode="numeric"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="profile_photo_url"
+                      className="mb-2 block text-sm font-extrabold !text-slate-950"
+                    >
+                      Profile image URL
+                    </label>
+                    <input
+                      id="profile_photo_url"
+                      value={profilePhotoUrl}
+                      onChange={(event) =>
+                        setProfilePhotoUrl(event.target.value)
+                      }
+                      placeholder="https://..."
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="bio"
+                    className="mb-2 block text-sm font-extrabold !text-slate-950"
+                  >
+                    Bio
+                  </label>
+                  <textarea
+                    id="bio"
+                    value={bio}
+                    onChange={(event) => setBio(event.target.value)}
+                    rows={6}
+                    placeholder="Tell pet parents who you are, how you care for pets, and why they can trust you."
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                </div>
+
+                <div>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-extrabold !text-slate-950">
+                        Profile photo
+                      </p>
+                      <p className="mt-1 text-sm font-semibold !text-slate-600">
+                        Upload a JPG, PNG, or WEBP photo. This becomes your mini
+                        avatar across SitGuru.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      {uploadingPhoto ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Camera className="h-4 w-4" />
+                      )}
+                      {uploadingPhoto ? "Uploading..." : "Upload photo"}
+                    </button>
+                  </div>
+
+                  <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4">
+                    {profilePhotoUrl ? (
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-white shadow-sm ring-1 ring-emerald-100">
+                          <Image
+                            src={profilePhotoUrl}
+                            alt="Guru profile preview"
+                            fill
+                            sizes="112px"
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                        <div>
+                          <p className="text-sm font-extrabold !text-slate-950">
+                            Profile photo ready
+                          </p>
+                          <p className="mt-1 break-all text-sm font-semibold leading-6 !text-slate-700">
+                            {profilePhotoUrl}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 !text-slate-700">
+                        <ImageIcon className="h-5 w-5 text-emerald-600" />
+                        <span className="text-sm font-semibold">
+                          No profile photo selected yet.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-3 text-sm font-extrabold !text-slate-950">
+                    Services
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {SERVICE_OPTIONS.map((service) => {
+                      const active = services.includes(service);
+
+                      return (
+                        <button
+                          key={service}
+                          type="button"
+                          onClick={() => toggleService(service)}
+                          className={`rounded-2xl border px-4 py-3 text-left text-sm font-extrabold transition ${
+                            active
+                              ? "border-emerald-300 bg-emerald-500 !text-slate-950 shadow-sm"
+                              : "border-slate-200 bg-slate-50 text-slate-800 hover:bg-emerald-50 hover:text-emerald-800"
+                          }`}
+                        >
+                          {service}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm font-extrabold !text-slate-950">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(event) => setIsPublic(event.target.checked)}
+                    className="h-4 w-4 rounded border-emerald-300 text-emerald-600"
+                  />
+                  Make this Guru profile public and customer-facing
                 </label>
-                <textarea
-                  id="bio"
-                  value={bio}
-                  onChange={(event) => setBio(event.target.value)}
-                  rows={6}
-                  placeholder="Tell pet parents who you are, how you care for pets, and why they can trust you."
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
-                />
-              </div>
 
-              <div>
-                <div className="mb-3 flex items-center justify-between gap-4">
-                  <p className="text-sm font-semibold text-slate-200">Profile photo</p>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
-                    {uploadingPhoto ? (
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {saving ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Camera className="h-4 w-4" />
+                      <Save className="h-4 w-4" />
                     )}
-                    Upload photo
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handlePhotoUpload}
-                    />
-                  </label>
+                    Save Guru Profile
+                  </button>
+
+                  <Link
+                    href={routes.dashboard}
+                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-extrabold text-slate-900 transition hover:bg-slate-100"
+                  >
+                    Cancel
+                  </Link>
                 </div>
+              </form>
+            </section>
+          </div>
 
-                <div className="rounded-[24px] border border-white/10 bg-slate-950/40 p-4">
-                  {profilePhotoUrl ? (
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                      <div className="relative h-28 w-28 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-                        <Image
-                          src={profilePhotoUrl}
-                          alt="Guru profile preview"
-                          fill
-                          sizes="112px"
-                          className="object-cover"
-                          unoptimized
-                        />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-white">
-                          Profile photo ready
-                        </p>
-                        <p className="mt-1 break-all text-sm leading-6 text-slate-300">
-                          {profilePhotoUrl}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3 text-slate-300">
-                      <ImageIcon className="h-5 w-5" />
-                      No profile photo selected yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-3 text-sm font-semibold text-slate-200">Services</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {SERVICE_OPTIONS.map((service) => {
-                    const active = services.includes(service);
-
-                    return (
-                      <button
-                        key={service}
-                        type="button"
-                        onClick={() => toggleService(service)}
-                        className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
-                          active
-                            ? "border-emerald-400/30 bg-emerald-500/10 text-white"
-                            : "border-white/10 bg-slate-950/40 text-slate-200 hover:bg-white/5"
-                        }`}
-                      >
-                        {service}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-4 text-sm font-medium text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={isPublic}
-                  onChange={(event) => setIsPublic(event.target.checked)}
-                  className="h-4 w-4 rounded border-white/20 bg-slate-900 text-emerald-500"
-                />
-                Make this Guru profile public and customer-facing
-              </label>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {saving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Save Guru Profile
-                </button>
-
-                <Link
-                  href="/guru/dashboard"
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-6 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
-                >
-                  Cancel
-                </Link>
-              </div>
-            </form>
-          </section>
-
-          <section className="space-y-6">
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
+          <div className="space-y-6">
+            <section className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm">
               <div className="flex items-center gap-3">
-                <UserCircle2 className="h-5 w-5 text-emerald-300" />
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+                <Sparkles className="h-5 w-5 text-emerald-600" />
+                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
+                  Profile strength
+                </p>
+              </div>
+
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <p className="text-5xl font-extrabold tracking-tight !text-slate-950">
+                  {completionPercent}%
+                </p>
+                <p className="text-sm font-extrabold !text-slate-600">
+                  {missingItems.length === 0 ? "Complete" : "Needs updates"}
+                </p>
+              </div>
+
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-emerald-50 ring-1 ring-emerald-100">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${completionPercent}%` }}
+                />
+              </div>
+
+              {missingItems.length > 0 ? (
+                <div className="mt-5 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                  <p className="text-sm font-extrabold !text-slate-950">
+                    Finish these next
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {missingItems.map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full bg-white px-3 py-1 text-xs font-extrabold !text-slate-700 ring-1 ring-slate-200"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-extrabold text-emerald-800 ring-1 ring-emerald-100">
+                  Your profile is ready for customer confidence and Guru
+                  recognition.
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-3">
+                <UserCircle2 className="h-5 w-5 text-emerald-600" />
+                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
                   Customer preview
                 </p>
               </div>
 
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
                 How your public profile can present
               </h2>
 
-              <div className="mt-6 rounded-[24px] border border-white/10 bg-slate-950/40 p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-                  Public profile
-                </p>
-
-                <div className="mt-4 flex items-start gap-4">
-                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+              <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                <div className="flex items-start gap-4">
+                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-4 border-white bg-emerald-50 shadow-sm ring-1 ring-emerald-100">
                     {profilePhotoUrl ? (
                       <Image
                         src={profilePhotoUrl}
                         alt="Profile preview"
                         fill
-                        sizes="64px"
+                        sizes="80px"
                         className="object-cover"
                         unoptimized
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <UserCircle2 className="h-8 w-8 text-slate-400" />
+                        <UserCircle2 className="h-9 w-9 text-emerald-600" />
                       </div>
                     )}
                   </div>
 
                   <div>
-                    <p className="text-2xl font-black text-white">{publicPreviewName}</p>
-                    <p className="mt-1 text-base font-semibold text-slate-200">
+                    <p className="text-2xl font-extrabold !text-slate-950">
+                      {publicPreviewName}
+                    </p>
+                    <p className="mt-1 text-base font-extrabold !text-slate-700">
                       {publicPreviewHeadline}
                     </p>
-                    <p className="mt-1 text-sm text-slate-400">{publicPreviewLocation}</p>
+                    <p className="mt-1 text-sm font-semibold !text-slate-500">
+                      {publicPreviewLocation}
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
                       Rate
                     </p>
-                    <p className="mt-2 text-lg font-bold text-white">{publicPreviewRate}</p>
+                    <p className="mt-2 text-lg font-extrabold !text-slate-950">
+                      {publicPreviewRate}
+                    </p>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
                       Slug
                     </p>
-                    <p className="mt-2 text-lg font-bold text-white">
+                    <p className="mt-2 break-all text-lg font-extrabold !text-slate-950">
                       /gurus/{publicPreviewSlug}
                     </p>
                   </div>
                 </div>
 
-                <p className="mt-5 text-sm leading-7 text-slate-300">
+                <p className="mt-5 text-sm font-semibold leading-7 !text-slate-700">
                   {publicPreviewBio}
                 </p>
 
@@ -940,13 +1308,13 @@ export default function GuruDashboardProfilePage() {
                     services.map((service) => (
                       <span
                         key={service}
-                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200"
+                        className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-800"
                       >
                         {service}
                       </span>
                     ))
                   ) : (
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-400">
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-extrabold !text-slate-500">
                       No services selected yet
                     </span>
                   )}
@@ -956,25 +1324,25 @@ export default function GuruDashboardProfilePage() {
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href={publicProfileHref}
-                  className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-emerald-700"
                 >
                   Preview Customer Guru Page
                 </Link>
 
                 <Link
-                  href="/guru/dashboard"
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+                  href={routes.dashboard}
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-extrabold text-slate-900 transition hover:bg-slate-100"
                 >
                   Return to Dashboard
                 </Link>
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
                 Admin visibility
               </p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
                 What Admin should also be able to see
               </h2>
 
@@ -988,30 +1356,75 @@ export default function GuruDashboardProfilePage() {
                 ].map((item) => (
                   <div
                     key={item}
-                    className="rounded-[18px] border border-white/10 bg-slate-950/40 px-4 py-4 text-sm font-medium text-slate-200"
+                    className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-extrabold !text-slate-700"
                   >
                     {item}
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(5,150,105,0.14),rgba(15,23,42,0.78))] p-6">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+            <section className="rounded-[2rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
+              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
                 Why this matters
               </p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
                 Better profile data strengthens the marketplace
               </h2>
-              <p className="mt-3 text-sm leading-7 text-slate-200">
+              <p className="mt-3 text-sm font-semibold leading-7 !text-slate-700">
                 The stronger your Guru profile is, the better it can perform for
-                customer trust, search visibility, and admin operations. This page
-                is one of the core pieces powering the Guru side of SitGuru.
+                customer trust, search visibility, and Admin operations. This
+                page is one of the core pieces powering the Guru side of
+                SitGuru.
+              </p>
+            </section>
+          </div>
+        </section>
+      </div>
+
+      <footer className="mt-12 border-t border-emerald-100 bg-white/95 px-4 py-8 shadow-[0_-8px_30px_rgba(15,23,42,0.03)] md:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
+            <Image
+              src="/images/sitguru-logo-cropped.png"
+              alt="SitGuru"
+              width={150}
+              height={42}
+              className="h-auto w-[130px] object-contain"
+            />
+            <div className="hidden h-8 w-px bg-emerald-100 sm:block" />
+            <div>
+              <p className="text-sm font-extrabold !text-slate-950">
+                Guru Portal
+              </p>
+              <p className="mt-1 text-xs font-semibold !text-slate-600">
+                Trusted pet care, simplified.
               </p>
             </div>
-          </section>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-extrabold sm:justify-end">
+            <Link
+              href={routes.dashboard}
+              className="rounded-full bg-emerald-50 px-4 py-2 !text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-100"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href={routes.bookings}
+              className="rounded-full bg-slate-50 px-4 py-2 !text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100"
+            >
+              Bookings
+            </Link>
+            <Link
+              href={routes.messages}
+              className="rounded-full bg-slate-50 px-4 py-2 !text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100"
+            >
+              Messages
+            </Link>
+          </div>
         </div>
-      </div>
-    </div>
+      </footer>
+    </main>
   );
 }

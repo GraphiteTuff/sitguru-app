@@ -22,10 +22,17 @@ type PetProfile = {
 };
 
 type BookGuruClientProps = {
+  guruId?: string | number;
   guruSlug: string;
   guruName: string;
-  calUsername?: string;
-  calEventTypeSlug?: string;
+
+  // Current/new prop names from app/book/[slug]/page.tsx
+  calendarUsername?: string | null;
+  calendarEventTypeSlug?: string | null;
+
+  // Older prop names kept so existing work does not break
+  calUsername?: string | null;
+  calEventTypeSlug?: string | null;
 };
 
 type CustomerProfile = {
@@ -43,6 +50,7 @@ function initialsFromName(name: string) {
 
 function formatDisplayDate(value: string) {
   if (!value) return "—";
+
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
 
@@ -86,6 +94,7 @@ function StepBadge({
       >
         {complete ? "✓" : number}
       </div>
+
       <div className="min-w-0">
         <p
           className={`text-sm font-bold ${
@@ -100,16 +109,24 @@ function StepBadge({
 }
 
 export default function BookGuruClient({
+  guruId,
   guruSlug,
   guruName,
+  calendarUsername,
+  calendarEventTypeSlug,
   calUsername,
   calEventTypeSlug,
 }: BookGuruClientProps) {
   const router = useRouter();
 
+  const resolvedCalendarUsername = calendarUsername || calUsername || "";
+  const resolvedCalendarEventTypeSlug =
+    calendarEventTypeSlug || calEventTypeSlug || "";
+
   const [step, setStep] = useState<BookingStep>(1);
   const [pets, setPets] = useState<PetProfile[]>([]);
   const [petsLoading, setPetsLoading] = useState(true);
+
   const [selectedPetId, setSelectedPetId] = useState("");
   const [petName, setPetName] = useState("");
   const [serviceType, setServiceType] = useState("Drop-In Visit");
@@ -117,8 +134,15 @@ export default function BookGuruClient({
   const [timeWindow, setTimeWindow] = useState("Morning");
   const [visitLength, setVisitLength] = useState("30 minutes");
   const [notes, setNotes] = useState("");
+
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+
+  const [detailsAccepted, setDetailsAccepted] = useState(false);
+  const [paymentAccepted, setPaymentAccepted] = useState(false);
+  const [payoutAccepted, setPayoutAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -200,22 +224,128 @@ export default function BookGuruClient({
 
   const canContinueStep1 = petName.trim().length > 0 && bookingDate.length > 0;
   const canContinueStep2 = true;
+  const allAcknowledgementsAccepted =
+    detailsAccepted && paymentAccepted && payoutAccepted && termsAccepted;
 
   const handleNext = () => {
-    if (step === 1 && canContinueStep1) setStep(2);
-    if (step === 2 && canContinueStep2) setStep(3);
+    setSubmitError("");
+
+    if (step === 1 && canContinueStep1) {
+      setStep(2);
+      return;
+    }
+
+    if (step === 2 && canContinueStep2) {
+      setStep(3);
+    }
   };
 
   const handleBack = () => {
+    setSubmitError("");
+
     if (step === 3) setStep(2);
     if (step === 2) setStep(1);
   };
+
+  function extractApiError(data: unknown, fallback: string) {
+    if (!data || typeof data !== "object") return fallback;
+
+    const responseData = data as {
+      error?: unknown;
+      message?: unknown;
+      details?: unknown;
+    };
+
+    if (typeof responseData.error === "string" && responseData.error.trim()) {
+      return responseData.error.trim();
+    }
+
+    if (typeof responseData.message === "string" && responseData.message.trim()) {
+      return responseData.message.trim();
+    }
+
+    if (typeof responseData.details === "string" && responseData.details.trim()) {
+      return responseData.details.trim();
+    }
+
+    if (responseData.details && typeof responseData.details === "object") {
+      const details = responseData.details as {
+        message?: unknown;
+        error?: unknown;
+        hint?: unknown;
+        details?: unknown;
+        code?: unknown;
+      };
+
+      const detailParts = [
+        typeof details.message === "string" ? details.message : "",
+        typeof details.error === "string" ? details.error : "",
+        typeof details.details === "string" ? details.details : "",
+        typeof details.hint === "string" ? `Hint: ${details.hint}` : "",
+        typeof details.code === "string" ? `Code: ${details.code}` : "",
+      ].filter(Boolean);
+
+      if (detailParts.length > 0) {
+        return detailParts.join(" | ");
+      }
+    }
+
+    return fallback;
+  }
+
+  async function readBookingResponse(response: Response) {
+    const responseText = await response.text();
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!responseText) {
+      return null;
+    }
+
+    if (!contentType.includes("application/json")) {
+      console.error("Booking API returned non-JSON response:", {
+        status: response.status,
+        contentType,
+        responseText: responseText.slice(0, 1200),
+      });
+
+      throw new Error(
+        "The booking service returned a webpage instead of booking data. Confirm app/api/stripe/bookings/route.ts exists, has no TypeScript errors, and restart npm run dev."
+      );
+    }
+
+    try {
+      return JSON.parse(responseText) as {
+        success?: boolean;
+        error?: string;
+        message?: string;
+        details?: unknown;
+        booking?: {
+          id?: string | number;
+          uid?: string;
+        };
+        checkoutUrl?: string;
+        url?: string;
+        stripeSessionId?: string;
+      };
+    } catch (error) {
+      console.error("Booking API returned invalid JSON:", {
+        status: response.status,
+        contentType,
+        responseText: responseText.slice(0, 1200),
+        error,
+      });
+
+      throw new Error(
+        "The booking service returned invalid booking data. Check the server terminal for the API error."
+      );
+    }
+  }
 
   const handleConfirm = async () => {
     try {
       setSubmitError("");
 
-      if (!calUsername || !calEventTypeSlug) {
+      if (!resolvedCalendarUsername || !resolvedCalendarEventTypeSlug) {
         setSubmitError(
           "This Guru is not fully connected to scheduling yet. Please try another Guru or contact support."
         );
@@ -227,39 +357,96 @@ export default function BookGuruClient({
         return;
       }
 
+      if (!allAcknowledgementsAccepted) {
+        setSubmitError(
+          "Please check all acknowledgements before continuing to secure checkout."
+        );
+        return;
+      }
+
       const finalName = customerName?.trim() || "SitGuru Customer";
       const finalEmail = customerEmail?.trim() || "customer@sitguru.com";
 
       setSubmitting(true);
 
-      const response = await fetch("/api/cal/book", {
+      const bookingPayload = {
+        guruId,
+        guru_id: guruId,
+        slug: guruSlug,
+        guruSlug,
+        calendarUsername: resolvedCalendarUsername,
+        calendarEventTypeSlug: resolvedCalendarEventTypeSlug,
+        bookingType: "instant_booking",
+        booking_type: "instant_booking",
+        start: new Date().toISOString(),
+        customerName: finalName,
+        customer_name: finalName,
+        customerEmail: finalEmail,
+        customer_email: finalEmail,
+        petId: selectedPetId || null,
+        pet_id: selectedPetId || null,
+        petName: petName.trim(),
+        pet_name: petName.trim(),
+        serviceType,
+        service_type: serviceType,
+        requestedDate: bookingDate,
+        requested_date: bookingDate,
+        booking_date: bookingDate,
+        date: bookingDate,
+        timeWindow,
+        time_window: timeWindow,
+        visitLength,
+        visit_length: visitLength,
+        servicePrice,
+        service_price: servicePrice,
+        platformFee,
+        platform_fee: platformFee,
+        total,
+        total_amount: total,
+        amount_total: total,
+        complianceAccepted: true,
+        compliance_accepted: true,
+        termsAccepted: true,
+        terms_accepted: true,
+        notes: [
+          `Service: ${serviceType}`,
+          `Requested date: ${bookingDate}`,
+          `Time window: ${timeWindow}`,
+          `Visit length: ${visitLength}`,
+          "",
+          notes.trim(),
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      };
+
+      const response = await fetch("/api/stripe/bookings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          slug: guruSlug,
-          start: new Date().toISOString(),
-          customerName: finalName,
-          customerEmail: finalEmail,
-          petName: petName.trim(),
-          notes: [
-            `Service: ${serviceType}`,
-            `Requested date: ${bookingDate}`,
-            `Time window: ${timeWindow}`,
-            `Visit length: ${visitLength}`,
-            "",
-            notes.trim(),
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        }),
+        body: JSON.stringify(bookingPayload),
       });
 
-      const data = await response.json();
+      const data = await readBookingResponse(response);
 
       if (!response.ok) {
-        throw new Error(data?.error || "Booking failed. Please try again.");
+        console.error("Booking API failed:", {
+          status: response.status,
+          data,
+          bookingPayload,
+        });
+
+        throw new Error(
+          extractApiError(data, "Unable to create the booking request. Check the VS Code terminal for the API error.")
+        );
+      }
+
+      const checkoutUrl = data?.checkoutUrl || data?.url;
+
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+        return;
       }
 
       const params = new URLSearchParams({
@@ -275,8 +462,14 @@ export default function BookGuruClient({
         params.set("booking_uid", data.booking.uid);
       }
 
+      if (data?.booking?.id) {
+        params.set("booking_id", String(data.booking.id));
+      }
+
       router.push(`/customer/dashboard?${params.toString()}`);
     } catch (error) {
+      console.error("Booking submit failed:", error);
+
       setSubmitError(
         error instanceof Error
           ? error.message
@@ -303,12 +496,14 @@ export default function BookGuruClient({
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-300">
             Premium booking flow
           </p>
+
           <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
             Book {guruName}
           </h1>
+
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-300">
             A cleaner, guided flow that helps customers move from interest to
-            booking with more confidence.
+            secure checkout with more confidence.
           </p>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -340,9 +535,11 @@ export default function BookGuruClient({
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-300">
                   Step 1 of 3
                 </p>
+
                 <h2 className="mt-2 text-3xl font-black text-white">
                   Tell us about your pet and visit
                 </h2>
+
                 <p className="mt-3 text-base leading-7 text-slate-300">
                   Start with the essentials so your Guru can quickly understand
                   your request.
@@ -356,6 +553,7 @@ export default function BookGuruClient({
                     >
                       Saved pet profile
                     </label>
+
                     <select
                       id="pet-profile"
                       value={selectedPetId}
@@ -367,6 +565,7 @@ export default function BookGuruClient({
                           ? "Loading saved pets..."
                           : "Select a saved pet or enter manually"}
                       </option>
+
                       {pets.map((pet) => (
                         <option key={pet.id} value={pet.id}>
                           {pet.name}
@@ -403,6 +602,7 @@ export default function BookGuruClient({
                           <p className="text-lg font-black text-white">
                             {selectedPet.name}
                           </p>
+
                           <p className="mt-1 text-sm text-slate-300">
                             {[
                               selectedPet.species,
@@ -433,6 +633,7 @@ export default function BookGuruClient({
                     >
                       Pet name
                     </label>
+
                     <input
                       id="pet-name"
                       value={petName}
@@ -450,6 +651,7 @@ export default function BookGuruClient({
                       >
                         Service
                       </label>
+
                       <select
                         id="service-type"
                         value={serviceType}
@@ -470,6 +672,7 @@ export default function BookGuruClient({
                       >
                         Requested date
                       </label>
+
                       <input
                         id="booking-date"
                         type="date"
@@ -488,6 +691,7 @@ export default function BookGuruClient({
                       >
                         Time window
                       </label>
+
                       <select
                         id="time-window"
                         value={timeWindow}
@@ -508,6 +712,7 @@ export default function BookGuruClient({
                       >
                         Visit length
                       </label>
+
                       <select
                         id="visit-length"
                         value={visitLength}
@@ -528,6 +733,7 @@ export default function BookGuruClient({
                     >
                       Care notes
                     </label>
+
                     <textarea
                       id="booking-notes"
                       value={notes}
@@ -567,9 +773,11 @@ export default function BookGuruClient({
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-300">
                   Step 2 of 3
                 </p>
+
                 <h2 className="mt-2 text-3xl font-black text-white">
                   Review your booking
                 </h2>
+
                 <p className="mt-3 text-base leading-7 text-slate-300">
                   Confirm the details before moving to secure checkout.
                 </p>
@@ -587,6 +795,7 @@ export default function BookGuruClient({
                     <p className="mt-2 text-xl font-black text-white">
                       {petName || "—"}
                     </p>
+
                     {selectedPet ? (
                       <p className="mt-2 text-sm text-slate-300">
                         Using saved profile: {selectedPet.name}
@@ -663,12 +872,14 @@ export default function BookGuruClient({
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-300">
                   Step 3 of 3
                 </p>
+
                 <h2 className="mt-2 text-3xl font-black text-white">
                   Secure checkout
                 </h2>
+
                 <p className="mt-3 text-base leading-7 text-slate-300">
-                  This is the final confirmation step before payment and booking
-                  request submission.
+                  Review the acknowledgements below before your booking request
+                  continues to secure checkout.
                 </p>
 
                 <div className="mt-8 rounded-[1.6rem] border border-emerald-400/20 bg-emerald-500/10 p-5">
@@ -676,9 +887,9 @@ export default function BookGuruClient({
                     Protected payment flow
                   </p>
                   <p className="mt-2 text-sm leading-7 text-slate-200">
-                    Stripe or your final payment processor can plug into this
-                    step later. For now, this step acts as the premium booking
-                    confirmation stage.
+                    SitGuru securely processes payment at checkout. Booking
+                    records, acknowledgements, and payment status are saved to
+                    support customer protection, Guru payouts, and admin review.
                   </p>
                 </div>
 
@@ -687,6 +898,7 @@ export default function BookGuruClient({
                     <p className="text-sm font-semibold text-slate-400">
                       Billing summary
                     </p>
+
                     <div className="mt-4 space-y-3">
                       <div className="flex items-center justify-between text-sm text-slate-200">
                         <span>{serviceType}</span>
@@ -694,12 +906,14 @@ export default function BookGuruClient({
                           {formatMoney(servicePrice)}
                         </span>
                       </div>
+
                       <div className="flex items-center justify-between text-sm text-slate-200">
                         <span>Platform fee</span>
                         <span className="font-bold">
                           {formatMoney(platformFee)}
                         </span>
                       </div>
+
                       <div className="border-t border-white/10 pt-3 text-base font-black text-white">
                         <div className="flex items-center justify-between">
                           <span>Total</span>
@@ -711,21 +925,92 @@ export default function BookGuruClient({
 
                   <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
                     <p className="text-sm font-semibold text-slate-400">
-                      What happens after confirmation
+                      What happens after checkout
                     </p>
+
                     <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-200">
-                      <li>• Your request is sent to the Guru</li>
-                      <li>• You receive a confirmation state</li>
-                      <li>
-                        • Messaging and follow-up can happen in your dashboard
-                      </li>
-                      <li>• Admin visibility can track this booking later</li>
+                      <li>• Your request is saved to your customer dashboard</li>
+                      <li>• Your Guru receives the booking information</li>
+                      <li>• Payment status is tracked securely</li>
+                      <li>• Support can review refunds or disputes if needed</li>
                     </ul>
                   </div>
                 </div>
 
+                <div className="mt-6 space-y-4">
+                  <label className="flex cursor-pointer gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.07]">
+                    <input
+                      type="checkbox"
+                      checked={detailsAccepted}
+                      onChange={(e) => setDetailsAccepted(e.target.checked)}
+                      className="mt-1 h-5 w-5 rounded border-slate-500 accent-emerald-500"
+                    />
+                    <span className="text-sm font-semibold leading-7 text-slate-200">
+                      I confirm the pet care details, requested date, visit
+                      length, notes, and pricing are accurate to the best of my
+                      knowledge.
+                    </span>
+                  </label>
+
+                  <label className="flex cursor-pointer gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.07]">
+                    <input
+                      type="checkbox"
+                      checked={paymentAccepted}
+                      onChange={(e) => setPaymentAccepted(e.target.checked)}
+                      className="mt-1 h-5 w-5 rounded border-slate-500 accent-emerald-500"
+                    />
+                    <span className="text-sm font-semibold leading-7 text-slate-200">
+                      I understand SitGuru securely processes payment at
+                      checkout and that payment handling, refunds, disputes, and
+                      chargebacks are managed through SitGuru&apos;s platform
+                      policies.
+                    </span>
+                  </label>
+
+                  <label className="flex cursor-pointer gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.07]">
+                    <input
+                      type="checkbox"
+                      checked={payoutAccepted}
+                      onChange={(e) => setPayoutAccepted(e.target.checked)}
+                      className="mt-1 h-5 w-5 rounded border-slate-500 accent-emerald-500"
+                    />
+                    <span className="text-sm font-semibold leading-7 text-slate-200">
+                      I understand Guru payouts are released after completed
+                      care unless a support case, refund request, chargeback, or
+                      safety review is open.
+                    </span>
+                  </label>
+
+                  <label className="flex cursor-pointer gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.07]">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="mt-1 h-5 w-5 rounded border-slate-500 accent-emerald-500"
+                    />
+                    <span className="text-sm font-semibold leading-7 text-slate-200">
+                      I agree to SitGuru&apos;s{" "}
+                      <Link
+                        href="/terms"
+                        className="font-black text-emerald-300 hover:text-emerald-200"
+                      >
+                        Terms
+                      </Link>
+                      ,{" "}
+                      <Link
+                        href="/privacy"
+                        className="font-black text-emerald-300 hover:text-emerald-200"
+                      >
+                        Privacy Policy
+                      </Link>
+                      , cancellation/refund policies, and booking agreement
+                      acknowledgements.
+                    </span>
+                  </label>
+                </div>
+
                 {submitError ? (
-                  <div className="mt-6 rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4">
+                  <div className="mt-6 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4">
                     <p className="text-sm font-semibold text-rose-200">
                       {submitError}
                     </p>
@@ -745,14 +1030,24 @@ export default function BookGuruClient({
                   <button
                     type="button"
                     onClick={handleConfirm}
-                    disabled={submitting}
-                    className="inline-flex min-h-[56px] items-center justify-center rounded-2xl bg-emerald-500 px-6 py-4 text-base font-black text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={submitting || !allAcknowledgementsAccepted}
+                    className={`inline-flex min-h-[56px] items-center justify-center rounded-2xl px-6 py-4 text-base font-black transition disabled:cursor-not-allowed ${
+                      submitting || !allAcknowledgementsAccepted
+                        ? "bg-slate-800 text-slate-500"
+                        : "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                    }`}
                   >
                     {submitting
                       ? "Submitting Booking..."
-                      : "Confirm Booking Request"}
+                      : "I Agree — Continue to Secure Checkout"}
                   </button>
                 </div>
+
+                <p className="mt-4 text-sm font-semibold leading-7 text-slate-400">
+                  Your booking request, pet details, compliance
+                  acknowledgements, and payment status will appear in your
+                  customer dashboard after checkout begins.
+                </p>
               </div>
             ) : null}
           </section>
@@ -763,6 +1058,7 @@ export default function BookGuruClient({
                 <span className="rounded-full border border-emerald-400 bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-emerald-700">
                   Booking Summary
                 </span>
+
                 <span className="rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
                   {step === 1
                     ? "Care Details"
@@ -782,6 +1078,7 @@ export default function BookGuruClient({
                     <p className="truncate text-lg font-black text-slate-900">
                       {guruName}
                     </p>
+
                     <p className="truncate text-sm font-semibold text-slate-700">
                       Premium booking experience
                     </p>
@@ -794,6 +1091,7 @@ export default function BookGuruClient({
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                     Selected pet profile
                   </p>
+
                   <div className="mt-3 flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-slate-300 bg-white">
                       {selectedPet.photo_url ? (
@@ -811,6 +1109,7 @@ export default function BookGuruClient({
                       <p className="text-sm font-black text-slate-900">
                         {selectedPet.name}
                       </p>
+
                       <p className="text-xs text-slate-600">
                         {[
                           selectedPet.species,
@@ -827,36 +1126,36 @@ export default function BookGuruClient({
 
               <div className="mt-5 space-y-4">
                 <div className="rounded-2xl border border-slate-300 bg-white p-4">
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="font-medium text-slate-600">Pet</span>
-                    <span className="font-black text-slate-900">
+                    <span className="text-right font-black text-slate-900">
                       {petName || "—"}
                     </span>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-300 bg-white p-4">
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="font-medium text-slate-600">Date</span>
-                    <span className="font-black text-slate-900">
+                    <span className="text-right font-black text-slate-900">
                       {formatDisplayDate(bookingDate)}
                     </span>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-300 bg-white p-4">
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="font-medium text-slate-600">Service</span>
-                    <span className="font-black text-slate-900">
+                    <span className="text-right font-black text-slate-900">
                       {serviceType}
                     </span>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-300 bg-white p-4">
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="font-medium text-slate-600">Length</span>
-                    <span className="font-black text-slate-900">
+                    <span className="text-right font-black text-slate-900">
                       {visitLength}
                     </span>
                   </div>
@@ -871,12 +1170,14 @@ export default function BookGuruClient({
                       {formatMoney(servicePrice)}
                     </span>
                   </div>
+
                   <div className="flex items-center justify-between text-sm text-slate-700">
                     <span>Platform fee</span>
                     <span className="font-black text-slate-900">
                       {formatMoney(platformFee)}
                     </span>
                   </div>
+
                   <div className="border-t border-slate-300 pt-3">
                     <div className="flex items-center justify-between text-base">
                       <span className="font-black text-slate-900">Total</span>
@@ -903,6 +1204,7 @@ export default function BookGuruClient({
                     <p className="text-sm font-black text-slate-900">
                       Your Guru reviews the request
                     </p>
+
                     <p className="mt-2 text-sm font-medium leading-6 text-slate-700">
                       Your details and care notes help them respond more quickly.
                     </p>
@@ -912,6 +1214,7 @@ export default function BookGuruClient({
                     <p className="text-sm font-black text-slate-900">
                       Secure confirmation follows
                     </p>
+
                     <p className="mt-2 text-sm font-medium leading-6 text-slate-700">
                       You will move through a protected payment and confirmation
                       experience.

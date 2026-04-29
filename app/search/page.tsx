@@ -255,12 +255,6 @@ function SearchPageContent() {
   const hoveredGuruIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    setServiceFilter(initialService);
-    setCityFilter(initialCity);
-    setStateFilter(initialState);
-  }, [initialService, initialCity, initialState]);
-
-  useEffect(() => {
     if (hasTrackedSearchPageVisit.current) return;
 
     hasTrackedSearchPageVisit.current = true;
