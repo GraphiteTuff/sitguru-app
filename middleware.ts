@@ -15,21 +15,47 @@ const ALLOWED_EXACT_PATHS = new Set([
   "/privacy",
   "/terms",
   "/help",
+  "/login",
+  "/signup",
+  "/admin/login",
+  "/guru/login",
+  "/guru/signup",
   "/favicon.ico",
   "/robots.txt",
   "/sitemap.xml",
 ]);
 
 const ALLOWED_PREFIXES = [
-  "/api/launch-signup",
+  "/api/",
   "/_next",
+  "/images/",
   "/about/",
   "/privacy/",
   "/terms/",
   "/help/",
+
+  // Internal testing/app routes allowed during pre-launch.
+  "/admin",
+  "/customer",
+  "/dashboard",
+  "/guru/dashboard",
+  "/guru/bookings",
+  "/guru/availability",
+  "/guru/resources",
+  "/guru/pet-families",
+  "/messages",
+  "/bookings",
+  "/pets",
+  "/profile",
+  "/rewards",
+  "/referrals",
+  "/search",
 ];
 
-const ALLOWED_PUBLIC_FILES = new Set(["/sitguru-logo-cropped.png.png"]);
+const ALLOWED_PUBLIC_FILES = new Set([
+  "/sitguru-logo-cropped.png",
+  "/sitguru-logo-cropped.png.png",
+]);
 
 function isStaticAsset(pathname: string) {
   return /\.(png|jpg|jpeg|gif|webp|svg|ico|css|js|map|txt|xml|woff|woff2|ttf|eot)$/i.test(
@@ -38,21 +64,15 @@ function isStaticAsset(pathname: string) {
 }
 
 function isAllowedPrelaunchPath(pathname: string) {
-  if (ALLOWED_EXACT_PATHS.has(pathname)) {
-    return true;
-  }
+  if (ALLOWED_EXACT_PATHS.has(pathname)) return true;
 
   if (ALLOWED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return true;
   }
 
-  if (ALLOWED_PUBLIC_FILES.has(pathname)) {
-    return true;
-  }
+  if (ALLOWED_PUBLIC_FILES.has(pathname)) return true;
 
-  if (isStaticAsset(pathname)) {
-    return true;
-  }
+  if (isStaticAsset(pathname)) return true;
 
   return false;
 }
@@ -65,6 +85,16 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const siteMode = getSiteMode();
 
+  // Public homepage should stay gated during pre-launch.
+  if (siteMode === "prelaunch" && pathname === "/") {
+    const launchUrl = request.nextUrl.clone();
+    launchUrl.pathname = "/launch";
+    launchUrl.search = "";
+
+    return NextResponse.redirect(launchUrl);
+  }
+
+  // Keep public routes gated, but allow direct app testing routes above.
   if (siteMode === "prelaunch" && !isAllowedPrelaunchPath(pathname)) {
     const launchUrl = request.nextUrl.clone();
     launchUrl.pathname = "/launch";
@@ -73,6 +103,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(launchUrl);
   }
 
+  // Admin protection still runs in pre-launch mode.
   if (!isProtectedAdminPath(pathname) || isAdminLoginPath(pathname)) {
     return NextResponse.next();
   }
@@ -139,21 +170,27 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    const loginUrl = new URL("/admin/login", request.url);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(new URL("/admin/login", request.url));
   }
 
   let isAdmin = false;
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, account_type")
     .eq("id", user.id)
     .maybeSingle();
 
+  const profileRole = String(profile?.role || "").toLowerCase();
+  const profileAccountType = String(profile?.account_type || "").toLowerCase();
+
   if (
-    typeof profile?.role === "string" &&
-    profile.role.toLowerCase() === "admin"
+    profileRole === "admin" ||
+    profileRole === "owner" ||
+    profileRole === "super_admin" ||
+    profileAccountType === "admin" ||
+    profileAccountType === "owner" ||
+    profileAccountType === "super_admin"
   ) {
     isAdmin = true;
   }
@@ -165,10 +202,10 @@ export async function middleware(request: NextRequest) {
       .eq("user_id", user.id);
 
     if (
-      (roleRows || []).some(
-        (row) =>
-          typeof row.role === "string" && row.role.toLowerCase() === "admin"
-      )
+      (roleRows || []).some((row) => {
+        const role = String(row.role || "").toLowerCase();
+        return role === "admin" || role === "owner" || role === "super_admin";
+      })
     ) {
       isAdmin = true;
     }
