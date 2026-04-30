@@ -7,25 +7,49 @@ import { createClient } from "@/lib/supabase/server";
 type CustomerLoginPageProps = {
   searchParams?: Promise<{
     error?: string;
+    next?: string;
+    redirect?: string;
   }>;
 };
 
 export const dynamic = "force-dynamic";
+
+function getSafeNextPath(nextValue?: string) {
+  const fallback = "/customer/dashboard";
+
+  if (!nextValue) return fallback;
+
+  try {
+    const decoded = decodeURIComponent(nextValue).trim();
+
+    if (!decoded.startsWith("/")) return fallback;
+    if (decoded.startsWith("//")) return fallback;
+    if (decoded.includes("://")) return fallback;
+
+    return decoded;
+  } catch {
+    return fallback;
+  }
+}
 
 export default async function CustomerLoginPage({
   searchParams,
 }: CustomerLoginPageProps) {
   const supabase = await createClient();
 
+  const params = searchParams ? await searchParams : undefined;
+
+  const rawNext = params?.next || params?.redirect || "";
+  const nextPath = getSafeNextPath(rawNext);
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/customer/dashboard");
+    redirect(nextPath);
   }
 
-  const params = searchParams ? await searchParams : undefined;
   const errorMessage = params?.error ? decodeURIComponent(params.error) : "";
 
   return (
@@ -102,6 +126,12 @@ export default async function CustomerLoginPage({
               </p>
             </div>
 
+            {nextPath !== "/customer/dashboard" ? (
+              <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-800">
+                After login, we’ll return you to where you left off.
+              </div>
+            ) : null}
+
             {errorMessage ? (
               <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                 {errorMessage}
@@ -109,7 +139,7 @@ export default async function CustomerLoginPage({
             ) : null}
 
             <form action={login} className="mt-8 space-y-5">
-              <input type="hidden" name="next" value="/customer/dashboard" />
+              <input type="hidden" name="next" value={nextPath} />
 
               <div className="space-y-2">
                 <label
@@ -158,7 +188,7 @@ export default async function CustomerLoginPage({
                 </Link>
 
                 <Link
-                  href="/phone-login"
+                  href={`/phone-login?next=${encodeURIComponent(nextPath)}`}
                   className="text-emerald-700 hover:text-emerald-600"
                 >
                   Log in with phone code
@@ -208,7 +238,7 @@ export default async function CustomerLoginPage({
             <div className="mt-2 text-sm text-slate-600">
               Need an account?{" "}
               <Link
-                href="/signup"
+                href={`/signup?next=${encodeURIComponent(nextPath)}`}
                 className="font-medium text-emerald-700 hover:text-emerald-600"
               >
                 Get started
