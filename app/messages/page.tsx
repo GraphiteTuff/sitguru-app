@@ -379,6 +379,15 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   const currentUserRole = normalizeRoleValue(
     currentProfile?.role || currentProfile?.account_type || ""
   );
+
+  if (currentUserRole === "guru") {
+    redirect("/guru/dashboard/messages");
+  }
+
+  if (currentUserRole === "admin") {
+    redirect("/admin/messages");
+  }
+
   const dashboardHref = getDashboardHref(currentUserRole);
 
   const myParticipantRows = await safeRows<ConversationParticipantRow>(

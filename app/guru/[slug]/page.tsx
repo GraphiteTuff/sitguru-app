@@ -641,7 +641,7 @@ export default async function GuruProfilePage({ params }: PageProps) {
   const primaryPhoto = getPrimaryPhoto(guru);
 
   return (
-    <main className="min-h-screen bg-slate-50 pb-24 !text-slate-900 sm:pb-0">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#eefdf6_100%)] pb-24 !text-slate-950 antialiased sm:pb-0 [&&_h1]:!text-slate-950 [&&_h2]:!text-slate-950 [&&_h3]:!text-slate-950 [&&_h4]:!text-slate-950 [&&_p]:!text-slate-800 [&&_label]:!text-slate-950 [&&_input]:!text-slate-950 [&&_select]:!text-slate-950 [&&_textarea]:!text-slate-950 [&&_option]:!text-slate-950 [&&_input::placeholder]:!text-slate-500 [&&_textarea::placeholder]:!text-slate-500">
       <GuruProfileAnalytics
         guruId={guru.id}
         guruSlug={publicSlug}
@@ -652,620 +652,500 @@ export default async function GuruProfilePage({ params }: PageProps) {
         isFallback={isFallback}
       />
 
-      <section className="relative overflow-hidden border-b border-slate-200 bg-[linear-gradient(135deg,#05244f_0%,#0b356c_42%,#0f172a_100%)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.22),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.10),transparent_22%)]" />
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold !text-slate-700">
+            <Link href="/search" className="transition hover:!text-emerald-700">
+              Find a Guru
+            </Link>
+            <span aria-hidden="true">›</span>
+            <span>{primaryService}</span>
+            {location ? (
+              <>
+                <span aria-hidden="true">›</span>
+                <span>{location}</span>
+              </>
+            ) : null}
+            <span aria-hidden="true">›</span>
+            <span className="!text-slate-900">{displayName}</span>
+          </nav>
 
-        {heroImage ? (
-          <div
-            className="absolute inset-0 opacity-15"
-            style={{
-              backgroundImage: `url(${heroImage})`,
-              backgroundPosition: "center",
-              backgroundSize: "cover",
-            }}
-          />
-        ) : null}
-
-        <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-          <div className="grid gap-6 lg:grid-cols-[1.28fr_0.72fr] lg:items-stretch">
-            <div className="rounded-[2rem] border border-white/10 bg-slate-950/30 p-6 shadow-[0_25px_80px_rgba(0,0,0,0.25)] backdrop-blur-md sm:p-8">
-              <div className="mb-5 flex flex-wrap items-center gap-3">
-                <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100">
-                  SitGuru Public Profile
-                </span>
-
-                {guru.is_verified ? (
-                  <span className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100">
-                    Verified by SitGuru
-                  </span>
-                ) : null}
-
-                {guru.is_featured ? (
-                  <span className="rounded-full border border-amber-300/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-amber-100">
-                    Featured Guru
-                  </span>
-                ) : null}
-
-                {isFallback ? (
-                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-100">
-                    Preview Profile
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[1.6rem] border border-white/15 bg-white/10 text-3xl font-bold text-white shadow-2xl sm:h-32 sm:w-32">
+          <Link
+            href="/search"
+            className="inline-flex min-h-[46px] w-fit items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black !text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md"
+          >
+            ← Back to Find a Guru
+          </Link>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-[1fr_390px] xl:grid-cols-[1fr_430px]">
+          <div className="space-y-6">
+            <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+              <div className="grid gap-0 lg:grid-cols-[260px_1fr]">
+                <div className="relative min-h-[260px] bg-slate-100 lg:min-h-full">
                   {primaryPhoto ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={primaryPhoto}
                       alt={displayName}
-                      className="h-full w-full object-cover object-center"
+                      className="h-full min-h-[260px] w-full object-cover object-center"
                     />
                   ) : (
-                    initialsFromName(displayName)
+                    <div className="flex h-full min-h-[260px] w-full items-center justify-center bg-slate-100 text-4xl font-black !text-slate-600">
+                      {initialsFromName(displayName)}
+                    </div>
                   )}
+
+                  <div className="absolute bottom-4 left-4 rounded-full bg-slate-950 px-4 py-2 text-sm font-black text-white shadow-lg">
+                    ⭐ {guru.is_featured ? "Featured Guru" : "Trusted Guru"}
+                  </div>
                 </div>
 
-                <div className="min-w-0">
-                  <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
-                    {displayName}
-                  </h1>
-
-                  <p className="mt-3 text-lg font-semibold text-emerald-200">
-                    {headline}
-                  </p>
-
-                  <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-slate-100">
-                    <span>{location || "Serving your area"}</span>
-                    <span className="text-slate-400">•</span>
-                    <span>{rate}/hr</span>
-                    <span className="text-slate-400">•</span>
-                    <span>{years}</span>
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <span className="inline-flex items-center rounded-full border border-amber-300/25 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-100">
-                      ⭐ {ratingValue} ({reviewText})
-                    </span>
-
-                    <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white">
-                      {responseStyle}
+                <div className="p-6 sm:p-8">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-black uppercase tracking-[0.16em] !text-emerald-700 ring-1 ring-emerald-100">
+                      {profileStatus}
                     </span>
 
                     {guru.is_verified ? (
-                      <span className="inline-flex items-center rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100">
-                        Verified by SitGuru
+                      <span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-black !text-sky-700 ring-1 ring-sky-100">
+                        🛡️ Verified Guru
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-slate-50 px-3 py-1 text-sm font-black !text-slate-800 ring-1 ring-slate-200">
+                        Profile reviewed
+                      </span>
+                    )}
+
+                    {isFallback ? (
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-black !text-amber-700 ring-1 ring-amber-100">
+                        Preview Profile
                       </span>
                     ) : null}
                   </div>
 
-                  <div className="mt-7 flex flex-wrap gap-3">
+                  <h1 className="mt-4 text-5xl font-black tracking-[-0.045em] !text-slate-950 sm:text-6xl">
+                    {displayName}
+                  </h1>
+
+                  <p className="mt-2 text-2xl font-semibold !text-slate-800">
+                    {headline}
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold !text-slate-800">
+                    <span>📍 {location || "Serving your area"}</span>
+                    <span className="hidden !text-slate-500 sm:inline">|</span>
+                    <span>{rate === "Rate pending" ? rate : `${rate}/hr`}</span>
+                    <span className="hidden !text-slate-500 sm:inline">|</span>
+                    <span>{years}</span>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center rounded-full bg-amber-50 px-4 py-2 text-sm font-black !text-amber-700 ring-1 ring-amber-100">
+                      ⭐ {ratingValue} ({reviewText})
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-slate-50 px-4 py-2 text-sm font-black !text-slate-700 ring-1 ring-slate-200">
+                      {responseStyle}
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-4 py-2 text-sm font-black !text-emerald-700 ring-1 ring-emerald-100">
+                      {years} experience
+                    </span>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {services.slice(0, 6).map((service) => (
+                      <span
+                        key={service}
+                        className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold !text-emerald-700 ring-1 ring-emerald-100"
+                      >
+                        {service}
+                      </span>
+                    ))}
+                    {services.length > 6 ? (
+                      <span className="rounded-full bg-slate-50 px-3 py-1.5 text-sm font-bold !text-slate-800 ring-1 ring-slate-200">
+                        +{services.length - 6} more
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-7 flex flex-wrap items-center gap-3">
                     <Link
                       href={bookingPageHref}
-                      className="inline-flex min-h-[56px] w-full items-center justify-center whitespace-nowrap rounded-2xl !bg-white px-7 py-3.5 text-lg font-black !text-slate-950 shadow-xl transition hover:!bg-slate-100 sm:w-auto"
+                      className="inline-flex min-h-[56px] min-w-[172px] items-center justify-center rounded-full bg-emerald-600 px-8 py-3 text-base font-black text-white shadow-[0_12px_28px_rgba(5,150,105,0.22)] transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-[0_16px_34px_rgba(5,150,105,0.28)]"
                     >
                       Book this Guru
                     </Link>
 
                     <Link
                       href={messageHref}
-                      className="inline-flex min-h-[56px] w-full items-center justify-center whitespace-nowrap rounded-2xl border border-white/25 bg-white/10 px-7 py-3.5 text-lg font-black !text-white transition hover:bg-white/20 sm:w-auto"
+                      className="inline-flex min-h-[56px] min-w-[172px] items-center justify-center rounded-full border border-slate-200 bg-white px-8 py-3 text-base font-black !text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:!text-emerald-700 hover:shadow-md"
                     >
                       Message Guru
+                    </Link>
+
+                    <Link
+                      href="/search"
+                      className="inline-flex h-[56px] w-[56px] items-center justify-center rounded-full border border-slate-200 bg-white text-2xl font-black !text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:!text-emerald-700 hover:shadow-md"
+                      aria-label="Save Guru"
+                    >
+                      ♡
+                    </Link>
+
+                    <Link
+                      href={`/search?service=${encodeURIComponent(primaryService)}`}
+                      className="inline-flex h-[56px] w-[56px] items-center justify-center rounded-full border border-slate-200 bg-white text-2xl font-black !text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:!text-emerald-700 hover:shadow-md"
+                      aria-label="Share or browse related Gurus"
+                    >
+                      ↗
                     </Link>
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div className="grid gap-3">
-              <div className="rounded-[1.6rem] border border-white/10 bg-white/10 p-5 shadow-xl backdrop-blur-md">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">
-                  Profile Status
-                </p>
-                <p className="mt-2 text-3xl font-black text-white">
-                  {profileStatus}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-200">
-                  Public and visible to customers on SitGuru.
-                </p>
-              </div>
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+              <p className="text-sm font-black uppercase tracking-[0.22em] !text-emerald-700">
+                About this Guru
+              </p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight !text-slate-950 sm:text-4xl">
+                Meet {displayName}
+              </h2>
 
-              <div className="rounded-[1.6rem] border border-white/10 bg-white/10 p-5 shadow-xl backdrop-blur-md">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">
-                  Response Style
-                </p>
-                <p className="mt-2 text-2xl font-black text-white">
-                  {responseStyle}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-200">
-                  Built to help pet parents feel informed and comfortable.
-                </p>
-              </div>
-
-              <div className="rounded-[1.6rem] border border-white/10 bg-white/10 p-5 shadow-xl backdrop-blur-md">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">
-                  Booking
-                </p>
-                <p className="mt-2 text-2xl font-black text-white">
-                  Request Open
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-200">
-                  Accepting new booking inquiries through the platform.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:px-8 lg:py-10">
-        <div className="space-y-6">
-          <section className="rounded-[2rem] border border-slate-200 !bg-white p-6 shadow-sm sm:p-8">
-            <p className="!text-emerald-700 text-sm font-semibold uppercase tracking-[0.24em]">
-              About
-            </p>
-
-            <h2 className="mt-2 !text-slate-950 text-4xl font-black tracking-tight">
-              Meet this Guru
-            </h2>
-
-            <div className="mt-5 border-t border-slate-200 pt-5">
-              <p className="!text-slate-700 text-base leading-8">
+              <p className="mt-5 max-w-3xl text-lg font-medium leading-8 !text-slate-800">
                 {guru.bio?.trim() ||
                   "This Guru offers thoughtful, polished care with a premium customer-facing experience. Families can feel confident with a clear profile, a professional presentation, and responsive communication."}
               </p>
-            </div>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-500 text-sm font-semibold">
-                  Starting rate
-                </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">
-                  {rate}/hr
-                </p>
-              </div>
-
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-500 text-sm font-semibold">
-                  Experience
-                </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">
-                  {years}
-                </p>
-              </div>
-
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-500 text-sm font-semibold">
-                  Location
-                </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">
-                  {location || "Flexible"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <p className="!text-slate-500 text-sm font-semibold uppercase tracking-[0.24em]">
-                Services
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                {services.map((service) => (
-                  <span
-                    key={service}
-                    className="rounded-full border border-slate-200 !bg-slate-50 px-4 py-2 !text-slate-800 text-sm font-semibold"
-                  >
-                    {service}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <p className="!text-slate-500 text-sm font-semibold uppercase tracking-[0.24em]">
-                Specialties
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                {specialties.map((specialty) => (
-                  <span
-                    key={specialty}
-                    className="rounded-full border border-emerald-200 !bg-emerald-50 px-4 py-2 !text-emerald-700 text-sm font-semibold"
-                  >
-                    {specialty}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <p className="!text-slate-500 text-sm font-semibold uppercase tracking-[0.24em]">
-                Trust & profile details
-              </p>
-
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                  <p className="!text-slate-950 text-lg font-bold">
-                    Trusted platform presence
-                  </p>
-                  <p className="mt-3 !text-slate-700 text-sm leading-7">
-                    This Guru has a live SitGuru profile with service and
-                    identity details visible to customers.
-                  </p>
-                </div>
-
-                <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                  <p className="!text-slate-950 text-lg font-bold">
-                    Professional presentation
-                  </p>
-                  <p className="mt-3 !text-slate-700 text-sm leading-7">
-                    Pricing, services, profile content, and media help customers
-                    understand what makes this Guru different.
-                  </p>
-                </div>
-
-                <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                  <p className="!text-slate-950 text-lg font-bold">
-                    Pet-first experience
-                  </p>
-                  <p className="mt-3 !text-slate-700 text-sm leading-7">
-                    Designed to make pet care feel clear, secure, and easier to
-                    request through SitGuru.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-slate-200 !bg-white p-6 shadow-sm sm:p-8">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="!text-emerald-700 text-sm font-semibold uppercase tracking-[0.24em]">
-                  Portfolio
-                </p>
-
-                <h2 className="mt-2 !text-slate-950 text-4xl font-black tracking-tight">
-                  Photos & videos that build trust
-                </h2>
-
-                <p className="mt-3 !text-slate-700 text-base leading-7">
-                  Let customers see real care moments, happy pets, clean visits,
-                  and the personality behind the profile.
-                </p>
-              </div>
-
-              <span className="rounded-full border border-slate-200 !bg-slate-50 px-4 py-2 !text-slate-700 text-xs font-bold uppercase tracking-[0.2em]">
-                {hasLivePortfolio ? "Live portfolio" : "Waiting for uploads"}
-              </span>
-            </div>
-
-            {galleryImages.length > 0 ? (
-              <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-                {galleryImages.slice(0, 6).map((imageUrl, index) => (
+              <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: "Starting rate", value: rate === "Rate pending" ? rate : `${rate}/hr` },
+                  { label: "Experience", value: years },
+                  { label: "Response style", value: responseStyle },
+                  { label: "Location", value: location || "Location pending" },
+                ].map((item) => (
                   <div
-                    key={`${imageUrl}-${index}`}
-                    className="overflow-hidden rounded-[1.4rem] border border-slate-200 !bg-slate-100 shadow-sm"
+                    key={item.label}
+                    className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-5"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={imageUrl}
-                      alt={`${displayName} portfolio image ${index + 1}`}
-                      className="h-44 w-full object-cover object-center transition duration-300 hover:scale-105"
-                    />
+                    <p className="text-sm font-bold !text-slate-700">{item.label}</p>
+                    <p className="mt-2 text-xl font-black !text-slate-950">{item.value}</p>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="mt-6 rounded-[1.4rem] border border-dashed border-slate-300 !bg-slate-50 p-5">
-                <p className="!text-slate-600 text-sm font-medium">
-                  Portfolio photos will appear here once uploaded from the Guru
-                  dashboard and saved to the profile.
+
+              <div className="mt-8">
+                <p className="text-sm font-black uppercase tracking-[0.22em] !text-slate-700">
+                  Services
                 </p>
-              </div>
-            )}
-
-            {portfolioVideos.length > 0 ? (
-              <div className="mt-6 grid gap-4">
-                {portfolioVideos.slice(0, 2).map((videoUrl, index) => (
-                  <div
-                    key={`${videoUrl}-${index}`}
-                    className="overflow-hidden rounded-[1.4rem] border border-slate-200 !bg-slate-50 shadow-sm"
-                  >
-                    <video controls preload="metadata" className="h-auto w-full">
-                      <source src={videoUrl} />
-                      Your browser does not support the video tag.
-                    </video>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-4 rounded-[1.4rem] border border-dashed border-slate-300 !bg-slate-50 p-5">
-                <p className="!text-slate-600 text-sm font-medium">
-                  Portfolio videos will appear here once uploaded from the Guru
-                  dashboard and saved to the profile.
-                </p>
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-[2rem] border border-slate-200 !bg-white p-6 shadow-sm sm:p-8">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="!text-emerald-700 text-sm font-semibold uppercase tracking-[0.24em]">
-                  Trust & confidence
-                </p>
-
-                <h2 className="mt-2 !text-slate-950 text-4xl font-black tracking-tight">
-                  What customers can trust today
-                </h2>
-
-                <p className="mt-3 !text-slate-700 text-base leading-7">
-                  This section is currently designed as a confidence and trust
-                  area. Live customer reviews will appear here once review data
-                  is connected to SitGuru.
-                </p>
-              </div>
-
-              <span className="rounded-full border border-slate-200 !bg-slate-50 px-4 py-2 !text-slate-700 text-xs font-bold uppercase tracking-[0.2em]">
-                {hasLiveReviews ? "Live reviews connected" : "Trust notes active"}
-              </span>
-            </div>
-
-            <div className="mt-6 space-y-4 border-t border-slate-200 pt-5">
-              {hasLiveReviews ? (
-                <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                  <p className="!text-slate-950 text-lg font-bold">
-                    Customer reviews
-                  </p>
-                  <p className="mt-3 !text-slate-700 text-base leading-8">
-                    This Guru currently shows {reviewText} with an average
-                    rating of {ratingValue}. A richer live review feed can be
-                    added once the platform review system is connected.
-                  </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {services.map((service) => (
+                    <div key={service} className="flex items-center gap-3 rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 !text-emerald-700 ring-1 ring-emerald-100">
+                        🐾
+                      </span>
+                      <span className="text-sm font-bold !text-slate-800">{service}</span>
+                    </div>
+                  ))}
                 </div>
-              ) : null}
-
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-950 text-lg font-bold">
-                  Completed public profile
-                </p>
-                <p className="mt-3 !text-slate-700 text-base leading-8">
-                  This Guru has completed a public-facing profile with service
-                  details, pricing, location visibility, and booking entry
-                  points.
-                </p>
               </div>
 
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-950 text-lg font-bold">
-                  Clear booking direction
+              <div className="mt-8">
+                <p className="text-sm font-black uppercase tracking-[0.22em] !text-slate-700">
+                  Specialties
                 </p>
-                <p className="mt-3 !text-slate-700 text-base leading-8">
-                  Customers can quickly understand what this Guru offers and
-                  move into the booking flow with more confidence.
-                </p>
-              </div>
-
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-950 text-lg font-bold">
-                  Better trust presentation
-                </p>
-                <p className="mt-3 !text-slate-700 text-base leading-8">
-                  Services, profile image, credentials, and portfolio placement
-                  are all helping the page feel more premium and trustworthy.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-slate-200 !bg-white p-6 shadow-sm sm:p-8">
-            <p className="!text-emerald-700 text-sm font-semibold uppercase tracking-[0.24em]">
-              Snapshot
-            </p>
-
-            <h2 className="mt-2 !text-slate-950 text-4xl font-black tracking-tight">
-              Quick facts
-            </h2>
-
-            <div className="mt-5 grid gap-4 border-t border-slate-200 pt-5 sm:grid-cols-2">
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-500 text-sm font-semibold">Location</p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">
-                  {location || "Flexible"}
-                </p>
-              </div>
-
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-500 text-sm font-semibold">
-                  Starting rate
-                </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">
-                  {rate}/hr
-                </p>
-              </div>
-
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-500 text-sm font-semibold">
-                  Experience
-                </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">
-                  {years}
-                </p>
-              </div>
-
-              <div className="rounded-[1.4rem] border border-slate-200 !bg-slate-50 p-5">
-                <p className="!text-slate-500 text-sm font-semibold">
-                  Service count
-                </p>
-                <p className="mt-2 !text-slate-950 text-2xl font-black">
-                  {services.length}
-                </p>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
-          <section id="book-guru" className="scroll-mt-28 overflow-hidden rounded-[2rem] border border-emerald-200 !bg-white shadow-[0_20px_60px_rgba(15,118,110,0.10)]">
-            <div className="border-b border-emerald-100 bg-emerald-50 p-5 sm:p-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="rounded-full border border-emerald-200 !bg-white px-3 py-1 !text-emerald-700 text-xs font-black uppercase tracking-[0.22em]">
-                  Step 1 of 2
-                </span>
-                <span className="rounded-full border border-slate-200 !bg-white px-3 py-1 !text-slate-700 text-xs font-bold">
-                  Request Booking
-                </span>
-              </div>
-
-              <h2 className="mt-4 !text-slate-950 text-3xl font-black tracking-tight sm:text-4xl">
-                Book the Guru
-              </h2>
-              <p className="mt-2 !text-slate-700 text-sm font-semibold leading-7">
-                Add the care basics now. You will review the full request before
-                checkout.
-              </p>
-            </div>
-
-                          <GuruQuickBookingForm
-                guruId={guru.id}
-                guruSlug={publicSlug}
-                guruName={displayName}
-                guruHeadline={headline}
-                guruPhotoUrl={primaryPhoto}
-                serviceOptions={bookingServices}
-                primaryService={primaryService}
-                hourlyRate={numericRate}
-                defaultCity={guru.city || ""}
-                defaultState={guru.state || ""}
-              />
-          </section>
-
-          <section className="rounded-[2rem] border border-slate-200 !bg-white p-5 shadow-sm sm:p-6">
-            <p className="!text-emerald-700 text-sm font-bold uppercase tracking-[0.24em]">
-              Trust profile
-            </p>
-
-            <h3 className="mt-3 !text-slate-950 text-3xl font-black tracking-tight">
-              What customers can see
-            </h3>
-
-            <div className="mt-5 space-y-4">
-              <div className="rounded-[1.35rem] border border-slate-200 !bg-slate-50 p-4">
-                <p className="!text-slate-950 text-base font-black">
-                  Verified status
-                </p>
-                <p className="mt-2 !text-slate-700 text-sm font-medium leading-7">
-                  {guru.is_verified
-                    ? "This Guru shows visible trust signals through SitGuru profile verification."
-                    : "Profile trust can continue to grow with richer details, reviews, and visible platform signals."}
-                </p>
-              </div>
-
-              <div className="rounded-[1.35rem] border border-slate-200 !bg-slate-50 p-4">
-                <p className="!text-slate-950 text-base font-black">
-                  Certifications & experience
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {certifications.map((item) => (
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {specialties.map((specialty) => (
                     <span
-                      key={item}
-                      className="rounded-full border border-slate-200 !bg-white px-3 py-1 !text-slate-900 text-xs font-bold"
+                      key={specialty}
+                      className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black !text-emerald-700"
                     >
-                      {item}
+                      {specialty}
                     </span>
                   ))}
                 </div>
               </div>
 
-              <div className="rounded-[1.35rem] border border-slate-200 !bg-slate-50 p-4">
-                <p className="!text-slate-950 text-base font-black">
-                  Booking readiness
+              <div className="mt-8">
+                <p className="text-sm font-black uppercase tracking-[0.22em] !text-slate-700">
+                  Why Pet Parents trust {displayName}
                 </p>
-                <p className="mt-2 !text-slate-700 text-sm font-medium leading-7">
-                  Service details, rate visibility, messaging, and booking
-                  access are all available from this public profile.
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  {[
+                    {
+                      title: "Verified & trusted",
+                      copy: guru.is_verified
+                        ? "This Guru shows visible trust signals through SitGuru profile verification."
+                        : "Profile trust can continue to grow with richer details, reviews, and platform signals.",
+                      icon: "🛡️",
+                    },
+                    {
+                      title: "Professional care",
+                      copy: "Services, pricing, profile content, and media help customers understand what makes this Guru different.",
+                      icon: "⭐",
+                    },
+                    {
+                      title: "Happy pets",
+                      copy: "Designed to make pet care feel clear, secure, and easier to request through SitGuru.",
+                      icon: "💚",
+                    },
+                  ].map((item) => (
+                    <div key={item.title} className="rounded-[1.35rem] border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
+                        {item.icon}
+                      </div>
+                      <p className="mt-4 text-base font-black !text-slate-950">{item.title}</p>
+                      <p className="mt-2 text-sm font-semibold leading-7 !text-slate-800">{item.copy}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-black uppercase tracking-[0.22em] !text-emerald-700">
+                    Photos & videos
+                  </p>
+                  <h2 className="mt-2 text-3xl font-black tracking-tight !text-slate-950">
+                    Real care moments that build trust
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 !text-slate-800">
+                    Let customers see happy pets, clean visits, and the personality behind the profile.
+                  </p>
+                </div>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black uppercase tracking-[0.16em] !text-slate-800">
+                  {hasLivePortfolio ? "Live portfolio" : "Waiting for uploads"}
+                </span>
+              </div>
+
+              {galleryImages.length > 0 ? (
+                <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                  {galleryImages.slice(0, 5).map((imageUrl, index) => (
+                    <div
+                      key={`${imageUrl}-${index}`}
+                      className="group relative overflow-hidden rounded-[1.25rem] border border-slate-200 bg-slate-100 shadow-sm"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imageUrl}
+                        alt={`${displayName} portfolio image ${index + 1}`}
+                        className="h-40 w-full object-cover object-center transition duration-300 group-hover:scale-105"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-6 rounded-[1.4rem] border border-dashed border-slate-300 bg-slate-50 p-5">
+                  <p className="text-sm font-semibold !text-slate-800">
+                    Portfolio photos will appear here once uploaded from the Guru dashboard and saved to the profile.
+                  </p>
+                </div>
+              )}
+
+              {portfolioVideos.length > 0 ? (
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  {portfolioVideos.slice(0, 2).map((videoUrl, index) => (
+                    <div
+                      key={`${videoUrl}-${index}`}
+                      className="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-slate-50 shadow-sm"
+                    >
+                      <video controls preload="metadata" className="h-auto w-full">
+                        <source src={videoUrl} />
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-[1.4rem] border border-dashed border-slate-300 bg-slate-50 p-5">
+                  <p className="text-sm font-semibold !text-slate-800">
+                    Portfolio videos will appear here once uploaded from the Guru dashboard and saved to the profile.
+                  </p>
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+              <p className="text-sm font-black uppercase tracking-[0.22em] !text-emerald-700">
+                Quick facts
+              </p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight !text-slate-950">
+                Snapshot
+              </h2>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {[
+                  { label: "Location", value: location || "Location pending", icon: "📍" },
+                  { label: "Experience", value: years, icon: "📅" },
+                  { label: "Starting rate", value: rate === "Rate pending" ? rate : `${rate}/hr`, icon: "💳" },
+                  { label: "Service count", value: String(services.length), icon: "🐾" },
+                  { label: "Response time", value: responseStyle, icon: "💬" },
+                  { label: "Reviews", value: reviewText, icon: "⭐" },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-4 rounded-[1.35rem] border border-slate-200 bg-slate-50 p-5">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl ring-1 ring-slate-200">
+                      {item.icon}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold !text-slate-700">{item.label}</p>
+                      <p className="mt-1 text-lg font-black !text-slate-950">{item.value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+            <section id="book-guru" className="scroll-mt-28 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,118,110,0.12)]">
+              <div className="border-b border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_100%)] p-5 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-sm font-black uppercase tracking-[0.22em] !text-emerald-700">
+                    Step 1 of 3
+                  </span>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-bold !text-slate-700">
+                    Request Booking
+                  </span>
+                </div>
+                <h2 className="mt-4 text-3xl font-black tracking-tight !text-slate-950 sm:text-4xl">
+                  Request care with {displayName}
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-7 !text-slate-700">
+                  Add the care basics now. You will review the full request before checkout.
                 </p>
+              </div>
+
+              <div className="[&&_h1]:!text-slate-950 [&&_h2]:!text-slate-950 [&&_h3]:!text-slate-950 [&&_p]:!text-slate-800 [&&_label]:!text-slate-950 [&&_input]:!text-slate-950 [&&_select]:!text-slate-950 [&&_textarea]:!text-slate-950 [&&_option]:!text-slate-950 [&&_input::placeholder]:!text-slate-500 [&&_textarea::placeholder]:!text-slate-500">
+                <GuruQuickBookingForm
+                  guruId={guru.id}
+                  guruSlug={publicSlug}
+                  guruName={displayName}
+                  guruHeadline={headline}
+                  guruPhotoUrl={primaryPhoto}
+                  serviceOptions={bookingServices}
+                  primaryService={primaryService}
+                  hourlyRate={numericRate}
+                  defaultCity={guru.city || ""}
+                  defaultState={guru.state || ""}
+                />
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-emerald-100 bg-emerald-50 p-5 shadow-sm sm:p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-2xl !text-emerald-700 ring-1 ring-emerald-100">
+                  🔒
+                </div>
+                <div>
+                  <h3 className="text-xl font-black tracking-tight !text-slate-950">
+                    Secure & private
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold leading-7 !text-slate-700">
+                    Your request is private and only shared with this Guru and SitGuru support when needed.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <p className="text-sm font-black uppercase tracking-[0.22em] !text-emerald-700">
+                Trust & credentials
+              </p>
+              <h3 className="mt-3 text-2xl font-black tracking-tight !text-slate-950">
+                Confidence signals
+              </h3>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                {[
+                  guru.is_verified ? "Verified profile" : "Profile reviewed",
+                  profileStatus,
+                  ...certifications.slice(0, 4),
+                ].map((item, index) => (
+                  <div
+                    key={`${item}-${index}`}
+                    className="flex items-center gap-2 text-sm font-bold !text-slate-700"
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 !text-emerald-700 ring-1 ring-emerald-100">
+                      ✓
+                    </span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <p className="text-sm font-black uppercase tracking-[0.22em] !text-emerald-700">
+                What happens next
+              </p>
+              <h3 className="mt-3 text-2xl font-black tracking-tight !text-slate-950">
+                Book this Guru
+              </h3>
+
+              <div className="mt-5 space-y-4">
+                {[
+                  {
+                    step: "1",
+                    title: "Submit your request",
+                    copy: "Tell us about your pet and care needs.",
+                  },
+                  {
+                    step: "2",
+                    title: "Guru confirms",
+                    copy: "This Guru will review availability and details.",
+                  },
+                  {
+                    step: "3",
+                    title: "You are all set",
+                    copy: "Relax while your pet gets clear, loving care.",
+                  },
+                ].map((item) => (
+                  <div key={item.step} className="flex gap-3 rounded-[1.35rem] bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-black text-white">
+                      {item.step}
+                    </span>
+                    <div>
+                      <p className="text-sm font-black !text-slate-950">{item.title}</p>
+                      <p className="mt-1 text-sm font-semibold leading-6 !text-slate-800">{item.copy}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </aside>
+        </div>
+
+        <section className="mt-6 grid gap-4 rounded-[2rem] border border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_100%)] p-5 shadow-sm md:grid-cols-4">
+          {[
+            { title: "Trusted pet care", copy: "Every Guru is presented with clear trust signals." , icon: "🛡️"},
+            { title: "Personalized matches", copy: "Customers can find care based on pets, services, and location." , icon: "🐾"},
+            { title: "Secure payments", copy: "Booking stays inside the SitGuru experience." , icon: "🔒"},
+            { title: "Support when needed", copy: "SitGuru support is available for care questions." , icon: "🎧"},
+          ].map((item) => (
+            <div key={item.title} className="flex gap-3 rounded-[1.5rem] bg-white/80 p-4 ring-1 ring-emerald-100">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
+                {item.icon}
+              </span>
+              <div>
+                <p className="font-black !text-slate-950">{item.title}</p>
+                <p className="mt-1 text-sm font-semibold leading-6 !text-slate-800">{item.copy}</p>
               </div>
             </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-slate-200 !bg-white p-5 shadow-sm sm:p-6">
-            <p className="!text-emerald-700 text-sm font-bold uppercase tracking-[0.24em]">
-              What happens next
-            </p>
-
-            <h3 className="mt-3 !text-slate-950 text-3xl font-black tracking-tight">
-              Book this Guru
-            </h3>
-
-            <div className="mt-5 space-y-4">
-              <div className="rounded-[1.35rem] border border-slate-200 !bg-slate-50 p-4">
-                <p className="!text-slate-950 text-base font-black">
-                  Tell your Guru what matters most
-                </p>
-                <p className="mt-2 !text-slate-700 text-sm font-medium leading-7">
-                  Share care needs, routine details, and anything important
-                  before the booking request.
-                </p>
-              </div>
-
-              <div className="rounded-[1.35rem] border border-slate-200 !bg-slate-50 p-4">
-                <p className="!text-slate-950 text-base font-black">
-                  Start with a clear date and timeline
-                </p>
-                <p className="mt-2 !text-slate-700 text-sm font-medium leading-7">
-                  This helps the booking flow stay simple and lets your Guru
-                  review quickly.
-                </p>
-              </div>
-
-              <div className="rounded-[1.35rem] border border-slate-200 !bg-slate-50 p-4">
-                <p className="!text-slate-950 text-base font-black">
-                  Submit your request
-                </p>
-                <p className="mt-2 !text-slate-700 text-sm font-medium leading-7">
-                  SitGuru guides you into the booking page with the selected
-                  Guru already attached.
-                </p>
-              </div>
-
-              <div className="rounded-[1.35rem] border border-slate-200 !bg-slate-50 p-4">
-                <p className="!text-slate-950 text-base font-black">
-                  Everything stays inside SitGuru
-                </p>
-                <p className="mt-2 !text-slate-700 text-sm font-medium leading-7">
-                  Your booking request stays within one clear customer-friendly
-                  experience.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 border-t border-slate-200 pt-5">
-              <Link
-                href="/search"
-                className="inline-flex items-center !text-emerald-700 text-sm font-black transition hover:!text-emerald-600"
-              >
-                Browse more Gurus →
-              </Link>
-            </div>
-          </section>
-        </aside>
+          ))}
+        </section>
       </section>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-100 bg-white/95 px-4 py-3 shadow-[0_-16px_40px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden">
         <div className="mx-auto flex max-w-7xl gap-3">
           <Link
             href={bookingPageHref}
-            className="flex min-h-[52px] flex-1 items-center justify-center rounded-2xl !bg-emerald-500 px-4 text-sm font-black !text-slate-950"
+            className="flex min-h-[52px] flex-1 items-center justify-center rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white"
           >
             Book Guru
           </Link>
           <Link
             href={messageHref}
-            className="flex min-h-[52px] flex-1 items-center justify-center rounded-2xl border border-emerald-200 !bg-white px-4 text-sm font-black !text-emerald-700"
+            className="flex min-h-[52px] flex-1 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black !text-emerald-700"
           >
             Message
           </Link>

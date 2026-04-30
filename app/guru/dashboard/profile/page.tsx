@@ -35,6 +35,18 @@ type GuruProfile = {
   bio?: string | null;
   city?: string | null;
   state?: string | null;
+  street_address?: string | null;
+  service_address?: string | null;
+  address?: string | null;
+  zip_code?: string | null;
+  postal_code?: string | null;
+  service_radius_miles?: number | null;
+  service_radius?: number | null;
+  radius_miles?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  lat?: number | null;
+  lng?: number | null;
   hourly_rate?: number | null;
   rate?: number | null;
   years_experience?: number | null;
@@ -184,6 +196,44 @@ async function saveGuruPayload({
   profileExists: boolean;
   payload: Record<string, unknown>;
 }) {
+  const mapPayload = {
+    user_id: payload.user_id,
+    display_name: payload.display_name,
+    full_name: payload.full_name,
+    slug: payload.slug,
+    bio: payload.bio,
+    city: payload.city,
+    state: payload.state,
+    zip_code: payload.zip_code,
+    service_radius_miles: payload.service_radius_miles,
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+    hourly_rate: payload.hourly_rate,
+    rate: payload.rate,
+    profile_photo_url: payload.profile_photo_url,
+    image_url: payload.image_url,
+    services: payload.services,
+    is_public: payload.is_public,
+  };
+
+  const latLngPayload = {
+    user_id: payload.user_id,
+    display_name: payload.display_name,
+    full_name: payload.full_name,
+    slug: payload.slug,
+    bio: payload.bio,
+    city: payload.city,
+    state: payload.state,
+    lat: payload.lat,
+    lng: payload.lng,
+    hourly_rate: payload.hourly_rate,
+    rate: payload.rate,
+    profile_photo_url: payload.profile_photo_url,
+    image_url: payload.image_url,
+    services: payload.services,
+    is_public: payload.is_public,
+  };
+
   const leanPayload = {
     user_id: payload.user_id,
     display_name: payload.display_name,
@@ -214,7 +264,7 @@ async function saveGuruPayload({
     is_public: payload.is_public,
   };
 
-  const attempts = [payload, leanPayload, basicPayload];
+  const attempts = [payload, mapPayload, latLngPayload, leanPayload, basicPayload];
   let lastError = "Could not save your guru profile.";
 
   for (const attempt of attempts) {
@@ -249,6 +299,11 @@ export default function GuruDashboardProfilePage() {
   const [bio, setBio] = useState("");
   const [city, setCity] = useState("");
   const [stateValue, setStateValue] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [zipCode, setZipCode] = useState("");
+  const [serviceRadius, setServiceRadius] = useState("25");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [yearsExperience, setYearsExperience] = useState("");
   const [profilePhotoUrl, setProfilePhotoUrl] = useState("");
@@ -257,6 +312,8 @@ export default function GuruDashboardProfilePage() {
 
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [zipLookupLoading, setZipLookupLoading] = useState(false);
+  const [zipLookupMessage, setZipLookupMessage] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -292,9 +349,7 @@ export default function GuruDashboardProfilePage() {
 
         const { data, error } = await supabase
           .from("gurus")
-          .select(
-            "id, user_id, display_name, full_name, slug, bio, city, state, hourly_rate, rate, profile_photo_url, image_url, avatar_url, photo_url, headline, years_experience, experience_years, services, is_public, onboarding_completed, profile_completed",
-          )
+          .select("*")
           .eq("user_id", user.id)
           .limit(1);
 
@@ -309,6 +364,11 @@ export default function GuruDashboardProfilePage() {
           setBio("");
           setCity("");
           setStateValue("");
+          setStreetAddress("");
+          setZipCode("");
+          setServiceRadius("25");
+          setLatitude("");
+          setLongitude("");
           setHourlyRate("");
           setYearsExperience("");
           setProfilePhotoUrl("");
@@ -332,6 +392,11 @@ export default function GuruDashboardProfilePage() {
           setBio("");
           setCity("");
           setStateValue("");
+          setStreetAddress("");
+          setZipCode("");
+          setServiceRadius("25");
+          setLatitude("");
+          setLongitude("");
           setHourlyRate("");
           setYearsExperience("");
           setProfilePhotoUrl("");
@@ -351,6 +416,31 @@ export default function GuruDashboardProfilePage() {
         setBio(profile.bio || "");
         setCity(profile.city || "");
         setStateValue(profile.state || "");
+        setStreetAddress(profile.street_address || profile.service_address || profile.address || "");
+        setZipCode(profile.zip_code || profile.postal_code || "");
+        setServiceRadius(
+          profile.service_radius_miles !== null && profile.service_radius_miles !== undefined
+            ? String(profile.service_radius_miles)
+            : profile.service_radius !== null && profile.service_radius !== undefined
+              ? String(profile.service_radius)
+              : profile.radius_miles !== null && profile.radius_miles !== undefined
+                ? String(profile.radius_miles)
+                : "25",
+        );
+        setLatitude(
+          profile.latitude !== null && profile.latitude !== undefined
+            ? String(profile.latitude)
+            : profile.lat !== null && profile.lat !== undefined
+              ? String(profile.lat)
+              : "",
+        );
+        setLongitude(
+          profile.longitude !== null && profile.longitude !== undefined
+            ? String(profile.longitude)
+            : profile.lng !== null && profile.lng !== undefined
+              ? String(profile.lng)
+              : "",
+        );
         setHourlyRate(
           profile.hourly_rate !== null && profile.hourly_rate !== undefined
             ? String(profile.hourly_rate)
@@ -392,6 +482,79 @@ export default function GuruDashboardProfilePage() {
       mounted = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    const cleanZip = zipCode.replace(/\D/g, "").slice(0, 5);
+
+    if (loading || cleanZip.length !== 5) {
+      if (cleanZip.length < 5) setZipLookupMessage("");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setZipLookupLoading(true);
+      setZipLookupMessage("Looking up ZIP code...");
+
+      try {
+        const response = await fetch(`/api/location/zip?zip=${cleanZip}`);
+        const result = (await response.json()) as {
+          ok?: boolean;
+          city?: string;
+          state?: string;
+          latitude?: number;
+          longitude?: number;
+          error?: string;
+        };
+
+        if (cancelled) return;
+
+        if (!response.ok || !result.ok) {
+          setZipLookupMessage(
+            result.error ||
+              "Could not auto-fill this ZIP code. Please check the ZIP and try again.",
+          );
+          return;
+        }
+
+        setCity(result.city || "");
+        setStateValue(result.state || "");
+        setLatitude(
+          typeof result.latitude === "number" ? String(result.latitude) : "",
+        );
+        setLongitude(
+          typeof result.longitude === "number" ? String(result.longitude) : "",
+        );
+        setZipLookupMessage(
+          `ZIP found: ${result.city || "City"}, ${result.state || "State"}. Map coordinates saved automatically.`,
+        );
+      } catch {
+        if (!cancelled) {
+          setZipLookupMessage(
+            "Could not auto-fill this ZIP code right now. Please try again.",
+          );
+        }
+      } finally {
+        if (!cancelled) setZipLookupLoading(false);
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [loading, zipCode]);
+
+  function handleZipCodeChange(value: string) {
+    const cleanZip = value.replace(/\D/g, "").slice(0, 5);
+    setZipCode(cleanZip);
+
+    if (cleanZip.length < 5) {
+      setZipLookupMessage("Enter a 5-digit ZIP code to auto-fill city and state.");
+      setLatitude("");
+      setLongitude("");
+    }
+  }
 
   function toggleService(service: string) {
     setServices((current) =>
@@ -450,6 +613,11 @@ export default function GuruDashboardProfilePage() {
     const cleanBio = bio.trim();
     const cleanCity = city.trim();
     const cleanState = stateValue.trim().toUpperCase();
+    const cleanStreetAddress = streetAddress.trim();
+    const cleanZipCode = zipCode.trim();
+    const parsedServiceRadius = serviceRadius ? Number(serviceRadius) : null;
+    const parsedLatitude = latitude ? Number(latitude) : null;
+    const parsedLongitude = longitude ? Number(longitude) : null;
     const cleanPhotoUrl = profilePhotoUrl.trim();
     const cleanServices = normalizeServices(services);
 
@@ -485,12 +653,42 @@ export default function GuruDashboardProfilePage() {
       return;
     }
 
+    if (
+      parsedServiceRadius !== null &&
+      (Number.isNaN(parsedServiceRadius) || parsedServiceRadius < 0)
+    ) {
+      setErrorMessage("Service radius must be a valid non-negative number.");
+      setSaving(false);
+      return;
+    }
+
+    if (
+      parsedLatitude !== null &&
+      (Number.isNaN(parsedLatitude) || parsedLatitude < -90 || parsedLatitude > 90)
+    ) {
+      setErrorMessage("Latitude must be between -90 and 90.");
+      setSaving(false);
+      return;
+    }
+
+    if (
+      parsedLongitude !== null &&
+      (Number.isNaN(parsedLongitude) ||
+        parsedLongitude < -180 ||
+        parsedLongitude > 180)
+    ) {
+      setErrorMessage("Longitude must be between -180 and 180.");
+      setSaving(false);
+      return;
+    }
+
     const onboardingCompleted =
       Boolean(cleanDisplayName) &&
       Boolean(cleanSlug) &&
       Boolean(cleanBio) &&
       Boolean(cleanCity) &&
       Boolean(cleanState) &&
+      Boolean(cleanZipCode) &&
       Boolean(cleanPhotoUrl) &&
       cleanServices.length > 0;
 
@@ -503,6 +701,19 @@ export default function GuruDashboardProfilePage() {
       bio: cleanBio || null,
       city: cleanCity || null,
       state: cleanState || null,
+      street_address: cleanStreetAddress || null,
+      service_address: cleanStreetAddress || null,
+      address: cleanStreetAddress || null,
+      zip_code: cleanZipCode || null,
+      postal_code: cleanZipCode || null,
+      service_radius_miles: parsedServiceRadius,
+      service_radius: parsedServiceRadius,
+      radius_miles: parsedServiceRadius,
+      latitude: parsedLatitude,
+      longitude: parsedLongitude,
+      lat: parsedLatitude,
+      lng: parsedLongitude,
+      location_updated_at: new Date().toISOString(),
       hourly_rate: parsedRate,
       rate: parsedRate,
       years_experience: parsedExperience,
@@ -522,9 +733,7 @@ export default function GuruDashboardProfilePage() {
 
       const { data: freshRows } = await supabase
         .from("gurus")
-        .select(
-          "id, user_id, display_name, full_name, slug, bio, city, state, hourly_rate, rate, profile_photo_url, image_url, avatar_url, photo_url, headline, years_experience, experience_years, services, is_public, onboarding_completed, profile_completed",
-        )
+        .select("*")
         .eq("user_id", userId)
         .limit(1);
 
@@ -541,6 +750,31 @@ export default function GuruDashboardProfilePage() {
         setBio(refreshed.bio || "");
         setCity(refreshed.city || "");
         setStateValue(refreshed.state || "");
+        setStreetAddress(refreshed.street_address || refreshed.service_address || refreshed.address || cleanStreetAddress);
+        setZipCode(refreshed.zip_code || refreshed.postal_code || cleanZipCode);
+        setServiceRadius(
+          refreshed.service_radius_miles !== null && refreshed.service_radius_miles !== undefined
+            ? String(refreshed.service_radius_miles)
+            : refreshed.service_radius !== null && refreshed.service_radius !== undefined
+              ? String(refreshed.service_radius)
+              : refreshed.radius_miles !== null && refreshed.radius_miles !== undefined
+                ? String(refreshed.radius_miles)
+                : serviceRadius,
+        );
+        setLatitude(
+          refreshed.latitude !== null && refreshed.latitude !== undefined
+            ? String(refreshed.latitude)
+            : refreshed.lat !== null && refreshed.lat !== undefined
+              ? String(refreshed.lat)
+              : latitude,
+        );
+        setLongitude(
+          refreshed.longitude !== null && refreshed.longitude !== undefined
+            ? String(refreshed.longitude)
+            : refreshed.lng !== null && refreshed.lng !== undefined
+              ? String(refreshed.lng)
+              : longitude,
+        );
         setHourlyRate(
           refreshed.hourly_rate !== null && refreshed.hourly_rate !== undefined
             ? String(refreshed.hourly_rate)
@@ -572,7 +806,7 @@ export default function GuruDashboardProfilePage() {
         setProfileExists(true);
       }
 
-      setSuccessMessage("Guru profile saved successfully.");
+      setSuccessMessage("Guru profile saved successfully. ZIP, city, state, service radius, and private map coordinates now feed Find a Guru.");
       router.refresh();
     } catch (error) {
       setErrorMessage(
@@ -591,6 +825,7 @@ export default function GuruDashboardProfilePage() {
       Boolean(bio.trim()),
       Boolean(city.trim()),
       Boolean(stateValue.trim()),
+      Boolean(zipCode.trim()),
       Boolean(profilePhotoUrl.trim()),
       services.length > 0,
     ];
@@ -604,6 +839,7 @@ export default function GuruDashboardProfilePage() {
     bio,
     city,
     stateValue,
+    zipCode,
     profilePhotoUrl,
     services,
   ]);
@@ -616,6 +852,7 @@ export default function GuruDashboardProfilePage() {
       { label: "Bio", complete: Boolean(bio.trim()) },
       { label: "City", complete: Boolean(city.trim()) },
       { label: "State", complete: Boolean(stateValue.trim()) },
+      { label: "ZIP code", complete: Boolean(zipCode.trim()) },
       { label: "Profile photo", complete: Boolean(profilePhotoUrl.trim()) },
       { label: "Services", complete: services.length > 0 },
     ];
@@ -628,6 +865,7 @@ export default function GuruDashboardProfilePage() {
     bio,
     city,
     stateValue,
+    zipCode,
     profilePhotoUrl,
     services,
   ]);
@@ -636,9 +874,15 @@ export default function GuruDashboardProfilePage() {
   const publicPreviewSlug = slugify(slug || displayName || "guru");
   const publicPreviewHeadline = headline.trim() || "Trusted Pet Care Guru";
   const publicPreviewLocation =
-    city.trim() || stateValue.trim()
-      ? [city.trim(), stateValue.trim()].filter(Boolean).join(", ")
+    city.trim() || stateValue.trim() || zipCode.trim()
+      ? [city.trim(), stateValue.trim(), zipCode.trim()]
+          .filter(Boolean)
+          .join(", ")
       : "Location pending";
+  const mapReady = Boolean(
+    city.trim() && stateValue.trim() && latitude.trim() && longitude.trim(),
+  );
+  const mapStatusLabel = mapReady ? "Map ready" : "Map location pending";
   const publicPreviewBio =
     bio.trim() ||
     "Your customer-facing bio will appear here once added. Share how you care for pets, what makes you trustworthy, and the kind of families you are best suited to help.";
@@ -821,12 +1065,13 @@ export default function GuruDashboardProfilePage() {
             </div>
           </div>
 
-          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-4 md:px-8">
+          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-5 md:px-8">
             {[
               { label: "Complete", value: `${completionPercent}%`, icon: "⭐" },
               { label: "Services", value: services.length, icon: "🐾" },
               { label: "Public", value: isPublic ? "Yes" : "No", icon: "👀" },
               { label: "Rate", value: publicPreviewRate, icon: "💚" },
+              { label: "Map", value: mapReady ? "Ready" : "Pending", icon: "🗺️" },
             ].map((item) => (
               <div
                 key={item.label}
@@ -1008,6 +1253,71 @@ export default function GuruDashboardProfilePage() {
                       maxLength={2}
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                     />
+                  </div>
+                  <div>
+                    <label htmlFor="zip_code" className="mb-2 block text-sm font-extrabold !text-slate-950">
+                      ZIP code
+                    </label>
+                    <input
+                      id="zip_code"
+                      value={zipCode}
+                      onChange={(event) => handleZipCodeChange(event.target.value)}
+                      placeholder="18951"
+                      inputMode="numeric"
+                      maxLength={5}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                    <p className="mt-2 text-xs font-bold text-slate-500">
+                      Enter a 5-digit ZIP code to auto-fill city, state, and map coordinates.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="service_radius" className="mb-2 block text-sm font-extrabold !text-slate-950">
+                      Service radius miles
+                    </label>
+                    <input
+                      id="service_radius"
+                      value={serviceRadius}
+                      onChange={(event) => setServiceRadius(event.target.value)}
+                      placeholder="25"
+                      inputMode="decimal"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label htmlFor="street_address" className="mb-2 block text-sm font-extrabold !text-slate-950">
+                      Service address or general area
+                    </label>
+                    <input
+                      id="street_address"
+                      value={streetAddress}
+                      onChange={(event) => setStreetAddress(event.target.value)}
+                      placeholder="Optional. Used by Admin/map setup, not shown as your exact public address."
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-bold text-emerald-900">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span>{mapStatusLabel}</span>
+                      {zipLookupLoading ? (
+                        <span className="inline-flex items-center gap-2 text-emerald-800">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Checking ZIP
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-emerald-800">
+                      Gurus only enter ZIP, city, state, and service radius.
+                      SitGuru saves map latitude and longitude privately after ZIP lookup.
+                    </p>
+                    {zipLookupMessage ? (
+                      <p className="mt-2 text-sm font-extrabold text-emerald-950">
+                        {zipLookupMessage}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div>

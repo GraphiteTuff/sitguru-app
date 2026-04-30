@@ -5,6 +5,34 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+const adminRoutes = {
+  dashboard: "/admin",
+  bookings: "/admin/bookings",
+  customers: "/admin/customers",
+  gurus: "/admin/gurus",
+  messages: "/admin/messages",
+  adminMessages: "/admin/messages/admin",
+  messageReview: "/admin/messages/review",
+  settings: "/admin/settings",
+  financials: "/admin/financials",
+  profitLoss: "/admin/financials/profit-loss",
+  balanceSheet: "/admin/financials/balance-sheet",
+  cashFlow: "/admin/financials/cash-flow",
+  proForma: "/admin/financials/pro-forma",
+  commissions: "/admin/commissions",
+  exports: "/admin/exports",
+  activity: "/admin/activity",
+  launchSignups: "/admin/launch-signups",
+  instagramLaunchSignups: "/admin/launch-signups?source=instagram",
+  bothLaunchSignups: "/admin/launch-signups?filter=both",
+  programs: "/admin/programs",
+  veteransProgram: "/admin/programs/veterans",
+  studentHireProgram: "/admin/programs/student-hire",
+  minorityHireProgram: "/admin/programs/minority-hire",
+  affiliates: "/admin/affiliates",
+  analytics: "/admin/analytics",
+};
+
 type Tone = "emerald" | "sky" | "violet" | "amber" | "rose";
 
 type BookingRow = Record<string, unknown>;
@@ -972,7 +1000,7 @@ async function getAdminOverviewData() {
       change: totalBookings > 0 ? `${totalBookings} bookings` : "No live bookings",
       subtext: "Live service subtotal volume flowing through marketplace bookings.",
       tone: "emerald" as Tone,
-      href: "/admin/financials",
+      href: adminRoutes.financials,
     },
     {
       title: "Net Platform Revenue",
@@ -980,7 +1008,7 @@ async function getAdminOverviewData() {
       change: percent(platformTakeRate || 0),
       subtext: "Current SitGuru fee revenue from processed booking volume.",
       tone: "sky" as Tone,
-      href: "/admin/financials/profit-loss",
+      href: adminRoutes.profitLoss,
     },
     {
       title: "Cash Position",
@@ -989,7 +1017,7 @@ async function getAdminOverviewData() {
         taxesCollected > 0 ? `Tax held ${money(taxesCollected)}` : "Tax not yet collected",
       subtext: "Simplified cash view using platform fee revenue plus taxes collected.",
       tone: "violet" as Tone,
-      href: "/admin/financials/cash-flow",
+      href: adminRoutes.cashFlow,
     },
     {
       title: "Pending Payouts",
@@ -997,7 +1025,7 @@ async function getAdminOverviewData() {
       change: pendingPayouts > 0 ? "Needs review" : "Clear",
       subtext: "Guru payout amounts still pending release after paid bookings.",
       tone: "amber" as Tone,
-      href: "/admin/commissions",
+      href: adminRoutes.commissions,
     },
     {
       title: "Taxes Collected",
@@ -1005,7 +1033,7 @@ async function getAdminOverviewData() {
       change: taxesCollected > 0 ? "Track liability" : "No tax captured yet",
       subtext: "Sales tax held separately from Guru earnings and platform revenue.",
       tone: "rose" as Tone,
-      href: "/admin/financials",
+      href: adminRoutes.financials,
     },
     {
       title: "Breakeven Margin",
@@ -1013,7 +1041,7 @@ async function getAdminOverviewData() {
       change: grossRevenue > 0 ? "Live estimate" : "Awaiting volume",
       subtext: "Current performance relative to modeled breakeven point.",
       tone: "emerald" as Tone,
-      href: "/admin/financials/pro-forma",
+      href: adminRoutes.proForma,
     },
   ];
 
@@ -1024,7 +1052,7 @@ async function getAdminOverviewData() {
       change: totalLaunchSignups > 0 ? "Live captured leads" : "No signups yet",
       subtext: "Combined early-access signups from website, social, and referrals.",
       tone: "emerald" as Tone,
-      href: "/admin/launch-signups",
+      href: adminRoutes.launchSignups,
     },
     {
       title: "Future Gurus",
@@ -1032,7 +1060,7 @@ async function getAdminOverviewData() {
       change: roles.guru > 0 ? "Strong pipeline" : "Build pipeline",
       subtext: "Prospects who selected Guru on the pre-launch page.",
       tone: "sky" as Tone,
-      href: "/admin/guru-approvals",
+      href: adminRoutes.gurus,
     },
     {
       title: "Pet Parents",
@@ -1040,7 +1068,7 @@ async function getAdminOverviewData() {
       change: roles.customer > 0 ? "Largest segment" : "Awaiting customers",
       subtext: "Customer-side interest captured from live homepage and social.",
       tone: "violet" as Tone,
-      href: "/admin/users",
+      href: adminRoutes.customers,
     },
     {
       title: "Instagram Source",
@@ -1048,7 +1076,7 @@ async function getAdminOverviewData() {
       change: instagramSource > 0 ? "Top tracked social source" : "No IG source yet",
       subtext: "Tracked from organic, awareness, and conversion-focused Instagram traffic.",
       tone: "amber" as Tone,
-      href: "/admin/launch-signups?source=instagram",
+      href: adminRoutes.instagramLaunchSignups,
     },
   ];
 
@@ -1059,7 +1087,7 @@ async function getAdminOverviewData() {
       change: totalMessages > 0 ? "Live inbox activity" : "No messages yet",
       subtext: "All customer, Guru, and admin/support message rows currently found.",
       tone: "emerald" as Tone,
-      href: "/admin/messages",
+      href: adminRoutes.messages,
     },
     {
       title: "Unread Messages",
@@ -1067,7 +1095,7 @@ async function getAdminOverviewData() {
       change: unreadMessages > 0 ? "Needs review" : "All clear",
       subtext: "Unread or unreviewed messages based on read/status fields.",
       tone: unreadMessages > 0 ? ("amber" as Tone) : ("sky" as Tone),
-      href: "/admin/messages",
+      href: adminRoutes.messages,
     },
     {
       title: "Admin Threads",
@@ -1075,7 +1103,7 @@ async function getAdminOverviewData() {
       change: adminConversations > 0 ? "Support active" : "No support threads",
       subtext: "Guru or customer conversations routed to admin/support.",
       tone: "violet" as Tone,
-      href: "/admin/messages/admin",
+      href: adminRoutes.adminMessages,
     },
     {
       title: "Customer ↔ Guru Threads",
@@ -1084,7 +1112,7 @@ async function getAdminOverviewData() {
         customerGuruConversations > 0 ? "Marketplace messaging" : "No active threads",
       subtext: "Direct service conversations between customers and Gurus.",
       tone: "rose" as Tone,
-      href: "/admin/messages/review",
+      href: adminRoutes.messageReview,
     },
   ];
 
@@ -1130,25 +1158,25 @@ const programCards = [
     title: "Veterans Program",
     description:
       "Support veteran Gurus, customers, and support providers with dedicated tracking and recruitment reporting.",
-    href: "/admin/programs/veterans",
+    href: adminRoutes.veteransProgram,
   },
   {
     title: "Student Hire Program",
     description:
       "Create pipelines for student Gurus and hiring-ready talent from universities.",
-    href: "/admin/programs/student-hire",
+    href: adminRoutes.studentHireProgram,
   },
   {
     title: "Minority Hire Program",
     description:
       "Track participation, outreach, and community partnership support across growth.",
-    href: "/admin/programs/minority-hire",
+    href: adminRoutes.minorityHireProgram,
   },
   {
     title: "Affiliate Partnerships",
     description:
       "Manage schools, vets, retailers, shelters, and organizations using SitGuru codes and partner campaigns.",
-    href: "/admin/affiliates",
+    href: adminRoutes.affiliates,
   },
 ];
 
@@ -1174,6 +1202,32 @@ export default async function AdminOverviewPage() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_30%),radial-gradient(circle_at_right,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-8">
+        <nav className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-white/5 p-4 shadow-[0_10px_35px_rgba(0,0,0,0.18)]">
+          <Link href={adminRoutes.dashboard} className="text-sm font-black uppercase tracking-[0.22em] text-emerald-300">
+            SitGuru Admin
+          </Link>
+
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: "Dashboard", href: adminRoutes.dashboard },
+              { label: "Bookings", href: adminRoutes.bookings },
+              { label: "Customers", href: adminRoutes.customers },
+              { label: "Gurus", href: adminRoutes.gurus },
+              { label: "Messages", href: adminRoutes.messages },
+              { label: "Financials", href: adminRoutes.financials },
+              { label: "Settings", href: adminRoutes.settings },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-slate-200 transition hover:border-emerald-300/40 hover:bg-emerald-400/10 hover:text-emerald-200"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+
         <section className="overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-emerald-500/15 via-slate-950 to-sky-500/10 p-6 shadow-[0_12px_60px_rgba(0,0,0,0.28)] lg:p-8">
           <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-4xl">
@@ -1194,13 +1248,13 @@ export default async function AdminOverviewPage() {
 
             <div className="flex flex-wrap gap-3">
               <ActionLink
-                href="/admin/financials"
+                href={adminRoutes.financials}
                 label="Open Financials"
                 primary
               />
-              <ActionLink href="/admin/messages" label="Message Center" />
-              <ActionLink href="/admin/exports" label="Export Center" />
-              <ActionLink href="/admin/activity" label="Live Activity" />
+              <ActionLink href={adminRoutes.messages} label="Message Center" />
+              <ActionLink href={adminRoutes.exports} label="Export Center" />
+              <ActionLink href={adminRoutes.activity} label="Live Activity" />
             </div>
           </div>
 
@@ -1258,9 +1312,9 @@ export default async function AdminOverviewPage() {
           description="Use this section to see message volume, unread items, support conversations, and direct customer-to-Guru threads from the admin dashboard."
           actions={
             <>
-              <ActionLink href="/admin/messages" label="Open All Messages" primary />
-              <ActionLink href="/admin/messages/admin" label="Admin Threads" />
-              <ActionLink href="/admin/messages/review" label="Review Marketplace" />
+              <ActionLink href={adminRoutes.messages} label="Open All Messages" primary />
+              <ActionLink href={adminRoutes.adminMessages} label="Admin Threads" />
+              <ActionLink href={adminRoutes.messageReview} label="Review Marketplace" />
             </>
           }
         >
@@ -1327,7 +1381,7 @@ export default async function AdminOverviewPage() {
                   Recent message activity
                 </p>
                 <Link
-                  href="/admin/messages"
+                  href={adminRoutes.messages}
                   className="text-sm font-semibold text-emerald-300 transition hover:text-emerald-200"
                 >
                   View all →
@@ -1342,7 +1396,7 @@ export default async function AdminOverviewPage() {
                       href={
                         message.conversationId
                           ? `/admin/messages/${message.conversationId}`
-                          : "/admin/messages"
+                          : adminRoutes.messages
                       }
                       className="block rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:border-emerald-300/30 hover:bg-white/10"
                     >
@@ -1405,15 +1459,15 @@ export default async function AdminOverviewPage() {
             actions={
               <>
                 <ActionLink
-                  href="/admin/financials/profit-loss"
+                  href={adminRoutes.profitLoss}
                   label="Profit & Loss"
                 />
                 <ActionLink
-                  href="/admin/financials/balance-sheet"
+                  href={adminRoutes.balanceSheet}
                   label="Balance Sheet"
                 />
-                <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
-                <ActionLink href="/admin/financials/pro-forma" label="Pro Forma" />
+                <ActionLink href={adminRoutes.cashFlow} label="Cash Flow" />
+                <ActionLink href={adminRoutes.proForma} label="Pro Forma" />
               </>
             }
           >
@@ -1461,7 +1515,7 @@ export default async function AdminOverviewPage() {
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <Link
-                    href="/admin/financials/balance-sheet"
+                    href={adminRoutes.balanceSheet}
                     className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
                   >
                     <p className="text-sm font-semibold text-white">
@@ -1473,7 +1527,7 @@ export default async function AdminOverviewPage() {
                   </Link>
 
                   <Link
-                    href="/admin/financials/profit-loss"
+                    href={adminRoutes.profitLoss}
                     className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
                   >
                     <p className="text-sm font-semibold text-white">
@@ -1485,7 +1539,7 @@ export default async function AdminOverviewPage() {
                   </Link>
 
                   <Link
-                    href="/admin/financials/cash-flow"
+                    href={adminRoutes.cashFlow}
                     className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
                   >
                     <p className="text-sm font-semibold text-white">Cash Flow</p>
@@ -1495,7 +1549,7 @@ export default async function AdminOverviewPage() {
                   </Link>
 
                   <Link
-                    href="/admin/financials/pro-forma"
+                    href={adminRoutes.proForma}
                     className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
                   >
                     <p className="text-sm font-semibold text-white">Pro Forma</p>
@@ -1542,16 +1596,16 @@ export default async function AdminOverviewPage() {
             actions={
               <>
                 <ActionLink
-                  href="/admin/launch-signups"
+                  href={adminRoutes.launchSignups}
                   label="Open Launch Signups"
                   primary
                 />
                 <ActionLink
-                  href="/admin/launch-signups?source=instagram"
+                  href={adminRoutes.instagramLaunchSignups}
                   label="Instagram Source"
                 />
                 <ActionLink
-                  href="/admin/launch-signups?filter=both"
+                  href={adminRoutes.bothLaunchSignups}
                   label="Both Segment"
                 />
               </>
@@ -1681,8 +1735,8 @@ export default async function AdminOverviewPage() {
             description="Quick executive chart placeholder that still reads from live totals while staying simple and Vercel-safe."
             actions={
               <>
-                <ActionLink href="/admin/financials" label="View Report" />
-                <ActionLink href="/admin/exports" label="Export" />
+                <ActionLink href={adminRoutes.financials} label="View Report" />
+                <ActionLink href={adminRoutes.exports} label="Export" />
               </>
             }
           >
@@ -1702,8 +1756,8 @@ export default async function AdminOverviewPage() {
             description="Use this to visualize service demand, pet concentration, and customer segmentation before drilling into exports."
             actions={
               <>
-                <ActionLink href="/admin/analytics" label="View Analytics" />
-                <ActionLink href="/admin/exports" label="Export Data" />
+                <ActionLink href={adminRoutes.analytics} label="View Analytics" />
+                <ActionLink href={adminRoutes.exports} label="Export Data" />
               </>
             }
           >
@@ -1779,8 +1833,8 @@ export default async function AdminOverviewPage() {
             description="Track best performing by revenue and booking count to support recruiting, recognition, and territory expansion."
             actions={
               <>
-                <ActionLink href="/admin/gurus" label="View Leaderboard" />
-                <ActionLink href="/admin/exports" label="Export" />
+                <ActionLink href={adminRoutes.gurus} label="View Leaderboard" />
+                <ActionLink href={adminRoutes.exports} label="Export" />
               </>
             }
           >
@@ -1837,8 +1891,8 @@ export default async function AdminOverviewPage() {
             description="Understand customer behavior, lifetime value, repeat booking, and top markets to drive growth, retention, and incentives."
             actions={
               <>
-                <ActionLink href="/admin/users" label="View Details" />
-                <ActionLink href="/admin/exports" label="Export" />
+                <ActionLink href={adminRoutes.customers} label="View Details" />
+                <ActionLink href={adminRoutes.exports} label="Export" />
               </>
             }
           >
@@ -1898,11 +1952,11 @@ export default async function AdminOverviewPage() {
           actions={
             <>
               <ActionLink
-                href="/admin/launch-signups"
+                href={adminRoutes.launchSignups}
                 label="View Launch List"
                 primary
               />
-              <ActionLink href="/admin/exports" label="Export Leads" />
+              <ActionLink href={adminRoutes.exports} label="Export Leads" />
             </>
           }
         >
@@ -1929,8 +1983,8 @@ export default async function AdminOverviewPage() {
           description="Keep SitGuru's mission-focused programs connected to admin reporting, recruiting, and outreach."
           actions={
             <>
-              <ActionLink href="/admin/programs" label="View Programs" primary />
-              <ActionLink href="/admin/affiliates" label="Affiliates" />
+              <ActionLink href={adminRoutes.programs} label="View Programs" primary />
+              <ActionLink href={adminRoutes.affiliates} label="Affiliates" />
             </>
           }
         >
@@ -1959,14 +2013,14 @@ export default async function AdminOverviewPage() {
           description="Quick access to the core pages needed to manage SitGuru from one place."
           actions={
             <>
-              <ActionLink href="/admin/settings" label="Admin Settings" />
-              <ActionLink href="/admin/activity" label="Activity" />
+              <ActionLink href={adminRoutes.settings} label="Admin Settings" />
+              <ActionLink href={adminRoutes.activity} label="Activity" />
             </>
           }
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Link
-              href="/admin/guru-approvals"
+              href={adminRoutes.gurus}
               className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
             >
               <p className="text-sm font-semibold text-white">Guru Approvals</p>
@@ -1976,7 +2030,7 @@ export default async function AdminOverviewPage() {
             </Link>
 
             <Link
-              href="/admin/users"
+              href={adminRoutes.customers}
               className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
             >
               <p className="text-sm font-semibold text-white">Users</p>
@@ -1986,7 +2040,7 @@ export default async function AdminOverviewPage() {
             </Link>
 
             <Link
-              href="/admin/commissions"
+              href={adminRoutes.commissions}
               className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
             >
               <p className="text-sm font-semibold text-white">Commissions</p>
@@ -1996,7 +2050,7 @@ export default async function AdminOverviewPage() {
             </Link>
 
             <Link
-              href="/admin/messages"
+              href={adminRoutes.messages}
               className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
             >
               <p className="text-sm font-semibold text-white">Messages</p>

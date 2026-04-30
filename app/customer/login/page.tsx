@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { login } from "@/app/auth/actions";
 import { createClient } from "@/lib/supabase/server";
@@ -25,21 +26,29 @@ export default async function CustomerLoginPage({
   }
 
   const params = searchParams ? await searchParams : undefined;
-  const errorMessage = params?.error
-    ? decodeURIComponent(params.error)
-    : "";
+  const errorMessage = params?.error ? decodeURIComponent(params.error) : "";
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-emerald-50 px-4 py-8 md:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[80vh] w-full max-w-6xl items-center justify-center">
+      <div className="mx-auto mb-8 flex w-full max-w-6xl items-center justify-end">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Home
+        </Link>
+      </div>
+
+      <div className="mx-auto flex min-h-[76vh] w-full max-w-6xl items-center justify-center">
         <div className="grid w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl md:grid-cols-2">
           <div className="flex flex-col justify-between border-b border-slate-200 bg-gradient-to-br from-emerald-400 via-emerald-300 to-sky-200 p-8 md:border-b-0 md:border-r">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-900">
-                SitGuru
+                SitGuru Customer
               </p>
 
-              <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
+              <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 md:text-5xl">
                 Customer Login
               </h1>
 
@@ -54,6 +63,7 @@ export default async function CustomerLoginPage({
                 <p className="text-sm font-semibold text-slate-900">
                   🐾 Manage bookings
                 </p>
+
                 <p className="mt-1 text-sm text-slate-700">
                   View upcoming services and care details.
                 </p>
@@ -63,6 +73,7 @@ export default async function CustomerLoginPage({
                 <p className="text-sm font-semibold text-slate-900">
                   💬 Message your Guru
                 </p>
+
                 <p className="mt-1 text-sm text-slate-700">
                   Stay connected with updates and notes.
                 </p>
@@ -72,6 +83,7 @@ export default async function CustomerLoginPage({
                 <p className="text-sm font-semibold text-slate-900">
                   🐶 Keep pet info ready
                 </p>
+
                 <p className="mt-1 text-sm text-slate-700">
                   Faster booking with saved pet profiles.
                 </p>
@@ -81,9 +93,10 @@ export default async function CustomerLoginPage({
 
           <div className="p-8 md:p-10">
             <div>
-              <h2 className="text-2xl font-semibold text-slate-900">
+              <h2 className="text-2xl font-semibold text-slate-900 md:text-4xl">
                 Welcome back
               </h2>
+
               <p className="mt-2 text-sm text-slate-600">
                 Sign in to your customer account.
               </p>
@@ -105,6 +118,7 @@ export default async function CustomerLoginPage({
                 >
                   Email
                 </label>
+
                 <input
                   id="email"
                   name="email"
@@ -123,6 +137,7 @@ export default async function CustomerLoginPage({
                 >
                   Password
                 </label>
+
                 <input
                   id="password"
                   name="password"
@@ -134,7 +149,7 @@ export default async function CustomerLoginPage({
                 />
               </div>
 
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                 <Link
                   href="/forgot-password"
                   className="text-emerald-700 hover:text-emerald-600"

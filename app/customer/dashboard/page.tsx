@@ -1,7 +1,7 @@
 // app/customer/dashboard/page.tsx
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -145,22 +145,30 @@ const initialProfileForm: CustomerProfileForm = {
 
 const routes = {
   home: "/",
-  dashboard: "/dashboard",
+  dashboard: "/customer/dashboard",
   findGuru: "/search",
   bookGuru: "/bookings/new",
-  bookings: "/customer/dashboard#recent-bookings",
-  allBookings: "/bookings",
-  messages: "/messages",
-  adminMessages: "/messages/admin",
+
+  // Customer dashboard pages
+  bookings: "/customer/dashboard/bookings",
+  allBookings: "/customer/dashboard/bookings",
+  messages: "/customer/dashboard/messages",
+  adminMessages: "/customer/dashboard/messages?support=admin",
+  pets: "/customer/dashboard/pets",
+  profile: "/customer/dashboard/profile",
+  pawPerks: "/customer/dashboard/pawperks",
+
+  // Fallback/general pages
   search: "/search",
-  pets: "/pets",
-  profile: "/customer/dashboard#customer-profile",
-  pawPerks: "/rewards",
   referrals: "/referrals",
   login: "/login",
 };
 
 const CUSTOMER_PROFILE_PHOTO_SRC = "/images/customer-profile-photo.jpg";
+const PAWPERKS_PREVIEW_DOG_SRC =
+  "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80";
+const PAWPERKS_PREVIEW_CAT_SRC =
+  "https://images.unsplash.com/photo-1519052537078-e6302a4968d4?auto=format&fit=crop&w=900&q=80";
 const PROFILE_PHOTO_BUCKETS = ["profile-photos", "avatars"];
 const PET_PHOTO_BUCKETS = ["pet-photos", "pets"];
 const PET_VIDEO_BUCKETS = ["pet-videos", "pets"];
@@ -855,6 +863,8 @@ export default function CustomerDashboardPage() {
     useState<UploadingPetMedia | null>(null);
   const [petMediaError, setPetMediaError] = useState("");
   const [petMediaMessage, setPetMediaMessage] = useState("");
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
   const customerAvatarSrc =
     customerProfile?.avatar_url?.trim() || CUSTOMER_PROFILE_PHOTO_SRC;
@@ -950,6 +960,28 @@ export default function CustomerDashboardPage() {
   }, [customerAvatarSrc]);
 
   useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setAccountMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const bookingStatus = params.get("booking");
 
@@ -980,10 +1012,10 @@ export default function CustomerDashboardPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const upcoming = bookings.filter((booking) => {
+    const upcomingBookings = bookings.filter((booking) => {
       const bookingDate = new Date(booking.start_time).getTime();
       return Number.isFinite(bookingDate) && bookingDate >= Date.now();
-    }).length;
+    });
 
     const pending = bookings.filter(
       (booking) => booking.status.toLowerCase() === "pending"
@@ -993,14 +1025,35 @@ export default function CustomerDashboardPage() {
       (booking) => booking.status.toLowerCase() === "confirmed"
     ).length;
 
+    const nextBooking = upcomingBookings
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+      )[0];
+
     return {
       total: bookings.length,
-      upcoming,
+      upcoming: upcomingBookings.length,
       pending,
       confirmed,
       pets: pets.length,
+      nextBooking,
     };
   }, [bookings, pets]);
+
+  const nextBookingLabel = useMemo(() => {
+    if (!stats.nextBooking) return "No upcoming booking";
+
+    const date = new Date(stats.nextBooking.start_time);
+
+    if (Number.isNaN(date.getTime())) return "Date pending";
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }, [stats.nextBooking]);
 
   async function handleCustomerAvatarUpload(
     event: ChangeEvent<HTMLInputElement>
@@ -1240,6 +1293,7 @@ export default function CustomerDashboardPage() {
   );
 
   async function handleSignOut() {
+    setAccountMenuOpen(false);
     await supabase.auth.signOut();
     router.replace(routes.login);
   }
@@ -1324,93 +1378,193 @@ export default function CustomerDashboardPage() {
           fontWeight: 300,
         }}
       >
-        <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-          <div className="mb-6 rounded-[2rem] border border-emerald-100 bg-white/95 p-3 shadow-sm backdrop-blur">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex min-w-0 items-center gap-3 px-1">
-                <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100 sm:flex">
-                  🐾
-                </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex rounded-full bg-emerald-600 px-4 py-2 text-sm font-extrabold text-white shadow-sm">
-                      SitGuru Customer
-                    </span>
-                    <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-100">
-                      Dashboard
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                    Book care, manage pets, check messages, and update your profile.
-                  </p>
-                </div>
-              </div>
+        <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
+          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-4 sm:px-6 lg:px-8">
+            <Link
+              href={routes.dashboard}
+              className="inline-flex h-14 w-[190px] shrink-0 items-center justify-start rounded-2xl px-1 transition hover:opacity-90 sm:w-[215px] lg:h-16 lg:w-[235px]"
+              aria-label="Go to SitGuru customer dashboard"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/sitguru-logo-cropped.png"
+                alt="SitGuru"
+                className="h-auto max-h-12 w-auto object-contain lg:max-h-14"
+              />
+            </Link>
 
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center xl:min-w-0 xl:flex-1 xl:justify-end">
-                <div className="overflow-x-auto rounded-[1.35rem] border border-emerald-100 bg-white p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <nav className="flex min-w-max items-center gap-1.5">
-                    {[
-                      { label: "Dashboard", href: routes.dashboard, active: true },
-                      { label: "Find a Guru", href: routes.findGuru },
-                      { label: "Book a Guru", href: routes.bookGuru },
-                      { label: "Bookings", href: routes.allBookings },
-                      { label: "Messages", href: routes.messages },
-                      { label: "My Pets", href: routes.pets },
-                      { label: "My Profile", href: routes.profile },
-                      { label: "PawPerks", href: routes.pawPerks },
-                    ].map((item) => (
-                      <Link
-                        key={item.label}
-                        href={item.href}
-                        className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                          item.active
-                            ? "bg-emerald-600 text-white shadow-sm"
-                            : "text-slate-800 hover:bg-emerald-50 hover:text-emerald-700"
-                        }`}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </nav>
-                </div>
+            <nav className="hidden flex-1 items-center justify-center gap-5 lg:flex xl:gap-8">
+              {[
+                { label: "Dashboard", href: routes.dashboard, active: true },
+                { label: "Find a Guru", href: routes.findGuru },
+                { label: "Book a Guru", href: routes.bookGuru },
+                { label: "Bookings", href: routes.allBookings },
+                { label: "Messages", href: routes.messages },
+                { label: "My Pets", href: routes.pets },
+                { label: "My Profile", href: routes.profile },
+                { label: "PawPerks", href: routes.pawPerks },
+              ].map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`pb-5 text-base font-black transition xl:text-lg ${
+                    item.active
+                      ? "border-b-[3px] border-emerald-500 !text-slate-950"
+                      : "!text-slate-900 hover:!text-emerald-700"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
 
-                <div className="flex items-center justify-between gap-3 rounded-[1.35rem] border border-slate-200 bg-slate-50 p-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-50 text-sm font-extrabold text-emerald-700 ring-2 ring-white">
-                      {showCustomerProfilePhoto ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={customerAvatarSrc}
-                          alt={`${customerDisplayName} profile photo`}
-                          onError={() => setCustomerPhotoFailed(true)}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        customerInitials
-                      )}
+            <div ref={accountMenuRef} className="relative hidden md:block">
+              <button
+                type="button"
+                onClick={() => setAccountMenuOpen((value) => !value)}
+                className="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1.5 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                aria-haspopup="menu"
+                aria-expanded={accountMenuOpen}
+                aria-label="Open customer account menu"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-black text-emerald-700 shadow-sm ring-1 ring-emerald-100">
+                  {showCustomerProfilePhoto ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={customerAvatarSrc}
+                      alt={`${customerDisplayName} profile photo`}
+                      onError={() => setCustomerPhotoFailed(true)}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    customerInitials
+                  )}
+                </span>
+
+                <span className="hidden max-w-[88px] truncate text-sm font-black text-slate-950 xl:block">
+                  {customerDisplayName}
+                </span>
+
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-lg font-black leading-none text-white shadow-sm">
+                  {accountMenuOpen ? "⌃" : "⌄"}
+                </span>
+              </button>
+
+              {accountMenuOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] w-72 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)]"
+                >
+                  <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_100%)] p-4">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-black text-emerald-700 shadow-sm ring-1 ring-emerald-100">
+                        {showCustomerProfilePhoto ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={customerAvatarSrc}
+                            alt={`${customerDisplayName} profile photo`}
+                            onError={() => setCustomerPhotoFailed(true)}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          customerInitials
+                        )}
+                      </span>
+
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-black text-slate-950">
+                          {customerDisplayName}
+                        </p>
+                        <p className="text-sm font-bold text-emerald-700">
+                          SitGuru Pet Parent
+                        </p>
+                      </div>
                     </div>
-                    <div className="hidden min-w-0 sm:block">
-                      <p className="truncate text-sm font-extrabold text-slate-950">
-                        {customerDisplayName}
-                      </p>
-                      <p className="text-xs font-semibold text-slate-500">
-                        Pet Parent
-                      </p>
-                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className="shrink-0 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-100"
-                  >
-                    Log out
-                  </button>
+                  <div className="grid gap-2 p-2">
+                    <Link
+                      href={routes.profile}
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="rounded-xl px-4 py-3 text-sm font-black text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+                    >
+                      Update Profile
+                    </Link>
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={handleSignOut}
+                      className="rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-black text-white transition hover:bg-emerald-700"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
+
+            <button
+              type="button"
+              onClick={() => setAccountMenuOpen((value) => !value)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-xl font-black text-emerald-700 transition hover:bg-emerald-100 md:hidden"
+              aria-label="Toggle customer menu"
+              aria-expanded={accountMenuOpen}
+            >
+              {accountMenuOpen ? "✕" : "☰"}
+            </button>
           </div>
 
+          {accountMenuOpen ? (
+            <div className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden">
+              <div className="mx-auto grid max-w-[1440px] gap-2">
+                {[
+                  { label: "Dashboard", href: routes.dashboard, active: true },
+                  { label: "Find a Guru", href: routes.findGuru },
+                  { label: "Book a Guru", href: routes.bookGuru },
+                  { label: "Bookings", href: routes.allBookings },
+                  { label: "Messages", href: routes.messages },
+                  { label: "My Pets", href: routes.pets },
+                  { label: "My Profile", href: routes.profile },
+                  { label: "PawPerks", href: routes.pawPerks },
+                ].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setAccountMenuOpen(false)}
+                    className={`rounded-xl px-4 py-3 text-sm font-bold transition ${
+                      item.active
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+
+                <div className="mt-2 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+                  <p className="text-base font-black text-slate-950">
+                    {customerDisplayName}
+                  </p>
+                  <p className="text-sm font-bold text-emerald-700">
+                    SitGuru Pet Parent
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="mt-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-black text-white transition hover:bg-emerald-700"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </header>
+
+        <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
           <section
             id="care-start"
             className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]"
@@ -1426,7 +1580,7 @@ export default function CustomerDashboardPage() {
                 </h1>
 
                 <p className="mt-5 max-w-3xl text-base leading-8 text-slate-900/75 md:text-xl">
-                  Manage your pets, book trusted Gurus, review messages, and keep your care details organized in one simple place.
+                  Manage your pets, book Gurus, review messages, and keep your care details organized in one simple place.
                 </p>
 
                 <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -1443,38 +1597,38 @@ export default function CustomerDashboardPage() {
                   </span>
                 </div>
 
-                <div className="mt-8 flex flex-wrap gap-3">
+                <div className="mt-8 flex flex-wrap items-center gap-3">
                   <Link
                     href={routes.findGuru}
-                    className="inline-flex min-w-[140px] items-center justify-center rounded-2xl bg-slate-950 px-6 py-4 text-sm font-extrabold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800"
+                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full bg-emerald-600 px-7 py-3 text-base font-black text-white shadow-sm shadow-emerald-900/10 ring-1 ring-emerald-500/20 transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-lg"
                   >
                     Find a Guru
                   </Link>
 
                   <Link
                     href={routes.bookGuru}
-                    className="inline-flex min-w-[140px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-base font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-lg"
                   >
                     Book a Guru
                   </Link>
 
                   <Link
                     href={routes.messages}
-                    className="inline-flex min-w-[140px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-base font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-lg"
                   >
                     Messages
                   </Link>
 
                   <Link
                     href={routes.pets}
-                    className="inline-flex min-w-[140px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-base font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-lg"
                   >
                     My Pets
                   </Link>
 
                   <Link
                     href={routes.profile}
-                    className="inline-flex min-w-[140px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-base font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-lg"
                   >
                     My Profile
                   </Link>
@@ -1539,92 +1693,228 @@ export default function CustomerDashboardPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-5 md:px-8">
+            <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-2 lg:grid-cols-5 md:px-8">
               {[
-                { label: "Pets", value: stats.pets, icon: "🐾" },
-                { label: "Bookings", value: stats.total, icon: "📅" },
-                { label: "Upcoming", value: stats.upcoming, icon: "⏰" },
-                { label: "Pending", value: stats.pending, icon: "💬" },
-                { label: "Confirmed", value: stats.confirmed, icon: "✅" },
+                {
+                  label: "Upcoming Booking",
+                  value: nextBookingLabel,
+                  helper: stats.nextBooking ? "View details" : "Book care",
+                  href: stats.nextBooking ? routes.bookings : routes.findGuru,
+                  icon: "📅",
+                },
+                {
+                  label: "My Pets",
+                  value: `${stats.pets} ${stats.pets === 1 ? "Pet" : "Pets"}`,
+                  helper: "Manage pets",
+                  href: routes.pets,
+                  icon: "🐾",
+                },
+                {
+                  label: "Total Bookings",
+                  value: String(stats.total),
+                  helper: "View history",
+                  href: routes.allBookings,
+                  icon: "🛡️",
+                },
+                {
+                  label: "Messages",
+                  value: "Inbox",
+                  helper: "Open messages",
+                  href: routes.messages,
+                  icon: "💬",
+                },
+                {
+                  label: "SitGuru Credit",
+                  value: formatMoney(referralProfile?.available_credit ?? 0),
+                  helper: "Open PawPerks",
+                  href: routes.pawPerks,
+                  icon: "⭐",
+                },
               ].map((item) => (
-                <div
+                <Link
                   key={item.label}
-                  className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200"
+                  href={item.href}
+                  className="group rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-500">
                         {item.label}
                       </p>
-                      <p className="mt-2 text-3xl font-extrabold text-slate-950">
+                      <p className="mt-2 truncate text-2xl font-extrabold text-slate-950">
                         {item.value}
                       </p>
+                      <p className="mt-3 text-sm font-bold text-emerald-700">
+                        {item.helper} <span aria-hidden="true">→</span>
+                      </p>
                     </div>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100 transition group-hover:scale-105">
                       {item.icon}
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </section>
 
           <section className="mt-6 grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
             <div className="space-y-6">
+              <div className="overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
+                <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#dff7ef_100%)] p-6">
+                  <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
+                        PawPerks Rewards
+                      </p>
+                      <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+                        Grow SitGuru with PawPerks.
+                      </h3>
+                      <p className="mt-3 text-sm leading-6 text-slate-700">
+                        Invite Pet Parents and Gurus, earn rewards, and help SitGuru expand trusted pet care in more communities.
+                      </p>
+                    </div>
+
+                    <div className="relative hidden min-h-[180px] lg:block">
+                      <div className="absolute inset-x-6 bottom-0 h-24 rounded-full bg-emerald-100/70 blur-2xl" />
+                      <div className="relative flex items-end justify-center gap-4">
+                        <div className="h-40 w-32 overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-xl">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={PAWPERKS_PREVIEW_DOG_SRC}
+                            alt="Golden retriever for PawPerks preview"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div className="mb-2 h-32 w-28 overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-xl">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={PAWPERKS_PREVIEW_CAT_SRC}
+                            alt="Tabby cat for PawPerks preview"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
+                        Available credit
+                      </p>
+                      <p className="mt-2 text-2xl font-black text-slate-950">
+                        {formatMoney(referralProfile?.available_credit ?? 0)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-100">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
+                        Pending rewards
+                      </p>
+                      <p className="mt-2 text-2xl font-black text-slate-950">
+                        {formatMoney(referralProfile?.pending_rewards ?? 0)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-sky-100">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">
+                        Completed
+                      </p>
+                      <p className="mt-2 text-2xl font-black text-slate-950">
+                        {referralProfile?.completed_referrals ?? 0}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <Link
+                      href={routes.pawPerks}
+                      className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
+                    >
+                      Open PawPerks
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyReferralLink(
+                          customerReferralLink,
+                          "Customer referral link"
+                        )
+                      }
+                      className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
+                    >
+                      Copy Customer Invite
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyReferralLink(guruReferralLink, "Guru invite link")
+                      }
+                      className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
+                    >
+                      Copy Guru Invite
+                    </button>
+                  </div>
+
+                  {referralMessage ? (
+                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-emerald-800">
+                      {referralMessage}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
               <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
                 <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Communication center
+                  Pet care tips
                 </p>
 
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                  Clear next steps for you and your pets
-                </h2>
+                <div className="mt-5 space-y-4">
+                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-sm font-bold text-slate-900">
+                      Keep routines updated
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Share feeding times, medications, favorite walks, and home
+                      notes so your Guru can deliver smoother care.
+                    </p>
+                  </div>
 
-                <div className="mt-5 grid gap-3">
-                  <Link
-                    href={routes.messages}
-                    className="rounded-2xl bg-emerald-500 px-5 py-4 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
-                  >
-                    Open messages
-                  </Link>
-
-                  <Link
-                    href={routes.pets}
-                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
-                  >
-                    Manage Pet Care Passports
-                  </Link>
-
-                  <Link
-                    href={routes.adminMessages}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                  >
-                    Message Admin support
-                  </Link>
-
-                  <Link
-                    href={routes.findGuru}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                  >
-                    Find a Guru for your pets
-                  </Link>
-
-                  <Link
-                    href={routes.bookings}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                  >
-                    Review your bookings
-                  </Link>
+                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-sm font-bold text-slate-900">
+                      Book with confidence
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      A complete pet profile and clear care details make every
+                      request feel easier, warmer, and more premium.
+                    </p>
+                  </div>
                 </div>
+              </div>
 
-                <div className="mt-5 rounded-[1.5rem] bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <p className="text-sm font-bold text-slate-900">
-                    Best experience tip
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    Start with a Pet Care Passport, then message or book from that
-                    pet’s card so your Guru immediately knows who care is for.
-                  </p>
+              <div
+                id="friendly-shortcuts"
+                className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Friendly shortcuts
+                </p>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-white p-4 ring-1 ring-emerald-100">
+                    <p className="text-lg font-black text-slate-900">🐶 Dogs</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Walks, drop-ins, overnight stays, and loving companionship.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100">
+                    <p className="text-lg font-black text-slate-900">🐱 Cats</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Calm visits, feeding, medications, check-ins, and gentle care.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1858,6 +2148,63 @@ export default function CustomerDashboardPage() {
                 ) : null}
               </div>
 
+              <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Communication center
+                </p>
+
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                  Clear next steps for you and your pets
+                </h2>
+
+                <div className="mt-5 grid gap-3">
+                  <Link
+                    href={routes.messages}
+                    className="rounded-2xl bg-emerald-500 px-5 py-4 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
+                  >
+                    Open messages
+                  </Link>
+
+                  <Link
+                    href={routes.pets}
+                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
+                  >
+                    Manage Pet Care Passports
+                  </Link>
+
+                  <Link
+                    href={routes.adminMessages}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                  >
+                    Message Admin support
+                  </Link>
+
+                  <Link
+                    href={routes.findGuru}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                  >
+                    Find a Guru for your pets
+                  </Link>
+
+                  <Link
+                    href={routes.bookings}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                  >
+                    Review your bookings
+                  </Link>
+                </div>
+
+                <div className="mt-5 rounded-[1.5rem] bg-slate-50 p-4 ring-1 ring-slate-200">
+                  <p className="text-sm font-bold text-slate-900">
+                    Best experience tip
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Start with a Pet Care Passport, then message or book from that
+                    pet’s card so your Guru immediately knows who care is for.
+                  </p>
+                </div>
+              </div>
+
               <div
                 id="messages-help"
                 className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
@@ -1890,183 +2237,6 @@ export default function CustomerDashboardPage() {
                 </div>
               </div>
 
-              <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Pet care tips
-                </p>
-
-                <div className="mt-5 space-y-4">
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-sm font-bold text-slate-900">
-                      Keep routines updated
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Share feeding times, medications, favorite walks, and home
-                      notes so your Guru can deliver smoother care.
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-sm font-bold text-slate-900">
-                      Book with confidence
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      A complete pet profile and clear care details make every
-                      request feel easier, warmer, and more premium.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                id="friendly-shortcuts"
-                className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Friendly shortcuts
-                </p>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-white p-4 ring-1 ring-emerald-100">
-                    <p className="text-lg font-black text-slate-900">🐶 Dogs</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Walks, drop-ins, overnight stays, and loving companionship.
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100">
-                    <p className="text-lg font-black text-slate-900">🐱 Cats</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Calm visits, feeding, medications, check-ins, and gentle care.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
-                <div className="bg-gradient-to-br from-emerald-500 via-emerald-400 to-sky-300 p-6">
-                  <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-950/80">
-                    PawPerks Rewards
-                  </p>
-                  <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                    Share SitGuru. Earn rewards. Grow trusted pet care.
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-slate-900/75">
-                    Invite pet parents and trusted caregivers to join SitGuru.
-                    Rewards are earned after real completed bookings, so the
-                    community grows safely and intentionally.
-                  </p>
-                </div>
-
-                <div className="p-6">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
-                        Available credit
-                      </p>
-                      <p className="mt-2 text-2xl font-black text-slate-950">
-                        {formatMoney(referralProfile?.available_credit ?? 0)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">
-                        Pending rewards
-                      </p>
-                      <p className="mt-2 text-2xl font-black text-slate-950">
-                        {formatMoney(referralProfile?.pending_rewards ?? 0)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">
-                        Completed
-                      </p>
-                      <p className="mt-2 text-2xl font-black text-slate-950">
-                        {referralProfile?.completed_referrals ?? 0}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-4">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                          <p className="text-sm font-black text-slate-950">
-                            Give $20. Get $20.
-                          </p>
-                          <p className="mt-1 text-sm leading-6 text-slate-600">
-                            Your friend gets $20 off their first completed booking.
-                            You get $20 in SitGuru credit after their care is complete.
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            copyReferralLink(
-                              customerReferralLink,
-                              "Customer referral link"
-                            )
-                          }
-                          className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
-                        >
-                          Copy Customer Link
-                        </button>
-                      </div>
-
-                      <p className="mt-3 break-all rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                        {customerReferralLink}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                          <p className="text-sm font-black text-slate-950">
-                            Refer a trusted Guru. Earn $50.
-                          </p>
-                          <p className="mt-1 text-sm leading-6 text-slate-700">
-                            Invite someone who would make a great SitGuru. You earn
-                            after they are approved and complete their first paid booking.
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            copyReferralLink(guruReferralLink, "Guru invite link")
-                          }
-                          className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
-                        >
-                          Copy Guru Invite
-                        </button>
-                      </div>
-
-                      <p className="mt-3 break-all rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-emerald-100">
-                        {guruReferralLink}
-                      </p>
-                    </div>
-                  </div>
-
-                  {referralMessage ? (
-                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
-                      {referralMessage}
-                    </div>
-                  ) : null}
-
-                  <div className="mt-5 rounded-2xl bg-slate-950 p-4 text-white">
-                    <p className="text-sm font-black">Reward rules</p>
-                    <ul className="mt-3 space-y-2 text-xs leading-5 text-white/75">
-                      <li>• Rewards are earned after completed paid bookings.</li>
-                      <li>• Canceled or refunded bookings do not qualify.</li>
-                      <li>• Referral credits cannot be converted to cash.</li>
-                      <li>• Self-referrals are not allowed.</li>
-                      <li>• SitGuru may review suspicious referral activity.</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div className="space-y-6">

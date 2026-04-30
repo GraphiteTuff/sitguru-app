@@ -26,10 +26,10 @@ const GURU_DASHBOARD_LOGO = "/images/sitguru-logo-cropped.png";
 
 const navItems = [
   { label: "Dashboard", href: "/guru/dashboard", key: "dashboard" },
-  { label: "Bookings", href: "/guru/bookings", key: "bookings" },
+  { label: "Bookings", href: "/guru/dashboard/bookings", key: "bookings" },
   { label: "Messages", href: "/guru/dashboard/messages", key: "messages" },
   { label: "My Profile", href: "/guru/dashboard/profile", key: "profile" },
-  { label: "Availability", href: "/guru/availability", key: "availability" },
+  { label: "Availability", href: "/guru/dashboard/availability", key: "availability" },
   { label: "Earnings", href: "/guru/dashboard/earnings", key: "earnings" },
 ] as const;
 
@@ -112,9 +112,9 @@ export default function GuruDashboardHeader({
     <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
       <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-4 sm:px-6 lg:px-8">
         <Link
-          href="/"
+          href="/guru/dashboard"
           className="inline-flex h-14 w-[190px] shrink-0 items-center justify-start rounded-2xl px-1 transition hover:opacity-90 sm:w-[215px] lg:h-16 lg:w-[235px]"
-          aria-label="Go to SitGuru home page"
+          aria-label="Go to SitGuru Guru dashboard"
         >
           <Image
             src={GURU_DASHBOARD_LOGO}
@@ -153,7 +153,7 @@ export default function GuruDashboardHeader({
 
         <div className="flex items-center gap-3">
           <Link
-            href="/guru/resources"
+            href="/guru/dashboard/resources"
             className="hidden items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black !text-slate-950 shadow-sm transition hover:bg-slate-50 md:inline-flex xl:px-6 xl:text-base"
           >
             <span className="text-lg">📖</span>
@@ -239,7 +239,7 @@ export default function GuruDashboardHeader({
             })}
 
             <Link
-              href="/guru/resources"
+              href="/guru/dashboard/resources"
               onClick={() => setMobileOpen(false)}
               className="rounded-xl px-4 py-3 text-sm font-bold !text-slate-800 transition hover:bg-slate-50 hover:!text-slate-950"
             >

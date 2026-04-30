@@ -587,6 +587,13 @@ export default async function MessageConversationPage({
           : "")
   );
 
+  const inboxHref =
+    currentUserRole === "guru"
+      ? "/guru/dashboard/messages"
+      : currentUserRole === "admin"
+        ? "/admin/messages"
+        : "/messages";
+
   const otherParticipantId =
     Array.from(allowedUserIds).find((participantId) => participantId !== user.id) ||
     "";
@@ -640,7 +647,7 @@ export default async function MessageConversationPage({
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <Link
-                  href="/messages"
+                  href={inboxHref}
                   className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
                 >
                   ← Back to inbox

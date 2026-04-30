@@ -642,7 +642,7 @@ async function getGuruConversations(
         conversation.updated_at ||
         conversation.created_at ||
         null,
-      href: `/messages/${conversation.id}`,
+      href: `/guru/dashboard/messages/${conversation.id}`,
     };
   });
 }
@@ -1042,21 +1042,21 @@ export default async function GuruDashboardPage() {
 
               <div className="mt-8 flex flex-wrap gap-4">
                 <Link
-                  href="/guru/bookings"
+                  href="/guru/dashboard/bookings"
                   className="rounded-[1.2rem] bg-[#07132f] px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
                 >
                   My Bookings
                 </Link>
 
                 <Link
-                  href="/guru/messages"
+                  href="/guru/dashboard/messages"
                   className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   Open Messages
                 </Link>
 
                 <Link
-                  href="/guru/availability"
+                  href="/guru/dashboard/availability"
                   className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   Availability
@@ -1134,7 +1134,7 @@ export default async function GuruDashboardPage() {
               </p>
 
               <Link
-                href="/guru/bookings"
+                href="/guru/dashboard/bookings"
                 className="rounded-full border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm font-black !text-slate-900 transition hover:bg-cyan-100"
               >
                 View all bookings
@@ -1167,7 +1167,7 @@ export default async function GuruDashboardPage() {
               </p>
 
               <Link
-                href="/guru/messages"
+                href="/guru/dashboard/messages"
                 className="rounded-full border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm font-black !text-slate-900 transition hover:bg-cyan-100"
               >
                 Open inbox
@@ -1423,7 +1423,7 @@ export default async function GuruDashboardPage() {
                 </p>
 
                 <Link
-                  href="/guru/availability"
+                  href="/guru/dashboard/availability"
                   className="mt-5 inline-flex w-full items-center justify-center rounded-[1rem] bg-[linear-gradient(90deg,#39c8b4_0%,#49aaf0_100%)] px-6 py-4 text-base font-black !text-white transition hover:opacity-95"
                 >
                   Manage Availability

@@ -43,6 +43,34 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     isGuruResourcesPage ||
     isGuruPetFamiliesPage;
 
+  const isCustomerDashboardPage =
+    pathname === "/customer/dashboard" ||
+    pathname.startsWith("/customer/dashboard/");
+
+  const isCustomerPawPerksPage =
+    pathname === "/customer/pawperks" ||
+    pathname.startsWith("/customer/pawperks/");
+
+  const isCustomerPage =
+    pathname === "/customer" || pathname.startsWith("/customer/");
+
+  const isCustomerMessagesPage =
+    pathname === "/messages" || pathname.startsWith("/messages/");
+
+  const isCustomerPetsPage =
+    pathname === "/pets" || pathname.startsWith("/pets/");
+
+  const isCustomerBookingsPage =
+    pathname === "/bookings" || pathname.startsWith("/bookings/");
+
+  const isCustomerPrivatePage =
+    isCustomerPage ||
+    isCustomerDashboardPage ||
+    isCustomerPawPerksPage ||
+    isCustomerMessagesPage ||
+    isCustomerPetsPage ||
+    isCustomerBookingsPage;
+
   if (isAdminPage) {
     return <main className="admin-theme site-main min-h-screen">{children}</main>;
   }
@@ -53,10 +81,11 @@ export default function RouteShell({ children }: { children: ReactNode }) {
 
   /*
    * Private Guru pages already render their own Guru dashboard header.
-   * Use a neutral wrapper here so there is no duplicate header and no dark/blue
-   * theme strip between the page content and the footer.
+   * Private Customer pages will render their own Customer dashboard header.
+   * Do not render the public marketing header here, or the dashboards show
+   * double/triple headers.
    */
-  if (isGuruPrivatePage) {
+  if (isGuruPrivatePage || isCustomerPrivatePage) {
     return (
       <>
         <div className="site-main bg-white">{children}</div>

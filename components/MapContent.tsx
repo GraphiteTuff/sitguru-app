@@ -13,11 +13,12 @@ type NormalizedMarker = {
   title: string;
   city: string;
   state: string;
+  zipCode: string;
   services: string[];
   latitude: number;
   longitude: number;
   profileHref: string;
-  source: "exact" | "city_fallback";
+  source: "exact" | "zip_fallback" | "city_fallback";
 };
 
 type MapContentProps = {
@@ -31,12 +32,40 @@ const DEFAULT_CENTER: [number, number] = [39.9526, -75.1652];
 const CITY_COORDINATES: Record<string, [number, number]> = {
   "philadelphia,pa": [39.9526, -75.1652],
   "philadelphia,pennsylvania": [39.9526, -75.1652],
+
   "pittsburgh,pa": [40.4406, -79.9959],
   "pittsburgh,pennsylvania": [40.4406, -79.9959],
+
   "quakertown,pa": [40.4418, -75.3416],
   "quakertown,pennsylvania": [40.4418, -75.3416],
+
+  "doylestown,pa": [40.3101, -75.1299],
+  "doylestown,pennsylvania": [40.3101, -75.1299],
+
   "cromwell,mn": [46.6766, -92.8802],
   "cromwell,minnesota": [46.6766, -92.8802],
+
+  "jacksonville,fl": [30.3322, -81.6557],
+  "jacksonville,florida": [30.3322, -81.6557],
+
+  "servingyourarea,pa": [40.3101, -75.1299],
+  "locationpending,pa": [40.3101, -75.1299],
+};
+
+const ZIP_COORDINATES: Record<string, [number, number]> = {
+  "18901": [40.3101, -75.1299],
+  "18902": [40.3368, -75.1113],
+  "18951": [40.4418, -75.3416],
+
+  "15201": [40.4734, -79.9558],
+  "15213": [40.4442, -79.9559],
+  "15222": [40.4475, -79.9934],
+
+  "32099": [30.3322, -81.6557],
+  "32202": [30.3285, -81.6562],
+  "32207": [30.2927, -81.6415],
+
+  "55726": [46.6766, -92.8802],
 };
 
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })
@@ -87,12 +116,46 @@ function asStringArray(value: unknown) {
     .slice(0, 5);
 }
 
-function cityKey(city: string, state: string) {
-  return `${city},${state}`.toLowerCase().replace(/\s+/g, "");
+function normalizeLocationText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function getFallbackCoordinates(city: string, state: string) {
-  return CITY_COORDINATES[cityKey(city, state)] || null;
+function cityKey(city: string, state: string) {
+  return `${normalizeLocationText(city)},${normalizeLocationText(state)}`;
+}
+
+function getZipCode(marker: RawMarker) {
+  return (
+    asString(marker.zip_code) ||
+    asString(marker.zip) ||
+    asString(marker.zipcode) ||
+    asString(marker.postal_code) ||
+    asString(marker.service_zip_code) ||
+    asString(marker.service_zip) ||
+    asString(marker.service_postal_code)
+  );
+}
+
+function getFallbackCoordinates(city: string, state: string, zipCode: string) {
+  const cleanZip = zipCode.replace(/\D/g, "").slice(0, 5);
+
+  if (cleanZip && ZIP_COORDINATES[cleanZip]) {
+    return {
+      coordinates: ZIP_COORDINATES[cleanZip],
+      source: "zip_fallback" as const,
+    };
+  }
+
+  const key = cityKey(city, state);
+
+  if (CITY_COORDINATES[key]) {
+    return {
+      coordinates: CITY_COORDINATES[key],
+      source: "city_fallback" as const,
+    };
+  }
+
+  return null;
 }
 
 function getMarkerId(marker: RawMarker, index: number) {
@@ -124,8 +187,17 @@ function normalizeMarker(
     asString(marker.role) ||
     "Pet Care Guru";
 
-  const city = asString(marker.city) || asString(marker.service_city);
-  const state = asString(marker.state) || asString(marker.service_state);
+  const city =
+    asString(marker.city) ||
+    asString(marker.service_city) ||
+    asString(marker.location_city);
+
+  const state =
+    asString(marker.state) ||
+    asString(marker.service_state) ||
+    asString(marker.location_state);
+
+  const zipCode = getZipCode(marker);
 
   const latitude =
     asNumber(marker.latitude) ||
@@ -149,7 +221,6 @@ function normalizeMarker(
     longitude <= 180;
 
   const slug = asString(marker.slug);
-
   const profileHref = slug ? `/guru/${slug}` : `/guru/${id}`;
 
   if (hasExactCoordinates) {
@@ -159,6 +230,7 @@ function normalizeMarker(
       title,
       city,
       state,
+      zipCode,
       services: asStringArray(marker.services),
       latitude,
       longitude,
@@ -167,7 +239,7 @@ function normalizeMarker(
     };
   }
 
-  const fallback = getFallbackCoordinates(city, state);
+  const fallback = getFallbackCoordinates(city, state, zipCode);
 
   if (!fallback) return null;
 
@@ -177,11 +249,12 @@ function normalizeMarker(
     title,
     city,
     state,
+    zipCode,
     services: asStringArray(marker.services),
-    latitude: fallback[0],
-    longitude: fallback[1],
+    latitude: fallback.coordinates[0],
+    longitude: fallback.coordinates[1],
     profileHref,
-    source: "city_fallback",
+    source: fallback.source,
   };
 }
 
@@ -321,6 +394,8 @@ export default function MapContent({
     return offsetDuplicateMarkers(cleanMarkers);
   }, [markers]);
 
+  const missingLocationCount = markers.length - normalizedMarkers.length;
+
   const mapCenter =
     normalizedMarkers.length > 0
       ? ([normalizedMarkers[0].latitude, normalizedMarkers[0].longitude] as [
@@ -371,8 +446,9 @@ export default function MapContent({
                   <span>{marker.title}</span>
                   <br />
                   <span>
-                    {marker.city || "Location"}
+                    {marker.city || "Service area"}
                     {marker.state ? `, ${marker.state}` : ""}
+                    {marker.zipCode ? ` ${marker.zipCode}` : ""}
                   </span>
 
                   {marker.services.length ? (
@@ -382,10 +458,10 @@ export default function MapContent({
                     </>
                   ) : null}
 
-                  {marker.source === "city_fallback" ? (
+                  {marker.source !== "exact" ? (
                     <>
                       <br />
-                      <small>Approximate city location</small>
+                      <small>Approximate service area</small>
                     </>
                   ) : null}
 
@@ -411,8 +487,16 @@ export default function MapContent({
 
       {!normalizedMarkers.length ? (
         <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-2xl border border-amber-300/40 bg-white/95 p-4 text-sm font-semibold text-slate-700 shadow-lg">
-          No map pins yet. Add latitude/longitude to Guru profiles, or use a
-          city/state supported by the current fallback map list.
+          No map pins yet. Gurus only need to add a city, state, and ZIP code in
+          their Guru profile.
+        </div>
+      ) : null}
+
+      {missingLocationCount > 0 && normalizedMarkers.length > 0 ? (
+        <div className="pointer-events-none absolute bottom-4 right-4 max-w-[220px] rounded-2xl border border-amber-300/50 bg-white/95 p-4 text-xs font-bold text-amber-800 shadow-lg">
+          {missingLocationCount} Guru
+          {missingLocationCount === 1 ? "" : "s"} need city, state, or ZIP added
+          in their profile.
         </div>
       ) : null}
     </div>

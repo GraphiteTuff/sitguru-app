@@ -1,300 +1,236 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
-import SiteLogo from "@/components/SiteLogo";
-import { supabase } from "@/lib/supabase";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  LogOut,
+  Menu,
+  UserRound,
+  X,
+} from "lucide-react";
 
-type UserRole = "public" | "customer" | "guru" | "admin";
+type HeaderProps = {
+  user?: {
+    name?: string | null;
+    email?: string | null;
+    avatarUrl?: string | null;
+    role?: "customer" | "guru" | "admin" | string | null;
+  } | null;
+};
 
-const publicLinks = [
-  { href: "/", label: "Home" },
-  { href: "/search", label: "Find Care" },
-  { href: "/login?redirect=/pets", label: "My Pets" },
-  { href: "/become-a-guru", label: "Become a Guru" },
+const navLinks = [
+  { label: "Home", href: "/" },
+  { label: "Find Care", href: "/search" },
+  { label: "My Pets", href: "/pets" },
+  { label: "Become a Guru", href: "/become-a-guru" },
 ];
 
-const customerLinks = [
-  { href: "/", label: "Home" },
-  { href: "/search", label: "Find Care" },
-  { href: "/bookings", label: "Bookings" },
-  { href: "/messages", label: "Messages" },
-  { href: "/pets", label: "My Pets" },
-  { href: "/customer/dashboard", label: "Dashboard" },
-];
-
-const guruLinks = [
-  { href: "/guru/dashboard", label: "Dashboard" },
-  { href: "/guru/bookings", label: "Bookings" },
-  { href: "/guru/messages", label: "Messages" },
-  { href: "/guru/dashboard/profile", label: "My Profile" },
-  { href: "/guru/availability", label: "Availability" },
-  { href: "/guru/dashboard/earnings", label: "Earnings" },
-];
-
-const adminLinks = [
-  { href: "/admin", label: "Admin" },
-  { href: "/admin/messages", label: "Messages" },
-  { href: "/admin/bookings", label: "Bookings" },
-  { href: "/admin/customers", label: "Customers" },
-  { href: "/admin/gurus", label: "Gurus" },
-];
-
-function normalizeRole(value?: string | null): UserRole {
-  const role = String(value || "").trim().toLowerCase();
-
-  if (role === "admin" || role === "owner" || role === "super_admin") {
-    return "admin";
-  }
-
-  if (role === "guru" || role === "provider" || role === "sitter") {
-    return "guru";
-  }
-
-  if (role === "customer" || role === "pet_parent" || role === "user") {
-    return "customer";
-  }
-
-  return "public";
-}
-
-function getDashboardHref(role: UserRole) {
-  if (role === "admin") return "/admin";
-  if (role === "guru") return "/guru/dashboard";
-  if (role === "customer") return "/customer/dashboard";
-
-  return "/login";
-}
-
-function getFallbackRoleFromPath(pathname: string): UserRole {
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) return "admin";
-  if (pathname === "/guru" || pathname.startsWith("/guru/")) return "guru";
-  if (
-    pathname === "/customer" ||
-    pathname.startsWith("/customer/") ||
-    pathname === "/dashboard" ||
-    pathname === "/pets" ||
-    pathname === "/bookings" ||
-    pathname.startsWith("/bookings/") ||
-    pathname === "/messages" ||
-    pathname.startsWith("/messages/")
-  ) {
-    return "customer";
-  }
-
-  return "public";
-}
-
-export default function Header() {
+export default function Header({ user = null }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
 
-  const [open, setOpen] = useState(false);
-  const [role, setRole] = useState<UserRole>(getFallbackRoleFromPath(pathname));
-  const [authChecked, setAuthChecked] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
-  const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
-  const dashboardHref = getDashboardHref(role);
-  const isLoggedIn = role !== "public";
-
-  const links = useMemo(() => {
-    if (role === "admin") return adminLinks;
-    if (role === "guru") return guruLinks;
-    if (role === "customer") return customerLinks;
-
-    return publicLinks;
-  }, [role]);
+  const avatarMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function resolveRole() {
-      const fallbackRole = getFallbackRoleFromPath(pathname);
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!mounted) return;
-
-      if (!user?.id) {
-        setRole(fallbackRole);
-        setAuthChecked(true);
-        return;
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        avatarMenuRef.current &&
+        !avatarMenuRef.current.contains(event.target as Node)
+      ) {
+        setAvatarOpen(false);
       }
-
-      const metadataRole = normalizeRole(
-        user.user_metadata?.role ||
-          user.user_metadata?.account_type ||
-          user.app_metadata?.role ||
-          user.app_metadata?.account_type
-      );
-
-      if (metadataRole !== "public") {
-        setRole(metadataRole);
-        setAuthChecked(true);
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, account_type")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      const profileRole = normalizeRole(
-        profile?.role || profile?.account_type || null
-      );
-
-      if (profileRole !== "public") {
-        setRole(profileRole);
-        setAuthChecked(true);
-        return;
-      }
-
-      const { data: guruProfile } = await supabase
-        .from("gurus")
-        .select("id, user_id, email")
-        .or(`user_id.eq.${user.id},email.eq.${user.email || ""}`)
-        .maybeSingle();
-
-      if (guruProfile?.id || fallbackRole === "guru") {
-        setRole("guru");
-        setAuthChecked(true);
-        return;
-      }
-
-      if (fallbackRole !== "public") {
-        setRole(fallbackRole);
-        setAuthChecked(true);
-        return;
-      }
-
-      setRole("customer");
-      setAuthChecked(true);
     }
 
-    resolveRole();
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      resolveRole();
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+  useEffect(() => {
+    setMobileOpen(false);
+    setAvatarOpen(false);
   }, [pathname]);
 
-  function isActive(href: string) {
-    const cleanHref = href.split("?")[0];
+  const isActive = (href: string) => {
+    if (href === "/") return pathname === "/";
+    return pathname?.startsWith(href);
+  };
 
-    if (cleanHref === "/") return pathname === "/";
-    if (cleanHref === "/messages") {
-      return pathname === "/messages" || pathname.startsWith("/messages/");
+  const dashboardHref =
+    user?.role === "guru"
+      ? "/guru/dashboard"
+      : user?.role === "admin"
+        ? "/admin"
+        : "/customer/dashboard";
+
+  const profileHref =
+    user?.role === "guru"
+      ? "/guru/profile"
+      : user?.role === "admin"
+        ? "/admin/profile"
+        : "/customer/profile";
+
+  async function handleLogout() {
+    setAvatarOpen(false);
+
+    try {
+      await fetch("/auth/signout", {
+        method: "POST",
+      });
+    } catch {
+      // Keep logout flow moving even if the endpoint is not present.
     }
 
-    return pathname === cleanHref || pathname.startsWith(`${cleanHref}/`);
-  }
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    setRole("public");
-    setOpen(false);
-    window.location.href = "/";
+    router.push("/");
+    router.refresh();
   }
 
   return (
-    <header
-      className={`sticky top-0 z-50 border-b backdrop-blur-md ${
-        isAdminPage
-          ? "border-slate-800 bg-slate-950/95 shadow-lg"
-          : "border-slate-200 bg-white/95 shadow-sm"
-      }`}
-    >
-      <div className="mx-auto flex h-20 w-full max-w-[1440px] items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
-        <SiteLogo
-          priority
-          wrapperClassName="h-14 w-[190px] shrink-0 sm:w-[215px] lg:w-[230px]"
-        />
+    <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+      <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
+        <Link href="/" className="flex items-center gap-3">
+          <Image
+            src="/images/sitguru-logo-cropped.png"
+            alt="SitGuru"
+            width={190}
+            height={70}
+            priority
+            className="h-auto w-[150px] sm:w-[175px] lg:w-[190px]"
+          />
+        </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-1 lg:flex">
-          {links.map((link) => {
+        <nav className="hidden items-center gap-8 lg:flex">
+          {navLinks.map((link) => {
             const active = isActive(link.href);
 
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`rounded-full px-3 py-2 text-sm font-semibold transition xl:px-4 ${
-                  isAdminPage
-                    ? active
-                      ? "bg-white/15 text-white"
-                      : "text-white/90 hover:bg-white/10 hover:text-white"
-                    : active
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+                className={`relative pb-2 text-[15px] font-extrabold transition ${
+                  active
+                    ? "text-emerald-500"
+                    : "text-slate-900 hover:text-emerald-600"
                 }`}
               >
                 {link.label}
+
+                {active && (
+                  <span className="absolute bottom-0 left-0 h-[3px] w-full rounded-full bg-emerald-400" />
+                )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="hidden shrink-0 items-center gap-3 lg:flex">
-          {authChecked && isLoggedIn ? (
-            <>
-              <Link
-                href={dashboardHref}
-                className="inline-flex h-11 items-center justify-center rounded-full bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 xl:h-12 xl:px-7 xl:text-base"
-              >
-                Dashboard
-              </Link>
-
+        <div className="hidden items-center gap-3 lg:flex">
+          {user ? (
+            <div ref={avatarMenuRef} className="relative">
               <button
                 type="button"
-                onClick={handleSignOut}
-                className={`text-sm font-semibold transition xl:text-base ${
-                  isAdminPage
-                    ? "text-white/90 hover:text-white"
-                    : "text-slate-700 hover:text-slate-950"
-                }`}
+                onClick={() => setAvatarOpen((current) => !current)}
+                className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
+                aria-expanded={avatarOpen}
+                aria-label="Open user menu"
               >
-                Sign Out
+                <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-emerald-100">
+                  {user.avatarUrl ? (
+                    <Image
+                      src={user.avatarUrl}
+                      alt={user.name || "User profile"}
+                      width={44}
+                      height={44}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <UserRound className="h-6 w-6 text-emerald-700" />
+                  )}
+                </div>
+
+                <div className="hidden text-left xl:block">
+                  <p className="max-w-[145px] truncate text-sm font-extrabold text-slate-900">
+                    {user.name || "My Account"}
+                  </p>
+                  <p className="max-w-[145px] truncate text-xs font-semibold text-slate-500">
+                    {user.role || "Customer"}
+                  </p>
+                </div>
+
+                {avatarOpen ? (
+                  <ChevronUp className="h-5 w-5 text-slate-700" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-slate-700" />
+                )}
               </button>
-            </>
+
+              {avatarOpen && (
+                <div className="absolute right-0 mt-3 w-64 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                  <div className="border-b border-slate-100 bg-emerald-50 px-5 py-4">
+                    <p className="truncate text-sm font-extrabold text-slate-900">
+                      {user.name || "SitGuru Member"}
+                    </p>
+
+                    {user.email && (
+                      <p className="truncate text-xs font-semibold text-slate-500">
+                        {user.email}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="p-2">
+                    <Link
+                      href={dashboardHref}
+                      className="flex items-center rounded-2xl px-4 py-3 text-sm font-bold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+                    >
+                      Dashboard
+                    </Link>
+
+                    <Link
+                      href={profileHref}
+                      className="flex items-center rounded-2xl px-4 py-3 text-sm font-bold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+                    >
+                      Update Profile
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-left text-sm font-bold text-red-600 transition hover:bg-red-50"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Log Out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <Link
-                href="/login"
-                className={`text-sm font-semibold transition xl:text-base ${
-                  isAdminPage
-                    ? "text-white/90 hover:text-white"
-                    : "text-slate-700 hover:text-slate-950"
-                }`}
-              >
-                Customer Login
-              </Link>
-
-              <Link
                 href="/guru/login"
-                className={`text-sm font-semibold transition xl:text-base ${
-                  isAdminPage
-                    ? "text-white/90 hover:text-white"
-                    : "text-slate-700 hover:text-slate-950"
-                }`}
+                className="rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-extrabold text-slate-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700"
               >
                 Guru Login
               </Link>
 
               <Link
-                href="/signup"
-                className="inline-flex h-11 items-center justify-center rounded-full bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 xl:h-12 xl:px-7 xl:text-base"
+                href="/customer/login"
+                className="rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-extrabold text-slate-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700"
               >
-                Get Started
+                Customer Login
+              </Link>
+
+              <Link
+                href="/signup"
+                className="rounded-full bg-emerald-600 px-6 py-3 text-sm font-extrabold text-white shadow-md transition hover:bg-emerald-700"
+              >
+                Sign Up Free
               </Link>
             </>
           )}
@@ -302,113 +238,88 @@ export default function Header() {
 
         <button
           type="button"
-          onClick={() => setOpen((value) => !value)}
-          className={`inline-flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold transition lg:hidden ${
-            isAdminPage
-              ? "bg-white/10 text-white hover:bg-white/15"
-              : "border border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-          }`}
-          aria-label="Toggle menu"
-          aria-expanded={open}
+          onClick={() => setMobileOpen((current) => !current)}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm lg:hidden"
+          aria-label="Open mobile menu"
         >
-          {open ? "✕" : "☰"}
+          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
 
-      {open ? (
-        <div
-          className={`border-t px-4 py-4 lg:hidden ${
-            isAdminPage
-              ? "border-slate-800 bg-slate-950"
-              : "border-slate-200 bg-white"
-          }`}
-        >
-          <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-2">
-            {links.map((link) => {
+      {mobileOpen && (
+        <div className="border-t border-slate-100 bg-white px-5 py-5 shadow-lg lg:hidden">
+          <nav className="flex flex-col gap-2">
+            {navLinks.map((link) => {
               const active = isActive(link.href);
 
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setOpen(false)}
-                  className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                    isAdminPage
-                      ? active
-                        ? "bg-white/15 text-white"
-                        : "text-white/90 hover:bg-white/10 hover:text-white"
-                      : active
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+                  className={`rounded-2xl px-4 py-3 text-base font-extrabold transition ${
+                    active
+                      ? "bg-emerald-50 text-emerald-600"
+                      : "text-slate-900 hover:bg-emerald-50 hover:text-emerald-700"
                   }`}
                 >
                   {link.label}
                 </Link>
               );
             })}
+          </nav>
 
-            <div className="mt-2 border-t border-slate-200 pt-3">
-              {authChecked && isLoggedIn ? (
-                <>
-                  <Link
-                    href={dashboardHref}
-                    onClick={() => setOpen(false)}
-                    className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                  >
-                    Dashboard
-                  </Link>
+          <div className="mt-5 grid gap-3">
+            {user ? (
+              <>
+                <Link
+                  href={dashboardHref}
+                  className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-800 shadow-sm"
+                >
+                  Dashboard
+                </Link>
 
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className={`mt-2 w-full rounded-xl px-4 py-3 text-center text-sm font-semibold transition ${
-                      isAdminPage
-                        ? "text-white/90 hover:bg-white/10 hover:text-white"
-                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
-                    }`}
-                  >
-                    Sign Out
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/login"
-                    onClick={() => setOpen(false)}
-                    className={`block rounded-xl px-4 py-3 text-center text-sm font-semibold transition ${
-                      isAdminPage
-                        ? "text-white/90 hover:bg-white/10 hover:text-white"
-                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
-                    }`}
-                  >
-                    Customer Login
-                  </Link>
+                <Link
+                  href={profileHref}
+                  className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-800 shadow-sm"
+                >
+                  Update Profile
+                </Link>
 
-                  <Link
-                    href="/guru/login"
-                    onClick={() => setOpen(false)}
-                    className={`block rounded-xl px-4 py-3 text-center text-sm font-semibold transition ${
-                      isAdminPage
-                        ? "text-white/90 hover:bg-white/10 hover:text-white"
-                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
-                    }`}
-                  >
-                    Guru Login
-                  </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-full bg-red-600 px-5 py-3 text-center text-sm font-extrabold text-white shadow-sm"
+                >
+                  Log Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/guru/login"
+                  className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-800 shadow-sm"
+                >
+                  Guru Login
+                </Link>
 
-                  <Link
-                    href="/signup"
-                    onClick={() => setOpen(false)}
-                    className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                  >
-                    Get Started
-                  </Link>
-                </>
-              )}
-            </div>
+                <Link
+                  href="/customer/login"
+                  className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-800 shadow-sm"
+                >
+                  Customer Login
+                </Link>
+
+                <Link
+                  href="/signup"
+                  className="rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-extrabold text-white shadow-md"
+                >
+                  Sign Up Free
+                </Link>
+              </>
+            )}
           </div>
         </div>
-      ) : null}
+      )}
     </header>
   );
 }
