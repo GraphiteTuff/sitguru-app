@@ -24,6 +24,7 @@ import {
   UserCircle2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import GuruDashboardHeader from "@/app/guru/dashboard/GuruDashboardHeader";
 
 type GuruProfile = {
   id?: string | null;
@@ -87,8 +88,8 @@ const PHOTO_BUCKETS = [
 
 const routes = {
   dashboard: "/guru/dashboard",
-  messages: "/guru/messages",
-  bookings: "/guru/bookings",
+  messages: "/guru/dashboard/messages",
+  bookings: "/guru/dashboard/bookings",
   settings: "/guru/dashboard/settings",
   login: "/guru/login",
 };
@@ -416,14 +417,22 @@ export default function GuruDashboardProfilePage() {
         setBio(profile.bio || "");
         setCity(profile.city || "");
         setStateValue(profile.state || "");
-        setStreetAddress(profile.street_address || profile.service_address || profile.address || "");
+        setStreetAddress(
+          profile.street_address ||
+            profile.service_address ||
+            profile.address ||
+            "",
+        );
         setZipCode(profile.zip_code || profile.postal_code || "");
         setServiceRadius(
-          profile.service_radius_miles !== null && profile.service_radius_miles !== undefined
+          profile.service_radius_miles !== null &&
+            profile.service_radius_miles !== undefined
             ? String(profile.service_radius_miles)
-            : profile.service_radius !== null && profile.service_radius !== undefined
+            : profile.service_radius !== null &&
+                profile.service_radius !== undefined
               ? String(profile.service_radius)
-              : profile.radius_miles !== null && profile.radius_miles !== undefined
+              : profile.radius_miles !== null &&
+                  profile.radius_miles !== undefined
                 ? String(profile.radius_miles)
                 : "25",
         );
@@ -526,7 +535,9 @@ export default function GuruDashboardProfilePage() {
           typeof result.longitude === "number" ? String(result.longitude) : "",
         );
         setZipLookupMessage(
-          `ZIP found: ${result.city || "City"}, ${result.state || "State"}. Map coordinates saved automatically.`,
+          `ZIP found: ${result.city || "City"}, ${
+            result.state || "State"
+          }. Map coordinates saved automatically.`,
         );
       } catch {
         if (!cancelled) {
@@ -664,7 +675,9 @@ export default function GuruDashboardProfilePage() {
 
     if (
       parsedLatitude !== null &&
-      (Number.isNaN(parsedLatitude) || parsedLatitude < -90 || parsedLatitude > 90)
+      (Number.isNaN(parsedLatitude) ||
+        parsedLatitude < -90 ||
+        parsedLatitude > 90)
     ) {
       setErrorMessage("Latitude must be between -90 and 90.");
       setSaving(false);
@@ -750,14 +763,22 @@ export default function GuruDashboardProfilePage() {
         setBio(refreshed.bio || "");
         setCity(refreshed.city || "");
         setStateValue(refreshed.state || "");
-        setStreetAddress(refreshed.street_address || refreshed.service_address || refreshed.address || cleanStreetAddress);
+        setStreetAddress(
+          refreshed.street_address ||
+            refreshed.service_address ||
+            refreshed.address ||
+            cleanStreetAddress,
+        );
         setZipCode(refreshed.zip_code || refreshed.postal_code || cleanZipCode);
         setServiceRadius(
-          refreshed.service_radius_miles !== null && refreshed.service_radius_miles !== undefined
+          refreshed.service_radius_miles !== null &&
+            refreshed.service_radius_miles !== undefined
             ? String(refreshed.service_radius_miles)
-            : refreshed.service_radius !== null && refreshed.service_radius !== undefined
+            : refreshed.service_radius !== null &&
+                refreshed.service_radius !== undefined
               ? String(refreshed.service_radius)
-              : refreshed.radius_miles !== null && refreshed.radius_miles !== undefined
+              : refreshed.radius_miles !== null &&
+                  refreshed.radius_miles !== undefined
                 ? String(refreshed.radius_miles)
                 : serviceRadius,
         );
@@ -806,7 +827,9 @@ export default function GuruDashboardProfilePage() {
         setProfileExists(true);
       }
 
-      setSuccessMessage("Guru profile saved successfully. ZIP, city, state, service radius, and private map coordinates now feed Find a Guru.");
+      setSuccessMessage(
+        "Guru profile saved successfully. ZIP, city, state, service radius, and private map coordinates now feed Find a Guru.",
+      );
       router.refresh();
     } catch (error) {
       setErrorMessage(
@@ -894,847 +917,818 @@ export default function GuruDashboardProfilePage() {
 
   if (loading) {
     return (
+      <>
+        <GuruDashboardHeader guruProfile={null} activeTab="profile" />
+
+        <main
+          className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 font-light !text-slate-950 md:px-6 lg:px-8"
+          style={{
+            fontFamily:
+              '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontWeight: 300,
+          }}
+        >
+          <div className="mx-auto flex max-w-6xl items-center justify-center">
+            <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
+              <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-600" />
+              <p className="mt-3 text-base font-semibold !text-slate-700">
+                Loading guru profile...
+              </p>
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <GuruDashboardHeader
+        guruProfile={{
+          display_name: displayName,
+          full_name: displayName,
+          name: displayName,
+          profile_photo_url: profilePhotoUrl,
+          photo_url: profilePhotoUrl,
+          avatar_url: profilePhotoUrl,
+          image_url: profilePhotoUrl,
+        }}
+        activeTab="profile"
+      />
+
       <main
-        className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 font-light !text-slate-950 md:px-6 lg:px-8"
+        className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light !text-slate-950"
         style={{
           fontFamily:
             '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           fontWeight: 300,
         }}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-center">
-          <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
-            <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-600" />
-            <p className="mt-3 text-base font-semibold !text-slate-700">
-              Loading guru profile...
-            </p>
-          </div>
-        </div>
-      </main>
-    );
-  }
+        <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
+          <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+              <div>
+                <div className="mb-5 flex flex-wrap items-center gap-3">
+                  <Link
+                    href={routes.dashboard}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-white/85 px-4 py-2 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/70 transition hover:bg-white"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Guru Dashboard
+                  </Link>
 
-  return (
-    <main
-      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light !text-slate-950"
-      style={{
-        fontFamily:
-          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontWeight: 300,
-      }}
-    >
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-        <div className="mb-5 overflow-x-auto rounded-[1.5rem] border border-emerald-100 bg-white/95 p-2 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <nav className="flex min-w-max items-center gap-2">
-            {[
-              { label: "Dashboard", href: routes.dashboard },
-              {
-                label: "Profile",
-                href: "/guru/dashboard/profile",
-                active: true,
-              },
-              { label: "Bookings", href: routes.bookings },
-              { label: "Messages", href: routes.messages },
-              { label: "Settings", href: routes.settings },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                  item.active
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-slate-800 hover:bg-emerald-50 hover:text-emerald-700"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
+                  <span className="inline-flex items-center gap-2 rounded-2xl bg-white/80 px-4 py-2 text-sm font-extrabold text-emerald-800 shadow-sm ring-1 ring-white/70">
+                    <ShieldCheck className="h-4 w-4" />
+                    Guru Profile Editor
+                  </span>
+                </div>
 
-        <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
-            <div>
-              <div className="mb-5 flex flex-wrap items-center gap-3">
-                <Link
-                  href={routes.dashboard}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-white/85 px-4 py-2 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/70 transition hover:bg-white"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Guru Dashboard
-                </Link>
-
-                <span className="inline-flex items-center gap-2 rounded-2xl bg-white/80 px-4 py-2 text-sm font-extrabold text-emerald-800 shadow-sm ring-1 ring-white/70">
+                <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.2em] text-emerald-800 shadow-sm ring-1 ring-white/70">
                   <ShieldCheck className="h-4 w-4" />
-                  Guru Profile Editor
-                </span>
-              </div>
-
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.2em] text-emerald-800 shadow-sm ring-1 ring-white/70">
-                <ShieldCheck className="h-4 w-4" />
-                Guru Portal
-              </div>
-
-              <h1
-                className="max-w-4xl text-4xl font-extrabold tracking-[-0.045em] !text-slate-950 md:text-6xl lg:text-7xl"
-                style={{ color: "#07112f" }}
-              >
-                Make your Guru profile customer-ready
-              </h1>
-
-              <p
-                className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-slate-800 md:text-xl"
-                style={{ color: "#1f2937" }}
-              >
-                Update the profile customers see, upload your photo, choose
-                services, and complete the details that help SitGuru match you
-                with the right pet families.
-              </p>
-
-              <div className="mt-8 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  disabled={uploadingPhoto}
-                  className="inline-flex min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-4 text-sm font-extrabold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:opacity-60"
-                >
-                  {uploadingPhoto ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Camera className="h-4 w-4" />
-                  )}
-                  Upload photo
-                </button>
-
-                <Link
-                  href={publicProfileHref}
-                  className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Preview profile
-                </Link>
-
-                <Link
-                  href={routes.messages}
-                  className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Messages
-                </Link>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center text-center">
-              <div className="relative">
-                <div className="absolute -inset-4 rounded-full bg-white/30 blur-xl" />
-                <div className="relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full border-[8px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl md:h-56 md:w-56">
-                  {profilePhotoUrl ? (
-                    <Image
-                      src={profilePhotoUrl}
-                      alt={`${publicPreviewName} profile photo`}
-                      fill
-                      sizes="224px"
-                      className="object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    publicPreviewName.charAt(0).toUpperCase()
-                  )}
+                  Guru Portal
                 </div>
-                <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
-                  🐾
-                </div>
-              </div>
 
-              <h2
-                className="mt-6 text-3xl font-extrabold tracking-tight !text-slate-950 md:text-4xl"
-                style={{ color: "#07112f" }}
-              >
-                {publicPreviewName}
-              </h2>
-              <p
-                className="mt-2 text-lg font-semibold !text-slate-700"
-                style={{ color: "#334155" }}
-              >
-                {publicPreviewHeadline}
-              </p>
-              <p
-                className="mt-1 max-w-xs text-sm font-semibold leading-6 !text-slate-600"
-                style={{ color: "#475569" }}
-              >
-                {publicPreviewLocation}
-              </p>
-            </div>
-          </div>
+                <h1
+                  className="max-w-4xl text-4xl font-extrabold tracking-[-0.045em] !text-slate-950 md:text-6xl lg:text-7xl"
+                  style={{ color: "#07112f" }}
+                >
+                  Make your Guru profile customer-ready
+                </h1>
 
-          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-5 md:px-8">
-            {[
-              { label: "Complete", value: `${completionPercent}%`, icon: "⭐" },
-              { label: "Services", value: services.length, icon: "🐾" },
-              { label: "Public", value: isPublic ? "Yes" : "No", icon: "👀" },
-              { label: "Rate", value: publicPreviewRate, icon: "💚" },
-              { label: "Map", value: mapReady ? "Ready" : "Pending", icon: "🗺️" },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold !text-slate-500">
-                      {item.label}
-                    </p>
-                    <p className="mt-2 text-3xl font-extrabold !text-slate-950">
-                      {item.value}
-                    </p>
-                  </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
-                    {item.icon}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <input
-          ref={photoInputRef}
-          type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp"
-          className="hidden"
-          onChange={handlePhotoUpload}
-        />
-
-        {!!errorMessage && (
-          <div className="mt-6 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-5 py-4 text-rose-800 shadow-sm">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
-              <div>
-                <p className="font-extrabold text-rose-900">Profile error</p>
-                <p className="mt-1 text-sm font-semibold leading-6">
-                  {errorMessage}
+                <p
+                  className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-slate-800 md:text-xl"
+                  style={{ color: "#1f2937" }}
+                >
+                  Update the profile customers see, upload your photo, choose
+                  services, and complete the details that help SitGuru match you
+                  with the right pet families.
                 </p>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {!!successMessage && (
-          <div className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-800 shadow-sm">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-              <div>
-                <p className="font-extrabold text-emerald-900">Success</p>
-                <p className="mt-1 text-sm font-semibold leading-6">
-                  {successMessage}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <section className="mt-6 grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-          <div className="space-y-6">
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-600">
-                    Edit profile
-                  </p>
-                  <h2 className="mt-2 text-3xl font-extrabold tracking-tight !text-slate-950">
-                    Keep your Guru profile current
-                  </h2>
-                  <p className="mt-2 text-sm font-semibold leading-6 !text-slate-600">
-                    These fields power your Guru dashboard, Admin visibility,
-                    and customer-facing profile.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-800 ring-1 ring-emerald-100">
-                  {signedInEmail || "Guru account"}
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="display_name"
-                      className="mb-2 block text-sm font-extrabold !text-slate-950"
-                    >
-                      Display name
-                    </label>
-                    <input
-                      id="display_name"
-                      value={displayName}
-                      onChange={(event) => setDisplayName(event.target.value)}
-                      placeholder="Your public display name"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="slug"
-                      className="mb-2 block text-sm font-extrabold !text-slate-950"
-                    >
-                      Public slug
-                    </label>
-                    <input
-                      id="slug"
-                      value={slug}
-                      onChange={(event) => setSlug(slugify(event.target.value))}
-                      placeholder="your-public-slug"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="headline"
-                      className="mb-2 block text-sm font-extrabold !text-slate-950"
-                    >
-                      Headline
-                    </label>
-                    <input
-                      id="headline"
-                      value={headline}
-                      onChange={(event) => setHeadline(event.target.value)}
-                      placeholder="Ex: Trusted Pet Care Guru"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="hourly_rate"
-                      className="mb-2 block text-sm font-extrabold !text-slate-950"
-                    >
-                      Hourly rate
-                    </label>
-                    <input
-                      id="hourly_rate"
-                      value={hourlyRate}
-                      onChange={(event) => setHourlyRate(event.target.value)}
-                      placeholder="45"
-                      inputMode="decimal"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="city"
-                      className="mb-2 block text-sm font-extrabold !text-slate-950"
-                    >
-                      City
-                    </label>
-                    <input
-                      id="city"
-                      value={city}
-                      onChange={(event) => setCity(event.target.value)}
-                      placeholder="Quakertown"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="state"
-                      className="mb-2 block text-sm font-extrabold !text-slate-950"
-                    >
-                      State
-                    </label>
-                    <input
-                      id="state"
-                      value={stateValue}
-                      onChange={(event) =>
-                        setStateValue(event.target.value.toUpperCase())
-                      }
-                      placeholder="PA"
-                      maxLength={2}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="zip_code" className="mb-2 block text-sm font-extrabold !text-slate-950">
-                      ZIP code
-                    </label>
-                    <input
-                      id="zip_code"
-                      value={zipCode}
-                      onChange={(event) => handleZipCodeChange(event.target.value)}
-                      placeholder="18951"
-                      inputMode="numeric"
-                      maxLength={5}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                    <p className="mt-2 text-xs font-bold text-slate-500">
-                      Enter a 5-digit ZIP code to auto-fill city, state, and map coordinates.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label htmlFor="service_radius" className="mb-2 block text-sm font-extrabold !text-slate-950">
-                      Service radius miles
-                    </label>
-                    <input
-                      id="service_radius"
-                      value={serviceRadius}
-                      onChange={(event) => setServiceRadius(event.target.value)}
-                      placeholder="25"
-                      inputMode="decimal"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label htmlFor="street_address" className="mb-2 block text-sm font-extrabold !text-slate-950">
-                      Service address or general area
-                    </label>
-                    <input
-                      id="street_address"
-                      value={streetAddress}
-                      onChange={(event) => setStreetAddress(event.target.value)}
-                      placeholder="Optional. Used by Admin/map setup, not shown as your exact public address."
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-bold text-emerald-900">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <span>{mapStatusLabel}</span>
-                      {zipLookupLoading ? (
-                        <span className="inline-flex items-center gap-2 text-emerald-800">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Checking ZIP
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-emerald-800">
-                      Gurus only enter ZIP, city, state, and service radius.
-                      SitGuru saves map latitude and longitude privately after ZIP lookup.
-                    </p>
-                    {zipLookupMessage ? (
-                      <p className="mt-2 text-sm font-extrabold text-emerald-950">
-                        {zipLookupMessage}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="years_experience"
-                      className="mb-2 block text-sm font-extrabold !text-slate-950"
-                    >
-                      Years of experience
-                    </label>
-                    <input
-                      id="years_experience"
-                      value={yearsExperience}
-                      onChange={(event) =>
-                        setYearsExperience(event.target.value)
-                      }
-                      placeholder="3"
-                      inputMode="numeric"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="profile_photo_url"
-                      className="mb-2 block text-sm font-extrabold !text-slate-950"
-                    >
-                      Profile image URL
-                    </label>
-                    <input
-                      id="profile_photo_url"
-                      value={profilePhotoUrl}
-                      onChange={(event) =>
-                        setProfilePhotoUrl(event.target.value)
-                      }
-                      placeholder="https://..."
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="bio"
-                    className="mb-2 block text-sm font-extrabold !text-slate-950"
-                  >
-                    Bio
-                  </label>
-                  <textarea
-                    id="bio"
-                    value={bio}
-                    onChange={(event) => setBio(event.target.value)}
-                    rows={6}
-                    placeholder="Tell pet parents who you are, how you care for pets, and why they can trust you."
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
-
-                <div>
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-extrabold !text-slate-950">
-                        Profile photo
-                      </p>
-                      <p className="mt-1 text-sm font-semibold !text-slate-600">
-                        Upload a JPG, PNG, or WEBP photo. This becomes your mini
-                        avatar across SitGuru.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => photoInputRef.current?.click()}
-                      disabled={uploadingPhoto}
-                      className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-60"
-                    >
-                      {uploadingPhoto ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Camera className="h-4 w-4" />
-                      )}
-                      {uploadingPhoto ? "Uploading..." : "Upload photo"}
-                    </button>
-                  </div>
-
-                  <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4">
-                    {profilePhotoUrl ? (
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                        <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-white shadow-sm ring-1 ring-emerald-100">
-                          <Image
-                            src={profilePhotoUrl}
-                            alt="Guru profile preview"
-                            fill
-                            sizes="112px"
-                            className="object-cover"
-                            unoptimized
-                          />
-                        </div>
-                        <div>
-                          <p className="text-sm font-extrabold !text-slate-950">
-                            Profile photo ready
-                          </p>
-                          <p className="mt-1 break-all text-sm font-semibold leading-6 !text-slate-700">
-                            {profilePhotoUrl}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3 !text-slate-700">
-                        <ImageIcon className="h-5 w-5 text-emerald-600" />
-                        <span className="text-sm font-semibold">
-                          No profile photo selected yet.
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="mb-3 text-sm font-extrabold !text-slate-950">
-                    Services
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {SERVICE_OPTIONS.map((service) => {
-                      const active = services.includes(service);
-
-                      return (
-                        <button
-                          key={service}
-                          type="button"
-                          onClick={() => toggleService(service)}
-                          className={`rounded-2xl border px-4 py-3 text-left text-sm font-extrabold transition ${
-                            active
-                              ? "border-emerald-300 bg-emerald-500 !text-slate-950 shadow-sm"
-                              : "border-slate-200 bg-slate-50 text-slate-800 hover:bg-emerald-50 hover:text-emerald-800"
-                          }`}
-                        >
-                          {service}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm font-extrabold !text-slate-950">
-                  <input
-                    type="checkbox"
-                    checked={isPublic}
-                    onChange={(event) => setIsPublic(event.target.checked)}
-                    className="h-4 w-4 rounded border-emerald-300 text-emerald-600"
-                  />
-                  Make this Guru profile public and customer-facing
-                </label>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="mt-8 flex flex-wrap gap-3">
                   <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    className="inline-flex min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-4 text-sm font-extrabold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:opacity-60"
                   >
-                    {saving ? (
+                    {uploadingPhoto ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Save className="h-4 w-4" />
+                      <Camera className="h-4 w-4" />
                     )}
-                    Save Guru Profile
+                    Upload photo
                   </button>
 
                   <Link
-                    href={routes.dashboard}
-                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-extrabold text-slate-900 transition hover:bg-slate-100"
+                    href={publicProfileHref}
+                    className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
                   >
-                    Cancel
+                    Preview profile
+                  </Link>
+
+                  <Link
+                    href={routes.messages}
+                    className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-white/90 px-6 py-4 text-sm font-extrabold !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
+                  >
+                    Messages
                   </Link>
                 </div>
-              </form>
-            </section>
-          </div>
-
-          <div className="space-y-6">
-            <section className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-3">
-                <Sparkles className="h-5 w-5 text-emerald-600" />
-                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                  Profile strength
-                </p>
               </div>
 
-              <div className="mt-4 flex items-end justify-between gap-4">
-                <p className="text-5xl font-extrabold tracking-tight !text-slate-950">
-                  {completionPercent}%
-                </p>
-                <p className="text-sm font-extrabold !text-slate-600">
-                  {missingItems.length === 0 ? "Complete" : "Needs updates"}
-                </p>
-              </div>
-
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-emerald-50 ring-1 ring-emerald-100">
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-all"
-                  style={{ width: `${completionPercent}%` }}
-                />
-              </div>
-
-              {missingItems.length > 0 ? (
-                <div className="mt-5 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <p className="text-sm font-extrabold !text-slate-950">
-                    Finish these next
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {missingItems.map((item) => (
-                      <span
-                        key={item}
-                        className="rounded-full bg-white px-3 py-1 text-xs font-extrabold !text-slate-700 ring-1 ring-slate-200"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-extrabold text-emerald-800 ring-1 ring-emerald-100">
-                  Your profile is ready for customer confidence and Guru
-                  recognition.
-                </div>
-              )}
-            </section>
-
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-3">
-                <UserCircle2 className="h-5 w-5 text-emerald-600" />
-                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                  Customer preview
-                </p>
-              </div>
-
-              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
-                How your public profile can present
-              </h2>
-
-              <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
-                <div className="flex items-start gap-4">
-                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-4 border-white bg-emerald-50 shadow-sm ring-1 ring-emerald-100">
+              <div className="flex flex-col items-center text-center">
+                <div className="relative">
+                  <div className="absolute -inset-4 rounded-full bg-white/30 blur-xl" />
+                  <div className="relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full border-[8px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl md:h-56 md:w-56">
                     {profilePhotoUrl ? (
                       <Image
                         src={profilePhotoUrl}
-                        alt="Profile preview"
+                        alt={`${publicPreviewName} profile photo`}
                         fill
-                        sizes="80px"
+                        sizes="224px"
                         className="object-cover"
                         unoptimized
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <UserCircle2 className="h-9 w-9 text-emerald-600" />
-                      </div>
+                      publicPreviewName.charAt(0).toUpperCase()
                     )}
+                  </div>
+                  <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
+                    🐾
+                  </div>
+                </div>
+
+                <h2
+                  className="mt-6 text-3xl font-extrabold tracking-tight !text-slate-950 md:text-4xl"
+                  style={{ color: "#07112f" }}
+                >
+                  {publicPreviewName}
+                </h2>
+                <p
+                  className="mt-2 text-lg font-semibold !text-slate-700"
+                  style={{ color: "#334155" }}
+                >
+                  {publicPreviewHeadline}
+                </p>
+                <p
+                  className="mt-1 max-w-xs text-sm font-semibold leading-6 !text-slate-600"
+                  style={{ color: "#475569" }}
+                >
+                  {publicPreviewLocation}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-5 md:px-8">
+              {[
+                { label: "Complete", value: `${completionPercent}%`, icon: "⭐" },
+                { label: "Services", value: services.length, icon: "🐾" },
+                { label: "Public", value: isPublic ? "Yes" : "No", icon: "👀" },
+                { label: "Rate", value: publicPreviewRate, icon: "💚" },
+                {
+                  label: "Map",
+                  value: mapReady ? "Ready" : "Pending",
+                  icon: "🗺️",
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold !text-slate-500">
+                        {item.label}
+                      </p>
+                      <p className="mt-2 text-3xl font-extrabold !text-slate-950">
+                        {item.value}
+                      </p>
+                    </div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
+                      {item.icon}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            className="hidden"
+            onChange={handlePhotoUpload}
+          />
+
+          {!!errorMessage && (
+            <div className="mt-6 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-5 py-4 text-rose-800 shadow-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+                <div>
+                  <p className="font-extrabold text-rose-900">Profile error</p>
+                  <p className="mt-1 text-sm font-semibold leading-6">
+                    {errorMessage}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!!successMessage && (
+            <div className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-800 shadow-sm">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                <div>
+                  <p className="font-extrabold text-emerald-900">Success</p>
+                  <p className="mt-1 text-sm font-semibold leading-6">
+                    {successMessage}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <section className="mt-6 grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+            <div className="space-y-6">
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-600">
+                      Edit profile
+                    </p>
+                    <h2 className="mt-2 text-3xl font-extrabold tracking-tight !text-slate-950">
+                      Keep your Guru profile current
+                    </h2>
+                    <p className="mt-2 text-sm font-semibold leading-6 !text-slate-600">
+                      These fields power your Guru dashboard, Admin visibility,
+                      and customer-facing profile.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-800 ring-1 ring-emerald-100">
+                    {signedInEmail || "Guru account"}
+                  </div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <div>
+                      <label
+                        htmlFor="display_name"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        Display name
+                      </label>
+                      <input
+                        id="display_name"
+                        value={displayName}
+                        onChange={(event) => setDisplayName(event.target.value)}
+                        placeholder="Your public display name"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="slug"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        Public slug
+                      </label>
+                      <input
+                        id="slug"
+                        value={slug}
+                        onChange={(event) =>
+                          setSlug(slugify(event.target.value))
+                        }
+                        placeholder="your-public-slug"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="headline"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        Headline
+                      </label>
+                      <input
+                        id="headline"
+                        value={headline}
+                        onChange={(event) => setHeadline(event.target.value)}
+                        placeholder="Ex: Trusted Pet Care Guru"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="hourly_rate"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        Hourly rate
+                      </label>
+                      <input
+                        id="hourly_rate"
+                        value={hourlyRate}
+                        onChange={(event) => setHourlyRate(event.target.value)}
+                        placeholder="45"
+                        inputMode="decimal"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="city"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        City
+                      </label>
+                      <input
+                        id="city"
+                        value={city}
+                        onChange={(event) => setCity(event.target.value)}
+                        placeholder="Quakertown"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="state"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        State
+                      </label>
+                      <input
+                        id="state"
+                        value={stateValue}
+                        onChange={(event) =>
+                          setStateValue(event.target.value.toUpperCase())
+                        }
+                        placeholder="PA"
+                        maxLength={2}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="zip_code"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        ZIP code
+                      </label>
+                      <input
+                        id="zip_code"
+                        value={zipCode}
+                        onChange={(event) =>
+                          handleZipCodeChange(event.target.value)
+                        }
+                        placeholder="18951"
+                        inputMode="numeric"
+                        maxLength={5}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                      <p className="mt-2 text-xs font-bold text-slate-500">
+                        Enter a 5-digit ZIP code to auto-fill city, state, and
+                        map coordinates.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="service_radius"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        Service radius miles
+                      </label>
+                      <input
+                        id="service_radius"
+                        value={serviceRadius}
+                        onChange={(event) =>
+                          setServiceRadius(event.target.value)
+                        }
+                        placeholder="25"
+                        inputMode="decimal"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label
+                        htmlFor="street_address"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        Service address or general area
+                      </label>
+                      <input
+                        id="street_address"
+                        value={streetAddress}
+                        onChange={(event) =>
+                          setStreetAddress(event.target.value)
+                        }
+                        placeholder="Optional. Used by Admin/map setup, not shown as your exact public address."
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-bold text-emerald-900 md:col-span-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <span>{mapStatusLabel}</span>
+                        {zipLookupLoading ? (
+                          <span className="inline-flex items-center gap-2 text-emerald-800">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Checking ZIP
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-emerald-800">
+                        Gurus only enter ZIP, city, state, and service radius.
+                        SitGuru saves map latitude and longitude privately after
+                        ZIP lookup.
+                      </p>
+                      {zipLookupMessage ? (
+                        <p className="mt-2 text-sm font-extrabold text-emerald-950">
+                          {zipLookupMessage}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="years_experience"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        Years of experience
+                      </label>
+                      <input
+                        id="years_experience"
+                        value={yearsExperience}
+                        onChange={(event) =>
+                          setYearsExperience(event.target.value)
+                        }
+                        placeholder="3"
+                        inputMode="numeric"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="profile_photo_url"
+                        className="mb-2 block text-sm font-extrabold !text-slate-950"
+                      >
+                        Profile image URL
+                      </label>
+                      <input
+                        id="profile_photo_url"
+                        value={profilePhotoUrl}
+                        onChange={(event) =>
+                          setProfilePhotoUrl(event.target.value)
+                        }
+                        placeholder="https://..."
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                    </div>
                   </div>
 
                   <div>
-                    <p className="text-2xl font-extrabold !text-slate-950">
-                      {publicPreviewName}
-                    </p>
-                    <p className="mt-1 text-base font-extrabold !text-slate-700">
-                      {publicPreviewHeadline}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold !text-slate-500">
-                      {publicPreviewLocation}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                      Rate
-                    </p>
-                    <p className="mt-2 text-lg font-extrabold !text-slate-950">
-                      {publicPreviewRate}
-                    </p>
+                    <label
+                      htmlFor="bio"
+                      className="mb-2 block text-sm font-extrabold !text-slate-950"
+                    >
+                      Bio
+                    </label>
+                    <textarea
+                      id="bio"
+                      value={bio}
+                      onChange={(event) => setBio(event.target.value)}
+                      rows={6}
+                      placeholder="Tell pet parents who you are, how you care for pets, and why they can trust you."
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                      Slug
-                    </p>
-                    <p className="mt-2 break-all text-lg font-extrabold !text-slate-950">
-                      /gurus/{publicPreviewSlug}
-                    </p>
-                  </div>
-                </div>
+                  <div>
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-extrabold !text-slate-950">
+                          Profile photo
+                        </p>
+                        <p className="mt-1 text-sm font-semibold !text-slate-600">
+                          Upload a JPG, PNG, or WEBP photo. This becomes your
+                          mini avatar across SitGuru.
+                        </p>
+                      </div>
 
-                <p className="mt-5 text-sm font-semibold leading-7 !text-slate-700">
-                  {publicPreviewBio}
-                </p>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {services.length > 0 ? (
-                    services.map((service) => (
-                      <span
-                        key={service}
-                        className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-800"
+                      <button
+                        type="button"
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={uploadingPhoto}
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-60"
                       >
-                        {service}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-extrabold !text-slate-500">
-                      No services selected yet
-                    </span>
-                  )}
-                </div>
-              </div>
+                        {uploadingPhoto ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Camera className="h-4 w-4" />
+                        )}
+                        {uploadingPhoto ? "Uploading..." : "Upload photo"}
+                      </button>
+                    </div>
 
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href={publicProfileHref}
-                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-emerald-700"
-                >
-                  Preview Customer Guru Page
-                </Link>
-
-                <Link
-                  href={routes.dashboard}
-                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-extrabold text-slate-900 transition hover:bg-slate-100"
-                >
-                  Return to Dashboard
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                Admin visibility
-              </p>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
-                What Admin should also be able to see
-              </h2>
-
-              <div className="mt-6 space-y-3">
-                {[
-                  "Updated display name and public title",
-                  "Location, pricing, and years of experience",
-                  "Service selections and profile visibility status",
-                  "Photo, bio, and profile completion data",
-                  "Customer-facing profile updates tied to your Guru record",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-extrabold !text-slate-700"
-                  >
-                    {item}
+                    <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4">
+                      {profilePhotoUrl ? (
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                          <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-white shadow-sm ring-1 ring-emerald-100">
+                            <Image
+                              src={profilePhotoUrl}
+                              alt="Guru profile preview"
+                              fill
+                              sizes="112px"
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
+                          <div>
+                            <p className="text-sm font-extrabold !text-slate-950">
+                              Profile photo ready
+                            </p>
+                            <p className="mt-1 break-all text-sm font-semibold leading-6 !text-slate-700">
+                              {profilePhotoUrl}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 !text-slate-700">
+                          <ImageIcon className="h-5 w-5 text-emerald-600" />
+                          <span className="text-sm font-semibold">
+                            No profile photo selected yet.
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </section>
 
-            <section className="rounded-[2rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
-              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
-                Why this matters
-              </p>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
-                Better profile data strengthens the marketplace
-              </h2>
-              <p className="mt-3 text-sm font-semibold leading-7 !text-slate-700">
-                The stronger your Guru profile is, the better it can perform for
-                customer trust, search visibility, and Admin operations. This
-                page is one of the core pieces powering the Guru side of
-                SitGuru.
-              </p>
-            </section>
-          </div>
-        </section>
-      </div>
+                  <div>
+                    <p className="mb-3 text-sm font-extrabold !text-slate-950">
+                      Services
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {SERVICE_OPTIONS.map((service) => {
+                        const active = services.includes(service);
 
-      <footer className="mt-12 border-t border-emerald-100 bg-white/95 px-4 py-8 shadow-[0_-8px_30px_rgba(15,23,42,0.03)] md:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
-            <Image
-              src="/images/sitguru-logo-cropped.png"
-              alt="SitGuru"
-              width={150}
-              height={42}
-              className="h-auto w-[130px] object-contain"
-            />
-            <div className="hidden h-8 w-px bg-emerald-100 sm:block" />
-            <div>
-              <p className="text-sm font-extrabold !text-slate-950">
-                Guru Portal
-              </p>
-              <p className="mt-1 text-xs font-semibold !text-slate-600">
-                Trusted pet care, simplified.
-              </p>
+                        return (
+                          <button
+                            key={service}
+                            type="button"
+                            onClick={() => toggleService(service)}
+                            className={`rounded-2xl border px-4 py-3 text-left text-sm font-extrabold transition ${
+                              active
+                                ? "border-emerald-300 bg-emerald-500 !text-slate-950 shadow-sm"
+                                : "border-slate-200 bg-slate-50 text-slate-800 hover:bg-emerald-50 hover:text-emerald-800"
+                            }`}
+                          >
+                            {service}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm font-extrabold !text-slate-950">
+                    <input
+                      type="checkbox"
+                      checked={isPublic}
+                      onChange={(event) => setIsPublic(event.target.checked)}
+                      className="h-4 w-4 rounded border-emerald-300 text-emerald-600"
+                    />
+                    Make this Guru profile public and customer-facing
+                  </label>
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {saving ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      Save Guru Profile
+                    </button>
+
+                    <Link
+                      href={routes.dashboard}
+                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-extrabold text-slate-900 transition hover:bg-slate-100"
+                    >
+                      Cancel
+                    </Link>
+                  </div>
+                </form>
+              </section>
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-extrabold sm:justify-end">
-            <Link
-              href={routes.dashboard}
-              className="rounded-full bg-emerald-50 px-4 py-2 !text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-100"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href={routes.bookings}
-              className="rounded-full bg-slate-50 px-4 py-2 !text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100"
-            >
-              Bookings
-            </Link>
-            <Link
-              href={routes.messages}
-              className="rounded-full bg-slate-50 px-4 py-2 !text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100"
-            >
-              Messages
-            </Link>
-          </div>
+            <div className="space-y-6">
+              <section className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="h-5 w-5 text-emerald-600" />
+                  <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
+                    Profile strength
+                  </p>
+                </div>
+
+                <div className="mt-4 flex items-end justify-between gap-4">
+                  <p className="text-5xl font-extrabold tracking-tight !text-slate-950">
+                    {completionPercent}%
+                  </p>
+                  <p className="text-sm font-extrabold !text-slate-600">
+                    {missingItems.length === 0 ? "Complete" : "Needs updates"}
+                  </p>
+                </div>
+
+                <div className="mt-4 h-3 overflow-hidden rounded-full bg-emerald-50 ring-1 ring-emerald-100">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    style={{ width: `${completionPercent}%` }}
+                  />
+                </div>
+
+                {missingItems.length > 0 ? (
+                  <div className="mt-5 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-sm font-extrabold !text-slate-950">
+                      Finish these next
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {missingItems.map((item) => (
+                        <span
+                          key={item}
+                          className="rounded-full bg-white px-3 py-1 text-xs font-extrabold !text-slate-700 ring-1 ring-slate-200"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-extrabold text-emerald-800 ring-1 ring-emerald-100">
+                    Your profile is ready for customer confidence and Guru
+                    recognition.
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <UserCircle2 className="h-5 w-5 text-emerald-600" />
+                  <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
+                    Customer preview
+                  </p>
+                </div>
+
+                <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
+                  How your public profile can present
+                </h2>
+
+                <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-4 border-white bg-emerald-50 shadow-sm ring-1 ring-emerald-100">
+                      {profilePhotoUrl ? (
+                        <Image
+                          src={profilePhotoUrl}
+                          alt="Profile preview"
+                          fill
+                          sizes="80px"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <UserCircle2 className="h-9 w-9 text-emerald-600" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-2xl font-extrabold !text-slate-950">
+                        {publicPreviewName}
+                      </p>
+                      <p className="mt-1 text-base font-extrabold !text-slate-700">
+                        {publicPreviewHeadline}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold !text-slate-500">
+                        {publicPreviewLocation}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
+                        Rate
+                      </p>
+                      <p className="mt-2 text-lg font-extrabold !text-slate-950">
+                        {publicPreviewRate}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
+                        Slug
+                      </p>
+                      <p className="mt-2 break-all text-lg font-extrabold !text-slate-950">
+                        /gurus/{publicPreviewSlug}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-5 text-sm font-semibold leading-7 !text-slate-700">
+                    {publicPreviewBio}
+                  </p>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {services.length > 0 ? (
+                      services.map((service) => (
+                        <span
+                          key={service}
+                          className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-800"
+                        >
+                          {service}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-extrabold !text-slate-500">
+                        No services selected yet
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href={publicProfileHref}
+                    className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-emerald-700"
+                  >
+                    Preview Customer Guru Page
+                  </Link>
+
+                  <Link
+                    href={routes.dashboard}
+                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-extrabold text-slate-900 transition hover:bg-slate-100"
+                  >
+                    Return to Dashboard
+                  </Link>
+                </div>
+              </section>
+
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
+                  Admin visibility
+                </p>
+                <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
+                  What Admin should also be able to see
+                </h2>
+
+                <div className="mt-6 space-y-3">
+                  {[
+                    "Updated display name and public title",
+                    "Location, pricing, and years of experience",
+                    "Service selections and profile visibility status",
+                    "Photo, bio, and profile completion data",
+                    "Customer-facing profile updates tied to your Guru record",
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-extrabold !text-slate-700"
+                    >
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-[2rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
+                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-700">
+                  Why this matters
+                </p>
+                <h2 className="mt-3 text-2xl font-extrabold tracking-tight !text-slate-950">
+                  Better profile data strengthens the marketplace
+                </h2>
+                <p className="mt-3 text-sm font-semibold leading-7 !text-slate-700">
+                  The stronger your Guru profile is, the better it can perform
+                  for customer trust, search visibility, and Admin operations.
+                  This page is one of the core pieces powering the Guru side of
+                  SitGuru.
+                </p>
+              </section>
+            </div>
+          </section>
         </div>
-      </footer>
-    </main>
+      </main>
+    </>
   );
 }
