@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
-import GuruDashboardHeader from "@/components/guru/GuruDashboardHeader";
+import GuruDashboardHeader from "./GuruDashboardHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -1000,7 +1000,6 @@ export default async function GuruDashboardPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light text-slate-900" style={SITE_FONT_STYLE}>
       <GuruDashboardHeader
-        active="dashboard"
         displayName={displayName}
         imageUrl={imageUrl}
         tierLabel={guruTier.label}
