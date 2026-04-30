@@ -10,6 +10,7 @@ type PetProfile = {
   species?: string | null;
   pet_type?: string | null;
   breed?: string | null;
+  age?: string | null;
   temperament?: string | null;
   medications?: string | null;
   notes?: string | null;
@@ -48,8 +49,70 @@ function todayForInput() {
   return `${today.getFullYear()}-${month}-${day}`;
 }
 
+function cleanText(value: string | null | undefined) {
+  return (value || "").trim();
+}
+
+function inferPetTypeFromText(pet: PetProfile | null) {
+  if (!pet) return "";
+
+  const joined = [
+    pet.species,
+    pet.pet_type,
+    pet.breed,
+    pet.name,
+    pet.notes,
+    pet.temperament,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (!joined) return "";
+
+  const catWords = [
+    "cat",
+    "kitten",
+    "feline",
+    "domestic shorthair",
+    "domestic longhair",
+    "tabby",
+    "maine coon",
+    "persian",
+    "siamese",
+    "ragdoll",
+    "bengal",
+  ];
+
+  const dogWords = [
+    "dog",
+    "puppy",
+    "canine",
+    "retriever",
+    "labrador",
+    "golden",
+    "german shepherd",
+    "poodle",
+    "doodle",
+    "bulldog",
+    "beagle",
+    "terrier",
+    "husky",
+    "boxer",
+    "rottweiler",
+    "pointer",
+    "shepherd",
+    "australian",
+  ];
+
+  if (catWords.some((word) => joined.includes(word))) return "Cat";
+  if (dogWords.some((word) => joined.includes(word))) return "Dog";
+
+  return "";
+}
+
 function getPetType(pet: PetProfile | null) {
-  return pet?.species || pet?.pet_type || "";
+  return cleanText(pet?.species) || cleanText(pet?.pet_type) || inferPetTypeFromText(pet);
 }
 
 function getPetNotes(pet: PetProfile | null) {
@@ -57,9 +120,10 @@ function getPetNotes(pet: PetProfile | null) {
 
   return [
     pet.breed ? `Breed: ${pet.breed}` : "",
+    pet.age ? `Age: ${pet.age}` : "",
     pet.temperament ? `Temperament: ${pet.temperament}` : "",
     pet.medications ? `Medications: ${pet.medications}` : "",
-    pet.notes ? `Pet notes: ${pet.notes}` : "",
+    pet.notes ? `Pet Passport notes: ${pet.notes}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -76,7 +140,7 @@ async function readJsonResponse(response: Response) {
     throw new Error(
       response.ok
         ? "The server returned an unreadable response."
-        : "The booking service returned a webpage instead of booking data. Confirm app/api/bookings/create/route.ts exists, has no TypeScript errors, and restart npm run dev."
+        : "The booking service returned a webpage instead of booking data. Confirm app/api/bookings/create/route.ts exists, has no TypeScript errors, and restart npm run dev.",
     );
   }
 }
@@ -126,17 +190,25 @@ export default function GuruQuickBookingForm({
 
   const selectedPet = useMemo(
     () => pets.find((pet) => pet.id === selectedPetId) || null,
-    [pets, selectedPetId]
+    [pets, selectedPetId],
   );
+
+  const selectedPetPhotoUrl = cleanText(selectedPet?.photo_url);
+  const selectedPetBreed = cleanText(selectedPet?.breed);
+  const selectedPetAge = cleanText(selectedPet?.age);
+  const selectedPetType = getPetType(selectedPet);
 
   const services = useMemo(() => {
     const cleaned = serviceOptions.map((service) => service.trim()).filter(Boolean);
+
     return Array.from(
-      new Set([primaryService || "General care", ...cleaned, "General care"])
+      new Set([primaryService || "General care", ...cleaned, "General care"]),
     );
   }, [primaryService, serviceOptions]);
 
-  const servicePrice = typeof hourlyRate === "number" && hourlyRate > 0 ? hourlyRate : 25;
+  const servicePrice =
+    typeof hourlyRate === "number" && hourlyRate > 0 ? hourlyRate : 25;
+
   const estimatedTotalBeforeTax = servicePrice + PLATFORM_FEE;
   const allComplianceChecked = Object.values(compliance).every(Boolean);
 
@@ -152,10 +224,14 @@ export default function GuruQuickBookingForm({
     !submitting;
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadCustomerPets() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (!mounted) return;
 
       if (!user) {
         setIsLoggedIn(false);
@@ -165,11 +241,18 @@ export default function GuruQuickBookingForm({
 
       setIsLoggedIn(true);
 
+      /*
+        Keep this query aligned with the current pets table.
+        The Pet Passport page currently saves:
+        id, owner_id, name, breed, age, photo_url, notes.
+      */
       const { data, error } = await supabase
         .from("pets")
-        .select("id,name,species,pet_type,breed,temperament,medications,notes,photo_url")
+        .select("id,name,breed,age,photo_url,notes")
         .eq("owner_id", user.id)
         .order("created_at", { ascending: false });
+
+      if (!mounted) return;
 
       if (!error) {
         setPets((data || []) as PetProfile[]);
@@ -179,27 +262,39 @@ export default function GuruQuickBookingForm({
     }
 
     loadCustomerPets();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
     if (!selectedPet) return;
 
     setPetName(selectedPet.name || "");
-    setPetType(getPetType(selectedPet));
+
+    const nextPetType = getPetType(selectedPet);
+    setPetType(nextPetType);
 
     const notes = getPetNotes(selectedPet);
-    if (notes && careNotes.trim().length === 0) {
-      setCareNotes(notes);
-    }
-    // Only react to changing the selected saved pet.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPetId]);
+    setCareNotes(notes);
+
+    setSavePetToDashboard(false);
+  }, [selectedPet]);
 
   function toggleCompliance(key: ComplianceKey) {
     setCompliance((current) => ({
       ...current,
       [key]: !current[key],
     }));
+  }
+
+  function clearSavedPetSelection() {
+    setSelectedPetId("");
+    setPetName("");
+    setPetType("");
+    setCareNotes("");
+    setSavePetToDashboard(true);
   }
 
   async function handleCheckout() {
@@ -213,7 +308,9 @@ export default function GuruQuickBookingForm({
       }
 
       if (!canCheckout) {
-        setError("Please complete the booking details and required acknowledgments before checkout.");
+        setError(
+          "Please complete the booking details and required acknowledgments before checkout.",
+        );
         return;
       }
 
@@ -232,10 +329,26 @@ export default function GuruQuickBookingForm({
 
           bookingType,
           petId: selectedPetId || null,
+          selectedPetId: selectedPetId || null,
           savePetToDashboard: selectedPetId ? false : savePetToDashboard,
 
           petName: petName.trim(),
           petType: petType.trim(),
+          petBreed: selectedPetBreed || null,
+          petAge: selectedPetAge || null,
+          petPhotoUrl: selectedPetPhotoUrl || null,
+
+          petPassport: selectedPet
+            ? {
+                id: selectedPet.id,
+                name: selectedPet.name,
+                type: selectedPetType || petType.trim(),
+                breed: selectedPet.breed || null,
+                age: selectedPet.age || null,
+                photo_url: selectedPet.photo_url || null,
+                notes: selectedPet.notes || null,
+              }
+            : null,
 
           serviceType: serviceType.trim(),
           bookingDate,
@@ -271,14 +384,16 @@ export default function GuruQuickBookingForm({
         throw new Error(
           created?.error ||
             created?.details?.message ||
-            "Unable to create the booking request."
+            "Unable to create the booking request.",
         );
       }
 
       const checkoutUrl = created.checkoutUrl || created.checkout_url || created.url;
 
       if (!checkoutUrl) {
-        throw new Error("Booking was created, but no secure checkout URL was returned.");
+        throw new Error(
+          "Booking was created, but no secure checkout URL was returned.",
+        );
       }
 
       window.location.href = checkoutUrl;
@@ -288,7 +403,7 @@ export default function GuruQuickBookingForm({
       setError(
         err instanceof Error
           ? err.message
-          : "Something went wrong while preparing checkout."
+          : "Something went wrong while preparing checkout.",
       );
 
       setSubmitting(false);
@@ -319,7 +434,10 @@ export default function GuruQuickBookingForm({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate !text-slate-950 text-lg font-black">{guruName}</p>
+            <p className="truncate !text-slate-950 text-lg font-black">
+              {guruName}
+            </p>
+
             <p className="mt-1 line-clamp-2 !text-slate-600 text-sm font-semibold leading-6">
               {guruHeadline || "Trusted SitGuru pet care provider"}
             </p>
@@ -328,6 +446,7 @@ export default function GuruQuickBookingForm({
               <span className="rounded-full border border-slate-200 !bg-white px-3 py-1 !text-slate-900 text-xs font-bold">
                 {money(servicePrice)}/hr
               </span>
+
               <span className="rounded-full border border-slate-200 !bg-white px-3 py-1 !text-slate-900 text-xs font-bold">
                 {primaryService}
               </span>
@@ -338,9 +457,13 @@ export default function GuruQuickBookingForm({
 
       <div className="mt-5 space-y-5">
         <div>
-          <label htmlFor="booking-type" className="mb-2 block !text-slate-900 text-sm font-black">
+          <label
+            htmlFor="booking-type"
+            className="mb-2 block !text-slate-900 text-sm font-black"
+          >
             Booking type
           </label>
+
           <select
             id="booking-type"
             value={bookingType}
@@ -350,16 +473,22 @@ export default function GuruQuickBookingForm({
             <option value="request">Request Booking</option>
             <option value="instant">Instant Booking, if available</option>
           </select>
+
           <p className="mt-2 !text-slate-500 text-xs font-medium leading-6">
-            Complete the details once. SitGuru will create the request and take you to secure checkout.
+            Complete the details once. SitGuru will create the request and take
+            you to secure checkout.
           </p>
         </div>
 
         {isLoggedIn ? (
           <div>
-            <label htmlFor="saved-pet" className="mb-2 block !text-slate-900 text-sm font-black">
-              Saved pet profile
+            <label
+              htmlFor="saved-pet"
+              className="mb-2 block !text-slate-900 text-sm font-black"
+            >
+              Saved Pet Passport
             </label>
+
             <select
               id="saved-pet"
               value={selectedPetId}
@@ -367,30 +496,111 @@ export default function GuruQuickBookingForm({
               className="min-h-[56px] w-full rounded-2xl border border-slate-300 !bg-white px-4 py-3 !text-slate-900 text-base font-semibold outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15"
             >
               <option value="">
-                {loadingPets ? "Loading saved pets..." : "Choose saved pet or enter a new pet"}
+                {loadingPets
+                  ? "Loading saved Pet Passports..."
+                  : pets.length
+                    ? "Choose saved Pet Passport or enter a new pet"
+                    : "No saved Pet Passports yet — enter a new pet"}
               </option>
-              {pets.map((pet) => (
-                <option key={pet.id} value={pet.id}>
-                  {pet.name || "Unnamed pet"}
-                  {getPetType(pet) ? ` • ${getPetType(pet)}` : ""}
-                </option>
-              ))}
+
+              {pets.map((pet) => {
+                const typeLabel = getPetType(pet);
+                const detailLabel = [typeLabel, pet.breed, pet.age]
+                  .filter(Boolean)
+                  .join(" • ");
+
+                return (
+                  <option key={pet.id} value={pet.id}>
+                    {pet.name || "Unnamed pet"}
+                    {detailLabel ? ` — ${detailLabel}` : ""}
+                  </option>
+                );
+              })}
             </select>
+
+            {selectedPet ? (
+              <div className="mt-4 rounded-[1.4rem] border border-emerald-200 !bg-emerald-50 p-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-emerald-200 bg-white text-sm font-black text-emerald-700 shadow-sm">
+                    {selectedPetPhotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={selectedPetPhotoUrl}
+                        alt={selectedPet.name || "Selected pet"}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      "🐾"
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="!text-slate-950 text-base font-black">
+                          {selectedPet.name || "Selected Pet Passport"}
+                        </p>
+
+                        <p className="mt-1 !text-slate-700 text-sm font-semibold">
+                          {[selectedPetType || petType, selectedPetBreed, selectedPetAge]
+                            .filter(Boolean)
+                            .join(" • ") || "Saved Pet Passport"}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={clearSavedPetSelection}
+                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Use different pet
+                      </button>
+                    </div>
+
+                    {selectedPet.notes ? (
+                      <p className="mt-3 line-clamp-3 rounded-2xl bg-white p-3 !text-slate-700 text-sm font-semibold leading-6 ring-1 ring-emerald-100">
+                        {selectedPet.notes}
+                      </p>
+                    ) : (
+                      <p className="mt-3 rounded-2xl bg-white p-3 !text-slate-500 text-sm font-semibold leading-6 ring-1 ring-emerald-100">
+                        No detailed care notes saved yet. You can add more notes
+                        below before checkout.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {!loadingPets && pets.length === 0 ? (
+              <p className="mt-2 !text-slate-500 text-xs font-semibold leading-6">
+                Add Pet Passports from your customer dashboard to speed up future
+                bookings.
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="rounded-2xl border border-amber-200 !bg-amber-50 p-4">
-            <p className="!text-amber-900 text-sm font-black">Login required before checkout</p>
+            <p className="!text-amber-900 text-sm font-black">
+              Login required before checkout
+            </p>
+
             <p className="mt-1 !text-amber-800 text-sm leading-6">
-              You can review the form now. When you continue, SitGuru will ask you to log in so the booking appears in your dashboard.
+              You can review the form now. When you continue, SitGuru will ask
+              you to log in so the booking appears in your dashboard.
             </p>
           </div>
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="pet-name" className="mb-2 block !text-slate-900 text-sm font-black">
+            <label
+              htmlFor="pet-name"
+              className="mb-2 block !text-slate-900 text-sm font-black"
+            >
               Pet name
             </label>
+
             <input
               id="pet-name"
               value={petName}
@@ -401,9 +611,13 @@ export default function GuruQuickBookingForm({
           </div>
 
           <div>
-            <label htmlFor="pet-type" className="mb-2 block !text-slate-900 text-sm font-black">
+            <label
+              htmlFor="pet-type"
+              className="mb-2 block !text-slate-900 text-sm font-black"
+            >
               Pet type
             </label>
+
             <select
               id="pet-type"
               value={petType}
@@ -417,6 +631,13 @@ export default function GuruQuickBookingForm({
               <option value="Small animal">Small animal</option>
               <option value="Other">Other</option>
             </select>
+
+            {selectedPet && !selectedPetType ? (
+              <p className="mt-2 !text-amber-700 text-xs font-bold leading-5">
+                Choose pet type once for this booking. A future Pet Passport
+                database upgrade can save this field directly.
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -428,6 +649,7 @@ export default function GuruQuickBookingForm({
               onChange={() => setSavePetToDashboard((current) => !current)}
               className="mt-1 h-4 w-4 accent-emerald-600"
             />
+
             <span className="!text-slate-700 text-sm font-semibold leading-6">
               Save this pet to my customer dashboard for faster future bookings.
             </span>
@@ -435,9 +657,13 @@ export default function GuruQuickBookingForm({
         ) : null}
 
         <div>
-          <label htmlFor="service-type" className="mb-2 block !text-slate-900 text-sm font-black">
+          <label
+            htmlFor="service-type"
+            className="mb-2 block !text-slate-900 text-sm font-black"
+          >
             Service
           </label>
+
           <select
             id="service-type"
             value={serviceType}
@@ -454,9 +680,13 @@ export default function GuruQuickBookingForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="booking-date" className="mb-2 block !text-slate-900 text-sm font-black">
+            <label
+              htmlFor="booking-date"
+              className="mb-2 block !text-slate-900 text-sm font-black"
+            >
               Requested date
             </label>
+
             <input
               id="booking-date"
               type="date"
@@ -468,9 +698,13 @@ export default function GuruQuickBookingForm({
           </div>
 
           <div>
-            <label htmlFor="preferred-time" className="mb-2 block !text-slate-900 text-sm font-black">
+            <label
+              htmlFor="preferred-time"
+              className="mb-2 block !text-slate-900 text-sm font-black"
+            >
               Preferred time
             </label>
+
             <select
               id="preferred-time"
               value={preferredTime}
@@ -488,9 +722,13 @@ export default function GuruQuickBookingForm({
 
         <div className="grid gap-4 sm:grid-cols-[0.9fr_1fr_0.7fr]">
           <div>
-            <label htmlFor="care-zip" className="mb-2 block !text-slate-900 text-sm font-black">
+            <label
+              htmlFor="care-zip"
+              className="mb-2 block !text-slate-900 text-sm font-black"
+            >
               ZIP code
             </label>
+
             <input
               id="care-zip"
               value={careZipCode}
@@ -501,9 +739,13 @@ export default function GuruQuickBookingForm({
           </div>
 
           <div>
-            <label htmlFor="care-city" className="mb-2 block !text-slate-900 text-sm font-black">
+            <label
+              htmlFor="care-city"
+              className="mb-2 block !text-slate-900 text-sm font-black"
+            >
               City
             </label>
+
             <input
               id="care-city"
               value={careCity}
@@ -514,9 +756,13 @@ export default function GuruQuickBookingForm({
           </div>
 
           <div>
-            <label htmlFor="care-state" className="mb-2 block !text-slate-900 text-sm font-black">
+            <label
+              htmlFor="care-state"
+              className="mb-2 block !text-slate-900 text-sm font-black"
+            >
               State
             </label>
+
             <input
               id="care-state"
               value={careState}
@@ -529,9 +775,13 @@ export default function GuruQuickBookingForm({
         </div>
 
         <div>
-          <label htmlFor="care-notes" className="mb-2 block !text-slate-900 text-sm font-black">
+          <label
+            htmlFor="care-notes"
+            className="mb-2 block !text-slate-900 text-sm font-black"
+          >
             Care notes
           </label>
+
           <textarea
             id="care-notes"
             value={careNotes}
@@ -543,9 +793,13 @@ export default function GuruQuickBookingForm({
         </div>
 
         <div>
-          <label htmlFor="emergency-instructions" className="mb-2 block !text-slate-900 text-sm font-black">
+          <label
+            htmlFor="emergency-instructions"
+            className="mb-2 block !text-slate-900 text-sm font-black"
+          >
             Emergency or special instructions
           </label>
+
           <textarea
             id="emergency-instructions"
             value={emergencyInstructions}
@@ -558,7 +812,10 @@ export default function GuruQuickBookingForm({
 
         <div className="rounded-[1.5rem] border border-slate-200 !bg-slate-50 p-5">
           <div className="flex items-center justify-between gap-4">
-            <p className="!text-slate-950 text-lg font-black">Review before checkout</p>
+            <p className="!text-slate-950 text-lg font-black">
+              Review before checkout
+            </p>
+
             <span className="rounded-full border border-emerald-200 !bg-white px-3 py-1 !text-emerald-700 text-xs font-black">
               Transparent pricing
             </span>
@@ -569,24 +826,34 @@ export default function GuruQuickBookingForm({
               <span>{serviceType || "Service"}</span>
               <span className="!text-slate-950">{money(servicePrice)}</span>
             </div>
+
             <div className="flex items-center justify-between gap-4 !text-slate-700">
               <span>SitGuru platform fee</span>
               <span className="!text-slate-950">{money(PLATFORM_FEE)}</span>
             </div>
+
             <div className="flex items-center justify-between gap-4 !text-slate-700">
               <span>Taxes</span>
               <span className="!text-slate-950">Calculated at checkout</span>
             </div>
+
             <div className="border-t border-slate-200 pt-3">
               <div className="flex items-center justify-between gap-4 text-base">
-                <span className="!text-slate-950 font-black">Estimated total before tax</span>
-                <span className="!text-slate-950 font-black">{money(estimatedTotalBeforeTax)}</span>
+                <span className="!text-slate-950 font-black">
+                  Estimated total before tax
+                </span>
+
+                <span className="!text-slate-950 font-black">
+                  {money(estimatedTotalBeforeTax)}
+                </span>
               </div>
             </div>
           </div>
 
           <p className="mt-4 !text-slate-500 text-xs font-semibold leading-6">
-            Taxes, if applicable, are calculated securely during Stripe Checkout based on your billing/location details. Your final total will be shown before payment is completed.
+            Taxes, if applicable, are calculated securely during Stripe Checkout
+            based on your billing/location details. Your final total will be
+            shown before payment is completed.
           </p>
         </div>
 
@@ -598,8 +865,11 @@ export default function GuruQuickBookingForm({
               onChange={() => toggleCompliance("details")}
               className="mt-1 h-4 w-4 accent-emerald-600"
             />
+
             <span className="!text-slate-700 text-sm font-semibold leading-6">
-              I confirm the booking details, booking type, care date, service type, pet information, ZIP code, city/state, and care notes are accurate to the best of my knowledge.
+              I confirm the booking details, booking type, care date, service
+              type, pet information, ZIP code, city/state, and care notes are
+              accurate to the best of my knowledge.
             </span>
           </label>
 
@@ -610,8 +880,11 @@ export default function GuruQuickBookingForm({
               onChange={() => toggleCompliance("payments")}
               className="mt-1 h-4 w-4 accent-emerald-600"
             />
+
             <span className="!text-slate-700 text-sm font-semibold leading-6">
-              I understand SitGuru securely processes payment at checkout and that payment handling, refunds, disputes, and chargebacks are managed through SitGuru’s platform policies.
+              I understand SitGuru securely processes payment at checkout and
+              that payment handling, refunds, disputes, and chargebacks are
+              managed through SitGuru’s platform policies.
             </span>
           </label>
 
@@ -622,8 +895,11 @@ export default function GuruQuickBookingForm({
               onChange={() => toggleCompliance("payouts")}
               className="mt-1 h-4 w-4 accent-emerald-600"
             />
+
             <span className="!text-slate-700 text-sm font-semibold leading-6">
-              I understand Guru payouts are released 48 hours after completed care unless a support case, refund request, chargeback, or safety review is open.
+              I understand Guru payouts are released 48 hours after completed
+              care unless a support case, refund request, chargeback, or safety
+              review is open.
             </span>
           </label>
 
@@ -634,16 +910,24 @@ export default function GuruQuickBookingForm({
               onChange={() => toggleCompliance("terms")}
               className="mt-1 h-4 w-4 accent-emerald-600"
             />
+
             <span className="!text-slate-700 text-sm font-semibold leading-6">
               I agree to SitGuru’s{" "}
-              <a href="/terms" className="font-black !text-emerald-700 underline-offset-4 hover:underline">
+              <a
+                href="/terms"
+                className="font-black !text-emerald-700 underline-offset-4 hover:underline"
+              >
                 Terms
               </a>
               ,{" "}
-              <a href="/privacy" className="font-black !text-emerald-700 underline-offset-4 hover:underline">
+              <a
+                href="/privacy"
+                className="font-black !text-emerald-700 underline-offset-4 hover:underline"
+              >
                 Privacy Policy
               </a>
-              , cancellation/refund policies, and booking agreement acknowledgments.
+              , cancellation/refund policies, and booking agreement
+              acknowledgments.
             </span>
           </label>
         </div>
@@ -660,11 +944,15 @@ export default function GuruQuickBookingForm({
           disabled={!canCheckout}
           className="inline-flex min-h-[64px] w-full items-center justify-center rounded-2xl !bg-emerald-500 px-6 py-4 text-center text-lg font-black tracking-tight !text-slate-950 shadow-[0_18px_40px_rgba(16,185,129,0.20)] transition hover:!bg-emerald-400 disabled:cursor-not-allowed disabled:!bg-slate-200 disabled:!text-slate-500"
         >
-          {submitting ? "Preparing Secure Checkout..." : "I Agree — Continue to Secure Checkout"}
+          {submitting
+            ? "Preparing Secure Checkout..."
+            : "I Agree — Continue to Secure Checkout"}
         </button>
 
         <p className="!text-slate-500 text-xs font-medium leading-6">
-          Your booking request, pet details, compliance acknowledgments, and payment status will appear in your customer dashboard after checkout begins.
+          Your booking request, Pet Passport details, compliance
+          acknowledgments, and payment status will appear in your customer
+          dashboard after checkout begins.
         </p>
       </div>
     </div>

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import GuruProfileAnalytics from "./GuruProfileAnalytics";
 import GuruQuickBookingForm from "./GuruQuickBookingForm";
+import BookThisGuruButton from "./BookThisGuruButton";
 
 type PageProps = {
   params: Promise<{
@@ -624,7 +625,6 @@ export default async function GuruProfilePage({ params }: PageProps) {
     typeof guru.review_count === "number" && guru.review_count > 0;
 
   const publicSlug = createGuruSlug(guru);
-  const bookingPageHref = "#book-guru";
   const messageHref = `/messages/new?guru=${encodeURIComponent(publicSlug)}`;
   const primaryService = services[0] || "General care";
   const bookingServices = Array.from(
@@ -768,12 +768,7 @@ export default async function GuruProfilePage({ params }: PageProps) {
                   </div>
 
                   <div className="mt-7 flex flex-wrap items-center gap-3">
-                    <Link
-                      href={bookingPageHref}
-                      className="inline-flex min-h-[56px] min-w-[172px] items-center justify-center rounded-full bg-emerald-600 px-8 py-3 text-base font-black text-white shadow-[0_12px_28px_rgba(5,150,105,0.22)] transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-[0_16px_34px_rgba(5,150,105,0.28)]"
-                    >
-                      Book this Guru
-                    </Link>
+                    <BookThisGuruButton />
 
                     <Link
                       href={messageHref}
@@ -997,7 +992,11 @@ export default async function GuruProfilePage({ params }: PageProps) {
           </div>
 
           <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
-            <section id="book-guru" className="scroll-mt-28 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,118,110,0.12)]">
+            <section
+              id="booking-panel"
+              tabIndex={-1}
+              className="scroll-mt-28 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,118,110,0.12)] outline-none transition-all duration-300"
+            >
               <div className="border-b border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_100%)] p-5 sm:p-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-sm font-black uppercase tracking-[0.22em] !text-emerald-700">
@@ -1137,12 +1136,10 @@ export default async function GuruProfilePage({ params }: PageProps) {
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-100 bg-white/95 px-4 py-3 shadow-[0_-16px_40px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden">
         <div className="mx-auto flex max-w-7xl gap-3">
-          <Link
-            href={bookingPageHref}
+          <BookThisGuruButton
+            label="Book Guru"
             className="flex min-h-[52px] flex-1 items-center justify-center rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white"
-          >
-            Book Guru
-          </Link>
+          />
           <Link
             href={messageHref}
             className="flex min-h-[52px] flex-1 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black !text-emerald-700"
