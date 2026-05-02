@@ -94,13 +94,17 @@ function getReferralCategory(referral: PartnerReferralCode) {
 
 function getLocation(referral: PartnerReferralCode) {
   if (referral.partners) {
-    return [referral.partners.city, referral.partners.state].filter(Boolean).join(", ");
+    return [referral.partners.city, referral.partners.state]
+      .filter(Boolean)
+      .join(", ");
   }
 
   if (referral.ambassadors) {
     return (
       referral.ambassadors.territory ||
-      [referral.ambassadors.city, referral.ambassadors.state].filter(Boolean).join(", ")
+      [referral.ambassadors.city, referral.ambassadors.state]
+        .filter(Boolean)
+        .join(", ")
     );
   }
 
@@ -127,6 +131,7 @@ function getPartnerIcon(referral: PartnerReferralCode) {
   if (type.includes("food")) return "🥣";
   if (type.includes("wellness")) return "🌿";
   if (type.includes("national")) return "🌐";
+
   return "🐾";
 }
 
@@ -162,7 +167,7 @@ export default async function PublicPartnerReferralPage({
   params,
   searchParams,
 }: PageProps) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("referral_codes")

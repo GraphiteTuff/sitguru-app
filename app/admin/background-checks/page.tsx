@@ -238,11 +238,19 @@ export default async function AdminBackgroundChecksPage() {
 
   const backgroundCheckByGuruId = new Map<string, GuruBackgroundCheckDetail>();
 
-  ((backgroundChecks || []) as GuruBackgroundCheckDetail[]).forEach((check) => {
-    backgroundCheckByGuruId.set(check.guru_id, check);
+  const safeBackgroundChecks = Array.isArray(backgroundChecks)
+    ? (backgroundChecks as unknown as GuruBackgroundCheckDetail[])
+    : [];
+
+  safeBackgroundChecks.forEach((check) => {
+    if (check?.guru_id) {
+      backgroundCheckByGuruId.set(check.guru_id, check);
+    }
   });
 
-  const rows = (gurus || []) as GuruBackgroundCheckRow[];
+  const rows = Array.isArray(gurus)
+    ? (gurus as unknown as GuruBackgroundCheckRow[])
+    : [];
 
   const total = rows.length;
 

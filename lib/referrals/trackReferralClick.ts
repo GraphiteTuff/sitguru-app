@@ -9,16 +9,16 @@ type TrackReferralClickInput = {
   utmCampaign?: string | null;
 };
 
-function getHeaderValue(name: string) {
-  const headerStore = headers();
+async function getHeaderValue(name: string) {
+  const headerStore = await headers();
   return headerStore.get(name) || null;
 }
 
-function getIpSource() {
+async function getIpSource() {
   return (
-    getHeaderValue("x-forwarded-for") ||
-    getHeaderValue("x-real-ip") ||
-    getHeaderValue("cf-connecting-ip") ||
+    (await getHeaderValue("x-forwarded-for")) ||
+    (await getHeaderValue("x-real-ip")) ||
+    (await getHeaderValue("cf-connecting-ip")) ||
     ""
   );
 }
@@ -45,9 +45,9 @@ export async function trackReferralClick({
   try {
     const supabase = await createClient();
 
-    const ipHash = await sha256(getIpSource());
-    const userAgent = getHeaderValue("user-agent");
-    const referrer = getHeaderValue("referer");
+    const ipHash = await sha256(await getIpSource());
+    const userAgent = await getHeaderValue("user-agent");
+    const referrer = await getHeaderValue("referer");
 
     const { error } = await supabase.from("referral_clicks").insert({
       referral_code_id: referralCodeId,

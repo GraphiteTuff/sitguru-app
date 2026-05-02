@@ -94,7 +94,7 @@ export async function submitPartnerApplication(
     };
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },

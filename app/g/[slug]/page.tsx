@@ -6,7 +6,13 @@ import { trackReferralClick } from "@/lib/referrals/trackReferralClick";
 type ReferralCode = {
   id: string;
   owner_user_id: string | null;
-  owner_type: "customer" | "guru" | "partner" | "affiliate" | "ambassador" | "admin";
+  owner_type:
+    | "customer"
+    | "guru"
+    | "partner"
+    | "affiliate"
+    | "ambassador"
+    | "admin";
   partner_id: string | null;
   ambassador_id: string | null;
   code: string;
@@ -62,14 +68,26 @@ function formatLabel(value: string | null | undefined) {
 }
 
 function getDisplayName(referral: ReferralCode) {
-  if (referral.ambassadors?.display_name) return referral.ambassadors.display_name;
-  if (referral.partners?.business_name) return referral.partners.business_name;
+  if (referral.ambassadors?.display_name) {
+    return referral.ambassadors.display_name;
+  }
+
+  if (referral.partners?.business_name) {
+    return referral.partners.business_name;
+  }
+
   return "a SitGuru Partner";
 }
 
 function getProgramLabel(referral: ReferralCode) {
-  if (referral.ambassadors) return formatLabel(referral.ambassadors.ambassador_type);
-  if (referral.partners) return formatLabel(referral.partners.partner_type);
+  if (referral.ambassadors) {
+    return formatLabel(referral.ambassadors.ambassador_type);
+  }
+
+  if (referral.partners) {
+    return formatLabel(referral.partners.partner_type);
+  }
+
   return formatLabel(referral.campaign_type);
 }
 
@@ -77,12 +95,16 @@ function getLocation(referral: ReferralCode) {
   if (referral.ambassadors) {
     return (
       referral.ambassadors.territory ||
-      [referral.ambassadors.city, referral.ambassadors.state].filter(Boolean).join(", ")
+      [referral.ambassadors.city, referral.ambassadors.state]
+        .filter(Boolean)
+        .join(", ")
     );
   }
 
   if (referral.partners) {
-    return [referral.partners.city, referral.partners.state].filter(Boolean).join(", ");
+    return [referral.partners.city, referral.partners.state]
+      .filter(Boolean)
+      .join(", ");
   }
 
   return "";
@@ -92,7 +114,7 @@ export default async function GuruReferralPage({
   params,
   searchParams,
 }: PageProps) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("referral_codes")

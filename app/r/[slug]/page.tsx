@@ -77,12 +77,16 @@ function getLocation(referral: ReferralCode) {
   if (referral.ambassadors) {
     return (
       referral.ambassadors.territory ||
-      [referral.ambassadors.city, referral.ambassadors.state].filter(Boolean).join(", ")
+      [referral.ambassadors.city, referral.ambassadors.state]
+        .filter(Boolean)
+        .join(", ")
     );
   }
 
   if (referral.partners) {
-    return [referral.partners.city, referral.partners.state].filter(Boolean).join(", ");
+    return [referral.partners.city, referral.partners.state]
+      .filter(Boolean)
+      .join(", ");
   }
 
   return "";
@@ -92,7 +96,7 @@ export default async function CustomerReferralPage({
   params,
   searchParams,
 }: PageProps) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("referral_codes")

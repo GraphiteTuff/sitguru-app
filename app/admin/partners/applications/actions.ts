@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
 type ApplicationStatus = "approved" | "rejected" | "needs_review";
 
 type PartnerApplication = {
@@ -122,13 +124,16 @@ function buildBaseName(application: PartnerApplication) {
 }
 
 async function makeUniqueSlug(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseServerClient,
   baseName: string
 ) {
   const baseSlug = slugify(baseName) || "sitguru-partner";
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const slug = attempt === 0 ? baseSlug : `${baseSlug}-${randomCodeSegment().toLowerCase()}`;
+    const slug =
+      attempt === 0
+        ? baseSlug
+        : `${baseSlug}-${randomCodeSegment().toLowerCase()}`;
 
     const { data: partnerMatch } = await supabase
       .from("partners")
@@ -151,7 +156,7 @@ async function makeUniqueSlug(
 }
 
 async function makeUniqueReferralCode(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseServerClient,
   baseName: string
 ) {
   const base = slugify(baseName)
@@ -181,7 +186,7 @@ async function createApprovedPartnerRecord({
   application,
   adminUserId,
 }: {
-  supabase: ReturnType<typeof createClient>;
+  supabase: SupabaseServerClient;
   application: PartnerApplication;
   adminUserId: string;
 }) {
@@ -260,7 +265,7 @@ async function createApprovedAmbassadorRecord({
   application,
   adminUserId,
 }: {
-  supabase: ReturnType<typeof createClient>;
+  supabase: SupabaseServerClient;
   application: PartnerApplication;
   adminUserId: string;
 }) {

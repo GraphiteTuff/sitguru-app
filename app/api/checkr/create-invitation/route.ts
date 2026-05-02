@@ -10,6 +10,19 @@ type CreateInvitationBody = {
   guruId?: string;
 };
 
+type GuruForCheckrInvite = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  full_name: string | null;
+  display_name: string | null;
+  phone: string | null;
+  city: string | null;
+  state: string | null;
+  checkr_candidate_id: string | null;
+  background_check_status: string | null;
+};
+
 type CheckrCandidate = {
   id: string;
   object?: string;
@@ -167,7 +180,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: guru, error: guruError } = await supabaseAdmin
+    const { data: guruData, error: guruError } = await supabaseAdmin
       .from("gurus")
       .select(
         [
@@ -185,6 +198,8 @@ export async function POST(request: Request) {
       )
       .eq("id", guruId)
       .single();
+
+    const guru = guruData as GuruForCheckrInvite | null;
 
     if (guruError || !guru) {
       console.error("Guru lookup error:", guruError);

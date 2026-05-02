@@ -135,7 +135,7 @@ function StatusActionButton({
 export default async function AdminPartnerApplicationReviewPage({
   params,
 }: PageProps) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("partner_applications")

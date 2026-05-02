@@ -55,12 +55,6 @@ function toNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function asBoolean(value: unknown) {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") return ["true", "1", "yes", "on"].includes(value.toLowerCase());
-  return Boolean(value);
-}
-
 function money(value: number) {
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -90,21 +84,6 @@ function formatDateShort(value?: string | null) {
     month: "short",
     day: "numeric",
     year: "numeric",
-  });
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "—";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
-
-  return parsed.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
   });
 }
 
@@ -156,7 +135,10 @@ function getCaseHref(kind: "booking" | "support" | "dispute" | "payment", id: st
 }
 
 function normalizeStatus(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase()) || "Review";
+  return (
+    value.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase()) ||
+    "Review"
+  );
 }
 
 function includesAny(value: string, terms: string[]) {
@@ -208,7 +190,14 @@ function getRiskFromSupportCase(row: AnyRow): "High" | "Medium" | "Low" {
 
   if (
     priority === "high" ||
-    includesAny(text, ["refund", "payment", "cancel", "no show", "no-show", "complaint"])
+    includesAny(text, [
+      "refund",
+      "payment",
+      "cancel",
+      "no show",
+      "no-show",
+      "complaint",
+    ])
   ) {
     return "Medium";
   }
@@ -221,11 +210,18 @@ function getRiskFromDispute(row: AnyRow): "High" | "Medium" | "Low" {
   const issueType = asTrimmedString(row.issue_type).toLowerCase();
   const summary = asTrimmedString(row.issue_summary).toLowerCase();
 
-  if (priority === "urgent" || issueType === "trust_safety" || includesAny(summary, ["fraud", "unsafe", "abuse"])) {
+  if (
+    priority === "urgent" ||
+    issueType === "trust_safety" ||
+    includesAny(summary, ["fraud", "unsafe", "abuse"])
+  ) {
     return "High";
   }
 
-  if (priority === "high" || includesAny(issueType, ["refund", "payment", "booking"])) {
+  if (
+    priority === "high" ||
+    includesAny(issueType, ["refund", "payment", "booking"])
+  ) {
     return "Medium";
   }
 
@@ -240,14 +236,26 @@ function getRiskFromBooking(row: AnyRow): "High" | "Medium" | "Low" {
   const hoursSince = getHoursSince(createdAt);
 
   if (
-    includesAny(`${status} ${paymentStatus} ${payoutStatus}`, ["failed", "chargeback", "dispute", "fraud", "hold", "blocked"])
+    includesAny(`${status} ${paymentStatus} ${payoutStatus}`, [
+      "failed",
+      "chargeback",
+      "dispute",
+      "fraud",
+      "hold",
+      "blocked",
+    ])
   ) {
     return "High";
   }
 
   if (
     hoursSince <= 24 ||
-    includesAny(`${status} ${paymentStatus} ${payoutStatus}`, ["pending", "review", "cancel", "refund"])
+    includesAny(`${status} ${paymentStatus} ${payoutStatus}`, [
+      "pending",
+      "review",
+      "cancel",
+      "refund",
+    ])
   ) {
     return "Medium";
   }
@@ -258,6 +266,7 @@ function getRiskFromBooking(row: AnyRow): "High" | "Medium" | "Low" {
 function riskScoreFromSignal(risk: "High" | "Medium" | "Low", amount = 0) {
   const base = risk === "High" ? 86 : risk === "Medium" ? 68 : 42;
   const amountBoost = amount >= 500 ? 8 : amount >= 200 ? 5 : amount >= 100 ? 2 : 0;
+
   return Math.min(98, base + amountBoost);
 }
 
@@ -268,9 +277,15 @@ function buildSupportAlerts(rows: AnyRow[]): FraudAlert[] {
       return !["resolved", "closed", "archived"].includes(status);
     })
     .map((row, index) => {
-      const caseNumber = asTrimmedString(row.case_number) || asTrimmedString(row.support_number) || getRowId(row, `SUP-${index + 1}`);
+      const caseNumber =
+        asTrimmedString(row.case_number) ||
+        asTrimmedString(row.support_number) ||
+        getRowId(row, `SUP-${index + 1}`);
       const subject = asTrimmedString(row.subject) || "Support case needs review";
-      const sender = asTrimmedString(row.sender_name) || asTrimmedString(row.customer_name) || "Sender";
+      const sender =
+        asTrimmedString(row.sender_name) ||
+        asTrimmedString(row.customer_name) ||
+        "Sender";
       const status = normalizeStatus(asTrimmedString(row.status) || "new");
       const risk = getRiskFromSupportCase(row);
       const amount = getAmount(row);
@@ -278,7 +293,9 @@ function buildSupportAlerts(rows: AnyRow[]): FraudAlert[] {
       return {
         id: caseNumber,
         title: subject,
-        detail: `${sender} • ${asTrimmedString(row.case_type).replace(/_/g, " ") || "support"}`,
+        detail: `${sender} • ${
+          asTrimmedString(row.case_type).replace(/_/g, " ") || "support"
+        }`,
         risk,
         status,
         source: "Support Intake",
@@ -296,11 +313,16 @@ function buildDisputeAlerts(rows: AnyRow[]): FraudAlert[] {
       return !["resolved", "closed", "archived"].includes(status);
     })
     .map((row, index) => {
-      const disputeNumber = asTrimmedString(row.dispute_number) || getRowId(row, `DP-${index + 1}`);
+      const disputeNumber =
+        asTrimmedString(row.dispute_number) || getRowId(row, `DP-${index + 1}`);
       const issue = asTrimmedString(row.issue_type).replace(/_/g, " ") || "dispute";
       const summary = asTrimmedString(row.issue_summary) || "Open dispute case";
       const risk = getRiskFromDispute(row);
-      const amount = Math.max(toNumber(row.refund_amount), toNumber(row.financial_impact), toNumber(row.financial_amount));
+      const amount = Math.max(
+        toNumber(row.refund_amount),
+        toNumber(row.financial_impact),
+        toNumber(row.financial_amount)
+      );
 
       return {
         id: disputeNumber,
@@ -323,15 +345,30 @@ function buildBookingAlerts(rows: AnyRow[]): FraudAlert[] {
       const paymentStatus = asTrimmedString(row.payment_status).toLowerCase();
       const payoutStatus = asTrimmedString(row.payout_status).toLowerCase();
       const text = `${status} ${paymentStatus} ${payoutStatus}`;
+
       return (
-        includesAny(text, ["pending", "review", "hold", "failed", "chargeback", "dispute", "cancel", "refund"]) ||
-        getHoursSince(getCreatedAt(row)) <= 24
+        includesAny(text, [
+          "pending",
+          "review",
+          "hold",
+          "failed",
+          "chargeback",
+          "dispute",
+          "cancel",
+          "refund",
+        ]) || getHoursSince(getCreatedAt(row)) <= 24
       );
     })
     .slice(0, 75)
     .map((row, index) => {
-      const bookingId = asTrimmedString(row.id) || asTrimmedString(row.booking_id) || `booking-${index + 1}`;
-      const customer = asTrimmedString(row.customer_name) || asTrimmedString(row.pet_parent_name) || "Pet parent";
+      const bookingId =
+        asTrimmedString(row.id) ||
+        asTrimmedString(row.booking_id) ||
+        `booking-${index + 1}`;
+      const customer =
+        asTrimmedString(row.customer_name) ||
+        asTrimmedString(row.pet_parent_name) ||
+        "Pet parent";
       const guru = asTrimmedString(row.guru_name) || "Guru";
       const risk = getRiskFromBooking(row);
       const status =
@@ -354,20 +391,31 @@ function buildBookingAlerts(rows: AnyRow[]): FraudAlert[] {
     });
 }
 
-function buildPaymentHolds(disputeRows: AnyRow[], supportRows: AnyRow[], ledgerRows: AnyRow[]): PaymentHold[] {
+function buildPaymentHolds(
+  disputeRows: AnyRow[],
+  supportRows: AnyRow[],
+  ledgerRows: AnyRow[]
+): PaymentHold[] {
   const disputeHolds = disputeRows
     .filter((row) => {
       const status = asTrimmedString(row.status).toLowerCase();
       return !["resolved", "closed", "archived"].includes(status);
     })
     .map((row, index) => {
-      const disputeNumber = asTrimmedString(row.dispute_number) || getRowId(row, `DP-${index + 1}`);
-      const amount = Math.max(toNumber(row.refund_amount), toNumber(row.financial_impact), toNumber(row.financial_amount));
+      const disputeNumber =
+        asTrimmedString(row.dispute_number) || getRowId(row, `DP-${index + 1}`);
+      const amount = Math.max(
+        toNumber(row.refund_amount),
+        toNumber(row.financial_impact),
+        toNumber(row.financial_amount)
+      );
 
       return {
         id: disputeNumber,
         owner: asTrimmedString(row.customer_name) || "Customer dispute",
-        reason: asTrimmedString(row.issue_summary) || "Open dispute requires payout review",
+        reason:
+          asTrimmedString(row.issue_summary) ||
+          "Open dispute requires payout review",
         status: normalizeStatus(asTrimmedString(row.status) || "open"),
         amount,
         href: getCaseHref("dispute", disputeNumber),
@@ -378,15 +426,24 @@ function buildPaymentHolds(disputeRows: AnyRow[], supportRows: AnyRow[], ledgerR
     .filter((row) => {
       const status = asTrimmedString(row.status).toLowerCase();
       const caseType = asTrimmedString(row.case_type).toLowerCase();
-      return !["resolved", "closed", "archived"].includes(status) && includesAny(caseType, ["refund", "payment", "trust", "safety"]);
+
+      return (
+        !["resolved", "closed", "archived"].includes(status) &&
+        includesAny(caseType, ["refund", "payment", "trust", "safety"])
+      );
     })
     .map((row, index) => {
-      const caseNumber = asTrimmedString(row.case_number) || asTrimmedString(row.support_number) || getRowId(row, `SUP-${index + 1}`);
+      const caseNumber =
+        asTrimmedString(row.case_number) ||
+        asTrimmedString(row.support_number) ||
+        getRowId(row, `SUP-${index + 1}`);
 
       return {
         id: caseNumber,
         owner: asTrimmedString(row.sender_name) || "Support sender",
-        reason: asTrimmedString(row.subject) || "Support case may affect payment or payout",
+        reason:
+          asTrimmedString(row.subject) ||
+          "Support case may affect payment or payout",
         status: normalizeStatus(asTrimmedString(row.status) || "new"),
         amount: getAmount(row),
         href: getCaseHref("support", caseNumber),
@@ -400,7 +457,8 @@ function buildPaymentHolds(disputeRows: AnyRow[], supportRows: AnyRow[], ledgerR
     })
     .slice(0, 10)
     .map((row, index) => {
-      const sourceId = asTrimmedString(row.source_id) || getRowId(row, `ledger-${index + 1}`);
+      const sourceId =
+        asTrimmedString(row.source_id) || getRowId(row, `ledger-${index + 1}`);
       const amount = Math.max(toNumber(row.debit), toNumber(row.credit));
 
       return {
@@ -416,14 +474,24 @@ function buildPaymentHolds(disputeRows: AnyRow[], supportRows: AnyRow[], ledgerR
   return [...disputeHolds, ...supportHolds, ...ledgerHolds].slice(0, 12);
 }
 
-function buildRiskAccounts(bookings: AnyRow[], supportRows: AnyRow[], disputeRows: AnyRow[]): RiskAccount[] {
+function buildRiskAccounts(
+  bookings: AnyRow[],
+  supportRows: AnyRow[],
+  disputeRows: AnyRow[]
+): RiskAccount[] {
   const fromSupport = supportRows.map((row, index) => {
-    const caseNumber = asTrimmedString(row.case_number) || asTrimmedString(row.support_number) || `support-${index + 1}`;
+    const caseNumber =
+      asTrimmedString(row.case_number) ||
+      asTrimmedString(row.support_number) ||
+      `support-${index + 1}`;
     const risk = getRiskFromSupportCase(row);
 
     return {
       id: caseNumber,
-      name: asTrimmedString(row.sender_name) || asTrimmedString(row.customer_name) || "Support sender",
+      name:
+        asTrimmedString(row.sender_name) ||
+        asTrimmedString(row.customer_name) ||
+        "Support sender",
       type: asTrimmedString(row.case_type).replace(/_/g, " ") || "Support",
       signal: asTrimmedString(row.subject) || "Open support signal",
       score: riskScoreFromSignal(risk, getAmount(row)),
@@ -450,12 +518,18 @@ function buildRiskAccounts(bookings: AnyRow[], supportRows: AnyRow[], disputeRow
   const fromBookings = bookings
     .filter((row) => getRiskFromBooking(row) !== "Low")
     .map((row, index) => {
-      const bookingId = asTrimmedString(row.id) || asTrimmedString(row.booking_id) || `booking-${index + 1}`;
+      const bookingId =
+        asTrimmedString(row.id) ||
+        asTrimmedString(row.booking_id) ||
+        `booking-${index + 1}`;
       const risk = getRiskFromBooking(row);
 
       return {
         id: bookingId,
-        name: asTrimmedString(row.customer_name) || asTrimmedString(row.pet_parent_name) || "Booking customer",
+        name:
+          asTrimmedString(row.customer_name) ||
+          asTrimmedString(row.pet_parent_name) ||
+          "Booking customer",
         type: "Booking",
         signal:
           asTrimmedString(row.payment_status) ||
@@ -504,11 +578,30 @@ function getRiskBadgeClasses(risk: string) {
 function getStatusBadgeClasses(status: string) {
   const normalized = status.toLowerCase();
 
-  if (includesAny(normalized, ["frozen", "respond", "escalated", "failed", "blocked", "chargeback"])) {
+  if (
+    includesAny(normalized, [
+      "frozen",
+      "respond",
+      "escalated",
+      "failed",
+      "blocked",
+      "chargeback",
+    ])
+  ) {
     return "border-rose-400/25 bg-rose-400/10 text-rose-100";
   }
 
-  if (includesAny(normalized, ["pending", "manual", "hold", "evidence", "monitor", "review", "waiting"])) {
+  if (
+    includesAny(normalized, [
+      "pending",
+      "manual",
+      "hold",
+      "evidence",
+      "monitor",
+      "review",
+      "waiting",
+    ])
+  ) {
     return "border-amber-400/25 bg-amber-400/10 text-amber-100";
   }
 
@@ -531,8 +624,14 @@ function StatCard({
   tone?: RiskTone;
 }) {
   return (
-    <div className={`rounded-3xl border p-5 shadow-[0_10px_40px_rgba(0,0,0,0.18)] ${getToneClasses(tone)}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] opacity-80">{label}</p>
+    <div
+      className={`rounded-3xl border p-5 shadow-[0_10px_40px_rgba(0,0,0,0.18)] ${getToneClasses(
+        tone
+      )}`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] opacity-80">
+        {label}
+      </p>
       <p className="mt-3 text-3xl font-black tracking-tight text-white">{value}</p>
       <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
     </div>
@@ -609,13 +708,18 @@ async function getFraudData() {
   const supportAlerts = buildSupportAlerts(supportCases);
   const disputeAlerts = buildDisputeAlerts(disputes);
   const bookingAlerts = buildBookingAlerts(bookings);
+
   const allAlerts = [...disputeAlerts, ...supportAlerts, ...bookingAlerts]
     .sort((a, b) => {
       const riskWeight = { High: 3, Medium: 2, Low: 1 } as Record<string, number>;
       const riskDiff = riskWeight[b.risk] - riskWeight[a.risk];
+
       if (riskDiff !== 0) return riskDiff;
 
-      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      return (
+        new Date(b.createdAt || 0).getTime() -
+        new Date(a.createdAt || 0).getTime()
+      );
     })
     .slice(0, 25);
 
@@ -624,8 +728,12 @@ async function getFraudData() {
 
   const highRiskAlerts = allAlerts.filter((item) => item.risk === "High");
   const mediumRiskAlerts = allAlerts.filter((item) => item.risk === "Medium");
-  const openDisputes = disputes.filter((row) => !["resolved", "closed"].includes(asTrimmedString(row.status).toLowerCase()));
-  const openSupport = supportCases.filter((row) => !["resolved", "closed"].includes(asTrimmedString(row.status).toLowerCase()));
+  const openDisputes = disputes.filter(
+    (row) => !["resolved", "closed"].includes(asTrimmedString(row.status).toLowerCase())
+  );
+  const openSupport = supportCases.filter(
+    (row) => !["resolved", "closed"].includes(asTrimmedString(row.status).toLowerCase())
+  );
   const reviewBookings = bookingAlerts.length;
   const paymentHoldAmount = paymentHolds.reduce((sum, item) => sum + item.amount, 0);
   const refundLedgerAmount = ledgerEntries
@@ -636,7 +744,10 @@ async function getFraudData() {
     0,
     Math.min(
       100,
-      92 - highRiskAlerts.length * 4 - mediumRiskAlerts.length * 1.5 - Math.min(openDisputes.length, 10)
+      92 -
+        highRiskAlerts.length * 4 -
+        mediumRiskAlerts.length * 1.5 -
+        Math.min(openDisputes.length, 10)
     )
   );
 
@@ -689,8 +800,9 @@ export default async function AdminFraudPage() {
               </h1>
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                Review suspicious bookings, support cases, payment holds, dispute signals,
-                refund activity, and Guru payout risks from one SitGuru operations center.
+                Review suspicious bookings, support cases, payment holds, dispute
+                signals, refund activity, and Guru payout risks from one SitGuru
+                operations center.
               </p>
             </div>
 
@@ -741,7 +853,8 @@ export default async function AdminFraudPage() {
                   Live issues requiring review.
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Pulls from support intake, disputes, bookings, and financial ledger signals.
+                  Pulls from support intake, disputes, bookings, and financial
+                  ledger signals.
                 </p>
               </div>
 
@@ -758,44 +871,78 @@ export default async function AdminFraudPage() {
                 <table className="min-w-full text-left text-sm">
                   <thead className="bg-white/5 text-slate-400">
                     <tr>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Source</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Case</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Signal</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Risk</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Status</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Amount</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Action</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Source
+                      </th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Case
+                      </th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Signal
+                      </th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Risk
+                      </th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Amount
+                      </th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Action
+                      </th>
                     </tr>
                   </thead>
 
                   <tbody className="divide-y divide-white/10 bg-slate-950/40">
                     {data.allAlerts.length ? (
                       data.allAlerts.map((item) => (
-                        <tr key={`${item.source}-${item.id}-${item.title}`} className="align-top transition hover:bg-white/5">
+                        <tr
+                          key={`${item.source}-${item.id}-${item.title}`}
+                          className="align-top transition hover:bg-white/5"
+                        >
                           <td className="px-4 py-4 text-xs font-black uppercase tracking-[0.16em] text-slate-400">
                             {item.source}
                           </td>
                           <td className="px-4 py-4">
-                            <Link href={item.href} className="font-black text-white hover:text-emerald-200">
+                            <Link
+                              href={item.href}
+                              className="font-black text-white hover:text-emerald-200"
+                            >
                               {item.id}
                             </Link>
-                            <p className="mt-1 text-xs text-slate-500">{formatDateShort(item.createdAt)}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {formatDateShort(item.createdAt)}
+                            </p>
                           </td>
                           <td className="px-4 py-4">
                             <p className="font-bold text-white">{item.title}</p>
-                            <p className="mt-1 max-w-sm text-sm leading-6 text-slate-400">{item.detail}</p>
+                            <p className="mt-1 max-w-sm text-sm leading-6 text-slate-400">
+                              {item.detail}
+                            </p>
                           </td>
                           <td className="px-4 py-4">
-                            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getRiskBadgeClasses(item.risk)}`}>
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getRiskBadgeClasses(
+                                item.risk
+                              )}`}
+                            >
                               {item.risk}
                             </span>
                           </td>
                           <td className="px-4 py-4">
-                            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getStatusBadgeClasses(item.status)}`}>
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getStatusBadgeClasses(
+                                item.status
+                              )}`}
+                            >
                               {item.status}
                             </span>
                           </td>
-                          <td className="px-4 py-4 font-black text-white">{moneyExact(item.amount)}</td>
+                          <td className="px-4 py-4 font-black text-white">
+                            {moneyExact(item.amount)}
+                          </td>
                           <td className="px-4 py-4">
                             <Link
                               href={item.href}
@@ -828,20 +975,34 @@ export default async function AdminFraudPage() {
                 Protect funds before release.
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-400">
-                SitGuru’s 48-hour payout review window gives management time to resolve support, refund, safety, and payment issues before Guru payouts are released.
+                SitGuru’s 48-hour payout review window gives management time to
+                resolve support, refund, safety, and payment issues before Guru
+                payouts are released.
               </p>
 
               <div className="mt-5 grid gap-3">
-                <Link href="/admin/disputes" className="rounded-2xl bg-rose-500 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-rose-400">
+                <Link
+                  href="/admin/disputes"
+                  className="rounded-2xl bg-rose-500 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-rose-400"
+                >
                   Review open disputes
                 </Link>
-                <Link href="/admin/support" className="rounded-2xl bg-amber-500 px-4 py-3 text-center text-sm font-black text-slate-950 transition hover:bg-amber-400">
+                <Link
+                  href="/admin/support"
+                  className="rounded-2xl bg-amber-500 px-4 py-3 text-center text-sm font-black text-slate-950 transition hover:bg-amber-400"
+                >
                   Investigate support cases
                 </Link>
-                <Link href="/admin/payments" className="rounded-2xl bg-white/5 px-4 py-3 text-center text-sm font-black text-white ring-1 ring-white/10 transition hover:bg-white/10">
+                <Link
+                  href="/admin/payments"
+                  className="rounded-2xl bg-white/5 px-4 py-3 text-center text-sm font-black text-white ring-1 ring-white/10 transition hover:bg-white/10"
+                >
                   Check payments and payouts
                 </Link>
-                <Link href="/admin/financials/cash-flow" className="rounded-2xl bg-white/5 px-4 py-3 text-center text-sm font-black text-white ring-1 ring-white/10 transition hover:bg-white/10">
+                <Link
+                  href="/admin/financials/cash-flow"
+                  className="rounded-2xl bg-white/5 px-4 py-3 text-center text-sm font-black text-white ring-1 ring-white/10 transition hover:bg-white/10"
+                >
                   View cash impact
                 </Link>
               </div>
@@ -851,9 +1012,12 @@ export default async function AdminFraudPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">
                 Trust Score Pulse
               </p>
-              <p className="mt-3 text-4xl font-black text-white">{Math.round(data.trustScore)}%</p>
+              <p className="mt-3 text-4xl font-black text-white">
+                {Math.round(data.trustScore)}%
+              </p>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                Platform trust health based on high-risk alerts, open disputes, and payout-sensitive cases.
+                Platform trust health based on high-risk alerts, open disputes, and
+                payout-sensitive cases.
               </p>
 
               <div className="mt-5 space-y-3">
@@ -868,7 +1032,12 @@ export default async function AdminFraudPage() {
                       <span>{Math.round(item.value)}%</span>
                     </div>
                     <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-950/70">
-                      <div className="h-full rounded-full bg-sky-300" style={{ width: `${Math.min(100, Math.max(5, item.value))}%` }} />
+                      <div
+                        className="h-full rounded-full bg-sky-300"
+                        style={{
+                          width: `${Math.min(100, Math.max(5, item.value))}%`,
+                        }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -886,7 +1055,8 @@ export default async function AdminFraudPage() {
               Payout and refund exposure.
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              Open disputes, support cases, and posted refund or credit activity that may affect cash and payout release.
+              Open disputes, support cases, and posted refund or credit activity
+              that may affect cash and payout release.
             </p>
 
             <div className="mt-6 space-y-3">
@@ -900,12 +1070,20 @@ export default async function AdminFraudPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-black text-white">{item.owner}</p>
-                        <p className="mt-1 text-sm leading-6 text-slate-400">{item.reason}</p>
-                        <span className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-black ${getStatusBadgeClasses(item.status)}`}>
+                        <p className="mt-1 text-sm leading-6 text-slate-400">
+                          {item.reason}
+                        </p>
+                        <span
+                          className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-black ${getStatusBadgeClasses(
+                            item.status
+                          )}`}
+                        >
                           {item.status}
                         </span>
                       </div>
-                      <p className="text-lg font-black text-white">{moneyExact(item.amount)}</p>
+                      <p className="text-lg font-black text-white">
+                        {moneyExact(item.amount)}
+                      </p>
                     </div>
                   </Link>
                 ))
@@ -937,21 +1115,36 @@ export default async function AdminFraudPage() {
                     <div className="flex items-center justify-between gap-4">
                       <div className="min-w-0">
                         <p className="truncate font-black text-white">{item.name}</p>
-                        <p className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{item.type}</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-400">{item.signal}</p>
-                        <p className="mt-1 text-xs text-slate-500">Joined / opened {formatDateShort(item.joined)}</p>
+                        <p className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                          {item.type}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                          {item.signal}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Joined / opened {formatDateShort(item.joined)}
+                        </p>
                       </div>
                       <div className="shrink-0 text-right">
                         <div className="rounded-2xl bg-slate-950 px-4 py-3 text-center ring-1 ring-white/10">
-                          <p className="text-2xl font-black text-white">{item.score}</p>
-                          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Risk</p>
+                          <p className="text-2xl font-black text-white">
+                            {item.score}
+                          </p>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                            Risk
+                          </p>
                         </div>
                       </div>
                     </div>
                     <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-950/70">
                       <div
                         className="h-full rounded-full bg-violet-300"
-                        style={{ width: `${Math.max(6, Math.min(100, (item.score / maxScore) * 100))}%` }}
+                        style={{
+                          width: `${Math.max(
+                            6,
+                            Math.min(100, (item.score / maxScore) * 100)
+                          )}%`,
+                        }}
                       />
                     </div>
                   </Link>
@@ -973,7 +1166,9 @@ export default async function AdminFraudPage() {
                 Built around SitGuru’s 48-hour review window.
               </h2>
               <p className="mt-3 text-sm leading-7 text-slate-300">
-                Pet parents pay securely at booking. Guru payouts are released 48 hours after completed care unless a support case, refund request, chargeback, dispute, or safety review is open.
+                Pet parents pay securely at booking. Guru payouts are released 48
+                hours after completed care unless a support case, refund request,
+                chargeback, dispute, or safety review is open.
               </p>
             </div>
 
@@ -992,9 +1187,14 @@ export default async function AdminFraudPage() {
                   body: "Use notes and branded email updates so Gurus and customers know when a case is being reviewed.",
                 },
               ].map((item) => (
-                <div key={item.title} className="rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-5">
+                <div
+                  key={item.title}
+                  className="rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-5"
+                >
                   <h3 className="text-lg font-black text-white">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">{item.body}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    {item.body}
+                  </p>
                 </div>
               ))}
             </div>
