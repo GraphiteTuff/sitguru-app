@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import Header from "@/components/Header";
 import MessageThreadComposer from "@/components/MessageThreadComposer";
 import MessageAutoRefresh from "@/components/MessageAutoRefresh";
 
@@ -77,6 +78,10 @@ function normalizeRole(role?: string | null) {
 
   if (!value) return "";
   if (value === "provider" || value === "sitter") return "guru";
+  if (value === "pet_parent" || value === "pet-parent") return "customer";
+  if (value === "owner" || value === "pet_owner" || value === "pet-owner") {
+    return "customer";
+  }
 
   return value;
 }
@@ -156,7 +161,7 @@ function getGuruProfilePhotoUrl(guru?: GuruProfileRow | null) {
 
 function mergeGuruProfilePhoto(
   profile: ProfileRow | null,
-  guru?: GuruProfileRow | null
+  guru?: GuruProfileRow | null,
 ): ProfileRow | null {
   if (!profile && !guru?.user_id) return profile;
 
@@ -164,31 +169,43 @@ function mergeGuruProfilePhoto(
 
   if (!guru) return profile;
 
+  const profileRole = normalizeRole(profile?.role || profile?.account_type || "");
+  const shouldUseGuruFields = profileRole === "guru";
+
   return {
     id: String(profile?.id || guru.user_id || ""),
     full_name:
       profile?.full_name ||
-      guru.full_name ||
-      guru.display_name ||
-      guru.name ||
-      [guru.first_name, guru.last_name].filter(Boolean).join(" ").trim() ||
-      guru.email?.split("@")[0] ||
+      (shouldUseGuruFields
+        ? guru.full_name ||
+          guru.display_name ||
+          guru.name ||
+          [guru.first_name, guru.last_name].filter(Boolean).join(" ").trim() ||
+          guru.email?.split("@")[0]
+        : null) ||
       "SitGuru User",
     display_name:
       profile?.display_name ||
-      guru.display_name ||
-      guru.full_name ||
-      guru.name ||
+      (shouldUseGuruFields
+        ? guru.display_name || guru.full_name || guru.name
+        : null) ||
       null,
-    name: profile?.name || guru.name || guru.full_name || guru.display_name || null,
-    first_name: profile?.first_name || guru.first_name || null,
-    last_name: profile?.last_name || guru.last_name || null,
+    name:
+      profile?.name ||
+      (shouldUseGuruFields ? guru.name || guru.full_name || guru.display_name : null) ||
+      null,
+    first_name: profile?.first_name || (shouldUseGuruFields ? guru.first_name : null),
+    last_name: profile?.last_name || (shouldUseGuruFields ? guru.last_name : null),
     email: profile?.email || guru.email || null,
-    profile_photo_url: profile?.profile_photo_url || guruPhotoUrl,
-    avatar_url: profile?.avatar_url || guru.avatar_url || null,
-    image_url: profile?.image_url || guru.image_url || null,
-    role: profile?.role || "guru",
-    account_type: profile?.account_type || "guru",
+    profile_photo_url:
+      profile?.profile_photo_url || (shouldUseGuruFields ? guruPhotoUrl : null),
+    avatar_url:
+      profile?.avatar_url || (shouldUseGuruFields ? guru.avatar_url : null) || null,
+    image_url:
+      profile?.image_url || (shouldUseGuruFields ? guru.image_url : null) || null,
+    role: profile?.role || (shouldUseGuruFields ? "guru" : "customer"),
+    account_type:
+      profile?.account_type || (shouldUseGuruFields ? "guru" : "customer"),
   };
 }
 
@@ -467,7 +484,7 @@ export default async function MessageConversationPage({
   const { data: conversation, error: conversationError } = await supabaseAdmin
     .from("conversations")
     .select(
-      "id, customer_id, guru_id, booking_id, subject, topic, status, created_at, updated_at, last_message_at, last_message_preview"
+      "id, customer_id, guru_id, booking_id, subject, topic, status, created_at, updated_at, last_message_at, last_message_preview",
     )
     .eq("id", conversationId)
     .maybeSingle<ConversationRow>();
@@ -484,7 +501,7 @@ export default async function MessageConversationPage({
     supabaseAdmin
       .from("messages")
       .select(
-        "id, conversation_id, sender_id, recipient_id, content, body, created_at, topic, message_type"
+        "id, conversation_id, sender_id, recipient_id, content, body, created_at, topic, message_type",
       )
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true }),
@@ -511,11 +528,11 @@ export default async function MessageConversationPage({
       conversation.customer_id || "",
       conversation.guru_id || "",
       ...safeParticipants.map((participant) => participant.user_id || ""),
-    ].filter(Boolean)
+    ].filter(Boolean),
   );
 
   if (!allowedUserIds.has(user.id)) {
-    redirect("/dashboard");
+    redirect("/customer/dashboard");
   }
 
   const profileIds = Array.from(
@@ -529,15 +546,15 @@ export default async function MessageConversationPage({
           message.sender_id || "",
           message.recipient_id || "",
         ]),
-      ].filter(Boolean)
-    )
+      ].filter(Boolean),
+    ),
   );
 
   const { data: profiles } = profileIds.length
     ? await supabaseAdmin
         .from("profiles")
         .select(
-          "id, full_name, first_name, last_name, email, profile_photo_url, avatar_url, image_url, role, account_type"
+          "id, full_name, first_name, last_name, email, profile_photo_url, avatar_url, image_url, role, account_type",
         )
         .in("id", profileIds)
     : { data: [] as ProfileRow[] };
@@ -584,7 +601,7 @@ export default async function MessageConversationPage({
         ? "customer"
         : user.id === conversation.guru_id
           ? "guru"
-          : "")
+          : ""),
   );
 
   const inboxHref =
@@ -610,7 +627,7 @@ export default async function MessageConversationPage({
         ? "customer"
         : otherParticipantId === conversation.guru_id
           ? "guru"
-          : "")
+          : ""),
   );
 
   const otherName = getDisplayNameForRole(otherProfile, otherRole);
@@ -639,6 +656,7 @@ export default async function MessageConversationPage({
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_30%),linear-gradient(180deg,#ffffff,#f2fbf7_48%,#ffffff)] text-slate-950">
+      <Header />
       <MessageAutoRefresh intervalMs={1000} />
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -684,7 +702,7 @@ export default async function MessageConversationPage({
 
               <span
                 className={`inline-flex w-fit rounded-full border px-5 py-2 text-sm font-black uppercase tracking-[0.18em] shadow-sm ${getStatusClasses(
-                  status
+                  status,
                 )}`}
               >
                 {status}
@@ -750,7 +768,7 @@ export default async function MessageConversationPage({
 
                         const senderName = getDisplayNameForRole(
                           senderProfile,
-                          senderRole
+                          senderRole,
                         );
 
                         const senderProfileImageUrl =
@@ -762,9 +780,9 @@ export default async function MessageConversationPage({
                         });
 
                         const senderRoleLabel =
-                      normalizeRole(senderRole) === "guru"
-                        ? `${getFirstName(senderName)} · Guru`
-                        : getReadableRole(senderRole);
+                          normalizeRole(senderRole) === "guru"
+                            ? `${getFirstName(senderName)} · Guru`
+                            : getReadableRole(senderRole);
 
                         const styles = getSmsBubbleClasses({
                           viewerRole: currentUserRole,
@@ -862,7 +880,7 @@ export default async function MessageConversationPage({
 
                 <div className="mt-6 grid gap-3">
                   <Link
-                    href="/messages"
+                    href={inboxHref}
                     className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
                   >
                     Back to inbox

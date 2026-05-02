@@ -15,6 +15,7 @@ import {
   LogOut,
   MessageCircle,
   UserCircle,
+  UserPlus,
   Wallet,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -39,6 +40,7 @@ type LoadedHeaderProfile = {
 type ActiveGuruTab =
   | "dashboard"
   | "bookings"
+  | "referrals"
   | "messages"
   | "profile"
   | "availability"
@@ -81,6 +83,12 @@ const navItems = [
     icon: CalendarDays,
   },
   {
+    label: "Referrals",
+    href: "/guru/dashboard/referrals",
+    tab: "referrals",
+    icon: UserPlus,
+  },
+  {
     label: "Messages",
     href: "/guru/dashboard/messages",
     tab: "messages",
@@ -110,6 +118,7 @@ const guruAccountMenuLinks = [
   { label: "Dashboard", href: "/guru/dashboard" },
   { label: "Update Profile", href: "/guru/dashboard/profile" },
   { label: "Bookings", href: "/guru/dashboard/bookings" },
+  { label: "Referrals", href: "/guru/dashboard/referrals" },
   { label: "Messages", href: "/guru/dashboard/messages" },
   { label: "Availability", href: "/guru/dashboard/availability" },
   { label: "Earnings", href: "/guru/dashboard/earnings" },
@@ -148,7 +157,7 @@ function getNameFromProfile(profile?: GuruProfileForHeader | null) {
     profile?.full_name,
     profile?.name,
     profile?.email,
-    "Guru"
+    "Guru",
   );
 }
 
@@ -157,7 +166,7 @@ function getPhotoFromProfile(profile?: GuruProfileForHeader | null) {
     profile?.profile_photo_url,
     profile?.photo_url,
     profile?.avatar_url,
-    profile?.image_url
+    profile?.image_url,
   );
 }
 
@@ -171,6 +180,7 @@ function isPathActive(pathname: string, href: string) {
 
 function getTabFromPathname(pathname: string): ActiveGuruTab {
   if (pathname.startsWith("/guru/dashboard/bookings")) return "bookings";
+  if (pathname.startsWith("/guru/dashboard/referrals")) return "referrals";
   if (pathname.startsWith("/guru/dashboard/messages")) return "messages";
   if (pathname.startsWith("/guru/dashboard/profile")) return "profile";
   if (pathname.startsWith("/guru/dashboard/availability")) return "availability";
@@ -233,7 +243,7 @@ export default function GuruDashboardHeader({
       const { data: guruData } = await supabase
         .from("gurus")
         .select(
-          "display_name,full_name,name,email,photo_url,profile_photo_url,avatar_url,image_url"
+          "display_name,full_name,name,email,photo_url,profile_photo_url,avatar_url,image_url",
         )
         .eq("user_id", user.id)
         .maybeSingle();
@@ -246,7 +256,7 @@ export default function GuruDashboardHeader({
           guru.display_name,
           guru.full_name,
           guru.name,
-          guru.email
+          guru.email,
         );
 
         profileEmail = firstText(guru.email, profileEmail);
@@ -256,14 +266,14 @@ export default function GuruDashboardHeader({
           guru.profile_photo_url,
           guru.photo_url,
           guru.avatar_url,
-          guru.image_url
+          guru.image_url,
         );
       }
 
       const { data: profileData } = await supabase
         .from("profiles")
         .select(
-          "display_name,full_name,name,email,photo_url,profile_photo_url,avatar_url,image_url"
+          "display_name,full_name,name,email,photo_url,profile_photo_url,avatar_url,image_url",
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -276,7 +286,7 @@ export default function GuruDashboardHeader({
           profile.display_name,
           profile.full_name,
           profile.name,
-          profile.email
+          profile.email,
         );
 
         profileEmail = firstText(profileEmail, profile.email);
@@ -286,7 +296,7 @@ export default function GuruDashboardHeader({
           profile.profile_photo_url,
           profile.photo_url,
           profile.avatar_url,
-          profile.image_url
+          profile.image_url,
         );
       }
 
@@ -347,7 +357,7 @@ export default function GuruDashboardHeader({
   const guruPhoto = loadedProfile.photoUrl || "";
   const guruInitials = useMemo(
     () => getInitials(guruName, guruEmail),
-    [guruName, guruEmail]
+    [guruName, guruEmail],
   );
 
   const profileCompletionLabel =
@@ -401,10 +411,11 @@ export default function GuruDashboardHeader({
           />
         </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-4 lg:flex xl:gap-6">
+        <nav className="hidden flex-1 items-center justify-center gap-4 lg:flex xl:gap-5">
           {navItems.map((item) => {
             const isActive =
-              resolvedActiveTab === item.tab || isPathActive(pathname, item.href);
+              resolvedActiveTab === item.tab ||
+              isPathActive(pathname, item.href);
 
             return (
               <Link
@@ -580,7 +591,8 @@ export default function GuruDashboardHeader({
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
-              resolvedActiveTab === item.tab || isPathActive(pathname, item.href);
+              resolvedActiveTab === item.tab ||
+              isPathActive(pathname, item.href);
 
             return (
               <Link

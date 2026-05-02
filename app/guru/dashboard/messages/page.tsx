@@ -3,14 +3,14 @@
 import Link from "next/link";
 import {
   FormEvent,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
-import GuruDashboardHeader from "@/components/guru/GuruDashboardHeader";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Profile = {
@@ -57,6 +57,15 @@ type GuruRecord = {
 
 type BookingRow = Record<string, string | number | null | undefined>;
 
+type DirectRecipientRequest = {
+  recipientId?: string | null;
+  email?: string | null;
+  name?: string | null;
+  bookingId?: string | null;
+  activeUserId: string;
+  guruId?: string | number | null;
+};
+
 function getName(profile?: Profile | null) {
   if (!profile) return "User";
 
@@ -101,6 +110,50 @@ function getGuruPhotoUrl(profile?: Profile | null, guru?: GuruRecord | null) {
     guru?.avatar_url ||
     guru?.image_url ||
     getProfilePhotoUrl(profile)
+  );
+}
+
+function getInitialsFromLabel(value?: string | null) {
+  if (!value) return "SG";
+
+  const parts = value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) return "SG";
+
+  return parts
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
+function MessageAvatar({
+  profile,
+  photoUrl,
+  fallbackName,
+}: {
+  profile?: Profile | null;
+  photoUrl?: string | null;
+  fallbackName?: string;
+}) {
+  const label = fallbackName || getName(profile);
+
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={label}
+        className="h-11 w-11 rounded-full border border-slate-200 object-cover shadow-sm"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-black text-slate-700 shadow-sm">
+      {getInitialsFromLabel(label)}
+    </div>
   );
 }
 
@@ -356,7 +409,6 @@ async function fetchBookedCustomerIds({
   return bookedCustomerIds;
 }
 
-
 async function fetchAdminRecipientProfile() {
   try {
     const response = await fetch("/api/guru/admin-recipient", {
@@ -380,7 +432,11 @@ async function fetchAdminRecipientProfile() {
       role: "admin",
       account_type: data.admin.account_type || "admin",
       display_name: "Admin HQ",
-      full_name: data.admin.full_name || data.admin.display_name || data.admin.name || "Admin HQ",
+      full_name:
+        data.admin.full_name ||
+        data.admin.display_name ||
+        data.admin.name ||
+        "Admin HQ",
     } as Profile;
   } catch (error) {
     console.warn("Could not load Admin HQ recipient:", error);
@@ -388,25 +444,179 @@ async function fetchAdminRecipientProfile() {
   }
 }
 
+function getBookingStringValue(booking: BookingRow | null, keys: string[]) {
+  if (!booking) return null;
+
+  for (const key of keys) {
+    const value = booking[key];
+
+    if (value !== null && value !== undefined && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+
+  return null;
+}
+
+async function fetchProfileById(profileId?: string | null) {
+  if (!profileId) return null;
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, account_type, role")
+    .eq("id", profileId)
+    .maybeSingle();
+
+  return (data || null) as Profile | null;
+}
+
+async function fetchProfileByEmail(email?: string | null) {
+  if (!email) return null;
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, account_type, role")
+    .ilike("email", email)
+    .maybeSingle();
+
+  return (data || null) as Profile | null;
+}
+
+async function fetchDirectRecipientProfile({
+  recipientId,
+  email,
+  name,
+  bookingId,
+  activeUserId,
+  guruId,
+}: DirectRecipientRequest) {
+  const directProfile = await fetchProfileById(recipientId);
+
+  if (directProfile?.id && directProfile.id !== activeUserId) {
+    return directProfile;
+  }
+
+  const emailProfile = await fetchProfileByEmail(email);
+
+  if (emailProfile?.id && emailProfile.id !== activeUserId) {
+    return emailProfile;
+  }
+
+  if (!bookingId) return null;
+
+  const { data: bookingData } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  const booking = (bookingData || null) as BookingRow | null;
+
+  if (!booking) return null;
+
+  const possibleRecipientIds = [
+    getBookingStringValue(booking, ["customer_id"]),
+    getBookingStringValue(booking, ["pet_owner_id"]),
+    getBookingStringValue(booking, ["owner_id"]),
+    getBookingStringValue(booking, ["customer_user_id"]),
+    getBookingStringValue(booking, ["user_id"]),
+  ].filter(Boolean) as string[];
+
+  const blockedIds = new Set(
+    [
+      activeUserId,
+      guruId ? String(guruId) : null,
+      getBookingStringValue(booking, ["guru_id"]),
+      getBookingStringValue(booking, ["sitter_id"]),
+    ]
+      .filter(Boolean)
+      .map(String)
+  );
+
+  const bookingEmail = getBookingStringValue(booking, [
+    "customer_email",
+    "owner_email",
+    "pet_parent_email",
+    "email",
+  ]);
+
+  const bookingName = getBookingStringValue(booking, [
+    "customer_name",
+    "owner_name",
+    "pet_parent_name",
+    "name",
+  ]);
+
+  for (const id of possibleRecipientIds) {
+    if (blockedIds.has(id)) continue;
+
+    const profile = await fetchProfileById(id);
+
+    if (profile?.id && profile.id !== activeUserId) {
+      return {
+        ...profile,
+        full_name:
+          profile.full_name || bookingName || name || profile.email || "Pet Parent",
+        email: profile.email || bookingEmail || email || null,
+        role: profile.role || profile.account_type || "customer",
+        account_type: profile.account_type || profile.role || "customer",
+      } as Profile;
+    }
+
+    return {
+      id,
+      email: bookingEmail || email || null,
+      full_name: bookingName || name || bookingEmail || email || "Pet Parent",
+      account_type: "customer",
+      role: "customer",
+    } as Profile;
+  }
+
+  const bookingEmailProfile = await fetchProfileByEmail(bookingEmail || email);
+
+  if (bookingEmailProfile?.id && bookingEmailProfile.id !== activeUserId) {
+    return {
+      ...bookingEmailProfile,
+      full_name:
+        bookingEmailProfile.full_name ||
+        bookingName ||
+        name ||
+        bookingEmailProfile.email ||
+        "Pet Parent",
+      role: bookingEmailProfile.role || bookingEmailProfile.account_type || "customer",
+      account_type:
+        bookingEmailProfile.account_type || bookingEmailProfile.role || "customer",
+    } as Profile;
+  }
+
+  return null;
+}
+
 async function fetchProfilesForGuruInbox({
   userId,
   partnerIdsWithMessages,
   bookedCustomerIds,
   adminRecipient,
+  directRecipient,
 }: {
   userId: string;
   partnerIdsWithMessages: Set<string>;
   bookedCustomerIds: Set<string>;
   adminRecipient?: Profile | null;
+  directRecipient?: Profile | null;
 }) {
-  const profileColumns =
-    "id, first_name, last_name, full_name, display_name, name, email, account_type, role, profile_photo_url, avatar_url, image_url";
+  const profileColumns = "id, email, full_name, account_type, role";
 
   const requiredProfileIds = Array.from(
     new Set([...partnerIdsWithMessages, ...bookedCustomerIds])
   ).filter((id) => id && id !== userId);
 
   const profileMap = new Map<string, Profile>();
+
+  if (directRecipient?.id && directRecipient.id !== userId) {
+    profileMap.set(directRecipient.id, directRecipient);
+    bookedCustomerIds.add(directRecipient.id);
+  }
 
   if (adminRecipient?.id && adminRecipient.id !== userId) {
     profileMap.set(adminRecipient.id, {
@@ -427,16 +637,24 @@ async function fetchProfilesForGuruInbox({
     });
   }
 
-  const { data: adminProfiles } = await supabase
-    .from("profiles")
-    .select(profileColumns)
-    .eq("role", "admin");
+  if (!adminRecipient?.id) {
+    const { data: adminProfiles } = await supabase
+      .from("profiles")
+      .select(profileColumns)
+      .eq("role", "admin")
+      .limit(1);
 
-  ((adminProfiles || []) as Profile[]).forEach((profile) => {
-    if (profile.id !== userId) {
-      profileMap.set(profile.id, profile);
+    const fallbackAdmin = ((adminProfiles || []) as Profile[])[0];
+
+    if (fallbackAdmin?.id && fallbackAdmin.id !== userId) {
+      profileMap.set(fallbackAdmin.id, {
+        ...fallbackAdmin,
+        full_name: fallbackAdmin.full_name || "Admin HQ",
+        role: "admin",
+        account_type: fallbackAdmin.account_type || "admin",
+      });
     }
-  });
+  }
 
   const fallbackAllProfiles =
     profileMap.size === 0 || requiredProfileIds.length === 0;
@@ -469,8 +687,13 @@ async function fetchProfilesForGuruInbox({
   );
 }
 
-export default function GuruDashboardMessagesPage() {
+function GuruDashboardMessagesPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedRecipientId = searchParams.get("recipient");
+  const requestedEmail = searchParams.get("email");
+  const requestedBookingId = searchParams.get("booking");
+  const requestedName = searchParams.get("name");
 
   const [userId, setUserId] = useState<string | null>(null);
   const [currentProfile, setCurrentProfile] = useState<Profile | null>(null);
@@ -514,9 +737,7 @@ export default function GuruDashboardMessagesPage() {
         ] = await Promise.all([
           supabase
             .from("profiles")
-            .select(
-              "id, first_name, last_name, full_name, display_name, name, email, account_type, role, profile_photo_url, avatar_url, image_url"
-            )
+            .select("id, email, full_name, account_type, role")
             .eq("id", user.id)
             .maybeSingle(),
           fetchGuruRecord(user.id, user.email),
@@ -535,6 +756,14 @@ export default function GuruDashboardMessagesPage() {
         const safeCurrentProfile = (currentProfileData || null) as Profile | null;
         const safeGuruRecord = guruData || null;
         const safeMessages = (messagesData || []) as Message[];
+        const directRecipient = await fetchDirectRecipientProfile({
+          recipientId: requestedRecipientId,
+          email: requestedEmail,
+          name: requestedName,
+          bookingId: requestedBookingId,
+          activeUserId: user.id,
+          guruId: safeGuruRecord?.id,
+        });
         const partnerIdsWithMessages = getPartnerIdsFromMessages(
           safeMessages,
           user.id
@@ -550,6 +779,7 @@ export default function GuruDashboardMessagesPage() {
           partnerIdsWithMessages,
           bookedCustomerIds: safeBookedCustomerIds,
           adminRecipient,
+          directRecipient,
         });
 
         const sortedProfiles = sortConversationPartners(
@@ -564,11 +794,14 @@ export default function GuruDashboardMessagesPage() {
         setMessages(safeMessages);
         setBookedCustomerIds(safeBookedCustomerIds);
 
+        const preferredRecipient =
+          preferredSelectedUser || directRecipient?.id || requestedRecipientId || null;
+
         if (
-          preferredSelectedUser &&
-          sortedProfiles.some((p) => p.id === preferredSelectedUser)
+          preferredRecipient &&
+          sortedProfiles.some((p) => p.id === preferredRecipient)
         ) {
-          setSelectedUser(preferredSelectedUser);
+          setSelectedUser(preferredRecipient);
         } else if (sortedProfiles.length > 0) {
           const existingConversationPartner = [...safeMessages]
             .reverse()
@@ -597,7 +830,7 @@ export default function GuruDashboardMessagesPage() {
         setLoading(false);
       }
     },
-    [router]
+    [requestedBookingId, requestedEmail, requestedName, requestedRecipientId, router]
   );
 
   const markConversationAsRead = useCallback(
@@ -791,13 +1024,36 @@ export default function GuruDashboardMessagesPage() {
     ? getReadableRole(selectedProfile)
     : "No contact selected";
 
-  const recipientOptions = conversationItems.map((item) => ({
-    id: item.profile.id,
-    label: `${
-      isAdminRole(item.profile) ? "Admin HQ" : getName(item.profile)
-    } · ${item.isBookedCustomer ? "Booked Customer" : getReadableRole(item.profile)}`,
-  }));
+  const recipientOptions = useMemo(() => {
+    const options: { id: string; label: string }[] = [];
+    let adminAdded = false;
+    const seenLabels = new Set<string>();
 
+    conversationItems.forEach((item) => {
+      const isAdmin = isAdminRole(item.profile);
+
+      if (isAdmin) {
+        if (adminAdded) return;
+        adminAdded = true;
+      }
+
+      const label = `${
+        isAdmin ? "Admin HQ" : getName(item.profile)
+      } · ${item.isBookedCustomer ? "Pet Parent" : getReadableRole(item.profile)}`;
+
+      const labelKey = label.toLowerCase();
+
+      if (seenLabels.has(labelKey)) return;
+      seenLabels.add(labelKey);
+
+      options.push({
+        id: item.profile.id,
+        label,
+      });
+    });
+
+    return options;
+  }, [conversationItems]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -823,6 +1079,7 @@ export default function GuruDashboardMessagesPage() {
         sender_id: userId,
         recipient_id: selectedUser,
         content: messageText,
+        body: messageText,
         is_read: false,
         read_at: null,
       });
@@ -850,8 +1107,6 @@ export default function GuruDashboardMessagesPage() {
           fontWeight: 300,
         }}
       >
-        <GuruDashboardHeader active="messages" />
-
         <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
           <div className="rounded-[2rem] border border-emerald-100 bg-white p-8 text-center shadow-sm">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl ring-1 ring-emerald-100">
@@ -876,12 +1131,6 @@ export default function GuruDashboardMessagesPage() {
         fontWeight: 300,
       }}
     >
-      <GuruDashboardHeader
-        active="messages"
-        displayName={getGuruDisplayName(currentProfile, guruRecord)}
-        imageUrl={getGuruPhotoUrl(currentProfile, guruRecord)}
-      />
-
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12">
@@ -965,7 +1214,12 @@ export default function GuruDashboardMessagesPage() {
 
             <div className="space-y-2">
               {conversationItems.map(
-                ({ profile, lastMessage, unreadCount: itemUnreadCount, isBookedCustomer }) => (
+                ({
+                  profile,
+                  lastMessage,
+                  unreadCount: itemUnreadCount,
+                  isBookedCustomer,
+                }) => (
                   <button
                     key={profile.id}
                     type="button"
@@ -1000,7 +1254,7 @@ export default function GuruDashboardMessagesPage() {
                             </p>
                             <p className="mt-0.5 text-xs font-bold !text-slate-600">
                               {isBookedCustomer
-                                ? "Booked Customer"
+                                ? "Pet Parent"
                                 : getReadableRole(profile)}
                             </p>
                           </div>
@@ -1061,21 +1315,12 @@ export default function GuruDashboardMessagesPage() {
                       value={selectedUser || ""}
                       onChange={(event) => {
                         const value = event.target.value;
-
-                        if (value === "__admin_hq_support__") {
-                          router.push("/messages/admin");
-                          return;
-                        }
-
                         setSelectedUser(value || null);
                       }}
                       disabled={false}
                       className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-sm font-black !text-slate-950 outline-none transition focus:border-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:!text-slate-700"
                     >
                       <option value="">Choose recipient</option>
-                      <option value="__admin_hq_support__">
-                        Admin HQ · Support
-                      </option>
 
                       {recipientOptions.map((option) => (
                         <option key={option.id} value={option.id}>
@@ -1106,8 +1351,9 @@ export default function GuruDashboardMessagesPage() {
               <div className="flex-1 space-y-3 overflow-y-auto bg-white p-5">
                 {!selectedUser ? (
                   <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-bold leading-6 !text-slate-800">
-                    Choose Admin HQ from the dropdown or green button to open your support
-                    thread, or select a customer conversation from the list to message them.
+                    Choose Admin HQ from the dropdown or green button to open
+                    your support thread, or select a customer conversation from
+                    the list to message them.
                   </div>
                 ) : null}
 
@@ -1119,32 +1365,68 @@ export default function GuruDashboardMessagesPage() {
 
                 {activeMessages.map((message) => {
                   const mine = message.sender_id === userId;
+                  const senderName = mine
+                    ? getGuruDisplayName(currentProfile, guruRecord)
+                    : selectedProfile
+                      ? getName(selectedProfile)
+                      : "Pet Parent";
+                  const senderPhoto = mine
+                    ? getGuruPhotoUrl(currentProfile, guruRecord)
+                    : getProfilePhotoUrl(selectedProfile);
 
                   return (
                     <div
                       key={message.id}
-                      className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                      className={`flex items-end gap-3 ${
+                        mine ? "justify-end" : "justify-start"
+                      }`}
                     >
+                      {!mine ? (
+                        <MessageAvatar
+                          profile={selectedProfile}
+                          photoUrl={senderPhoto}
+                          fallbackName={senderName}
+                        />
+                      ) : null}
+
                       <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                          mine
-                            ? "bg-emerald-600 text-white"
-                            : message.is_read === false
-                              ? "border border-emerald-200 bg-emerald-50 text-slate-950"
-                              : "border border-slate-200 bg-slate-100 text-slate-950"
+                        className={`flex max-w-[80%] flex-col ${
+                          mine ? "items-end" : "items-start"
                         }`}
                       >
-                        <div className="font-semibold leading-6">
-                          {message.content}
+                        <div className="mb-1 px-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+                          {mine ? "You" : senderName}
                         </div>
+
                         <div
-                          className={`mt-2 text-[11px] font-bold ${
-                            mine ? "text-emerald-100" : "text-slate-500"
+                          className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                            mine
+                              ? "bg-emerald-600 text-white"
+                              : message.is_read === false
+                                ? "border border-emerald-200 bg-emerald-50 text-slate-950"
+                                : "border border-slate-200 bg-slate-100 text-slate-950"
                           }`}
                         >
-                          {new Date(message.created_at).toLocaleString()}
+                          <div className="whitespace-pre-wrap font-semibold leading-6">
+                            {message.content}
+                          </div>
+                          <div
+                            className={`mt-2 text-[11px] font-bold ${
+                              mine ? "text-emerald-100" : "text-slate-500"
+                            }`}
+                          >
+                            {new Date(message.created_at).toLocaleString()}
+                          </div>
                         </div>
                       </div>
+
+                      {mine ? (
+                        <MessageAvatar
+                          profile={currentProfile}
+                          photoUrl={senderPhoto}
+                          fallbackName={senderName}
+                        />
+                      ) : null}
                     </div>
                   );
                 })}
@@ -1216,5 +1498,38 @@ export default function GuruDashboardMessagesPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function GuruDashboardMessagesFallback() {
+  return (
+    <main
+      className="bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] pb-10 text-slate-950"
+      style={{
+        fontFamily:
+          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontWeight: 300,
+      }}
+    >
+      <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
+        <div className="rounded-[2rem] border border-emerald-100 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl ring-1 ring-emerald-100">
+            💬
+          </div>
+          <h1 className="text-2xl font-black text-slate-950">Messages</h1>
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Loading your Guru inbox...
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default function GuruDashboardMessagesPage() {
+  return (
+    <Suspense fallback={<GuruDashboardMessagesFallback />}>
+      <GuruDashboardMessagesPageContent />
+    </Suspense>
   );
 }

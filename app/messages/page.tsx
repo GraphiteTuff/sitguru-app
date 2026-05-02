@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import Header from "@/components/Header";
 
 export const dynamic = "force-dynamic";
 
@@ -187,7 +188,8 @@ function getThreadKind({
   });
 
   const hasAdmin = participantRoles.includes("admin");
-  const hasGuru = participantRoles.includes("guru") || Boolean(conversation.guru_id);
+  const hasGuru =
+    participantRoles.includes("guru") || Boolean(conversation.guru_id);
   const hasCustomer =
     participantRoles.includes("customer") || Boolean(conversation.customer_id);
 
@@ -271,7 +273,10 @@ function getConversationSubject(conversation: ConversationRow, kind: string) {
   return "SitGuru Conversation";
 }
 
-function getTopicLabel(conversation: ConversationRow, latestMessage?: MessageRow | null) {
+function getTopicLabel(
+  conversation: ConversationRow,
+  latestMessage?: MessageRow | null
+) {
   const topic = String(latestMessage?.topic || "").trim();
 
   if (topic) return topic;
@@ -520,7 +525,11 @@ export default async function MessagesPage({ searchParams }: PageProps) {
     messagesByConversationId.set(conversationId, list);
   });
 
-  const participantsByConversationId = new Map<string, ConversationParticipantRow[]>();
+  const participantsByConversationId = new Map<
+    string,
+    ConversationParticipantRow[]
+  >();
+
   allParticipants.forEach((participant) => {
     const conversationId = participant.conversation_id || "";
 
@@ -531,96 +540,96 @@ export default async function MessagesPage({ searchParams }: PageProps) {
     participantsByConversationId.set(conversationId, list);
   });
 
-  const inboxConversations: InboxConversation[] = conversations.map((conversation) => {
-    const participants = participantsByConversationId.get(conversation.id) || [];
-    const otherParticipants = participants.filter(
-      (participant) => participant.user_id && participant.user_id !== user.id
-    );
+  const inboxConversations: InboxConversation[] = conversations.map(
+    (conversation) => {
+      const participants = participantsByConversationId.get(conversation.id) || [];
+      const otherParticipants = participants.filter(
+        (participant) => participant.user_id && participant.user_id !== user.id
+      );
 
-    const messages = messagesByConversationId.get(conversation.id) || [];
-    const latestMessage = messages[messages.length - 1] || null;
+      const messages = messagesByConversationId.get(conversation.id) || [];
+      const latestMessage = messages[messages.length - 1] || null;
 
-    const fallbackOtherIds = [
-      conversation.customer_id || "",
-      conversation.guru_id || "",
-    ].filter((id) => id && id !== user.id);
+      const fallbackOtherIds = [
+        conversation.customer_id || "",
+        conversation.guru_id || "",
+      ].filter((id) => id && id !== user.id);
 
-    const otherUserIds = Array.from(
-      new Set(
-        [
-          ...otherParticipants.map((participant) => participant.user_id || ""),
-          ...fallbackOtherIds,
-        ].filter(Boolean)
-      )
-    );
+      const otherUserIds = Array.from(
+        new Set(
+          [
+            ...otherParticipants.map((participant) => participant.user_id || ""),
+            ...fallbackOtherIds,
+          ].filter(Boolean)
+        )
+      );
 
-    const kind = getThreadKind({
-      otherParticipants,
-      conversation,
-      profilesById,
-    });
+      const kind = getThreadKind({
+        otherParticipants,
+        conversation,
+        profilesById,
+      });
 
-    const firstOtherProfile =
-      otherUserIds.length > 0 ? profilesById.get(otherUserIds[0]) || null : null;
+      const firstOtherProfile =
+        otherUserIds.length > 0 ? profilesById.get(otherUserIds[0]) || null : null;
 
-    const otherUserName =
-      kind === "admin"
-        ? "SitGuru Admin"
-        : getProfileName(firstOtherProfile);
+      const otherUserName =
+        kind === "admin" ? "SitGuru Admin" : getProfileName(firstOtherProfile);
 
-    const otherUserRole =
-      kind === "admin"
-        ? "Admin"
-        : normalizeRoleLabel(
-            otherParticipants[0]?.role ||
-              firstOtherProfile?.role ||
-              firstOtherProfile?.account_type ||
-              kind
-          );
+      const otherUserRole =
+        kind === "admin"
+          ? "Admin"
+          : normalizeRoleLabel(
+              otherParticipants[0]?.role ||
+                firstOtherProfile?.role ||
+                firstOtherProfile?.account_type ||
+                kind
+            );
 
-    const otherUserPhotoUrl =
-      kind === "admin" ? null : getProfilePhotoUrl(firstOtherProfile);
+      const otherUserPhotoUrl =
+        kind === "admin" ? null : getProfilePhotoUrl(firstOtherProfile);
 
-    const currentParticipant = participants.find(
-      (participant) => participant.user_id === user.id
-    );
+      const currentParticipant = participants.find(
+        (participant) => participant.user_id === user.id
+      );
 
-    const lastActivity =
-      conversation.last_message_at ||
-      latestMessage?.created_at ||
-      conversation.updated_at ||
-      conversation.created_at ||
-      null;
+      const lastActivity =
+        conversation.last_message_at ||
+        latestMessage?.created_at ||
+        conversation.updated_at ||
+        conversation.created_at ||
+        null;
 
-    const unread =
-      Boolean(latestMessage?.sender_id && latestMessage.sender_id !== user.id) &&
-      isAfterDate(lastActivity, currentParticipant?.last_read_at);
+      const unread =
+        Boolean(latestMessage?.sender_id && latestMessage.sender_id !== user.id) &&
+        isAfterDate(lastActivity, currentParticipant?.last_read_at);
 
-    const preview =
-      conversation.last_message_preview ||
-      getMessagePreview(latestMessage) ||
-      "Conversation started.";
+      const preview =
+        conversation.last_message_preview ||
+        getMessagePreview(latestMessage) ||
+        "Conversation started.";
 
-    const topicLabel = getTopicLabel(conversation, latestMessage);
-    const subject = getConversationSubject(conversation, kind);
+      const topicLabel = getTopicLabel(conversation, latestMessage);
+      const subject = getConversationSubject(conversation, kind);
 
-    return {
-      id: conversation.id,
-      otherUserIds,
-      otherUserName,
-      otherUserRole,
-      otherUserPhotoUrl,
-      subject,
-      preview,
-      status: String(conversation.status || "open"),
-      lastActivity,
-      unread,
-      href: `/messages/${conversation.id}`,
-      threadKind: kind,
-      bookingLabel: getBookingLabel(conversation),
-      topicLabel,
-    };
-  });
+      return {
+        id: conversation.id,
+        otherUserIds,
+        otherUserName,
+        otherUserRole,
+        otherUserPhotoUrl,
+        subject,
+        preview,
+        status: String(conversation.status || "open"),
+        lastActivity,
+        unread,
+        href: `/messages/${conversation.id}`,
+        threadKind: kind,
+        bookingLabel: getBookingLabel(conversation),
+        topicLabel,
+      };
+    }
+  );
 
   const filteredConversations = inboxConversations.filter((conversation) => {
     if (activeFilter === "unread") return conversation.unread;
@@ -632,13 +641,21 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   });
 
   const totalConversations = inboxConversations.length;
-  const unreadCount = inboxConversations.filter((conversation) => conversation.unread).length;
-  const guruCount = inboxConversations.filter((conversation) => conversation.threadKind === "guru").length;
-  const adminCount = inboxConversations.filter((conversation) => conversation.threadKind === "admin").length;
+  const unreadCount = inboxConversations.filter(
+    (conversation) => conversation.unread
+  ).length;
+  const guruCount = inboxConversations.filter(
+    (conversation) => conversation.threadKind === "guru"
+  ).length;
+  const adminCount = inboxConversations.filter(
+    (conversation) => conversation.threadKind === "admin"
+  ).length;
 
   const adminThread = inboxConversations.find(
     (conversation) => conversation.threadKind === "admin"
   );
+
+  const adminMessageHref = adminThread?.href || "/messages/admin";
 
   const filterLinks = [
     { label: "All", value: "all", href: "/messages" },
@@ -648,10 +665,19 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   ];
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_28%),linear-gradient(180deg,#ffffff,#f2fbf7_48%,#ffffff)] text-slate-950">
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.10)]">
-          <div className="bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.22),transparent_30%),linear-gradient(135deg,#ffffff,#ecfdf5)] p-6 sm:p-8">
+    <main
+      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light text-slate-950"
+      style={{
+        fontFamily:
+          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontWeight: 300,
+      }}
+    >
+      <Header />
+
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_30%),linear-gradient(135deg,#ffffff,#ecfdf5)] p-6 sm:p-8">
             <Link
               href={dashboardHref}
               className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
@@ -693,10 +719,17 @@ export default async function MessagesPage({ searchParams }: PageProps) {
               </div>
 
               <Link
-                href="/search?intent=message-guru"
+                href="/search"
                 className="inline-flex min-h-[86px] items-center justify-center rounded-[1.3rem] bg-emerald-500 px-7 text-base font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-600"
               >
                 Find a Guru
+              </Link>
+
+              <Link
+                href={adminMessageHref}
+                className="inline-flex min-h-[86px] items-center justify-center rounded-[1.3rem] border border-emerald-200 bg-white px-7 text-base font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+              >
+                Message Admin
               </Link>
             </div>
           </div>
@@ -821,11 +854,19 @@ export default async function MessagesPage({ searchParams }: PageProps) {
                     </p>
                     <div className="mt-6 flex flex-wrap justify-center gap-3">
                       <Link
-                        href="/search?intent=message-guru"
+                        href={adminMessageHref}
                         className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
+                      >
+                        Message Admin
+                      </Link>
+
+                      <Link
+                        href="/search"
+                        className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
                       >
                         Find a Guru
                       </Link>
+
                       <Link
                         href={dashboardHref}
                         className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
@@ -851,26 +892,26 @@ export default async function MessagesPage({ searchParams }: PageProps) {
                 <p className="mt-4 text-sm font-semibold leading-7 text-slate-600">
                   Start with SitGuru Admin for account, safety, booking, or
                   platform support. To message a Guru, choose the Guru first from
-                  Find Care.
+                  Find a Guru.
                 </p>
 
                 <div className="mt-6 grid gap-3">
                   <Link
-                    href={adminThread?.href || "/messages?filter=admin"}
+                    href={adminMessageHref}
                     className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
                   >
                     Message Admin
                   </Link>
 
                   <Link
-                    href="/customer/pets"
+                    href="/customer/dashboard/pets"
                     className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
                   >
                     Go to My Pets
                   </Link>
 
                   <Link
-                    href="/search?intent=message-guru"
+                    href="/search"
                     className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
                   >
                     Find a Guru
@@ -915,7 +956,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
                   {[
                     "Include pet names, care dates, and the kind of help you need.",
                     "Use Admin for account, booking, refund, verification, or safety questions.",
-                    "Use Find Care first if you want to message a specific Guru.",
+                    "Use Find a Guru first if you want to message a specific Guru.",
                   ].map((tip) => (
                     <div
                       key={tip}

@@ -13,8 +13,9 @@ export default function Footer() {
             />
 
             <p className="mt-4 text-sm leading-6 text-slate-500">
-              Trusted pet care for modern pet owners and gurus. Book services,
-              connect with verified professionals, and manage everything in one place.
+              Trusted pet care for modern Pet Parents and Gurus. Book services,
+              connect with verified professionals, and manage everything in one
+              place.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2 text-xs">
@@ -27,17 +28,20 @@ export default function Footer() {
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-500">
                 Pet Care
               </span>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
+                Partner Network
+              </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-10 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:grid-cols-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                 Find Care
               </p>
               <div className="mt-4 flex flex-col gap-3 text-sm font-medium text-slate-600">
-                <Link href="/search" className="hover:text-emerald-600">
-                  Find Gurus
+                <Link href="/find-care" className="hover:text-emerald-600">
+                  Find a Guru
                 </Link>
                 <Link href="/become-a-guru" className="hover:text-emerald-600">
                   Become a Guru
@@ -50,23 +54,56 @@ export default function Footer() {
 
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Pet Owners
+                Pet Parents
               </p>
               <div className="mt-4 flex flex-col gap-3 text-sm font-medium text-slate-600">
-                <Link href="/login" className="hover:text-emerald-600">
+                <Link href="/customer/login" className="hover:text-emerald-600">
                   Customer Login
                 </Link>
-                <Link href="/dashboard" className="hover:text-emerald-600">
+                <Link
+                  href="/customer/dashboard"
+                  className="hover:text-emerald-600"
+                >
                   Dashboard
                 </Link>
-                <Link href="/pets" className="hover:text-emerald-600">
-                  My Pets
+                <Link href="/find-care" className="hover:text-emerald-600">
+                  Find a Guru
                 </Link>
-                <Link href="/bookings" className="hover:text-emerald-600">
+                <Link
+                  href="/customer/dashboard/bookings"
+                  className="hover:text-emerald-600"
+                >
                   Bookings
                 </Link>
-                <Link href="/dashboard/messages" className="hover:text-emerald-600">
+                <Link
+                  href="/customer/dashboard/messages"
+                  className="hover:text-emerald-600"
+                >
                   Messages
+                </Link>
+                <Link
+                  href="/customer/dashboard/pets"
+                  className="hover:text-emerald-600"
+                >
+                  My Pets
+                </Link>
+                <Link
+                  href="/customer/dashboard/profile"
+                  className="hover:text-emerald-600"
+                >
+                  My Profile
+                </Link>
+                <Link
+                  href="/customer/dashboard/pawperks"
+                  className="hover:text-emerald-600"
+                >
+                  PawPerks
+                </Link>
+                <Link
+                  href="/customer/dashboard/bookings"
+                  className="hover:text-emerald-600"
+                >
+                  My Care
                 </Link>
               </div>
             </div>
@@ -76,20 +113,141 @@ export default function Footer() {
                 Gurus
               </p>
               <div className="mt-4 flex flex-col gap-3 text-sm font-medium text-slate-600">
-                <Link href="/guru/login" className="hover:text-emerald-600">
-                  Guru Login
-                </Link>
                 <Link href="/guru/dashboard" className="hover:text-emerald-600">
-                  Guru Dashboard
+                  Dashboard
                 </Link>
-                <Link href="/guru/dashboard/services" className="hover:text-emerald-600">
-                  Services
+                <Link
+                  href="/guru/dashboard/bookings"
+                  className="hover:text-emerald-600"
+                >
+                  Bookings
                 </Link>
-                <Link href="/guru/dashboard/availability" className="hover:text-emerald-600">
+                <Link
+                  href="/guru/dashboard/referrals"
+                  className="hover:text-emerald-600"
+                >
+                  Referrals
+                </Link>
+                <Link
+                  href="/guru/dashboard/messages"
+                  className="hover:text-emerald-600"
+                >
+                  Messages
+                </Link>
+                <Link
+                  href="/guru/dashboard/profile"
+                  className="hover:text-emerald-600"
+                >
+                  My Profile
+                </Link>
+                <Link
+                  href="/guru/dashboard/availability"
+                  className="hover:text-emerald-600"
+                >
                   Availability
                 </Link>
-                <Link href="/guru/dashboard/earnings" className="hover:text-emerald-600">
+                <Link
+                  href="/guru/dashboard/earnings"
+                  className="hover:text-emerald-600"
+                >
                   Earnings
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Partners
+              </p>
+              <div className="mt-4 flex flex-col gap-3 text-sm font-medium text-slate-600">
+                <Link href="/partners" className="hover:text-emerald-600">
+                  Partner Network
+                </Link>
+                <Link
+                  href="/partners/local"
+                  className="hover:text-emerald-600"
+                >
+                  Local Partners
+                </Link>
+                <Link
+                  href="/partners/national"
+                  className="hover:text-emerald-600"
+                >
+                  National Partners
+                </Link>
+                <Link
+                  href="/partners/affiliates"
+                  className="hover:text-emerald-600"
+                >
+                  Growth Affiliates
+                </Link>
+                <Link
+                  href="/partners/ambassadors"
+                  className="hover:text-emerald-600"
+                >
+                  Ambassadors
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Partner Admin
+              </p>
+              <div className="mt-4 flex flex-col gap-3 text-sm font-medium text-slate-600">
+                <Link
+                  href="/admin/partners"
+                  className="font-semibold text-slate-700 hover:text-emerald-600"
+                >
+                  Partner Admin
+                </Link>
+                <Link
+                  href="/admin/partners/applications"
+                  className="hover:text-emerald-600"
+                >
+                  Applications
+                </Link>
+                <Link
+                  href="/admin/partners/active"
+                  className="hover:text-emerald-600"
+                >
+                  Active Partners
+                </Link>
+                <Link
+                  href="/admin/partners/ambassadors"
+                  className="hover:text-emerald-600"
+                >
+                  Ambassadors
+                </Link>
+                <Link
+                  href="/admin/partners/affiliates"
+                  className="hover:text-emerald-600"
+                >
+                  Affiliates
+                </Link>
+                <Link
+                  href="/admin/partners/campaigns"
+                  className="hover:text-emerald-600"
+                >
+                  Campaigns
+                </Link>
+                <Link
+                  href="/admin/partners/rewards"
+                  className="hover:text-emerald-600"
+                >
+                  Rewards
+                </Link>
+                <Link
+                  href="/admin/partners/payouts"
+                  className="hover:text-emerald-600"
+                >
+                  Payouts
+                </Link>
+                <Link
+                  href="/admin/partners/messages"
+                  className="hover:text-emerald-600"
+                >
+                  Messages
                 </Link>
               </div>
             </div>

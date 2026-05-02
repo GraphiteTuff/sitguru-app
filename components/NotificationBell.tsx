@@ -304,6 +304,15 @@ function speakNewMessage() {
   window.speechSynthesis.speak(utterance);
 }
 
+function createNotificationChannelName(userId: string) {
+  const randomPart =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return `notifications:${userId}:${randomPart}`;
+}
+
 export default function NotificationBell() {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -464,21 +473,26 @@ export default function NotificationBell() {
   useEffect(() => {
     if (!userId) return;
 
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          loadNotifications();
-        },
-      )
-      .subscribe();
+    const channel = supabase.channel(createNotificationChannelName(userId));
+
+    channel.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "notifications",
+        filter: `user_id=eq.${userId}`,
+      },
+      () => {
+        loadNotifications();
+      },
+    );
+
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        loadNotifications();
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);
@@ -647,8 +661,8 @@ export default function NotificationBell() {
       >
         {hasUnreadNotifications ? (
           <>
-            <span className="absolute inset-0 rounded-full border border-emerald-300/60 animate-ping" />
-            <span className="absolute -inset-1 rounded-full border border-emerald-200/70 animate-pulse" />
+            <span className="absolute inset-0 animate-ping rounded-full border border-emerald-300/60" />
+            <span className="absolute -inset-1 animate-pulse rounded-full border border-emerald-200/70" />
           </>
         ) : null}
 

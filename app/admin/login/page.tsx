@@ -1,215 +1,242 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { Loader2, ShieldCheck, LockKeyhole, LayoutDashboard } from "lucide-react";
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  MessageCircle,
+  PawPrint,
+  ShieldCheck,
+  Sparkles,
+  Users,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const supabase = createClient();
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("admin@sitguru.com");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (loading) return;
-
-    setLoading(true);
+    setSubmitting(true);
     setErrorMessage("");
 
     try {
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanPassword = password;
-
-      if (!cleanEmail || !cleanPassword) {
-        setErrorMessage("Enter your admin email and password.");
-        setLoading(false);
-        return;
-      }
-
       const { error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password: cleanPassword,
+        email: email.trim(),
+        password,
       });
 
       if (error) {
         setErrorMessage(error.message || "Unable to sign in.");
-        setLoading(false);
         return;
       }
 
       router.push("/admin");
       router.refresh();
-    } catch (error) {
-      console.error("Admin login error:", error);
+    } catch {
       setErrorMessage("Something went wrong while signing in.");
-      setLoading(false);
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black px-4 py-8 md:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[80vh] w-full max-w-6xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 shadow-2xl backdrop-blur md:grid-cols-2">
-          <div className="flex flex-col justify-between border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-8 md:border-b-0 md:border-r">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
-                SitGuru HQ
-              </p>
-              <h1 className="mt-4 text-4xl font-bold tracking-tight text-white">
-                Admin Login
+    <main className="min-h-screen overflow-hidden bg-[#f7f8f4] text-slate-950">
+      <div className="absolute left-0 top-0 h-[420px] w-[420px] rounded-full bg-emerald-100/70 blur-3xl" />
+      <div className="absolute bottom-0 right-0 h-[480px] w-[480px] rounded-full bg-sky-100/70 blur-3xl" />
+
+      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-5 py-6 sm:px-8">
+        <Link
+          href="/"
+          className="inline-flex items-center rounded-2xl transition hover:opacity-90"
+          aria-label="Back to SitGuru homepage"
+        >
+          <Image
+            src="/images/sitguru-logo-cropped.png"
+            alt="SitGuru"
+            width={320}
+            height={132}
+            priority
+            className="h-auto w-[140px]"
+          />
+        </Link>
+
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Homepage
+        </Link>
+      </header>
+
+      <section className="relative z-10 mx-auto grid min-h-[calc(100vh-112px)] max-w-7xl place-items-center px-5 py-10 sm:px-8">
+        <div className="grid w-full max-w-5xl overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.13)] lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="relative overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(52,211,153,0.24),_transparent_34%),linear-gradient(135deg,#064e3b_0%,#047857_55%,#065f46_100%)] p-8 text-white sm:p-10">
+            <div className="absolute -left-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+            <div className="absolute -bottom-20 -right-20 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
+
+            <div className="relative">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-black text-white shadow-sm backdrop-blur">
+                <ShieldCheck className="h-4 w-4" />
+                SitGuru Admin
+              </span>
+
+              <h1 className="mt-8 max-w-sm text-5xl font-black leading-[0.95] tracking-tight text-white sm:text-6xl">
+                Welcome back.
               </h1>
-              <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">
-                Secure access to platform operations, users, bookings, payouts,
-                disputes, analytics, and reporting.
+
+              <p className="mt-5 max-w-md text-base font-bold leading-7 text-white/90">
+                Sign in to manage SitGuru operations, bookings, messages, Gurus,
+                customers, partners, referrals, and platform activity.
               </p>
-            </div>
 
-            <div className="mt-8 grid gap-4">
-              <div className="rounded-2xl bg-white/5 p-4">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="h-5 w-5 text-emerald-300" />
-                  <p className="text-sm font-medium text-white">Platform oversight</p>
+              <div className="mt-10 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                  <PawPrint className="h-6 w-6 text-emerald-100" />
+                  <p className="mt-3 text-sm font-black text-white">Gurus</p>
                 </div>
-                <p className="mt-2 text-sm text-slate-300">
-                  Monitor gurus, customers, bookings, fraud signals, and trust operations.
-                </p>
-              </div>
 
-              <div className="rounded-2xl bg-white/5 p-4">
-                <div className="flex items-center gap-3">
-                  <LayoutDashboard className="h-5 w-5 text-sky-300" />
-                  <p className="text-sm font-medium text-white">Financial controls</p>
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                  <MessageCircle className="h-6 w-6 text-emerald-100" />
+                  <p className="mt-3 text-sm font-black text-white">Messages</p>
                 </div>
-                <p className="mt-2 text-sm text-slate-300">
-                  Review payouts, disputes, refunds, marketplace performance, and exports.
-                </p>
-              </div>
 
-              <div className="rounded-2xl bg-white/5 p-4">
-                <div className="flex items-center gap-3">
-                  <LockKeyhole className="h-5 w-5 text-violet-300" />
-                  <p className="text-sm font-medium text-white">Restricted access</p>
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                  <Users className="h-6 w-6 text-emerald-100" />
+                  <p className="mt-3 text-sm font-black text-white">Partners</p>
                 </div>
-                <p className="mt-2 text-sm text-slate-300">
-                  Intended for authorized SitGuru administrative staff only.
-                </p>
               </div>
             </div>
           </div>
 
-          <div className="p-8 md:p-10">
-            <div>
-              <h2 className="text-2xl font-semibold text-white">
-                Secure admin access
-              </h2>
-              <p className="mt-2 text-sm text-slate-300">
-                Sign in to the admin control center.
+          <div className="p-8 sm:p-10 lg:p-12">
+            <div className="mx-auto max-w-md">
+              <p className="text-xs font-black uppercase tracking-[0.32em] text-slate-900">
+                Admin Login
               </p>
-            </div>
 
-            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-slate-200"
+              <h2 className="mt-3 text-4xl font-black tracking-tight text-green-950 sm:text-5xl">
+                Sign in to Admin
+              </h2>
+
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                Use your SitGuru Admin credentials to continue.
+              </p>
+
+              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                <div>
+                  <label
+                    htmlFor="admin-email"
+                    className="mb-2 block text-sm font-black text-slate-800"
+                  >
+                    Email
+                  </label>
+
+                  <div className="flex items-center rounded-2xl border border-emerald-100 bg-[#eef6ff] px-4 py-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-4 focus-within:ring-emerald-100">
+                    <Mail className="h-5 w-5 shrink-0 text-slate-400" />
+
+                    <input
+                      id="admin-email"
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      autoComplete="email"
+                      className="ml-3 w-full bg-transparent text-base font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                      placeholder="admin@sitguru.com"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="admin-password"
+                    className="mb-2 block text-sm font-black text-slate-800"
+                  >
+                    Password
+                  </label>
+
+                  <div className="flex items-center rounded-2xl border border-emerald-100 bg-[#eef6ff] px-4 py-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-4 focus-within:ring-emerald-100">
+                    <Lock className="h-5 w-5 shrink-0 text-slate-400" />
+
+                    <input
+                      id="admin-password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      autoComplete="current-password"
+                      className="ml-3 w-full bg-transparent text-base font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                      placeholder="Enter password"
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="ml-3 rounded-full p-1 text-slate-500 transition hover:bg-white hover:text-green-800"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {errorMessage ? (
+                  <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                    {errorMessage}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-4 text-base font-black text-white shadow-[0_12px_30px_rgba(22,101,52,0.22)] transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  Email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@sitguru.com"
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400"
-                />
-              </div>
+                  {submitting ? (
+                    <>
+                      <Sparkles className="h-5 w-5 animate-pulse" />
+                      Signing in...
+                    </>
+                  ) : (
+                    "Sign In"
+                  )}
+                </button>
+              </form>
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-slate-200"
-                >
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400"
-                />
-              </div>
+              <div className="mt-6 flex flex-col gap-3 text-sm font-bold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                <Link href="/" className="text-green-800 transition hover:text-green-900">
+                  Back to Homepage
+                </Link>
 
-              <div className="flex items-center justify-between text-sm">
                 <Link
                   href="/forgot-password"
-                  className="text-slate-300 transition hover:text-white"
+                  className="text-slate-500 transition hover:text-green-800"
                 >
                   Forgot password?
                 </Link>
               </div>
-
-              {errorMessage ? (
-                <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-300">
-                  {errorMessage}
-                </div>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Logging in...
-                  </>
-                ) : (
-                  "Log in to Admin"
-                )}
-              </button>
-            </form>
-
-            <div className="mt-8 rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-              <p className="text-sm text-slate-300">
-                Need customer access instead?
-              </p>
-              <Link
-                href="/login"
-                className="mt-2 inline-flex text-sm font-medium text-emerald-300 transition hover:text-emerald-200"
-              >
-                Go to customer login
-              </Link>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                Admin route
-              </p>
-              <p className="mt-2 text-sm text-slate-200">
-                After successful sign-in, this page redirects directly to
-                <span className="ml-1 font-semibold text-white">/admin</span>.
-              </p>
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

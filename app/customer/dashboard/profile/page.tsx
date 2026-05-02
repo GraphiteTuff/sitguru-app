@@ -20,8 +20,14 @@ type CustomerProfile = {
   email: string | null;
   phone: string | null;
   service_address: string | null;
+  service_city: string | null;
+  service_state: string | null;
+  service_zip: string | null;
   emergency_contact: string | null;
   care_preferences: string | null;
+  email_notifications: boolean;
+  push_notifications: boolean;
+  text_notifications: boolean;
   avatar_url: string | null;
 };
 
@@ -29,8 +35,20 @@ type CustomerProfileForm = {
   full_name: string;
   phone: string;
   service_address: string;
+  service_city: string;
+  service_state: string;
+  service_zip: string;
   emergency_contact: string;
   care_preferences: string;
+  email_notifications: boolean;
+  push_notifications: boolean;
+  text_notifications: boolean;
+};
+
+type CustomerSecurityForm = {
+  login_email: string;
+  new_password: string;
+  confirm_password: string;
 };
 
 type RawProfileRow = {
@@ -42,11 +60,25 @@ type RawProfileRow = {
   service_address?: string | null;
   address?: string | null;
   home_address?: string | null;
+  service_city?: string | null;
+  city?: string | null;
+  home_city?: string | null;
+  service_state?: string | null;
+  state?: string | null;
+  home_state?: string | null;
+  service_zip?: string | null;
+  zip?: string | null;
+  zip_code?: string | null;
+  zipcode?: string | null;
+  postal_code?: string | null;
   emergency_contact?: string | null;
   emergency_contact_name?: string | null;
   care_preferences?: string | null;
   preferences?: string | null;
   notes?: string | null;
+  email_notifications?: boolean | null;
+  push_notifications?: boolean | null;
+  text_notifications?: boolean | null;
   avatar_url?: string | null;
   profile_photo_url?: string | null;
   photo_url?: string | null;
@@ -88,6 +120,11 @@ type SavedPlace = {
   id: string;
 };
 
+type ZipLookupResult = {
+  city: string;
+  state: string;
+};
+
 const routes = {
   dashboard: "/customer/dashboard",
   profile: "/customer/dashboard/profile",
@@ -96,6 +133,7 @@ const routes = {
   pets: "/customer/pets",
   saved: "/customer/dashboard/saved",
   settings: "/customer/dashboard/settings",
+  accountSecurity: "/customer/dashboard/settings",
   pawPerks: "/customer/dashboard/pawperks",
   login: "/login",
 };
@@ -108,17 +146,37 @@ const initialProfileForm: CustomerProfileForm = {
   full_name: "",
   phone: "",
   service_address: "",
+  service_city: "",
+  service_state: "",
+  service_zip: "",
   emergency_contact: "",
   care_preferences: "",
+  email_notifications: false,
+  push_notifications: false,
+  text_notifications: false,
+};
+
+const initialSecurityForm: CustomerSecurityForm = {
+  login_email: "",
+  new_password: "",
+  confirm_password: "",
 };
 
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function readBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : false;
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
 function readMetadataString(
   metadata: Record<string, unknown> | null | undefined,
-  keys: string[]
+  keys: string[],
 ) {
   for (const key of keys) {
     const value = readString(metadata?.[key]);
@@ -128,9 +186,61 @@ function readMetadataString(
   return null;
 }
 
+function normalizeZip(value: string) {
+  return value.replace(/\D/g, "").slice(0, 5);
+}
+
+function formatAddressLine(profile: CustomerProfile | null) {
+  const street = profile?.service_address?.trim();
+  const city = profile?.service_city?.trim();
+  const state = profile?.service_state?.trim();
+  const zip = profile?.service_zip?.trim();
+
+  const cityStateZip = [city, state].filter(Boolean).join(", ");
+  const cityStateZipWithZip = [cityStateZip, zip].filter(Boolean).join(" ");
+
+  if (street && cityStateZipWithZip) {
+    return `${street}, ${cityStateZipWithZip}`;
+  }
+
+  return street || cityStateZipWithZip || "Not added yet";
+}
+
+async function lookupZipCode(zip: string): Promise<ZipLookupResult | null> {
+  const normalizedZip = normalizeZip(zip);
+
+  if (normalizedZip.length !== 5) {
+    return null;
+  }
+
+  const response = await fetch(`https://api.zippopotam.us/us/${normalizedZip}`);
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = (await response.json()) as {
+    places?: Array<{
+      "place name"?: string;
+      "state abbreviation"?: string;
+    }>;
+  };
+
+  const firstPlace = data.places?.[0];
+
+  if (!firstPlace?.["place name"] || !firstPlace?.["state abbreviation"]) {
+    return null;
+  }
+
+  return {
+    city: firstPlace["place name"],
+    state: firstPlace["state abbreviation"],
+  };
+}
+
 function buildCustomerProfile(
   row: RawProfileRow | null,
-  user: SupabaseUserLike
+  user: SupabaseUserLike,
 ): CustomerProfile {
   const metadata = user.user_metadata ?? null;
 
@@ -165,6 +275,32 @@ function buildCustomerProfile(
         "home_address",
       ]) ||
       null,
+    service_city:
+      readString(row?.service_city) ||
+      readString(row?.city) ||
+      readString(row?.home_city) ||
+      readMetadataString(metadata, ["service_city", "city", "home_city"]) ||
+      null,
+    service_state:
+      readString(row?.service_state) ||
+      readString(row?.state) ||
+      readString(row?.home_state) ||
+      readMetadataString(metadata, ["service_state", "state", "home_state"]) ||
+      null,
+    service_zip:
+      readString(row?.service_zip) ||
+      readString(row?.zip) ||
+      readString(row?.zip_code) ||
+      readString(row?.zipcode) ||
+      readString(row?.postal_code) ||
+      readMetadataString(metadata, [
+        "service_zip",
+        "zip",
+        "zip_code",
+        "zipcode",
+        "postal_code",
+      ]) ||
+      null,
     emergency_contact:
       readString(row?.emergency_contact) ||
       readString(row?.emergency_contact_name) ||
@@ -177,8 +313,15 @@ function buildCustomerProfile(
       readString(row?.care_preferences) ||
       readString(row?.preferences) ||
       readString(row?.notes) ||
-      readMetadataString(metadata, ["care_preferences", "preferences", "notes"]) ||
+      readMetadataString(metadata, [
+        "care_preferences",
+        "preferences",
+        "notes",
+      ]) ||
       null,
+    email_notifications: readBoolean(row?.email_notifications),
+    push_notifications: readBoolean(row?.push_notifications),
+    text_notifications: readBoolean(row?.text_notifications),
     avatar_url:
       readString(row?.avatar_url) ||
       readString(row?.profile_photo_url) ||
@@ -196,14 +339,20 @@ function buildCustomerProfile(
 }
 
 function customerProfileToForm(
-  profile: CustomerProfile | null
+  profile: CustomerProfile | null,
 ): CustomerProfileForm {
   return {
     full_name: profile?.full_name || profile?.first_name || "",
     phone: profile?.phone || "",
     service_address: profile?.service_address || "",
+    service_city: profile?.service_city || "",
+    service_state: profile?.service_state || "",
+    service_zip: profile?.service_zip || "",
     emergency_contact: profile?.emergency_contact || "",
     care_preferences: profile?.care_preferences || "",
+    email_notifications: Boolean(profile?.email_notifications),
+    push_notifications: Boolean(profile?.push_notifications),
+    text_notifications: Boolean(profile?.text_notifications),
   };
 }
 
@@ -253,95 +402,97 @@ function formatActivityDate(value: string) {
 }
 
 async function fetchCustomerProfile(user: SupabaseUserLike) {
-  const selectAttempts = [
-    "first_name, full_name, phone, service_address, emergency_contact, care_preferences, avatar_url",
-    "first_name, full_name, phone, address, emergency_contact, care_preferences, avatar_url",
-    "first_name, full_name, phone, service_address, emergency_contact, care_preferences, profile_photo_url",
-    "first_name, full_name, phone, address, emergency_contact, care_preferences, profile_photo_url",
-    "first_name, full_name, phone, service_address, emergency_contact, care_preferences, photo_url",
-    "first_name, full_name, phone, address, emergency_contact, care_preferences, photo_url",
-    "first_name, full_name, phone, service_address, emergency_contact, care_preferences",
-    "first_name, full_name, phone, address, emergency_contact, care_preferences",
-    "first_name, full_name, phone, service_address, avatar_url",
-    "first_name, full_name, phone, address, avatar_url",
-    "first_name, full_name, phone, service_address",
-    "first_name, full_name, phone, address",
-    "first_name, full_name, avatar_url",
-    "first_name, full_name",
-  ];
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "first_name, full_name, phone, service_address, service_city, service_state, service_zip, emergency_contact, care_preferences, email_notifications, push_notifications, text_notifications, avatar_url",
+    )
+    .eq("id", user.id)
+    .maybeSingle();
 
-  for (const selectColumns of selectAttempts) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(selectColumns)
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (!error) {
-      return buildCustomerProfile((data as RawProfileRow | null) ?? null, user);
-    }
+  if (!error) {
+    return buildCustomerProfile((data as RawProfileRow | null) ?? null, user);
   }
 
-  return buildCustomerProfile(null, user);
+  throw new Error(
+    `Customer profile columns are not ready yet: ${error.message}. Run the customer profile SQL update, then try again.`,
+  );
 }
 
 async function saveCustomerProfile(userId: string, form: CustomerProfileForm) {
   const fullName = form.full_name.trim();
   const firstName = fullName.split(" ")[0] || fullName || null;
+  const serviceZip = normalizeZip(form.service_zip);
 
-  const saveAttempts: Array<Record<string, string | null>> = [
-    {
-      id: userId,
-      full_name: fullName || null,
-      first_name: firstName,
-      phone: form.phone.trim() || null,
-      service_address: form.service_address.trim() || null,
-      emergency_contact: form.emergency_contact.trim() || null,
-      care_preferences: form.care_preferences.trim() || null,
-    },
-    {
-      id: userId,
-      full_name: fullName || null,
-      first_name: firstName,
-      phone: form.phone.trim() || null,
-      address: form.service_address.trim() || null,
-      emergency_contact: form.emergency_contact.trim() || null,
-      care_preferences: form.care_preferences.trim() || null,
-    },
-    {
-      id: userId,
-      full_name: fullName || null,
-      first_name: firstName,
-      phone: form.phone.trim() || null,
-      service_address: form.service_address.trim() || null,
-    },
-    {
-      id: userId,
-      full_name: fullName || null,
-      first_name: firstName,
-      phone: form.phone.trim() || null,
-      address: form.service_address.trim() || null,
-    },
-    {
-      id: userId,
-      full_name: fullName || null,
-      first_name: firstName,
-    },
-  ];
+  const payload = {
+    id: userId,
+    full_name: fullName || null,
+    first_name: firstName,
+    phone: form.phone.trim() || null,
+    service_address: form.service_address.trim() || null,
+    service_city: form.service_city.trim() || null,
+    service_state: form.service_state.trim().toUpperCase().slice(0, 2) || null,
+    service_zip: serviceZip || null,
+    emergency_contact: form.emergency_contact.trim() || null,
+    care_preferences: form.care_preferences.trim() || null,
+    email_notifications: form.email_notifications,
+    push_notifications: form.push_notifications,
+    text_notifications: form.text_notifications,
+  };
 
-  let lastError = "We could not save your profile right now.";
+  const { error } = await supabase
+    .from("profiles")
+    .upsert(payload, { onConflict: "id" });
 
-  for (const payload of saveAttempts) {
-    const { error } = await supabase
-      .from("profiles")
-      .upsert(payload, { onConflict: "id" });
+  if (error) {
+    throw new Error(
+      `Profile did not save: ${error.message}. Make sure the profiles table has phone, service_address, service_city, service_state, service_zip, emergency_contact, care_preferences, email_notifications, push_notifications, and text_notifications columns.`,
+    );
+  }
+}
 
-    if (!error) return;
+async function updateCustomerSecurity(
+  form: CustomerSecurityForm,
+  currentEmail: string | null | undefined,
+) {
+  const nextEmail = normalizeEmail(form.login_email);
+  const currentNormalizedEmail = normalizeEmail(currentEmail || "");
+  const newPassword = form.new_password.trim();
+  const confirmPassword = form.confirm_password.trim();
 
-    lastError = error.message || lastError;
+  const authPayload: { email?: string; password?: string } = {};
+
+  if (nextEmail && nextEmail !== currentNormalizedEmail) {
+    if (!nextEmail.includes("@") || !nextEmail.includes(".")) {
+      throw new Error("Please enter a valid login email address.");
+    }
+
+    authPayload.email = nextEmail;
   }
 
-  throw new Error(lastError);
+  if (newPassword || confirmPassword) {
+    if (newPassword.length < 6) {
+      throw new Error("Password must be at least 6 characters.");
+    }
+
+    if (newPassword !== confirmPassword) {
+      throw new Error("Password and confirm password must match.");
+    }
+
+    authPayload.password = newPassword;
+  }
+
+  if (!authPayload.email && !authPayload.password) {
+    throw new Error("Enter a new email or password before saving security changes.");
+  }
+
+  const { data, error } = await supabase.auth.updateUser(authPayload);
+
+  if (error) {
+    throw new Error(`Security update failed: ${error.message}`);
+  }
+
+  return data.user;
 }
 
 function getProfilePhotoExtension(file: File) {
@@ -366,11 +517,13 @@ async function uploadCustomerProfilePhoto(userId: string, file: File) {
   let lastError = "We could not upload your profile picture right now.";
 
   for (const bucket of profilePhotoBuckets) {
-    const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
-      cacheControl: "3600",
-      contentType: file.type,
-      upsert: true,
-    });
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        contentType: file.type,
+        upsert: true,
+      });
 
     if (!error) {
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
@@ -386,31 +539,20 @@ async function uploadCustomerProfilePhoto(userId: string, file: File) {
   }
 
   throw new Error(
-    `${lastError} Make sure Supabase Storage has a public bucket named profile-photos or avatars.`
+    `${lastError} Make sure Supabase Storage has a public bucket named profile-photos or avatars.`,
   );
 }
 
 async function saveCustomerProfilePhotoUrl(userId: string, avatarUrl: string) {
-  const saveAttempts = [
-    { id: userId, avatar_url: avatarUrl },
-    { id: userId, profile_photo_url: avatarUrl },
-    { id: userId, photo_url: avatarUrl },
-  ];
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({ id: userId, avatar_url: avatarUrl }, { onConflict: "id" });
 
-  let lastError =
-    "The photo uploaded, but we could not connect it to your profile.";
-
-  for (const payload of saveAttempts) {
-    const { error } = await supabase
-      .from("profiles")
-      .upsert(payload, { onConflict: "id" });
-
-    if (!error) return;
-
-    lastError = error.message || lastError;
+  if (error) {
+    throw new Error(
+      `The photo uploaded, but we could not connect it to your profile: ${error.message}`,
+    );
   }
-
-  throw new Error(lastError);
 }
 
 async function fetchBookingsForUser(userId: string) {
@@ -605,7 +747,9 @@ function MobileActionCard({
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-base font-black text-slate-950">{title}</span>
+        <span className="block text-base font-black text-slate-950">
+          {title}
+        </span>
         <span className="mt-1 block text-sm font-semibold leading-5 text-slate-500">
           {text}
         </span>
@@ -617,6 +761,59 @@ function MobileActionCard({
   );
 }
 
+function CardSaveButton({
+  children,
+  disabled,
+  onClick,
+}: {
+  children: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="inline-flex min-h-[42px] items-center justify-center rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white shadow-sm shadow-emerald-900/10 transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {children}
+    </button>
+  );
+}
+
+function NotificationToggle({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "inline-flex min-h-[38px] items-center justify-center rounded-full border px-4 text-xs font-black transition hover:-translate-y-0.5",
+        active
+          ? "border-emerald-200 bg-emerald-100 text-emerald-800 shadow-sm shadow-emerald-900/5"
+          : "border-red-200 bg-red-50 text-red-700",
+      ].join(" ")}
+      aria-pressed={active}
+    >
+      <span
+        className={[
+          "mr-2 h-2.5 w-2.5 rounded-full",
+          active ? "bg-emerald-600" : "bg-red-500",
+        ].join(" ")}
+      />
+      {label}
+    </button>
+  );
+}
+
 export default function CustomerDashboardProfilePage() {
   const router = useRouter();
 
@@ -624,17 +821,23 @@ export default function CustomerDashboardProfilePage() {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [profileForm, setProfileForm] =
     useState<CustomerProfileForm>(initialProfileForm);
+  const [securityForm, setSecurityForm] =
+    useState<CustomerSecurityForm>(initialSecurityForm);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingSecurity, setSavingSecurity] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
   const [photoFailed, setPhotoFailed] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const [avatarMessage, setAvatarMessage] = useState("");
+  const [zipLookupLoading, setZipLookupLoading] = useState(false);
+  const [zipLookupMessage, setZipLookupMessage] = useState("");
+  const [zipLookupError, setZipLookupError] = useState("");
 
   const avatarSrc = profile?.avatar_url?.trim() || fallbackAvatar;
   const showAvatar = Boolean(avatarSrc) && !photoFailed;
@@ -652,29 +855,43 @@ export default function CustomerDashboardProfilePage() {
 
   const completedBookings = useMemo(() => {
     return bookings.filter(
-      (booking) => booking.status.toLowerCase() === "completed"
+      (booking) => booking.status.toLowerCase() === "completed",
     ).length;
   }, [bookings]);
 
   const careReadiness = useMemo(() => {
     const contactReady = Boolean(profile?.phone?.trim());
     const addressReady = Boolean(profile?.service_address?.trim());
+    const cityStateReady = Boolean(
+      profile?.service_city?.trim() && profile?.service_state?.trim(),
+    );
+    const zipReady = Boolean(profile?.service_zip?.trim());
     const petReady = pets.length > 0;
     const notesReady = Boolean(profile?.care_preferences?.trim());
 
-    const items = [contactReady, addressReady, petReady, notesReady];
+    const items = [
+      contactReady,
+      addressReady,
+      cityStateReady,
+      zipReady,
+      petReady,
+      notesReady,
+    ];
     const completed = items.filter(Boolean).length;
     const score = Math.round((completed / items.length) * 100);
 
     return {
       contactReady,
       addressReady,
+      cityStateReady,
+      zipReady,
       petReady,
       notesReady,
       score,
       completed,
       total: items.length,
-      bookingReady: contactReady && addressReady && petReady,
+      bookingReady:
+        contactReady && addressReady && cityStateReady && zipReady && petReady,
     };
   }, [profile, pets.length]);
 
@@ -734,19 +951,34 @@ export default function CustomerDashboardProfilePage() {
       return;
     }
 
-    const [profileData, bookingsData, petsData, savedData] = await Promise.all([
-      fetchCustomerProfile(user),
-      fetchBookingsForUser(user.id),
-      fetchPetsForUser(user.id),
-      fetchSavedPlacesForUser(user.id),
-    ]);
+    try {
+      const [profileData, bookingsData, petsData, savedData] =
+        await Promise.all([
+          fetchCustomerProfile(user),
+          fetchBookingsForUser(user.id),
+          fetchPetsForUser(user.id),
+          fetchSavedPlacesForUser(user.id),
+        ]);
 
-    setProfile(profileData);
-    setProfileForm(customerProfileToForm(profileData));
-    setBookings(bookingsData);
-    setPets(petsData);
-    setSavedPlaces(savedData);
-    setLoading(false);
+      setProfile(profileData);
+      setProfileForm(customerProfileToForm(profileData));
+      setSecurityForm({
+        login_email: profileData.email || "",
+        new_password: "",
+        confirm_password: "",
+      });
+      setBookings(bookingsData);
+      setPets(petsData);
+      setSavedPlaces(savedData);
+    } catch (error) {
+      setProfileError(
+        error instanceof Error
+          ? error.message
+          : "We could not load your customer profile.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   useEffect(() => {
@@ -768,6 +1000,32 @@ export default function CustomerDashboardProfilePage() {
   useEffect(() => {
     setPhotoFailed(false);
   }, [avatarSrc]);
+
+  useEffect(() => {
+    setSecurityForm((currentForm) => ({
+      ...currentForm,
+      login_email: profile?.email || "",
+    }));
+  }, [profile?.email]);
+
+  useEffect(() => {
+    const normalizedZip = normalizeZip(profileForm.service_zip);
+
+    if (normalizedZip.length !== 5) {
+      setZipLookupMessage("");
+      setZipLookupError("");
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      handleZipLookup(normalizedZip);
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileForm.service_zip]);
 
   async function handleSaveProfile(e?: FormEvent<HTMLFormElement>) {
     e?.preventDefault();
@@ -794,19 +1052,109 @@ export default function CustomerDashboardProfilePage() {
       setProfileForm(customerProfileToForm(refreshedProfile));
       setEditMode(false);
       setProfileMessage("Saved");
+      router.refresh();
     } catch (error) {
       setProfileError(
         error instanceof Error
           ? error.message
-          : "We could not save your profile right now."
+          : "We could not save your profile right now.",
       );
     } finally {
       setSavingProfile(false);
     }
   }
 
+  async function handleZipLookup(zip: string) {
+    const normalizedZip = normalizeZip(zip);
+
+    if (normalizedZip.length !== 5) {
+      return;
+    }
+
+    setZipLookupLoading(true);
+    setZipLookupMessage("");
+    setZipLookupError("");
+
+    try {
+      const result = await lookupZipCode(normalizedZip);
+
+      if (!result) {
+        setZipLookupError(
+          "We could not find a city and state for that ZIP code.",
+        );
+        return;
+      }
+
+      setProfileForm((currentForm) => ({
+        ...currentForm,
+        service_zip: normalizedZip,
+        service_city: result.city,
+        service_state: result.state,
+      }));
+
+      setZipLookupMessage(
+        `City and state filled: ${result.city}, ${result.state}`,
+      );
+    } catch {
+      setZipLookupError("City/state autofill is unavailable right now.");
+    } finally {
+      setZipLookupLoading(false);
+    }
+  }
+
+  async function handleSecuritySave() {
+    setSavingSecurity(true);
+    setProfileMessage("");
+    setProfileError("");
+
+    try {
+      const updatedUser = await updateCustomerSecurity(securityForm, profile?.email);
+      const refreshedUser = updatedUser
+        ? {
+            id: updatedUser.id,
+            email: updatedUser.email,
+            user_metadata: updatedUser.user_metadata,
+          }
+        : null;
+
+      if (refreshedUser) {
+        const refreshedProfile = await fetchCustomerProfile(refreshedUser);
+
+        setProfile(refreshedProfile);
+        setProfileForm(customerProfileToForm(refreshedProfile));
+        setSecurityForm({
+          login_email: refreshedProfile.email || securityForm.login_email,
+          new_password: "",
+          confirm_password: "",
+        });
+      } else {
+        setSecurityForm((currentForm) => ({
+          ...currentForm,
+          new_password: "",
+          confirm_password: "",
+        }));
+      }
+
+      setProfileMessage(
+        securityForm.login_email &&
+          normalizeEmail(securityForm.login_email) !== normalizeEmail(profile?.email || "")
+          ? "Security saved. Check the new email inbox if Supabase asks you to confirm the email change."
+          : "Security saved.",
+      );
+      router.refresh();
+    } catch (error) {
+      setProfileError(
+        error instanceof Error
+          ? error.message
+          : "We could not save your security changes right now.",
+      );
+    } finally {
+      setSavingSecurity(false);
+    }
+  }
+
   async function handleCustomerAvatarUpload(
-    event: ChangeEvent<HTMLInputElement>
+    event: ChangeEvent<HTMLInputElement>,
   ) {
     const file = event.target.files?.[0];
 
@@ -843,7 +1191,7 @@ export default function CustomerDashboardProfilePage() {
       setAvatarError(
         error instanceof Error
           ? error.message
-          : "We could not upload your profile picture right now."
+          : "We could not upload your profile picture right now.",
       );
     } finally {
       setUploadingAvatar(false);
@@ -900,6 +1248,11 @@ export default function CustomerDashboardProfilePage() {
                     setProfileMessage("");
                     setProfileError("");
                     setProfileForm(customerProfileToForm(profile));
+                    setSecurityForm({
+                      login_email: profile?.email || "",
+                      new_password: "",
+                      confirm_password: "",
+                    });
                     setEditMode((value) => !value);
                   }}
                   className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/90 px-6 text-sm font-black text-slate-950 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:bg-white"
@@ -913,7 +1266,10 @@ export default function CustomerDashboardProfilePage() {
                   onClick={() => handleSaveProfile()}
                   className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:opacity-60"
                 >
-                  ✓ {savingProfile ? "Saving..." : profileMessage || "Save Changes"}
+                  ✓{" "}
+                  {savingProfile
+                    ? "Saving..."
+                    : profileMessage || "Save Changes"}
                 </button>
               </div>
             </div>
@@ -1050,7 +1406,7 @@ export default function CustomerDashboardProfilePage() {
                 href="#security"
                 icon="🛡️"
                 title="Security"
-                text="Change password, manage 2FA and active sessions."
+                text="Change password, manage login email, and account access."
               />
               <MobileActionCard
                 href="#care-readiness"
@@ -1091,7 +1447,9 @@ export default function CustomerDashboardProfilePage() {
                   {editMode ? (
                     <>
                       <label className="grid gap-2 py-3 text-sm">
-                        <span className="font-black text-slate-600">Full Name</span>
+                        <span className="font-black text-slate-600">
+                          Full Name
+                        </span>
                         <input
                           type="text"
                           value={profileForm.full_name}
@@ -1121,7 +1479,9 @@ export default function CustomerDashboardProfilePage() {
                       </label>
 
                       <label className="grid gap-2 py-3 text-sm">
-                        <span className="font-black text-slate-600">Location</span>
+                        <span className="font-black text-slate-600">
+                          Street Address
+                        </span>
                         <input
                           type="text"
                           value={profileForm.service_address}
@@ -1131,9 +1491,92 @@ export default function CustomerDashboardProfilePage() {
                               service_address: e.target.value,
                             })
                           }
+                          placeholder="123 Main Street"
                           className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-3 font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
                         />
                       </label>
+
+                      <label className="grid gap-2 py-3 text-sm">
+                        <span className="font-black text-slate-600">
+                          ZIP Code
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={5}
+                          value={profileForm.service_zip}
+                          onChange={(e) =>
+                            setProfileForm({
+                              ...profileForm,
+                              service_zip: normalizeZip(e.target.value),
+                            })
+                          }
+                          onBlur={() =>
+                            handleZipLookup(profileForm.service_zip)
+                          }
+                          placeholder="08030"
+                          className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-3 font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+                        />
+
+                        {zipLookupLoading ? (
+                          <span className="text-xs font-bold text-slate-500">
+                            Looking up city and state...
+                          </span>
+                        ) : null}
+
+                        {zipLookupMessage ? (
+                          <span className="text-xs font-bold text-emerald-700">
+                            {zipLookupMessage}
+                          </span>
+                        ) : null}
+
+                        {zipLookupError ? (
+                          <span className="text-xs font-bold text-amber-700">
+                            {zipLookupError}
+                          </span>
+                        ) : null}
+                      </label>
+
+                      <div className="grid gap-3 py-3 sm:grid-cols-2">
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-black text-slate-600">
+                            City
+                          </span>
+                          <input
+                            type="text"
+                            value={profileForm.service_city}
+                            onChange={(e) =>
+                              setProfileForm({
+                                ...profileForm,
+                                service_city: e.target.value,
+                              })
+                            }
+                            placeholder="Auto-filled from ZIP"
+                            className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-3 font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+                          />
+                        </label>
+
+                        <label className="grid gap-2 text-sm">
+                          <span className="font-black text-slate-600">
+                            State
+                          </span>
+                          <input
+                            type="text"
+                            value={profileForm.service_state}
+                            onChange={(e) =>
+                              setProfileForm({
+                                ...profileForm,
+                                service_state: e.target.value
+                                  .toUpperCase()
+                                  .slice(0, 2),
+                              })
+                            }
+                            placeholder="NJ"
+                            maxLength={2}
+                            className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-3 font-bold uppercase text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+                          />
+                        </label>
+                      </div>
 
                       <label className="grid gap-2 py-3 text-sm">
                         <span className="font-black text-slate-600">
@@ -1157,12 +1600,17 @@ export default function CustomerDashboardProfilePage() {
                       {[
                         [
                           "Full Name",
-                          getDisplayValue(profile?.full_name || profile?.first_name),
+                          getDisplayValue(
+                            profile?.full_name || profile?.first_name,
+                          ),
                         ],
                         ["Email", getDisplayValue(profile?.email)],
                         ["Phone", getDisplayValue(profile?.phone)],
-                        ["Emergency", getDisplayValue(profile?.emergency_contact)],
-                        ["Location", getDisplayValue(profile?.service_address)],
+                        ["Street Address", formatAddressLine(profile)],
+                        [
+                          "Emergency",
+                          getDisplayValue(profile?.emergency_contact),
+                        ],
                       ].map(([label, value]) => (
                         <div
                           key={label}
@@ -1183,6 +1631,15 @@ export default function CustomerDashboardProfilePage() {
                       ))}
                     </>
                   )}
+                </div>
+
+                <div className="mt-5 flex justify-center border-t border-emerald-50 pt-4">
+                  <CardSaveButton
+                    disabled={savingProfile}
+                    onClick={() => handleSaveProfile()}
+                  >
+                    {savingProfile ? "Saving..." : "Save Personal Info"}
+                  </CardSaveButton>
                 </div>
               </div>
 
@@ -1213,7 +1670,9 @@ export default function CustomerDashboardProfilePage() {
                   </div>
 
                   <div className="grid grid-cols-[1fr_auto] gap-3 py-3 text-sm">
-                    <p className="font-black text-slate-600">Favorite Services</p>
+                    <p className="font-black text-slate-600">
+                      Favorite Services
+                    </p>
                     <div className="flex flex-wrap justify-end gap-2">
                       {["🐕", "🏠", "🌙", "🐾", "+2"].map((item) => (
                         <span
@@ -1226,40 +1685,83 @@ export default function CustomerDashboardProfilePage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-[1fr_auto_20px] items-center gap-3 py-3 text-sm">
-                    <p className="font-black text-slate-600">Notifications</p>
-                    <p className="text-right font-bold text-slate-500">
-                      Email, Push, SMS
-                    </p>
-                    <ChevronRightIcon />
-                  </div>
+                  <div className="grid gap-3 py-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-black text-slate-600">Notifications</p>
+                      <p className="text-right text-xs font-bold text-slate-500">
+                        Tap to toggle red/off or green/on
+                      </p>
+                    </div>
 
-                  <div className="grid grid-cols-[1fr_auto_20px] items-center gap-3 py-3 text-sm">
-                    <p className="font-black text-slate-600">Care Notes</p>
-                    <p className="max-w-[150px] truncate text-right font-bold text-slate-500">
-                      {getDisplayValue(profile?.care_preferences)}
-                    </p>
-                    <ChevronRightIcon />
-                  </div>
-
-                  {editMode ? (
-                    <label className="grid gap-2 py-3 text-sm">
-                      <span className="font-black text-slate-600">
-                        Care Preferences
-                      </span>
-                      <textarea
-                        rows={4}
-                        value={profileForm.care_preferences}
-                        onChange={(e) =>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <NotificationToggle
+                        label="Email"
+                        active={profileForm.email_notifications}
+                        onClick={() =>
                           setProfileForm({
                             ...profileForm,
-                            care_preferences: e.target.value,
+                            email_notifications:
+                              !profileForm.email_notifications,
                           })
                         }
-                        className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-3 font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
                       />
-                    </label>
-                  ) : null}
+                      <NotificationToggle
+                        label="Push"
+                        active={profileForm.push_notifications}
+                        onClick={() =>
+                          setProfileForm({
+                            ...profileForm,
+                            push_notifications: !profileForm.push_notifications,
+                          })
+                        }
+                      />
+                      <NotificationToggle
+                        label="Text"
+                        active={profileForm.text_notifications}
+                        onClick={() =>
+                          setProfileForm({
+                            ...profileForm,
+                            text_notifications: !profileForm.text_notifications,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <label className="grid gap-2 py-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-black text-slate-600">Care Notes</span>
+                      <span className="text-xs font-bold text-slate-500">
+                        Optional details for your Guru
+                      </span>
+                    </div>
+
+                    <textarea
+                      rows={5}
+                      value={profileForm.care_preferences}
+                      onChange={(e) =>
+                        setProfileForm({
+                          ...profileForm,
+                          care_preferences: e.target.value,
+                        })
+                      }
+                      placeholder="Example: My dog gets nervous around loud noises. Please use the side gate, keep walks short in hot weather, and avoid treats unless approved."
+                      className="resize-y rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-3 font-bold leading-6 text-slate-950 outline-none transition placeholder:font-semibold placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white"
+                    />
+
+                    <span className="text-xs font-semibold leading-5 text-slate-500">
+                      These notes save to the customer profile and can be used for booking details, pet care instructions, and Guru preparation.
+                    </span>
+                  </label>
+                </div>
+
+                <div className="mt-5 flex justify-center border-t border-emerald-50 pt-4">
+                  <CardSaveButton
+                    disabled={savingProfile}
+                    onClick={() => handleSaveProfile()}
+                  >
+                    {savingProfile ? "Saving..." : "Save Care Preferences"}
+                  </CardSaveButton>
                 </div>
               </div>
 
@@ -1271,24 +1773,66 @@ export default function CustomerDashboardProfilePage() {
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
                     <ShieldIcon />
                   </span>
-                  <h3 className="text-xl font-black text-slate-950">Security</h3>
+                  <h3 className="text-xl font-black text-slate-950">
+                    Security
+                  </h3>
                 </div>
 
                 <div className="divide-y divide-emerald-50">
-                  <div className="grid grid-cols-[1fr_auto] items-center gap-3 py-4 text-sm">
-                    <p className="font-black text-slate-600">Password</p>
-                    <div className="flex items-center gap-4">
-                      <span className="font-black tracking-[0.25em] text-slate-950">
-                        ••••••••
-                      </span>
-                      <Link
-                        href={routes.settings}
-                        className="font-black text-emerald-600 hover:text-emerald-700"
-                      >
-                        Change
-                      </Link>
-                    </div>
-                  </div>
+                  <label className="grid gap-2 py-4 text-sm">
+                    <span className="font-black text-slate-600">Login Email</span>
+                    <input
+                      type="email"
+                      value={securityForm.login_email}
+                      onChange={(e) =>
+                        setSecurityForm({
+                          ...securityForm,
+                          login_email: e.target.value,
+                        })
+                      }
+                      placeholder="customer@email.com"
+                      className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-3 font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+                    />
+                    <span className="text-xs font-semibold leading-5 text-slate-500">
+                      This is the email used for customer login across SitGuru.
+                    </span>
+                  </label>
+
+                  <label className="grid gap-2 py-4 text-sm">
+                    <span className="font-black text-slate-600">New Password</span>
+                    <input
+                      type="password"
+                      value={securityForm.new_password}
+                      onChange={(e) =>
+                        setSecurityForm({
+                          ...securityForm,
+                          new_password: e.target.value,
+                        })
+                      }
+                      placeholder="At least 6 characters"
+                      autoComplete="new-password"
+                      className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-3 font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+                    />
+                  </label>
+
+                  <label className="grid gap-2 py-4 text-sm">
+                    <span className="font-black text-slate-600">
+                      Confirm Password
+                    </span>
+                    <input
+                      type="password"
+                      value={securityForm.confirm_password}
+                      onChange={(e) =>
+                        setSecurityForm({
+                          ...securityForm,
+                          confirm_password: e.target.value,
+                        })
+                      }
+                      placeholder="Re-enter new password"
+                      autoComplete="new-password"
+                      className="rounded-xl border border-emerald-100 bg-emerald-50/40 px-3 py-3 font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+                    />
+                  </label>
 
                   <div className="grid grid-cols-[1fr_auto] items-center gap-3 py-4 text-sm">
                     <p className="font-black text-slate-600">Account Status</p>
@@ -1307,6 +1851,15 @@ export default function CustomerDashboardProfilePage() {
                     </Link>
                   </div>
                 </div>
+
+                <div className="mt-5 flex justify-center border-t border-emerald-50 pt-4">
+                  <CardSaveButton
+                    disabled={savingSecurity}
+                    onClick={handleSecuritySave}
+                  >
+                    {savingSecurity ? "Saving..." : "Save Security"}
+                  </CardSaveButton>
+                </div>
               </div>
 
               <div
@@ -1322,7 +1875,8 @@ export default function CustomerDashboardProfilePage() {
                       Care Readiness
                     </h3>
                     <p className="mt-1 text-xs font-bold text-slate-500">
-                      {careReadiness.completed} of {careReadiness.total} setup steps complete
+                      {careReadiness.completed} of {careReadiness.total} setup
+                      steps complete
                     </p>
                   </div>
                 </div>
@@ -1345,17 +1899,55 @@ export default function CustomerDashboardProfilePage() {
                   </div>
                 </div>
 
-                <div className="divide-y divide-emerald-50">
+                <div className="mb-5 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+                  <h4 className="text-sm font-black text-slate-950">
+                    Why completing Care Readiness matters
+                  </h4>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    These details help SitGuru match you with the right Guru, avoid
+                    booking delays, and give your pet care provider the information
+                    they need before care starts. A complete profile also helps reduce
+                    back-and-forth messages because your Guru can see the basics up front.
+                  </p>
+                </div>
+
+                <div className="grid gap-3">
                   {[
                     {
                       label: "Contact Info",
                       ready: careReadiness.contactReady,
-                      value: careReadiness.contactReady ? "Added" : "Needs phone",
+                      value: careReadiness.contactReady
+                        ? "Added"
+                        : "Needs phone",
+                      why:
+                        "Gives your Guru and SitGuru a reliable way to reach you for booking questions, arrival updates, or urgent pet-care needs.",
                     },
                     {
-                      label: "Service Address",
+                      label: "Street Address",
                       ready: careReadiness.addressReady,
-                      value: careReadiness.addressReady ? "Added" : "Needs address",
+                      value: careReadiness.addressReady
+                        ? "Added"
+                        : "Needs street address",
+                      why:
+                        "Helps confirm where care will happen and supports accurate service-area matching before a booking is accepted.",
+                    },
+                    {
+                      label: "City / State",
+                      ready: careReadiness.cityStateReady,
+                      value: careReadiness.cityStateReady
+                        ? `${profile?.service_city}, ${profile?.service_state}`
+                        : "Needs ZIP autofill",
+                      why:
+                        "Makes location matching cleaner so SitGuru can show Gurus who actually serve your area.",
+                    },
+                    {
+                      label: "ZIP Code",
+                      ready: careReadiness.zipReady,
+                      value: careReadiness.zipReady
+                        ? "Added"
+                        : "Needs ZIP code",
+                      why:
+                        "Improves local search, distance checks, and future service-radius matching between pet parents and Gurus.",
                     },
                     {
                       label: "Pet Profiles",
@@ -1364,33 +1956,58 @@ export default function CustomerDashboardProfilePage() {
                         pets.length > 0
                           ? `${pets.length} pet${pets.length === 1 ? "" : "s"}`
                           : "Add first pet",
+                      why:
+                        "Lets your Guru understand each pet’s name, needs, routine, and care details before accepting or starting care.",
                     },
                     {
                       label: "Care Notes",
                       ready: careReadiness.notesReady,
                       value: careReadiness.notesReady ? "Added" : "Recommended",
+                      why:
+                        "Shares important instructions like feeding, medication, anxiety triggers, leash rules, door access, or what to avoid.",
                     },
                   ].map((item) => (
                     <div
                       key={item.label}
-                      className="grid grid-cols-[1fr_auto] items-center gap-3 py-3 text-sm"
+                      className="rounded-2xl border border-emerald-50 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.03)]"
                     >
-                      <p className="font-black text-slate-600">{item.label}</p>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-black ${
-                          item.ready
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-amber-50 text-amber-700 ring-1 ring-amber-100"
-                        }`}
-                      >
-                        {item.value}
-                      </span>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm font-black text-slate-700">
+                          {item.label}
+                        </p>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-black ${
+                            item.ready
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-50 text-amber-700 ring-1 ring-amber-100"
+                          }`}
+                        >
+                          {item.value}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                        {item.why}
+                      </p>
                     </div>
                   ))}
                 </div>
 
+                <div className="mt-5 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+                  <p className="text-sm font-black text-emerald-900">
+                    Benefit for Pet Parents
+                  </p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-emerald-800/85">
+                    The more complete this card is, the easier it is to book confidently.
+                    Your Guru can prepare properly, confirm they are the right fit, and
+                    provide safer, smoother care for your pets from the first visit.
+                  </p>
+                </div>
+
                 <div className="mt-5 flex flex-wrap gap-3">
-                  {!careReadiness.contactReady || !careReadiness.addressReady ? (
+                  {!careReadiness.contactReady ||
+                  !careReadiness.addressReady ||
+                  !careReadiness.cityStateReady ||
+                  !careReadiness.zipReady ? (
                     <button
                       type="button"
                       onClick={() => setEditMode(true)}
@@ -1468,6 +2085,11 @@ export default function CustomerDashboardProfilePage() {
                     type="button"
                     onClick={() => {
                       setProfileForm(customerProfileToForm(profile));
+                      setSecurityForm({
+                        login_email: profile?.email || "",
+                        new_password: "",
+                        confirm_password: "",
+                      });
                       setEditMode(false);
                       setProfileError("");
                       setProfileMessage("");

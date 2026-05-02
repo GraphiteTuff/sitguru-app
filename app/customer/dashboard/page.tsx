@@ -1,10 +1,11 @@
 // app/customer/dashboard/page.tsx
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import Header from "@/components/Header";
 
 type Booking = {
   id: string;
@@ -863,8 +864,6 @@ export default function CustomerDashboardPage() {
     useState<UploadingPetMedia | null>(null);
   const [petMediaError, setPetMediaError] = useState("");
   const [petMediaMessage, setPetMediaMessage] = useState("");
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
   const customerAvatarSrc =
     customerProfile?.avatar_url?.trim() || CUSTOMER_PROFILE_PHOTO_SRC;
@@ -958,28 +957,6 @@ export default function CustomerDashboardPage() {
   useEffect(() => {
     setCustomerPhotoFailed(false);
   }, [customerAvatarSrc]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (!accountMenuRef.current?.contains(event.target as Node)) {
-        setAccountMenuOpen(false);
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setAccountMenuOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1292,11 +1269,7 @@ export default function CustomerDashboardPage() {
     [customerProfile]
   );
 
-  async function handleSignOut() {
-    setAccountMenuOpen(false);
-    await supabase.auth.signOut();
-    router.replace(routes.login);
-  }
+
 
   if (loading) {
     return (
@@ -1378,191 +1351,7 @@ export default function CustomerDashboardPage() {
           fontWeight: 300,
         }}
       >
-        <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
-          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-4 sm:px-6 lg:px-8">
-            <Link
-              href={routes.dashboard}
-              className="inline-flex h-14 w-[190px] shrink-0 items-center justify-start rounded-2xl px-1 transition hover:opacity-90 sm:w-[215px] lg:h-16 lg:w-[235px]"
-              aria-label="Go to SitGuru customer dashboard"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/sitguru-logo-cropped.png"
-                alt="SitGuru"
-                className="h-auto max-h-12 w-auto object-contain lg:max-h-14"
-              />
-            </Link>
-
-            <nav className="hidden flex-1 items-center justify-center gap-5 lg:flex xl:gap-8">
-              {[
-                { label: "Dashboard", href: routes.dashboard, active: true },
-                { label: "Find a Guru", href: routes.findGuru },
-                { label: "Book a Guru", href: routes.bookGuru },
-                { label: "Bookings", href: routes.allBookings },
-                { label: "Messages", href: routes.messages },
-                { label: "My Pets", href: routes.pets },
-                { label: "My Profile", href: routes.profile },
-                { label: "PawPerks", href: routes.pawPerks },
-              ].map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`pb-5 text-base font-black transition xl:text-lg ${
-                    item.active
-                      ? "border-b-[3px] border-emerald-500 !text-slate-950"
-                      : "!text-slate-900 hover:!text-emerald-700"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-
-            <div ref={accountMenuRef} className="relative hidden md:block">
-              <button
-                type="button"
-                onClick={() => setAccountMenuOpen((value) => !value)}
-                className="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1.5 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-                aria-haspopup="menu"
-                aria-expanded={accountMenuOpen}
-                aria-label="Open customer account menu"
-              >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-black text-emerald-700 shadow-sm ring-1 ring-emerald-100">
-                  {showCustomerProfilePhoto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={customerAvatarSrc}
-                      alt={`${customerDisplayName} profile photo`}
-                      onError={() => setCustomerPhotoFailed(true)}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    customerInitials
-                  )}
-                </span>
-
-                <span className="hidden max-w-[88px] truncate text-sm font-black text-slate-950 xl:block">
-                  {customerDisplayName}
-                </span>
-
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-lg font-black leading-none text-white shadow-sm">
-                  {accountMenuOpen ? "⌃" : "⌄"}
-                </span>
-              </button>
-
-              {accountMenuOpen ? (
-                <div
-                  role="menu"
-                  className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] w-72 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)]"
-                >
-                  <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_100%)] p-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-black text-emerald-700 shadow-sm ring-1 ring-emerald-100">
-                        {showCustomerProfilePhoto ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={customerAvatarSrc}
-                            alt={`${customerDisplayName} profile photo`}
-                            onError={() => setCustomerPhotoFailed(true)}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          customerInitials
-                        )}
-                      </span>
-
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-black text-slate-950">
-                          {customerDisplayName}
-                        </p>
-                        <p className="text-sm font-bold text-emerald-700">
-                          SitGuru Pet Parent
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2 p-2">
-                    <Link
-                      href={routes.profile}
-                      role="menuitem"
-                      onClick={() => setAccountMenuOpen(false)}
-                      className="rounded-xl px-4 py-3 text-sm font-black text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-                    >
-                      Update Profile
-                    </Link>
-
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={handleSignOut}
-                      className="rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-black text-white transition hover:bg-emerald-700"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setAccountMenuOpen((value) => !value)}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-xl font-black text-emerald-700 transition hover:bg-emerald-100 md:hidden"
-              aria-label="Toggle customer menu"
-              aria-expanded={accountMenuOpen}
-            >
-              {accountMenuOpen ? "✕" : "☰"}
-            </button>
-          </div>
-
-          {accountMenuOpen ? (
-            <div className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden">
-              <div className="mx-auto grid max-w-[1440px] gap-2">
-                {[
-                  { label: "Dashboard", href: routes.dashboard, active: true },
-                  { label: "Find a Guru", href: routes.findGuru },
-                  { label: "Book a Guru", href: routes.bookGuru },
-                  { label: "Bookings", href: routes.allBookings },
-                  { label: "Messages", href: routes.messages },
-                  { label: "My Pets", href: routes.pets },
-                  { label: "My Profile", href: routes.profile },
-                  { label: "PawPerks", href: routes.pawPerks },
-                ].map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setAccountMenuOpen(false)}
-                    className={`rounded-xl px-4 py-3 text-sm font-bold transition ${
-                      item.active
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-
-                <div className="mt-2 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
-                  <p className="text-base font-black text-slate-950">
-                    {customerDisplayName}
-                  </p>
-                  <p className="text-sm font-bold text-emerald-700">
-                    SitGuru Pet Parent
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="mt-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-black text-white transition hover:bg-emerald-700"
-                >
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </header>
+        <Header />
 
         <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
           <section

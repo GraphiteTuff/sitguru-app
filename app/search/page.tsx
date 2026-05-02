@@ -25,6 +25,7 @@ type GuruRow = {
   bio?: string | null;
   city?: string | null;
   state?: string | null;
+  zip_code?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   hourly_rate?: number | null;
@@ -35,10 +36,21 @@ type GuruRow = {
   rating?: number | null;
   review_count?: number | null;
   profile_photo_url?: string | null;
+  photo_url?: string | null;
+  avatar_url?: string | null;
   image_url?: string | null;
   is_public?: boolean | null;
   is_active?: boolean | null;
   services?: string[] | null;
+};
+
+type ZipLookupResult = {
+  zip: string;
+  city: string;
+  state: string;
+  stateName?: string;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 const SERVICE_OPTIONS = [
@@ -101,12 +113,23 @@ function getGuruName(guru: GuruRow) {
 }
 
 function getGuruPhotoUrl(guru: GuruRow) {
-  return guru.profile_photo_url || guru.image_url || "";
+  return (
+    guru.profile_photo_url ||
+    guru.photo_url ||
+    guru.avatar_url ||
+    guru.image_url ||
+    ""
+  );
 }
 
 function getGuruHref(guru: GuruRow) {
   if (guru.slug) return `/guru/${guru.slug}`;
   return `/guru/${guru.id}`;
+}
+
+function getBookGuruHref(guru: GuruRow) {
+  if (guru.slug) return `/book/${guru.slug}`;
+  return getGuruHref(guru);
 }
 
 function getGuruRating(guru: GuruRow) {
@@ -125,6 +148,51 @@ function getGuruAnalyticsId(guru: GuruRow) {
   return String(guru.user_id || guru.id || "");
 }
 
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+
+  if (!parts.length) return "SG";
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
+function cleanZip(value?: string | null) {
+  return String(value || "").replace(/\D/g, "").slice(0, 5);
+}
+
+function GuruResultPhoto({
+  photoUrl,
+  guruName,
+}: {
+  photoUrl: string;
+  guruName: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showPhoto = Boolean(photoUrl) && !imageFailed;
+
+  return (
+    <div className="h-64 w-full shrink-0 overflow-hidden bg-slate-100 md:h-[320px] md:w-72">
+      {showPhoto ? (
+        <img
+          src={photoUrl}
+          alt={guruName}
+          className="h-full w-full object-cover object-center"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-slate-100">
+          <div className="flex h-24 w-24 items-center justify-center rounded-full border border-emerald-200 bg-white text-2xl font-black text-emerald-700 shadow-sm">
+            {getInitials(guruName)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function matchesService(guru: GuruRow, selectedService: string) {
   if (!selectedService) return true;
 
@@ -132,7 +200,7 @@ function matchesService(guru: GuruRow, selectedService: string) {
   if (!services.length) return false;
 
   return services.some(
-    (service) => service.toLowerCase() === selectedService.toLowerCase()
+    (service) => service.toLowerCase() === selectedService.toLowerCase(),
   );
 }
 
@@ -171,11 +239,27 @@ function getSearchMapCenter({
   filteredGurus,
   cityFilter,
   stateFilter,
+  zipLookup,
 }: {
   filteredGurus: GuruRow[];
   cityFilter: string;
   stateFilter: string;
+  zipLookup: ZipLookupResult | null;
 }): [number, number] {
+  if (
+    typeof zipLookup?.latitude === "number" &&
+    typeof zipLookup?.longitude === "number" &&
+    Number.isFinite(zipLookup.latitude) &&
+    Number.isFinite(zipLookup.longitude)
+  ) {
+    return [zipLookup.latitude, zipLookup.longitude];
+  }
+
+  const searchedLocation =
+    CITY_COORDINATES[normalizeLocationKey(cityFilter, stateFilter)];
+
+  if (searchedLocation) return searchedLocation;
+
   const firstExactGuru = filteredGurus.find(hasValidCoordinates);
 
   if (
@@ -187,22 +271,13 @@ function getSearchMapCenter({
   }
 
   const firstFallbackGuru = filteredGurus.find((guru) =>
-    Boolean(getGuruFallbackCoordinates(guru))
+    Boolean(getGuruFallbackCoordinates(guru)),
   );
 
   if (firstFallbackGuru) {
     const fallback = getGuruFallbackCoordinates(firstFallbackGuru);
 
-    if (fallback) {
-      return fallback;
-    }
-  }
-
-  const searchedLocation =
-    CITY_COORDINATES[normalizeLocationKey(cityFilter, stateFilter)];
-
-  if (searchedLocation) {
-    return searchedLocation;
+    if (fallback) return fallback;
   }
 
   return DEFAULT_MAP_CENTER;
@@ -236,18 +311,25 @@ function SearchPageContent() {
   const initialService = searchParams.get("service") || "";
   const initialCity = searchParams.get("city") || "";
   const initialState = searchParams.get("state") || "";
+  const initialZip = cleanZip(searchParams.get("zip") || "");
 
   const [gurus, setGurus] = useState<GuruRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [serviceFilter, setServiceFilter] = useState(initialService);
+  const [zipFilter, setZipFilter] = useState(initialZip);
   const [cityFilter, setCityFilter] = useState(initialCity);
   const [stateFilter, setStateFilter] = useState(initialState);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const [zipLookup, setZipLookup] = useState<ZipLookupResult | null>(null);
+  const [zipLookupStatus, setZipLookupStatus] = useState<
+    "idle" | "loading" | "found" | "not_found"
+  >("idle");
+
   const [highlightedGuruId, setHighlightedGuruId] = useState<string | undefined>(
-    undefined
+    undefined,
   );
 
   const hasTrackedSearchPageVisit = useRef(false);
@@ -269,18 +351,19 @@ function SearchPageContent() {
         search: window.location.search,
         pathname: window.location.pathname,
         initial_service: initialService,
+        initial_zip: initialZip,
         initial_city: initialCity,
         initial_state: initialState,
       },
     });
-  }, [initialService, initialCity, initialState]);
+  }, [initialService, initialZip, initialCity, initialState]);
 
   useEffect(() => {
     async function loadGurus() {
       setLoading(true);
       setError("");
 
-      const { data, error } = await supabase
+      const { data, error: gurusError } = await supabase
         .from("gurus")
         .select(
           `
@@ -293,6 +376,7 @@ function SearchPageContent() {
             bio,
             city,
             state,
+            zip_code,
             latitude,
             longitude,
             hourly_rate,
@@ -303,18 +387,20 @@ function SearchPageContent() {
             rating,
             review_count,
             profile_photo_url,
+            photo_url,
+            avatar_url,
             image_url,
             is_public,
             is_active,
             services
-          `
+          `,
         )
         .or("is_public.eq.true,is_active.eq.true")
         .order("is_verified", { ascending: false })
         .order("rating_avg", { ascending: false, nullsFirst: false });
 
-      if (error) {
-        setError(error.message);
+      if (gurusError) {
+        setError(gurusError.message);
         setLoading(false);
 
         trackEvent({
@@ -322,7 +408,7 @@ function SearchPageContent() {
           eventType: "system",
           source: detectSourceFromUrl(),
           metadata: {
-            error: error.message,
+            error: gurusError.message,
           },
         });
 
@@ -342,6 +428,7 @@ function SearchPageContent() {
           guru_count: guruRows.length,
           guru_count_with_map_location: guruRows.filter(hasMapLocation).length,
           has_initial_service: Boolean(initialService),
+          has_initial_zip: Boolean(initialZip),
           has_initial_city: Boolean(initialCity),
           has_initial_state: Boolean(initialState),
         },
@@ -349,43 +436,131 @@ function SearchPageContent() {
     }
 
     loadGurus();
-  }, [initialService, initialCity, initialState]);
+  }, [initialService, initialZip, initialCity, initialState]);
+
+  useEffect(() => {
+    const cleanedZip = cleanZip(zipFilter);
+
+    if (!cleanedZip) {
+      setZipLookup(null);
+      setZipLookupStatus("idle");
+      setCityFilter("");
+      setStateFilter("");
+      return;
+    }
+
+    if (cleanedZip.length !== 5) {
+      setZipLookup(null);
+      setZipLookupStatus("idle");
+      setCityFilter("");
+      setStateFilter("");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function lookupZip() {
+      try {
+        setZipLookupStatus("loading");
+
+        const response = await fetch(`/api/geo/zip?zip=${cleanedZip}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          if (!cancelled) {
+            setZipLookup(null);
+            setZipLookupStatus("not_found");
+            setCityFilter("");
+            setStateFilter("");
+          }
+
+          return;
+        }
+
+        const data = (await response.json()) as ZipLookupResult;
+
+        if (cancelled) return;
+
+        setZipLookup(data);
+        setZipLookupStatus("found");
+        setCityFilter(data.city || "");
+        setStateFilter(data.state || data.stateName || "");
+
+        trackEvent({
+          eventName: "search_zip_autofilled",
+          eventType: "search",
+          source: detectSourceFromUrl(),
+          role: "customer",
+          metadata: {
+            zip: data.zip,
+            city: data.city,
+            state: data.state,
+            latitude: data.latitude,
+            longitude: data.longitude,
+          },
+        });
+      } catch (lookupError) {
+        console.error("Find a Guru ZIP lookup failed:", lookupError);
+
+        if (!cancelled) {
+          setZipLookup(null);
+          setZipLookupStatus("not_found");
+          setCityFilter("");
+          setStateFilter("");
+        }
+      }
+    }
+
+    const timer = window.setTimeout(() => {
+      lookupZip();
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [zipFilter]);
 
   const filteredGurus = useMemo(() => {
     const query = normalizeText(searchTerm);
     const city = normalizeText(cityFilter);
     const state = normalizeText(stateFilter);
+    const zip = cleanZip(zipFilter);
 
     return gurus.filter((guru) => {
       const guruName = normalizeText(getGuruName(guru));
       const guruCity = normalizeText(guru.city);
       const guruState = normalizeText(guru.state);
+      const guruZip = cleanZip(guru.zip_code);
       const guruBio = normalizeText(guru.bio);
       const guruTitle = normalizeText(guru.title);
       const guruServices = (guru.services || []).join(" ").toLowerCase();
 
       const matchesText =
         !query ||
-        [guruName, guruCity, guruState, guruBio, guruTitle, guruServices]
+        [guruName, guruCity, guruState, guruZip, guruBio, guruTitle, guruServices]
           .join(" ")
           .includes(query);
 
+      const matchesZipFilter = !zip || guruZip === zip;
       const matchesCityFilter = !city || guruCity.includes(city);
       const matchesStateFilter = !state || guruState.includes(state);
       const matchesSelectedService = matchesService(guru, serviceFilter);
 
       return (
         matchesText &&
+        matchesZipFilter &&
         matchesCityFilter &&
         matchesStateFilter &&
         matchesSelectedService
       );
     });
-  }, [gurus, searchTerm, cityFilter, stateFilter, serviceFilter]);
+  }, [gurus, searchTerm, zipFilter, cityFilter, stateFilter, serviceFilter]);
 
   const mapReadyGuruCount = useMemo(
     () => filteredGurus.filter(hasMapLocation).length,
-    [filteredGurus]
+    [filteredGurus],
   );
 
   const mapMissingLocationCount = filteredGurus.length - mapReadyGuruCount;
@@ -395,6 +570,7 @@ function SearchPageContent() {
 
     const searchKey = JSON.stringify({
       serviceFilter,
+      zipFilter: cleanZip(zipFilter),
       cityFilter: cityFilter.trim(),
       stateFilter: stateFilter.trim(),
       searchTerm: searchTerm.trim(),
@@ -403,6 +579,7 @@ function SearchPageContent() {
 
     const hasSearchInput =
       Boolean(serviceFilter) ||
+      Boolean(cleanZip(zipFilter)) ||
       Boolean(cityFilter.trim()) ||
       Boolean(stateFilter.trim()) ||
       Boolean(searchTerm.trim());
@@ -421,6 +598,7 @@ function SearchPageContent() {
         metadata: {
           location: "search_page",
           service: serviceFilter,
+          zip: cleanZip(zipFilter),
           city: cityFilter.trim(),
           state: stateFilter.trim(),
           query: searchTerm.trim(),
@@ -435,6 +613,7 @@ function SearchPageContent() {
   }, [
     loading,
     serviceFilter,
+    zipFilter,
     cityFilter,
     stateFilter,
     searchTerm,
@@ -449,16 +628,31 @@ function SearchPageContent() {
         filteredGurus,
         cityFilter,
         stateFilter,
+        zipLookup,
       }),
-    [filteredGurus, cityFilter, stateFilter]
+    [filteredGurus, cityFilter, stateFilter, zipLookup],
   );
 
   const activeFilterCount = [
     serviceFilter,
+    cleanZip(zipFilter),
     cityFilter.trim(),
     stateFilter.trim(),
     searchTerm.trim(),
   ].filter(Boolean).length;
+
+  function handleZipChange(value: string) {
+    const cleanedZip = cleanZip(value);
+
+    setZipFilter(cleanedZip);
+
+    if (!cleanedZip) {
+      setZipLookup(null);
+      setZipLookupStatus("idle");
+      setCityFilter("");
+      setStateFilter("");
+    }
+  }
 
   function clearFilters(location: string) {
     trackEvent({
@@ -469,6 +663,7 @@ function SearchPageContent() {
       metadata: {
         location,
         previous_service: serviceFilter,
+        previous_zip: cleanZip(zipFilter),
         previous_city: cityFilter.trim(),
         previous_state: stateFilter.trim(),
         previous_query: searchTerm.trim(),
@@ -477,6 +672,9 @@ function SearchPageContent() {
     });
 
     setServiceFilter("");
+    setZipFilter("");
+    setZipLookup(null);
+    setZipLookupStatus("idle");
     setCityFilter("");
     setStateFilter("");
     setSearchTerm("");
@@ -500,6 +698,7 @@ function SearchPageContent() {
         guru_name: getGuruName(guru),
         guru_city: guru.city || "",
         guru_state: guru.state || "",
+        guru_zip: guru.zip_code || "",
         guru_has_map_location: hasMapLocation(guru),
         selected_service: serviceFilter,
         result_count: filteredGurus.length,
@@ -522,7 +721,9 @@ function SearchPageContent() {
         guru_name: getGuruName(guru),
         guru_city: guru.city || "",
         guru_state: guru.state || "",
+        guru_zip: guru.zip_code || "",
         selected_service: serviceFilter,
+        zip_filter: cleanZip(zipFilter),
         city_filter: cityFilter.trim(),
         state_filter: stateFilter.trim(),
         query: searchTerm.trim(),
@@ -553,10 +754,11 @@ function SearchPageContent() {
       guruId: getGuruAnalyticsId(guru),
       metadata: {
         location: "search_results",
-        destination: getGuruHref(guru),
+        destination: getBookGuruHref(guru),
         guru_id: guru.id,
         guru_name: getGuruName(guru),
         selected_service: serviceFilter,
+        zip_filter: cleanZip(zipFilter),
         city_filter: cityFilter.trim(),
         state_filter: stateFilter.trim(),
         query: searchTerm.trim(),
@@ -566,40 +768,40 @@ function SearchPageContent() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50">
+    <main className="min-h-screen bg-[#f8fcfd] text-slate-900">
+      <section className="relative overflow-hidden border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#f8fcfd_48%,#ecfdf5_100%)]">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
           <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-slate-200/40 blur-3xl" />
         </div>
 
-        <div className="relative mx-auto max-w-7xl px-6 py-10 sm:py-12">
-          <div className="max-w-4xl">
+        <div className="relative mx-auto max-w-[1500px] px-5 py-10 sm:px-6 sm:py-12 lg:px-8">
+          <div className="max-w-5xl">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-700">
               Find a Guru
             </p>
 
-            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-              Search trusted local pet care with more confidence
+            <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+              Search trusted local pet care by ZIP code
             </h1>
 
-            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700 sm:text-lg">
-              Browse SitGuru providers by service, city, state, and profile
-              details. Compare Gurus in a cleaner, more modern search experience
-              built for pet parents.
+            <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
+              Enter your ZIP code to quickly find SitGuru providers near your
+              pet. City and state will auto-fill and the map will center around
+              your search area.
             </p>
           </div>
 
-          <Card className="mt-8 p-5 sm:p-6">
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_1fr_1fr_1.25fr_auto]">
+          <Card className="mt-8 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.85fr_1fr_0.85fr_1.15fr_auto]">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-800">
                   Service
                 </label>
                 <select
                   value={serviceFilter}
-                  onChange={(e) => setServiceFilter(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500"
+                  onChange={(event) => setServiceFilter(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 >
                   <option value="">All services</option>
                   {SERVICE_OPTIONS.map((service) => (
@@ -612,14 +814,29 @@ function SearchPageContent() {
 
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-800">
+                  ZIP Code
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={5}
+                  value={zipFilter}
+                  onChange={(event) => handleZipChange(event.target.value)}
+                  placeholder="18951"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-800">
                   City
                 </label>
                 <input
                   type="text"
                   value={cityFilter}
-                  onChange={(e) => setCityFilter(e.target.value)}
+                  onChange={(event) => setCityFilter(event.target.value)}
                   placeholder="Quakertown"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -630,9 +847,9 @@ function SearchPageContent() {
                 <input
                   type="text"
                   value={stateFilter}
-                  onChange={(e) => setStateFilter(e.target.value)}
-                  placeholder="Pennsylvania"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500"
+                  onChange={(event) => setStateFilter(event.target.value)}
+                  placeholder="PA"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -643,9 +860,9 @@ function SearchPageContent() {
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Name, bio, title, services"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -662,26 +879,45 @@ function SearchPageContent() {
 
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-                {filteredGurus.length} Guru{filteredGurus.length === 1 ? "" : "s"} found
+                {filteredGurus.length} Guru
+                {filteredGurus.length === 1 ? "" : "s"} found
               </span>
+
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
                 {mapReadyGuruCount} map pin
                 {mapReadyGuruCount === 1 ? "" : "s"} ready
               </span>
+
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-                {activeFilterCount} active filter{activeFilterCount === 1 ? "" : "s"}
+                {activeFilterCount} active filter
+                {activeFilterCount === 1 ? "" : "s"}
               </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-                Mobile-friendly search
-              </span>
+
+              {zipLookupStatus === "loading" ? (
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 font-medium text-sky-700">
+                  Looking up ZIP...
+                </span>
+              ) : null}
+
+              {zipLookupStatus === "found" && zipLookup ? (
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
+                  ZIP found: {zipLookup.city}, {zipLookup.state}
+                </span>
+              ) : null}
+
+              {zipLookupStatus === "not_found" ? (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-medium text-amber-700">
+                  ZIP not found
+                </span>
+              ) : null}
             </div>
           </Card>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-8 sm:py-10">
+      <section className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 sm:py-10 lg:px-8">
         {error ? (
-          <Card className="p-6">
+          <Card className="mb-6 p-6">
             <p className="font-medium text-red-600">{error}</p>
           </Card>
         ) : null}
@@ -698,10 +934,11 @@ function SearchPageContent() {
                   <h2 className="text-xl font-bold text-slate-900">
                     No Gurus found
                   </h2>
+
                   <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                    Try changing the service, city, state, or profile search.
-                    You can also clear the filters and browse all available
-                    Gurus.
+                    Try changing the ZIP code, city, state, service, or profile
+                    search. You can also clear the filters and browse all
+                    available Gurus.
                   </p>
 
                   <div className="mt-5">
@@ -734,23 +971,10 @@ function SearchPageContent() {
                       onMouseLeave={() => setHighlightedGuruId(undefined)}
                     >
                       <div className="flex h-full flex-col md:flex-row">
-                        <div className="h-64 w-full shrink-0 overflow-hidden bg-slate-100 md:h-[320px] md:w-72">
-                          {photoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={photoUrl}
-                              alt={guruName}
-                              className="h-full w-full object-cover object-center"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-sm font-medium text-slate-400">
-                              No Image
-                            </div>
-                          )}
-                        </div>
+                        <GuruResultPhoto
+                          photoUrl={photoUrl}
+                          guruName={guruName}
+                        />
 
                         <div className="flex min-w-0 flex-1 flex-col justify-between p-6">
                           <div>
@@ -788,6 +1012,7 @@ function SearchPageContent() {
 
                                 <p className="mt-1 text-sm text-slate-500">
                                   {formatLocation(guru.city, guru.state)}
+                                  {guru.zip_code ? ` · ${guru.zip_code}` : ""}
                                 </p>
                               </div>
 
@@ -797,7 +1022,9 @@ function SearchPageContent() {
                                     Rating
                                   </div>
                                   <div className="mt-1 text-lg font-bold text-slate-900">
-                                    {guruRating > 0 ? guruRating.toFixed(1) : "New"}
+                                    {guruRating > 0
+                                      ? guruRating.toFixed(1)
+                                      : "New"}
                                   </div>
                                 </div>
 
@@ -856,20 +1083,19 @@ function SearchPageContent() {
                               onClick={() =>
                                 trackGuruProfileClick(guru, "View Guru Profile")
                               }
-                              className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                              className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
                             >
                               View Guru Profile
                             </Link>
 
                             <Link
-                              href={getGuruHref(guru)}
+                              href={getBookGuruHref(guru)}
                               onClick={() => {
                                 trackBookingCtaClick(guru);
-                                trackGuruProfileClick(guru, "Book or Learn More");
                               }}
-                              className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                              className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                             >
-                              Book or Learn More
+                              Book This Guru
                             </Link>
                           </div>
                         </div>
@@ -880,12 +1106,14 @@ function SearchPageContent() {
               )}
             </div>
 
-            <div className="xl:sticky xl:top-6 xl:self-start">
-              <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+            <div className="xl:sticky xl:top-28 xl:self-start">
+              <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
                 <div className="border-b border-slate-200 px-5 py-4">
                   <h2 className="text-lg font-bold text-slate-900">Map view</h2>
+
                   <p className="mt-1 text-sm text-slate-600">
-                    Hover over a Guru card to highlight their location.
+                    Enter a ZIP code or hover over a Guru card to highlight
+                    nearby care.
                   </p>
 
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -893,6 +1121,12 @@ function SearchPageContent() {
                       {mapReadyGuruCount} map pin
                       {mapReadyGuruCount === 1 ? "" : "s"}
                     </span>
+
+                    {zipLookupStatus === "found" && zipLookup ? (
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
+                        Centered on {zipLookup.zip}
+                      </span>
+                    ) : null}
 
                     {mapMissingLocationCount > 0 ? (
                       <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
@@ -921,32 +1155,33 @@ function SearchPageContent() {
 
 function SearchPageFallback() {
   return (
-    <main className="min-h-screen bg-slate-50">
-      <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50">
+    <main className="min-h-screen bg-[#f8fcfd] text-slate-900">
+      <section className="relative overflow-hidden border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#f8fcfd_48%,#ecfdf5_100%)]">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
           <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-slate-200/40 blur-3xl" />
         </div>
 
-        <div className="relative mx-auto max-w-7xl px-6 py-10 sm:py-12">
-          <div className="max-w-4xl">
+        <div className="relative mx-auto max-w-[1500px] px-5 py-10 sm:px-6 sm:py-12 lg:px-8">
+          <div className="max-w-5xl">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-700">
               Find a Guru
             </p>
 
-            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-              Search trusted local pet care with more confidence
+            <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+              Search trusted local pet care by ZIP code
             </h1>
 
-            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700 sm:text-lg">
-              Browse SitGuru providers by service, city, state, and profile
-              details. Compare Gurus in a cleaner, more modern search experience
-              built for pet parents.
+            <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
+              Enter your ZIP code to quickly find SitGuru providers near your
+              pet. City and state will auto-fill and the map will center around
+              your search area.
             </p>
           </div>
 
-          <Card className="mt-8 p-5 sm:p-6">
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_1fr_1fr_1.25fr_auto]">
+          <Card className="mt-8 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.85fr_1fr_0.85fr_1.15fr_auto]">
+              <div className="h-[72px] rounded-2xl bg-slate-100" />
               <div className="h-[72px] rounded-2xl bg-slate-100" />
               <div className="h-[72px] rounded-2xl bg-slate-100" />
               <div className="h-[72px] rounded-2xl bg-slate-100" />
@@ -957,7 +1192,7 @@ function SearchPageFallback() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-8 sm:py-10">
+      <section className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 sm:py-10 lg:px-8">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="space-y-5">
             <Card className="p-7">
@@ -965,8 +1200,8 @@ function SearchPageFallback() {
             </Card>
           </div>
 
-          <div className="xl:sticky xl:top-6 xl:self-start">
-            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="xl:sticky xl:top-28 xl:self-start">
+            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
               <div className="border-b border-slate-200 px-5 py-4">
                 <h2 className="text-lg font-bold text-slate-900">Map view</h2>
                 <p className="mt-1 text-sm text-slate-600">

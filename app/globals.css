@@ -809,3 +809,73 @@ p {
 .public-dark-section .text-emerald-400 {
   color: #34d399 !important;
 }
+/* =========================================
+   SITGURU ADMIN LIGHT HQ OVERRIDE
+   New cream / green admin portal
+========================================= */
+
+.admin-theme {
+  background: #f9faf5 !important;
+  color: #23352d !important;
+}
+
+.admin-theme header {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-bottom: 1px solid #edf3ee !important;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04) !important;
+}
+
+.admin-theme h1,
+.admin-theme h2,
+.admin-theme h3,
+.admin-theme h4,
+.admin-theme h5,
+.admin-theme h6 {
+  color: #23352d !important;
+}
+
+.admin-theme p {
+  color: inherit;
+}
+
+.admin-theme .panel,
+.admin-theme .panel-soft,
+.admin-theme .muted-panel {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid #e3ece5 !important;
+  color: #23352d !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.035),
+    0 14px 38px rgba(15, 23, 42, 0.055) !important;
+}
+
+.admin-theme .glass {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border: 1px solid #e3ece5 !important;
+  color: #23352d !important;
+}
+
+.admin-theme .input,
+.admin-theme .select,
+.admin-theme .textarea {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid #d3e4ec !important;
+  color: #23352d !important;
+}
+
+.admin-theme .input::placeholder,
+.admin-theme .textarea::placeholder {
+  color: #8ca4b8 !important;
+}
+
+.admin-theme .btn-secondary {
+  background: #ffffff !important;
+  border: 1px solid #bbd8c3 !important;
+  color: #116a36 !important;
+}
+
+.admin-theme .btn-secondary:hover {
+  background: #f4fbf6 !important;
+  border-color: #116a36 !important;
+  color: #116a36 !important;
+}
