@@ -72,6 +72,71 @@ function getDashboardHref(role?: string | null) {
   return "/customer/dashboard";
 }
 
+
+function isDuplicateDirectThreadError(error?: { code?: string; message?: string } | null) {
+  const code = String(error?.code || "").trim();
+  const message = String(error?.message || "").toLowerCase();
+
+  return (
+    code === "23505" ||
+    message.includes("duplicate key") ||
+    message.includes("conversations_unique_direct_thread_idx")
+  );
+}
+
+async function findExistingAdminSupportConversation({
+  participantUserId,
+  adminUserId,
+  isGuruUser,
+}: {
+  participantUserId: string;
+  adminUserId: string;
+  isGuruUser: boolean;
+}) {
+  const [customerAdminResult, guruAdminResult, legacyReverseResult] =
+    await Promise.all([
+      supabaseAdmin
+        .from("conversations")
+        .select("*")
+        .eq("customer_id", participantUserId)
+        .eq("guru_id", adminUserId)
+        .order("updated_at", { ascending: false })
+        .limit(1),
+
+      isGuruUser
+        ? supabaseAdmin
+            .from("conversations")
+            .select("*")
+            .eq("guru_id", participantUserId)
+            .eq("customer_id", adminUserId)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+        : Promise.resolve({ data: [], error: null }),
+
+      /**
+       * Legacy cleanup lookup:
+       * If an old customer account was accidentally saved as guru_id and admin as customer_id,
+       * find it so we can correct and reuse it.
+       */
+      !isGuruUser
+        ? supabaseAdmin
+            .from("conversations")
+            .select("*")
+            .eq("guru_id", participantUserId)
+            .eq("customer_id", adminUserId)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+  return (
+    ((customerAdminResult.data ?? [])[0] as ConversationRow | undefined) ||
+    ((guruAdminResult.data ?? [])[0] as ConversationRow | undefined) ||
+    ((legacyReverseResult.data ?? [])[0] as ConversationRow | undefined) ||
+    null
+  );
+}
+
 async function getGuruRecordForConfirmedGuru(
   userId: string,
   email?: string | null,
@@ -296,46 +361,11 @@ export default async function AdminMessageEntryPage({
 
   const dashboardHref = getDashboardHref(currentUserRole);
 
-  const [customerAdminResult, guruAdminResult, legacyReverseResult] =
-    await Promise.all([
-      supabaseAdmin
-        .from("conversations")
-        .select("*")
-        .eq("customer_id", participantUserId)
-        .eq("guru_id", adminUserId)
-        .order("updated_at", { ascending: false })
-        .limit(1),
-
-      isGuruUser
-        ? supabaseAdmin
-            .from("conversations")
-            .select("*")
-            .eq("guru_id", participantUserId)
-            .eq("customer_id", adminUserId)
-            .order("updated_at", { ascending: false })
-            .limit(1)
-        : Promise.resolve({ data: [], error: null }),
-
-      /**
-       * Legacy cleanup lookup:
-       * If an old customer account was accidentally saved as guru_id and admin as customer_id,
-       * find it so we can correct and reuse it.
-       */
-      !isGuruUser
-        ? supabaseAdmin
-            .from("conversations")
-            .select("*")
-            .eq("guru_id", participantUserId)
-            .eq("customer_id", adminUserId)
-            .order("updated_at", { ascending: false })
-            .limit(1)
-        : Promise.resolve({ data: [], error: null }),
-    ]);
-
-  const existingConversation =
-    ((customerAdminResult.data ?? [])[0] as ConversationRow | undefined) ||
-    ((guruAdminResult.data ?? [])[0] as ConversationRow | undefined) ||
-    ((legacyReverseResult.data ?? [])[0] as ConversationRow | undefined);
+  const existingConversation = await findExistingAdminSupportConversation({
+    participantUserId,
+    adminUserId,
+    isGuruUser,
+  });
 
   if (existingConversation?.id) {
     /**
@@ -420,35 +450,70 @@ export default async function AdminMessageEntryPage({
       .select("*")
       .single();
 
-  if (insertConversationError || !insertedConversation?.id) {
-    console.error(
-      "Admin support conversation create error:",
-      insertConversationError?.message || "Unknown error",
-    );
+  let conversationToUse = (insertedConversation ?? null) as ConversationRow | null;
+
+  if (insertConversationError || !conversationToUse?.id) {
+    const recoveredConversation = isDuplicateDirectThreadError(
+      insertConversationError,
+    )
+      ? await findExistingAdminSupportConversation({
+          participantUserId,
+          adminUserId,
+          isGuruUser,
+        })
+      : null;
+
+    if (recoveredConversation?.id) {
+      conversationToUse = recoveredConversation;
+    } else {
+      console.error(
+        "Admin support conversation create error:",
+        insertConversationError?.message || "Unknown error",
+      );
+      redirect(dashboardHref);
+    }
+  }
+
+  if (!conversationToUse?.id) {
     redirect(dashboardHref);
   }
 
+  /**
+   * A duplicate direct-thread error means the conversation already exists.
+   * Reuse it and normalize it instead of failing the page.
+   */
+  if (!isGuruUser) {
+    await supabaseAdmin
+      .from("conversations")
+      .update({
+        customer_id: participantUserId,
+        guru_id: adminUserId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", conversationToUse.id);
+  }
+
   await addParticipantIfMissing(
-    insertedConversation.id,
+    conversationToUse.id,
     participantUserId,
     participantRole,
   );
-  await addParticipantIfMissing(insertedConversation.id, adminUserId, "admin");
+  await addParticipantIfMissing(conversationToUse.id, adminUserId, "admin");
 
   await updateParticipantRole({
-    conversationId: insertedConversation.id,
+    conversationId: conversationToUse.id,
     userId: participantUserId,
     role: participantRole,
   });
 
   await updateParticipantRole({
-    conversationId: insertedConversation.id,
+    conversationId: conversationToUse.id,
     userId: adminUserId,
     role: "admin",
   });
 
   await createStarterMessageIfMissing({
-    conversationId: insertedConversation.id,
+    conversationId: conversationToUse.id,
     adminUserId,
     participantDisplayName,
   });
@@ -457,8 +522,8 @@ export default async function AdminMessageEntryPage({
     userId: participantUserId,
     title: "Admin support thread started",
     body: "SitGuru Admin Support is ready to help.",
-    href: `/messages/${insertedConversation.id}`,
+    href: `/messages/${conversationToUse.id}`,
   });
 
-  redirect(`/messages/${insertedConversation.id}`);
+  redirect(`/messages/${conversationToUse.id}`);
 }

@@ -4,15 +4,22 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  HeartHandshake,
+  MessageCircle,
+  PawPrint,
+  Receipt,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Upload,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
-
-type Booking = {
-  id: string;
-  status: string;
-  start_time: string;
-  notes: string | null;
-};
 
 type CustomerProfile = {
   first_name: string | null;
@@ -87,12 +94,87 @@ type ReferralProfile = {
   available_credit: number;
 };
 
+type Booking = {
+  id: string;
+  status: string;
+  payment_status: string;
+  payout_status: string | null;
+  start_time: string;
+  booking_date: string | null;
+  requested_date: string | null;
+  service_type: string | null;
+  service_key: string | null;
+  pet_name: string | null;
+  guru_name: string | null;
+  guru_id: string | null;
+  guru_avatar_url: string | null;
+  pet_id: string | null;
+  notes: string | null;
+  time_window: string | null;
+  visit_length: string | null;
+  care_city: string | null;
+  care_state: string | null;
+  care_zip_code: string | null;
+  subtotal_amount: number;
+  marketplace_fee_percent: number;
+  marketplace_fee_amount: number;
+  tip_amount: number;
+  guru_payout_amount: number;
+  total_customer_paid: number;
+  stripe_session_id: string | null;
+  created_at: string | null;
+};
+
 type RawBookingRow = {
   id?: string | number | null;
+  customer_id?: string | number | null;
+  pet_owner_id?: string | number | null;
+  user_id?: string | number | null;
+  customer_email?: string | null;
+  email?: string | null;
   status?: string | null;
+  payment_status?: string | null;
+  payout_status?: string | null;
   start_time?: string | null;
+  booking_date?: string | null;
+  requested_date?: string | null;
   date?: string | null;
+  service_type?: string | null;
+  service_key?: string | null;
+  pet_name?: string | null;
+  guru_name?: string | null;
+  sitter_name?: string | null;
+  provider_name?: string | null;
+  guru_id?: string | number | null;
+  guru_avatar_url?: string | null;
+  guru_photo_url?: string | null;
+  sitter_avatar_url?: string | null;
+  sitter_photo_url?: string | null;
+  provider_avatar_url?: string | null;
+  provider_photo_url?: string | null;
+  pet_id?: string | number | null;
   notes?: string | null;
+  time_window?: string | null;
+  visit_length?: string | null;
+  care_city?: string | null;
+  care_state?: string | null;
+  care_zip_code?: string | null;
+  subtotal_amount?: number | string | null;
+  service_price?: number | string | null;
+  total_amount?: number | string | null;
+  marketplace_fee_percent?: number | string | null;
+  marketplace_fee_amount?: number | string | null;
+  sitguru_fee_amount?: number | string | null;
+  tip_amount?: number | string | null;
+  guru_tip_amount?: number | string | null;
+  guru_payout_amount?: number | string | null;
+  guru_estimated_total_payout?: number | string | null;
+  total_customer_paid?: number | string | null;
+  customer_total_amount?: number | string | null;
+  amount_total?: number | string | null;
+  stripe_session_id?: string | null;
+  stripe_checkout_session_id?: string | null;
+  created_at?: string | null;
 };
 
 type RawPetRow = {
@@ -123,6 +205,23 @@ type RawReferralProfileRow = {
   available_credit?: number | null;
 };
 
+type PetMediaKind = "photo" | "video";
+
+type UploadingPetMedia = {
+  petId: string;
+  kind: PetMediaKind;
+};
+
+type ConfettiPiece = {
+  id: number;
+  left: number;
+  delay: number;
+  duration: number;
+  size: number;
+  rotate: number;
+  color: string;
+};
+
 const initialPetForm = {
   name: "",
   species: "",
@@ -149,8 +248,6 @@ const routes = {
   dashboard: "/customer/dashboard",
   findGuru: "/search",
   bookGuru: "/bookings/new",
-
-  // Customer dashboard pages
   bookings: "/customer/dashboard/bookings",
   allBookings: "/customer/dashboard/bookings",
   messages: "/customer/dashboard/messages",
@@ -158,10 +255,7 @@ const routes = {
   pets: "/customer/dashboard/pets",
   profile: "/customer/dashboard/profile",
   pawPerks: "/customer/dashboard/pawperks",
-
-  // Fallback/general pages
   search: "/search",
-  referrals: "/referrals",
   login: "/login",
 };
 
@@ -170,30 +264,13 @@ const PAWPERKS_PREVIEW_DOG_SRC =
   "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80";
 const PAWPERKS_PREVIEW_CAT_SRC =
   "https://images.unsplash.com/photo-1519052537078-e6302a4968d4?auto=format&fit=crop&w=900&q=80";
+
 const PROFILE_PHOTO_BUCKETS = ["profile-photos", "avatars"];
 const PET_PHOTO_BUCKETS = ["pet-photos", "pets"];
 const PET_VIDEO_BUCKETS = ["pet-videos", "pets"];
 const MAX_PROFILE_PHOTO_SIZE = 5 * 1024 * 1024;
 const MAX_PET_PHOTO_SIZE = 8 * 1024 * 1024;
 const MAX_PET_VIDEO_SIZE = 75 * 1024 * 1024;
-
-type PetMediaKind = "photo" | "video";
-
-type UploadingPetMedia = {
-  petId: string;
-  kind: PetMediaKind;
-};
-
-
-type ConfettiPiece = {
-  id: number;
-  left: number;
-  delay: number;
-  duration: number;
-  size: number;
-  rotate: number;
-  color: string;
-};
 
 const confettiColors = [
   "#10b981",
@@ -216,43 +293,117 @@ function createConfettiPieces() {
   }));
 }
 
-function formatStatus(status: string) {
-  return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
-
-function getStatusClasses(status: string) {
-  const normalized = status.toLowerCase();
-
-  if (normalized === "pending") {
-    return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
-  }
-
-  if (normalized === "confirmed") {
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
-  }
-
-  if (normalized === "completed") {
-    return "bg-sky-50 text-sky-700 ring-1 ring-sky-200";
-  }
-
-  return "bg-rose-50 text-rose-700 ring-1 ring-rose-200";
-}
-
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function readNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function parseMoneyFromText(source: string | null | undefined, patterns: RegExp[]) {
+  if (!source) return 0;
+
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    const rawValue = match?.[1]?.replace(/,/g, "");
+
+    if (rawValue) {
+      const parsed = Number(rawValue);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+
+  return 0;
+}
+
+function readBookingMoney(row: RawBookingRow, keys: Array<keyof RawBookingRow>, fallback = 0) {
+  for (const key of keys) {
+    const parsed = readNumber(row[key], Number.NaN);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  return fallback;
+}
+
+function getBestBookingTip(row: RawBookingRow) {
+  const directTip = readBookingMoney(row, ["tip_amount", "guru_tip_amount"], 0);
+  if (directTip > 0) return directTip;
+
+  return parseMoneyFromText(row.notes, [
+    /guru\s+tip\s+selected[:\s]+\$?([0-9]+(?:\.[0-9]{1,2})?)/i,
+    /tip\s+selected[:\s]+\$?([0-9]+(?:\.[0-9]{1,2})?)/i,
+    /tip\s+amount[:\s]+\$?([0-9]+(?:\.[0-9]{1,2})?)/i,
+  ]);
+}
+
+function getBestBookingFee(row: RawBookingRow) {
+  const directFee = readBookingMoney(row, ["marketplace_fee_amount", "sitguru_fee_amount"], 0);
+  if (directFee > 0) return directFee;
+
+  return parseMoneyFromText(row.notes, [
+    /marketplace\s+fee\s+amount[:\s]+\$?([0-9]+(?:\.[0-9]{1,2})?)/i,
+    /sitguru\s+marketplace\s+fee\s+amount[:\s]+\$?([0-9]+(?:\.[0-9]{1,2})?)/i,
+  ]);
+}
+
+function getBestBookingPayout(row: RawBookingRow) {
+  const directPayout = readBookingMoney(
+    row,
+    ["guru_payout_amount", "guru_estimated_total_payout"],
+    0,
+  );
+
+  if (directPayout > 0) return directPayout;
+
+  return parseMoneyFromText(row.notes, [
+    /estimated\s+guru\s+payout[:\s]+\$?([0-9]+(?:\.[0-9]{1,2})?)/i,
+  ]);
+}
+
+function getBestCustomerTotal(row: RawBookingRow) {
+  const directTotal = readBookingMoney(
+    row,
+    [
+      "total_customer_paid",
+      "customer_total_amount",
+      "amount_total",
+      "total_amount",
+      "service_price",
+      "subtotal_amount",
+    ],
+    0,
+  );
+
+  if (directTotal > 0) return directTotal;
+
+  const servicePrice = parseMoneyFromText(row.notes, [
+    /service(?:\s+price|\s+amount)?[:\s]+\$?([0-9]+(?:\.[0-9]{1,2})?)/i,
+    /subtotal[:\s]+\$?([0-9]+(?:\.[0-9]{1,2})?)/i,
+  ]);
+  const fee = getBestBookingFee(row);
+  const tip = getBestBookingTip(row);
+  const payout = getBestBookingPayout(row);
+
+  if (servicePrice > 0 || fee > 0 || tip > 0) {
+    return servicePrice + fee + tip;
+  }
+
+  if (payout > 0 || fee > 0) {
+    return payout + fee;
+  }
+
+  return 0;
+}
+
 function readMetadataString(
   metadata: Record<string, unknown> | null | undefined,
-  keys: string[]
+  keys: string[],
 ) {
   for (const key of keys) {
     const value = readString(metadata?.[key]);
@@ -262,9 +413,164 @@ function readMetadataString(
   return null;
 }
 
+function formatStatus(status: string) {
+  return status
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatMoney(value: number, cents = false) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: cents ? 2 : 0,
+  }).format(value || 0);
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "Date pending";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Date pending";
+
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatShortDate(value: string | null | undefined) {
+  if (!value) return "No upcoming booking";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Date pending";
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatTime(value: string | null | undefined) {
+  if (!value) return "Flexible";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Flexible";
+
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getStatusClasses(status: string) {
+  const normalized = status.toLowerCase();
+
+  if (["pending", "requested", "checkout_started", "unpaid"].includes(normalized)) {
+    return "bg-amber-50 text-amber-800 ring-1 ring-amber-200";
+  }
+
+  if (["confirmed", "paid", "completed", "succeeded"].includes(normalized)) {
+    return "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200";
+  }
+
+  if (["in_progress", "processing"].includes(normalized)) {
+    return "bg-sky-50 text-sky-800 ring-1 ring-sky-200";
+  }
+
+  if (["cancelled", "canceled", "failed", "refunded"].includes(normalized)) {
+    return "bg-rose-50 text-rose-800 ring-1 ring-rose-200";
+  }
+
+  return "bg-slate-50 text-slate-700 ring-1 ring-slate-200";
+}
+
+function getBookingDisplayDate(booking: Booking) {
+  return booking.start_time || booking.booking_date || booking.requested_date || booking.created_at;
+}
+
+function isUpcomingBooking(booking: Booking) {
+  const rawDate = getBookingDisplayDate(booking);
+  if (!rawDate) return false;
+
+  const date = new Date(rawDate).getTime();
+
+  if (!Number.isFinite(date)) return false;
+
+  const status = booking.status.toLowerCase();
+  const payment = booking.payment_status.toLowerCase();
+
+  return (
+    date >= Date.now() - 24 * 60 * 60 * 1000 &&
+    !["cancelled", "canceled", "completed"].includes(status) &&
+    !["refunded", "failed"].includes(payment)
+  );
+}
+
+function getBookingDetailHref(bookingId: string) {
+  return `/customer/dashboard/bookings/${encodeURIComponent(bookingId)}`;
+}
+
+function getBookingLocation(booking: Booking) {
+  return [booking.care_city, booking.care_state, booking.care_zip_code]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function findPetForBooking(booking: Booking, pets: Pet[]) {
+  const bookingPetId = booking.pet_id?.trim();
+  const bookingPetName = booking.pet_name?.trim().toLowerCase();
+
+  return (
+    pets.find((pet) => (bookingPetId ? pet.id === bookingPetId : false)) ||
+    pets.find((pet) => (bookingPetName ? pet.name.trim().toLowerCase() === bookingPetName : false)) ||
+    (pets.length === 1 ? pets[0] : null)
+  );
+}
+
+function getBookingCareSummary(booking: Booking) {
+  const service = booking.service_type || "Pet care";
+  const petName = booking.pet_name || "your pet";
+  const guruName = booking.guru_name?.trim();
+
+  if (guruName) {
+    return `${service} with ${guruName} for ${petName}`;
+  }
+
+  return `${service} arranged for ${petName}`;
+}
+
+function getBookingNextStep(booking: Booking) {
+  const status = booking.status.toLowerCase();
+  const payment = booking.payment_status.toLowerCase();
+
+  if (["pending", "requested"].includes(status)) {
+    return "Your request is in review. We’ll keep your care plan and updates easy to follow here.";
+  }
+
+  if (["checkout_started", "unpaid"].includes(payment)) {
+    return "Your booking is saved and ready for final care coordination.";
+  }
+
+  if (["confirmed", "paid", "succeeded"].includes(payment) || ["confirmed"].includes(status)) {
+    return "You’re all set. Review your timing, pet details, and support options anytime.";
+  }
+
+  if (["completed"].includes(status)) {
+    return "This visit is complete. Rebook or revisit the care summary whenever you need it.";
+  }
+
+  return "Everything for this booking is organized in one place for easy, stress-free care.";
+}
+
 function buildCustomerProfile(
   row: RawProfileRow | null,
-  user: SupabaseUserLike
+  user: SupabaseUserLike,
 ): CustomerProfile {
   const metadata = user.user_metadata ?? null;
 
@@ -322,9 +628,7 @@ function buildCustomerProfile(
   };
 }
 
-function customerProfileToForm(
-  profile: CustomerProfile | null
-): CustomerProfileForm {
+function customerProfileToForm(profile: CustomerProfile | null): CustomerProfileForm {
   return {
     full_name: profile?.full_name || profile?.first_name || "",
     phone: profile?.phone || "",
@@ -335,19 +639,12 @@ function customerProfileToForm(
 }
 
 function getSafeFirstName(profile: CustomerProfile | null, email?: string | null) {
-  if (profile?.first_name?.trim()) {
-    return profile.first_name.trim();
-  }
-
-  if (profile?.full_name?.trim()) {
-    return profile.full_name.trim().split(" ")[0] || "there";
-  }
+  if (profile?.first_name?.trim()) return profile.first_name.trim();
+  if (profile?.full_name?.trim()) return profile.full_name.trim().split(" ")[0] || "there";
 
   if (email?.trim()) {
     const emailPrefix = email.trim().split("@")[0];
-    if (emailPrefix) {
-      return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
-    }
+    if (emailPrefix) return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
   }
 
   return "there";
@@ -355,10 +652,7 @@ function getSafeFirstName(profile: CustomerProfile | null, email?: string | null
 
 function getCustomerInitials(profile: CustomerProfile | null) {
   const name = profile?.full_name || profile?.first_name || profile?.email || "Customer";
-  const parts = name
-    .replace(/@.*/, "")
-    .split(/[\s._-]+/)
-    .filter(Boolean);
+  const parts = name.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean);
 
   const firstInitial = parts[0]?.charAt(0) || "C";
   const secondInitial = parts[1]?.charAt(0) || "U";
@@ -371,12 +665,54 @@ function getDisplayValue(value: string | null | undefined) {
 }
 
 function normalizeBookingRow(row: RawBookingRow): Booking {
+  const subtotal = readNumber(row.subtotal_amount ?? row.service_price ?? row.total_amount, 0);
+  const marketplaceFee = getBestBookingFee(row);
+  const tip = getBestBookingTip(row);
+  const customerTotal = getBestCustomerTotal(row);
+  const guruPayout = getBestBookingPayout(row) || Math.max(0, customerTotal - marketplaceFee);
+
   return {
     id: String(row.id ?? crypto.randomUUID()),
     status: row.status?.trim() || "pending",
+    payment_status: row.payment_status?.trim() || "unpaid",
+    payout_status: row.payout_status?.trim() || null,
     start_time:
-      row.start_time?.trim() || row.date?.trim() || new Date(0).toISOString(),
+      row.start_time?.trim() ||
+      row.booking_date?.trim() ||
+      row.requested_date?.trim() ||
+      row.date?.trim() ||
+      row.created_at?.trim() ||
+      new Date(0).toISOString(),
+    booking_date: row.booking_date ?? null,
+    requested_date: row.requested_date ?? row.date ?? null,
+    service_type: row.service_type ?? "Pet Care",
+    service_key: row.service_key ?? null,
+    pet_name: row.pet_name ?? "Pet",
+    guru_name: row.guru_name ?? row.sitter_name ?? row.provider_name ?? null,
+    guru_id: row.guru_id ? String(row.guru_id) : null,
+    guru_avatar_url:
+      row.guru_avatar_url ??
+      row.guru_photo_url ??
+      row.sitter_avatar_url ??
+      row.sitter_photo_url ??
+      row.provider_avatar_url ??
+      row.provider_photo_url ??
+      null,
+    pet_id: row.pet_id ? String(row.pet_id) : null,
     notes: row.notes ?? null,
+    time_window: row.time_window ?? null,
+    visit_length: row.visit_length ?? null,
+    care_city: row.care_city ?? null,
+    care_state: row.care_state ?? null,
+    care_zip_code: row.care_zip_code ?? null,
+    subtotal_amount: subtotal,
+    marketplace_fee_percent: readNumber(row.marketplace_fee_percent, 15),
+    marketplace_fee_amount: marketplaceFee,
+    tip_amount: tip,
+    guru_payout_amount: guruPayout,
+    total_customer_paid: customerTotal || subtotal + tip,
+    stripe_session_id: row.stripe_session_id ?? row.stripe_checkout_session_id ?? null,
+    created_at: row.created_at ?? null,
   };
 }
 
@@ -396,9 +732,7 @@ function normalizePetRow(row: RawPetRow): Pet {
   };
 }
 
-function normalizeReferralProfileRow(
-  row: RawReferralProfileRow
-): ReferralProfile {
+function normalizeReferralProfileRow(row: RawReferralProfileRow): ReferralProfile {
   return {
     id: row.id ?? crypto.randomUUID(),
     user_id: row.user_id ?? "",
@@ -419,35 +753,29 @@ function generateCustomerReferralCode(userId: string) {
   return `CUST-${cleanId}`;
 }
 
+function buildCustomerReferralLink(referralCode: string) {
+  return `https://sitguru.com/signup?ref=${encodeURIComponent(referralCode)}&type=customer`;
+}
+
+function buildGuruReferralLink(referralCode: string) {
+  return `https://sitguru.com/become-a-guru?ref=${encodeURIComponent(referralCode)}&type=guru`;
+}
+
 function buildPetMessageHref(pet: Pet) {
   const intro = `Hi! I would like to talk about care for ${pet.name}.`;
   return `/messages?pet=${encodeURIComponent(pet.id)}&petName=${encodeURIComponent(
-    pet.name
+    pet.name,
   )}&message=${encodeURIComponent(intro)}`;
 }
 
 function buildPetAdminHref(pet: Pet) {
   return `/messages/admin?pet=${encodeURIComponent(pet.id)}&petName=${encodeURIComponent(
-    pet.name
+    pet.name,
   )}`;
 }
 
 function buildPetBookingHref(pet: Pet) {
-  return `/search?pet=${encodeURIComponent(pet.id)}&petName=${encodeURIComponent(
-    pet.name
-  )}`;
-}
-
-function buildCustomerReferralLink(referralCode: string) {
-  return `https://sitguru.com/signup?ref=${encodeURIComponent(
-    referralCode
-  )}&type=customer`;
-}
-
-function buildGuruReferralLink(referralCode: string) {
-  return `https://sitguru.com/become-a-guru?ref=${encodeURIComponent(
-    referralCode
-  )}&type=guru`;
+  return `/search?pet=${encodeURIComponent(pet.id)}&petName=${encodeURIComponent(pet.name)}`;
 }
 
 async function fetchCustomerProfile(user: SupabaseUserLike) {
@@ -552,9 +880,7 @@ async function saveCustomerProfile(userId: string, form: CustomerProfileForm) {
       .from("profiles")
       .upsert(attempt.payload, { onConflict: "id" });
 
-    if (!error) {
-      return attempt.label;
-    }
+    if (!error) return attempt.label;
 
     lastError = error.message || lastError;
   }
@@ -593,18 +919,15 @@ async function uploadCustomerProfilePhoto(userId: string, file: File) {
     if (!error) {
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
 
-      if (data.publicUrl) {
-        return data.publicUrl;
-      }
+      if (data.publicUrl) return data.publicUrl;
     }
 
     lastError =
-      error?.message ||
-      `We could not upload your profile picture to the ${bucket} bucket.`;
+      error?.message || `We could not upload your profile picture to the ${bucket} bucket.`;
   }
 
   throw new Error(
-    `${lastError} Make sure Supabase Storage has a public bucket named profile-photos or avatars.`
+    `${lastError} Make sure Supabase Storage has a public bucket named profile-photos or avatars.`,
   );
 }
 
@@ -622,9 +945,7 @@ async function saveCustomerProfilePhotoUrl(userId: string, avatarUrl: string) {
       .from("profiles")
       .upsert(payload, { onConflict: "id" });
 
-    if (!error) {
-      return;
-    }
+    if (!error) return;
 
     lastError = error.message || lastError;
   }
@@ -643,9 +964,8 @@ function getPetMediaExtension(file: File, kind: PetMediaKind) {
 
   if (file.type === "video/quicktime") return "mov";
   if (file.type === "video/webm") return "webm";
-  return extension && ["mp4", "mov", "webm"].includes(extension)
-    ? extension
-    : "mp4";
+
+  return extension && ["mp4", "mov", "webm"].includes(extension) ? extension : "mp4";
 }
 
 function validatePetMediaFile(file: File, kind: PetMediaKind) {
@@ -674,7 +994,7 @@ async function uploadPetMedia(
   userId: string,
   petId: string,
   file: File,
-  kind: PetMediaKind
+  kind: PetMediaKind,
 ) {
   validatePetMediaFile(file, kind);
 
@@ -694,73 +1014,97 @@ async function uploadPetMedia(
     if (!error) {
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
 
-      if (data.publicUrl) {
-        return data.publicUrl;
-      }
+      if (data.publicUrl) return data.publicUrl;
     }
 
     lastError = error?.message || `We could not upload to the ${bucket} bucket.`;
   }
 
   throw new Error(
-    `${lastError} Make sure Supabase Storage has public buckets named pet-photos and pet-videos.`
+    `${lastError} Make sure Supabase Storage has public buckets named pet-photos and pet-videos.`,
   );
 }
 
-async function savePetMediaUrl(
-  petId: string,
-  kind: PetMediaKind,
-  publicUrl: string
-) {
+async function savePetMediaUrl(petId: string, kind: PetMediaKind, publicUrl: string) {
   const payload = kind === "photo" ? { photo_url: publicUrl } : { video_url: publicUrl };
 
   const { error } = await supabase.from("pets").update(payload).eq("id", petId);
 
   if (error) {
     throw new Error(
-      error.message || `The ${kind} uploaded, but we could not connect it to the pet profile.`
+      error.message ||
+        `The ${kind} uploaded, but we could not connect it to the pet profile.`,
     );
   }
 }
 
-async function fetchBookingsForUser(userId: string) {
-  const attempts: Array<{
+async function fetchBookingsForUser(userId: string, userEmail?: string | null) {
+  const richSelect =
+    "id,status,payment_status,payout_status,start_time,booking_date,requested_date,service_type,service_key,pet_name,guru_name,sitter_name,provider_name,guru_id,guru_avatar_url,guru_photo_url,sitter_avatar_url,sitter_photo_url,provider_avatar_url,provider_photo_url,pet_id,notes,time_window,visit_length,care_city,care_state,care_zip_code,subtotal_amount,service_price,total_amount,marketplace_fee_percent,marketplace_fee_amount,sitguru_fee_amount,tip_amount,guru_tip_amount,guru_payout_amount,guru_estimated_total_payout,total_customer_paid,customer_total_amount,amount_total,stripe_session_id,stripe_checkout_session_id,created_at";
+
+  const fallbackSelect = "id,status,start_time,booking_date,requested_date,notes,created_at";
+  const normalizedEmail = userEmail?.trim().toLowerCase() || null;
+  let firstSuccessfulEmptyResult: Booking[] | null = null;
+
+  const idAttempts: Array<{
     matchColumn: string;
-    dateColumn: "start_time" | "date";
+    matchValue: string;
+    dateColumn: "start_time" | "booking_date" | "requested_date" | "created_at";
+    selectColumns: string;
   }> = [
-    { matchColumn: "pet_owner_id", dateColumn: "start_time" },
-    { matchColumn: "customer_id", dateColumn: "start_time" },
-    { matchColumn: "user_id", dateColumn: "start_time" },
-    { matchColumn: "pet_owner_id", dateColumn: "date" },
-    { matchColumn: "customer_id", dateColumn: "date" },
-    { matchColumn: "user_id", dateColumn: "date" },
+    { matchColumn: "pet_owner_id", matchValue: userId, dateColumn: "start_time", selectColumns: richSelect },
+    { matchColumn: "customer_id", matchValue: userId, dateColumn: "start_time", selectColumns: richSelect },
+    { matchColumn: "user_id", matchValue: userId, dateColumn: "start_time", selectColumns: richSelect },
+    { matchColumn: "pet_owner_id", matchValue: userId, dateColumn: "booking_date", selectColumns: richSelect },
+    { matchColumn: "customer_id", matchValue: userId, dateColumn: "booking_date", selectColumns: richSelect },
+    { matchColumn: "user_id", matchValue: userId, dateColumn: "booking_date", selectColumns: richSelect },
+    { matchColumn: "pet_owner_id", matchValue: userId, dateColumn: "created_at", selectColumns: fallbackSelect },
+    { matchColumn: "customer_id", matchValue: userId, dateColumn: "created_at", selectColumns: fallbackSelect },
+    { matchColumn: "user_id", matchValue: userId, dateColumn: "created_at", selectColumns: fallbackSelect },
   ];
 
-  for (const attempt of attempts) {
-    const selectColumns =
-      attempt.dateColumn === "start_time"
-        ? "id, status, start_time, notes"
-        : "id, status, date, notes";
+  const emailAttempts: Array<{
+    matchColumn: string;
+    matchValue: string;
+    dateColumn: "start_time" | "booking_date" | "requested_date" | "created_at";
+    selectColumns: string;
+  }> = normalizedEmail
+    ? [
+        { matchColumn: "customer_email", matchValue: normalizedEmail, dateColumn: "start_time", selectColumns: richSelect },
+        { matchColumn: "email", matchValue: normalizedEmail, dateColumn: "start_time", selectColumns: richSelect },
+        { matchColumn: "customer_email", matchValue: normalizedEmail, dateColumn: "booking_date", selectColumns: richSelect },
+        { matchColumn: "email", matchValue: normalizedEmail, dateColumn: "booking_date", selectColumns: richSelect },
+        { matchColumn: "customer_email", matchValue: normalizedEmail, dateColumn: "created_at", selectColumns: fallbackSelect },
+        { matchColumn: "email", matchValue: normalizedEmail, dateColumn: "created_at", selectColumns: fallbackSelect },
+      ]
+    : [];
 
+  for (const attempt of [...idAttempts, ...emailAttempts]) {
     const { data, error } = await supabase
       .from("bookings")
-      .select(selectColumns)
-      .eq(attempt.matchColumn, userId)
-      .order(attempt.dateColumn, { ascending: false });
+      .select(attempt.selectColumns)
+      .eq(attempt.matchColumn, attempt.matchValue)
+      .order(attempt.dateColumn, { ascending: false })
+      .limit(12);
 
-    if (!error) {
-      return (data as RawBookingRow[] | null)?.map(normalizeBookingRow) || [];
+    if (error) continue;
+
+    const normalizedRows = (data as RawBookingRow[] | null)?.map(normalizeBookingRow) || [];
+
+    if (normalizedRows.length > 0) {
+      return normalizedRows;
+    }
+
+    if (!firstSuccessfulEmptyResult) {
+      firstSuccessfulEmptyResult = normalizedRows;
     }
   }
 
-  return [] as Booking[];
+  return firstSuccessfulEmptyResult || [];
 }
 
 async function fetchPetsForUser(userId: string) {
-  const attempts: Array<{
-    matchColumn: string;
-    orderByCreatedAt: boolean;
-  }> = [
+  const attempts: Array<{ matchColumn: string; orderByCreatedAt: boolean }> = [
     { matchColumn: "owner_id", orderByCreatedAt: true },
     { matchColumn: "user_id", orderByCreatedAt: true },
     { matchColumn: "owner_id", orderByCreatedAt: false },
@@ -771,7 +1115,7 @@ async function fetchPetsForUser(userId: string) {
     let query = supabase
       .from("pets")
       .select(
-        "id, name, species, breed, age, weight, temperament, medications, notes, photo_url, video_url"
+        "id, name, species, breed, age, weight, temperament, medications, notes, photo_url, video_url",
       )
       .eq(attempt.matchColumn, userId);
 
@@ -781,9 +1125,7 @@ async function fetchPetsForUser(userId: string) {
 
     const { data, error } = await query;
 
-    if (!error) {
-      return (data as RawPetRow[] | null)?.map(normalizePetRow) || [];
-    }
+    if (!error) return (data as RawPetRow[] | null)?.map(normalizePetRow) || [];
   }
 
   return [] as Pet[];
@@ -793,14 +1135,12 @@ async function getOrCreateReferralProfile(userId: string) {
   const { data, error } = await supabase
     .from("referral_profiles")
     .select(
-      "id, user_id, role, referral_code, referral_link, total_invites, completed_referrals, pending_rewards, earned_rewards, paid_rewards, available_credit"
+      "id, user_id, role, referral_code, referral_link, total_invites, completed_referrals, pending_rewards, earned_rewards, paid_rewards, available_credit",
     )
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (!error && data) {
-    return normalizeReferralProfileRow(data as RawReferralProfileRow);
-  }
+  if (!error && data) return normalizeReferralProfileRow(data as RawReferralProfileRow);
 
   const referralCode = generateCustomerReferralCode(userId);
   const referralLink = buildCustomerReferralLink(referralCode);
@@ -820,7 +1160,7 @@ async function getOrCreateReferralProfile(userId: string) {
       available_credit: 0,
     })
     .select(
-      "id, user_id, role, referral_code, referral_link, total_invites, completed_referrals, pending_rewards, earned_rewards, paid_rewards, available_credit"
+      "id, user_id, role, referral_code, referral_link, total_invites, completed_referrals, pending_rewards, earned_rewards, paid_rewards, available_credit",
     )
     .maybeSingle();
 
@@ -832,21 +1172,187 @@ async function getOrCreateReferralProfile(userId: string) {
   return normalizeReferralProfileRow(createdProfile as RawReferralProfileRow);
 }
 
+function BookingCard({
+  booking,
+  featured = false,
+  petPhotoUrl = null,
+}: {
+  booking: Booking;
+  featured?: boolean;
+  petPhotoUrl?: string | null;
+}) {
+  const displayDate = getBookingDisplayDate(booking);
+  const location = getBookingLocation(booking);
+  const totalAmount = booking.total_customer_paid || booking.subtotal_amount;
+
+  return (
+    <article
+      className={[
+        "overflow-hidden rounded-[1.9rem] border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl",
+        featured ? "border-emerald-200 ring-4 ring-emerald-50" : "border-slate-200",
+      ].join(" ")}
+    >
+      <div
+        className={[
+          "relative overflow-hidden p-5 sm:p-6",
+          featured
+            ? "bg-gradient-to-br from-emerald-50 via-white to-sky-50"
+            : "bg-gradient-to-br from-slate-50 via-white to-white",
+        ].join(" ")}
+      >
+        <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-100/60 blur-2xl" />
+
+        <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px] xl:items-start">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-800">
+                Trusted care
+              </span>
+              <span className={`rounded-full px-3 py-1 text-xs font-black ${getStatusClasses(booking.status)}`}>
+                {formatStatus(booking.status)}
+              </span>
+              <span className={`rounded-full px-3 py-1 text-xs font-black ${getStatusClasses(booking.payment_status)}`}>
+                {formatStatus(booking.payment_status)}
+              </span>
+            </div>
+
+            <div className="mt-4 flex min-w-0 items-start gap-4">
+              <div className="relative shrink-0">
+                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[1.4rem] bg-white text-3xl shadow-sm ring-1 ring-slate-200">
+                  {petPhotoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={petPhotoUrl} alt={booking.pet_name || "Pet"} className="h-full w-full object-cover" />
+                  ) : (
+                    <PawPrint className="h-7 w-7 text-emerald-600" />
+                  )}
+                </div>
+
+                {booking.guru_avatar_url ? (
+                  <div className="absolute -bottom-2 -right-2 h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm ring-1 ring-emerald-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={booking.guru_avatar_url} alt={booking.guru_name || "Guru"} className="h-full w-full object-cover" />
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                  {booking.pet_name || "Your pet"}
+                </h3>
+                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                  {getBookingCareSummary(booking)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="rounded-2xl bg-white/90 p-3 ring-1 ring-slate-200">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Date
+                </p>
+                <p className="mt-1 inline-flex items-center gap-2 text-sm font-black text-slate-950">
+                  <CalendarDays className="h-4 w-4 text-emerald-600" />
+                  {formatDate(displayDate)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-white/90 p-3 ring-1 ring-slate-200">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Time
+                </p>
+                <p className="mt-1 inline-flex items-center gap-2 text-sm font-black text-slate-950">
+                  <Clock3 className="h-4 w-4 text-emerald-600" />
+                  {booking.time_window || formatTime(displayDate)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-white/90 p-3 ring-1 ring-slate-200 md:col-span-2 xl:col-span-1">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Location
+                </p>
+                <p className="mt-1 text-sm font-black leading-5 text-slate-950 break-words">
+                  {location || "Location details ready in booking view"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.4rem] bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Total
+                </p>
+                <p className="mt-1 text-3xl font-black tracking-tight text-slate-950">
+                  {formatMoney(totalAmount, true)}
+                </p>
+              </div>
+
+              <ShieldCheck className="h-9 w-9 text-emerald-600" />
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              {getBookingNextStep(booking)}
+            </p>
+
+            <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-800">
+              Need to adjust timing or care notes? Message your Guru or support first so we can help before you cancel.
+            </div>
+
+            {booking.tip_amount > 0 ? (
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700">
+                Includes {formatMoney(booking.tip_amount, true)} tip for your Guru
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 border-t border-slate-100 p-5 sm:grid-cols-2 xl:grid-cols-4">
+        <Link
+          href={getBookingDetailHref(booking.id)}
+          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+        >
+          View Details
+        </Link>
+
+        <Link
+          href={routes.messages}
+          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-50"
+        >
+          Message Guru
+        </Link>
+
+        <Link
+          href={routes.findGuru}
+          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
+        >
+          Rebook
+        </Link>
+
+        <Link
+          href={routes.adminMessages}
+          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-100"
+        >
+          Get Help
+        </Link>
+      </div>
+    </article>
+  );
+}
+
 export default function CustomerDashboardPage() {
   const router = useRouter();
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
-  const [referralProfile, setReferralProfile] =
-    useState<ReferralProfile | null>(null);
+  const [referralProfile, setReferralProfile] = useState<ReferralProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [firstName, setFirstName] = useState("there");
-  const [customerProfile, setCustomerProfile] =
-    useState<CustomerProfile | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [profileForm, setProfileForm] =
-    useState<CustomerProfileForm>(initialProfileForm);
+  const [profileForm, setProfileForm] = useState<CustomerProfileForm>(initialProfileForm);
   const [profileError, setProfileError] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
   const [showPetForm, setShowPetForm] = useState(false);
@@ -860,16 +1366,14 @@ export default function CustomerDashboardPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const [avatarMessage, setAvatarMessage] = useState("");
-  const [uploadingPetMedia, setUploadingPetMedia] =
-    useState<UploadingPetMedia | null>(null);
+  const [uploadingPetMedia, setUploadingPetMedia] = useState<UploadingPetMedia | null>(null);
   const [petMediaError, setPetMediaError] = useState("");
   const [petMediaMessage, setPetMediaMessage] = useState("");
 
   const customerAvatarSrc =
     customerProfile?.avatar_url?.trim() || CUSTOMER_PROFILE_PHOTO_SRC;
 
-  const showCustomerProfilePhoto =
-    Boolean(customerAvatarSrc) && !customerPhotoFailed;
+  const showCustomerProfilePhoto = Boolean(customerAvatarSrc) && !customerPhotoFailed;
 
   const customerReferralLink = useMemo(() => {
     if (!referralProfile?.referral_code) return "https://sitguru.com/signup";
@@ -877,10 +1381,7 @@ export default function CustomerDashboardPage() {
   }, [referralProfile]);
 
   const guruReferralLink = useMemo(() => {
-    if (!referralProfile?.referral_code) {
-      return "https://sitguru.com/become-a-guru";
-    }
-
+    if (!referralProfile?.referral_code) return "https://sitguru.com/become-a-guru";
     return buildGuruReferralLink(referralProfile.referral_code);
   }, [referralProfile]);
 
@@ -913,7 +1414,7 @@ export default function CustomerDashboardPage() {
 
     const [profileData, bookingsData, petsData, referralData] = await Promise.all([
       fetchCustomerProfile(user),
-      fetchBookingsForUser(user.id),
+      fetchBookingsForUser(user.id, user.email),
       fetchPetsForUser(user.id),
       getOrCreateReferralProfile(user.id),
     ]);
@@ -943,9 +1444,7 @@ export default function CustomerDashboardPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") {
-        router.replace(routes.login);
-      }
+      if (event === "SIGNED_OUT") router.replace(routes.login);
     });
 
     return () => {
@@ -962,17 +1461,12 @@ export default function CustomerDashboardPage() {
     const params = new URLSearchParams(window.location.search);
     const bookingStatus = params.get("booking");
 
-    if (bookingStatus !== "confirmed" && bookingStatus !== "created") {
-      return;
-    }
+    if (bookingStatus !== "confirmed" && bookingStatus !== "created") return;
 
-    const bookingId =
-      params.get("booking_id") || params.get("session_id") || "recent";
+    const bookingId = params.get("booking_id") || params.get("session_id") || "recent";
     const celebrationKey = `sitguru-booking-celebration-${bookingId}`;
 
-    if (window.sessionStorage.getItem(celebrationKey)) {
-      return;
-    }
+    if (window.sessionStorage.getItem(celebrationKey)) return;
 
     window.sessionStorage.setItem(celebrationKey, "shown");
     setConfettiPieces(createConfettiPieces());
@@ -988,26 +1482,47 @@ export default function CustomerDashboardPage() {
     };
   }, []);
 
+  const upcomingBookings = useMemo(
+    () =>
+      bookings
+        .filter(isUpcomingBooking)
+        .sort(
+          (a, b) =>
+            new Date(getBookingDisplayDate(a) || 0).getTime() -
+            new Date(getBookingDisplayDate(b) || 0).getTime(),
+        ),
+    [bookings],
+  );
+
+  const recentBookings = useMemo(
+    () =>
+      bookings
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(getBookingDisplayDate(b) || 0).getTime() -
+            new Date(getBookingDisplayDate(a) || 0).getTime(),
+        ),
+    [bookings],
+  );
+
+  const latestBooking = recentBookings[0] || null;
+
   const stats = useMemo(() => {
-    const upcomingBookings = bookings.filter((booking) => {
-      const bookingDate = new Date(booking.start_time).getTime();
-      return Number.isFinite(bookingDate) && bookingDate >= Date.now();
-    });
-
-    const pending = bookings.filter(
-      (booking) => booking.status.toLowerCase() === "pending"
+    const pending = bookings.filter((booking) =>
+      ["pending", "requested"].includes(booking.status.toLowerCase()),
     ).length;
 
-    const confirmed = bookings.filter(
-      (booking) => booking.status.toLowerCase() === "confirmed"
+    const confirmed = bookings.filter((booking) =>
+      ["confirmed", "paid", "checkout_started"].includes(booking.status.toLowerCase()) ||
+      ["paid", "checkout_started"].includes(booking.payment_status.toLowerCase()),
     ).length;
 
-    const nextBooking = upcomingBookings
-      .slice()
-      .sort(
-        (a, b) =>
-          new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-      )[0];
+    const totalTips = bookings.reduce((sum, booking) => sum + booking.tip_amount, 0);
+    const totalSpent = bookings.reduce(
+      (sum, booking) => sum + (booking.total_customer_paid || booking.subtotal_amount || 0),
+      0,
+    );
 
     return {
       total: bookings.length,
@@ -1015,31 +1530,21 @@ export default function CustomerDashboardPage() {
       pending,
       confirmed,
       pets: pets.length,
-      nextBooking,
+      totalTips,
+      totalSpent,
+      nextBooking: upcomingBookings[0],
     };
-  }, [bookings, pets]);
+  }, [bookings, pets, upcomingBookings]);
 
   const nextBookingLabel = useMemo(() => {
     if (!stats.nextBooking) return "No upcoming booking";
-
-    const date = new Date(stats.nextBooking.start_time);
-
-    if (Number.isNaN(date.getTime())) return "Date pending";
-
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    return formatShortDate(getBookingDisplayDate(stats.nextBooking));
   }, [stats.nextBooking]);
 
-  async function handleCustomerAvatarUpload(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
+  async function handleCustomerAvatarUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     setUploadingAvatar(true);
     setAvatarError("");
@@ -1073,7 +1578,7 @@ export default function CustomerDashboardPage() {
       setAvatarError(
         error instanceof Error
           ? error.message
-          : "We could not upload your profile picture right now."
+          : "We could not upload your profile picture right now.",
       );
     } finally {
       setUploadingAvatar(false);
@@ -1084,13 +1589,11 @@ export default function CustomerDashboardPage() {
   async function handlePetMediaUpload(
     event: ChangeEvent<HTMLInputElement>,
     pet: Pet,
-    kind: PetMediaKind
+    kind: PetMediaKind,
   ) {
     const file = event.target.files?.[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     setUploadingPetMedia({ petId: pet.id, kind });
     setPetMediaError("");
@@ -1118,18 +1621,18 @@ export default function CustomerDashboardPage() {
                 photo_url: kind === "photo" ? publicUrl : currentPet.photo_url,
                 video_url: kind === "video" ? publicUrl : currentPet.video_url,
               }
-            : currentPet
-        )
+            : currentPet,
+        ),
       );
 
       setPetMediaMessage(
-        `${pet.name}'s ${kind === "photo" ? "photo" : "video"} was uploaded.`
+        `${pet.name}'s ${kind === "photo" ? "photo" : "video"} was uploaded.`,
       );
     } catch (error) {
       setPetMediaError(
         error instanceof Error
           ? error.message
-          : `We could not upload ${pet.name}'s ${kind} right now.`
+          : `We could not upload ${pet.name}'s ${kind} right now.`,
       );
     } finally {
       setUploadingPetMedia(null);
@@ -1164,13 +1667,11 @@ export default function CustomerDashboardPage() {
       setProfileMessage(
         savedLevel === "basic"
           ? "Basic profile saved. Contact and preference fields will appear once your profiles table includes those columns."
-          : "Customer profile saved."
+          : "Customer profile saved.",
       );
     } catch (error) {
       setProfileError(
-        error instanceof Error
-          ? error.message
-          : "We could not save your profile right now."
+        error instanceof Error ? error.message : "We could not save your profile right now.",
       );
     } finally {
       setSavingProfile(false);
@@ -1255,21 +1756,14 @@ export default function CustomerDashboardPage() {
     setSavingPet(false);
   }
 
-
   const customerDisplayName = useMemo(() => {
-    return (
-      customerProfile?.full_name?.trim() ||
-      customerProfile?.first_name?.trim() ||
-      firstName
-    );
+    return customerProfile?.full_name?.trim() || customerProfile?.first_name?.trim() || firstName;
   }, [customerProfile, firstName]);
 
   const customerInitials = useMemo(
     () => getCustomerInitials(customerProfile),
-    [customerProfile]
+    [customerProfile],
   );
-
-
 
   if (loading) {
     return (
@@ -1337,7 +1831,7 @@ export default function CustomerDashboardPage() {
               Booking confirmed!
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-              Your SitGuru booking was created successfully and added to your dashboard.
+              Your booking is now organized in your SitGuru dashboard.
             </p>
           </div>
         </div>
@@ -1384,6 +1878,13 @@ export default function CustomerDashboardPage() {
                     <span className="text-amber-400">★ ★ ★</span>
                     {profileCompletion}% profile ready
                   </span>
+
+                  {latestBooking ? (
+                    <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      Last booking: {formatStatus(latestBooking.status)}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -1457,7 +1958,8 @@ export default function CustomerDashboardPage() {
                     : "Add your first pet profile to get started"}
                 </p>
 
-                <label className="mt-5 inline-flex cursor-pointer items-center justify-center rounded-2xl bg-white/90 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white">
+                <label className="mt-5 inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white/90 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white">
+                  <Upload className="h-4 w-4" />
                   {uploadingAvatar ? "Uploading..." : "Upload profile photo"}
                   <input
                     type="file"
@@ -1488,36 +1990,36 @@ export default function CustomerDashboardPage() {
                   label: "Upcoming Booking",
                   value: nextBookingLabel,
                   helper: stats.nextBooking ? "View details" : "Book care",
-                  href: stats.nextBooking ? routes.bookings : routes.findGuru,
-                  icon: "📅",
+                  href: stats.nextBooking ? getBookingDetailHref(stats.nextBooking.id) : routes.findGuru,
+                  icon: <CalendarDays className="h-5 w-5" />,
                 },
                 {
                   label: "My Pets",
                   value: `${stats.pets} ${stats.pets === 1 ? "Pet" : "Pets"}`,
                   helper: "Manage pets",
                   href: routes.pets,
-                  icon: "🐾",
+                  icon: <PawPrint className="h-5 w-5" />,
                 },
                 {
                   label: "Total Bookings",
                   value: String(stats.total),
                   helper: "View history",
                   href: routes.allBookings,
-                  icon: "🛡️",
+                  icon: <ShieldCheck className="h-5 w-5" />,
                 },
                 {
-                  label: "Messages",
-                  value: "Inbox",
-                  helper: "Open messages",
-                  href: routes.messages,
-                  icon: "💬",
+                  label: "Tips Given",
+                  value: formatMoney(stats.totalTips),
+                  helper: "Guru appreciation",
+                  href: routes.allBookings,
+                  icon: <HeartHandshake className="h-5 w-5" />,
                 },
                 {
                   label: "SitGuru Credit",
                   value: formatMoney(referralProfile?.available_credit ?? 0),
                   helper: "Open PawPerks",
                   href: routes.pawPerks,
-                  icon: "⭐",
+                  icon: <Star className="h-5 w-5" />,
                 },
               ].map((item) => (
                 <Link
@@ -1527,9 +2029,7 @@ export default function CustomerDashboardPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-500">
-                        {item.label}
-                      </p>
+                      <p className="text-sm font-semibold text-slate-500">{item.label}</p>
                       <p className="mt-2 truncate text-2xl font-extrabold text-slate-950">
                         {item.value}
                       </p>
@@ -1537,7 +2037,7 @@ export default function CustomerDashboardPage() {
                         {item.helper} <span aria-hidden="true">→</span>
                       </p>
                     </div>
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100 transition group-hover:scale-105">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:scale-105">
                       {item.icon}
                     </div>
                   </div>
@@ -1625,12 +2125,7 @@ export default function CustomerDashboardPage() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        copyReferralLink(
-                          customerReferralLink,
-                          "Customer referral link"
-                        )
-                      }
+                      onClick={() => copyReferralLink(customerReferralLink, "Customer referral link")}
                       className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
                     >
                       Copy Customer Invite
@@ -1638,9 +2133,7 @@ export default function CustomerDashboardPage() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        copyReferralLink(guruReferralLink, "Guru invite link")
-                      }
+                      onClick={() => copyReferralLink(guruReferralLink, "Guru invite link")}
                       className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
                     >
                       Copy Guru Invite
@@ -1652,58 +2145,6 @@ export default function CustomerDashboardPage() {
                       {referralMessage}
                     </div>
                   ) : null}
-                </div>
-              </div>
-              <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Pet care tips
-                </p>
-
-                <div className="mt-5 space-y-4">
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-sm font-bold text-slate-900">
-                      Keep routines updated
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Share feeding times, medications, favorite walks, and home
-                      notes so your Guru can deliver smoother care.
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-sm font-bold text-slate-900">
-                      Book with confidence
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      A complete pet profile and clear care details make every
-                      request feel easier, warmer, and more premium.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                id="friendly-shortcuts"
-                className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Friendly shortcuts
-                </p>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-white p-4 ring-1 ring-emerald-100">
-                    <p className="text-lg font-black text-slate-900">🐶 Dogs</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Walks, drop-ins, overnight stays, and loving companionship.
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-white p-4 ring-1 ring-sky-100">
-                    <p className="text-lg font-black text-slate-900">🐱 Cats</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Calm visits, feeding, medications, check-ins, and gentle care.
-                    </p>
-                  </div>
                 </div>
               </div>
 
@@ -1720,8 +2161,7 @@ export default function CustomerDashboardPage() {
                       Your care account details
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Keep your contact details and household notes easy to find so
-                      bookings, Admin support, and Guru communication stay clear.
+                      Keep household notes, emergency contacts, and preferences ready for your Guru.
                     </p>
                   </div>
 
@@ -1742,12 +2182,8 @@ export default function CustomerDashboardPage() {
 
                 <div className="mt-5 rounded-[1.5rem] bg-emerald-50 p-4 ring-1 ring-emerald-100">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-black text-slate-950">
-                      Profile completion
-                    </p>
-                    <p className="text-sm font-black text-emerald-700">
-                      {profileCompletion}%
-                    </p>
+                    <p className="text-sm font-black text-slate-950">Profile completion</p>
+                    <p className="text-sm font-black text-emerald-700">{profileCompletion}%</p>
                   </div>
                   <div className="mt-3 h-3 overflow-hidden rounded-full bg-white ring-1 ring-emerald-100">
                     <div
@@ -1770,63 +2206,23 @@ export default function CustomerDashboardPage() {
                 ) : null}
 
                 <div className="mt-5 grid gap-3">
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                      Name
-                    </p>
-                    <p className="mt-1 text-sm font-black text-slate-950">
-                      {getDisplayValue(
-                        customerProfile?.full_name || customerProfile?.first_name
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                  {[
+                    ["Name", getDisplayValue(customerProfile?.full_name || customerProfile?.first_name)],
+                    ["Email", getDisplayValue(customerProfile?.email)],
+                    ["Phone", getDisplayValue(customerProfile?.phone)],
+                    ["Service address", getDisplayValue(customerProfile?.service_address)],
+                    ["Emergency contact", getDisplayValue(customerProfile?.emergency_contact)],
+                    ["Care preferences", getDisplayValue(customerProfile?.care_preferences)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                        Email
+                        {label}
                       </p>
-                      <p className="mt-1 break-words text-sm font-black text-slate-950">
-                        {getDisplayValue(customerProfile?.email)}
+                      <p className="mt-1 break-words text-sm font-black leading-6 text-slate-950">
+                        {value}
                       </p>
                     </div>
-
-                    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                        Phone
-                      </p>
-                      <p className="mt-1 text-sm font-black text-slate-950">
-                        {getDisplayValue(customerProfile?.phone)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                      Service address
-                    </p>
-                    <p className="mt-1 text-sm font-black leading-6 text-slate-950">
-                      {getDisplayValue(customerProfile?.service_address)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                      Emergency contact
-                    </p>
-                    <p className="mt-1 text-sm font-black leading-6 text-slate-950">
-                      {getDisplayValue(customerProfile?.emergency_contact)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                      Care preferences
-                    </p>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-700">
-                      {getDisplayValue(customerProfile?.care_preferences)}
-                    </p>
-                  </div>
+                  ))}
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-3">
@@ -1869,10 +2265,7 @@ export default function CustomerDashboardPage() {
                       placeholder="Full name"
                       value={profileForm.full_name}
                       onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          full_name: e.target.value,
-                        })
+                        setProfileForm({ ...profileForm, full_name: e.target.value })
                       }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
@@ -1892,10 +2285,7 @@ export default function CustomerDashboardPage() {
                       placeholder="Home or service address"
                       value={profileForm.service_address}
                       onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          service_address: e.target.value,
-                        })
+                        setProfileForm({ ...profileForm, service_address: e.target.value })
                       }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
@@ -1905,10 +2295,7 @@ export default function CustomerDashboardPage() {
                       placeholder="Emergency contact"
                       value={profileForm.emergency_contact}
                       onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          emergency_contact: e.target.value,
-                        })
+                        setProfileForm({ ...profileForm, emergency_contact: e.target.value })
                       }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
@@ -1918,10 +2305,7 @@ export default function CustomerDashboardPage() {
                       rows={4}
                       value={profileForm.care_preferences}
                       onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          care_preferences: e.target.value,
-                        })
+                        setProfileForm({ ...profileForm, care_preferences: e.target.value })
                       }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
@@ -1974,63 +2358,105 @@ export default function CustomerDashboardPage() {
                   >
                     Find a Guru for your pets
                   </Link>
-
-                  <Link
-                    href={routes.bookings}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                  >
-                    Review your bookings
-                  </Link>
-                </div>
-
-                <div className="mt-5 rounded-[1.5rem] bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <p className="text-sm font-bold text-slate-900">
-                    Best experience tip
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    Start with a Pet Care Passport, then message or book from that
-                    pet’s card so your Guru immediately knows who care is for.
-                  </p>
                 </div>
               </div>
-
-              <div
-                id="messages-help"
-                className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Messages
-                </p>
-                <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                  Better communication for bookings and care
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Use messages to talk with your Guru, confirm care details, ask
-                  follow-up questions, and contact Admin when you need support.
-                </p>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <Link
-                    href={routes.messages}
-                    className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
-                  >
-                    Open inbox
-                  </Link>
-
-                  <Link
-                    href={routes.adminMessages}
-                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                  >
-                    Start admin support thread
-                  </Link>
-                </div>
-              </div>
-
             </div>
 
             <div className="space-y-6">
-              <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+              <section
+                id="upcoming-care"
+                className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-600">
+                      Upcoming care
+                    </p>
+                    <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+                      Your next booking, clearly organized
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                      View details, message your Guru, rebook, or get help without being sent back to search.
+                    </p>
+                  </div>
+
+                  <Link
+                    href={routes.findGuru}
+                    className="inline-flex items-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+                  >
+                    Book more care
+                  </Link>
+                </div>
+
+                <div className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-sm font-black text-slate-950">A calmer customer experience, built for trust</p>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                        Plans can change. If timing, notes, or details need an adjustment, message your Guru or support first and we’ll help keep your care on track.
+                      </p>
+
+                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2">
+                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Confidence</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">Care details stay organized.</p>
+                        </div>
+                        <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2">
+                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Support</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">Message before canceling.</p>
+                        </div>
+                        <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2">
+                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Updates</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">Review every next step.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Link
+                      href={routes.adminMessages}
+                      className="inline-flex min-h-[42px] shrink-0 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
+                    >
+                      Need help first?
+                    </Link>
+                  </div>
+                </div>
+
+                {upcomingBookings.length === 0 ? (
+                  <div className="mt-6 rounded-[1.75rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-8 text-center">
+                    <Sparkles className="mx-auto h-10 w-10 text-emerald-600" />
+                    <p className="mt-4 text-lg font-black text-slate-900">
+                      No upcoming bookings yet
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Find a trusted Guru and book care when your pet needs support.
+                    </p>
+                    <Link
+                      href={routes.findGuru}
+                      className="mt-5 inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+                    >
+                      Find a Guru
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="mt-6 grid gap-4">
+                    {upcomingBookings.slice(0, 3).map((booking, index) => {
+                      const matchedPet = findPetForBooking(booking, pets);
+
+                      return (
+                        <BookingCard
+                          key={booking.id}
+                          booking={booking}
+                          featured={index === 0}
+                          petPhotoUrl={matchedPet?.photo_url || null}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
                       My pets
@@ -2083,9 +2509,7 @@ export default function CustomerDashboardPage() {
                       type="text"
                       placeholder="Pet name"
                       value={petForm.name}
-                      onChange={(e) =>
-                        setPetForm({ ...petForm, name: e.target.value })
-                      }
+                      onChange={(e) => setPetForm({ ...petForm, name: e.target.value })}
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
 
@@ -2104,9 +2528,7 @@ export default function CustomerDashboardPage() {
                         type="text"
                         placeholder="Breed"
                         value={petForm.breed}
-                        onChange={(e) =>
-                          setPetForm({ ...petForm, breed: e.target.value })
-                        }
+                        onChange={(e) => setPetForm({ ...petForm, breed: e.target.value })}
                         className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                       />
                     </div>
@@ -2116,9 +2538,7 @@ export default function CustomerDashboardPage() {
                         type="text"
                         placeholder="Age"
                         value={petForm.age}
-                        onChange={(e) =>
-                          setPetForm({ ...petForm, age: e.target.value })
-                        }
+                        onChange={(e) => setPetForm({ ...petForm, age: e.target.value })}
                         className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                       />
 
@@ -2177,9 +2597,7 @@ export default function CustomerDashboardPage() {
                       placeholder="Care notes for your Guru"
                       rows={4}
                       value={petForm.notes}
-                      onChange={(e) =>
-                        setPetForm({ ...petForm, notes: e.target.value })
-                      }
+                      onChange={(e) => setPetForm({ ...petForm, notes: e.target.value })}
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
 
@@ -2199,13 +2617,12 @@ export default function CustomerDashboardPage() {
                       No pet profiles yet.
                     </p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Add your first pet profile so booking and Guru communication
-                      feel easier.
+                      Add your first pet profile so booking and Guru communication feel easier.
                     </p>
                   </div>
                 ) : (
                   <div className="mt-5 grid gap-4">
-                    {pets.map((pet) => (
+                    {pets.slice(0, 3).map((pet) => (
                       <div
                         key={pet.id}
                         className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4"
@@ -2248,32 +2665,12 @@ export default function CustomerDashboardPage() {
                             </div>
 
                             <p className="mt-1 text-sm text-slate-600">
-                              {[pet.breed, pet.age, pet.weight]
-                                .filter(Boolean)
-                                .join(" • ") ||
+                              {[pet.breed, pet.age, pet.weight].filter(Boolean).join(" • ") ||
                                 "Profile details can be added anytime."}
                             </p>
 
-                            {pet.temperament ? (
-                              <p className="mt-2 text-sm text-slate-700">
-                                <span className="font-semibold text-slate-900">
-                                  Temperament:
-                                </span>{" "}
-                                {pet.temperament}
-                              </p>
-                            ) : null}
-
-                            {pet.medications ? (
-                              <p className="mt-1 text-sm text-slate-700">
-                                <span className="font-semibold text-slate-900">
-                                  Medications:
-                                </span>{" "}
-                                {pet.medications}
-                              </p>
-                            ) : null}
-
                             {pet.notes ? (
-                              <p className="mt-2 text-sm leading-6 text-slate-700">
+                              <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-700">
                                 {pet.notes}
                               </p>
                             ) : null}
@@ -2304,9 +2701,7 @@ export default function CustomerDashboardPage() {
                                   type="file"
                                   accept="image/jpeg,image/png"
                                   disabled={Boolean(uploadingPetMedia)}
-                                  onChange={(event) =>
-                                    handlePetMediaUpload(event, pet, "photo")
-                                  }
+                                  onChange={(event) => handlePetMediaUpload(event, pet, "photo")}
                                   className="sr-only"
                                 />
                               </label>
@@ -2322,9 +2717,7 @@ export default function CustomerDashboardPage() {
                                   type="file"
                                   accept="video/mp4,video/quicktime,video/webm"
                                   disabled={Boolean(uploadingPetMedia)}
-                                  onChange={(event) =>
-                                    handlePetMediaUpload(event, pet, "video")
-                                  }
+                                  onChange={(event) => handlePetMediaUpload(event, pet, "video")}
                                   className="sr-only"
                                 />
                               </label>
@@ -2342,24 +2735,6 @@ export default function CustomerDashboardPage() {
                               >
                                 Message Admin
                               </Link>
-
-                              <Link
-                                href={routes.messages}
-                                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                              >
-                                View messages
-                              </Link>
-
-                              {pet.video_url ? (
-                                <a
-                                  href={pet.video_url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                                >
-                                  View pet video
-                                </a>
-                              ) : null}
                             </div>
                           </div>
                         </div>
@@ -2367,13 +2742,13 @@ export default function CustomerDashboardPage() {
                     ))}
                   </div>
                 )}
-              </div>
+              </section>
 
-              <div
+              <section
                 id="recent-bookings"
                 className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
                       Recent bookings
@@ -2381,13 +2756,16 @@ export default function CustomerDashboardPage() {
                     <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-900">
                       Your pet care activity
                     </h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                      A cleaner timeline of requests, checkout, tips, payments, and care history. Use the full Bookings page for the Trust & Care overview.
+                    </p>
                   </div>
 
                   <Link
                     href={routes.bookings}
-                    className="inline-flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                    className="inline-flex items-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
                   >
-                    View all
+                    Open Bookings Overview
                   </Link>
                 </div>
 
@@ -2397,8 +2775,7 @@ export default function CustomerDashboardPage() {
                       No bookings yet
                     </p>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Start exploring trusted pet care options and request your first
-                      booking with a Guru who feels right for your pet.
+                      Start exploring trusted pet care options and request your first booking with a Guru who feels right for your pet.
                     </p>
 
                     <Link
@@ -2409,60 +2786,119 @@ export default function CustomerDashboardPage() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="mt-6 space-y-4">
-                    {bookings.map((booking) => (
-                      <div
-                        key={booking.id}
-                        className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5"
-                      >
-                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                          <div className="min-w-0">
-                            <p className="text-base font-black text-slate-900">
-                              Booking #{booking.id}
-                            </p>
+                  <div className="mt-6 grid gap-4">
+                    {recentBookings.slice(0, 5).map((booking) => {
+                      const matchedPet = findPetForBooking(booking, pets);
+                      const location = getBookingLocation(booking);
 
-                            <p className="mt-1 text-sm font-medium text-slate-500">
-                              {booking.start_time === new Date(0).toISOString()
-                                ? "Booking date unavailable"
-                                : new Date(booking.start_time).toLocaleString()}
-                            </p>
+                      return (
+                        <div
+                          key={booking.id}
+                          className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5"
+                        >
+                          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-start gap-3">
+                                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[1.1rem] bg-white shadow-sm ring-1 ring-slate-200">
+                                  {matchedPet?.photo_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={matchedPet.photo_url} alt={booking.pet_name || matchedPet.name} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <PawPrint className="h-6 w-6 text-emerald-600" />
+                                  )}
+                                </div>
 
-                            <p className="mt-3 text-sm leading-6 text-slate-700">
-                              {booking.notes?.trim()
-                                ? booking.notes
-                                : "No booking notes were added for this request."}
-                            </p>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-base font-black text-slate-900">
+                                      {booking.pet_name || "Pet Care"} • {booking.service_type || "Booking"}
+                                    </p>
+                                    <span
+                                      className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-[11px] font-bold ${getStatusClasses(
+                                        booking.status,
+                                      )}`}
+                                    >
+                                      {formatStatus(booking.status)}
+                                    </span>
+                                  </div>
 
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              <Link
-                                href={routes.messages}
-                                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                              >
-                                Open messages
-                              </Link>
+                                  <p className="mt-1 text-sm font-medium text-slate-500">
+                                    {formatDate(getBookingDisplayDate(booking))}
+                                    {location ? ` • ${location}` : ""}
+                                  </p>
+                                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                                    {getBookingNextStep(booking)}
+                                  </p>
+                                </div>
+                              </div>
 
-                              <Link
-                                href={routes.adminMessages}
-                                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                              >
-                                Get support
-                              </Link>
+                              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                                <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                                    Payment
+                                  </p>
+                                  <p className="mt-1 text-sm font-black text-slate-950">
+                                    {formatStatus(booking.payment_status)}
+                                  </p>
+                                </div>
+                                <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                                    Tip
+                                  </p>
+                                  <p className="mt-1 text-sm font-black text-emerald-700">
+                                    {formatMoney(booking.tip_amount, true)}
+                                  </p>
+                                </div>
+                                <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                                    Total
+                                  </p>
+                                  <p className="mt-1 text-sm font-black text-slate-950">
+                                    {formatMoney(
+                                      booking.total_customer_paid || booking.subtotal_amount,
+                                      true,
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <Link
+                                  href={getBookingDetailHref(booking.id)}
+                                  className="inline-flex items-center rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black text-white transition hover:bg-emerald-700"
+                                >
+                                  View Details
+                                </Link>
+
+                                <Link
+                                  href={routes.messages}
+                                  className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
+                                >
+                                  Open messages
+                                </Link>
+
+                                <Link
+                                  href={routes.adminMessages}
+                                  className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
+                                >
+                                  Get support
+                                </Link>
+
+                                <Link
+                                  href={routes.bookings}
+                                  className="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
+                                >
+                                  All bookings
+                                </Link>
+                              </div>
                             </div>
                           </div>
-
-                          <span
-                            className={`inline-flex w-fit items-center rounded-full px-3 py-1.5 text-xs font-bold ${getStatusClasses(
-                              booking.status
-                            )}`}
-                          >
-                            {formatStatus(booking.status)}
-                          </span>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
-              </div>
+              </section>
             </div>
           </section>
         </div>

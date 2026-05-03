@@ -36,6 +36,8 @@ type ServiceKey =
 
 type CalendarStatus = "available" | "blackout" | "pending" | "closed";
 
+type TipChoice = "none" | "10" | "15" | "20" | "custom";
+
 type PetProfile = {
   id: string;
   name: string;
@@ -211,6 +213,42 @@ const timeWindowOptions = [
 
 const visitLengthOptions = ["30 minutes", "60 minutes", "90 minutes"];
 
+const tipOptions: {
+  key: TipChoice;
+  label: string;
+  helper: string;
+}[] = [
+  {
+    key: "none",
+    label: "No tip",
+    helper: "You can always thank your Guru another way.",
+  },
+  {
+    key: "10",
+    label: "10%",
+    helper: "A kind thank-you for reliable care.",
+  },
+  {
+    key: "15",
+    label: "15%",
+    helper: "Great care and peace of mind.",
+  },
+  {
+    key: "20",
+    label: "20%",
+    helper: "Above-and-beyond Guru care.",
+  },
+  {
+    key: "custom",
+    label: "Custom",
+    helper: "Choose your own amount.",
+  },
+];
+
+const ESTIMATED_MARKETPLACE_FEE_PERCENT = 15;
+const MIN_MARKETPLACE_FEE_PERCENT = 15;
+const MAX_MARKETPLACE_FEE_PERCENT = 20;
+
 const usStateOptions = [
   { value: "AL", label: "Alabama" },
   { value: "AK", label: "Alaska" },
@@ -352,6 +390,21 @@ function cleanZip(value?: string | null) {
   return String(value || "").replace(/\D/g, "").slice(0, 5);
 }
 
+function cleanCurrencyInput(value: string) {
+  return value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+}
+
+function normalizeCustomTip(value: string) {
+  const cleaned = cleanCurrencyInput(value);
+  const parsed = Number(cleaned);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 0;
+  }
+
+  return Math.min(500, parsed);
+}
+
 function normalizeStateForSelect(value?: string | null) {
   const clean = String(value || "").trim();
 
@@ -419,6 +472,34 @@ function getServicePrice(key: ServiceKey, visitLength: string) {
   if (visitLength === "90 minutes") return basePrice + 30;
 
   return basePrice;
+}
+
+function getTipAmount({
+  tipChoice,
+  customTipAmount,
+  servicePrice,
+}: {
+  tipChoice: TipChoice;
+  customTipAmount: string;
+  servicePrice: number;
+}) {
+  if (tipChoice === "none") return 0;
+
+  if (tipChoice === "custom") {
+    return Number(normalizeCustomTip(customTipAmount).toFixed(2));
+  }
+
+  const percentage = Number(tipChoice);
+
+  if (!Number.isFinite(percentage) || percentage <= 0) {
+    return 0;
+  }
+
+  return Number((servicePrice * (percentage / 100)).toFixed(2));
+}
+
+function dollarsToCents(value: number) {
+  return Math.max(0, Math.round(value * 100));
 }
 
 function formatMoney(value: number) {
@@ -809,6 +890,9 @@ export default function BookGuruClient({
   const [notes, setNotes] = useState("");
   const [emergencyNotes, setEmergencyNotes] = useState("");
 
+  const [tipChoice, setTipChoice] = useState<TipChoice>("none");
+  const [customTipAmount, setCustomTipAmount] = useState("");
+
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
 
@@ -834,8 +918,33 @@ export default function BookGuruClient({
     [selectedService, visitLength],
   );
 
-  const platformFee = Number((servicePrice * 0.1).toFixed(2));
-  const total = Number((servicePrice + platformFee).toFixed(2));
+  const marketplaceFeePercent = ESTIMATED_MARKETPLACE_FEE_PERCENT;
+
+  const marketplaceFee = Number(
+    (servicePrice * (marketplaceFeePercent / 100)).toFixed(2),
+  );
+
+  const tipAmount = useMemo(
+    () =>
+      getTipAmount({
+        tipChoice,
+        customTipAmount,
+        servicePrice,
+      }),
+    [tipChoice, customTipAmount, servicePrice],
+  );
+
+  const tipCents = dollarsToCents(tipAmount);
+
+  const guruEstimatedBasePayout = Number(
+    (servicePrice - marketplaceFee).toFixed(2),
+  );
+
+  const guruEstimatedTotalPayout = Number(
+    (guruEstimatedBasePayout + tipAmount).toFixed(2),
+  );
+
+  const total = Number((servicePrice + marketplaceFee + tipAmount).toFixed(2));
 
   const displayPreferredTime =
     timeWindow === "Specific time needed"
@@ -1191,11 +1300,17 @@ export default function BookGuruClient({
       return responseData.error.trim();
     }
 
-    if (typeof responseData.message === "string" && responseData.message.trim()) {
+    if (
+      typeof responseData.message === "string" &&
+      responseData.message.trim()
+    ) {
       return responseData.message.trim();
     }
 
-    if (typeof responseData.details === "string" && responseData.details.trim()) {
+    if (
+      typeof responseData.details === "string" &&
+      responseData.details.trim()
+    ) {
       return responseData.details.trim();
     }
 
@@ -1331,13 +1446,47 @@ export default function BookGuruClient({
         care_city: careCity,
         careState,
         care_state: careState,
+
         servicePrice,
         service_price: servicePrice,
-        platformFee,
-        platform_fee: platformFee,
+        subtotalAmount: servicePrice,
+        subtotal_amount: servicePrice,
+        bookingSubtotalAmount: servicePrice,
+        booking_subtotal_amount: servicePrice,
+
+        marketplaceFeePercent: marketplaceFeePercent,
+        marketplace_fee_percent: marketplaceFeePercent,
+        marketplaceFeeMinPercent: MIN_MARKETPLACE_FEE_PERCENT,
+        marketplace_fee_min_percent: MIN_MARKETPLACE_FEE_PERCENT,
+        marketplaceFeeMaxPercent: MAX_MARKETPLACE_FEE_PERCENT,
+        marketplace_fee_max_percent: MAX_MARKETPLACE_FEE_PERCENT,
+        marketplaceFee,
+        marketplace_fee: marketplaceFee,
+        marketplaceFeeAmount: marketplaceFee,
+        marketplace_fee_amount: marketplaceFee,
+        platformFee: marketplaceFee,
+        platform_fee: marketplaceFee,
+
+        tipChoice,
+        tip_choice: tipChoice,
+        tipAmount,
+        tip_amount: tipAmount,
+        tipCents,
+        tip_cents: tipCents,
+        guruTipAmount: tipAmount,
+        guru_tip_amount: tipAmount,
+
+        guruEstimatedBasePayout,
+        guru_estimated_base_payout: guruEstimatedBasePayout,
+        guruEstimatedTotalPayout,
+        guru_estimated_total_payout: guruEstimatedTotalPayout,
+
         total,
         total_amount: total,
         amount_total: total,
+        customerTotalAmount: total,
+        customer_total_amount: total,
+
         complianceAccepted: true,
         compliance_accepted: true,
         termsAccepted: true,
@@ -1357,6 +1506,9 @@ export default function BookGuruClient({
           emergencyNotes.trim()
             ? `Emergency / special instructions: ${emergencyNotes.trim()}`
             : "",
+          "",
+          `Customer-facing SitGuru marketplace fee estimate: ${marketplaceFeePercent}%`,
+          `Guru tip selected: ${formatMoney(tipAmount)}. 100% of the tip goes directly to the Guru.`,
         ]
           .filter(Boolean)
           .join("\n"),
@@ -1431,8 +1583,10 @@ export default function BookGuruClient({
             </h1>
 
             <p className="mt-4 max-w-2xl text-lg font-semibold leading-8 text-slate-700">
-              Tell us about your pet and care needs. Your Guru will review and
-              confirm before checkout.
+              Care that costs less, without feeling less. SitGuru keeps
+              marketplace fees lower than many major care platforms while
+              supporting secure payments, customer care, safety tools, and
+              reliable Guru payouts.
             </p>
           </div>
 
@@ -1963,13 +2117,105 @@ export default function BookGuruClient({
                 <div className="mt-6 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 p-5">
                   <p className="flex items-center gap-2 text-lg font-black text-emerald-900">
                     <CreditCard className="h-5 w-5" />
-                    Protected payment flow
+                    A lower service fee than many leading care platforms
                   </p>
                   <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">
-                    SitGuru securely processes payment at checkout. Booking
-                    records and payment status are saved for customer protection,
-                    Guru payouts, and admin review.
+                    SitGuru keeps marketplace fees competitive so more of your
+                    booking goes toward quality care, Guru earnings, support,
+                    safety tools, and improving your experience.
                   </p>
+                </div>
+
+                <div className="mt-6 rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-lg font-black text-slate-950">
+                        Tip your Guru
+                      </p>
+                      <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-slate-700">
+                        Show appreciation for great care. 100% of your tip goes
+                        directly to your Guru.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-right">
+                      <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-800">
+                        Selected tip
+                      </p>
+                      <p className="text-2xl font-black text-emerald-700">
+                        {formatMoney(tipAmount)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    {tipOptions.map((option) => {
+                      const selected = tipChoice === option.key;
+
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => {
+                            setTipChoice(option.key);
+                            if (option.key !== "custom") {
+                              setCustomTipAmount("");
+                            }
+                          }}
+                          className={[
+                            "rounded-2xl border p-4 text-left transition",
+                            selected
+                              ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.16)]"
+                              : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/70",
+                          ].join(" ")}
+                        >
+                          <p
+                            className={[
+                              "text-base font-black",
+                              selected ? "text-emerald-800" : "text-slate-950",
+                            ].join(" ")}
+                          >
+                            {option.label}
+                          </p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                            {option.helper}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {tipChoice === "custom" ? (
+                    <div className="mt-5 max-w-xs">
+                      <label className={labelClass()} htmlFor="custom-tip">
+                        Custom tip amount
+                      </label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-500">
+                          $
+                        </span>
+                        <input
+                          id="custom-tip"
+                          value={customTipAmount}
+                          onChange={(event) =>
+                            setCustomTipAmount(
+                              cleanCurrencyInput(event.target.value),
+                            )
+                          }
+                          inputMode="decimal"
+                          className={`${fieldClass()} pl-8`}
+                          placeholder="10.00"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                    <p className="text-sm font-bold leading-6 text-emerald-900">
+                      Tips are never included in SitGuru’s marketplace fee. Your
+                      Guru receives 100% of the tip you choose.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mt-6 space-y-4">
@@ -2232,9 +2478,28 @@ export default function BookGuruClient({
                     <CircleHelp className="h-3.5 w-3.5" />
                   </span>
                   <span className="font-black text-slate-950">
-                    {formatMoney(platformFee)}
+                    {formatMoney(marketplaceFee)}
                   </span>
                 </div>
+
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                  Estimated at {marketplaceFeePercent}%. Final fee may range
+                  from {MIN_MARKETPLACE_FEE_PERCENT}%–
+                  {MAX_MARKETPLACE_FEE_PERCENT}% depending on locality.
+                </p>
+
+                <div className="mt-3 flex justify-between gap-4 text-sm">
+                  <span className="font-semibold text-slate-600">
+                    Guru Tip
+                  </span>
+                  <span className="font-black text-slate-950">
+                    {formatMoney(tipAmount)}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs font-semibold leading-5 text-emerald-700">
+                  100% of your tip goes directly to your Guru.
+                </p>
 
                 <div className="mt-5 flex justify-between gap-4 border-t border-slate-100 pt-5">
                   <span className="text-sm font-black text-slate-950">
@@ -2249,9 +2514,43 @@ export default function BookGuruClient({
               <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
                 <p className="flex items-start gap-2 text-xs font-bold leading-5 text-slate-700">
                   <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                  Final price may vary based on actual time and services
-                  provided.
+                  Care that costs less, without feeling less. SitGuru keeps
+                  marketplace fees lower than many major care platforms while
+                  supporting secure payments, customer care, safety tools, and
+                  reliable Guru payouts.
                 </p>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                  Estimated Guru payout
+                </p>
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="font-semibold text-slate-600">
+                      Base payout after SitGuru fee
+                    </span>
+                    <span className="font-black text-slate-950">
+                      {formatMoney(guruEstimatedBasePayout)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="font-semibold text-slate-600">
+                      Tip pass-through
+                    </span>
+                    <span className="font-black text-emerald-700">
+                      +{formatMoney(tipAmount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-4 border-t border-slate-200 pt-2">
+                    <span className="font-black text-slate-950">
+                      Guru estimated total
+                    </span>
+                    <span className="font-black text-slate-950">
+                      {formatMoney(guruEstimatedTotalPayout)}
+                    </span>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -2329,7 +2628,7 @@ export default function BookGuruClient({
 
             <div className="flex items-start gap-2 px-2 text-sm font-semibold text-slate-600">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-              <span>You won’t be charged yet. Review first.</span>
+              <span>You won’t be charged until secure checkout is completed.</span>
             </div>
           </aside>
         </div>
