@@ -2,6 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  Send,
+  Sparkles,
+} from "lucide-react";
+import {
   FormEvent,
   KeyboardEvent,
   useMemo,
@@ -46,7 +53,7 @@ function normalizeTopic(value?: string | null) {
   if (!topic) return "Other";
 
   const matchedTopic = topicOptions.find(
-    (option) => option.toLowerCase() === topic.toLowerCase()
+    (option) => option.toLowerCase() === topic.toLowerCase(),
   );
 
   return matchedTopic || "Other";
@@ -77,6 +84,7 @@ export default function AdminMessageComposer({
   const [message, setMessage] = useState("");
   const [topic, setTopic] = useState(normalizeTopic(currentTopic));
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const trimmedMessage = useMemo(() => message.trim(), [message]);
@@ -88,6 +96,7 @@ export default function AdminMessageComposer({
     if (isDisabled) return;
 
     setError("");
+    setSuccess("");
 
     try {
       const response = await fetch("/api/admin/messages/send", {
@@ -132,13 +141,14 @@ export default function AdminMessageComposer({
             data?.error ||
               data?.details ||
               responseText ||
-              "Admin message did not confirm as sent."
-          )
+              "Admin message did not confirm as sent.",
+          ),
         );
         return;
       }
 
       setMessage("");
+      setSuccess("Admin message sent.");
 
       startTransition(() => {
         router.refresh();
@@ -147,7 +157,7 @@ export default function AdminMessageComposer({
       setError(
         err instanceof Error
           ? cleanErrorText(err.message)
-          : "Unable to send admin message because the request failed."
+          : "Unable to send admin message because the request failed.",
       );
     }
   }
@@ -158,7 +168,7 @@ export default function AdminMessageComposer({
   }
 
   async function handleMessageKeyDown(
-    event: KeyboardEvent<HTMLTextAreaElement>
+    event: KeyboardEvent<HTMLTextAreaElement>,
   ) {
     if (event.key !== "Enter") return;
 
@@ -170,83 +180,125 @@ export default function AdminMessageComposer({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <label
-          htmlFor="admin-message-topic"
-          className="mb-3 block text-sm font-black uppercase tracking-[0.18em] !text-emerald-300"
-        >
-          Topic / Subject
-        </label>
+      <div className="rounded-[28px] border border-[#e3ece5] bg-[#fbfcf9] p-4 sm:p-5">
+        <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-white px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-green-800 shadow-sm">
+              <Sparkles size={14} />
+              SitGuru Admin Reply
+            </div>
+            <p className="mt-2 text-sm font-semibold text-slate-500">
+              Send a clear admin response connected to this message thread.
+            </p>
+          </div>
 
-        <select
-          id="admin-message-topic"
-          name="topic"
-          value={topic}
-          onChange={(event) => {
-            setTopic(event.target.value);
-            if (error) setError("");
-          }}
-          disabled={isPending}
-          className="w-full rounded-[1.35rem] border border-white/10 bg-slate-950 px-4 py-4 text-base font-bold !text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {topicOptions.map((option) => (
-            <option
-              key={option}
-              value={option}
-              className="bg-slate-950 text-white"
+          <div className="rounded-2xl border border-green-100 bg-white px-4 py-3 text-xs font-black text-green-900 shadow-sm">
+            Enter sends · Shift + Enter adds a line
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          <div>
+            <label
+              htmlFor="admin-message-topic"
+              className="mb-3 block text-xs font-black uppercase tracking-[0.18em] text-green-700"
             >
-              {option}
-            </option>
-          ))}
-        </select>
+              Topic / Subject
+            </label>
 
-        <p className="mt-2 text-xs font-semibold !text-slate-300">
-          Choose the topic so Gurus and customers know exactly what SitGuru is
-          contacting them about.
-        </p>
-      </div>
+            <select
+              id="admin-message-topic"
+              name="topic"
+              value={topic}
+              onChange={(event) => {
+                setTopic(event.target.value);
+                if (error) setError("");
+                if (success) setSuccess("");
+              }}
+              disabled={isPending}
+              className="h-14 w-full rounded-2xl border border-green-100 bg-white px-4 text-base font-black text-slate-900 outline-none transition focus:border-green-300 focus:ring-4 focus:ring-green-100 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {topicOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
 
-      <div>
-        <label
-          htmlFor="admin-message-body"
-          className="mb-3 block text-sm font-black uppercase tracking-[0.18em] !text-emerald-300"
-        >
-          Admin Message
-        </label>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Choose the topic so Gurus and customers know exactly what SitGuru
+              is contacting them about.
+            </p>
+          </div>
 
-        <textarea
-          id="admin-message-body"
-          name="body"
-          value={message}
-          onChange={(event) => {
-            setMessage(event.target.value);
-            if (error) setError("");
-          }}
-          onKeyDown={handleMessageKeyDown}
-          placeholder="Write your Admin reply..."
-          rows={7}
-          disabled={isPending}
-          className="w-full rounded-[1.35rem] border border-white/10 bg-slate-900/80 px-5 py-4 text-base font-semibold leading-7 !text-white outline-none transition placeholder:!text-slate-300 focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-70"
-        />
+          <div>
+            <label
+              htmlFor="admin-message-body"
+              className="mb-3 block text-xs font-black uppercase tracking-[0.18em] text-green-700"
+            >
+              Admin Message
+            </label>
 
-        <p className="mt-2 text-xs font-semibold !text-slate-300">
-          Press Enter to send. Press Shift + Enter for a new line.
-        </p>
+            <textarea
+              id="admin-message-body"
+              name="body"
+              value={message}
+              onChange={(event) => {
+                setMessage(event.target.value);
+                if (error) setError("");
+                if (success) setSuccess("");
+              }}
+              onKeyDown={handleMessageKeyDown}
+              placeholder="Write your Admin reply..."
+              rows={7}
+              disabled={isPending}
+              className="w-full resize-y rounded-[24px] border border-green-100 bg-white px-5 py-4 text-base font-semibold leading-7 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-300 focus:ring-4 focus:ring-green-100 disabled:cursor-not-allowed disabled:opacity-70"
+            />
+
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              The message will be saved to the current conversation and shown in
+              the thread after refresh.
+            </p>
+          </div>
+        </div>
       </div>
 
       {error ? (
-        <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-bold leading-6 !text-rose-100">
-          {error}
+        <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold leading-6 text-rose-900">
+          <AlertCircle className="mt-0.5 shrink-0" size={18} />
+          <span>{error}</span>
         </div>
       ) : null}
 
-      <div className="flex justify-end">
+      {success ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold leading-6 text-green-900">
+          <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
+          <span>{success}</span>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs font-semibold text-slate-500">
+          Replies are sent as SitGuru Admin and use the Message Center admin
+          avatar.
+        </p>
+
         <button
           type="submit"
           disabled={isDisabled}
-          className="inline-flex min-w-[150px] items-center justify-center rounded-2xl bg-emerald-500 px-6 py-3 text-base font-black !text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-w-[165px] items-center justify-center gap-2 rounded-2xl bg-green-800 px-6 py-3 text-base font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isPending ? "Sending..." : "Send Message"}
+          {isPending ? (
+            <>
+              <Loader2 className="animate-spin" size={18} />
+              Sending...
+            </>
+          ) : (
+            <>
+              <Send size={18} />
+              Send Message
+            </>
+          )}
         </button>
       </div>
     </form>

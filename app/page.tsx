@@ -25,6 +25,59 @@ const heroServiceOptions = [
   "Custom Care",
 ];
 
+const zipCodeFallbackMap: Record<
+  string,
+  { city: string; state: string; stateAbbreviation: string }
+> = {
+  "08030": {
+    city: "Camden",
+    state: "New Jersey",
+    stateAbbreviation: "NJ",
+  },
+  "18018": {
+    city: "Bethlehem",
+    state: "Pennsylvania",
+    stateAbbreviation: "PA",
+  },
+  "18101": {
+    city: "Allentown",
+    state: "Pennsylvania",
+    stateAbbreviation: "PA",
+  },
+  "18951": {
+    city: "Quakertown",
+    state: "Pennsylvania",
+    stateAbbreviation: "PA",
+  },
+  "19103": {
+    city: "Philadelphia",
+    state: "Pennsylvania",
+    stateAbbreviation: "PA",
+  },
+};
+
+type ZipLookupResult = {
+  city: string;
+  state: string;
+  stateAbbreviation: string;
+};
+
+type ZipLookupStatus = "idle" | "loading" | "found" | "not-found" | "error";
+
+type SearchFormState = {
+  service: string;
+  city: string;
+  state: string;
+  zipCode: string;
+};
+
+const initialSearchFormState: SearchFormState = {
+  service: "",
+  city: "",
+  state: "",
+  zipCode: "",
+};
+
 const serviceCards = [
   {
     title: "Dog Walking",
@@ -185,6 +238,36 @@ const launchHighlights = [
   "Capture leads from Instagram, Facebook, TikTok, and more",
 ];
 
+const homepagePrograms = [
+  {
+    title: "Military Hire Program",
+    eyebrow: "Military-connected pathway",
+    description:
+      "For veterans, eligible service members, National Guard, reservists, military spouses, and qualified dependents over 18 who want to grow into trusted SitGuru Gurus.",
+    href: "/programs#military-hire",
+    applyHref: "/programs/apply?program=military-hire",
+    icon: "🎖️",
+  },
+  {
+    title: "Student Hire Program",
+    eyebrow: "Students, recent grads, summer work",
+    description:
+      "For current students, recent graduates, and students looking for summer work who want flexible pet care opportunities and a path to full Guru status.",
+    href: "/programs#student-hire",
+    applyHref: "/programs/apply?program=student-hire",
+    icon: "🎓",
+  },
+  {
+    title: "Community Hire Program",
+    eyebrow: "Community workforce pathway",
+    description:
+      "For qualified people connected through city, state, federal, nonprofit, and community workforce programs who are ready to work, learn, and grow with SitGuru.",
+    href: "/programs#community-hire",
+    applyHref: "/programs/apply?program=community-hire",
+    icon: "🤝",
+  },
+];
+
 type Guru = {
   id: string;
   slug?: string | null;
@@ -314,7 +397,8 @@ function formatLocation(city?: string | null, state?: string | null) {
 
 function getPetType(services?: string[] | null) {
   if (!services || services.length === 0) return "Pet Care";
-  if (services.includes("Cat Care") || services.includes("Cat Sitting")) return "Cats";
+  if (services.includes("Cat Care") || services.includes("Cat Sitting"))
+    return "Cats";
   if (services.includes("Dog Walking")) return "Dogs";
   if (services.includes("Pet Sitting")) return "Cats & Dogs";
   return services[0];
@@ -341,21 +425,50 @@ function detectSourceFromUrl() {
 
   const params = new URLSearchParams(window.location.search);
   const sourceParam =
-    params.get("source") ||
-    params.get("utm_source") ||
-    params.get("ref") ||
-    "";
+    params.get("source") || params.get("utm_source") || params.get("ref") || "";
 
   const normalized = sourceParam.trim().toLowerCase();
 
   if (!normalized) return "direct";
-  if (normalized.includes("instagram") || normalized === "ig") return "instagram";
+  if (normalized.includes("instagram") || normalized === "ig")
+    return "instagram";
   if (normalized.includes("facebook") || normalized === "fb") return "facebook";
   if (normalized.includes("tiktok") || normalized === "tt") return "tiktok";
   if (normalized.includes("referral")) return "referral";
   if (normalized.includes("email")) return "email";
 
   return normalized;
+}
+
+function normalizeZipCode(value: string) {
+  return value.replace(/\D/g, "").slice(0, 5);
+}
+
+async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
+  const normalizedZip = normalizeZipCode(zipCode);
+
+  if (normalizedZip.length !== 5) return null;
+
+  const fallback = zipCodeFallbackMap[normalizedZip];
+
+  if (fallback) {
+    return fallback;
+  }
+
+  const response = await fetch(`https://api.zippopotam.us/us/${normalizedZip}`);
+
+  if (!response.ok) return null;
+
+  const payload = await response.json();
+  const place = payload?.places?.[0];
+
+  if (!place) return null;
+
+  return {
+    city: String(place["place name"] || "").trim(),
+    state: String(place.state || "").trim(),
+    stateAbbreviation: String(place["state abbreviation"] || "").trim(),
+  };
 }
 
 function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
@@ -366,7 +479,7 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
 
   const displayItems = useMemo(
     () => (items.length > 0 ? items : fallbackCarouselItems),
-    [items]
+    [items],
   );
 
   const total = displayItems.length;
@@ -380,7 +493,8 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
     if (!card) return;
 
     const track = trackRef.current;
-    const left = card.offsetLeft - (track.clientWidth / 2 - card.clientWidth / 2);
+    const left =
+      card.offsetLeft - (track.clientWidth / 2 - card.clientWidth / 2);
 
     track.scrollTo({
       left: Math.max(left, 0),
@@ -459,7 +573,7 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
 
     const handleScroll = () => {
       const cards = Array.from(
-        track.querySelectorAll("[data-carousel-card]")
+        track.querySelectorAll("[data-carousel-card]"),
       ) as HTMLElement[];
 
       if (!cards.length) return;
@@ -495,8 +609,8 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
               Meet local Gurus pet owners can feel good about
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              Browse real SitGuru providers in a warm, modern, easy-to-scan layout
-              built for confidence and discovery.
+              Browse real SitGuru providers in a warm, modern, easy-to-scan
+              layout built for confidence and discovery.
             </p>
           </div>
 
@@ -552,7 +666,9 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
                 <div className="p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-xl font-bold text-slate-900">{item.name}</h3>
+                      <h3 className="text-xl font-bold text-slate-900">
+                        {item.name}
+                      </h3>
                       <p className="mt-1 text-sm font-semibold text-emerald-700">
                         {item.role}
                       </p>
@@ -571,7 +687,9 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
                           eventName: "guru_profile_view_clicked",
                           eventType: "profile",
                           source: detectSourceFromUrl(),
-                          guruId: item.id.startsWith("fallback") ? undefined : item.id,
+                          guruId: item.id.startsWith("fallback")
+                            ? undefined
+                            : item.id,
                           metadata: {
                             location: "homepage_carousel",
                             guru_name: item.name,
@@ -612,7 +730,9 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
                 type="button"
                 onClick={() => goToSlide(index)}
                 className={`h-2.5 w-2.5 rounded-full transition-all ${
-                  index === activeIndex ? "scale-125 bg-emerald-600" : "bg-slate-300"
+                  index === activeIndex
+                    ? "scale-125 bg-emerald-600"
+                    : "bg-slate-300"
                 }`}
                 aria-label={`Go to slide ${index + 1}`}
               />
@@ -625,24 +745,34 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
 }
 
 export default function HomePage() {
-  const [carouselItems, setCarouselItems] =
-    useState<CarouselItem[]>(fallbackCarouselItems);
+  const [carouselItems, setCarouselItems] = useState<CarouselItem[]>(
+    fallbackCarouselItems,
+  );
+  const [searchForm, setSearchForm] = useState<SearchFormState>(
+    initialSearchFormState,
+  );
+  const [zipLookupStatus, setZipLookupStatus] =
+    useState<ZipLookupStatus>("idle");
+  const [zipLookupMessage, setZipLookupMessage] = useState("");
 
-  const [launchForm, setLaunchForm] =
-    useState<LaunchFormState>(initialLaunchFormState);
+  const [launchForm, setLaunchForm] = useState<LaunchFormState>(
+    initialLaunchFormState,
+  );
   const [isSubmittingLaunch, setIsSubmittingLaunch] = useState(false);
   const [launchError, setLaunchError] = useState("");
   const [launchSuccess, setLaunchSuccess] = useState("");
 
   const isCustomerSelected = useMemo(
     () =>
-      launchForm.interestType === "customer" || launchForm.interestType === "both",
-    [launchForm.interestType]
+      launchForm.interestType === "customer" ||
+      launchForm.interestType === "both",
+    [launchForm.interestType],
   );
 
   const isGuruSelected = useMemo(
-    () => launchForm.interestType === "guru" || launchForm.interestType === "both",
-    [launchForm.interestType]
+    () =>
+      launchForm.interestType === "guru" || launchForm.interestType === "both",
+    [launchForm.interestType],
   );
 
   useEffect(() => {
@@ -689,7 +819,7 @@ export default function HomePage() {
           rating,
           is_verified,
           is_active
-        `
+        `,
         )
         .eq("is_active", true)
         .order("rating", { ascending: false, nullsFirst: false })
@@ -730,9 +860,83 @@ export default function HomePage() {
     loadHomepageGurus();
   }, []);
 
+  useEffect(() => {
+    const normalizedZip = normalizeZipCode(searchForm.zipCode);
+
+    if (!normalizedZip) {
+      setZipLookupStatus("idle");
+      setZipLookupMessage("");
+      return;
+    }
+
+    if (normalizedZip.length < 5) {
+      setZipLookupStatus("idle");
+      setZipLookupMessage("Enter a 5-digit ZIP code to autofill city and state.");
+      return;
+    }
+
+    let isMounted = true;
+
+    async function runLookup() {
+      setZipLookupStatus("loading");
+      setZipLookupMessage("Looking up ZIP code...");
+
+      try {
+        const result = await lookupZipCode(normalizedZip);
+
+        if (!isMounted) return;
+
+        if (!result?.city || !result?.state) {
+          setZipLookupStatus("not-found");
+          setZipLookupMessage(
+            "We could not autofill that ZIP code. You can still enter city and state manually.",
+          );
+          return;
+        }
+
+        setSearchForm((prev) => ({
+          ...prev,
+          zipCode: normalizedZip,
+          city: result.city,
+          state: result.state,
+        }));
+
+        setZipLookupStatus("found");
+        setZipLookupMessage(
+          `Autofilled ${result.city}, ${result.stateAbbreviation || result.state}.`,
+        );
+      } catch (error) {
+        if (!isMounted) return;
+
+        console.error("ZIP code lookup failed:", error);
+        setZipLookupStatus("error");
+        setZipLookupMessage(
+          "ZIP autofill is unavailable right now. You can still enter city and state manually.",
+        );
+      }
+    }
+
+    const timeout = window.setTimeout(runLookup, 350);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeout);
+    };
+  }, [searchForm.zipCode]);
+
+  function updateSearchField<K extends keyof SearchFormState>(
+    key: K,
+    value: SearchFormState[K],
+  ) {
+    setSearchForm((prev) => ({
+      ...prev,
+      [key]: key === "zipCode" ? normalizeZipCode(String(value)) : value,
+    }));
+  }
+
   function updateLaunchField<K extends keyof LaunchFormState>(
     key: K,
-    value: LaunchFormState[K]
+    value: LaunchFormState[K],
   ) {
     setLaunchForm((prev) => ({
       ...prev,
@@ -740,7 +944,11 @@ export default function HomePage() {
     }));
   }
 
-  function trackHomepageClick(label: string, location: string, destination?: string) {
+  function trackHomepageClick(
+    label: string,
+    location: string,
+    destination?: string,
+  ) {
     trackEvent({
       eventName: "homepage_cta_clicked",
       eventType: "navigation",
@@ -792,6 +1000,7 @@ export default function HomePage() {
         service: String(formData.get("service") || ""),
         city: String(formData.get("city") || ""),
         state: String(formData.get("state") || ""),
+        zip_code: String(formData.get("zipCode") || formData.get("zip") || ""),
       },
     });
   }
@@ -828,7 +1037,9 @@ export default function HomePage() {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Unable to join the launch list right now.");
+        throw new Error(
+          payload?.error || "Unable to join the launch list right now.",
+        );
       }
 
       trackEvent({
@@ -847,7 +1058,7 @@ export default function HomePage() {
       });
 
       setLaunchSuccess(
-        "You’re officially on the SitGuru launch list. We’ll share early access and launch updates soon."
+        "You’re officially on the SitGuru launch list. We’ll share early access and launch updates soon.",
       );
 
       setLaunchForm((prev) => ({
@@ -881,6 +1092,121 @@ export default function HomePage() {
       className={`${openSans.className} page-shell bg-white text-slate-950 font-light`}
       style={{ fontWeight: 300 }}
     >
+      {/* Quick Search */}
+      <section className="border-b border-slate-200 bg-white py-8 sm:py-10">
+        <div className="page-container">
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="section-kicker">Find a Guru</div>
+            <h2 className="mt-4 text-slate-950">Start with a simple search</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
+              Search by service and location from any device. Start simple now,
+              then continue into richer matching, pet details, and booking flow.
+            </p>
+          </div>
+
+          <form
+            action="/search"
+            onSubmit={handleSearchSubmit}
+            className="panel mx-auto mt-8 max-w-5xl p-6 sm:p-8"
+          >
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-800">
+                  What service do you need?
+                </label>
+                <select
+                  name="service"
+                  value={searchForm.service}
+                  onChange={(event) =>
+                    updateSearchField("service", event.target.value)
+                  }
+                  className="select w-full"
+                >
+                  <option value="">All services</option>
+                  {heroServiceOptions.map((service) => (
+                    <option key={service} value={service}>
+                      {service}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-800">
+                  ZIP code
+                </label>
+                <input
+                  name="zipCode"
+                  value={searchForm.zipCode}
+                  onChange={(event) =>
+                    updateSearchField("zipCode", event.target.value)
+                  }
+                  className="input w-full"
+                  inputMode="numeric"
+                  maxLength={5}
+                  placeholder="18951"
+                />
+                <input type="hidden" name="zip" value={searchForm.zipCode} />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-800">
+                  City
+                </label>
+                <input
+                  name="city"
+                  value={searchForm.city}
+                  onChange={(event) =>
+                    updateSearchField("city", event.target.value)
+                  }
+                  className="input w-full"
+                  placeholder="Quakertown"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-800">
+                  State
+                </label>
+                <input
+                  name="state"
+                  value={searchForm.state}
+                  onChange={(event) =>
+                    updateSearchField("state", event.target.value)
+                  }
+                  className="input w-full"
+                  placeholder="Pennsylvania"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  className="btn-primary w-full px-10 py-4 text-lg lg:w-auto"
+                >
+                  Search Gurus
+                </button>
+              </div>
+            </div>
+
+            {zipLookupMessage ? (
+              <p
+                className={`mt-4 text-sm font-semibold ${
+                  zipLookupStatus === "found"
+                    ? "text-emerald-700"
+                    : zipLookupStatus === "loading"
+                      ? "text-slate-500"
+                      : "text-amber-700"
+                }`}
+              >
+                {zipLookupMessage}
+              </p>
+            ) : null}
+          </form>
+        </div>
+      </section>
+
+
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50">
         <div className="pointer-events-none absolute inset-0">
@@ -902,7 +1228,8 @@ export default function HomePage() {
 
               <div className="mt-5 space-y-4">
                 <p className="max-w-3xl text-lg font-medium leading-8 text-slate-800 sm:text-xl">
-                  SitGuru helps pet parents discover trusted local caregivers for{" "}
+                  SitGuru helps pet parents discover trusted local caregivers
+                  for{" "}
                   <span className="font-semibold text-emerald-700">
                     walking, sitting, boarding, day care, training support,
                   </span>{" "}
@@ -910,9 +1237,9 @@ export default function HomePage() {
                 </p>
 
                 <p className="max-w-3xl text-base leading-7 text-slate-700 sm:text-lg sm:leading-8">
-                  A Guru is a trusted pet care pro — someone pets love, parents trust,
-                  and communities rely on. More than a sitter, a Guru is a trusted
-                  guide in your pet’s care.
+                  A Guru is a trusted pet care pro — someone pets love, parents
+                  trust, and communities rely on. More than a sitter, a Guru is
+                  a trusted guide in your pet’s care.
                 </p>
               </div>
 
@@ -952,7 +1279,11 @@ export default function HomePage() {
                   href="/login"
                   className="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
                   onClick={() =>
-                    trackHomepageClick("Customer Login", "hero_login_prompt", "/login")
+                    trackHomepageClick(
+                      "Customer Login",
+                      "hero_login_prompt",
+                      "/login",
+                    )
                   }
                 >
                   Customer Login
@@ -1023,7 +1354,9 @@ export default function HomePage() {
                     <input
                       type="text"
                       value={launchForm.fullName}
-                      onChange={(e) => updateLaunchField("fullName", e.target.value)}
+                      onChange={(e) =>
+                        updateLaunchField("fullName", e.target.value)
+                      }
                       placeholder="Your full name"
                       className="input w-full"
                       required
@@ -1037,7 +1370,9 @@ export default function HomePage() {
                     <input
                       type="email"
                       value={launchForm.email}
-                      onChange={(e) => updateLaunchField("email", e.target.value)}
+                      onChange={(e) =>
+                        updateLaunchField("email", e.target.value)
+                      }
                       placeholder="you@example.com"
                       className="input w-full"
                       required
@@ -1053,7 +1388,9 @@ export default function HomePage() {
                     <input
                       type="tel"
                       value={launchForm.phone}
-                      onChange={(e) => updateLaunchField("phone", e.target.value)}
+                      onChange={(e) =>
+                        updateLaunchField("phone", e.target.value)
+                      }
                       placeholder="Optional"
                       className="input w-full"
                     />
@@ -1066,7 +1403,9 @@ export default function HomePage() {
                     <input
                       type="text"
                       value={launchForm.zipCode}
-                      onChange={(e) => updateLaunchField("zipCode", e.target.value)}
+                      onChange={(e) =>
+                        updateLaunchField("zipCode", e.target.value)
+                      }
                       placeholder="Optional"
                       className="input w-full"
                     />
@@ -1092,7 +1431,8 @@ export default function HomePage() {
                             trackEvent({
                               eventName: "launch_interest_selected",
                               eventType: "lead",
-                              source: launchForm.source || detectSourceFromUrl(),
+                              source:
+                                launchForm.source || detectSourceFromUrl(),
                               role: option.value,
                               metadata: {
                                 selected_interest: option.value,
@@ -1129,7 +1469,9 @@ export default function HomePage() {
                     <input
                       type="text"
                       value={launchForm.petTypes}
-                      onChange={(e) => updateLaunchField("petTypes", e.target.value)}
+                      onChange={(e) =>
+                        updateLaunchField("petTypes", e.target.value)
+                      }
                       placeholder="Dogs, cats, puppies, senior pets, etc."
                       className="input w-full"
                     />
@@ -1174,9 +1516,11 @@ export default function HomePage() {
                     {launchForm.source || "direct"}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Use links like <span className="font-semibold">?source=instagram</span>,{" "}
+                    Use links like{" "}
+                    <span className="font-semibold">?source=instagram</span>,{" "}
                     <span className="font-semibold">?source=facebook</span>, or{" "}
-                    <span className="font-semibold">?source=tiktok</span> in your bios.
+                    <span className="font-semibold">?source=tiktok</span> in
+                    your bios.
                   </p>
                 </div>
 
@@ -1197,7 +1541,9 @@ export default function HomePage() {
                   disabled={isSubmittingLaunch}
                   className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isSubmittingLaunch ? "Joining Launch List..." : "Unlock Early Access"}
+                  {isSubmittingLaunch
+                    ? "Joining Launch List..."
+                    : "Unlock Early Access"}
                 </button>
               </form>
 
@@ -1250,73 +1596,124 @@ export default function HomePage() {
               });
             }}
           />
-        </div>
-      </section>
 
-      {/* Quick Search */}
-      <section className="section-space border-t border-slate-200 bg-white py-10">
-        <div className="page-container">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="section-kicker">Find a Guru</div>
-            <h2 className="mt-4 text-slate-950">Start with a simple search</h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              Search by service and location from any device. Start simple now,
-              then continue into richer matching, pet details, and booking flow.
-            </p>
-          </div>
-
-          <form
-            action="/search"
-            onSubmit={handleSearchSubmit}
-            className="panel mx-auto mt-8 max-w-5xl p-6 sm:p-8"
-          >
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr_1fr_auto]">
+          <section className="mt-10 rounded-[34px] border border-emerald-100 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
+            <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  What service do you need?
-                </label>
-                <select name="service" className="select w-full">
-                  <option value="">All services</option>
-                  {heroServiceOptions.map((service) => (
-                    <option key={service} value={service}>
-                      {service}
-                    </option>
-                  ))}
-                </select>
+                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-emerald-800">
+                  SitGuru Programs
+                </div>
+
+                <h2 className="mt-4 !text-3xl !font-bold !leading-tight text-slate-950 sm:!text-4xl">
+                  Interested in a SitGuru program? Apply today.
+                </h2>
+
+                <p className="mt-4 text-base leading-7 text-slate-700">
+                  Our Military Hire, Student Hire, and Community Hire programs
+                  are designed to welcome qualified people, provide training and
+                  support, and help productive participants grow into full
+                  SitGuru Gurus.
+                </p>
+
+                <p className="mt-4 text-base leading-7 text-slate-700">
+                  Current students, recent grads, and students looking for
+                  summer work are welcome to apply through the Student Hire
+                  Program.
+                </p>
+
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <Link
+                    href="/programs/apply"
+                    className="btn-primary w-full sm:w-auto"
+                    onClick={() =>
+                      trackHomepageClick(
+                        "Apply to SitGuru Programs",
+                        "homepage_programs_highlight",
+                        "/programs/apply",
+                      )
+                    }
+                  >
+                    Apply Today
+                  </Link>
+
+                  <Link
+                    href="/programs"
+                    className="btn-secondary w-full sm:w-auto"
+                    onClick={() =>
+                      trackHomepageClick(
+                        "View SitGuru Programs",
+                        "homepage_programs_highlight",
+                        "/programs",
+                      )
+                    }
+                  >
+                    Learn More
+                  </Link>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <span className="chip">Training and support</span>
+                  <span className="chip">Background checks required</span>
+                  <span className="chip">Pathway to full Guru status</span>
+                </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  City
-                </label>
-                <input
-                  name="city"
-                  className="input w-full"
-                  placeholder="Quakertown"
-                />
-              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {homepagePrograms.map((program) => (
+                  <div
+                    key={program.title}
+                    className="rounded-[26px] border border-slate-200 bg-slate-50 p-5 transition hover:border-emerald-200 hover:bg-emerald-50/40"
+                  >
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-700 text-2xl text-white shadow-lg shadow-emerald-900/15">
+                      {program.icon}
+                    </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  State
-                </label>
-                <input
-                  name="state"
-                  className="input w-full"
-                  placeholder="Pennsylvania"
-                />
-              </div>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
+                      {program.eyebrow}
+                    </p>
 
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="btn-primary w-full px-10 py-4 text-lg lg:w-auto"
-                >
-                  Search Gurus
-                </button>
+                    <h3 className="mt-2 text-lg font-bold text-slate-950">
+                      {program.title}
+                    </h3>
+
+                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                      {program.description}
+                    </p>
+
+                    <div className="mt-5 flex flex-col gap-2">
+                      <Link
+                        href={program.applyHref}
+                        className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                        onClick={() =>
+                          trackHomepageClick(
+                            `Apply ${program.title}`,
+                            "homepage_programs_card",
+                            program.applyHref,
+                          )
+                        }
+                      >
+                        Apply Today
+                      </Link>
+
+                      <Link
+                        href={program.href}
+                        className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
+                        onClick={() =>
+                          trackHomepageClick(
+                            `Learn ${program.title}`,
+                            "homepage_programs_card",
+                            program.href,
+                          )
+                        }
+                      >
+                        Program Details
+                      </Link>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </form>
+          </section>
         </div>
       </section>
 
@@ -1329,8 +1726,8 @@ export default function HomePage() {
               The 5 pillars guiding the SitGuru experience
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              SitGuru is being shaped around trust, service clarity, better matching,
-              modern discovery, and stronger customer confidence.
+              SitGuru is being shaped around trust, service clarity, better
+              matching, modern discovery, and stronger customer confidence.
             </p>
           </div>
 
@@ -1343,7 +1740,9 @@ export default function HomePage() {
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
                   {pillar.number}
                 </p>
-                <h3 className="mt-3 text-xl font-bold text-slate-950">{pillar.title}</h3>
+                <h3 className="mt-3 text-xl font-bold text-slate-950">
+                  {pillar.title}
+                </h3>
                 <p className="mt-3 text-sm leading-7 text-slate-700">
                   {pillar.description}
                 </p>
@@ -1362,8 +1761,9 @@ export default function HomePage() {
               A marketplace that feels familiar but more elevated
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              SitGuru should feel intuitive to customers coming from platforms like
-              Rover, while offering a broader, more premium path for pet care.
+              SitGuru should feel intuitive to customers coming from platforms
+              like Rover, while offering a broader, more premium path for pet
+              care.
             </p>
           </div>
 
@@ -1392,8 +1792,8 @@ export default function HomePage() {
                 </h3>
                 <p className="mt-3 text-base leading-7 text-slate-700">
                   SitGuru can stand out by supporting specialized requests like
-                  puppy care, senior care, medication support, transport, and custom
-                  pet care needs.
+                  puppy care, senior care, medication support, transport, and
+                  custom pet care needs.
                 </p>
               </div>
 
@@ -1404,7 +1804,7 @@ export default function HomePage() {
                   trackHomepageClick(
                     "Browse Services Through Search",
                     "premium_specialty_care",
-                    "/search"
+                    "/search",
                   )
                 }
               >
@@ -1435,8 +1835,8 @@ export default function HomePage() {
               <p className="mt-4 text-base leading-7 text-slate-700">
                 SitGuru should not stop at service selection alone. Customers
                 should be able to match care to the pet through photos, notes,
-                medication details, temperament, feeding instructions, and special
-                needs.
+                medication details, temperament, feeding instructions, and
+                special needs.
               </p>
               <ul className="mt-6 space-y-3 text-sm leading-7 text-slate-700">
                 <li>• Pet photos and profile details</li>
@@ -1454,8 +1854,9 @@ export default function HomePage() {
                 SitGuru can feel smarter without feeling harder
               </h2>
               <p className="mt-4 text-base leading-7 !text-slate-100">
-                The booking journey should stay simple while collecting the right
-                information to help Gurus understand the pet and the requested care.
+                The booking journey should stay simple while collecting the
+                right information to help Gurus understand the pet and the
+                requested care.
               </p>
               <div className="mt-6 grid gap-3">
                 {[
@@ -1487,8 +1888,8 @@ export default function HomePage() {
               Real local caregivers from a variety of backgrounds
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              The word Guru is flexible on purpose. It supports different types of
-              pet care and trusted local providers while staying easy for pet
+              The word Guru is flexible on purpose. It supports different types
+              of pet care and trusted local providers while staying easy for pet
               parents to understand.
             </p>
           </div>
@@ -1516,9 +1917,9 @@ export default function HomePage() {
                 Find care that feels more trustworthy from the start
               </h2>
               <p className="mt-4 text-base leading-7 text-slate-700">
-                Browse nearby Gurus, compare services, and choose someone who feels
-                right for your pet. SitGuru is being shaped to reduce confusion and
-                make booking feel more confident.
+                Browse nearby Gurus, compare services, and choose someone who
+                feels right for your pet. SitGuru is being shaped to reduce
+                confusion and make booking feel more confident.
               </p>
               <ul className="mt-6 space-y-3 text-sm text-slate-700">
                 <li>• Browse local pet care providers</li>
@@ -1534,7 +1935,7 @@ export default function HomePage() {
                     trackHomepageClick(
                       "Search for a Guru",
                       "for_pet_parents",
-                      "/search"
+                      "/search",
                     )
                   }
                 >
@@ -1580,13 +1981,16 @@ export default function HomePage() {
       <section className="section-space bg-slate-50">
         <div className="page-container">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="section-kicker">Why pet parents will choose SitGuru</div>
+            <div className="section-kicker">
+              Why pet parents will choose SitGuru
+            </div>
             <h2 className="mt-4 text-slate-950">
               Cleaner, clearer, warmer, and more trust-first
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              SitGuru is being built to make discovery feel modern for pet parents
-              while making it easier to search, compare, and choose care.
+              SitGuru is being built to make discovery feel modern for pet
+              parents while making it easier to search, compare, and choose
+              care.
             </p>
           </div>
 
@@ -1652,7 +2056,8 @@ export default function HomePage() {
               </h2>
               <p className="mt-4 text-base leading-7 text-slate-700">
                 SitGuru should help customers before, during, and after bookings
-                with clearer support access, trust guidance, and more visible help.
+                with clearer support access, trust guidance, and more visible
+                help.
               </p>
               <ul className="mt-6 space-y-3 text-sm leading-7 text-slate-700">
                 <li>• Booking help and common questions</li>
@@ -1669,8 +2074,8 @@ export default function HomePage() {
               </h2>
               <p className="mt-4 text-base leading-7 text-slate-700">
                 After this page, the strongest next updates are the search page,
-                public Guru profile, booking flow, customer dashboard, and My Pets
-                experience.
+                public Guru profile, booking flow, customer dashboard, and My
+                Pets experience.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <span className="chip">Find a Guru page</span>
@@ -1688,7 +2093,9 @@ export default function HomePage() {
       <section className="section-space bg-white">
         <div className="page-container">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="section-kicker">Early impression and social proof</div>
+            <div className="section-kicker">
+              Early impression and social proof
+            </div>
             <h2 className="mt-4 text-slate-950">
               Messaging should feel human and easy to trust
             </h2>
@@ -1704,7 +2111,9 @@ export default function HomePage() {
                   “{testimonial.quote}”
                 </p>
                 <div className="mt-6 border-t border-slate-200 pt-4">
-                  <p className="font-semibold text-slate-950">{testimonial.name}</p>
+                  <p className="font-semibold text-slate-950">
+                    {testimonial.name}
+                  </p>
                   <p className="text-sm text-slate-600">{testimonial.role}</p>
                 </div>
               </div>
@@ -1727,9 +2136,9 @@ export default function HomePage() {
               </h2>
 
               <p className="mx-auto mt-4 max-w-2xl !text-base !leading-7 !text-slate-200 sm:!text-lg">
-                Browse local Gurus, compare profiles, and start finding care that
-                feels right for your pet. Or join the early-access list and be part
-                of what launches next.
+                Browse local Gurus, compare profiles, and start finding care
+                that feels right for your pet. Or join the early-access list and
+                be part of what launches next.
               </p>
 
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">

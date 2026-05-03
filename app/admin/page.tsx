@@ -1,12 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
-  Activity,
   BarChart3,
   Bell,
   BriefcaseBusiness,
   CalendarDays,
-  CheckCircle2,
   CircleDollarSign,
   Download,
   FileBarChart,
@@ -27,10 +25,16 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import GuruFinancialDashboardSnapshot from "./GuruFinancialDashboardSnapshot";
 
 export const dynamic = "force-dynamic";
 
 type AnyRow = Record<string, unknown>;
+
+type SafeAdminQueryResponse = {
+  data: unknown;
+  error: unknown;
+};
 
 const adminRoutes = {
   dashboard: "/admin",
@@ -40,6 +44,8 @@ const adminRoutes = {
   newCustomer: "/admin/customers/new",
   gurus: "/admin/gurus",
   newGuru: "/admin/gurus/new",
+  guruPerformance: "/admin/guru-performance",
+  guruPerformanceExport: "/admin/guru-performance/export",
   messages: "/admin/messages",
   settings: "/admin/settings",
   financials: "/admin/financials",
@@ -59,6 +65,8 @@ const adminRoutes = {
   partnerRewards: "/admin/partners/rewards",
   partnerPayouts: "/admin/partners/payouts",
   partnerMessages: "/admin/partners/messages",
+  backgroundChecks: "/admin/background-checks",
+  fraud: "/admin/partners/fraud",
 };
 
 function asString(value: unknown) {
@@ -377,11 +385,6 @@ function getMessageSender(message: AnyRow) {
   );
 }
 
-type SafeAdminQueryResponse = {
-  data: unknown;
-  error: unknown;
-};
-
 async function safeAdminQuery(
   query: PromiseLike<SafeAdminQueryResponse>,
   label: string,
@@ -421,6 +424,39 @@ function mergeRows(...groups: AnyRow[][]) {
   return merged;
 }
 
+function getSourceColor(source: string) {
+  if (source === "Instagram") return "#EC4899";
+  if (source === "Facebook") return "#3B82F6";
+  if (source === "TikTok") return "#1F2937";
+  if (source === "Referral / Email") return "#FB923C";
+  return "#059669";
+}
+
+function buildSignupConicGradient(
+  sources: {
+    name: string;
+    value: number;
+  }[],
+) {
+  const total = sources.reduce((sum, source) => sum + source.value, 0);
+
+  if (!total) {
+    return "conic-gradient(#E5E7EB 0deg 360deg)";
+  }
+
+  let start = 0;
+
+  const stops = sources.map((source) => {
+    const degrees = (source.value / total) * 360;
+    const end = start + degrees;
+    const segment = `${getSourceColor(source.name)} ${start}deg ${end}deg`;
+    start = end;
+    return segment;
+  });
+
+  return `conic-gradient(${stops.join(", ")})`;
+}
+
 async function getAdminDashboardData() {
   const [
     bookingsResult,
@@ -431,6 +467,7 @@ async function getAdminDashboardData() {
     messagesResult,
     programsResult,
     partnersResult,
+    expensesResult,
     networkProgramsResult,
     networkParticipantsResult,
     networkReferralsResult,
@@ -490,6 +527,10 @@ async function getAdminDashboardData() {
     safeAdminQuery(
       supabaseAdmin.from("partners").select("*").limit(500),
       "partners",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("expenses").select("*").limit(1000),
+      "expenses",
     ),
     safeAdminQuery(
       supabaseAdmin.from("network_programs").select("*").limit(500),
@@ -559,6 +600,7 @@ async function getAdminDashboardData() {
   const messages = ((messagesResult.data || []) as AnyRow[]).filter(Boolean);
   const programs = ((programsResult.data || []) as AnyRow[]).filter(Boolean);
   const partners = ((partnersResult.data || []) as AnyRow[]).filter(Boolean);
+  const expenses = ((expensesResult.data || []) as AnyRow[]).filter(Boolean);
 
   const networkPrograms = ((networkProgramsResult.data || []) as AnyRow[]).filter(Boolean);
   const networkParticipants = ((networkParticipantsResult.data || []) as AnyRow[]).filter(Boolean);
@@ -615,6 +657,14 @@ async function getAdminDashboardData() {
     (sum, booking) => sum + getTaxAmount(booking),
     0,
   );
+
+  const realExpenseTotal = sumAmounts(expenses, [
+    "amount",
+    "expense_amount",
+    "total",
+    "cost",
+    "price",
+  ]);
 
   const pendingPayouts = bookings.reduce((sum, booking) => {
     const paymentStatus = asString(booking.payment_status).toLowerCase();
@@ -893,12 +943,16 @@ async function getAdminDashboardData() {
 
   const ambassadorRows = mergeRows(
     ambassadors,
-    networkParticipants.filter((row) => getParticipantType(row).includes("ambassador")),
+    networkParticipants.filter((row) =>
+      getParticipantType(row).includes("ambassador"),
+    ),
   );
 
   const affiliateRows = mergeRows(
     affiliates,
-    networkParticipants.filter((row) => getParticipantType(row).includes("affiliate")),
+    networkParticipants.filter((row) =>
+      getParticipantType(row).includes("affiliate"),
+    ),
   );
 
   const pendingApplications = partnerApplications.filter(isPendingStatus);
@@ -910,8 +964,16 @@ async function getAdminDashboardData() {
   const pendingPartnerPayouts = partnerPayouts.filter(isPendingStatus);
 
   const pendingRewardsAmount =
-    sumAmounts(pendingNetworkRewards, ["amount", "reward_amount", "payout_amount"]) +
-    sumAmounts(pendingReferralRewards, ["amount", "reward_amount", "payout_amount"]);
+    sumAmounts(pendingNetworkRewards, [
+      "amount",
+      "reward_amount",
+      "payout_amount",
+    ]) +
+    sumAmounts(pendingReferralRewards, [
+      "amount",
+      "reward_amount",
+      "payout_amount",
+    ]);
 
   const pendingPartnerPayoutAmount = sumAmounts(pendingPartnerPayouts, [
     "amount",
@@ -920,12 +982,23 @@ async function getAdminDashboardData() {
     "total",
   ]);
 
-  const totalNetworkClicks = networkClickEvents.length + referralClickEvents.length;
+  const totalNetworkClicks =
+    networkClickEvents.length + referralClickEvents.length;
 
   const campaignNames = new Set<string>();
 
-  for (const row of [...networkClickEvents, ...referralClickEvents, ...partnerCampaigns]) {
-    const campaign = getText(row, ["campaign", "campaign_name", "utm_campaign", "name", "title"]);
+  for (const row of [
+    ...networkClickEvents,
+    ...referralClickEvents,
+    ...partnerCampaigns,
+  ]) {
+    const campaign = getText(row, [
+      "campaign",
+      "campaign_name",
+      "utm_campaign",
+      "name",
+      "title",
+    ]);
     if (campaign) campaignNames.add(campaign);
   }
 
@@ -938,16 +1011,19 @@ async function getAdminDashboardData() {
     messages,
     programs,
     partners,
+    expenses,
     launchSignups,
     grossRevenue,
     netPlatformRevenue,
     taxesCollected,
+    realExpenseTotal,
     pendingPayouts,
     revenueChange,
     platformTakeRate,
     unreadMessages,
     signupSources,
     signupTotal,
+    signupConicGradient: buildSignupConicGradient(signupSources),
     topGurus,
     topCustomers,
     recentMessages,
@@ -964,7 +1040,8 @@ async function getAdminDashboardData() {
       clicks: totalNetworkClicks,
       campaigns: partnerCampaigns.length || campaignNames.size,
       pendingRewardsAmount,
-      pendingRewardsCount: pendingNetworkRewards.length + pendingReferralRewards.length,
+      pendingRewardsCount:
+        pendingNetworkRewards.length + pendingReferralRewards.length,
       pendingPayoutAmount: pendingPartnerPayoutAmount,
       pendingPayoutCount: pendingPartnerPayouts.length,
       unreadPartnerMessages: partnerUnreadMessages,
@@ -991,8 +1068,13 @@ export default async function AdminDashboardPage() {
     data.netPlatformRevenue + data.taxesCollected - data.pendingPayouts,
     0,
   );
-  const expenseTotal = data.grossRevenue * 0.57;
-  const netProfit = Math.max(data.netPlatformRevenue - expenseTotal * 0.08, 0);
+
+  const estimatedExpenseTotal = data.grossRevenue * 0.57;
+  const expenseTotal =
+    data.realExpenseTotal > 0 ? data.realExpenseTotal : estimatedExpenseTotal;
+  const expensesAreEstimated = data.realExpenseTotal <= 0;
+
+  const netProfit = Math.max(data.netPlatformRevenue - expenseTotal, 0);
   const revenueTarget = data.grossRevenue > 0 ? data.grossRevenue * 1.22 : 1;
   const revenueTargetPercent =
     data.grossRevenue > 0
@@ -1025,7 +1107,7 @@ export default async function AdminDashboardPage() {
       trend: "up",
       icon: <BarChart3 size={22} />,
       href: adminRoutes.profitLoss,
-      action: "View financials",
+      action: "View P&L",
       iconBg: "bg-emerald-50 text-emerald-700",
     },
     {
@@ -1048,7 +1130,7 @@ export default async function AdminDashboardPage() {
       trend: "up",
       icon: <ReceiptText size={22} />,
       href: adminRoutes.financials,
-      action: "View financials",
+      action: "View taxes",
       iconBg: "bg-sky-100 text-sky-700",
     },
     {
@@ -1070,14 +1152,15 @@ export default async function AdminDashboardPage() {
     <div className="space-y-4">
       <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
         <div>
-          <div className="mb-1 flex items-center gap-3">
-            <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl 2xl:text-[3.6rem] 2xl:leading-none">
+          <div className="mb-1 flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl 2xl:text-[3.25rem] 2xl:leading-none">
               Welcome back, Admin
             </h1>
             <span className="text-3xl">👋</span>
           </div>
           <p className="text-base font-semibold text-slate-600">
-            Here&apos;s what&apos;s happening with SitGuru today.
+            Real-time SitGuru operations, financials, network programs, and
+            Supabase activity.
           </p>
         </div>
 
@@ -1099,6 +1182,20 @@ export default async function AdminDashboardPage() {
           </Link>
         </div>
       </div>
+
+      <section className="grid gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DataHealthTile label="Supabase Source" value="Live data" />
+        <DataHealthTile label="Bookings Loaded" value={number(data.bookings.length)} />
+        <DataHealthTile label="Profiles Loaded" value={number(data.profiles.length)} />
+        <DataHealthTile
+          label="Network Rows"
+          value={number(
+            data.networkMetrics.activeParticipants +
+              data.networkMetrics.referrals +
+              data.networkMetrics.clicks,
+          )}
+        />
+      </section>
 
       <section className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-5">
         {metrics.map((metric) => (
@@ -1153,6 +1250,8 @@ export default async function AdminDashboardPage() {
         ))}
       </section>
 
+      <GuruFinancialDashboardSnapshot />
+
       <section className="grid items-start gap-4 xl:grid-cols-12">
         <div className="xl:col-span-4">
           <DashboardCard>
@@ -1162,27 +1261,31 @@ export default async function AdminDashboardPage() {
                   Revenue Overview
                 </h2>
                 <p className="text-sm font-semibold text-slate-500">
-                  Track your financial performance
+                  Bookings, platform fees, taxes, payouts, and expenses.
                 </p>
               </div>
 
-              <button className="rounded-2xl border border-[#e3ece5] bg-[#fbfcf9] px-4 py-2 text-xs font-black text-slate-600">
-                This Month
-              </button>
+              <span className="rounded-2xl border border-[#e3ece5] bg-[#fbfcf9] px-4 py-2 text-xs font-black text-slate-600">
+                Live
+              </span>
             </div>
 
             <div className="space-y-5">
               <ProgressLine
-                title="Revenue"
+                title="Gross Revenue"
                 value={money(data.grossRevenue)}
                 percent={revenueTargetPercent}
                 label={`${revenueTargetPercent}% of target`}
               />
               <ProgressLine
-                title="Expenses"
+                title={expensesAreEstimated ? "Expenses Estimate" : "Expenses"}
                 value={money(expenseTotal)}
                 percent={expensePercent}
-                label={`${expensePercent}% of budget`}
+                label={
+                  expensesAreEstimated
+                    ? "No expenses table rows found"
+                    : `${expensePercent}% of revenue`
+                }
                 tone="orange"
               />
               <ProgressLine
@@ -1195,7 +1298,7 @@ export default async function AdminDashboardPage() {
                 title="Platform Take Rate"
                 value={percent(data.platformTakeRate)}
                 percent={Math.min(100, data.platformTakeRate * 10)}
-                label="Healthy"
+                label="Calculated from booking fees"
               />
             </div>
 
@@ -1217,7 +1320,7 @@ export default async function AdminDashboardPage() {
                 Launch Signups
               </h2>
               <p className="text-sm font-semibold text-slate-500">
-                Total signups across all sources
+                Signup sources calculated from Supabase rows.
               </p>
             </div>
 
@@ -1225,10 +1328,7 @@ export default async function AdminDashboardPage() {
               <div className="relative mx-auto h-[180px] w-[180px]">
                 <div
                   className="h-full w-full rounded-full"
-                  style={{
-                    background:
-                      "conic-gradient(#EC4899 0deg 151deg, #059669 151deg 252deg, #3B82F6 252deg 303deg, #1F2937 303deg 335deg, #FB923C 335deg 360deg)",
-                  }}
+                  style={{ background: data.signupConicGradient }}
                 />
                 <div className="absolute inset-[34px] flex flex-col items-center justify-center rounded-full bg-white shadow-inner">
                   <span className="text-2xl font-black text-slate-950">
@@ -1284,7 +1384,7 @@ export default async function AdminDashboardPage() {
               <div>
                 <h2 className="text-lg font-black text-slate-950">Messages</h2>
                 <p className="text-sm font-semibold text-slate-500">
-                  Recent conversations
+                  Recent admin, customer, guru, and SitGuru conversations.
                 </p>
               </div>
 
@@ -1320,7 +1420,7 @@ export default async function AdminDashboardPage() {
                           ) : null}
                         </div>
                       </div>
-                      <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                      <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">
                         {message.body}
                       </p>
                     </div>
@@ -1353,8 +1453,8 @@ export default async function AdminDashboardPage() {
           <DashboardCard>
             <TableHeader
               title="Top Performing Gurus"
-              subtitle="By earnings this month"
-              href={adminRoutes.gurus}
+              subtitle="Calculated from real guru rows and bookings."
+              href={adminRoutes.guruPerformance}
             />
 
             <div className="overflow-x-auto">
@@ -1417,7 +1517,7 @@ export default async function AdminDashboardPage() {
           <DashboardCard>
             <TableHeader
               title="Top Customers"
-              subtitle="By lifetime spend"
+              subtitle="Calculated from profile and booking spend."
               href={adminRoutes.customers}
             />
 
@@ -1480,7 +1580,7 @@ export default async function AdminDashboardPage() {
           <DashboardCard>
             <TableHeader
               title="SitGuru Network Programs"
-              subtitle="Partner, ambassador, affiliate, referral, rewards, and campaign tracking"
+              subtitle="Partners, ambassadors, affiliates, referrals, rewards, and campaigns."
               href={adminRoutes.partners}
             />
 
@@ -1581,7 +1681,7 @@ export default async function AdminDashboardPage() {
               Quick Actions
             </h2>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-9">
               <QuickAction
                 href={adminRoutes.newBooking}
                 icon={<CalendarDays />}
@@ -1601,6 +1701,11 @@ export default async function AdminDashboardPage() {
                 href={adminRoutes.messages}
                 icon={<MessageCircle />}
                 label="Send Message"
+              />
+              <QuickAction
+                href={adminRoutes.guruPerformance}
+                icon={<BarChart3 />}
+                label="Guru Financials"
               />
               <QuickAction
                 href={adminRoutes.reports}
@@ -1632,7 +1737,7 @@ export default async function AdminDashboardPage() {
               <div>
                 <h2 className="text-lg font-black text-white">Cash Position</h2>
                 <p className="text-sm font-semibold text-white/75">
-                  Available Balance
+                  Available balance after pending payouts
                 </p>
               </div>
               <Bell className="text-white/80" />
@@ -1642,7 +1747,7 @@ export default async function AdminDashboardPage() {
               {money(cashPosition)}
             </p>
             <p className="mt-2 text-sm font-bold text-white/75">
-              Updated just now
+              Updated just now from Supabase bookings and payouts
             </p>
 
             <div className="mt-8 h-[70px] rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -1651,8 +1756,8 @@ export default async function AdminDashboardPage() {
                   d="M3 60 C 35 55, 33 42, 56 48 S 83 62, 104 44 S 132 28, 153 38 S 181 55, 199 33 S 223 8, 240 27 S 260 46, 277 5"
                   fill="none"
                   stroke="rgba(255,255,255,0.9)"
-                  strokeWidth="5"
                   strokeLinecap="round"
+                  strokeWidth="5"
                 />
               </svg>
             </div>
@@ -1661,6 +1766,17 @@ export default async function AdminDashboardPage() {
       </section>
 
       <DesignSystem />
+    </div>
+  );
+}
+
+function DataHealthTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-green-100 bg-white px-4 py-3 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-xl font-black text-green-950">{value}</p>
     </div>
   );
 }
@@ -1688,7 +1804,7 @@ function TableHeader({
         <h2 className="text-lg font-black text-slate-950">{title}</h2>
         <p className="text-sm font-semibold text-slate-500">{subtitle}</p>
       </div>
-      <Link href={href} className="text-sm font-black text-green-800">
+      <Link href={href} className="shrink-0 text-sm font-black text-green-800">
         View all
       </Link>
     </div>
@@ -1742,9 +1858,9 @@ function Avatar({
   if (src) {
     return (
       <img
-        src={src}
         alt={name}
         className={`${className} shrink-0 rounded-full object-cover`}
+        src={src}
       />
     );
   }
@@ -1940,8 +2056,8 @@ function DesignSystem() {
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star
                   key={star}
-                  size={16}
                   className="fill-yellow-400 text-yellow-400"
+                  size={16}
                 />
               ))}
               <span className="ml-1">4.9</span>

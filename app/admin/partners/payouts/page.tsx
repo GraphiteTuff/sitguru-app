@@ -1,91 +1,81 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import {
+  ArrowLeft,
+  BadgeDollarSign,
+  Banknote,
+  CheckCircle2,
+  Clock,
+  Download,
+  FileSpreadsheet,
+  MessageCircle,
+  RefreshCcw,
+  ShieldAlert,
+  ShieldCheck,
+  WalletCards,
+  XCircle,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import BackToPartnersButton from "../_components/back-to-partners-button";
+import SupabaseCoordinationBanner from "../_components/supabase-coordination-banner";
 
 type PartnerPayout = {
   id: string;
-  payout_type: "partner" | "affiliate" | "ambassador" | "donation" | "manual";
   partner_id: string | null;
   ambassador_id: string | null;
-  recipient_user_id: string | null;
+  affiliate_id: string | null;
+  reward_id: string | null;
+  payout_batch_id: string | null;
+
   recipient_name: string | null;
   recipient_email: string | null;
-  amount: number;
-  currency: string;
-  status:
+  recipient_type: "partner" | "ambassador" | "affiliate" | "manual" | null;
+
+  payout_amount: number | null;
+  currency: string | null;
+
+  payment_method: string | null;
+  payment_status:
     | "pending"
     | "approved"
     | "processing"
     | "paid"
     | "failed"
-    | "cancelled";
-  payout_method:
-    | "manual"
-    | "stripe"
-    | "paypal"
-    | "check"
-    | "bank_transfer"
-    | "donation"
+    | "cancelled"
+    | "exception"
     | null;
-  payout_period_start: string | null;
-  payout_period_end: string | null;
-  reward_ids: string[] | null;
-  external_reference: string | null;
-  admin_notes: string | null;
+
+  transaction_reference: string | null;
+  accounting_reference: string | null;
+
+  notes: string | null;
+  admin_note: string | null;
+  exception_reason: string | null;
+
   approved_by: string | null;
   approved_at: string | null;
-  paid_by: string | null;
   paid_at: string | null;
   failed_at: string | null;
-  cancelled_at: string | null;
+
   created_at: string;
   updated_at: string;
-  partners: {
-    id: string;
-    business_name: string;
-    partner_type: string;
-    email: string | null;
-  } | null;
-  ambassadors: {
-    id: string;
-    display_name: string;
-    ambassador_type: string;
-    email: string;
-  } | null;
 };
 
-type ReferralReward = {
+type PartnerReward = {
   id: string;
-  referral_code_id: string | null;
   partner_id: string | null;
   ambassador_id: string | null;
-  reward_type: "cash" | "credit" | "donation" | "badge" | "boost" | "manual_bonus";
-  amount: number | null;
+  affiliate_id: string | null;
+  campaign_id: string | null;
+  reward_amount: number | null;
   currency: string | null;
-  status: "pending" | "qualified" | "approved" | "paid" | "rejected" | "reversed";
-  payout_id: string | null;
+  status: string | null;
+  payout_batch_id: string | null;
   created_at: string;
-  partners: {
-    id: string;
-    business_name: string;
-    partner_type: string;
-    email: string | null;
-  } | null;
-  ambassadors: {
-    id: string;
-    display_name: string;
-    ambassador_type: string;
-    email: string;
-  } | null;
-  referral_codes: {
-    id: string;
-    code: string;
-    owner_type: string;
-    campaign_type: string;
-  } | null;
 };
 
 function formatLabel(value: string | null | undefined) {
-  if (!value) return "Not Provided";
+  if (!value) return "Not Available";
 
   return value
     .split("_")
@@ -93,595 +83,1006 @@ function formatLabel(value: string | null | undefined) {
     .join(" ");
 }
 
+function formatDate(value: string | null | undefined) {
+  if (!value) return "Not available";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
 function formatMoney(value: number | null | undefined, currency = "USD") {
+  if (value === null || value === undefined) return "$0";
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency,
+    currency: currency || "USD",
+    maximumFractionDigits: 0,
   }).format(Number(value || 0));
 }
 
-function formatDate(value: string | null) {
-  if (!value) return "Not available";
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+function formatNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) return "0";
+  return new Intl.NumberFormat("en-US").format(value);
 }
 
-function formatDateTime(value: string | null) {
-  if (!value) return "Not available";
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
+function percentage(part: number, total: number) {
+  if (!total) return 0;
+  return Math.round((part / total) * 100);
 }
 
-function statusClasses(status: PartnerPayout["status"]) {
+function statusClasses(status: PartnerPayout["payment_status"]) {
   switch (status) {
     case "paid":
-      return "border-green-200 bg-green-50 text-green-800";
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
     case "approved":
-      return "border-blue-200 bg-blue-50 text-blue-800";
+      return "border-green-200 bg-green-50 text-green-800";
     case "processing":
-      return "border-purple-200 bg-purple-50 text-purple-800";
+      return "border-blue-200 bg-blue-50 text-blue-800";
+    case "pending":
+      return "border-amber-200 bg-amber-50 text-amber-800";
     case "failed":
+    case "exception":
       return "border-red-200 bg-red-50 text-red-800";
     case "cancelled":
       return "border-slate-200 bg-slate-50 text-slate-700";
     default:
-      return "border-amber-200 bg-amber-50 text-amber-800";
-  }
-}
-
-function rewardStatusClasses(status: ReferralReward["status"]) {
-  switch (status) {
-    case "paid":
-      return "border-green-200 bg-green-50 text-green-800";
-    case "approved":
-      return "border-blue-200 bg-blue-50 text-blue-800";
-    case "qualified":
-      return "border-purple-200 bg-purple-50 text-purple-800";
-    case "rejected":
-      return "border-red-200 bg-red-50 text-red-800";
-    case "reversed":
       return "border-slate-200 bg-slate-50 text-slate-700";
-    default:
-      return "border-amber-200 bg-amber-50 text-amber-800";
   }
 }
 
-function payoutTypeIcon(type: PartnerPayout["payout_type"] | ReferralReward["reward_type"]) {
+function recipientClasses(type: PartnerPayout["recipient_type"]) {
   switch (type) {
+    case "partner":
+      return "border-green-200 bg-green-50 text-green-800";
+    case "ambassador":
+      return "border-orange-200 bg-orange-50 text-orange-800";
+    case "affiliate":
+      return "border-purple-200 bg-purple-50 text-purple-800";
+    case "manual":
+      return "border-blue-200 bg-blue-50 text-blue-800";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-700";
+  }
+}
+
+function payoutIcon(type: PartnerPayout["recipient_type"]) {
+  switch (type) {
+    case "partner":
+      return "🤝";
     case "ambassador":
       return "⭐";
     case "affiliate":
       return "📈";
-    case "donation":
-      return "💚";
     case "manual":
-    case "manual_bonus":
       return "🧾";
-    case "credit":
-      return "🎟️";
-    case "cash":
-      return "💵";
     default:
-      return "🤝";
+      return "💸";
   }
 }
 
-function getPayoutRecipient(payout: PartnerPayout) {
-  if (payout.recipient_name) return payout.recipient_name;
-  if (payout.partners?.business_name) return payout.partners.business_name;
-  if (payout.ambassadors?.display_name) return payout.ambassadors.display_name;
-  return "Unknown Recipient";
+function sumPayouts(
+  payouts: PartnerPayout[],
+  statuses?: NonNullable<PartnerPayout["payment_status"]>[]
+) {
+  return payouts.reduce((sum, payout) => {
+    if (statuses && !statuses.includes(payout.payment_status || "pending")) {
+      return sum;
+    }
+
+    return sum + Number(payout.payout_amount || 0);
+  }, 0);
 }
 
-function getRewardRecipient(reward: ReferralReward) {
-  if (reward.partners?.business_name) return reward.partners.business_name;
-  if (reward.ambassadors?.display_name) return reward.ambassadors.display_name;
-  return "Unassigned Reward";
+function sumRewards(
+  rewards: PartnerReward[],
+  statuses?: string[]
+) {
+  return rewards.reduce((sum, reward) => {
+    if (statuses && !statuses.includes(reward.status || "")) return sum;
+    return sum + Number(reward.reward_amount || 0);
+  }, 0);
+}
+
+async function updatePayoutStatusAction(formData: FormData) {
+  "use server";
+
+  const payoutId = String(formData.get("payoutId") || "");
+  const paymentStatus = String(
+    formData.get("paymentStatus") || ""
+  ) as NonNullable<PartnerPayout["payment_status"]>;
+  const adminNote = String(formData.get("adminNote") || "");
+  const transactionReference = String(
+    formData.get("transactionReference") || ""
+  );
+
+  if (!payoutId || !paymentStatus) return;
+
+  const now = new Date().toISOString();
+
+  const updatePayload: Partial<PartnerPayout> = {
+    payment_status: paymentStatus,
+    admin_note: adminNote || null,
+    updated_at: now,
+  };
+
+  if (transactionReference) {
+    updatePayload.transaction_reference = transactionReference;
+  }
+
+  if (paymentStatus === "approved") {
+    updatePayload.approved_at = now;
+  }
+
+  if (paymentStatus === "paid") {
+    updatePayload.paid_at = now;
+  }
+
+  if (paymentStatus === "failed" || paymentStatus === "exception") {
+    updatePayload.failed_at = now;
+  }
+
+  const supabase = await createClient();
+
+  await supabase.from("partner_payouts").update(updatePayload).eq("id", payoutId);
+
+  revalidatePath("/admin/partners/payouts");
+  revalidatePath("/admin/partners");
 }
 
 export default async function AdminPartnerPayoutsPage() {
   const supabase = await createClient();
 
-  const { data: payoutsData, error: payoutsError } = await supabase
-    .from("partner_payouts")
-    .select(
-      `
-        *,
-        partners (
-          id,
-          business_name,
-          partner_type,
-          email
-        ),
-        ambassadors (
-          id,
-          display_name,
-          ambassador_type,
-          email
-        )
-      `
-    )
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const [payoutResponse, rewardResponse] = await Promise.all([
+    supabase
+      .from("partner_payouts")
+      .select("*")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("partner_rewards")
+      .select(
+        "id, partner_id, ambassador_id, affiliate_id, campaign_id, reward_amount, currency, status, payout_batch_id, created_at"
+      )
+      .order("created_at", { ascending: false }),
+  ]);
 
-  const { data: approvedRewardsData, error: approvedRewardsError } = await supabase
-    .from("referral_rewards")
-    .select(
-      `
-        *,
-        partners (
-          id,
-          business_name,
-          partner_type,
-          email
-        ),
-        ambassadors (
-          id,
-          display_name,
-          ambassador_type,
-          email
-        ),
-        referral_codes (
-          id,
-          code,
-          owner_type,
-          campaign_type
-        )
-      `
-    )
-    .eq("status", "approved")
-    .is("payout_id", null)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const payouts = (payoutResponse.data ?? []) as PartnerPayout[];
+  const rewards = (rewardResponse.data ?? []) as PartnerReward[];
 
-  const payouts = (payoutsData ?? []) as PartnerPayout[];
-  const approvedRewards = (approvedRewardsData ?? []) as ReferralReward[];
+  const payoutError = payoutResponse.error;
+  const rewardError = rewardResponse.error;
 
-  const pendingPayouts = payouts.filter((payout) => payout.status === "pending").length;
-  const approvedPayouts = payouts.filter((payout) => payout.status === "approved").length;
-  const processingPayouts = payouts.filter(
-    (payout) => payout.status === "processing"
+  const pendingCount = payouts.filter(
+    (payout) => payout.payment_status === "pending"
   ).length;
-  const paidPayouts = payouts.filter((payout) => payout.status === "paid").length;
 
-  const pendingPayoutValue = payouts
-    .filter((payout) => payout.status === "pending")
-    .reduce((sum, payout) => sum + Number(payout.amount || 0), 0);
+  const approvedCount = payouts.filter(
+    (payout) => payout.payment_status === "approved"
+  ).length;
 
-  const paidPayoutValue = payouts
-    .filter((payout) => payout.status === "paid")
-    .reduce((sum, payout) => sum + Number(payout.amount || 0), 0);
+  const processingCount = payouts.filter(
+    (payout) => payout.payment_status === "processing"
+  ).length;
 
-  const approvedRewardValue = approvedRewards.reduce(
-    (sum, reward) => sum + Number(reward.amount || 0),
-    0
-  );
+  const paidCount = payouts.filter(
+    (payout) => payout.payment_status === "paid"
+  ).length;
+
+  const failedCount = payouts.filter(
+    (payout) =>
+      payout.payment_status === "failed" ||
+      payout.payment_status === "exception"
+  ).length;
+
+  const cancelledCount = payouts.filter(
+    (payout) => payout.payment_status === "cancelled"
+  ).length;
+
+  const pendingValue = sumPayouts(payouts, ["pending"]);
+  const approvedValue = sumPayouts(payouts, ["approved"]);
+  const processingValue = sumPayouts(payouts, ["processing"]);
+  const paidValue = sumPayouts(payouts, ["paid"]);
+  const exceptionValue = sumPayouts(payouts, ["failed", "exception"]);
+  const totalPayoutValue = sumPayouts(payouts);
+
+  const approvedRewardValue = sumRewards(rewards, ["approved"]);
+  const paidRewardValue = sumRewards(rewards, ["paid"]);
+  const payoutReadyRewardValue = approvedRewardValue;
+
+  const partnerPayoutCount = payouts.filter(
+    (payout) => payout.recipient_type === "partner"
+  ).length;
+
+  const ambassadorPayoutCount = payouts.filter(
+    (payout) => payout.recipient_type === "ambassador"
+  ).length;
+
+  const affiliatePayoutCount = payouts.filter(
+    (payout) => payout.recipient_type === "affiliate"
+  ).length;
+
+  const manualPayoutCount = payouts.filter(
+    (payout) => payout.recipient_type === "manual"
+  ).length;
+
+  const paidRate = percentage(paidCount, payouts.length);
+  const approvalRate = percentage(approvedCount + processingCount + paidCount, payouts.length);
+  const exceptionRate = percentage(failedCount, payouts.length);
 
   return (
-    <main className="min-h-screen bg-[#fbfaf6] text-slate-950">
-      <section className="border-b border-green-100 bg-white">
-        <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-green-800">
-                <Link href="/admin" className="hover:text-green-950">
-                  Admin
+    <main className="min-h-screen bg-[#F7FAF3] text-[#17382B]">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <BackToPartnersButton />
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Link
+                  href="/admin/partners/rewards"
+                  className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Previous: Rewards
                 </Link>
-                <span className="mx-2 text-slate-400">/</span>
-                <Link href="/admin/partners" className="hover:text-green-950">
-                  Partners
+
+                <Link
+                  href="/api/admin/partners/payouts/export"
+                  className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Export CSV
                 </Link>
-                <span className="mx-2 text-slate-400">/</span>
-                Payouts
+              </div>
+            </div>
+
+            <div className="max-w-4xl">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
+                <WalletCards className="h-7 w-7" />
               </div>
 
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-green-950 sm:text-5xl">
-                Partner Payouts
+              <p className="mt-6 text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+                Partner Network Payments and Accounting Reports
+              </p>
+
+              <h1 className="mt-3 text-4xl font-black leading-tight tracking-tight text-[#17382B] sm:text-5xl lg:text-6xl">
+                Payouts
               </h1>
 
-              <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-                Manage payout batches for approved partner, affiliate,
-                ambassador, donation, and manual bonus rewards.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/admin/partners/rewards"
-                className="inline-flex items-center justify-center rounded-xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 transition hover:border-green-800 hover:bg-green-50"
-              >
-                Rewards
-              </Link>
-
-              <Link
-                href="/admin/partners"
-                className="inline-flex items-center justify-center rounded-xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-green-900/15 transition hover:bg-green-900"
-              >
-                Partner Overview
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5">
-              <p className="text-sm font-bold text-amber-800">
-                Pending Payouts
-              </p>
-              <p className="mt-2 text-3xl font-black text-amber-950">
-                {pendingPayouts}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-              <p className="text-sm font-bold text-blue-800">
-                Approved Payouts
-              </p>
-              <p className="mt-2 text-3xl font-black text-blue-950">
-                {approvedPayouts}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-purple-100 bg-purple-50 p-5">
-              <p className="text-sm font-bold text-purple-800">Processing</p>
-              <p className="mt-2 text-3xl font-black text-purple-950">
-                {processingPayouts}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-green-100 bg-green-50 p-5">
-              <p className="text-sm font-bold text-green-800">Paid Payouts</p>
-              <p className="mt-2 text-3xl font-black text-green-950">
-                {paidPayouts}
+              <p className="mt-4 max-w-3xl text-base font-semibold leading-7 text-slate-700 sm:text-lg">
+                Track SitGuru partner payouts, ambassador payments, affiliate
+                commissions, payout batches, payment statuses, transaction
+                references, exceptions, and accounting-ready payout reporting.
               </p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-5 py-8 sm:px-8 lg:grid-cols-[1fr_360px] lg:px-10">
-        <div className="space-y-6">
-          {payoutsError ? (
-            <div className="rounded-[1.5rem] border border-red-200 bg-red-50 p-6 text-red-900">
-              <h2 className="text-xl font-black">Could not load payouts</h2>
-              <p className="mt-2 text-sm leading-6">
-                Supabase returned an error while loading partner payouts:
-              </p>
-              <pre className="mt-4 overflow-auto rounded-xl bg-white p-4 text-xs">
-                {payoutsError.message}
-              </pre>
-            </div>
-          ) : (
-            <div className="rounded-[1.5rem] border border-green-100 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.22em] text-green-700">
-                    Payout batches
-                  </p>
-                  <h2 className="mt-2 text-3xl font-black tracking-tight text-green-950">
-                    Recent payouts
-                  </h2>
-                </div>
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-3xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
+            <p className="text-sm font-black text-blue-900">Pending Payouts</p>
+            <p className="mt-3 text-4xl font-black leading-none text-blue-950">
+              {pendingCount}
+            </p>
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-700">
+              Payouts waiting for admin approval or payment processing.
+            </p>
+          </div>
 
-                <p className="text-sm font-semibold text-slate-500">
-                  Showing latest 50 payout rows.
+          <div className="rounded-3xl border border-green-100 bg-green-50 p-5 shadow-sm">
+            <p className="text-sm font-black text-green-900">Approved / Processing</p>
+            <p className="mt-3 text-4xl font-black leading-none text-green-950">
+              {approvedCount + processingCount}
+            </p>
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-700">
+              Payouts approved or currently being processed.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+            <p className="text-sm font-black text-emerald-900">Paid Payouts</p>
+            <p className="mt-3 text-4xl font-black leading-none text-emerald-950">
+              {paidCount}
+            </p>
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-700">
+              Payouts marked paid with accounting or transaction references.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
+            <p className="text-sm font-black text-amber-900">Pending Value</p>
+            <p className="mt-3 text-4xl font-black leading-none text-amber-950">
+              {formatMoney(pendingValue)}
+            </p>
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-700">
+              Estimated payout value waiting for approval or processing.
+            </p>
+          </div>
+        </section>
+
+        {payoutError ? (
+          <section className="rounded-[2rem] border border-red-200 bg-red-50 p-6 text-red-900 shadow-sm">
+            <h2 className="text-xl font-black">Could not load payouts</h2>
+            <p className="mt-2 text-sm font-semibold leading-6">
+              Supabase returned an error while loading partner payouts.
+            </p>
+            <pre className="mt-4 overflow-auto rounded-2xl bg-white p-4 text-xs font-bold text-red-900">
+              {payoutError.message}
+            </pre>
+          </section>
+        ) : null}
+
+        {rewardError ? (
+          <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
+            <h2 className="text-xl font-black">
+              Reward payout readiness could not load
+            </h2>
+            <p className="mt-2 text-sm font-semibold leading-6">
+              The Payouts page loaded, but Supabase could not read
+              partner_rewards for payout-ready reward value.
+            </p>
+            <pre className="mt-4 overflow-auto rounded-2xl bg-white p-4 text-xs font-bold text-amber-900">
+              {rewardError.message}
+            </pre>
+          </section>
+        ) : null}
+
+        <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
+          <div className="flex flex-col gap-6">
+            <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <div className="mb-6">
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+                  Payout Records
+                </p>
+
+                <h2 className="mt-2 text-3xl font-black leading-tight text-[#17382B] sm:text-4xl">
+                  {payouts.length} Payout Records
+                </h2>
+
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                  Partner Network payout records for partners, ambassadors,
+                  affiliates, manual payments, payout batches, accounting exports,
+                  and exception handling.
                 </p>
               </div>
 
               {payouts.length === 0 ? (
-                <div className="mt-6 rounded-2xl border border-green-100 bg-[#fbfaf6] p-8 text-center">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100 text-3xl">
-                    💵
+                <div className="rounded-3xl border border-emerald-100 bg-[#FBFCF8] p-8 text-center">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-3xl">
+                    💸
                   </div>
-                  <h3 className="mt-4 text-xl font-black text-green-950">
-                    No payout batches yet
+
+                  <h3 className="mt-5 text-2xl font-black text-[#17382B]">
+                    No payouts yet
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Payout batches will appear here after approved rewards are
-                    grouped into manual or automated payouts.
+
+                  <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-700">
+                    Once approved rewards are batched for payment, payout records
+                    will appear here with recipient details, payment status,
+                    transaction references, and accounting export readiness.
                   </p>
+
+                  <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                    <Link
+                      href="/admin/partners/rewards"
+                      className="inline-flex rounded-2xl bg-[#007A3D] px-5 py-3 text-sm font-black !text-white transition hover:bg-[#006B35]"
+                    >
+                      View Rewards
+                    </Link>
+
+                    <BackToPartnersButton />
+                  </div>
                 </div>
               ) : (
-                <div className="mt-6 grid gap-4">
+                <div className="grid gap-5">
                   {payouts.map((payout) => (
                     <article
                       key={payout.id}
-                      className="overflow-hidden rounded-2xl border border-green-100 bg-[#fbfaf6]"
+                      className="overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white shadow-sm"
                     >
-                      <div className="flex flex-col gap-4 border-b border-green-100 bg-white p-5 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="flex gap-4">
-                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-green-100 text-3xl">
-                            {payoutTypeIcon(payout.payout_type)}
-                          </div>
-
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={`rounded-full border px-3 py-1 text-xs font-black ${statusClasses(
-                                  payout.status
-                                )}`}
-                              >
-                                {formatLabel(payout.status)}
-                              </span>
-
-                              <span className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-black text-green-800">
-                                {formatLabel(payout.payout_type)}
-                              </span>
-
-                              <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black text-blue-800">
-                                {formatLabel(payout.payout_method)}
-                              </span>
+                      <div className="border-b border-emerald-100 bg-[#FBFCF8] p-5">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="flex gap-4">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-3xl">
+                              {payoutIcon(payout.recipient_type)}
                             </div>
 
-                            <h3 className="mt-3 text-2xl font-black text-green-950">
-                              {getPayoutRecipient(payout)}
-                            </h3>
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`rounded-full border px-3 py-1 text-xs font-black ${recipientClasses(
+                                    payout.recipient_type
+                                  )}`}
+                                >
+                                  {formatLabel(payout.recipient_type)}
+                                </span>
 
-                            <p className="mt-1 text-sm text-slate-600">
-                              Created {formatDateTime(payout.created_at)}
-                            </p>
+                                <span
+                                  className={`rounded-full border px-3 py-1 text-xs font-black ${statusClasses(
+                                    payout.payment_status
+                                  )}`}
+                                >
+                                  {formatLabel(payout.payment_status)}
+                                </span>
+
+                                {payout.payout_batch_id ? (
+                                  <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black text-blue-800">
+                                    Batch Linked
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-800">
+                                    No Batch
+                                  </span>
+                                )}
+                              </div>
+
+                              <h3 className="mt-3 text-2xl font-black text-[#17382B]">
+                                {payout.recipient_name || "Unnamed Recipient"}
+                              </h3>
+
+                              <p className="mt-1 text-sm font-semibold text-slate-600">
+                                Created {formatDate(payout.created_at)} · Updated{" "}
+                                {formatDate(payout.updated_at)}
+                              </p>
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="rounded-2xl bg-[#fbfaf6] px-5 py-4 text-right">
-                          <p className="text-xs font-black uppercase tracking-wide text-green-700">
-                            Amount
-                          </p>
-                          <p className="mt-1 text-3xl font-black text-green-950">
-                            {formatMoney(payout.amount, payout.currency)}
-                          </p>
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Link
+                              href={`/admin/messages?payoutId=${payout.id}`}
+                              className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-900 transition hover:border-emerald-300 hover:bg-emerald-50"
+                            >
+                              <MessageCircle className="mr-2 h-4 w-4" />
+                              Message
+                            </Link>
+
+                            <Link
+                              href="/api/admin/partners/payouts/export"
+                              className="inline-flex items-center justify-center rounded-xl bg-[#007A3D] px-4 py-2 text-sm font-black !text-white transition hover:bg-[#006B35]"
+                            >
+                              <FileSpreadsheet className="mr-2 h-4 w-4 !text-white" />
+                              Export
+                            </Link>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="grid gap-4 p-5 md:grid-cols-3">
-                        <div className="rounded-2xl border border-green-100 bg-white p-4">
-                          <p className="text-xs font-black uppercase tracking-wide text-green-700">
+                      <div className="grid gap-5 p-5 lg:grid-cols-3">
+                        <div className="rounded-2xl border border-emerald-100 bg-[#FBFCF8] p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
+                            Payout Amount
+                          </p>
+
+                          <p className="mt-3 text-3xl font-black text-[#17382B]">
+                            {formatMoney(payout.payout_amount, payout.currency || "USD")}
+                          </p>
+
+                          <p className="mt-2 text-sm font-semibold text-slate-700">
+                            Currency: {payout.currency || "USD"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-emerald-100 bg-[#FBFCF8] p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
                             Recipient
                           </p>
-                          <p className="mt-2 break-words text-sm font-bold text-slate-900">
-                            {payout.recipient_email ||
-                              payout.partners?.email ||
-                              payout.ambassadors?.email ||
-                              "Not provided"}
+
+                          <p className="mt-3 text-sm font-black text-[#17382B]">
+                            {payout.recipient_name || "Not provided"}
+                          </p>
+
+                          <p className="mt-2 break-words text-sm font-semibold text-slate-700">
+                            {payout.recipient_email || "No email provided"}
                           </p>
                         </div>
 
-                        <div className="rounded-2xl border border-green-100 bg-white p-4">
-                          <p className="text-xs font-black uppercase tracking-wide text-green-700">
-                            Payout Period
+                        <div className="rounded-2xl border border-emerald-100 bg-[#FBFCF8] p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
+                            Payment Timeline
                           </p>
-                          <p className="mt-2 text-sm font-bold text-slate-900">
-                            {formatDate(payout.payout_period_start)} →{" "}
-                            {formatDate(payout.payout_period_end)}
+
+                          <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-700">
+                            <p>Approved: {formatDate(payout.approved_at)}</p>
+                            <p>Paid: {formatDate(payout.paid_at)}</p>
+                            <p>Failed: {formatDate(payout.failed_at)}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-5 border-t border-emerald-100 p-5 lg:grid-cols-4">
+                        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-blue-900">
+                            Partner ID
+                          </p>
+                          <p className="mt-3 break-words text-sm font-black text-blue-950">
+                            {payout.partner_id || "Not linked"}
                           </p>
                         </div>
 
-                        <div className="rounded-2xl border border-green-100 bg-white p-4">
-                          <p className="text-xs font-black uppercase tracking-wide text-green-700">
-                            Paid At
+                        <div className="rounded-2xl border border-orange-100 bg-orange-50 p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-orange-900">
+                            Ambassador ID
                           </p>
-                          <p className="mt-2 text-sm font-bold text-slate-900">
-                            {formatDateTime(payout.paid_at)}
+                          <p className="mt-3 break-words text-sm font-black text-orange-950">
+                            {payout.ambassador_id || "Not linked"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-purple-100 bg-purple-50 p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-purple-900">
+                            Affiliate ID
+                          </p>
+                          <p className="mt-3 break-words text-sm font-black text-purple-950">
+                            {payout.affiliate_id || "Not linked"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-emerald-900">
+                            Reward ID
+                          </p>
+                          <p className="mt-3 break-words text-sm font-black text-emerald-950">
+                            {payout.reward_id || "Not linked"}
                           </p>
                         </div>
                       </div>
 
-                      {payout.admin_notes ? (
-                        <div className="border-t border-green-100 p-5">
-                          <div className="rounded-2xl border border-green-100 bg-white p-4">
-                            <p className="text-xs font-black uppercase tracking-wide text-green-700">
-                              Admin Notes
+                      <div className="grid gap-5 border-t border-emerald-100 p-5 lg:grid-cols-3">
+                        <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
+                            Payment Details
+                          </p>
+
+                          <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-700">
+                            <p>Method: {payout.payment_method || "Not set"}</p>
+                            <p>
+                              Transaction:{" "}
+                              {payout.transaction_reference || "Not provided"}
                             </p>
-                            <p className="mt-2 text-sm leading-6 text-slate-700">
-                              {payout.admin_notes}
+                            <p>
+                              Accounting Ref:{" "}
+                              {payout.accounting_reference || "Not provided"}
                             </p>
                           </div>
                         </div>
-                      ) : null}
+
+                        <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
+                            Batch Details
+                          </p>
+
+                          <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-700">
+                            <p>Batch ID: {payout.payout_batch_id || "Not batched"}</p>
+                            <p>Approved By: {payout.approved_by || "Not available"}</p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
+                            Exceptions
+                          </p>
+
+                          <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
+                            {payout.exception_reason ||
+                              payout.admin_note ||
+                              payout.notes ||
+                              "No exceptions recorded."}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-emerald-100 p-5">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <form action={updatePayoutStatusAction}>
+                            <input type="hidden" name="payoutId" value={payout.id} />
+                            <input
+                              type="hidden"
+                              name="paymentStatus"
+                              value="approved"
+                            />
+                            <input
+                              type="hidden"
+                              name="adminNote"
+                              value="Payout approved from admin payouts page."
+                            />
+                            <button
+                              type="submit"
+                              className="inline-flex w-full items-center justify-center rounded-xl bg-[#007A3D] px-4 py-3 text-sm font-black !text-white transition hover:bg-[#006B35]"
+                            >
+                              <ShieldCheck className="mr-2 h-4 w-4 !text-white" />
+                              Approve
+                            </button>
+                          </form>
+
+                          <form action={updatePayoutStatusAction}>
+                            <input type="hidden" name="payoutId" value={payout.id} />
+                            <input
+                              type="hidden"
+                              name="paymentStatus"
+                              value="processing"
+                            />
+                            <input
+                              type="hidden"
+                              name="adminNote"
+                              value="Payout moved to processing from admin payouts page."
+                            />
+                            <button
+                              type="submit"
+                              className="inline-flex w-full items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-900 transition hover:bg-blue-100"
+                            >
+                              <Clock className="mr-2 h-4 w-4" />
+                              Processing
+                            </button>
+                          </form>
+
+                          <form action={updatePayoutStatusAction}>
+                            <input type="hidden" name="payoutId" value={payout.id} />
+                            <input type="hidden" name="paymentStatus" value="paid" />
+                            <input
+                              type="hidden"
+                              name="transactionReference"
+                              value={`TXN-${payout.id.slice(0, 8).toUpperCase()}`}
+                            />
+                            <input
+                              type="hidden"
+                              name="adminNote"
+                              value="Payout marked paid from admin payouts page."
+                            />
+                            <button
+                              type="submit"
+                              className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Mark Paid
+                            </button>
+                          </form>
+
+                          <form action={updatePayoutStatusAction}>
+                            <input type="hidden" name="payoutId" value={payout.id} />
+                            <input
+                              type="hidden"
+                              name="paymentStatus"
+                              value="exception"
+                            />
+                            <input
+                              type="hidden"
+                              name="adminNote"
+                              value="Payout marked as exception from admin payouts page."
+                            />
+                            <button
+                              type="submit"
+                              className="inline-flex w-full items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-900 transition hover:bg-red-100"
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Exception
+                            </button>
+                          </form>
+                        </div>
+                      </div>
                     </article>
                   ))}
                 </div>
               )}
-            </div>
-          )}
+            </section>
+          </div>
 
-          {approvedRewardsError ? (
-            <div className="rounded-[1.5rem] border border-red-200 bg-red-50 p-6 text-red-900">
-              <h2 className="text-xl font-black">
-                Could not load approved rewards
+          <aside className="flex flex-col gap-6">
+            <section className="rounded-[2rem] bg-[#003D1F] p-6 !text-white shadow-sm">
+              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 !text-white">
+                <Banknote className="h-6 w-6 !text-white" />
+              </div>
+
+              <h2 className="text-3xl font-black leading-tight !text-white">
+                Payout Health
               </h2>
-              <p className="mt-2 text-sm leading-6">
-                Supabase returned an error while loading approved rewards:
-              </p>
-              <pre className="mt-4 overflow-auto rounded-xl bg-white p-4 text-xs">
-                {approvedRewardsError.message}
-              </pre>
-            </div>
-          ) : (
-            <div className="rounded-[1.5rem] border border-green-100 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.22em] text-green-700">
-                    Ready for payout
+
+              <div className="mt-6 space-y-4 !text-white">
+                <div className="rounded-2xl bg-white/12 p-4 !text-white">
+                  <p className="text-sm font-black !text-white">Approval Rate</p>
+                  <p className="mt-2 text-3xl font-black !text-white">
+                    {approvalRate}%
                   </p>
-                  <h2 className="mt-2 text-3xl font-black tracking-tight text-green-950">
-                    Approved rewards without payout batch
+                </div>
+
+                <div className="rounded-2xl bg-white/12 p-4 !text-white">
+                  <p className="text-sm font-black !text-white">Paid Rate</p>
+                  <p className="mt-2 text-3xl font-black !text-white">
+                    {paidRate}%
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white/12 p-4 !text-white">
+                  <p className="text-sm font-black !text-white">Exception Rate</p>
+                  <p className="mt-2 text-3xl font-black !text-white">
+                    {exceptionRate}%
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white/12 p-4 !text-white">
+                  <p className="text-sm font-black !text-white">
+                    Total Payout Value
+                  </p>
+                  <p className="mt-2 text-3xl font-black !text-white">
+                    {formatMoney(totalPayoutValue)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white/12 p-4 !text-white">
+                  <p className="text-sm font-black !text-white">Next Priority</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 !text-white">
+                    Wire payout batch creation, payment provider exports,
+                    accounting references, exception resolution, and payout
+                    notifications.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                  <BadgeDollarSign className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+                    Payout Totals
+                  </p>
+                  <h2 className="text-2xl font-black text-[#17382B]">
+                    Value Summary
                   </h2>
                 </div>
-
-                <p className="text-sm font-semibold text-slate-500">
-                  Showing latest 50 approved rewards.
-                </p>
               </div>
 
-              {approvedRewards.length === 0 ? (
-                <div className="mt-6 rounded-2xl border border-green-100 bg-[#fbfaf6] p-8 text-center">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100 text-3xl">
-                    🎁
-                  </div>
-                  <h3 className="mt-4 text-xl font-black text-green-950">
-                    No approved rewards ready for payout
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Rewards marked approved and not assigned to a payout batch
-                    will appear here.
+              <div className="mt-5 space-y-3">
+                <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm font-black text-blue-900">
+                    Pending Value
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-blue-950">
+                    {formatMoney(pendingValue)}
                   </p>
                 </div>
-              ) : (
-                <div className="mt-6 grid gap-4">
-                  {approvedRewards.map((reward) => (
-                    <article
-                      key={reward.id}
-                      className="rounded-2xl border border-green-100 bg-[#fbfaf6] p-5"
-                    >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="flex gap-4">
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-100 text-2xl">
-                            {payoutTypeIcon(reward.reward_type)}
-                          </div>
 
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={`rounded-full border px-3 py-1 text-xs font-black ${rewardStatusClasses(
-                                  reward.status
-                                )}`}
-                              >
-                                {formatLabel(reward.status)}
-                              </span>
-
-                              <span className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-black text-green-800">
-                                {formatLabel(reward.reward_type)}
-                              </span>
-
-                              <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black text-blue-800">
-                                {reward.referral_codes?.code || "Unknown Code"}
-                              </span>
-                            </div>
-
-                            <h3 className="mt-3 text-xl font-black text-green-950">
-                              {getRewardRecipient(reward)}
-                            </h3>
-
-                            <p className="mt-1 text-sm text-slate-600">
-                              Created {formatDateTime(reward.created_at)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-white px-5 py-4 text-right shadow-sm">
-                          <p className="text-xs font-black uppercase tracking-wide text-green-700">
-                            Amount
-                          </p>
-                          <p className="mt-1 text-3xl font-black text-green-950">
-                            {formatMoney(reward.amount, reward.currency || "USD")}
-                          </p>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
+                <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                  <p className="text-sm font-black text-green-900">
+                    Approved Value
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-green-950">
+                    {formatMoney(approvedValue)}
+                  </p>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
 
-        <aside className="space-y-6">
-          <div className="rounded-[1.5rem] border border-green-100 bg-green-950 p-6 text-white shadow-xl shadow-green-950/15">
-            <h2 className="text-2xl font-black">Payout Summary</h2>
-
-            <div className="mt-6 space-y-4">
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="text-sm font-bold text-green-100">
-                  Pending Payout Value
-                </p>
-                <p className="mt-2 text-3xl font-black">
-                  {formatMoney(pendingPayoutValue)}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="text-sm font-bold text-green-100">
-                  Paid Payout Value
-                </p>
-                <p className="mt-2 text-3xl font-black">
-                  {formatMoney(paidPayoutValue)}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="text-sm font-bold text-green-100">
-                  Approved Rewards Ready
-                </p>
-                <p className="mt-2 text-3xl font-black">
-                  {formatMoney(approvedRewardValue)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[1.5rem] border border-green-100 bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-black text-green-950">
-              Payout Workflow
-            </h2>
-
-            <div className="mt-5 space-y-3">
-              {[
-                "Review approved rewards",
-                "Group rewards by partner or ambassador",
-                "Create payout batch",
-                "Approve payout",
-                "Send payment manually or through provider",
-                "Mark payout paid",
-                "Mark related rewards paid",
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-green-100 bg-[#fbfaf6] p-4 text-sm font-bold text-slate-700"
-                >
-                  {item}
+                <div className="rounded-2xl border border-purple-100 bg-purple-50 p-4">
+                  <p className="text-sm font-black text-purple-900">
+                    Processing Value
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-purple-950">
+                    {formatMoney(processingValue)}
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="rounded-[1.5rem] border border-green-100 bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-black text-green-950">Quick Links</h2>
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <p className="text-sm font-black text-emerald-900">
+                    Paid Value
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-emerald-950">
+                    {formatMoney(paidValue)}
+                  </p>
+                </div>
 
-            <div className="mt-5 space-y-3">
-              <Link
-                href="/admin/partners/rewards"
-                className="block rounded-xl border border-green-200 bg-[#fbfaf6] px-4 py-3 text-center text-sm font-black text-green-900 transition hover:border-green-800 hover:bg-green-50"
-              >
-                Rewards
-              </Link>
+                <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
+                  <p className="text-sm font-black text-red-900">
+                    Exception Value
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-red-950">
+                    {formatMoney(exceptionValue)}
+                  </p>
+                </div>
+              </div>
+            </section>
 
-              <Link
-                href="/admin/partners/campaigns"
-                className="block rounded-xl border border-green-200 bg-[#fbfaf6] px-4 py-3 text-center text-sm font-black text-green-900 transition hover:border-green-800 hover:bg-green-50"
-              >
-                Campaigns
-              </Link>
+            <section className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
+                  <RefreshCcw className="h-5 w-5" />
+                </div>
 
-              <Link
-                href="/admin/partners"
-                className="block rounded-xl bg-green-800 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-green-900"
-              >
-                Partner Overview
-              </Link>
-            </div>
-          </div>
-        </aside>
-      </section>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+                    Reward Readiness
+                  </p>
+                  <h2 className="text-2xl font-black text-[#17382B]">
+                    Batch Inputs
+                  </h2>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                  <p className="text-sm font-black text-green-900">
+                    Approved Rewards
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-green-950">
+                    {formatMoney(approvedRewardValue)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <p className="text-sm font-black text-emerald-900">
+                    Paid Rewards
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-emerald-950">
+                    {formatMoney(paidRewardValue)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm font-black text-blue-900">
+                    Payout Ready
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-blue-950">
+                    {formatMoney(payoutReadyRewardValue)}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-800">
+                  <ShieldAlert className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+                    Recipient Breakdown
+                  </p>
+                  <h2 className="text-2xl font-black text-[#17382B]">
+                    Sources
+                  </h2>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                  <p className="text-sm font-black text-green-900">
+                    Partner Payouts
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-green-950">
+                    {formatNumber(partnerPayoutCount)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-orange-100 bg-orange-50 p-4">
+                  <p className="text-sm font-black text-orange-900">
+                    Ambassador Payouts
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-orange-950">
+                    {formatNumber(ambassadorPayoutCount)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-purple-100 bg-purple-50 p-4">
+                  <p className="text-sm font-black text-purple-900">
+                    Affiliate Payouts
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-purple-950">
+                    {formatNumber(affiliatePayoutCount)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm font-black text-blue-900">
+                    Manual Payouts
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-blue-950">
+                    {formatNumber(manualPayoutCount)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-black text-slate-800">
+                    Cancelled
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-slate-950">
+                    {formatNumber(cancelledCount)}
+                  </p>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+
+        <SupabaseCoordinationBanner
+          pagePath="app/admin/partners/payouts/page.tsx"
+          folderPath="app/admin/partners/payouts"
+          primaryTable="partner_payouts"
+          operation="Read partner_payouts, read partner_rewards for payout readiness, approve payouts, move payouts to processing, mark payouts paid, mark payout exceptions, and prepare accounting-ready payout reporting"
+          selectQuery='supabase.from("partner_payouts").select("*").order("created_at", { ascending: false }); supabase.from("partner_rewards").select("id, partner_id, ambassador_id, affiliate_id, campaign_id, reward_amount, currency, status, payout_batch_id, created_at").order("created_at", { ascending: false })'
+          readFields={[
+            "partner_payouts.id",
+            "partner_payouts.partner_id",
+            "partner_payouts.ambassador_id",
+            "partner_payouts.affiliate_id",
+            "partner_payouts.reward_id",
+            "partner_payouts.payout_batch_id",
+            "partner_payouts.recipient_name",
+            "partner_payouts.recipient_email",
+            "partner_payouts.recipient_type",
+            "partner_payouts.payout_amount",
+            "partner_payouts.currency",
+            "partner_payouts.payment_method",
+            "partner_payouts.payment_status",
+            "partner_payouts.transaction_reference",
+            "partner_payouts.accounting_reference",
+            "partner_payouts.exception_reason",
+            "partner_payouts.approved_at",
+            "partner_payouts.paid_at",
+            "partner_payouts.failed_at",
+            "partner_payouts.created_at",
+            "partner_payouts.updated_at",
+            "partner_rewards.id",
+            "partner_rewards.reward_amount",
+            "partner_rewards.status",
+            "partner_rewards.payout_batch_id",
+          ]}
+          filters={[
+            "pending value is calculated from partner_payouts.payout_amount where payment_status is pending",
+            "approved value is calculated from approved payouts",
+            "processing value is calculated from processing payouts",
+            "paid value is calculated from paid payouts",
+            "exception value is calculated from failed and exception payouts",
+            "reward readiness reads approved and paid partner_rewards rows",
+            "recipient breakdown is calculated from recipient_type",
+          ]}
+          searchFields={[
+            "No search input on this page yet",
+            "recipient_name",
+            "recipient_email",
+            "transaction_reference",
+            "accounting_reference",
+            "payout_batch_id",
+            "payment_status",
+          ]}
+          writeActions={[
+            "updatePayoutStatusAction updates partner_payouts.payment_status",
+            "approve action writes approved status and approved_at",
+            "processing action writes processing status",
+            "mark paid action writes paid status, paid_at, and transaction_reference",
+            "exception action writes exception status and failed_at",
+            "all payout actions update admin_note and updated_at",
+          ]}
+          exportRoutes={[
+            "/api/admin/partners/payouts/export",
+            "/admin/partners/rewards",
+          ]}
+          relatedPages={[
+            "/admin/partners",
+            "/admin/partners/rewards",
+            "/admin/partners/campaigns",
+            "/admin/partners/active",
+            "/admin/partners/ambassadors",
+            "/admin/partners/affiliates",
+          ]}
+          relatedTables={[
+            "partner_rewards",
+            "partner_tracking_events",
+            "partner_campaigns",
+            "partners",
+            "ambassadors",
+            "affiliates",
+          ]}
+          notes={[
+            "This page is designed for accounting-ready payout reporting.",
+            "Approved rewards are shown as payout-ready inputs until payout batches are created.",
+            "Payout action buttons write directly to partner_payouts.",
+            "The next build should add payout batch creation and external payment provider exports.",
+          ]}
+        />
+      </div>
     </main>
   );
 }
