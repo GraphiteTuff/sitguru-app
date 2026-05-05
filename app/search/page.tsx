@@ -26,8 +26,14 @@ type GuruRow = {
   city?: string | null;
   state?: string | null;
   zip_code?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
+  service_latitude?: number | string | null;
+  service_longitude?: number | string | null;
+  service_radius_miles?: number | string | null;
+  service_area_enabled?: boolean | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
   hourly_rate?: number | null;
   rate?: number | null;
   experience_years?: number | null;
@@ -41,7 +47,11 @@ type GuruRow = {
   image_url?: string | null;
   is_public?: boolean | null;
   is_active?: boolean | null;
+  is_accepting_bookings?: boolean | null;
+  accepting_bookings?: boolean | null;
   services?: string[] | null;
+  distance_miles?: number | null;
+  service_radius_display?: number | null;
 };
 
 type ZipLookupResult = {
@@ -77,6 +87,131 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
   "cromwell,mn": [46.6766, -92.8802],
   "cromwell,minnesota": [46.6766, -92.8802],
 };
+
+const GURU_SELECT_ATTEMPTS = [
+  `
+    id,
+    user_id,
+    slug,
+    display_name,
+    full_name,
+    title,
+    bio,
+    city,
+    state,
+    zip_code,
+    service_latitude,
+    service_longitude,
+    service_radius_miles,
+    service_area_enabled,
+    latitude,
+    longitude,
+    lat,
+    lng,
+    hourly_rate,
+    rate,
+    experience_years,
+    is_verified,
+    rating_avg,
+    rating,
+    review_count,
+    profile_photo_url,
+    photo_url,
+    avatar_url,
+    image_url,
+    is_public,
+    is_active,
+    is_accepting_bookings,
+    accepting_bookings,
+    services
+  `,
+  `
+    id,
+    user_id,
+    slug,
+    display_name,
+    full_name,
+    title,
+    bio,
+    city,
+    state,
+    zip_code,
+    service_latitude,
+    service_longitude,
+    service_radius_miles,
+    service_area_enabled,
+    hourly_rate,
+    rate,
+    experience_years,
+    is_verified,
+    rating_avg,
+    rating,
+    review_count,
+    profile_photo_url,
+    photo_url,
+    avatar_url,
+    image_url,
+    is_public,
+    is_active,
+    is_accepting_bookings,
+    accepting_bookings,
+    services
+  `,
+  `
+    id,
+    user_id,
+    slug,
+    display_name,
+    full_name,
+    title,
+    bio,
+    city,
+    state,
+    zip_code,
+    latitude,
+    longitude,
+    hourly_rate,
+    rate,
+    experience_years,
+    is_verified,
+    rating_avg,
+    rating,
+    review_count,
+    profile_photo_url,
+    photo_url,
+    avatar_url,
+    image_url,
+    is_public,
+    is_active,
+    services
+  `,
+  `
+    id,
+    user_id,
+    slug,
+    display_name,
+    full_name,
+    title,
+    bio,
+    city,
+    state,
+    zip_code,
+    hourly_rate,
+    rate,
+    experience_years,
+    is_verified,
+    rating_avg,
+    rating,
+    review_count,
+    profile_photo_url,
+    photo_url,
+    avatar_url,
+    image_url,
+    is_public,
+    is_active,
+    services
+  `,
+];
 
 function Card({
   children,
@@ -160,7 +295,176 @@ function getInitials(name: string) {
 }
 
 function cleanZip(value?: string | null) {
-  return String(value || "").replace(/\D/g, "").slice(0, 5);
+  return String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 5);
+}
+
+function readNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function normalizeStateCode(value?: string | null) {
+  const state = String(value || "").trim();
+
+  if (!state) return "";
+
+  const normalized = state.toUpperCase();
+  const stateMap: Record<string, string> = {
+    PENNSYLVANIA: "PA",
+    "NEW JERSEY": "NJ",
+    DELAWARE: "DE",
+    MARYLAND: "MD",
+    "NEW YORK": "NY",
+    MINNESOTA: "MN",
+  };
+
+  return stateMap[normalized] || normalized.slice(0, 2);
+}
+
+function parseCoordinate(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getGuruLatitude(guru: GuruRow) {
+  return parseCoordinate(guru.service_latitude ?? guru.latitude ?? guru.lat);
+}
+
+function getGuruLongitude(guru: GuruRow) {
+  return parseCoordinate(guru.service_longitude ?? guru.longitude ?? guru.lng);
+}
+
+function getGuruRadius(guru: GuruRow) {
+  const parsed = readNumber(guru.service_radius_miles, 25);
+  return parsed > 0 ? parsed : 25;
+}
+
+function calculateDistanceMiles(
+  fromLatitude: number,
+  fromLongitude: number,
+  toLatitude: number,
+  toLongitude: number,
+) {
+  const earthRadiusMiles = 3958.8;
+  const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
+
+  const latitudeDifference = degreesToRadians(toLatitude - fromLatitude);
+  const longitudeDifference = degreesToRadians(toLongitude - fromLongitude);
+
+  const a =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(degreesToRadians(fromLatitude)) *
+      Math.cos(degreesToRadians(toLatitude)) *
+      Math.sin(longitudeDifference / 2) ** 2;
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusMiles * c;
+}
+
+function locationsMatchByText(guru: GuruRow, location: ZipLookupResult | null) {
+  if (!location) return false;
+
+  const guruZip = cleanZip(guru.zip_code);
+
+  if (guruZip && guruZip === location.zip) return true;
+
+  const guruCity = normalizeText(guru.city);
+  const guruState = normalizeStateCode(guru.state);
+  const locationCity = normalizeText(location.city);
+  const locationState = normalizeStateCode(
+    location.state || location.stateName,
+  );
+
+  return Boolean(
+    guruCity &&
+    locationCity &&
+    guruCity === locationCity &&
+    (!guruState || !locationState || guruState === locationState),
+  );
+}
+
+function getGuruSearchCoordinates(guru: GuruRow): [number, number] | null {
+  const latitude = getGuruLatitude(guru);
+  const longitude = getGuruLongitude(guru);
+
+  if (latitude !== null && longitude !== null) {
+    return [latitude, longitude];
+  }
+
+  return getGuruFallbackCoordinates(guru);
+}
+
+function getDistanceFromSearchLocation(
+  guru: GuruRow,
+  searchLocation: ZipLookupResult | null,
+) {
+  if (
+    !searchLocation ||
+    typeof searchLocation.latitude !== "number" ||
+    typeof searchLocation.longitude !== "number" ||
+    !Number.isFinite(searchLocation.latitude) ||
+    !Number.isFinite(searchLocation.longitude)
+  ) {
+    return null;
+  }
+
+  const coordinates = getGuruSearchCoordinates(guru);
+
+  if (!coordinates) return null;
+
+  return calculateDistanceMiles(
+    searchLocation.latitude,
+    searchLocation.longitude,
+    coordinates[0],
+    coordinates[1],
+  );
+}
+
+function guruServesSearchLocation(
+  guru: GuruRow,
+  searchLocation: ZipLookupResult | null,
+  zipFilter: string,
+) {
+  const zip = cleanZip(zipFilter);
+
+  if (!zip) return true;
+
+  if (guru.service_area_enabled === false) return false;
+
+  const textLocationMatches = locationsMatchByText(guru, searchLocation);
+
+  if (textLocationMatches) return true;
+
+  const distanceMiles = getDistanceFromSearchLocation(guru, searchLocation);
+
+  if (distanceMiles === null) {
+    return cleanZip(guru.zip_code) === zip;
+  }
+
+  return distanceMiles <= getGuruRadius(guru);
+}
+
+function enrichGuruWithDistance(
+  guru: GuruRow,
+  searchLocation: ZipLookupResult | null,
+): GuruRow {
+  const textLocationMatches = locationsMatchByText(guru, searchLocation);
+  const distanceMiles = textLocationMatches
+    ? 0
+    : getDistanceFromSearchLocation(guru, searchLocation);
+
+  return {
+    ...guru,
+    distance_miles: distanceMiles,
+    service_radius_display: getGuruRadius(guru),
+  };
 }
 
 function GuruResultPhoto({
@@ -213,17 +517,18 @@ function normalizeLocationKey(city?: string | null, state?: string | null) {
 }
 
 function hasValidCoordinates(guru: GuruRow) {
-  return (
-    typeof guru.latitude === "number" &&
-    typeof guru.longitude === "number" &&
-    Number.isFinite(guru.latitude) &&
-    Number.isFinite(guru.longitude) &&
-    guru.latitude >= -90 &&
-    guru.latitude <= 90 &&
-    guru.longitude >= -180 &&
-    guru.longitude <= 180 &&
-    guru.latitude !== 0 &&
-    guru.longitude !== 0
+  const latitude = getGuruLatitude(guru);
+  const longitude = getGuruLongitude(guru);
+
+  return Boolean(
+    latitude !== null &&
+    longitude !== null &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180 &&
+    latitude !== 0 &&
+    longitude !== 0,
   );
 }
 
@@ -264,10 +569,13 @@ function getSearchMapCenter({
 
   if (
     firstExactGuru &&
-    typeof firstExactGuru.latitude === "number" &&
-    typeof firstExactGuru.longitude === "number"
+    getGuruLatitude(firstExactGuru) !== null &&
+    getGuruLongitude(firstExactGuru) !== null
   ) {
-    return [firstExactGuru.latitude, firstExactGuru.longitude];
+    return [
+      getGuruLatitude(firstExactGuru)!,
+      getGuruLongitude(firstExactGuru)!,
+    ];
   }
 
   const firstFallbackGuru = filteredGurus.find((guru) =>
@@ -288,15 +596,13 @@ function detectSourceFromUrl() {
 
   const params = new URLSearchParams(window.location.search);
   const sourceParam =
-    params.get("source") ||
-    params.get("utm_source") ||
-    params.get("ref") ||
-    "";
+    params.get("source") || params.get("utm_source") || params.get("ref") || "";
 
   const normalized = sourceParam.trim().toLowerCase();
 
   if (!normalized) return "direct";
-  if (normalized.includes("instagram") || normalized === "ig") return "instagram";
+  if (normalized.includes("instagram") || normalized === "ig")
+    return "instagram";
   if (normalized.includes("facebook") || normalized === "fb") return "facebook";
   if (normalized.includes("tiktok") || normalized === "tt") return "tiktok";
   if (normalized.includes("referral")) return "referral";
@@ -312,6 +618,9 @@ function SearchPageContent() {
   const initialCity = searchParams.get("city") || "";
   const initialState = searchParams.get("state") || "";
   const initialZip = cleanZip(searchParams.get("zip") || "");
+  const selectedGuruId =
+    searchParams.get("guru") || searchParams.get("guruId") || "";
+  const selectedGuruSlug = searchParams.get("slug") || "";
 
   const [gurus, setGurus] = useState<GuruRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -328,9 +637,9 @@ function SearchPageContent() {
     "idle" | "loading" | "found" | "not_found"
   >("idle");
 
-  const [highlightedGuruId, setHighlightedGuruId] = useState<string | undefined>(
-    undefined,
-  );
+  const [highlightedGuruId, setHighlightedGuruId] = useState<
+    string | undefined
+  >(undefined);
 
   const hasTrackedSearchPageVisit = useRef(false);
   const lastTrackedSearchKey = useRef("");
@@ -354,53 +663,46 @@ function SearchPageContent() {
         initial_zip: initialZip,
         initial_city: initialCity,
         initial_state: initialState,
+        selected_guru_id: selectedGuruId,
+        selected_guru_slug: selectedGuruSlug,
       },
     });
-  }, [initialService, initialZip, initialCity, initialState]);
+  }, [
+    initialService,
+    initialZip,
+    initialCity,
+    initialState,
+    selectedGuruId,
+    selectedGuruSlug,
+  ]);
 
   useEffect(() => {
     async function loadGurus() {
       setLoading(true);
       setError("");
 
-      const { data, error: gurusError } = await supabase
-        .from("gurus")
-        .select(
-          `
-            id,
-            user_id,
-            slug,
-            display_name,
-            full_name,
-            title,
-            bio,
-            city,
-            state,
-            zip_code,
-            latitude,
-            longitude,
-            hourly_rate,
-            rate,
-            experience_years,
-            is_verified,
-            rating_avg,
-            rating,
-            review_count,
-            profile_photo_url,
-            photo_url,
-            avatar_url,
-            image_url,
-            is_public,
-            is_active,
-            services
-          `,
-        )
-        .or("is_public.eq.true,is_active.eq.true")
-        .order("is_verified", { ascending: false })
-        .order("rating_avg", { ascending: false, nullsFirst: false });
+      let guruRows: GuruRow[] = [];
+      let gurusErrorMessage = "";
 
-      if (gurusError) {
-        setError(gurusError.message);
+      for (const selectColumns of GURU_SELECT_ATTEMPTS) {
+        const { data, error: gurusError } = await supabase
+          .from("gurus")
+          .select(selectColumns)
+          .or("is_public.eq.true,is_active.eq.true")
+          .order("is_verified", { ascending: false })
+          .order("rating_avg", { ascending: false, nullsFirst: false });
+
+        if (!gurusError) {
+          guruRows = ((data || []) as unknown) as GuruRow[];
+          gurusErrorMessage = "";
+          break;
+        }
+
+        gurusErrorMessage = gurusError.message || gurusErrorMessage;
+      }
+
+      if (gurusErrorMessage) {
+        setError(gurusErrorMessage);
         setLoading(false);
 
         trackEvent({
@@ -408,14 +710,12 @@ function SearchPageContent() {
           eventType: "system",
           source: detectSourceFromUrl(),
           metadata: {
-            error: gurusError.message,
+            error: gurusErrorMessage,
           },
         });
 
         return;
       }
-
-      const guruRows = (data || []) as GuruRow[];
 
       setGurus(guruRows);
       setLoading(false);
@@ -527,36 +827,96 @@ function SearchPageContent() {
     const city = normalizeText(cityFilter);
     const state = normalizeText(stateFilter);
     const zip = cleanZip(zipFilter);
+    const selectedId = String(selectedGuruId || "").trim();
+    const selectedSlug = String(selectedGuruSlug || "")
+      .trim()
+      .toLowerCase();
 
-    return gurus.filter((guru) => {
-      const guruName = normalizeText(getGuruName(guru));
-      const guruCity = normalizeText(guru.city);
-      const guruState = normalizeText(guru.state);
-      const guruZip = cleanZip(guru.zip_code);
-      const guruBio = normalizeText(guru.bio);
-      const guruTitle = normalizeText(guru.title);
-      const guruServices = (guru.services || []).join(" ").toLowerCase();
+    return gurus
+      .filter((guru) => guru.is_active !== false)
+      .filter((guru) => guru.is_public !== false)
+      .filter((guru) => guru.is_accepting_bookings !== false)
+      .filter((guru) => guru.accepting_bookings !== false)
+      .filter((guru) => {
+        const guruName = normalizeText(getGuruName(guru));
+        const guruCity = normalizeText(guru.city);
+        const guruState = normalizeText(guru.state);
+        const guruZip = cleanZip(guru.zip_code);
+        const guruBio = normalizeText(guru.bio);
+        const guruTitle = normalizeText(guru.title);
+        const guruServices = (guru.services || []).join(" ").toLowerCase();
 
-      const matchesText =
-        !query ||
-        [guruName, guruCity, guruState, guruZip, guruBio, guruTitle, guruServices]
-          .join(" ")
-          .includes(query);
+        const matchesText =
+          !query ||
+          [
+            guruName,
+            guruCity,
+            guruState,
+            guruZip,
+            guruBio,
+            guruTitle,
+            guruServices,
+          ]
+            .join(" ")
+            .includes(query);
 
-      const matchesZipFilter = !zip || guruZip === zip;
-      const matchesCityFilter = !city || guruCity.includes(city);
-      const matchesStateFilter = !state || guruState.includes(state);
-      const matchesSelectedService = matchesService(guru, serviceFilter);
+        const matchesCareRadius = guruServesSearchLocation(
+          guru,
+          zipLookup,
+          zip,
+        );
+        const matchesManualCityFilter = zip
+          ? true
+          : !city || guruCity.includes(city);
+        const matchesManualStateFilter = zip
+          ? true
+          : !state || guruState.includes(state);
+        const matchesSelectedService = matchesService(guru, serviceFilter);
 
-      return (
-        matchesText &&
-        matchesZipFilter &&
-        matchesCityFilter &&
-        matchesStateFilter &&
-        matchesSelectedService
-      );
-    });
-  }, [gurus, searchTerm, zipFilter, cityFilter, stateFilter, serviceFilter]);
+        return (
+          matchesText &&
+          matchesCareRadius &&
+          matchesManualCityFilter &&
+          matchesManualStateFilter &&
+          matchesSelectedService
+        );
+      })
+      .map((guru) => enrichGuruWithDistance(guru, zipLookup))
+      .sort((a, b) => {
+        const aSelected =
+          (selectedId && String(a.id) === selectedId) ||
+          (selectedSlug && String(a.slug || "").toLowerCase() === selectedSlug);
+        const bSelected =
+          (selectedId && String(b.id) === selectedId) ||
+          (selectedSlug && String(b.slug || "").toLowerCase() === selectedSlug);
+
+        if (aSelected && !bSelected) return -1;
+        if (!aSelected && bSelected) return 1;
+
+        const aDistance =
+          typeof a.distance_miles === "number"
+            ? a.distance_miles
+            : Number.POSITIVE_INFINITY;
+        const bDistance =
+          typeof b.distance_miles === "number"
+            ? b.distance_miles
+            : Number.POSITIVE_INFINITY;
+
+        if (aDistance !== bDistance) return aDistance - bDistance;
+
+        return getGuruName(a).localeCompare(getGuruName(b));
+      });
+  }, [
+    gurus,
+    searchTerm,
+    zipFilter,
+    cityFilter,
+    stateFilter,
+    serviceFilter,
+    zipLookup,
+    selectedGuruId,
+    selectedGuruSlug,
+  ]);
 
   const mapReadyGuruCount = useMemo(
     () => filteredGurus.filter(hasMapLocation).length,
@@ -786,9 +1146,9 @@ function SearchPageContent() {
             </h1>
 
             <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
-              Enter your ZIP code to quickly find SitGuru providers near your
-              pet. City and state will auto-fill and the map will center around
-              your search area.
+              Enter your care ZIP code to find SitGuru providers who accept
+              bookings inside their service radius. City and state will
+              auto-fill and the map will center around your search area.
             </p>
           </div>
 
@@ -883,6 +1243,12 @@ function SearchPageContent() {
                 {filteredGurus.length === 1 ? "" : "s"} found
               </span>
 
+              {cleanZip(zipFilter) ? (
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
+                  Radius-matched care area
+                </span>
+              ) : null}
+
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
                 {mapReadyGuruCount} map pin
                 {mapReadyGuruCount === 1 ? "" : "s"} ready
@@ -936,9 +1302,9 @@ function SearchPageContent() {
                   </h2>
 
                   <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                    Try changing the ZIP code, city, state, service, or profile
-                    search. You can also clear the filters and browse all
-                    available Gurus.
+                    Try changing the ZIP code, service, or profile search. ZIP
+                    searches now show only Gurus who accept care inside their
+                    service radius for that location.
                   </p>
 
                   <div className="mt-5">
@@ -959,11 +1325,28 @@ function SearchPageContent() {
                   const guruRating = getGuruRating(guru);
                   const services = guru.services || [];
                   const guruHasMapLocation = hasMapLocation(guru);
+                  const guruRadius = Math.round(
+                    guru.service_radius_display || getGuruRadius(guru),
+                  );
+                  const guruDistance =
+                    typeof guru.distance_miles === "number"
+                      ? `${guru.distance_miles.toFixed(1)} mi away`
+                      : "Distance calculated by service area";
+                  const isSelectedGuru = Boolean(
+                    (selectedGuruId && String(guru.id) === selectedGuruId) ||
+                    (selectedGuruSlug &&
+                      String(guru.slug || "").toLowerCase() ===
+                        selectedGuruSlug.toLowerCase()),
+                  );
 
                   return (
                     <Card
                       key={guru.id}
-                      className="overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                      className={`overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                        isSelectedGuru
+                          ? "border-emerald-400 ring-4 ring-emerald-100"
+                          : ""
+                      }`}
                       onMouseEnter={() => {
                         setHighlightedGuruId(String(guru.id));
                         trackGuruHover(guru);
@@ -984,6 +1367,12 @@ function SearchPageContent() {
                                   <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl">
                                     {guruName}
                                   </h2>
+
+                                  {isSelectedGuru ? (
+                                    <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
+                                      Selected
+                                    </span>
+                                  ) : null}
 
                                   {guru.is_verified ? (
                                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -1014,6 +1403,16 @@ function SearchPageContent() {
                                   {formatLocation(guru.city, guru.state)}
                                   {guru.zip_code ? ` · ${guru.zip_code}` : ""}
                                 </p>
+
+                                <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                                  {guruRadius}-mile service radius
+                                </p>
+
+                                {cleanZip(zipFilter) ? (
+                                  <p className="mt-1 text-xs font-bold text-slate-500">
+                                    {guruDistance}
+                                  </p>
+                                ) : null}
                               </div>
 
                               <div className="grid shrink-0 grid-cols-2 gap-2 sm:min-w-[180px]">
@@ -1048,6 +1447,10 @@ function SearchPageContent() {
                                 {guru.experience_years
                                   ? `${guru.experience_years}+ years experience`
                                   : "Experience not listed"}
+                              </span>
+
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-bold text-emerald-800">
+                                Accepts care within {guruRadius} mi
                               </span>
                             </div>
 
@@ -1139,7 +1542,9 @@ function SearchPageContent() {
 
                 <div className="min-h-[420px] sm:min-h-[520px] xl:min-h-[900px]">
                   <ProviderMap
-                    markers={filteredGurus as unknown as Record<string, unknown>[]}
+                    markers={
+                      filteredGurus as unknown as Record<string, unknown>[]
+                    }
                     center={mapCenter}
                     highlightedMarkerId={highlightedGuruId}
                   />
@@ -1173,9 +1578,9 @@ function SearchPageFallback() {
             </h1>
 
             <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
-              Enter your ZIP code to quickly find SitGuru providers near your
-              pet. City and state will auto-fill and the map will center around
-              your search area.
+              Enter your care ZIP code to find SitGuru providers who accept
+              bookings inside their service radius. City and state will
+              auto-fill and the map will center around your search area.
             </p>
           </div>
 

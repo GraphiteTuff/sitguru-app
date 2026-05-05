@@ -30,10 +30,15 @@ import Header from "@/components/Header";
 
 type CustomerProfile = {
   first_name: string | null;
+  last_name: string | null;
   full_name: string | null;
   email: string | null;
   phone: string | null;
   service_address: string | null;
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
   emergency_contact: string | null;
   care_preferences: string | null;
   avatar_url: string | null;
@@ -49,6 +54,7 @@ type CustomerProfileForm = {
 
 type RawProfileRow = {
   first_name?: string | null;
+  last_name?: string | null;
   full_name?: string | null;
   name?: string | null;
   phone?: string | null;
@@ -57,9 +63,16 @@ type RawProfileRow = {
   street_address?: string | null;
   address?: string | null;
   home_address?: string | null;
+  service_city?: string | null;
   city?: string | null;
+  home_city?: string | null;
+  service_state?: string | null;
   state?: string | null;
+  home_state?: string | null;
+  service_zip?: string | null;
+  zip?: string | null;
   zip_code?: string | null;
+  zipcode?: string | null;
   postal_code?: string | null;
   emergency_contact?: string | null;
   emergency_contact_name?: string | null;
@@ -437,6 +450,86 @@ function extractZipCode(value?: string | null) {
   return cleanZipCode(match?.[0] || "");
 }
 
+function normalizeStateCode(value?: string | null) {
+  const state = readString(value);
+  if (!state) return "";
+
+  const normalized = state.toUpperCase();
+
+  const stateMap: Record<string, string> = {
+    PENNSYLVANIA: "PA",
+    "NEW JERSEY": "NJ",
+    DELAWARE: "DE",
+    MARYLAND: "MD",
+    "NEW YORK": "NY",
+  };
+
+  return stateMap[normalized] || normalized.slice(0, 2);
+}
+
+function buildAddressFromParts({
+  street,
+  city,
+  state,
+  zipCode,
+}: {
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+}) {
+  const streetValue = readString(street);
+  const cityValue = readString(city);
+  const stateValue = readString(state);
+  const zipValue = cleanZipCode(zipCode);
+  const cityStateZip = [
+    cityValue,
+    [stateValue, zipValue].filter(Boolean).join(" "),
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return [streetValue, cityStateZip].filter(Boolean).join(", ") || null;
+}
+
+function getCustomerCareZip(profile: CustomerProfile | null) {
+  return (
+    cleanZipCode(profile?.zip_code) ||
+    extractZipCode(profile?.service_address) ||
+    ""
+  );
+}
+
+function getCustomerLocationLabel(profile: CustomerProfile | null) {
+  const city = readString(profile?.city);
+  const state = normalizeStateCode(profile?.state);
+  const zipCode = getCustomerCareZip(profile);
+
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  if (state && zipCode) return `${state} ${zipCode}`;
+  if (zipCode) return `ZIP ${zipCode}`;
+  return "";
+}
+
+function locationsMatchByText(guru: RawGuruRow, location: ZipLookupLocation) {
+  const guruZip = cleanZipCode(guru.zip_code);
+
+  if (guruZip && guruZip === location.zip) return true;
+
+  const guruCity = readString(guru.city)?.toLowerCase();
+  const guruState = normalizeStateCode(guru.state);
+  const locationCity = location.city.trim().toLowerCase();
+  const locationState = normalizeStateCode(location.state);
+
+  return Boolean(
+    guruCity &&
+    locationCity &&
+    guruCity === locationCity &&
+    (!guruState || !locationState || guruState === locationState),
+  );
+}
+
 function parseCoordinate(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -503,103 +596,27 @@ function getGuruLocationLabel(guru: RawGuruRow) {
   );
 }
 
-const STATE_ABBREVIATIONS: Record<string, string> = {
-  alabama: "AL",
-  alaska: "AK",
-  arizona: "AZ",
-  arkansas: "AR",
-  california: "CA",
-  colorado: "CO",
-  connecticut: "CT",
-  delaware: "DE",
-  florida: "FL",
-  georgia: "GA",
-  hawaii: "HI",
-  idaho: "ID",
-  illinois: "IL",
-  indiana: "IN",
-  iowa: "IA",
-  kansas: "KS",
-  kentucky: "KY",
-  louisiana: "LA",
-  maine: "ME",
-  maryland: "MD",
-  massachusetts: "MA",
-  michigan: "MI",
-  minnesota: "MN",
-  mississippi: "MS",
-  missouri: "MO",
-  montana: "MT",
-  nebraska: "NE",
-  nevada: "NV",
-  "new hampshire": "NH",
-  "new jersey": "NJ",
-  "new mexico": "NM",
-  "new york": "NY",
-  "north carolina": "NC",
-  "north dakota": "ND",
-  ohio: "OH",
-  oklahoma: "OK",
-  oregon: "OR",
-  pennsylvania: "PA",
-  "rhode island": "RI",
-  "south carolina": "SC",
-  "south dakota": "SD",
-  tennessee: "TN",
-  texas: "TX",
-  utah: "UT",
-  vermont: "VT",
-  virginia: "VA",
-  washington: "WA",
-  "west virginia": "WV",
-  wisconsin: "WI",
-  wyoming: "WY",
-};
+function getGuruSearchHref(guru: NearbyGuru, careZip?: string | null) {
+  const params = new URLSearchParams();
+  const cleanCareZip = cleanZipCode(careZip);
 
-function normalizeState(value?: string | null) {
-  const cleaned = String(value || "").trim();
-  if (!cleaned) return "";
-
-  if (cleaned.length === 2) return cleaned.toUpperCase();
-
-  return STATE_ABBREVIATIONS[cleaned.toLowerCase()] || cleaned.toUpperCase();
-}
-
-function valuesMatch(left?: string | null, right?: string | null) {
-  return String(left || "").trim().toLowerCase() === String(right || "").trim().toLowerCase();
-}
-
-function getGuruZipCode(guru: RawGuruRow) {
-  return cleanZipCode(guru.zip_code);
-}
-
-function getGuruFallbackDistance(
-  guru: RawGuruRow,
-  customerLocation: ZipLookupLocation,
-) {
-  const guruZip = getGuruZipCode(guru);
-
-  if (guruZip && guruZip === customerLocation.zip) {
-    return 0;
+  if (cleanCareZip) {
+    params.set("zip", cleanCareZip);
   }
 
-  const guruCity = readString(guru.city);
-  const guruState = normalizeState(guru.state);
-  const customerCity = readString(customerLocation.city);
-  const customerState = normalizeState(customerLocation.state);
+  params.set("guru", guru.id);
 
-  if (guruCity && customerCity && valuesMatch(guruCity, customerCity) && guruState === customerState) {
-    return 0;
+  if (guru.slug) {
+    params.set("slug", guru.slug);
   }
 
-  return null;
+  const queryString = params.toString();
+
+  return queryString ? `${routes.findGuru}?${queryString}` : routes.findGuru;
 }
 
 function getGuruHref(guru: RawGuruRow) {
-  const slugOrId = guru.slug || guru.id;
-  return slugOrId
-    ? `/gurus/${encodeURIComponent(String(slugOrId))}`
-    : routes.findGuru;
+  return routes.findGuru;
 }
 
 function normalizeNearbyGuru(
@@ -644,7 +661,7 @@ function getLatestCareZip(
 
   if (recentCareZip) return recentCareZip;
 
-  return extractZipCode(profile?.service_address);
+  return getCustomerCareZip(profile);
 }
 
 async function lookupCareZipLocation(
@@ -730,26 +747,25 @@ async function fetchNearbyGurusForCareLocation(zipCode: string) {
     .map((guru) => {
       const guruLatitude = getGuruLatitude(guru);
       const guruLongitude = getGuruLongitude(guru);
+      const textLocationMatches = locationsMatchByText(guru, customerLocation);
 
-      const distanceMiles =
-        guruLatitude !== null && guruLongitude !== null
-          ? calculateDistanceMilesLocal(
-              customerLocation.latitude,
-              customerLocation.longitude,
-              guruLatitude,
-              guruLongitude,
-            )
-          : getGuruFallbackDistance(guru, customerLocation);
+      if (guru.service_area_enabled === false) return null;
 
-      if (distanceMiles === null) return null;
-
-      if (guru.service_area_enabled === false) {
-        return normalizeNearbyGuru(guru, distanceMiles);
+      if (guruLatitude === null || guruLongitude === null) {
+        return textLocationMatches ? normalizeNearbyGuru(guru, 0) : null;
       }
 
-      if (distanceMiles > getGuruRadius(guru)) return null;
+      const distanceMiles = calculateDistanceMilesLocal(
+        customerLocation.latitude,
+        customerLocation.longitude,
+        guruLatitude,
+        guruLongitude,
+      );
 
-      return normalizeNearbyGuru(guru, distanceMiles);
+      if (distanceMiles > getGuruRadius(guru) && !textLocationMatches)
+        return null;
+
+      return normalizeNearbyGuru(guru, textLocationMatches ? 0 : distanceMiles);
     })
     .filter((guru): guru is NearbyGuru => Boolean(guru))
     .sort((a, b) => a.distance_miles - b.distance_miles)
@@ -761,7 +777,7 @@ async function fetchNearbyGurusForCareLocation(zipCode: string) {
     message:
       nearbyGurus.length > 0
         ? ""
-        : "No available Gurus match this care ZIP yet. Check that Gurus have a matching ZIP/city or latitude/longitude plus service radius.",
+        : "No available Gurus are inside their service radius for this care ZIP yet.",
   };
 }
 
@@ -1050,48 +1066,95 @@ function getBookingNextStep(booking: Booking) {
   return "Everything for this booking is organized in one place for easy, stress-free care.";
 }
 
-function buildReadableProfileAddress(row: RawProfileRow | null) {
-  const directAddress =
-    readString(row?.service_address) ||
-    readString(row?.street_address) ||
-    readString(row?.address) ||
-    readString(row?.home_address);
-
-  const city = readString(row?.city);
-  const state = readString(row?.state);
-  const zipCode = cleanZipCode(row?.zip_code || row?.postal_code || extractZipCode(directAddress));
-
-  if (!directAddress && !city && !state && !zipCode) return null;
-
-  const cityStateZip = [city, state, zipCode].filter(Boolean).join(" ");
-
-  if (directAddress && extractZipCode(directAddress)) return directAddress;
-  if (directAddress && cityStateZip) return `${directAddress}, ${cityStateZip}`;
-  if (directAddress) return directAddress;
-
-  return cityStateZip || null;
-}
-
 function buildCustomerProfile(
   row: RawProfileRow | null,
   user: SupabaseUserLike,
 ): CustomerProfile {
   const metadata = user.user_metadata ?? null;
 
+  const firstName =
+    readString(row?.first_name) ||
+    readMetadataString(metadata, ["first_name", "given_name"]) ||
+    null;
+
+  const lastName =
+    readString(row?.last_name) ||
+    readMetadataString(metadata, ["last_name", "family_name"]) ||
+    null;
+
   const fullName =
     readString(row?.full_name) ||
     readString(row?.name) ||
     readMetadataString(metadata, ["full_name", "name"]) ||
+    [firstName, lastName].filter(Boolean).join(" ").trim() ||
     null;
 
-  const firstName =
-    readString(row?.first_name) ||
-    readMetadataString(metadata, ["first_name", "given_name"]) ||
-    fullName?.split(" ")[0] ||
+  const resolvedFirstName = firstName || fullName?.split(" ")[0] || null;
+
+  const streetAddress =
+    readString(row?.street_address) ||
+    readString(row?.address) ||
+    readString(row?.home_address) ||
+    readMetadataString(metadata, [
+      "street_address",
+      "street",
+      "streetAddress",
+      "address",
+      "home_address",
+      "service_address",
+    ]) ||
     null;
+
+  const city =
+    readString(row?.service_city) ||
+    readString(row?.city) ||
+    readString(row?.home_city) ||
+    readMetadataString(metadata, ["service_city", "city", "home_city"]) ||
+    null;
+
+  const state =
+    readString(row?.service_state) ||
+    readString(row?.state) ||
+    readString(row?.home_state) ||
+    readMetadataString(metadata, ["service_state", "state", "home_state"]) ||
+    null;
+
+  const zipCode =
+    cleanZipCode(row?.service_zip) ||
+    cleanZipCode(row?.zip) ||
+    cleanZipCode(row?.zip_code) ||
+    cleanZipCode(row?.zipcode) ||
+    cleanZipCode(row?.postal_code) ||
+    cleanZipCode(
+      readMetadataString(metadata, [
+        "service_zip",
+        "zip",
+        "zip_code",
+        "zipcode",
+        "postal_code",
+      ]),
+    ) ||
+    null;
+
+  const directAddress =
+    readString(row?.service_address) ||
+    readString(row?.address) ||
+    readString(row?.home_address) ||
+    readMetadataString(metadata, ["service_address", "address", "home_address"]) ||
+    null;
+
+  const serviceAddress =
+    directAddress ||
+    buildAddressFromParts({
+      street: streetAddress,
+      city,
+      state,
+      zipCode,
+    });
 
   return {
-    first_name: firstName,
+    first_name: resolvedFirstName,
+    last_name: lastName,
     full_name: fullName,
     email: user.email ?? null,
     phone:
@@ -1099,33 +1162,21 @@ function buildCustomerProfile(
       readString(row?.phone_number) ||
       readMetadataString(metadata, ["phone", "phone_number"]) ||
       null,
-    service_address:
-      readString(row?.service_address) ||
-      readString(row?.address) ||
-      readString(row?.home_address) ||
-      readMetadataString(metadata, [
-        "service_address",
-        "address",
-        "home_address",
-      ]) ||
-      null,
+    service_address: serviceAddress,
+    street_address: streetAddress,
+    city,
+    state,
+    zip_code: zipCode || extractZipCode(serviceAddress),
     emergency_contact:
       readString(row?.emergency_contact) ||
       readString(row?.emergency_contact_name) ||
-      readMetadataString(metadata, [
-        "emergency_contact",
-        "emergency_contact_name",
-      ]) ||
+      readMetadataString(metadata, ["emergency_contact", "emergency_contact_name"]) ||
       null,
     care_preferences:
       readString(row?.care_preferences) ||
       readString(row?.preferences) ||
       readString(row?.notes) ||
-      readMetadataString(metadata, [
-        "care_preferences",
-        "preferences",
-        "notes",
-      ]) ||
+      readMetadataString(metadata, ["care_preferences", "preferences", "notes"]) ||
       null,
     avatar_url:
       readString(row?.avatar_url) ||
@@ -1312,35 +1363,46 @@ function buildPetBookingHref(pet: Pet) {
 }
 
 async function fetchCustomerProfile(user: SupabaseUserLike) {
-  const selectAttempts = [
-    "first_name, full_name, phone, service_address, street_address, address, home_address, city, state, zip_code, postal_code, emergency_contact, care_preferences, avatar_url",
-    "first_name, full_name, phone, street_address, city, state, zip_code, emergency_contact, care_preferences, avatar_url",
-    "first_name, full_name, phone, address, city, state, zip_code, emergency_contact, care_preferences, avatar_url",
-    "first_name, full_name, phone, service_address, emergency_contact, care_preferences, avatar_url",
-    "first_name, full_name, phone, address, emergency_contact, care_preferences, avatar_url",
-    "first_name, full_name, phone, service_address, emergency_contact, care_preferences, profile_photo_url",
-    "first_name, full_name, phone, address, emergency_contact, care_preferences, profile_photo_url",
-    "first_name, full_name, phone, service_address, emergency_contact, care_preferences, photo_url",
-    "first_name, full_name, phone, address, emergency_contact, care_preferences, photo_url",
-    "first_name, full_name, phone, service_address, emergency_contact, care_preferences",
-    "first_name, full_name, phone, address, emergency_contact, care_preferences",
-    "first_name, full_name, phone, service_address, avatar_url",
-    "first_name, full_name, phone, address, avatar_url",
-    "first_name, full_name, phone, service_address",
-    "first_name, full_name, phone, address",
-    "first_name, full_name, avatar_url",
-    "first_name, full_name",
+  const profileSelectAttempts = [
+    "first_name, full_name, phone, service_address, service_city, service_state, service_zip, emergency_contact, care_preferences, email_notifications, push_notifications, text_notifications, avatar_url",
+    "first_name, last_name, full_name, name, phone, phone_number, service_address, service_city, service_state, service_zip, emergency_contact, emergency_contact_name, care_preferences, preferences, notes, avatar_url, profile_photo_url, photo_url, image_url",
+    "first_name, last_name, full_name, name, phone, phone_number, street_address, address, service_address, home_address, service_city, city, home_city, service_state, state, home_state, service_zip, zip, zip_code, zipcode, postal_code, emergency_contact, emergency_contact_name, care_preferences, preferences, notes, avatar_url, profile_photo_url, photo_url, image_url",
+    "first_name, last_name, full_name, name, phone, phone_number, street_address, address, service_address, service_city, city, service_state, state, service_zip, zip, zip_code, zipcode, postal_code, emergency_contact, care_preferences, avatar_url, profile_photo_url, photo_url, image_url",
+    "first_name, last_name, full_name, name, phone, street_address, service_city, city, service_state, state, service_zip, zip_code, emergency_contact, care_preferences, avatar_url",
+    "first_name, last_name, full_name, name, phone, address, service_city, city, service_state, state, service_zip, zip_code, emergency_contact, care_preferences, avatar_url",
+    "first_name, last_name, full_name, name, phone, service_address, emergency_contact, care_preferences, avatar_url",
+    "first_name, last_name, full_name, name, phone, address, emergency_contact, care_preferences, avatar_url",
+    "first_name, last_name, full_name, name, phone, street_address, city, state, zip_code",
+    "first_name, last_name, full_name, name, phone, address, city, state, zip_code",
+    "first_name, last_name, full_name, name, phone, service_address",
+    "first_name, last_name, full_name, name, avatar_url, profile_photo_url, photo_url, image_url",
+    "first_name, last_name, full_name, name",
   ];
 
-  for (const selectColumns of selectAttempts) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(selectColumns)
-      .eq("id", user.id)
-      .maybeSingle();
+  const tableAttempts: Array<{
+    table: string;
+    column: string;
+    value: string;
+  }> = [
+    { table: "profiles", column: "id", value: user.id },
+    { table: "profiles", column: "user_id", value: user.id },
+    { table: "customer_profiles", column: "user_id", value: user.id },
+    { table: "customer_profiles", column: "id", value: user.id },
+    { table: "customers", column: "user_id", value: user.id },
+    { table: "customers", column: "id", value: user.id },
+  ];
 
-    if (!error) {
-      return buildCustomerProfile((data as RawProfileRow | null) ?? null, user);
+  for (const tableAttempt of tableAttempts) {
+    for (const selectColumns of profileSelectAttempts) {
+      const { data, error } = await supabase
+        .from(tableAttempt.table)
+        .select(selectColumns)
+        .eq(tableAttempt.column, tableAttempt.value)
+        .maybeSingle();
+
+      if (!error && data) {
+        return buildCustomerProfile(data as RawProfileRow, user);
+      }
     }
   }
 
@@ -1903,7 +1965,7 @@ function NearbyGurusCarousel({
                 key={guru.id}
                 className="min-w-[280px] max-w-[280px] overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl sm:min-w-[320px] sm:max-w-[320px]"
               >
-                <Link href={guru.href} className="block">
+                <Link href={getGuruSearchHref(guru, careZip)} className="block">
                   <div className="relative h-48 overflow-hidden bg-emerald-50">
                     {guru.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -1935,7 +1997,7 @@ function NearbyGurusCarousel({
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <Link href={guru.href}>
+                      <Link href={getGuruSearchHref(guru, careZip)}>
                         <h3 className="truncate text-lg font-black text-slate-950 transition hover:text-emerald-700">
                           {guru.name}
                         </h3>
@@ -1955,9 +2017,14 @@ function NearbyGurusCarousel({
                     {guru.location}
                   </p>
 
+                  <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                    {Math.round(guru.service_radius_miles)}-mile service radius
+                  </p>
+
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
-                      Radius {guru.service_radius_miles} mi
+                      Accepts care within{" "}
+                      {Math.round(guru.service_radius_miles)} mi
                     </span>
 
                     {guru.rate ? (
@@ -1982,17 +2049,17 @@ function NearbyGurusCarousel({
 
                   <div className="mt-5 grid grid-cols-2 gap-2">
                     <Link
-                      href={guru.href}
+                      href={getGuruSearchHref(guru, careZip)}
                       className="inline-flex min-h-[42px] items-center justify-center rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white transition hover:bg-emerald-700"
                     >
-                      View Guru
+                      Select Guru
                     </Link>
 
                     <Link
-                      href={`${routes.findGuru}?zip=${encodeURIComponent(careZip)}`}
+                      href={`${routes.bookGuru}?guru=${encodeURIComponent(guru.id)}&zip=${encodeURIComponent(careZip)}`}
                       className="inline-flex min-h-[42px] items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
                     >
-                      Search
+                      Book
                     </Link>
                   </div>
                 </div>
@@ -2917,6 +2984,13 @@ export default function CustomerDashboardPage() {
                 <p className="mt-2 text-lg font-semibold text-slate-700">
                   SitGuru Pet Parent
                 </p>
+
+                {getCustomerLocationLabel(customerProfile) ? (
+                  <p className="mt-1 text-base font-black text-slate-800">
+                    {getCustomerLocationLabel(customerProfile)}
+                  </p>
+                ) : null}
+
                 <p className="mt-1 max-w-xs text-sm font-semibold leading-6 text-slate-600">
                   {pets.length > 0
                     ? `${pets.length} pet profile${pets.length === 1 ? "" : "s"} ready for care`
