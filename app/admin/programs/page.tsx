@@ -3,7 +3,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   BadgeCheck,
-  BarChart3,
   BriefcaseBusiness,
   Building2,
   CheckCircle2,
@@ -12,10 +11,9 @@ import {
   Handshake,
   Medal,
   MessageCircle,
-  MousePointerClick,
   ShieldCheck,
   Sparkles,
-  TrendingUp,
+  Trophy,
   UserCheck,
   UsersRound,
 } from "lucide-react";
@@ -30,27 +28,37 @@ type SafeAdminQueryResponse = {
   error: unknown;
 };
 
+type ProgramKey =
+  | "student-hire"
+  | "community-hire"
+  | "military-hire"
+  | "skillbridge-interest";
+
 type ProgramDefinition = {
-  key: "military-hire" | "student-hire" | "community-hire";
+  key: ProgramKey;
   title: string;
+  shortTitle: string;
   eyebrow: string;
   description: string;
   href: string;
+  applicationsHref: string;
   icon: ReactNode;
   audience: string[];
   partners: string[];
   goals: string[];
-  contractorRequirements: string[];
+  requirements: string[];
   keywords: string[];
 };
 
 const adminRoutes = {
   dashboard: "/admin",
   programs: "/admin/programs",
+  programApplications: "/admin/program-applications",
   programsExport: "/admin/programs/export",
-  militaryHire: "/admin/programs/military-hire",
   studentHire: "/admin/programs/student-hire",
   communityHire: "/admin/programs/community-hire",
+  militaryHire: "/admin/programs/military-hire",
+  skillbridgeInterest: "/admin/programs/skillbridge-interest",
   partners: "/admin/partners",
   gurus: "/admin/gurus",
   messages: "/admin/messages",
@@ -58,41 +66,172 @@ const adminRoutes = {
 
 const programDefinitions: ProgramDefinition[] = [
   {
+    key: "student-hire",
+    title: "Student Hire Program",
+    shortTitle: "Student Hire",
+    eyebrow: "Extra cash for students",
+    description:
+      "Flexible pet care opportunities for students, recent grads, high school seniors 18+, trade school students, gap-year students, and summer workers who want to earn around class, weekends, school breaks, and summer.",
+    href: adminRoutes.studentHire,
+    applicationsHref: `${adminRoutes.programApplications}?program=student-hire`,
+    icon: <GraduationCap size={26} />,
+    audience: [
+      "Students who want extra cash",
+      "High school seniors 18+",
+      "College students",
+      "Trade school and certificate program students",
+      "Recent graduates",
+      "Summer workers",
+      "Students looking for after-class, break, or weekend income",
+    ],
+    partners: [
+      "Universities",
+      "High schools",
+      "Career centers",
+      "Student organizations",
+      "Athletic teams and clubs",
+      "Summer work programs",
+      "Local education partners",
+    ],
+    goals: [
+      "Increase student Guru applicants",
+      "Create flexible earning opportunities around school",
+      "Track school, availability, services, resume, and onboarding readiness",
+      "Encourage students to share Student Hire with friends",
+    ],
+    requirements: [
+      "Independent contractor marketplace model",
+      "Applicant review",
+      "Age and eligibility review",
+      "Onboarding completion",
+      "Checkr background check when required",
+      "Profile readiness",
+      "Bookable Guru status when approved",
+    ],
+    keywords: [
+      "student-hire",
+      "student hire",
+      "student",
+      "college",
+      "university",
+      "graduate",
+      "recent grad",
+      "campus",
+      "school",
+      "summer",
+      "after class",
+      "between classes",
+    ],
+  },
+  {
+    key: "community-hire",
+    title: "Community Hire Program",
+    shortTitle: "Community Hire",
+    eyebrow: "Community workforce pathway",
+    description:
+      "A supported referral and readiness pathway for qualified applicants connected through workforce programs, nonprofits, city, state, federal, community organizations, re-entry support programs, job-readiness programs, and local employment-support partners.",
+    href: adminRoutes.communityHire,
+    applicationsHref: `${adminRoutes.programApplications}?program=community-hire`,
+    icon: <Building2 size={26} />,
+    audience: [
+      "Workforce program participants",
+      "Nonprofit partner referrals",
+      "City, state, and federal program referrals",
+      "Job-readiness program participants",
+      "Re-entry support program participants",
+      "Community organization referrals",
+      "People seeking flexible local work opportunities",
+      "Applicants ready to learn, communicate, and show reliability",
+    ],
+    partners: [
+      "Workforce development boards",
+      "CareerLink and job centers",
+      "City workforce programs",
+      "State employment programs",
+      "Federal workforce programs",
+      "Nonprofit workforce partners",
+      "Re-entry support organizations",
+      "Community training organizations",
+      "Faith-based and community organizations",
+    ],
+    goals: [
+      "Support workforce-friendly access to local pet care opportunities",
+      "Track partner/referral source and readiness",
+      "Apply fair, consistent, role-related background check review",
+      "Move qualified applicants toward onboarding and full Guru status",
+    ],
+    requirements: [
+      "Independent contractor marketplace model",
+      "Not full-time or part-time employment",
+      "Not guaranteed job placement",
+      "Partner/referral source tracking",
+      "Fair Checkr background check review when required",
+      "EEOC-guided background check review",
+      "Applicable review and notice process when needed",
+    ],
+    keywords: [
+      "community-hire",
+      "community hire",
+      "community",
+      "workforce",
+      "employment-support",
+      "employment support",
+      "job-readiness",
+      "job readiness",
+      "nonprofit",
+      "re-entry",
+      "reentry",
+      "city",
+      "state",
+      "federal",
+      "careerlink",
+      "work program",
+    ],
+  },
+  {
     key: "military-hire",
     title: "Military Hire Program",
-    eyebrow: "1099 marketplace opportunities for military-connected applicants",
+    shortTitle: "Military Hire",
+    eyebrow: "Military-connected pathway",
     description:
-      "Create flexible independent contractor income opportunities for veterans, eligible service members, National Guard, reservists, military spouses, and qualified dependents over 18 who want to become trusted bookable SitGuru pet care providers.",
+      "A supported pathway for veterans, transitioning service members, eligible service members, National Guard, reservists, military spouses, and qualified military-connected applicants over 18 who want flexible pet care opportunities.",
     href: adminRoutes.militaryHire,
+    applicationsHref: `${adminRoutes.programApplications}?program=military-hire`,
     icon: <Medal size={26} />,
     audience: [
       "Veterans",
+      "Transitioning service members",
       "Eligible service members",
-      "National Guard",
-      "Reservists",
+      "National Guard and reservists",
       "Military spouses",
-      "Qualified dependents 18+",
+      "Qualified dependents over 18",
+      "Military-connected applicants ready to work, learn, and grow",
     ],
     partners: [
       "Military transition offices",
       "Veteran support organizations",
-      "Military spouse employment networks",
+      "Military spouse support networks",
       "Base community partners",
+      "Guard and reserve networks",
     ],
     goals: [
-      "Increase qualified Guru applicants",
-      "Support military-connected contractor income opportunities",
-      "Track onboarding, background checks, and bookable readiness",
+      "Increase qualified military-connected Guru applicants",
+      "Track transferable experience and supporting documents",
+      "Support onboarding, training, trust, and background check readiness",
+      "Move strong applicants toward full Guru status",
     ],
-    contractorRequirements: [
-      "1099 independent contractor model",
-      "Identity verification",
-      "Background check eligibility",
-      "Trust and safety approval",
+    requirements: [
+      "Independent contractor marketplace model",
+      "Applicant review",
+      "Resume and optional supporting documents",
+      "Onboarding completion",
+      "Checkr background check when required",
       "Profile readiness",
-      "Bookable Guru status",
+      "Bookable Guru status when approved",
     ],
     keywords: [
+      "military-hire",
+      "military hire",
       "military",
       "veteran",
       "veterans",
@@ -106,95 +245,54 @@ const programDefinitions: ProgramDefinition[] = [
     ],
   },
   {
-    key: "student-hire",
-    title: "Student Hire Program",
-    eyebrow: "Flexible 1099 income opportunities for students",
+    key: "skillbridge-interest",
+    title: "SkillBridge Interest List",
+    shortTitle: "SkillBridge",
+    eyebrow: "Future transition pathway",
     description:
-      "Help students and recent graduates access flexible independent contractor income opportunities through pet care services while building responsibility, communication skills, trust, and local marketplace work experience.",
-    href: adminRoutes.studentHire,
-    icon: <GraduationCap size={26} />,
+      "An interest list for active-duty transitioning service members interested in future SitGuru training pathways around pet care operations, trust and safety, customer experience, local services, and post-transition opportunities.",
+    href: adminRoutes.skillbridgeInterest,
+    applicationsHref: `${adminRoutes.programApplications}?program=skillbridge-interest`,
+    icon: <ShieldCheck size={26} />,
     audience: [
-      "College students",
-      "Trade school students",
-      "Recent graduates",
-      "Responsible student workers",
+      "Active-duty transitioning service members",
+      "Service members exploring civilian pet care operations",
+      "Applicants interested in customer trust and safety",
+      "Applicants interested in local services and operations",
+      "Transitioning service members with command approval when applicable",
+      "People planning post-transition flexible opportunities",
     ],
     partners: [
-      "Universities",
-      "Career centers",
-      "Student organizations",
-      "Local education partners",
+      "Transition assistance programs",
+      "Military education offices",
+      "SkillBridge providers",
+      "Veteran transition partners",
+      "Local workforce partners",
     ],
     goals: [
-      "Create flexible contractor work opportunities",
-      "Grow local Guru coverage",
-      "Track student onboarding, trust checks, and retention",
+      "Track interest in a future SkillBridge-style pathway",
+      "Collect transition timelines and transferable experience",
+      "Evaluate future training and provider partnership options",
+      "Route interested applicants into future SitGuru pathways",
     ],
-    contractorRequirements: [
-      "1099 independent contractor model",
-      "Age and eligibility review",
-      "Background check eligibility",
-      "Training completion",
-      "Profile readiness",
-      "Bookable Guru status",
-    ],
-    keywords: [
-      "student",
-      "college",
-      "university",
-      "graduate",
-      "campus",
-      "career center",
-      "intern",
-      "school",
-    ],
-  },
-  {
-    key: "community-hire",
-    title: "Community Hire Program",
-    eyebrow: "1099 income pathways through workforce partnerships",
-    description:
-      "Coordinate workforce partnerships with city, state, federal, nonprofit, and community employment programs so qualified people who need work can apply, complete SitGuru onboarding, pass trust and safety requirements, and access flexible pet care income opportunities as independent contractors.",
-    href: adminRoutes.communityHire,
-    icon: <Building2 size={26} />,
-    audience: [
-      "People needing work",
-      "Workforce program participants",
-      "Job training participants",
-      "Community re-entry participants",
-      "Local nonprofit referrals",
-    ],
-    partners: [
-      "City workforce programs",
-      "State employment programs",
-      "Federal workforce programs",
-      "Nonprofit workforce partners",
-      "Community training organizations",
-    ],
-    goals: [
-      "Support qualified workers facing employment barriers",
-      "Track partner source, eligibility, and readiness",
-      "Convert qualified participants into bookable Gurus",
-    ],
-    contractorRequirements: [
-      "1099 independent contractor model",
-      "Program source tracking",
-      "Identity verification",
-      "Background check eligibility",
-      "Trust and safety approval",
-      "Bookable Guru status",
+    requirements: [
+      "Interest list only",
+      "No guaranteed SkillBridge participation",
+      "No guaranteed placement or bookings",
+      "Transition timeline review",
+      "Supporting document review when provided",
+      "Future pathway evaluation",
     ],
     keywords: [
-      "community",
-      "city",
-      "state",
-      "federal",
-      "workforce",
-      "employment",
-      "nonprofit",
-      "job training",
-      "re-entry",
-      "work program",
+      "skillbridge-interest",
+      "skillbridge interest",
+      "skillbridge",
+      "transition",
+      "transitioning",
+      "active duty",
+      "active-duty",
+      "military education",
+      "training pathway",
     ],
   },
 ];
@@ -254,62 +352,67 @@ function getStatus(row: AnyRow) {
   return getText(
     row,
     ["status", "application_status", "participant_status", "program_status"],
-    "pending",
-  ).toLowerCase();
-}
-
-function isActiveStatus(row: AnyRow) {
-  const status = getStatus(row);
-
-  return (
-    status === "active" ||
-    status === "approved" ||
-    status === "accepted" ||
-    status === "live" ||
-    status === "enabled" ||
-    status === "bookable" ||
-    status === "complete" ||
-    status === "completed"
-  );
+    "new",
+  )
+    .toLowerCase()
+    .replace(/\s+/g, "_");
 }
 
 function isPendingStatus(row: AnyRow) {
   const status = getStatus(row);
 
-  return (
-    status === "new" ||
-    status === "pending" ||
-    status === "submitted" ||
-    status === "review" ||
-    status === "in_review" ||
-    status === "contacted" ||
-    status === "interested" ||
-    status === "applied"
-  );
+  return [
+    "new",
+    "pending",
+    "submitted",
+    "review",
+    "reviewing",
+    "in_review",
+    "contacted",
+    "interested",
+    "applied",
+    "missing_info",
+  ].includes(status);
 }
 
-function isTrainingStatus(row: AnyRow) {
+function isApprovedStatus(row: AnyRow) {
+  const status = getStatus(row);
+
+  return [
+    "active",
+    "approved",
+    "accepted",
+    "live",
+    "enabled",
+    "bookable",
+    "complete",
+    "completed",
+  ].includes(status);
+}
+
+function isOnboardingStatus(row: AnyRow) {
   const status = getStatus(row);
   const text = JSON.stringify(row).toLowerCase();
 
   return (
+    status.includes("onboarding") ||
     status.includes("training") ||
+    text.includes("onboarding") ||
     text.includes("training_started") ||
-    text.includes("training started") ||
-    text.includes("training")
+    text.includes("training started")
   );
 }
 
-function isBackgroundCheckStatus(row: AnyRow) {
-  const text = JSON.stringify(row).toLowerCase();
+function isCheckrStatus(row: AnyRow) {
   const status = getStatus(row);
+  const text = JSON.stringify(row).toLowerCase();
 
   return (
-    status.includes("background") ||
     status.includes("checkr") ||
+    status.includes("background") ||
+    text.includes("checkr") ||
     text.includes("background_check") ||
-    text.includes("background check") ||
-    text.includes("checkr")
+    text.includes("background check")
   );
 }
 
@@ -336,52 +439,15 @@ function isCompletedBookingStatus(row: AnyRow) {
   );
 }
 
-function getProgramSourceText(row: AnyRow) {
-  return [
-    getText(row, [
-      "program_key",
-      "program_slug",
-      "program_type",
-      "program_name",
-      "program",
-      "source_program",
-      "campaign",
-      "campaign_name",
-      "utm_campaign",
-      "partner_source",
-      "source",
-      "referral_source",
-      "affiliation",
-      "affiliation_type",
-      "community_source",
-      "contractor_type",
-      "worker_type",
-      "classification",
-      "notes",
-      "message",
-      "description",
-      "type",
-      "category",
-      "topic",
-    ]),
-    JSON.stringify(row),
-  ]
-    .join(" ")
-    .toLowerCase();
-}
-
-function rowMatchesProgram(row: AnyRow, program: ProgramDefinition) {
-  const search = getProgramSourceText(row);
-
-  return program.keywords.some((keyword) => search.includes(keyword));
-}
-
-function rowsForProgram(rows: AnyRow[], program: ProgramDefinition) {
-  return rows.filter((row) => rowMatchesProgram(row, program));
-}
-
-function sumRows(rows: AnyRow[], keys: string[]) {
-  return rows.reduce((sum, row) => sum + getAmount(row, keys), 0);
+function getDate(row: AnyRow) {
+  return (
+    asString(row.created_at) ||
+    asString(row.updated_at) ||
+    asString(row.submitted_at) ||
+    asString(row.application_date) ||
+    asString(row.date) ||
+    null
+  );
 }
 
 function formatDate(value?: string | null) {
@@ -397,15 +463,77 @@ function formatDate(value?: string | null) {
   });
 }
 
-function getDate(row: AnyRow) {
-  return (
-    asString(row.created_at) ||
-    asString(row.updated_at) ||
-    asString(row.submitted_at) ||
-    asString(row.application_date) ||
-    asString(row.date) ||
-    null
-  );
+function getProgramSourceText(row: AnyRow) {
+  return [
+    getText(row, [
+      "program",
+      "program_key",
+      "program_slug",
+      "program_type",
+      "program_name",
+      "source_program",
+      "campaign",
+      "campaign_name",
+      "utm_campaign",
+      "partner_source",
+      "source",
+      "referral_source",
+      "affiliation",
+      "affiliation_type",
+      "community_source",
+      "contractor_type",
+      "worker_type",
+      "classification",
+      "school_name",
+      "student_status",
+      "student_background",
+      "military_connected_background",
+      "notes",
+      "message",
+      "description",
+      "type",
+      "category",
+      "topic",
+    ]),
+    JSON.stringify(row),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function rowMatchesProgram(row: AnyRow, program: ProgramDefinition) {
+  const exactProgram = getText(row, [
+    "program",
+    "program_key",
+    "program_slug",
+    "program_type",
+  ])
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+
+  if (exactProgram === program.key) return true;
+
+  const search = getProgramSourceText(row);
+  return program.keywords.some((keyword) => search.includes(keyword));
+}
+
+function rowsForProgram(rows: AnyRow[], program: ProgramDefinition) {
+  return rows.filter((row) => rowMatchesProgram(row, program));
+}
+
+function sumRows(rows: AnyRow[], keys: string[]) {
+  return rows.reduce((sum, row) => sum + getAmount(row, keys), 0);
+}
+
+function latestDateFromRows(rows: AnyRow[]) {
+  const latest = rows
+    .map((row) => getDate(row))
+    .filter(Boolean)
+    .map((value) => new Date(value as string))
+    .filter((value) => !Number.isNaN(value.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+
+  return latest?.toISOString() || null;
 }
 
 async function safeAdminQuery(
@@ -429,6 +557,7 @@ async function safeAdminQuery(
 
 async function getProgramData() {
   const [
+    programApplicationsResult,
     programsResult,
     networkProgramsResult,
     networkParticipantsResult,
@@ -440,6 +569,14 @@ async function getProgramData() {
     gurusResult,
     bookingsResult,
   ] = await Promise.all([
+    safeAdminQuery(
+      supabaseAdmin
+        .from("program_applications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "program_applications",
+    ),
     safeAdminQuery(
       supabaseAdmin.from("programs").select("*").limit(1000),
       "programs",
@@ -464,17 +601,11 @@ async function getProgramData() {
       "network_rewards",
     ),
     safeAdminQuery(
-      supabaseAdmin
-        .from("network_partner_leads")
-        .select("*")
-        .limit(5000),
+      supabaseAdmin.from("network_partner_leads").select("*").limit(5000),
       "network_partner_leads",
     ),
     safeAdminQuery(
-      supabaseAdmin
-        .from("partner_applications")
-        .select("*")
-        .limit(5000),
+      supabaseAdmin.from("partner_applications").select("*").limit(5000),
       "partner_applications",
     ),
     safeAdminQuery(
@@ -495,18 +626,34 @@ async function getProgramData() {
     ),
   ]);
 
+  const programApplications = (
+    (programApplicationsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
   const programs = ((programsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkPrograms = ((networkProgramsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkParticipants = ((networkParticipantsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkReferrals = ((networkReferralsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkRewards = ((networkRewardsResult.data || []) as AnyRow[]).filter(Boolean);
-  const partnerLeads = ((partnerLeadsResult.data || []) as AnyRow[]).filter(Boolean);
-  const partnerApplications = ((partnerApplicationsResult.data || []) as AnyRow[]).filter(Boolean);
+  const networkPrograms = ((networkProgramsResult.data || []) as AnyRow[]).filter(
+    Boolean,
+  );
+  const networkParticipants = (
+    (networkParticipantsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
+  const networkReferrals = ((networkReferralsResult.data || []) as AnyRow[]).filter(
+    Boolean,
+  );
+  const networkRewards = ((networkRewardsResult.data || []) as AnyRow[]).filter(
+    Boolean,
+  );
+  const partnerLeads = ((partnerLeadsResult.data || []) as AnyRow[]).filter(
+    Boolean,
+  );
+  const partnerApplications = (
+    (partnerApplicationsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
   const messages = ((messagesResult.data || []) as AnyRow[]).filter(Boolean);
   const gurus = ((gurusResult.data || []) as AnyRow[]).filter(Boolean);
   const bookings = ((bookingsResult.data || []) as AnyRow[]).filter(Boolean);
 
   const allProgramRows = [
+    ...programApplications,
     ...programs,
     ...networkPrograms,
     ...networkParticipants,
@@ -520,31 +667,50 @@ async function getProgramData() {
   ];
 
   const programStats = programDefinitions.map((program) => {
-    const matchingRows = rowsForProgram(allProgramRows, program);
-    const matchingParticipants = rowsForProgram(networkParticipants, program);
-    const matchingApplications = rowsForProgram(
-      [...partnerApplications, ...partnerLeads, ...gurus],
+    const matchingApplications = rowsForProgram(programApplications, program);
+    const matchingLegacyApplications = rowsForProgram(
+      [...partnerApplications, ...partnerLeads],
       program,
     );
+    const matchingParticipants = rowsForProgram(networkParticipants, program);
     const matchingReferrals = rowsForProgram(networkReferrals, program);
     const matchingRewards = rowsForProgram(networkRewards, program);
     const matchingMessages = rowsForProgram(messages, program);
     const matchingBookings = rowsForProgram(bookings, program);
     const matchingGurus = rowsForProgram(gurus, program);
+    const matchingRows = rowsForProgram(allProgramRows, program);
 
     const applications = matchingApplications.length;
-    const approvedParticipants =
-      matchingParticipants.filter(isActiveStatus).length ||
-      matchingGurus.filter(isActiveStatus).length;
+    const legacyApplications = matchingLegacyApplications.length;
+    const totalApplicationSignals = applications + legacyApplications;
+
     const pendingApplications = matchingApplications.filter(isPendingStatus).length;
-    const training = matchingParticipants.filter(isTrainingStatus).length;
+    const approvedApplications = matchingApplications.filter(isApprovedStatus).length;
+    const onboardingApplications =
+      matchingApplications.filter(isOnboardingStatus).length;
+    const checkrApplications = matchingApplications.filter(isCheckrStatus).length;
+
+    const approvedParticipants =
+      approvedApplications ||
+      matchingParticipants.filter(isApprovedStatus).length ||
+      matchingGurus.filter(isApprovedStatus).length;
+
+    const onboarding =
+      onboardingApplications ||
+      matchingParticipants.filter(isOnboardingStatus).length;
+
     const backgroundChecks =
-      matchingParticipants.filter(isBackgroundCheckStatus).length ||
-      matchingGurus.filter(isBackgroundCheckStatus).length;
+      checkrApplications ||
+      matchingParticipants.filter(isCheckrStatus).length ||
+      matchingGurus.filter(isCheckrStatus).length;
+
     const bookable =
       matchingParticipants.filter(isBookableStatus).length ||
       matchingGurus.filter(isBookableStatus).length;
-    const completedBookings = matchingBookings.filter(isCompletedBookingStatus).length;
+
+    const completedBookings = matchingBookings.filter(
+      isCompletedBookingStatus,
+    ).length;
 
     const participantEarnings = sumRows(matchingBookings, [
       "guru_payout",
@@ -577,27 +743,23 @@ async function getProgramData() {
       Math.min(
         100,
         approvedParticipants * 22 +
-          training * 12 +
+          onboarding * 12 +
           backgroundChecks * 16 +
           bookable * 26 +
           completedBookings * 8,
       ),
     );
 
-    const latestActivityDate = matchingRows
-      .map((row) => getDate(row))
-      .filter(Boolean)
-      .map((value) => new Date(value as string))
-      .filter((value) => !Number.isNaN(value.getTime()))
-      .sort((a, b) => b.getTime() - a.getTime())[0];
-
     return {
       ...program,
       rows: matchingRows.length,
       applications,
+      legacyApplications,
+      totalApplicationSignals,
       pendingApplications,
+      approvedApplications,
       approvedParticipants,
-      training,
+      onboarding,
       backgroundChecks,
       bookable,
       referrals: matchingReferrals.length,
@@ -609,21 +771,33 @@ async function getProgramData() {
       rewardsPendingAmount,
       conversionRate,
       readinessScore,
-      latestActivity: latestActivityDate?.toISOString() || null,
+      latestActivity: latestDateFromRows(matchingRows),
     };
   });
 
   const totals = {
     applications: programStats.reduce((sum, item) => sum + item.applications, 0),
-    approvedParticipants: programStats.reduce(
-      (sum, item) => sum + item.approvedParticipants,
+    legacyApplications: programStats.reduce(
+      (sum, item) => sum + item.legacyApplications,
+      0,
+    ),
+    totalApplicationSignals: programStats.reduce(
+      (sum, item) => sum + item.totalApplicationSignals,
       0,
     ),
     pendingApplications: programStats.reduce(
       (sum, item) => sum + item.pendingApplications,
       0,
     ),
-    training: programStats.reduce((sum, item) => sum + item.training, 0),
+    approvedApplications: programStats.reduce(
+      (sum, item) => sum + item.approvedApplications,
+      0,
+    ),
+    approvedParticipants: programStats.reduce(
+      (sum, item) => sum + item.approvedParticipants,
+      0,
+    ),
+    onboarding: programStats.reduce((sum, item) => sum + item.onboarding, 0),
     backgroundChecks: programStats.reduce(
       (sum, item) => sum + item.backgroundChecks,
       0,
@@ -649,6 +823,7 @@ async function getProgramData() {
   };
 
   return {
+    programApplications,
     programs,
     networkPrograms,
     networkParticipants,
@@ -662,6 +837,50 @@ async function getProgramData() {
     programStats,
     totals,
   };
+}
+
+function Badge({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex rounded-full border border-green-100 bg-green-50 px-3 py-1 text-xs font-black text-green-900">
+      {children}
+    </span>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function InfoList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
+      <p className="mb-3 text-xs font-black uppercase tracking-[0.12em] text-green-800">
+        {title}
+      </p>
+
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div
+            key={item}
+            className="flex items-start gap-2 text-sm font-bold text-slate-600"
+          >
+            <CheckCircle2
+              className="mt-0.5 shrink-0 text-green-700"
+              size={15}
+            />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function StatCard({
@@ -713,13 +932,7 @@ function StatCard({
   );
 }
 
-function ProgressBar({
-  value,
-  label,
-}: {
-  value: number;
-  label: string;
-}) {
+function ProgressBar({ value, label }: { value: number; label: string }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
@@ -746,11 +959,10 @@ function ProgramCard({
 }: {
   program: Awaited<ReturnType<typeof getProgramData>>["programStats"][number];
 }) {
+  const isCommunity = program.key === "community-hire";
+
   return (
-    <Link
-      href={program.href}
-      className="group block rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md"
-    >
+    <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
         <div className="flex items-start gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
@@ -770,82 +982,87 @@ function ProgramCard({
           </div>
         </div>
 
-        <span className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-900 transition group-hover:bg-green-800 group-hover:text-white">
-          Open Program →
-        </span>
+        <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+          <Link
+            href={program.applicationsHref}
+            className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white transition hover:bg-green-900"
+          >
+            Review Applicants →
+          </Link>
+
+          <Link
+            href={program.href}
+            className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 transition hover:bg-green-50"
+          >
+            Program Ops →
+          </Link>
+        </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MiniMetric label="Applications" value={number(program.applications)} />
         <MiniMetric
-          label="Approved"
-          value={number(program.approvedParticipants)}
+          label="Pending"
+          value={number(program.pendingApplications)}
+        />
+        <MiniMetric
+          label="Onboarding"
+          value={number(program.onboarding)}
+        />
+        <MiniMetric
+          label="Checkr / Background"
+          value={number(program.backgroundChecks)}
         />
         <MiniMetric label="Bookable" value={number(program.bookable)} />
-        <MiniMetric
-          label="Earnings"
-          value={money(program.participantEarnings)}
-        />
       </div>
 
       <div className="mt-5">
-        <ProgressBar label="1099 marketplace readiness" value={program.readinessScore} />
+        <ProgressBar
+          label="Program readiness"
+          value={program.readinessScore}
+        />
       </div>
+
+      {isCommunity ? (
+        <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-800 shadow-sm">
+              <ShieldCheck size={21} />
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-800">
+                Community Hire review reminder
+              </p>
+              <p className="mt-1 text-sm font-bold leading-6 text-blue-950">
+                Community Hire is a referral and readiness pathway, not
+                full-time employment, part-time employment, or guaranteed job
+                placement. Background check information should be reviewed
+                fairly, consistently, and in relation to pet care
+                responsibilities, home access, safety, trust, and customer
+                needs. SitGuru follows EEOC guidance for role-related review.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-4">
         <InfoList title="Who it supports" items={program.audience} />
         <InfoList title="Partner sources" items={program.partners} />
         <InfoList title="Program goals" items={program.goals} />
-        <InfoList title="1099 requirements" items={program.contractorRequirements} />
+        <InfoList title="Requirements" items={program.requirements} />
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <Badge>{number(program.pendingApplications)} pending applications</Badge>
-        <Badge>{number(program.training)} in training</Badge>
-        <Badge>{number(program.backgroundChecks)} background checks</Badge>
+        <Badge>{number(program.approvedParticipants)} approved</Badge>
+        <Badge>{number(program.legacyApplications)} legacy signals</Badge>
         <Badge>{number(program.completedBookings)} bookings</Badge>
+        <Badge>{money(program.participantEarnings)} earnings</Badge>
         <Badge>{number(program.messages)} messages</Badge>
         <Badge>{formatDate(program.latestActivity)} latest activity</Badge>
       </div>
-    </Link>
-  );
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
     </div>
-  );
-}
-
-function InfoList({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
-      <p className="mb-3 text-xs font-black uppercase tracking-[0.12em] text-green-800">
-        {title}
-      </p>
-
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div key={item} className="flex items-start gap-2 text-sm font-bold text-slate-600">
-            <CheckCircle2 className="mt-0.5 shrink-0 text-green-700" size={15} />
-            <span>{item}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Badge({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex rounded-full border border-green-100 bg-green-50 px-3 py-1 text-xs font-black text-green-900">
-      {children}
-    </span>
   );
 }
 
@@ -861,6 +1078,7 @@ function ProgramChart({
   items: Awaited<ReturnType<typeof getProgramData>>["programStats"];
   valueKey:
     | "applications"
+    | "pendingApplications"
     | "approvedParticipants"
     | "bookable"
     | "participantEarnings"
@@ -869,7 +1087,10 @@ function ProgramChart({
     | "backgroundChecks";
   valueFormatter?: (value: number) => string;
 }) {
-  const maxValue = Math.max(...items.map((item) => Number(item[valueKey]) || 0), 0);
+  const maxValue = Math.max(
+    ...items.map((item) => Number(item[valueKey]) || 0),
+    0,
+  );
 
   return (
     <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
@@ -886,7 +1107,7 @@ function ProgramChart({
           return (
             <Link
               key={item.key}
-              href={item.href}
+              href={item.applicationsHref}
               className="block rounded-2xl border border-transparent p-2 transition hover:border-green-100 hover:bg-[#fbfcf9]"
             >
               <div className="mb-2 flex items-start justify-between gap-3">
@@ -910,7 +1131,13 @@ function ProgramChart({
                   style={{
                     width: `${Math.max(3, width)}%`,
                     backgroundColor:
-                      index === 0 ? "#166534" : index === 1 ? "#16a34a" : "#0f766e",
+                      index === 0
+                        ? "#f59e0b"
+                        : index === 1
+                          ? "#166534"
+                          : index === 2
+                            ? "#0f766e"
+                            : "#2563eb",
                   }}
                 />
               </div>
@@ -954,20 +1181,28 @@ export default async function AdminProgramsPage() {
                 </p>
 
                 <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                  SitGuru 1099 Programs
+                  SitGuru Program Operations
                 </h1>
 
                 <p className="mt-1 max-w-5xl text-base font-semibold text-slate-600">
-                  Manage flexible independent contractor marketplace programs
-                  that help qualified people access pet care income opportunities
-                  after onboarding, eligibility review, background checks, trust
-                  and safety approval, and bookable Guru readiness.
+                  Track Student Hire, Community Hire, Military Hire, and
+                  SkillBridge Interest applications, onboarding, Checkr /
+                  background check readiness, partner sources, and progress
+                  toward bookable Guru status.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href={adminRoutes.programApplications}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+            >
+              <UserCheck size={17} />
+              Review Applications
+            </Link>
+
             <Link
               href={adminRoutes.programsExport}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
@@ -983,14 +1218,6 @@ export default async function AdminProgramsPage() {
               <Handshake size={17} />
               Partners
             </Link>
-
-            <Link
-              href={adminRoutes.gurus}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-            >
-              <UsersRound size={18} />
-              Gurus
-            </Link>
           </div>
         </section>
 
@@ -1001,34 +1228,71 @@ export default async function AdminProgramsPage() {
                 Program Work Model
               </p>
               <h2 className="mt-1 text-2xl font-black text-green-950">
-                1099 independent contractor marketplace opportunities
+                Supported pathways into independent-contractor pet care
+                opportunities
               </h2>
               <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
-                SitGuru programs are designed to help qualified participants
-                access flexible contractor income opportunities, similar to
-                marketplace models used by rideshare and delivery platforms.
-                Program participation does not guarantee bookings or employment.
-                Participants must meet SitGuru onboarding, eligibility,
-                background check, trust, safety, service quality, and marketplace
-                readiness requirements before becoming bookable Gurus.
+                SitGuru programs are designed to help qualified applicants apply
+                for flexible local pet care opportunities. Approved Gurus
+                provide services as independent contractors. Program
+                participation does not guarantee approval, bookings, earnings,
+                employment, commissions, benefits, placement, or full Guru
+                status.
               </p>
             </div>
 
             <div className="grid shrink-0 gap-3 sm:grid-cols-2">
-              <Badge>1099 contractor model</Badge>
-              <Badge>Background checks required</Badge>
-              <Badge>Trust and safety approval</Badge>
-              <Badge>No guaranteed bookings</Badge>
+              <Badge>Student → Community → Military → SkillBridge</Badge>
+              <Badge>Admin applicant tracking</Badge>
+              <Badge>Checkr readiness</Badge>
+              <Badge>No guaranteed employment</Badge>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-[30px] border border-blue-200 bg-blue-50 p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-800 shadow-sm">
+                <ShieldCheck size={24} />
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-800">
+                  Community Hire fair review
+                </p>
+                <h2 className="mt-1 text-2xl font-black text-blue-950">
+                  SitGuru follows EEOC guidance for background check review.
+                </h2>
+                <p className="mt-2 max-w-5xl text-sm font-bold leading-6 text-blue-950">
+                  For Community Hire applicants, background check information
+                  should be reviewed fairly, consistently, and in relation to
+                  pet care responsibilities, home access, safety, trust, and
+                  customer needs. Background check information is reviewed in
+                  context and does not automatically disqualify every applicant.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href={`${adminRoutes.programApplications}?program=community-hire`}
+              className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-blue-300 bg-white px-5 py-3 text-sm font-black shadow-sm transition hover:border-blue-400 hover:bg-blue-100"
+              style={{
+                color: "#172554",
+                WebkitTextFillColor: "#172554",
+              }}
+            >
+              Review Community Applicants →
+            </Link>
           </div>
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             icon={<BriefcaseBusiness size={22} />}
-            label="Active Programs"
+            label="Programs"
             value={number(programDefinitions.length)}
-            detail="Military, Student, Community"
+            detail="Student, Community, Military, SkillBridge"
             href={adminRoutes.programs}
           />
 
@@ -1037,6 +1301,7 @@ export default async function AdminProgramsPage() {
             label="Applications"
             value={number(data.totals.applications)}
             detail={`${number(data.totals.pendingApplications)} pending review`}
+            href={adminRoutes.programApplications}
           />
 
           <StatCard
@@ -1048,7 +1313,7 @@ export default async function AdminProgramsPage() {
 
           <StatCard
             icon={<ShieldCheck size={22} />}
-            label="Background Checks"
+            label="Checkr / Background"
             value={number(data.totals.backgroundChecks)}
             detail="Trust and safety readiness signal"
           />
@@ -1070,7 +1335,7 @@ export default async function AdminProgramsPage() {
           />
 
           <StatCard
-            icon={<TrendingUp size={22} />}
+            icon={<Trophy size={22} />}
             label="Participant Earnings"
             value={money(data.totals.earnings)}
             detail={`${money(data.totals.bookingValue)} booking value tracked`}
@@ -1085,18 +1350,11 @@ export default async function AdminProgramsPage() {
           />
 
           <StatCard
-            icon={<MousePointerClick size={22} />}
-            label="Rows Loaded"
-            value={number(
-              data.programs.length +
-                data.networkPrograms.length +
-                data.networkParticipants.length +
-                data.networkReferrals.length +
-                data.networkRewards.length +
-                data.partnerLeads.length +
-                data.partnerApplications.length,
-            )}
-            detail="Supabase program and network rows"
+            icon={<UsersRound size={22} />}
+            label="Gurus"
+            value={number(data.gurus.length)}
+            detail="Total Guru rows loaded"
+            href={adminRoutes.gurus}
           />
         </section>
 
@@ -1109,9 +1367,16 @@ export default async function AdminProgramsPage() {
         <section className="grid gap-5 xl:grid-cols-3">
           <ProgramChart
             title="Applications by Program"
-            subtitle="Which 1099 program is creating the most candidate activity."
+            subtitle="Which program is creating the most applicant activity."
             items={data.programStats}
             valueKey="applications"
+          />
+
+          <ProgramChart
+            title="Pending Review"
+            subtitle="Applicants who may need admin follow-up or next steps."
+            items={data.programStats}
+            valueKey="pendingApplications"
           />
 
           <ProgramChart
@@ -1119,6 +1384,22 @@ export default async function AdminProgramsPage() {
             subtitle="Which program is moving candidates through trust and safety."
             items={data.programStats}
             valueKey="backgroundChecks"
+          />
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-3">
+          <ProgramChart
+            title="Bookable Readiness"
+            subtitle="Participants connected to bookable readiness signals."
+            items={data.programStats}
+            valueKey="bookable"
+          />
+
+          <ProgramChart
+            title="Completed Bookings"
+            subtitle="Completed bookings connected to program signals."
+            items={data.programStats}
+            valueKey="completedBookings"
           />
 
           <ProgramChart
@@ -1133,51 +1414,52 @@ export default async function AdminProgramsPage() {
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
           <div className="mb-5">
             <h2 className="text-xl font-black text-slate-950">
-              Program KPI Framework
+              Program Admin Workflow
             </h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">
-              These are the operational measurements SitGuru should use to know
-              whether programs are creating qualified 1099 contractors, bookable
-              supply, completed bookings, participant earnings, and safe service
-              quality.
+              Use this dashboard to see program health. Use Program
+              Applications to action individual applicants.
             </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <InfoList
-              title="Contractor Eligibility"
+              title="Application Review"
               items={[
-                "1099 eligibility",
-                "Age and identity verification",
-                "Program source",
-                "Application status",
+                "New application",
+                "Program routing",
+                "Resume and document review",
+                "Referral source review",
               ]}
             />
+
+            <InfoList
+              title="Applicant Contact"
+              items={[
+                "Contacted",
+                "Missing information",
+                "Partner follow-up",
+                "Applicant notes",
+              ]}
+            />
+
             <InfoList
               title="Trust and Safety"
               items={[
-                "Background check started",
-                "Background check completed",
-                "Safety approval",
-                "Profile verification",
+                "Checkr invitation needed",
+                "Checkr pending",
+                "Review required",
+                "Applicable notice process",
               ]}
             />
+
             <InfoList
-              title="Marketplace Readiness"
+              title="Growth Path"
               items={[
-                "Training started",
-                "Training completed",
+                "Onboarding started",
                 "Profile readiness",
-                "Bookable Guru status",
-              ]}
-            />
-            <InfoList
-              title="Business Outcomes"
-              items={[
-                "First booking completed",
-                "Participant earnings",
-                "Ratings and quality",
-                "Retention",
+                "Approved",
+                "Full Guru status tracking",
               ]}
             />
           </div>
@@ -1187,14 +1469,14 @@ export default async function AdminProgramsPage() {
           <span className="font-black text-green-900">
             Supabase coordination:
           </span>{" "}
-          this page safely reads `programs`, `network_programs`,
-          `network_program_participants`, `network_referrals`,
-          `network_rewards`, `network_partner_leads`, `partner_applications`,
-          `messages`, `gurus`, and `bookings` when those tables exist. The page
-          classifies rows into Military Hire, Student Hire, and Community Hire
-          using program names, topics, campaigns, sources, notes, and message
-          content while clearly framing program work as flexible 1099
-          independent contractor marketplace opportunities.
+          this page safely reads <code>program_applications</code>,{" "}
+          <code>programs</code>, <code>network_programs</code>,{" "}
+          <code>network_program_participants</code>,{" "}
+          <code>network_referrals</code>, <code>network_rewards</code>,{" "}
+          <code>network_partner_leads</code>,{" "}
+          <code>partner_applications</code>, <code>messages</code>,{" "}
+          <code>gurus</code>, and <code>bookings</code> when those tables exist.
+          The main applicant source is now <code>program_applications</code>.
         </div>
       </div>
     </main>

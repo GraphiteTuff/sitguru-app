@@ -1,26 +1,42 @@
-// lib/geocodeAddress.ts
+export type GeocodeResult = {
+  latitude: number;
+  longitude: number;
+  formatted_address?: string;
+};
 
-export async function geocodeAddress(address: string) {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Missing Google Maps API key");
+export async function geocodeAddress(address: string): Promise<GeocodeResult> {
+  if (!address || address.trim().length < 5) {
+    throw new Error("A valid address or ZIP code is required.");
   }
 
-  const res = await fetch(
-    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
-  );
+  const url = new URL("https://nominatim.openstreetmap.org/search");
 
-  const data = await res.json();
+  url.searchParams.set("q", address);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("addressdetails", "1");
 
-  if (!data.results || data.results.length === 0) {
-    return null;
+  const response = await fetch(url.toString(), {
+    headers: {
+      "User-Agent": "SitGuru/1.0 support@sitguru.com",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to contact geocoding service.");
   }
 
-  const location = data.results[0].geometry.location;
+  const data = await response.json();
+
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error("Could not verify this location.");
+  }
+
+  const result = data[0];
 
   return {
-    lat: location.lat,
-    lng: location.lng,
+    latitude: Number(result.lat),
+    longitude: Number(result.lon),
+    formatted_address: result.display_name,
   };
 }

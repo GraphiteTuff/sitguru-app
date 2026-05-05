@@ -2,7 +2,8 @@
 
 import { Open_Sans } from "next/font/google";
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import ReferralRewardsSection from "@/components/ReferralRewardsSection";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
@@ -240,22 +241,16 @@ const launchHighlights = [
 
 const homepagePrograms = [
   {
-    title: "Military Hire Program",
-    eyebrow: "Military-connected pathway",
-    description:
-      "For veterans, eligible service members, National Guard, reservists, military spouses, and qualified dependents over 18 who want to grow into trusted SitGuru Gurus.",
-    href: "/programs#military-hire",
-    applyHref: "/programs/apply?program=military-hire",
-    icon: "🎖️",
-  },
-  {
     title: "Student Hire Program",
-    eyebrow: "Students, recent grads, summer work",
+    eyebrow: "Extra cash for students",
     description:
-      "For current students, recent graduates, and students looking for summer work who want flexible pet care opportunities and a path to full Guru status.",
+      "Broke between classes? Earn extra cash after class, between classes, weekends, school breaks, or all summer helping local pet families.",
     href: "/programs#student-hire",
     applyHref: "/programs/apply?program=student-hire",
     icon: "🎓",
+    primaryCta: "Start Earning",
+    secondaryCta: "Student Details",
+    featured: true,
   },
   {
     title: "Community Hire Program",
@@ -265,6 +260,33 @@ const homepagePrograms = [
     href: "/programs#community-hire",
     applyHref: "/programs/apply?program=community-hire",
     icon: "🤝",
+    primaryCta: "Apply Today",
+    secondaryCta: "Program Details",
+    featured: false,
+  },
+  {
+    title: "Military Hire Program",
+    eyebrow: "Military-connected pathway",
+    description:
+      "For veterans, eligible service members, National Guard, reservists, military spouses, and qualified dependents over 18 who want to grow into trusted SitGuru Gurus.",
+    href: "/programs#military-hire",
+    applyHref: "/programs/apply?program=military-hire",
+    icon: "🎖️",
+    primaryCta: "Apply Today",
+    secondaryCta: "Program Details",
+    featured: false,
+  },
+  {
+    title: "SkillBridge Interest List",
+    eyebrow: "Future transition pathway",
+    description:
+      "For active-duty transitioning service members interested in future SitGuru training pathways around pet care operations, local services, and post-transition opportunities.",
+    href: "/programs#skillbridge-interest",
+    applyHref: "/programs/apply?program=skillbridge-interest",
+    icon: "🛡️",
+    primaryCta: "Join Interest List",
+    secondaryCta: "Learn More",
+    featured: false,
   },
 ];
 
@@ -473,9 +495,7 @@ async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
 
 function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const trackRef = useRef<HTMLDivElement | null>(null);
-  const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
 
   const displayItems = useMemo(
     () => (items.length > 0 ? items : fallbackCarouselItems),
@@ -483,36 +503,21 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
   );
 
   const total = displayItems.length;
+  const hasMultipleItems = total > 1;
 
-  const scrollToIndex = (index: number) => {
-    if (!trackRef.current) return;
-
-    const cards = trackRef.current.querySelectorAll("[data-carousel-card]");
-    const card = cards[index] as HTMLElement | undefined;
-
-    if (!card) return;
-
-    const track = trackRef.current;
-    const left =
-      card.offsetLeft - (track.clientWidth / 2 - card.clientWidth / 2);
-
-    track.scrollTo({
-      left: Math.max(left, 0),
-      behavior: "smooth",
-    });
-  };
-
-  const goToSlide = (index: number) => {
-    if (total === 0) return;
+  const goToSlide = (
+    index: number,
+    eventName = "homepage_carousel_slide_selected",
+  ) => {
+    if (!hasMultipleItems) return;
 
     const safeIndex = (index + total) % total;
     const item = displayItems[safeIndex];
 
     setActiveIndex(safeIndex);
-    scrollToIndex(safeIndex);
 
     trackEvent({
-      eventName: "homepage_carousel_slide_selected",
+      eventName,
       eventType: "engagement",
       source: detectSourceFromUrl(),
       guruId: item?.id?.startsWith("fallback") ? undefined : item?.id,
@@ -526,218 +531,222 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
   };
 
   const nextSlide = () => {
+    if (!hasMultipleItems) return;
+
+    const nextIndex = activeIndex >= total - 1 ? 0 : activeIndex + 1;
+
     trackEvent({
       eventName: "homepage_carousel_next_clicked",
       eventType: "engagement",
       source: detectSourceFromUrl(),
       metadata: {
         active_index: activeIndex,
+        next_index: nextIndex,
       },
     });
 
-    goToSlide(activeIndex + 1);
+    goToSlide(nextIndex);
   };
 
   const prevSlide = () => {
+    if (!hasMultipleItems) return;
+
+    const previousIndex = activeIndex <= 0 ? total - 1 : activeIndex - 1;
+
     trackEvent({
       eventName: "homepage_carousel_previous_clicked",
       eventType: "engagement",
       source: detectSourceFromUrl(),
       metadata: {
         active_index: activeIndex,
+        previous_index: previousIndex,
       },
     });
 
-    goToSlide(activeIndex - 1);
+    goToSlide(previousIndex);
   };
 
   useEffect(() => {
-    if (total <= 1 || isPaused) return;
+    if (!hasMultipleItems || isCarouselPaused) return;
 
-    autoplayRef.current = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % total);
+    const rotationTimer = window.setInterval(() => {
+      setActiveIndex((currentIndex) =>
+        currentIndex >= total - 1 ? 0 : currentIndex + 1,
+      );
     }, 5000);
 
     return () => {
-      if (autoplayRef.current) clearInterval(autoplayRef.current);
+      window.clearInterval(rotationTimer);
     };
-  }, [isPaused, total]);
+  }, [hasMultipleItems, isCarouselPaused, total]);
 
-  useEffect(() => {
-    scrollToIndex(activeIndex);
-  }, [activeIndex]);
-
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
-
-    const handleScroll = () => {
-      const cards = Array.from(
-        track.querySelectorAll("[data-carousel-card]"),
-      ) as HTMLElement[];
-
-      if (!cards.length) return;
-
-      const trackCenter = track.scrollLeft + track.clientWidth / 2;
-      let closestIndex = 0;
-      let closestDistance = Number.POSITIVE_INFINITY;
-
-      cards.forEach((card, index) => {
-        const cardCenter = card.offsetLeft + card.clientWidth / 2;
-        const distance = Math.abs(trackCenter - cardCenter);
-
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestIndex = index;
-        }
-      });
-
-      setActiveIndex((prev) => (prev === closestIndex ? prev : closestIndex));
-    };
-
-    track.addEventListener("scroll", handleScroll, { passive: true });
-    return () => track.removeEventListener("scroll", handleScroll);
-  }, []);
+  if (total === 0) {
+    return null;
+  }
 
   return (
-    <section className="section-space bg-white">
+    <section className="section-space overflow-hidden bg-white">
       <div className="page-container">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-3xl">
             <div className="section-kicker">Trusted local pet care</div>
+
             <h2 className="mt-4 text-slate-950">
               Meet local Gurus pet owners can feel good about
             </h2>
+
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
               Browse real SitGuru providers in a warm, modern, easy-to-scan
               layout built for confidence and discovery.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={prevSlide}
-              className="btn-secondary h-11 w-11 rounded-full p-0"
-              aria-label="Previous slide"
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              onClick={nextSlide}
-              className="btn-secondary h-11 w-11 rounded-full p-0"
-              aria-label="Next slide"
-            >
-              →
-            </button>
-          </div>
+          {hasMultipleItems ? (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={prevSlide}
+                className="btn-secondary relative z-20 h-11 w-11 rounded-full p-0"
+                aria-label="Previous slide"
+              >
+                ←
+              </button>
+
+              <button
+                type="button"
+                onClick={nextSlide}
+                className="btn-secondary relative z-20 h-11 w-11 rounded-full p-0"
+                aria-label="Next slide"
+              >
+                →
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div
-          className="mt-8"
-          onMouseEnter={() => setIsPaused(true)}
-          onMouseLeave={() => setIsPaused(false)}
+          className="relative mt-8 overflow-hidden"
+          onMouseEnter={() => setIsCarouselPaused(true)}
+          onMouseLeave={() => setIsCarouselPaused(false)}
+          onFocus={() => setIsCarouselPaused(true)}
+          onBlur={() => setIsCarouselPaused(false)}
+          style={
+            {
+              "--homepage-carousel-step": "324px",
+            } as CSSProperties
+          }
         >
-          <div
-            ref={trackRef}
-            className="flex min-h-[440px] snap-x snap-mandatory gap-6 overflow-x-auto pb-8 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {displayItems.map((item) => (
-              <article
-                key={item.id}
-                data-carousel-card
-                className="panel min-w-[300px] max-w-[300px] snap-center overflow-hidden flex-shrink-0"
-              >
-                <div className="relative h-72 overflow-hidden rounded-t-3xl">
-                  <img
-                    src={item.image}
-                    alt={`${item.name} with pets`}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
+          <div className="sm:[--homepage-carousel-step:364px] lg:[--homepage-carousel-step:384px]">
+            <div
+              className="flex gap-6 transition-transform duration-500 ease-out will-change-transform"
+              style={{
+                transform: `translateX(calc(-${activeIndex} * var(--homepage-carousel-step)))`,
+              }}
+            >
+              {displayItems.map((item) => (
+                <article
+                  key={item.id}
+                  className="panel flex min-h-[440px] min-w-[300px] max-w-[300px] flex-shrink-0 flex-col overflow-hidden sm:min-w-[340px] sm:max-w-[340px] lg:min-w-[360px] lg:max-w-[360px]"
+                >
+                  <div className="relative h-72 overflow-hidden rounded-t-3xl">
+                    <img
+                      src={item.image}
+                      alt={`${item.name} with pets`}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
 
-                  <div className="absolute left-4 top-4 flex gap-2">
-                    {item.badge && <span className="chip">{item.badge}</span>}
-                    <span className="badge">⭐ {item.rating}</span>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-900">
-                        {item.name}
-                      </h3>
-                      <p className="mt-1 text-sm font-semibold text-emerald-700">
-                        {item.role}
-                      </p>
+                    <div className="absolute left-4 top-4 flex gap-2">
+                      {item.badge ? (
+                        <span className="chip">{item.badge}</span>
+                      ) : null}
+                      <span className="badge">⭐ {item.rating}</span>
                     </div>
-                    <span className="badge">{item.petType}</span>
                   </div>
 
-                  <p className="mt-3 text-sm text-slate-600">{item.location}</p>
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-900">
+                          {item.name}
+                        </h3>
 
-                  <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                    <Link
-                      href={item.href}
-                      className="btn-primary w-full sm:w-auto"
-                      onClick={() =>
-                        trackEvent({
-                          eventName: "guru_profile_view_clicked",
-                          eventType: "profile",
-                          source: detectSourceFromUrl(),
-                          guruId: item.id.startsWith("fallback")
-                            ? undefined
-                            : item.id,
-                          metadata: {
-                            location: "homepage_carousel",
-                            guru_name: item.name,
-                            guru_role: item.role,
-                            destination: item.href,
-                          },
-                        })
-                      }
-                    >
-                      View Profile
-                    </Link>
-                    <Link
-                      href="/search"
-                      className="btn-secondary w-full sm:w-auto"
-                      onClick={() =>
-                        trackEvent({
-                          eventName: "browse_all_clicked",
-                          eventType: "navigation",
-                          source: detectSourceFromUrl(),
-                          metadata: {
-                            location: "homepage_carousel",
-                          },
-                        })
-                      }
-                    >
-                      Browse All
-                    </Link>
+                        <p className="mt-1 text-sm font-semibold text-emerald-700">
+                          {item.role}
+                        </p>
+                      </div>
+
+                      <span className="badge shrink-0">{item.petType}</span>
+                    </div>
+
+                    <p className="mt-3 text-sm text-slate-600">
+                      {item.location}
+                    </p>
+
+                    <div className="mt-auto flex flex-col gap-3 pt-6 sm:flex-row">
+                      <Link
+                        href={item.href}
+                        className="btn-primary w-full text-center sm:w-auto"
+                        onClick={() =>
+                          trackEvent({
+                            eventName: "guru_profile_view_clicked",
+                            eventType: "profile",
+                            source: detectSourceFromUrl(),
+                            guruId: item.id.startsWith("fallback")
+                              ? undefined
+                              : item.id,
+                            metadata: {
+                              location: "homepage_carousel",
+                              guru_name: item.name,
+                              guru_role: item.role,
+                              destination: item.href,
+                            },
+                          })
+                        }
+                      >
+                        View Profile
+                      </Link>
+
+                      <Link
+                        href="/search"
+                        className="btn-secondary w-full text-center sm:w-auto"
+                        onClick={() =>
+                          trackEvent({
+                            eventName: "browse_all_clicked",
+                            eventType: "navigation",
+                            source: detectSourceFromUrl(),
+                            metadata: {
+                              location: "homepage_carousel",
+                            },
+                          })
+                        }
+                      >
+                        Browse All
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-6 flex justify-center gap-2">
-            {displayItems.map((_, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => goToSlide(index)}
-                className={`h-2.5 w-2.5 rounded-full transition-all ${
-                  index === activeIndex
-                    ? "scale-125 bg-emerald-600"
-                    : "bg-slate-300"
-                }`}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
-          </div>
+          {hasMultipleItems ? (
+            <div className="mt-8 flex justify-center gap-2">
+              {displayItems.map((_, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => goToSlide(index)}
+                  className={`h-2.5 rounded-full transition-all ${
+                    index === activeIndex
+                      ? "w-6 bg-emerald-600"
+                      : "w-2.5 bg-slate-300 hover:bg-slate-400"
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
@@ -1206,7 +1215,6 @@ export default function HomePage() {
         </div>
       </section>
 
-
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50">
         <div className="pointer-events-none absolute inset-0">
@@ -1605,35 +1613,36 @@ export default function HomePage() {
                 </div>
 
                 <h2 className="mt-4 !text-3xl !font-bold !leading-tight text-slate-950 sm:!text-4xl">
-                  Interested in a SitGuru program? Apply today.
+                  Broke between classes? Start with Student Hire.
                 </h2>
 
                 <p className="mt-4 text-base leading-7 text-slate-700">
-                  Our Military Hire, Student Hire, and Community Hire programs
-                  are designed to welcome qualified people, provide training and
-                  support, and help productive participants grow into full
-                  SitGuru Gurus.
+                  Student Hire is built for students, recent grads, summer
+                  workers, and pet lovers who want a flexible way to earn extra
+                  cash after class, between classes, on weekends, during school
+                  breaks, or all summer.
                 </p>
 
                 <p className="mt-4 text-base leading-7 text-slate-700">
-                  Current students, recent grads, and students looking for
-                  summer work are welcome to apply through the Student Hire
-                  Program.
+                  SitGuru also offers Community Hire, Military Hire, and a
+                  SkillBridge Interest List so qualified applicants can find the
+                  right pathway, complete onboarding, and grow toward full Guru
+                  status over time.
                 </p>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Link
-                    href="/programs/apply"
+                    href="/programs/apply?program=student-hire"
                     className="btn-primary w-full sm:w-auto"
                     onClick={() =>
                       trackHomepageClick(
-                        "Apply to SitGuru Programs",
+                        "Start Student Hire",
                         "homepage_programs_highlight",
-                        "/programs/apply",
+                        "/programs/apply?program=student-hire",
                       )
                     }
                   >
-                    Apply Today
+                    Start Student Hire
                   </Link>
 
                   <Link
@@ -1647,28 +1656,45 @@ export default function HomePage() {
                       )
                     }
                   >
-                    Learn More
+                    Compare Programs
                   </Link>
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
+                  <span className="chip">Extra cash</span>
+                  <span className="chip">After class</span>
+                  <span className="chip">Summer money</span>
                   <span className="chip">Training and support</span>
                   <span className="chip">Background checks required</span>
                   <span className="chip">Pathway to full Guru status</span>
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {homepagePrograms.map((program) => (
                   <div
                     key={program.title}
-                    className="rounded-[26px] border border-slate-200 bg-slate-50 p-5 transition hover:border-emerald-200 hover:bg-emerald-50/40"
+                    className={`rounded-[26px] border p-5 transition ${
+                      program.featured
+                        ? "border-amber-200 bg-amber-50 hover:border-amber-300 hover:bg-amber-100/70"
+                        : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/40"
+                    }`}
                   >
-                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-700 text-2xl text-white shadow-lg shadow-emerald-900/15">
+                    <div
+                      className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-lg ${
+                        program.featured
+                          ? "bg-amber-400 text-amber-950 shadow-amber-900/10"
+                          : "bg-emerald-700 text-white shadow-emerald-900/15"
+                      }`}
+                    >
                       {program.icon}
                     </div>
 
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
+                    <p
+                      className={`text-xs font-bold uppercase tracking-[0.16em] ${
+                        program.featured ? "text-amber-700" : "text-emerald-700"
+                      }`}
+                    >
                       {program.eyebrow}
                     </p>
 
@@ -1683,30 +1709,38 @@ export default function HomePage() {
                     <div className="mt-5 flex flex-col gap-2">
                       <Link
                         href={program.applyHref}
-                        className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                        className={`inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                          program.featured
+                            ? "bg-amber-400 text-amber-950 hover:bg-amber-300"
+                            : "bg-emerald-700 text-white hover:bg-emerald-800"
+                        }`}
                         onClick={() =>
                           trackHomepageClick(
-                            `Apply ${program.title}`,
+                            `${program.primaryCta} ${program.title}`,
                             "homepage_programs_card",
                             program.applyHref,
                           )
                         }
                       >
-                        Apply Today
+                        {program.primaryCta}
                       </Link>
 
                       <Link
                         href={program.href}
-                        className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
+                        className={`inline-flex items-center justify-center rounded-full border bg-white px-4 py-2.5 text-sm font-semibold transition ${
+                          program.featured
+                            ? "border-amber-300 text-amber-900 hover:bg-amber-50"
+                            : "border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                        }`}
                         onClick={() =>
                           trackHomepageClick(
-                            `Learn ${program.title}`,
+                            `${program.secondaryCta} ${program.title}`,
                             "homepage_programs_card",
                             program.href,
                           )
                         }
                       >
-                        Program Details
+                        {program.secondaryCta}
                       </Link>
                     </div>
                   </div>

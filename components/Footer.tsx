@@ -14,23 +14,38 @@ export default function Footer() {
 
             <p className="mt-4 text-sm leading-6 text-slate-500">
               Trusted pet care for modern Pet Parents and Gurus. Book services,
-              connect with verified professionals, and manage everything in one
+              connect with trusted professionals, and manage everything in one
               place.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-500">
+              <Link
+                href="/search?service=Pet%20Sitting"
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+              >
                 Pet Sitting
-              </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-500">
+              </Link>
+
+              <Link
+                href="/search?service=Dog%20Walking"
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+              >
                 Dog Walking
-              </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-500">
+              </Link>
+
+              <Link
+                href="/search"
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+              >
                 Pet Care
-              </span>
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
+              </Link>
+
+              <Link
+                href="/partners"
+                className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+              >
                 Partner Network
-              </span>
+              </Link>
             </div>
           </div>
 
@@ -41,12 +56,26 @@ export default function Footer() {
               </p>
 
               <div className="mt-4 flex flex-col gap-3 text-sm font-medium text-slate-600">
-                <Link href="/find-care" className="hover:text-emerald-600">
+                <Link href="/search" className="hover:text-emerald-600">
                   Find a Guru
                 </Link>
 
-                <Link href="/become-a-guru" className="hover:text-emerald-600">
-                  Become a Guru
+                <Link
+                  href="/search?service=Pet%20Sitting"
+                  className="hover:text-emerald-600"
+                >
+                  Pet Sitting
+                </Link>
+
+                <Link
+                  href="/search?service=Dog%20Walking"
+                  className="hover:text-emerald-600"
+                >
+                  Dog Walking
+                </Link>
+
+                <Link href="/search" className="hover:text-emerald-600">
+                  Pet Care
                 </Link>
 
                 <Link href="/help" className="hover:text-emerald-600">
@@ -72,7 +101,7 @@ export default function Footer() {
                   Dashboard
                 </Link>
 
-                <Link href="/find-care" className="hover:text-emerald-600">
+                <Link href="/search" className="hover:text-emerald-600">
                   Find a Guru
                 </Link>
 
@@ -126,6 +155,27 @@ export default function Footer() {
               </p>
 
               <div className="mt-4 flex flex-col gap-3 text-sm font-medium text-slate-600">
+                <Link
+                  href="/become-a-guru"
+                  className="font-semibold text-emerald-700 hover:text-emerald-600"
+                >
+                  Become a Guru
+                </Link>
+
+                <Link
+                  href="/programs"
+                  className="font-semibold text-emerald-700 hover:text-emerald-600"
+                >
+                  Hiring Programs
+                </Link>
+
+                <Link
+                  href="/ambassadors"
+                  className="font-semibold text-emerald-700 hover:text-emerald-600"
+                >
+                  Ambassador Program
+                </Link>
+
                 <Link href="/guru/login" className="hover:text-emerald-600">
                   Guru Login
                 </Link>
@@ -175,10 +225,6 @@ export default function Footer() {
                 >
                   Earnings
                 </Link>
-
-                <Link href="/programs" className="hover:text-emerald-600">
-                  Programs
-                </Link>
               </div>
             </div>
 
@@ -188,36 +234,25 @@ export default function Footer() {
               </p>
 
               <div className="mt-4 flex flex-col gap-3 text-sm font-medium text-slate-600">
-                <Link href="/partners" className="hover:text-emerald-600">
+                <Link
+                  href="/partners"
+                  className="font-semibold text-emerald-700 hover:text-emerald-600"
+                >
                   Partner Network
                 </Link>
 
                 <Link
-                  href="/partners/local"
-                  className="hover:text-emerald-600"
+                  href="/partners"
+                  className="font-semibold text-emerald-700 hover:text-emerald-600"
                 >
-                  Local Partners
+                  Become a Partner
                 </Link>
 
                 <Link
-                  href="/partners/national"
-                  className="hover:text-emerald-600"
+                  href="/affiliate-program"
+                  className="font-semibold text-emerald-700 hover:text-emerald-600"
                 >
-                  National Partners
-                </Link>
-
-                <Link
-                  href="/partners/affiliates"
-                  className="hover:text-emerald-600"
-                >
-                  Growth Affiliates
-                </Link>
-
-                <Link
-                  href="/partners/ambassadors"
-                  className="hover:text-emerald-600"
-                >
-                  Ambassadors
+                  Affiliate Program
                 </Link>
               </div>
             </div>

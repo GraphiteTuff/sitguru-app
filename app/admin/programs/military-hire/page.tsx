@@ -7,9 +7,9 @@ import {
   CheckCircle2,
   Download,
   FileText,
-  GraduationCap,
   Mail,
   MapPin,
+  Medal,
   Search,
   ShieldCheck,
   Sparkles,
@@ -27,14 +27,14 @@ type AnyRow = Record<string, unknown>;
 type SortKey =
   | "created_at"
   | "full_name"
-  | "school_name"
-  | "student_status"
+  | "military_connected_background"
+  | "referral_source"
   | "status"
   | "city"
   | "state"
   | "zip_code";
 
-type StudentApplication = {
+type MilitaryApplication = {
   id: string;
   program: string;
   status: string;
@@ -53,10 +53,10 @@ type StudentApplication = {
   additional_documents: string[];
   background_check_consent: boolean;
   experience: string;
-  school_name: string;
-  student_status: string;
-  graduation_year_or_availability: string;
-  student_background: string;
+  military_connected_background: string;
+  military_status: string;
+  transition_timeline: string;
+  supporting_document_notes: string;
   notes: string;
   admin_notes: string;
   next_step: string;
@@ -68,93 +68,109 @@ const adminRoutes = {
   dashboard: "/admin",
   programs: "/admin/programs",
   programApplications: "/admin/program-applications",
-  studentApplications: "/admin/program-applications?program=student-hire",
-  studentOps: "/admin/programs/student-hire",
+  militaryApplications: "/admin/program-applications?program=military-hire",
+  militaryOps: "/admin/programs/military-hire",
 };
 
-const studentAudiences = [
-  "College students",
-  "High school seniors 18+",
-  "Trade school students",
-  "Recent graduates",
-  "Summer-break workers",
-  "Students looking for after-class income",
-  "Students looking for weekend or school-break income",
+const militaryAudiences = [
+  "Veterans",
+  "Transitioning service members",
+  "Eligible service members",
+  "National Guard",
+  "Reservists",
+  "Military spouses",
+  "Qualified dependents over 18",
+  "Military-connected applicants ready to work, learn, and grow",
 ];
 
-const studentPartnerSources = [
-  "Universities",
-  "High schools",
-  "Career centers",
-  "Student organizations",
-  "Athletic teams and clubs",
-  "Summer work programs",
-  "Local education partners",
+const militaryPartnerSources = [
+  "Military transition offices",
+  "Veteran support organizations",
+  "Military spouse support networks",
+  "Base community partners",
+  "Guard and reserve networks",
+  "Workforce partners serving veterans",
+  "Community veteran organizations",
+  "Education and transition partners",
 ];
 
-const studentGoals = [
+const militaryGoals = [
   {
     key: "applications",
-    label: "Increase qualified student applicants",
+    label: "Increase qualified military-connected applicants",
     metric: "Applications",
     target: 50,
-    action: "Promote Student Hire around schools, clubs, summer work, and friend referrals.",
+    action:
+      "Promote Military Hire through transition offices, veteran organizations, spouse networks, Guard/reserve contacts, and community partners.",
+  },
+  {
+    key: "documents",
+    label: "Collect resumes and optional supporting documents",
+    metric: "Resume/documents",
+    target: 35,
+    action:
+      "Request resume, profile link, DD214 or supporting documents when applicable, without requiring unnecessary sensitive information.",
   },
   {
     key: "onboarding",
-    label: "Move students into onboarding",
+    label: "Move qualified applicants into onboarding",
     metric: "Onboarding",
     target: 20,
-    action: "Follow up quickly with students who have strong availability and service interest.",
+    action:
+      "Prioritize applicants with complete contact info, availability, service interests, consent, and strong reliability signals.",
   },
   {
     key: "background",
     label: "Complete background check readiness",
     metric: "Background consent",
     target: 35,
-    action: "Make sure students understand Checkr may be required before pet care approval.",
+    action:
+      "Confirm applicants understand Checkr/background check may be part of approval and pet-care trust readiness.",
   },
   {
     key: "approved",
-    label: "Approve qualified students for next Guru steps",
+    label: "Approve qualified applicants for next Guru steps",
     metric: "Approved",
     target: 15,
-    action: "Prioritize applicants with complete profiles, good availability, and pet care fit.",
-  },
-  {
-    key: "documents",
-    label: "Collect resumes or profile links",
-    metric: "Resume/profile",
-    target: 35,
-    action: "Request a resume, LinkedIn, portfolio, or simple profile link when missing.",
+    action:
+      "Move applicants forward based on eligibility, reliability, communication, trust, availability, and SitGuru service fit.",
   },
 ];
 
 const requirementDefinitions = [
   {
+    key: "military_background",
+    label: "Military-connected background provided",
+    action:
+      "Request veteran, service member, Guard, reserve, spouse, dependent, or military-connected context.",
+  },
+  {
     key: "resume",
     label: "Resume/profile provided",
-    action: "Request resume, profile link, or uploaded resume file.",
+    action:
+      "Request resume, profile link, uploaded resume, or optional supporting documents.",
+  },
+  {
+    key: "documents",
+    label: "Additional documents provided",
+    action:
+      "Allow optional supporting documents such as DD214, certifications, references, or transition paperwork when appropriate.",
   },
   {
     key: "background_consent",
     label: "Background check consent",
-    action: "Ask applicant to confirm Checkr/background check acknowledgement.",
+    action:
+      "Confirm applicant acknowledges Checkr/background check may be required before approval.",
   },
   {
     key: "services",
     label: "Services selected",
-    action: "Ask which services they want to offer.",
+    action: "Ask which pet care services they want to offer.",
   },
   {
     key: "availability",
     label: "Availability provided",
-    action: "Ask when they can earn: after class, breaks, weekends, or summer.",
-  },
-  {
-    key: "school",
-    label: "School/program provided",
-    action: "Ask for school, program, graduation year, or student status.",
+    action: "Ask when they are available for flexible local pet care opportunities.",
   },
   {
     key: "location",
@@ -164,7 +180,8 @@ const requirementDefinitions = [
   {
     key: "admin_notes",
     label: "Admin notes added",
-    action: "Add admin notes to document follow-up and review status.",
+    action:
+      "Add outreach notes, military-connected context, onboarding status, and next-step review notes.",
   },
   {
     key: "next_step",
@@ -231,12 +248,17 @@ function normalizeProgram(value: string) {
 }
 
 function normalizeStatus(value: string) {
-  const normalized = value.toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+  const normalized = value
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
 
   if (normalized === "pending" || normalized === "submitted") return "new";
   if (normalized === "in_review") return "reviewing";
   if (normalized === "background_check") return "checkr_pending";
-  if (normalized === "rejected" || normalized === "declined") return "not_approved";
+  if (normalized === "rejected" || normalized === "declined") {
+    return "not_approved";
+  }
 
   return normalized || "new";
 }
@@ -259,12 +281,20 @@ function statusLabel(value: string) {
   return labels[normalized] || value || "New";
 }
 
-function buildStudentApplication(row: AnyRow): StudentApplication {
+function buildMilitaryApplication(row: AnyRow): MilitaryApplication {
   return {
     id: getText(row, ["id", "application_id", "uuid"]),
-    program: getText(row, ["program", "program_key", "program_slug"], "student-hire"),
+    program: getText(
+      row,
+      ["program", "program_key", "program_slug"],
+      "military-hire",
+    ),
     status: normalizeStatus(getText(row, ["status"], "new")),
-    checkr_status: getText(row, ["checkr_status", "background_check_status"], "not_started"),
+    checkr_status: getText(
+      row,
+      ["checkr_status", "background_check_status"],
+      "not_started",
+    ),
     full_name: getText(row, ["full_name", "name", "applicant_name"]),
     email: getText(row, ["email", "applicant_email"]),
     phone: getText(row, ["phone", "phone_number", "applicant_phone"]),
@@ -283,6 +313,7 @@ function buildStudentApplication(row: AnyRow): StudentApplication {
       "partner_source",
       "source",
       "program_source",
+      "military_source",
     ]),
     resume_link: getText(row, ["resume_link", "resumeLink", "profile_link"]),
     resume_url: getText(row, ["resume_url", "resume_file_url", "resume_path"]),
@@ -296,13 +327,32 @@ function buildStudentApplication(row: AnyRow): StudentApplication {
       row.background_check_consent || row.backgroundCheckConsent,
     ),
     experience: getText(row, ["experience", "why", "reason"]),
-    school_name: getText(row, ["school_name", "schoolName"]),
-    student_status: getText(row, ["student_status", "studentStatus"]),
-    graduation_year_or_availability: getText(row, [
-      "graduation_year_or_availability",
-      "graduationYearOrAvailability",
+    military_connected_background: getText(row, [
+      "military_connected_background",
+      "militaryConnectedBackground",
+      "military_background",
+      "militaryBackground",
+      "veteran_background",
+      "veteranBackground",
     ]),
-    student_background: getText(row, ["student_background", "studentBackground"]),
+    military_status: getText(row, [
+      "military_status",
+      "militaryStatus",
+      "service_status",
+      "serviceStatus",
+    ]),
+    transition_timeline: getText(row, [
+      "transition_timeline",
+      "transitionTimeline",
+      "availability_window",
+      "availabilityWindow",
+    ]),
+    supporting_document_notes: getText(row, [
+      "supporting_document_notes",
+      "supportingDocumentNotes",
+      "document_notes",
+      "documentNotes",
+    ]),
     notes: getText(row, ["notes", "additional_notes"]),
     admin_notes: getText(row, ["admin_notes", "adminNotes"]),
     next_step: getText(row, ["next_step", "nextStep"]),
@@ -311,28 +361,31 @@ function buildStudentApplication(row: AnyRow): StudentApplication {
   };
 }
 
-function isStudentHire(row: AnyRow) {
+function isMilitaryHire(row: AnyRow) {
   const program = normalizeProgram(
     getText(row, ["program", "program_key", "program_slug", "program_type"]),
   );
 
-  if (program === "student-hire") return true;
+  if (program === "military-hire") return true;
 
   const search = JSON.stringify(row).toLowerCase();
 
   return [
-    "student-hire",
-    "student hire",
-    "student",
-    "college",
-    "university",
-    "school",
-    "summer",
-    "recent grad",
-    "graduate",
-    "campus",
-    "after class",
-    "between classes",
+    "military-hire",
+    "military hire",
+    "military",
+    "veteran",
+    "veterans",
+    "service member",
+    "servicemember",
+    "transitioning service",
+    "guard",
+    "national guard",
+    "reservist",
+    "reserve",
+    "spouse",
+    "dependent",
+    "dd214",
   ].some((keyword) => search.includes(keyword));
 }
 
@@ -359,7 +412,9 @@ function formatDate(value?: string | null) {
 }
 
 function number(value: number) {
-  return new Intl.NumberFormat("en-US").format(Number.isFinite(value) ? value : 0);
+  return new Intl.NumberFormat("en-US").format(
+    Number.isFinite(value) ? value : 0,
+  );
 }
 
 function percent(value: number) {
@@ -370,7 +425,10 @@ function clampPercent(value: number) {
   return Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
 }
 
-function countBy(items: StudentApplication[], getter: (item: StudentApplication) => string | string[]) {
+function countBy(
+  items: MilitaryApplication[],
+  getter: (item: MilitaryApplication) => string | string[],
+) {
   const counts = new Map<string, number>();
 
   items.forEach((item) => {
@@ -389,7 +447,7 @@ function countBy(items: StudentApplication[], getter: (item: StudentApplication)
 }
 
 function sortApplications(
-  applications: StudentApplication[],
+  applications: MilitaryApplication[],
   sort: SortKey,
   direction: "asc" | "desc",
 ) {
@@ -424,7 +482,7 @@ function buildSortHref(current: SearchParams, sort: SortKey) {
   params.set("sort", sort);
   params.set("direction", nextDirection);
 
-  return `${adminRoutes.studentOps}?${params.toString()}`;
+  return `${adminRoutes.militaryOps}?${params.toString()}`;
 }
 
 function escapeCsv(value: string | number | boolean) {
@@ -436,7 +494,7 @@ function escapeCsv(value: string | number | boolean) {
   return stringValue;
 }
 
-function buildCsv(applications: StudentApplication[]) {
+function buildCsv(applications: MilitaryApplication[]) {
   const headers = [
     "Application ID",
     "Full Name",
@@ -444,18 +502,21 @@ function buildCsv(applications: StudentApplication[]) {
     "Phone",
     "Status",
     "Checkr Status",
-    "School",
-    "Student Status",
-    "Graduation / Availability",
+    "Military Connected Background",
+    "Military Status",
+    "Transition Timeline",
+    "Partner / Referral Source",
     "City",
     "State",
     "ZIP",
     "Availability",
     "Services",
-    "Referral Source",
     "Resume Link",
     "Resume File",
+    "Additional Documents",
+    "Supporting Document Notes",
     "Background Consent",
+    "Experience",
     "Next Step",
     "Admin Notes",
     "Submitted",
@@ -468,18 +529,21 @@ function buildCsv(applications: StudentApplication[]) {
     item.phone,
     statusLabel(item.status),
     item.checkr_status,
-    item.school_name,
-    item.student_status,
-    item.graduation_year_or_availability,
+    item.military_connected_background,
+    item.military_status,
+    item.transition_timeline,
+    item.referral_source,
     item.city,
     item.state,
     item.zip_code,
     item.availability,
     item.services_interested.join("; "),
-    item.referral_source,
     item.resume_link,
     item.resume_url,
+    item.additional_documents.join("; "),
+    item.supporting_document_notes,
     item.background_check_consent ? "Yes" : "No",
+    item.experience,
     item.next_step,
     item.admin_notes,
     item.created_at,
@@ -493,27 +557,40 @@ function buildCsv(applications: StudentApplication[]) {
 function statusClass(status: string) {
   const normalized = normalizeStatus(status);
 
-  if (normalized === "approved") return "border-green-200 bg-green-50 text-green-800";
-  if (normalized === "onboarding") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (normalized === "checkr_pending") return "border-blue-200 bg-blue-50 text-blue-800";
-  if (normalized === "missing_info") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (normalized === "not_approved") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (normalized === "approved") {
+    return "border-green-200 bg-green-50 text-green-800";
+  }
+  if (normalized === "onboarding") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+  if (normalized === "checkr_pending") {
+    return "border-blue-200 bg-blue-50 text-blue-800";
+  }
+  if (normalized === "missing_info") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+  if (normalized === "not_approved") {
+    return "border-rose-200 bg-rose-50 text-rose-800";
+  }
 
   return "border-slate-200 bg-white text-slate-700";
 }
 
-function completeRequirement(application: StudentApplication, key: string) {
-  if (key === "resume") return Boolean(application.resume_link || application.resume_url);
-  if (key === "background_consent") return application.background_check_consent;
-  if (key === "services") return application.services_interested.length > 0;
-  if (key === "availability") return Boolean(application.availability);
-  if (key === "school") {
+function completeRequirement(application: MilitaryApplication, key: string) {
+  if (key === "military_background") {
     return Boolean(
-      application.school_name ||
-        application.student_status ||
-        application.graduation_year_or_availability,
+      application.military_connected_background || application.military_status,
     );
   }
+  if (key === "resume") {
+    return Boolean(application.resume_link || application.resume_url);
+  }
+  if (key === "documents") return application.additional_documents.length > 0;
+  if (key === "background_consent") {
+    return application.background_check_consent;
+  }
+  if (key === "services") return application.services_interested.length > 0;
+  if (key === "availability") return Boolean(application.availability);
   if (key === "location") {
     return Boolean(application.zip_code || application.city || application.state);
   }
@@ -523,7 +600,7 @@ function completeRequirement(application: StudentApplication, key: string) {
   return false;
 }
 
-async function getStudentApplications() {
+async function getMilitaryApplications() {
   const { data, error } = await supabaseAdmin
     .from("program_applications")
     .select("*")
@@ -531,16 +608,16 @@ async function getStudentApplications() {
     .limit(5000);
 
   if (error) {
-    console.error("Student Hire ops load error:", error.message);
+    console.error("Military Hire ops load error:", error.message);
     return {
-      applications: [] as StudentApplication[],
+      applications: [] as MilitaryApplication[],
       error: error.message,
     };
   }
 
   const applications = ((data || []) as AnyRow[])
-    .filter(isStudentHire)
-    .map(buildStudentApplication);
+    .filter(isMilitaryHire)
+    .map(buildMilitaryApplication);
 
   return { applications, error: "" };
 }
@@ -560,7 +637,7 @@ function StatCard({
 }) {
   const content = (
     <>
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 transition group-hover:bg-amber-500 group-hover:text-white">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-green-700 transition group-hover:bg-green-800 group-hover:text-white">
         {icon}
       </div>
 
@@ -582,7 +659,7 @@ function StatCard({
     return (
       <Link
         href={href}
-        className="group rounded-[26px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md"
+        className="group rounded-[26px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md"
       >
         {content}
       </Link>
@@ -611,7 +688,7 @@ function TopFiveCard({
   return (
     <div className="rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
       <div className="mb-5">
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
           Top 5
         </p>
         <h3 className="mt-1 text-xl font-black text-slate-950">{title}</h3>
@@ -629,14 +706,14 @@ function TopFiveCard({
                   <p className="truncate text-sm font-black text-slate-800">
                     {item.label}
                   </p>
-                  <p className="shrink-0 text-sm font-black text-amber-700">
+                  <p className="shrink-0 text-sm font-black text-green-700">
                     {number(item.count)}
                   </p>
                 </div>
 
-                <div className="h-3 overflow-hidden rounded-full bg-amber-50">
+                <div className="h-3 overflow-hidden rounded-full bg-green-50">
                   <div
-                    className="h-full rounded-full bg-amber-500"
+                    className="h-full rounded-full bg-green-800"
                     style={{ width: `${Math.max(4, width)}%` }}
                   />
                 </div>
@@ -667,12 +744,12 @@ function SectionHeader({
   return (
     <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
       <div className="flex gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-sm">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white shadow-sm">
           {icon}
         </div>
 
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
             {eyebrow}
           </p>
           <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
@@ -769,14 +846,14 @@ function ProgressLine({
           <p className="mt-1 text-xs font-bold text-slate-500">{detail}</p>
         </div>
 
-        <p className="shrink-0 text-sm font-black text-amber-700">
+        <p className="shrink-0 text-sm font-black text-green-700">
           {number(value)} / {number(total)}
         </p>
       </div>
 
-      <div className="h-3 overflow-hidden rounded-full bg-amber-50">
+      <div className="h-3 overflow-hidden rounded-full bg-green-50">
         <div
-          className="h-full rounded-full bg-amber-500"
+          className="h-full rounded-full bg-green-800"
           style={{ width: `${Math.max(3, clampPercent(rate))}%` }}
         />
       </div>
@@ -798,7 +875,7 @@ function SortLink({
   return (
     <Link
       href={buildSortHref(current, sort)}
-      className="inline-flex items-center gap-1 hover:text-amber-700"
+      className="inline-flex items-center gap-1 hover:text-green-700"
     >
       {label}
       <span className="text-[10px]">↕</span>
@@ -806,54 +883,82 @@ function SortLink({
   );
 }
 
-export default async function AdminStudentHireProgramPage({
+export default async function AdminMilitaryHireProgramPage({
   searchParams,
 }: {
   searchParams?: Promise<SearchParams> | SearchParams;
 }) {
   const resolvedSearchParams = await Promise.resolve(searchParams || {});
   const sort = getParam(resolvedSearchParams, "sort", "created_at") as SortKey;
-  const direction = getParam(resolvedSearchParams, "direction", "desc") === "asc" ? "asc" : "desc";
+  const direction =
+    getParam(resolvedSearchParams, "direction", "desc") === "asc"
+      ? "asc"
+      : "desc";
 
-  const { applications, error } = await getStudentApplications();
+  const { applications, error } = await getMilitaryApplications();
   const sortedApplications = sortApplications(applications, sort, direction);
   const csv = buildCsv(sortedApplications);
 
   const total = applications.length;
   const pending = applications.filter((item) =>
-    ["new", "reviewing", "contacted", "missing_info"].includes(normalizeStatus(item.status)),
+    ["new", "reviewing", "contacted", "missing_info"].includes(
+      normalizeStatus(item.status),
+    ),
   ).length;
-  const onboarding = applications.filter((item) => normalizeStatus(item.status) === "onboarding").length;
-  const approved = applications.filter((item) => normalizeStatus(item.status) === "approved").length;
+  const onboarding = applications.filter(
+    (item) => normalizeStatus(item.status) === "onboarding",
+  ).length;
+  const approved = applications.filter(
+    (item) => normalizeStatus(item.status) === "approved",
+  ).length;
   const checkrPending = applications.filter(
     (item) =>
       normalizeStatus(item.status) === "checkr_pending" ||
       item.checkr_status.includes("pending") ||
       item.checkr_status.includes("invited"),
   ).length;
-  const backgroundConsent = applications.filter((item) => item.background_check_consent).length;
-  const resumeProvided = applications.filter((item) => item.resume_link || item.resume_url).length;
-  const servicesProvided = applications.filter((item) => item.services_interested.length > 0).length;
+  const backgroundConsent = applications.filter(
+    (item) => item.background_check_consent,
+  ).length;
+  const resumeProvided = applications.filter(
+    (item) => item.resume_link || item.resume_url,
+  ).length;
+  const docsProvided = applications.filter(
+    (item) => item.additional_documents.length > 0,
+  ).length;
   const conversionRate = total > 0 ? (approved / total) * 100 : 0;
 
-  const schools = countBy(applications, (item) => item.school_name);
-  const studentStatuses = countBy(applications, (item) => item.student_status);
-  const graduationWindows = countBy(applications, (item) => item.graduation_year_or_availability);
+  const militaryBackgrounds = countBy(
+    applications,
+    (item) => item.military_connected_background,
+  );
+  const militaryStatuses = countBy(applications, (item) => item.military_status);
+  const transitionTimelines = countBy(
+    applications,
+    (item) => item.transition_timeline || item.availability,
+  );
   const services = countBy(applications, (item) => item.services_interested);
   const zips = countBy(applications, (item) => item.zip_code);
+  const states = countBy(applications, (item) => item.state);
   const sources = countBy(applications, (item) => item.referral_source);
   const availability = countBy(applications, (item) => item.availability);
-  const states = countBy(applications, (item) => item.state);
+  const checkrStatuses = countBy(applications, (item) => item.checkr_status);
 
   const partnerRows = sources.slice(0, 25).map((source) => {
     const matching = applications.filter(
       (item) => (item.referral_source || "Not provided") === source.label,
     );
     const sourcePending = matching.filter((item) =>
-      ["new", "reviewing", "contacted", "missing_info"].includes(normalizeStatus(item.status)),
+      ["new", "reviewing", "contacted", "missing_info"].includes(
+        normalizeStatus(item.status),
+      ),
     ).length;
-    const sourceOnboarding = matching.filter((item) => normalizeStatus(item.status) === "onboarding").length;
-    const sourceApproved = matching.filter((item) => normalizeStatus(item.status) === "approved").length;
+    const sourceOnboarding = matching.filter(
+      (item) => normalizeStatus(item.status) === "onboarding",
+    ).length;
+    const sourceApproved = matching.filter(
+      (item) => normalizeStatus(item.status) === "approved",
+    ).length;
     const sourceCheckr = matching.filter(
       (item) => normalizeStatus(item.status) === "checkr_pending",
     ).length;
@@ -869,22 +974,24 @@ export default async function AdminStudentHireProgramPage({
       onboarding: number(sourceOnboarding),
       approved: number(sourceApproved),
       checkr: number(sourceCheckr),
-      conversion: percent(matching.length > 0 ? (sourceApproved / matching.length) * 100 : 0),
+      conversion: percent(
+        matching.length > 0 ? (sourceApproved / matching.length) * 100 : 0,
+      ),
       latest: formatDate(latest),
     };
   });
 
-  const goalRows = studentGoals.map((goal) => {
+  const goalRows = militaryGoals.map((goal) => {
     const current =
       goal.key === "applications"
         ? total
-        : goal.key === "onboarding"
-          ? onboarding
-          : goal.key === "background"
-            ? backgroundConsent
-            : goal.key === "approved"
-              ? approved
-              : resumeProvided;
+        : goal.key === "documents"
+          ? resumeProvided + docsProvided
+          : goal.key === "onboarding"
+            ? onboarding
+            : goal.key === "background"
+              ? backgroundConsent
+              : approved;
 
     const rate = goal.target > 0 ? (current / goal.target) * 100 : 0;
 
@@ -895,13 +1002,15 @@ export default async function AdminStudentHireProgramPage({
       target: number(goal.target),
       progress: (
         <div className="min-w-[180px]">
-          <div className="h-3 overflow-hidden rounded-full bg-amber-50">
+          <div className="h-3 overflow-hidden rounded-full bg-green-50">
             <div
-              className="h-full rounded-full bg-amber-500"
+              className="h-full rounded-full bg-green-800"
               style={{ width: `${Math.max(3, clampPercent(rate))}%` }}
             />
           </div>
-          <p className="mt-1 text-xs font-black text-slate-500">{percent(rate)}</p>
+          <p className="mt-1 text-xs font-black text-slate-500">
+            {percent(rate)}
+          </p>
         </div>
       ),
       status:
@@ -931,18 +1040,22 @@ export default async function AdminStudentHireProgramPage({
       .join(", ");
 
     return {
-      requirement: <span className="font-black text-slate-950">{requirement.label}</span>,
+      requirement: (
+        <span className="font-black text-slate-950">{requirement.label}</span>
+      ),
       complete: number(complete),
       missing: number(missing),
       completion: (
         <div className="min-w-[180px]">
-          <div className="h-3 overflow-hidden rounded-full bg-amber-50">
+          <div className="h-3 overflow-hidden rounded-full bg-green-50">
             <div
-              className="h-full rounded-full bg-amber-500"
+              className="h-full rounded-full bg-green-800"
               style={{ width: `${Math.max(3, clampPercent(rate))}%` }}
             />
           </div>
-          <p className="mt-1 text-xs font-black text-slate-500">{percent(rate)}</p>
+          <p className="mt-1 text-xs font-black text-slate-500">
+            {percent(rate)}
+          </p>
         </div>
       ),
       missing_applicants: missingApplicants || "None",
@@ -953,51 +1066,110 @@ export default async function AdminStudentHireProgramPage({
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <section className="overflow-hidden rounded-[34px] border border-amber-200 bg-white shadow-sm">
-          <div className="bg-gradient-to-br from-amber-400 via-yellow-400 to-emerald-500 p-6 sm:p-8">
+        <section className="overflow-hidden rounded-[34px] border border-green-200 bg-green-950 shadow-sm">
+          <div className="bg-green-950 p-6 sm:p-8">
             <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
               <div>
                 <Link
                   href={adminRoutes.programs}
-                  className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/30 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-white"
+                  className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/40 bg-white px-4 py-2 text-sm font-black text-green-950 shadow-sm transition hover:bg-green-50"
+                  style={{
+                    color: "#052e16",
+                    WebkitTextFillColor: "#052e16",
+                  }}
                 >
                   <ArrowLeft size={17} />
                   Back to Program Operations
                 </Link>
 
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-950">
-                  Admin / Programs / Student Hire
+                <p
+                  className="text-xs font-black uppercase tracking-[0.22em]"
+                  style={{
+                    color: "#bbf7d0",
+                    WebkitTextFillColor: "#bbf7d0",
+                  }}
+                >
+                  Admin / Programs / Military Hire
                 </p>
 
-                <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
-                  Student Hire Program Ops
+                <h1
+                  className="mt-3 max-w-5xl text-4xl font-black tracking-tight sm:text-6xl"
+                  style={{
+                    color: "#ffffff",
+                    WebkitTextFillColor: "#ffffff",
+                  }}
+                >
+                  Military Hire Program Ops
                 </h1>
 
-                <p className="mt-4 max-w-4xl text-base font-bold leading-7 text-slate-900 sm:text-lg">
-                  Visualize the student applicant pipeline: who we support,
-                  partner sources, goals, requirements, top 5s, sorted ledgers,
-                  and export-ready reporting for easy extra-cash student growth.
+                <p
+                  className="mt-4 max-w-4xl text-base font-bold leading-7 sm:text-lg"
+                  style={{
+                    color: "#f0fdf4",
+                    WebkitTextFillColor: "#f0fdf4",
+                  }}
+                >
+                  Visualize veteran, service member, Guard, reserve, spouse,
+                  dependent, and military-connected applicant pipelines with
+                  document readiness, onboarding, Checkr/background workflow,
+                  partner-source tracking, sorted ledgers, and export-ready
+                  reporting.
                 </p>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
                 <Link
-                  href={adminRoutes.studentApplications}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg transition hover:bg-slate-800"
+                  href={adminRoutes.militaryApplications}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-green-950 shadow-lg transition hover:bg-green-50"
+                  style={{
+                    color: "#052e16",
+                    WebkitTextFillColor: "#052e16",
+                  }}
                 >
                   <UserCheck size={17} />
-                  Review Student Applicants
+                  Review Military Applicants
                 </Link>
 
                 <a
                   href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`}
-                  download="sitguru-student-hire-ops.csv"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-950/20 bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:bg-amber-50"
+                  download="sitguru-military-hire-ops.csv"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/40 bg-amber-500 px-5 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:bg-amber-400"
+                  style={{
+                    color: "#020617",
+                    WebkitTextFillColor: "#020617",
+                  }}
                 >
                   <Download size={17} />
                   Export CSV
                 </a>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[30px] border border-green-200 bg-green-50 p-5 shadow-sm">
+          <div className="flex gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-green-800 shadow-sm">
+              <ShieldCheck size={24} />
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
+                Military-connected pathway
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-green-950">
+                SitGuru welcomes qualified military-connected applicants.
+              </h2>
+              <p className="mt-2 max-w-5xl text-sm font-bold leading-6 text-green-950">
+                Military Hire is a supported pathway for veterans, eligible
+                service members, transitioning service members, National Guard,
+                reservists, military spouses, and qualified dependents over 18.
+                Applicants may apply for flexible local pet care opportunities.
+                Approval, bookings, earnings, commissions, benefits, or full
+                Guru status are not guaranteed and depend on eligibility,
+                onboarding, background check results, reliability, performance,
+                customer demand, and SitGuru program needs.
+              </p>
             </div>
           </div>
         </section>
@@ -1013,8 +1185,8 @@ export default async function AdminStudentHireProgramPage({
             icon={<UsersRound size={22} />}
             label="Applications"
             value={number(total)}
-            detail="Total Student Hire applicants"
-            href={adminRoutes.studentApplications}
+            detail="Total Military Hire applicants"
+            href={adminRoutes.militaryApplications}
           />
 
           <StatCard
@@ -1028,7 +1200,7 @@ export default async function AdminStudentHireProgramPage({
             icon={<Sparkles size={22} />}
             label="Onboarding"
             value={number(onboarding)}
-            detail="Students moving into next steps"
+            detail="Applicants moving into next steps"
           />
 
           <StatCard
@@ -1047,25 +1219,29 @@ export default async function AdminStudentHireProgramPage({
 
           <StatCard
             icon={<FileText size={22} />}
-            label="Resume/Profile"
-            value={number(resumeProvided)}
-            detail={`${percent(total > 0 ? (resumeProvided / total) * 100 : 0)} complete`}
+            label="Docs / Resume"
+            value={number(resumeProvided + docsProvided)}
+            detail={`${percent(
+              total > 0
+                ? ((resumeProvided + docsProvided) / Math.max(total, 1)) * 100
+                : 0,
+            )} document signal`}
           />
         </section>
 
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
           <SectionHeader
             eyebrow="Who it supports"
-            title="Student applicant audience breakdown"
-            description="Track who is applying, where they go to school, when they can earn, and which services they want to offer."
-            icon={<GraduationCap size={24} />}
+            title="Military-connected applicant breakdown"
+            description="Track military-connected backgrounds, service status, transition timing, locations, service interests, and readiness signals."
+            icon={<Medal size={24} />}
           />
 
           <div className="mb-5 flex flex-wrap gap-2">
-            {studentAudiences.map((audience) => (
+            {militaryAudiences.map((audience) => (
               <span
                 key={audience}
-                className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-900"
+                className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-black text-green-900"
               >
                 {audience}
               </span>
@@ -1074,28 +1250,28 @@ export default async function AdminStudentHireProgramPage({
 
           <div className="grid gap-4 xl:grid-cols-5">
             <TopFiveCard
-              title="Schools"
-              subtitle="Most common school or program entries."
-              items={schools}
+              title="Military Backgrounds"
+              subtitle="Most common military-connected background entries."
+              items={militaryBackgrounds}
             />
             <TopFiveCard
-              title="Student Status"
-              subtitle="Student type, recent grad, summer worker, or status."
-              items={studentStatuses}
+              title="Military Status"
+              subtitle="Veteran, service member, spouse, Guard, reserve, or related status."
+              items={militaryStatuses}
             />
             <TopFiveCard
-              title="Availability Windows"
-              subtitle="After class, weekend, break, summer, or custom availability."
-              items={graduationWindows.length ? graduationWindows : availability}
+              title="Transition / Availability"
+              subtitle="Transition timing, availability window, or schedule."
+              items={transitionTimelines}
             />
             <TopFiveCard
               title="Services"
-              subtitle="Most selected ways students want to earn."
+              subtitle="Most selected services applicants want to offer."
               items={services}
             />
             <TopFiveCard
               title="ZIP Codes"
-              subtitle="Where student applicants are located."
+              subtitle="Where military-connected applicants are located."
               items={zips}
             />
           </div>
@@ -1104,13 +1280,13 @@ export default async function AdminStudentHireProgramPage({
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
           <SectionHeader
             eyebrow="Partner sources"
-            title="Student referral and partner source leaderboard"
-            description="See which schools, clubs, community partners, campaigns, and referral sources are bringing in student applicants."
+            title="Military referral and partner source leaderboard"
+            description="See which transition offices, veteran organizations, spouse networks, base community partners, and workforce partners are driving applications."
             icon={<Trophy size={24} />}
           />
 
           <div className="mb-5 flex flex-wrap gap-2">
-            {studentPartnerSources.map((source) => (
+            {militaryPartnerSources.map((source) => (
               <span
                 key={source}
                 className="rounded-full border border-green-100 bg-green-50 px-3 py-1 text-xs font-black text-green-900"
@@ -1133,7 +1309,7 @@ export default async function AdminStudentHireProgramPage({
             />
             <TopFiveCard
               title="Availability"
-              subtitle="When students say they can earn."
+              subtitle="When applicants say they can work."
               items={availability}
             />
           </div>
@@ -1159,8 +1335,8 @@ export default async function AdminStudentHireProgramPage({
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
           <SectionHeader
             eyebrow="Program goals"
-            title="Student Hire goal progress"
-            description="Measure growth toward applications, onboarding, background readiness, approvals, and profile completeness."
+            title="Military Hire goal progress"
+            description="Measure military-connected pipeline growth, document readiness, onboarding, background readiness, and approvals."
             icon={<BarChart3 size={24} />}
           />
 
@@ -1169,7 +1345,13 @@ export default async function AdminStudentHireProgramPage({
               label="Qualified applicants"
               value={total}
               total={50}
-              detail="Target student applicant pool"
+              detail="Target military-connected applicant pool"
+            />
+            <ProgressLine
+              label="Documents / resume"
+              value={resumeProvided + docsProvided}
+              total={35}
+              detail="Resume or supporting document signal"
             />
             <ProgressLine
               label="Onboarding"
@@ -1188,12 +1370,6 @@ export default async function AdminStudentHireProgramPage({
               value={approved}
               total={15}
               detail="Approved for next Guru steps"
-            />
-            <ProgressLine
-              label="Services selected"
-              value={servicesProvided}
-              total={35}
-              detail="Applicants selected earning services"
             />
           </div>
 
@@ -1217,8 +1393,8 @@ export default async function AdminStudentHireProgramPage({
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
           <SectionHeader
             eyebrow="Requirements"
-            title="Student applicant readiness requirements"
-            description="Track what is complete, what is missing, and what admins should request before moving applicants forward."
+            title="Military applicant readiness requirements"
+            description="Track complete versus missing requirements, supporting documents, onboarding readiness, and next-step admin actions."
             icon={<CheckCircle2 size={24} />}
           />
 
@@ -1256,24 +1432,52 @@ export default async function AdminStudentHireProgramPage({
           </div>
         </section>
 
+        <section className="rounded-[30px] border border-green-200 bg-green-50 p-5 shadow-sm">
+          <SectionHeader
+            eyebrow="Background and document breakdown"
+            title="Checkr, documents, and readiness-stage signals"
+            description="Use this section to monitor background check steps, optional document signals, and military-connected context."
+            icon={<ShieldCheck size={24} />}
+          />
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <TopFiveCard
+              title="Checkr Statuses"
+              subtitle="Current background check stage signals."
+              items={checkrStatuses}
+            />
+            <TopFiveCard
+              title="Military Status"
+              subtitle="Military-connected status distribution."
+              items={militaryStatuses}
+            />
+            <TopFiveCard
+              title="Referral Sources"
+              subtitle="Partner context for applicant review."
+              items={sources}
+            />
+          </div>
+        </section>
+
         <section className="overflow-hidden rounded-[30px] border border-[#e3ece5] bg-white shadow-sm">
           <div className="flex flex-col justify-between gap-4 border-b border-[#edf3ee] p-5 lg:flex-row lg:items-center">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
                 Sortable ledger
               </p>
               <h2 className="mt-1 text-2xl font-black text-slate-950">
-                Student applicant ledger
+                Military applicant ledger
               </h2>
               <p className="mt-1 text-sm font-semibold text-slate-500">
-                Sorted by {sort.replace(/_/g, " ")} / {direction}. Export button includes this full dataset.
+                Sorted by {sort.replace(/_/g, " ")} / {direction}. Export
+                button includes this full dataset.
               </p>
             </div>
 
             <a
               href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`}
-              download="sitguru-student-hire-applicant-ledger.csv"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-black text-amber-900 shadow-sm transition hover:bg-amber-100"
+              download="sitguru-military-hire-applicant-ledger.csv"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-green-50 px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-100"
             >
               <Download size={17} />
               Export Ledger
@@ -1281,35 +1485,55 @@ export default async function AdminStudentHireProgramPage({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1300px] text-left">
+            <table className="w-full min-w-[1400px] text-left">
               <thead className="bg-[#fbfcf9]">
                 <tr>
                   <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    <SortLink label="Submitted" sort="created_at" current={resolvedSearchParams} />
+                    <SortLink
+                      label="Submitted"
+                      sort="created_at"
+                      current={resolvedSearchParams}
+                    />
                   </th>
                   <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    <SortLink label="Name" sort="full_name" current={resolvedSearchParams} />
+                    <SortLink
+                      label="Name"
+                      sort="full_name"
+                      current={resolvedSearchParams}
+                    />
                   </th>
                   <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
                     Contact
                   </th>
                   <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    <SortLink label="Status" sort="status" current={resolvedSearchParams} />
+                    <SortLink
+                      label="Status"
+                      sort="status"
+                      current={resolvedSearchParams}
+                    />
                   </th>
                   <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    <SortLink label="School" sort="school_name" current={resolvedSearchParams} />
+                    <SortLink
+                      label="Military background"
+                      sort="military_connected_background"
+                      current={resolvedSearchParams}
+                    />
                   </th>
                   <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    <SortLink label="Student status" sort="student_status" current={resolvedSearchParams} />
+                    <SortLink
+                      label="Partner/source"
+                      sort="referral_source"
+                      current={resolvedSearchParams}
+                    />
+                  </th>
+                  <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                    Checkr / Documents
                   </th>
                   <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
                     Location
                   </th>
                   <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
                     Services
-                  </th>
-                  <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    Requirements
                   </th>
                   <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
                     Next Step
@@ -1362,21 +1586,61 @@ export default async function AdminStudentHireProgramPage({
                       </td>
 
                       <td className="px-4 py-4 text-sm font-bold text-slate-700">
-                        {application.school_name || "—"}
-                      </td>
-
-                      <td className="px-4 py-4 text-sm font-bold text-slate-700">
-                        {application.student_status || "—"}
-                        {application.graduation_year_or_availability ? (
+                        {application.military_connected_background ||
+                          application.military_status ||
+                          "Not provided"}
+                        {application.transition_timeline ? (
                           <p className="mt-1 text-xs font-semibold text-slate-500">
-                            {application.graduation_year_or_availability}
+                            {application.transition_timeline}
                           </p>
                         ) : null}
                       </td>
 
                       <td className="px-4 py-4 text-sm font-bold text-slate-700">
+                        {application.referral_source || "Not provided"}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          {application.background_check_consent ? (
+                            <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-black text-green-800">
+                              Consent
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-black text-amber-800">
+                              Consent missing
+                            </span>
+                          )}
+
+                          <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-black text-blue-800">
+                            {application.checkr_status || "not_started"}
+                          </span>
+
+                          {application.resume_link || application.resume_url ? (
+                            <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-black text-green-800">
+                              Resume
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-black text-amber-800">
+                              Resume missing
+                            </span>
+                          )}
+
+                          {application.additional_documents.length > 0 ? (
+                            <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-black text-green-800">
+                              Docs
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-slate-50 px-2 py-1 text-xs font-black text-slate-600">
+                              No extra docs
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4 text-sm font-bold text-slate-700">
                         <div className="flex items-start gap-2">
-                          <MapPin size={14} className="mt-1 text-amber-700" />
+                          <MapPin size={14} className="mt-1 text-green-700" />
                           <span>
                             {[application.city, application.state, application.zip_code]
                               .filter(Boolean)
@@ -1397,30 +1661,8 @@ export default async function AdminStudentHireProgramPage({
                               </span>
                             ))
                           ) : (
-                            <span className="text-sm font-bold text-slate-500">—</span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          {application.resume_link || application.resume_url ? (
-                            <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-black text-green-800">
-                              Resume
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-black text-amber-800">
-                              Resume missing
-                            </span>
-                          )}
-
-                          {application.background_check_consent ? (
-                            <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-black text-green-800">
-                              Consent
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-black text-amber-800">
-                              Consent missing
+                            <span className="text-sm font-bold text-slate-500">
+                              —
                             </span>
                           )}
                         </div>
@@ -1437,7 +1679,7 @@ export default async function AdminStudentHireProgramPage({
                       colSpan={10}
                       className="px-4 py-10 text-center text-sm font-bold text-slate-500"
                     >
-                      No Student Hire applicants found yet.
+                      No Military Hire applicants found yet.
                     </td>
                   </tr>
                 )}

@@ -36,8 +36,29 @@ type GuruRow = {
 
 type BookingRow = {
   id: string;
+  pet_id?: string | number | null;
+  customer_pet_id?: string | number | null;
+  primary_pet_id?: string | number | null;
   pet_name?: string | null;
   pet_type?: string | null;
+  species?: string | null;
+  breed?: string | null;
+  pet_breed?: string | null;
+  age?: string | number | null;
+  pet_age?: string | number | null;
+  weight?: string | number | null;
+  pet_weight?: string | number | null;
+  temperament?: string | null;
+  pet_temperament?: string | null;
+  medications?: string | null;
+  pet_medications?: string | null;
+  pet_notes?: string | null;
+  pet_photo_url?: string | null;
+  pet_avatar_url?: string | null;
+  pet_image_url?: string | null;
+  photo_url?: string | null;
+  avatar_url?: string | null;
+  image_url?: string | null;
   service?: string | null;
   service_type?: string | null;
   booking_type?: string | null;
@@ -48,9 +69,17 @@ type BookingRow = {
   booking_date?: string | null;
   booking_start?: string | null;
   booking_end?: string | null;
+  requested_date?: string | null;
+  requested_start_date?: string | null;
+  requested_end_date?: string | null;
+  date_selection_mode?: string | null;
+  date_range_label?: string | null;
+  selected_dates?: string[] | string | null;
   start_time?: string | null;
   end_time?: string | null;
   timezone?: string | null;
+  time_window?: string | null;
+  visit_length?: string | null;
   customer_name?: string | null;
   customer_email?: string | null;
   customer_phone?: string | null;
@@ -62,6 +91,7 @@ type BookingRow = {
   user_id?: string | number | null;
   notes?: string | null;
   care_notes?: string | null;
+  emergency_notes?: string | null;
   address?: string | null;
   care_area?: string | null;
   care_city?: string | null;
@@ -76,6 +106,17 @@ type BookingRow = {
   guru_name?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  resolved_pet_photo_url?: string | null;
+};
+
+type PetRow = {
+  id?: string | number | null;
+  name?: string | null;
+  photo_url?: string | null;
+  pet_photo_url?: string | null;
+  avatar_url?: string | null;
+  profile_photo_url?: string | null;
+  image_url?: string | null;
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -87,6 +128,45 @@ type FilterKey =
   | "in-progress"
   | "completed"
   | "canceled";
+
+type NoteItem = {
+  label: string;
+  value: string;
+};
+
+type NoteSection = {
+  title: string;
+  items?: NoteItem[];
+  body?: string;
+};
+
+const NOTE_LABELS = [
+  "Service",
+  "Requested dates",
+  "Requested date",
+  "Selected care dates",
+  "Date selection mode",
+  "Time window",
+  "Visit length",
+  "Care location",
+  "Species",
+  "Breed",
+  "Age",
+  "Weight",
+  "Temperament",
+  "Medications",
+  "Pet notes",
+  "Emergency / special instructions",
+  "Customer-facing SitGuru marketplace fee estimate",
+  "SitGuru marketplace fee estimate",
+  "SitGuru marketplace fee amount",
+  "Guru tip selected",
+  "Estimated Guru payout",
+  "Guru name",
+  "Guru avatar URL",
+  "Pet ID",
+  "Pet photo URL",
+];
 
 function getParam(params: SearchParams, key: string): string | undefined {
   const value = params[key];
@@ -263,7 +343,18 @@ function getBookingValue(booking: BookingRow) {
 }
 
 function getBookingDateValue(booking: BookingRow) {
-  return booking.booking_start || booking.booking_date || booking.created_at || null;
+  return (
+    booking.requested_start_date ||
+    booking.requested_date ||
+    booking.booking_start ||
+    booking.booking_date ||
+    booking.created_at ||
+    null
+  );
+}
+
+function getBookingEndDateValue(booking: BookingRow) {
+  return booking.requested_end_date || booking.booking_end || booking.end_time || null;
 }
 
 function getBookingNotes(booking: BookingRow) {
@@ -301,6 +392,78 @@ function getPetGradient(name?: string | null) {
   if (seed === 1) return "from-[#e4f4ff] to-[#f9fcff]";
   if (seed === 2) return "from-[#fff0db] to-[#fffaf0]";
   return "from-[#ede9ff] to-[#faf8ff]";
+}
+
+function getBookingPetId(booking: BookingRow) {
+  return booking.pet_id || booking.customer_pet_id || booking.primary_pet_id || null;
+}
+
+function getPetRowPhotoUrl(pet?: PetRow | null) {
+  return (
+    pet?.photo_url ||
+    pet?.pet_photo_url ||
+    pet?.avatar_url ||
+    pet?.profile_photo_url ||
+    pet?.image_url ||
+    ""
+  );
+}
+
+function getBookingPetPhotoUrl(booking: BookingRow) {
+  return (
+    booking.resolved_pet_photo_url ||
+    booking.pet_photo_url ||
+    booking.pet_avatar_url ||
+    booking.pet_image_url ||
+    booking.photo_url ||
+    booking.avatar_url ||
+    booking.image_url ||
+    ""
+  );
+}
+
+function PetAvatar({
+  booking,
+  size = "md",
+}: {
+  booking: BookingRow;
+  size?: "sm" | "lg" | "md";
+}) {
+  const petName = booking.pet_name?.trim() || "Pet booking";
+  const photoUrl = getBookingPetPhotoUrl(booking);
+
+  const sizeClass =
+    size === "lg"
+      ? "h-full w-full text-6xl rounded-[28px]"
+      : size === "sm"
+        ? "h-14 w-14 text-lg rounded-2xl"
+        : "h-20 w-20 text-2xl rounded-3xl";
+
+  if (photoUrl) {
+    return (
+      <div
+        className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br ${getPetGradient(
+          petName
+        )} ${sizeClass}`}
+      >
+        <img
+          src={photoUrl}
+          alt={`${petName} avatar`}
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center bg-gradient-to-br ${getPetGradient(
+        petName
+      )} font-black !text-[#061638] ${sizeClass}`}
+    >
+      {getPetInitial(petName)}
+    </div>
+  );
 }
 
 function getMonthGrid(referenceDate: Date) {
@@ -426,6 +589,271 @@ function bookingMatchesSearch(booking: BookingRow, query: string) {
   return haystack.includes(query.trim().toLowerCase());
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeNoteText(value: string) {
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n\s+/g, "\n")
+    .trim();
+}
+
+function parseNoteLabels(rawNotes: string) {
+  const notes = normalizeNoteText(rawNotes);
+  const labelPattern = NOTE_LABELS.map(escapeRegex).join("|");
+  const matcher = new RegExp(`(?:^|\\s)(${labelPattern}):`, "g");
+  const matches = Array.from(notes.matchAll(matcher));
+  const values = new Map<string, string>();
+
+  matches.forEach((match, index) => {
+    const label = match[1];
+    const valueStart = (match.index || 0) + match[0].length;
+    const nextMatch = matches[index + 1];
+    const valueEnd = nextMatch?.index ?? notes.length;
+    const value = notes.slice(valueStart, valueEnd).trim();
+
+    if (value) {
+      values.set(label, value);
+    }
+  });
+
+  const firstMatchIndex = matches[0]?.index ?? -1;
+  const introduction = firstMatchIndex > 0 ? notes.slice(0, firstMatchIndex).trim() : "";
+
+  return {
+    values,
+    introduction,
+    hasLabels: matches.length > 0,
+    raw: notes,
+  };
+}
+
+function getFirstNoteValue(labels: Map<string, string>, keys: string[]) {
+  for (const key of keys) {
+    const value = labels.get(key);
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function buildNoteSections(booking: BookingRow): NoteSection[] {
+  const rawNotes = getBookingNotes(booking);
+  const parsed = parseNoteLabels(rawNotes);
+  const values = parsed.values;
+
+  const serviceDetails: NoteItem[] = [
+    {
+      label: "Service",
+      value:
+        getFirstNoteValue(values, ["Service"]) ||
+        booking.service?.trim() ||
+        booking.service_type?.trim() ||
+        booking.booking_type?.trim() ||
+        "Service not set",
+    },
+    {
+      label: "Dates",
+      value:
+        getFirstNoteValue(values, ["Requested dates", "Requested date", "Selected care dates"]) ||
+        [formatShortDate(getBookingDateValue(booking)), formatShortDate(getBookingEndDateValue(booking))]
+          .filter((value, index, array) => value !== "Not set" && array.indexOf(value) === index)
+          .join(" – ") ||
+        "Date not set",
+    },
+    {
+      label: "Time window",
+      value: getFirstNoteValue(values, ["Time window"]) || booking.time_window || "Not provided",
+    },
+    {
+      label: "Visit length",
+      value: getFirstNoteValue(values, ["Visit length"]) || booking.visit_length || "Not provided",
+    },
+  ];
+
+  const careLocation = getFirstNoteValue(values, ["Care location"]) || getBookingLocation(booking);
+
+  const petDetails: NoteItem[] = [
+    {
+      label: "Species",
+      value: getFirstNoteValue(values, ["Species"]) || booking.species || booking.pet_type || "Not provided",
+    },
+    {
+      label: "Breed",
+      value: getFirstNoteValue(values, ["Breed"]) || booking.breed || booking.pet_breed || "Not provided",
+    },
+    {
+      label: "Age",
+      value: getFirstNoteValue(values, ["Age"]) || (booking.age != null ? String(booking.age) : "") || (booking.pet_age != null ? String(booking.pet_age) : "") || "Not provided",
+    },
+    {
+      label: "Weight",
+      value: getFirstNoteValue(values, ["Weight"]) || (booking.weight != null ? String(booking.weight) : "") || (booking.pet_weight != null ? String(booking.pet_weight) : "") || "Not provided",
+    },
+    {
+      label: "Temperament",
+      value: getFirstNoteValue(values, ["Temperament"]) || booking.temperament || booking.pet_temperament || "Not provided",
+    },
+    {
+      label: "Medications",
+      value: getFirstNoteValue(values, ["Medications"]) || booking.medications || booking.pet_medications || "Not provided",
+    },
+  ];
+
+  const petNotes = getFirstNoteValue(values, ["Pet notes"]) || booking.pet_notes || "";
+  const emergencyNotes = getFirstNoteValue(values, ["Emergency / special instructions"]) || booking.emergency_notes || "";
+
+  const paymentSummary: NoteItem[] = [
+    {
+      label: "Marketplace fee",
+      value:
+        getFirstNoteValue(values, [
+          "Customer-facing SitGuru marketplace fee estimate",
+          "SitGuru marketplace fee estimate",
+        ]) || "Not provided",
+    },
+    {
+      label: "Marketplace fee amount",
+      value: getFirstNoteValue(values, ["SitGuru marketplace fee amount"]) || "Not provided",
+    },
+    {
+      label: "Guru tip",
+      value: getFirstNoteValue(values, ["Guru tip selected"]) || "Not provided",
+    },
+    {
+      label: "Estimated Guru payout",
+      value: getFirstNoteValue(values, ["Estimated Guru payout"]) || formatCurrency(getBookingValue(booking)),
+    },
+  ];
+
+  const sections: NoteSection[] = [
+    {
+      title: "Service Details",
+      items: serviceDetails,
+    },
+    {
+      title: "Care Location",
+      body: careLocation,
+    },
+    {
+      title: "Pet Details",
+      items: petDetails,
+    },
+  ];
+
+  if (petNotes) {
+    sections.push({
+      title: "Care Notes",
+      body: petNotes,
+    });
+  }
+
+  if (emergencyNotes) {
+    sections.push({
+      title: "Emergency / Special Instructions",
+      body: emergencyNotes,
+    });
+  }
+
+  sections.push({
+    title: "Payment Summary",
+    items: paymentSummary,
+  });
+
+  if (!parsed.hasLabels && parsed.raw) {
+    return [
+      {
+        title: "Care Notes",
+        body: parsed.raw,
+      },
+    ];
+  }
+
+  if (parsed.introduction) {
+    sections.unshift({
+      title: "Pet Parent Message",
+      body: parsed.introduction,
+    });
+  }
+
+  return sections;
+}
+
+function OrganizedBookingNotes({ booking }: { booking: BookingRow }) {
+  const notes = getBookingNotes(booking);
+
+  if (!notes.trim()) {
+    return (
+      <div className="mt-4 rounded-[24px] border border-slate-200 bg-white p-5">
+        <div className="flex items-start gap-3">
+          <MessageSquare className="mt-0.5 h-5 w-5 text-slate-500" />
+          <div>
+            <div className="text-sm font-semibold !text-slate-600">
+              Notes from Pet Parent
+            </div>
+            <div className="mt-2 text-base leading-8 !text-slate-700">
+              No Pet Parent notes were included for this booking.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const sections = buildNoteSections(booking);
+
+  return (
+    <div className="mt-4 rounded-[24px] border border-slate-200 bg-white p-5">
+      <div className="flex items-start gap-3">
+        <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold !text-slate-600">
+            Notes from Pet Parent
+          </div>
+
+          <div className="mt-4 space-y-4">
+            {sections.map((section) => (
+              <div
+                key={section.title}
+                className="rounded-[20px] border border-slate-100 bg-[#fbfffd] p-4"
+              >
+                <div className="text-xs font-black uppercase tracking-[0.14em] !text-emerald-700">
+                  {section.title}
+                </div>
+
+                {section.body ? (
+                  <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-7 !text-[#061638]">
+                    {section.body}
+                  </p>
+                ) : null}
+
+                {section.items ? (
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    {section.items.map((item) => (
+                      <div key={`${section.title}-${item.label}`}>
+                        <div className="text-xs font-black uppercase tracking-[0.1em] !text-slate-500">
+                          {item.label}
+                        </div>
+                        <div className="mt-1 break-words text-sm font-black !text-[#061638]">
+                          {item.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function getGuruProfile(userId: string, email?: string | null) {
   const byUserId = await supabaseAdmin
     .from("gurus")
@@ -481,6 +909,49 @@ async function getGuruBookings(guruId: string | number) {
   return [];
 }
 
+async function getPetPhotoMap(bookings: BookingRow[]) {
+  const petIds = Array.from(
+    new Set(
+      bookings
+        .map((booking) => getBookingPetId(booking))
+        .filter((id): id is string | number => id !== null && id !== undefined)
+        .map(String)
+    )
+  );
+
+  if (petIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("pets")
+    .select("id,name,photo_url,pet_photo_url,avatar_url,profile_photo_url,image_url")
+    .in("id", petIds);
+
+  if (error || !data) {
+    return new Map<string, string>();
+  }
+
+  return new Map(
+    (data as PetRow[])
+      .map((pet) => [String(pet.id), getPetRowPhotoUrl(pet)] as const)
+      .filter(([, url]) => Boolean(url))
+  );
+}
+
+function applyPetPhotosToBookings(bookings: BookingRow[], petPhotoMap: Map<string, string>) {
+  return bookings.map((booking) => {
+    const directPhoto = getBookingPetPhotoUrl(booking);
+    const petId = getBookingPetId(booking);
+    const resolvedPhoto = directPhoto || (petId ? petPhotoMap.get(String(petId)) : "") || "";
+
+    return {
+      ...booking,
+      resolved_pet_photo_url: resolvedPhoto,
+    };
+  });
+}
+
 export default async function GuruBookingsPage({
   searchParams,
 }: {
@@ -521,7 +992,9 @@ export default async function GuruBookingsPage({
     redirect("/guru/login");
   }
 
-  const allBookings = await getGuruBookings(guru.id);
+  const rawBookings = await getGuruBookings(guru.id);
+  const petPhotoMap = await getPetPhotoMap(rawBookings);
+  const allBookings = applyPetPhotosToBookings(rawBookings, petPhotoMap);
 
   const filteredBookings = allBookings
     .filter((booking) => bookingMatchesFilter(booking, activeFilter))
@@ -868,13 +1341,7 @@ export default async function GuruBookingsPage({
                       }`}
                     >
                       <div className="flex items-center gap-4">
-                        <div
-                          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${getPetGradient(
-                            petName
-                          )} text-lg font-black !text-[#061638]`}
-                        >
-                          {getPetInitial(petName)}
-                        </div>
+                        <PetAvatar booking={booking} size="sm" />
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
@@ -956,13 +1423,7 @@ export default async function GuruBookingsPage({
             ) : (
               <div className="pt-5">
                 <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)]">
-                  <div
-                    className={`flex aspect-square items-center justify-center rounded-[28px] bg-gradient-to-br ${getPetGradient(
-                      selectedBooking.pet_name
-                    )} text-6xl font-black !text-[#061638]`}
-                  >
-                    {getPetInitial(selectedBooking.pet_name)}
-                  </div>
+                  <PetAvatar booking={selectedBooking} size="lg" />
 
                   <div>
                     <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1031,18 +1492,18 @@ export default async function GuruBookingsPage({
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
                   <div className="rounded-[24px] border border-slate-200 bg-white p-5">
                     <div className="flex items-start gap-3">
-                      <CalendarDays className="mt-0.5 h-5 w-5 text-slate-500" />
+                      <CalendarDays className="mt-0.5 h-5 w-5 text-slate-400" />
                       <div>
                         <div className="text-sm font-semibold !text-slate-600">
                           Date & Time
                         </div>
-                        <div className="mt-1 text-xl font-black !text-[#061638]">
+                        <div className="mt-1 text-lg font-black !text-[#061638]">
                           {formatDate(getBookingDateValue(selectedBooking))}
                         </div>
                         <div className="mt-1 text-sm font-semibold !text-slate-600">
-                          {selectedBooking.start_time && selectedBooking.end_time
-                            ? `${selectedBooking.start_time} – ${selectedBooking.end_time}`
-                            : formatShortDateTime(getBookingDateValue(selectedBooking))}
+                          {formatShortDateTime(
+                            selectedBooking.start_time || getBookingDateValue(selectedBooking)
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1050,12 +1511,12 @@ export default async function GuruBookingsPage({
 
                   <div className="rounded-[24px] border border-slate-200 bg-white p-5">
                     <div className="flex items-start gap-3">
-                      <MapPin className="mt-0.5 h-5 w-5 text-slate-500" />
+                      <MapPin className="mt-0.5 h-5 w-5 text-slate-400" />
                       <div>
                         <div className="text-sm font-semibold !text-slate-600">
                           Location
                         </div>
-                        <div className="mt-1 text-xl font-black !text-[#061638]">
+                        <div className="mt-1 text-lg font-black !text-[#061638]">
                           {getBookingLocation(selectedBooking)}
                         </div>
                       </div>
@@ -1064,23 +1525,20 @@ export default async function GuruBookingsPage({
 
                   <div className="rounded-[24px] border border-slate-200 bg-white p-5">
                     <div className="flex items-start gap-3">
-                      <UserRound className="mt-0.5 h-5 w-5 text-slate-500" />
+                      <UserRound className="mt-0.5 h-5 w-5 text-slate-400" />
                       <div>
                         <div className="text-sm font-semibold !text-slate-600">
                           Customer
                         </div>
-                        <div className="mt-1 text-xl font-black !text-[#061638]">
-                          {selectedBooking.customer_name || "Customer"}
+                        <div className="mt-1 text-lg font-black !text-[#061638]">
+                          {selectedBooking.customer_name?.trim() || "Customer"}
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-4 text-sm font-semibold !text-slate-600">
-                          <span className="inline-flex items-center gap-2">
+                        <div className="mt-2 flex flex-wrap gap-3 text-sm font-semibold !text-slate-600">
+                          <span className="inline-flex items-center gap-1">
                             <Mail className="h-4 w-4" />
-                            {selectedBooking.customer_email || "No email"}
+                            {selectedBooking.customer_email?.trim() || "No email"}
                           </span>
-                          <span className="inline-flex items-center gap-2">
-                            <MessageSquare className="h-4 w-4" />
-                            {selectedBooking.customer_phone || "No phone"}
-                          </span>
+                          <span>{selectedBooking.customer_phone?.trim() || "No phone"}</span>
                         </div>
                       </div>
                     </div>
@@ -1104,21 +1562,7 @@ export default async function GuruBookingsPage({
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-[24px] border border-slate-200 bg-white p-5">
-                  <div className="flex items-start gap-3">
-                    <MessageSquare className="mt-0.5 h-5 w-5 text-slate-500" />
-                    <div>
-                      <div className="text-sm font-semibold !text-slate-600">
-                        Notes from Pet Parent
-                      </div>
-                      <div className="mt-2 text-base leading-8 !text-slate-700">
-                        {getBookingNotes(selectedBooking)
-                          ? getBookingNotes(selectedBooking)
-                          : "No Pet Parent notes were included for this booking."}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <OrganizedBookingNotes booking={selectedBooking} />
 
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link
@@ -1157,36 +1601,31 @@ export default async function GuruBookingsPage({
           <aside className="self-start space-y-6">
             <div className="rounded-[28px] border border-[#dfeee7] bg-white p-5 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CalendarDays className="h-5 w-5 text-emerald-600" />
-                  <div className="text-3xl font-black tracking-tight !text-[#061638]">
-                    Calendar
-                  </div>
+                <div className="text-3xl font-black tracking-tight !text-[#061638]">
+                  Calendar
                 </div>
-
                 <div className="flex items-center gap-2">
                   <Link
                     href={previousMonthHref}
-                    className="flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-100 bg-white !text-slate-300 transition hover:!text-emerald-700"
                     aria-label="Previous month"
                   >
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-5 w-5" />
                   </Link>
                   <Link
                     href={nextMonthHref}
-                    className="flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-100 bg-white !text-slate-300 transition hover:!text-emerald-700"
                     aria-label="Next month"
                   >
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-5 w-5" />
                   </Link>
                 </div>
               </div>
 
-              <div className="mt-5 flex items-center justify-between gap-3">
+              <div className="mt-5 flex items-center justify-between">
                 <div className="text-2xl font-black !text-[#061638]">
                   {formatMonthLabel(safeCalendarDate)}
                 </div>
-
                 <Link
                   href={todayMonthHref}
                   className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-700 transition hover:bg-emerald-100"
@@ -1229,12 +1668,12 @@ export default async function GuruBookingsPage({
                             isSelected && cell.inCurrentMonth
                               ? "bg-emerald-500 !text-white shadow-sm"
                               : hasBooking && cell.inCurrentMonth
-                              ? "bg-emerald-100 !text-emerald-800"
-                              : isToday
-                              ? "bg-sky-50 !text-sky-700"
-                              : cell.inCurrentMonth
-                              ? "bg-white !text-slate-700"
-                              : "bg-slate-50 !text-slate-300"
+                                ? "bg-emerald-100 !text-emerald-800"
+                                : isToday
+                                  ? "bg-sky-50 !text-sky-700"
+                                  : cell.inCurrentMonth
+                                    ? "bg-white !text-slate-700"
+                                    : "bg-slate-50 !text-slate-300"
                           }`}
                         >
                           {cell.day}
@@ -1257,11 +1696,11 @@ export default async function GuruBookingsPage({
                   Booking scheduled
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-sky-100 ring-1 ring-sky-200" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
                   Today
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-slate-100 ring-1 ring-slate-200" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
                   No booking
                 </div>
               </div>
@@ -1272,10 +1711,10 @@ export default async function GuruBookingsPage({
                 <div className="text-3xl font-black tracking-tight !text-[#061638]">
                   Profile Performance
                 </div>
-                <div className="text-sm font-black !text-slate-500">Live</div>
+                <div className="text-sm font-black !text-emerald-700">Live</div>
               </div>
 
-              <div className="mt-5 space-y-4">
+              <div className="mt-6 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div className="text-base font-semibold !text-slate-600">
                     Pending Requests

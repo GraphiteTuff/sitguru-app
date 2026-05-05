@@ -38,6 +38,17 @@ type CalendarStatus = "available" | "blackout" | "pending" | "closed";
 
 type TipChoice = "none" | "10" | "15" | "20" | "custom";
 
+type DateSelectionMode = "single" | "range";
+
+type ServiceAreaStatus =
+  | "idle"
+  | "checking"
+  | "invalid_zip"
+  | "missing_customer_location"
+  | "missing_guru_location"
+  | "inside"
+  | "outside";
+
 type PetProfile = {
   id: string;
   name: string;
@@ -82,6 +93,7 @@ type CustomerProfile = {
 type GuruProfileRow = {
   id?: string | number | null;
   user_id?: string | null;
+  profile_id?: string | null;
   display_name?: string | null;
   full_name?: string | null;
   slug?: string | null;
@@ -89,6 +101,7 @@ type GuruProfileRow = {
   city?: string | null;
   state?: string | null;
   zip_code?: string | null;
+  postal_code?: string | null;
   profile_photo_url?: string | null;
   photo_url?: string | null;
   avatar_url?: string | null;
@@ -100,6 +113,17 @@ type GuruProfileRow = {
   years_experience?: number | null;
   completed_bookings?: number | null;
   response_rate?: number | null;
+
+  service_latitude?: number | string | null;
+  service_longitude?: number | string | null;
+  service_radius_miles?: number | string | null;
+  service_radius?: number | string | null;
+  radius_miles?: number | string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  service_area_enabled?: boolean | null;
 };
 
 type GuruProfileFallbackRow = {
@@ -248,6 +272,8 @@ const tipOptions: {
 const ESTIMATED_MARKETPLACE_FEE_PERCENT = 15;
 const MIN_MARKETPLACE_FEE_PERCENT = 15;
 const MAX_MARKETPLACE_FEE_PERCENT = 20;
+const DEFAULT_SERVICE_RADIUS_MILES = 25;
+const EARTH_RADIUS_MILES = 3958.8;
 
 const usStateOptions = [
   { value: "AL", label: "Alabama" },
@@ -405,6 +431,72 @@ function normalizeCustomTip(value: string) {
   return Math.min(500, parsed);
 }
 
+function toNullableNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return null;
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function calculateDistanceMiles(
+  startLatitude: number,
+  startLongitude: number,
+  endLatitude: number,
+  endLongitude: number,
+) {
+  const latitudeDelta = toRadians(endLatitude - startLatitude);
+  const longitudeDelta = toRadians(endLongitude - startLongitude);
+
+  const startLatitudeRadians = toRadians(startLatitude);
+  const endLatitudeRadians = toRadians(endLatitude);
+
+  const haversine =
+    Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2) +
+    Math.cos(startLatitudeRadians) *
+      Math.cos(endLatitudeRadians) *
+      Math.sin(longitudeDelta / 2) *
+      Math.sin(longitudeDelta / 2);
+
+  const angularDistance =
+    2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+
+  return EARTH_RADIUS_MILES * angularDistance;
+}
+
+function getGuruServiceLatitude(guru: GuruProfileRow | null) {
+  if (!guru) return null;
+
+  return toNullableNumber(guru.service_latitude ?? guru.latitude ?? guru.lat);
+}
+
+function getGuruServiceLongitude(guru: GuruProfileRow | null) {
+  if (!guru) return null;
+
+  return toNullableNumber(
+    guru.service_longitude ?? guru.longitude ?? guru.lng,
+  );
+}
+
+function getGuruServiceRadiusMiles(guru: GuruProfileRow | null) {
+  if (!guru) return DEFAULT_SERVICE_RADIUS_MILES;
+
+  const parsed = toNullableNumber(
+    guru.service_radius_miles ?? guru.service_radius ?? guru.radius_miles,
+  );
+
+  if (parsed === null || parsed <= 0) return DEFAULT_SERVICE_RADIUS_MILES;
+
+  return parsed;
+}
+
 function normalizeStateForSelect(value?: string | null) {
   const clean = String(value || "").trim();
 
@@ -518,6 +610,14 @@ function formatMoneyNoCents(value: number) {
   }).format(value);
 }
 
+function formatDistanceMiles(value: number | null) {
+  if (value === null) return "";
+
+  if (value < 10) return `${value.toFixed(1)} miles`;
+
+  return `${Math.round(value)} miles`;
+}
+
 function toISODate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -544,6 +644,63 @@ function formatDisplayDate(value: string) {
     day: "numeric",
     year: "numeric",
   }).format(date);
+}
+
+function formatShortDisplayDate(value: string) {
+  if (!value) return "";
+
+  const date = new Date(`${value}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function compareISODate(a: string, b: string) {
+  return (
+    new Date(`${a}T12:00:00`).getTime() -
+    new Date(`${b}T12:00:00`).getTime()
+  );
+}
+
+function isISODateBetween(value: string, start: string, end: string) {
+  if (!value || !start || !end) return false;
+
+  return compareISODate(value, start) >= 0 && compareISODate(value, end) <= 0;
+}
+
+function getDateRangeLabel(startDate: string, endDate: string) {
+  if (!startDate && !endDate) return "Not selected";
+  if (!endDate || startDate === endDate) return formatDisplayDate(startDate);
+
+  return `${formatShortDisplayDate(startDate)} – ${formatDisplayDate(endDate)}`;
+}
+
+function getDatesInRange(startDate: string, endDate: string) {
+  if (!startDate) return [];
+  if (!endDate || startDate === endDate) return [startDate];
+
+  const start = new Date(`${startDate}T12:00:00`);
+  const end = new Date(`${endDate}T12:00:00`);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return [startDate];
+  }
+
+  const orderedStart = start.getTime() <= end.getTime() ? start : end;
+  const orderedEnd = start.getTime() <= end.getTime() ? end : start;
+  const dates: string[] = [];
+  const current = new Date(orderedStart);
+
+  while (current.getTime() <= orderedEnd.getTime()) {
+    dates.push(toISODate(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
 }
 
 function monthLabel(date: Date) {
@@ -641,10 +798,7 @@ function mergeGuruProfileWithFallbacks({
     photo_url: guruData?.photo_url || profileData?.photo_url || null,
     avatar_url: guruData?.avatar_url || profileData?.avatar_url || null,
     image_url:
-      guruData?.image_url ||
-      profileData?.image_url ||
-      initialPhotoUrl ||
-      null,
+      guruData?.image_url || profileData?.image_url || initialPhotoUrl || null,
     rating_avg: guruData?.rating_avg ?? initialRatingAvg ?? null,
     review_count: guruData?.review_count ?? initialReviewCount ?? null,
     hourly_rate: guruData?.hourly_rate ?? initialHourlyRate ?? null,
@@ -881,12 +1035,19 @@ export default function BookGuruClient({
   const [selectedService, setSelectedService] =
     useState<ServiceKey>("drop_in_visit");
   const [bookingDate, setBookingDate] = useState("");
+  const [bookingEndDate, setBookingEndDate] = useState("");
+  const [dateSelectionMode, setDateSelectionMode] =
+    useState<DateSelectionMode>("single");
+  const [hoverDate, setHoverDate] = useState("");
   const [timeWindow, setTimeWindow] = useState("Flexible");
   const [customPreferredTime, setCustomPreferredTime] = useState("");
   const [visitLength, setVisitLength] = useState("60 minutes");
   const [careZipCode, setCareZipCode] = useState("");
   const [careCity, setCareCity] = useState("");
   const [careState, setCareState] = useState("");
+  const [careLatitude, setCareLatitude] = useState<number | null>(null);
+  const [careLongitude, setCareLongitude] = useState<number | null>(null);
+  const [careLocalityName, setCareLocalityName] = useState("");
   const [notes, setNotes] = useState("");
   const [emergencyNotes, setEmergencyNotes] = useState("");
 
@@ -977,6 +1138,150 @@ export default function BookGuruClient({
     .filter(Boolean)
     .join(", ");
 
+  const guruServiceLatitude = getGuruServiceLatitude(guruProfile);
+  const guruServiceLongitude = getGuruServiceLongitude(guruProfile);
+  const guruServiceRadiusMiles = getGuruServiceRadiusMiles(guruProfile);
+
+  const serviceAreaDistanceMiles = useMemo(() => {
+    if (
+      careLatitude === null ||
+      careLongitude === null ||
+      guruServiceLatitude === null ||
+      guruServiceLongitude === null
+    ) {
+      return null;
+    }
+
+    return calculateDistanceMiles(
+      careLatitude,
+      careLongitude,
+      guruServiceLatitude,
+      guruServiceLongitude,
+    );
+  }, [
+    careLatitude,
+    careLongitude,
+    guruServiceLatitude,
+    guruServiceLongitude,
+  ]);
+
+  const serviceAreaStatus = useMemo<ServiceAreaStatus>(() => {
+    if (!careZipCode) return "idle";
+    if (zipLookupStatus === "loading") return "checking";
+    if (zipLookupStatus === "not_found") return "invalid_zip";
+
+    if (careZipCode.length === 5 && zipLookupStatus !== "found") {
+      return "checking";
+    }
+
+    if (careLatitude === null || careLongitude === null) {
+      return "missing_customer_location";
+    }
+
+    if (guruServiceLatitude === null || guruServiceLongitude === null) {
+      return "missing_guru_location";
+    }
+
+    if (
+      serviceAreaDistanceMiles !== null &&
+      serviceAreaDistanceMiles <= guruServiceRadiusMiles
+    ) {
+      return "inside";
+    }
+
+    return "outside";
+  }, [
+    careZipCode,
+    zipLookupStatus,
+    careLatitude,
+    careLongitude,
+    guruServiceLatitude,
+    guruServiceLongitude,
+    serviceAreaDistanceMiles,
+    guruServiceRadiusMiles,
+  ]);
+
+  const isCareLocationInsideGuruServiceArea = serviceAreaStatus === "inside";
+
+  const serviceAreaTitle = useMemo(() => {
+    if (serviceAreaStatus === "inside") return "In this Guru’s service area";
+    if (serviceAreaStatus === "outside") return "Outside this Guru’s service area";
+    if (serviceAreaStatus === "missing_guru_location") {
+      return "Guru service area needs setup";
+    }
+    if (serviceAreaStatus === "missing_customer_location") {
+      return "Care location needs verification";
+    }
+    if (serviceAreaStatus === "invalid_zip") return "ZIP code not found";
+    if (serviceAreaStatus === "checking") return "Checking service area";
+    return "";
+  }, [serviceAreaStatus]);
+
+  const serviceAreaMessage = useMemo(() => {
+    const careLocation =
+      careLocalityName || [careCity, careState].filter(Boolean).join(", ");
+
+    if (serviceAreaStatus === "inside") {
+      return `This Guru serves ${careLocation || "this care location"}${
+        serviceAreaDistanceMiles !== null
+          ? ` · ${formatDistanceMiles(serviceAreaDistanceMiles)} away`
+          : ""
+      }.`;
+    }
+
+    if (serviceAreaStatus === "outside") {
+      return `This Guru does not currently serve ${
+        careLocation || "this care location"
+      }. Please choose a Guru near this care location.`;
+    }
+
+    if (serviceAreaStatus === "missing_guru_location") {
+      return "This Guru needs a service address or radius set before customers can book care. Please update the Guru service area before testing this booking.";
+    }
+
+    if (serviceAreaStatus === "missing_customer_location") {
+      return "Enter a valid ZIP code so SitGuru can verify whether this Guru serves the care location.";
+    }
+
+    if (serviceAreaStatus === "invalid_zip") {
+      return "We could not match that ZIP code. Please check it or enter the city and state manually.";
+    }
+
+    if (serviceAreaStatus === "checking") {
+      return "SitGuru is checking whether this Guru serves the care location.";
+    }
+
+    return "";
+  }, [
+    serviceAreaStatus,
+    careLocalityName,
+    careCity,
+    careState,
+    serviceAreaDistanceMiles,
+  ]);
+
+  const serviceAreaBadgeClass = useMemo(() => {
+    if (serviceAreaStatus === "inside") {
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    }
+
+    if (
+      serviceAreaStatus === "outside" ||
+      serviceAreaStatus === "missing_guru_location"
+    ) {
+      return "border-rose-200 bg-rose-50 text-rose-700";
+    }
+
+    if (
+      serviceAreaStatus === "checking" ||
+      serviceAreaStatus === "missing_customer_location"
+    ) {
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    }
+
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }, [serviceAreaStatus]);
+
   const yearsExperience = guruProfile?.years_experience ?? 5;
   const completedBookings = guruProfile?.completed_bookings ?? 312;
   const responseRate = guruProfile?.response_rate ?? 98;
@@ -997,14 +1302,72 @@ export default function BookGuruClient({
     [calendarCells, bookingDate],
   );
 
+  const selectedEndDateCell = useMemo(
+    () => calendarCells.find((cell) => cell.iso === bookingEndDate),
+    [calendarCells, bookingEndDate],
+  );
+
+  const selectedDates = useMemo(
+    () =>
+      dateSelectionMode === "range"
+        ? getDatesInRange(bookingDate, bookingEndDate)
+        : bookingDate
+          ? [bookingDate]
+          : [],
+    [bookingDate, bookingEndDate, dateSelectionMode],
+  );
+
+  const dateRangeLabel = useMemo(
+    () =>
+      dateSelectionMode === "range"
+        ? getDateRangeLabel(bookingDate, bookingEndDate)
+        : formatDisplayDate(bookingDate),
+    [bookingDate, bookingEndDate, dateSelectionMode],
+  );
+
+  const hoverRangeEndDate =
+    dateSelectionMode === "range" && bookingDate && !bookingEndDate && hoverDate
+      ? hoverDate
+      : "";
+
+  const isRangeSelectionIncomplete =
+    dateSelectionMode === "range" && Boolean(bookingDate) && !bookingEndDate;
+
+  const rangeHasUnavailableDate = useMemo(() => {
+    if (selectedDates.length === 0) return false;
+
+    const availabilityByDate = new Map(
+      calendarCells.map((cell) => [cell.iso, cell]),
+    );
+
+    return selectedDates.some((date) => {
+      const cell = availabilityByDate.get(date);
+
+      return (
+        !cell ||
+        !cell.inMonth ||
+        cell.status === "blackout" ||
+        cell.status === "closed" ||
+        cell.status === "pending"
+      );
+    });
+  }, [calendarCells, selectedDates]);
+
   const isSelectedDateUnavailable =
     selectedDateCell?.status === "blackout" ||
     selectedDateCell?.status === "closed" ||
-    selectedDateCell?.status === "pending";
+    selectedDateCell?.status === "pending" ||
+    selectedEndDateCell?.status === "blackout" ||
+    selectedEndDateCell?.status === "closed" ||
+    selectedEndDateCell?.status === "pending" ||
+    rangeHasUnavailableDate;
 
   const canContinueStep1 =
     petName.trim().length > 0 &&
     bookingDate.length > 0 &&
+    cleanZip(careZipCode).length === 5 &&
+    isCareLocationInsideGuruServiceArea &&
+    !isRangeSelectionIncomplete &&
     !isSelectedDateUnavailable;
 
   const allAcknowledgementsAccepted =
@@ -1054,9 +1417,7 @@ export default function BookGuruClient({
       try {
         const { data: guruData } = await supabase
           .from("gurus")
-          .select(
-            "id,user_id,display_name,full_name,slug,bio,city,state,zip_code,profile_photo_url,photo_url,avatar_url,image_url,rating_avg,review_count,hourly_rate,rate,years_experience,completed_bookings,response_rate",
-          )
+          .select("*")
           .eq("id", guruId)
           .maybeSingle<GuruProfileRow>();
 
@@ -1147,6 +1508,9 @@ export default function BookGuruClient({
       setZipLookupStatus("idle");
       setCareCity("");
       setCareState("");
+      setCareLatitude(null);
+      setCareLongitude(null);
+      setCareLocalityName("");
       return;
     }
 
@@ -1154,6 +1518,9 @@ export default function BookGuruClient({
       setZipLookupStatus("idle");
       setCareCity("");
       setCareState("");
+      setCareLatitude(null);
+      setCareLongitude(null);
+      setCareLocalityName("");
       return;
     }
 
@@ -1172,6 +1539,9 @@ export default function BookGuruClient({
             setZipLookupStatus("not_found");
             setCareCity("");
             setCareState("");
+            setCareLatitude(null);
+            setCareLongitude(null);
+            setCareLocalityName("");
           }
 
           return;
@@ -1188,6 +1558,11 @@ export default function BookGuruClient({
         setZipLookupStatus("found");
         setCareCity(data.city || "");
         setCareState(normalizedState);
+        setCareLatitude(data.latitude ?? null);
+        setCareLongitude(data.longitude ?? null);
+        setCareLocalityName(
+          [data.city || "", normalizedState || ""].filter(Boolean).join(", "),
+        );
       } catch (error) {
         console.error("Booking ZIP lookup failed:", error);
 
@@ -1195,6 +1570,9 @@ export default function BookGuruClient({
           setZipLookupStatus("not_found");
           setCareCity("");
           setCareState("");
+          setCareLatitude(null);
+          setCareLongitude(null);
+          setCareLocalityName("");
         }
       }
     }
@@ -1236,15 +1614,30 @@ export default function BookGuruClient({
     if (!bookingDate) return;
 
     const currentCell = calendarCells.find((cell) => cell.iso === bookingDate);
+    const currentEndCell = bookingEndDate
+      ? calendarCells.find((cell) => cell.iso === bookingEndDate)
+      : null;
 
     if (
       currentCell?.status === "blackout" ||
       currentCell?.status === "closed" ||
-      currentCell?.status === "pending"
+      currentCell?.status === "pending" ||
+      currentEndCell?.status === "blackout" ||
+      currentEndCell?.status === "closed" ||
+      currentEndCell?.status === "pending" ||
+      rangeHasUnavailableDate
     ) {
       setBookingDate("");
+      setBookingEndDate("");
+      setHoverDate("");
     }
-  }, [selectedService, calendarCells, bookingDate]);
+  }, [
+    selectedService,
+    calendarCells,
+    bookingDate,
+    bookingEndDate,
+    rangeHasUnavailableDate,
+  ]);
 
   function moveCalendar(direction: "prev" | "next") {
     setCalendarMonth((current) => {
@@ -1254,16 +1647,82 @@ export default function BookGuruClient({
     });
   }
 
+  function resetCareGeo() {
+    setCareLatitude(null);
+    setCareLongitude(null);
+    setCareLocalityName("");
+  }
+
   function handleZipChange(value: string) {
     const cleanedZip = cleanZip(value);
 
     setCareZipCode(cleanedZip);
+    setSubmitError("");
 
     if (!cleanedZip) {
       setZipLookupStatus("idle");
       setCareCity("");
       setCareState("");
+      resetCareGeo();
     }
+  }
+
+  function handleCareCityChange(value: string) {
+    setCareCity(value);
+    setCareLatitude(null);
+    setCareLongitude(null);
+    setCareLocalityName([value, careState].filter(Boolean).join(", "));
+    setSubmitError("");
+  }
+
+  function handleCareStateChange(value: string) {
+    setCareState(value);
+    setCareLatitude(null);
+    setCareLongitude(null);
+    setCareLocalityName([careCity, value].filter(Boolean).join(", "));
+    setSubmitError("");
+  }
+
+  function handleDateModeChange(mode: DateSelectionMode) {
+    setSubmitError("");
+    setDateSelectionMode(mode);
+    setHoverDate("");
+
+    if (mode === "single") {
+      setBookingEndDate("");
+    }
+  }
+
+  function handleManualStartDateChange(value: string) {
+    setSubmitError("");
+    setBookingDate(value);
+
+    if (dateSelectionMode === "single") {
+      setBookingEndDate("");
+      return;
+    }
+
+    if (bookingEndDate && compareISODate(bookingEndDate, value) < 0) {
+      setBookingEndDate("");
+    }
+  }
+
+  function handleManualEndDateChange(value: string) {
+    setSubmitError("");
+
+    if (!bookingDate) {
+      setBookingDate(value);
+      setBookingEndDate("");
+      return;
+    }
+
+    if (compareISODate(value, bookingDate) < 0) {
+      setBookingEndDate(bookingDate);
+      setBookingDate(value);
+      return;
+    }
+
+    setBookingEndDate(value);
   }
 
   function handleDateSelect(cell: CalendarCell) {
@@ -1284,7 +1743,35 @@ export default function BookGuruClient({
       return;
     }
 
-    setBookingDate(cell.iso);
+    if (dateSelectionMode === "single") {
+      setBookingDate(cell.iso);
+      setBookingEndDate("");
+      setHoverDate("");
+      return;
+    }
+
+    if (!bookingDate || bookingEndDate) {
+      setBookingDate(cell.iso);
+      setBookingEndDate("");
+      setHoverDate("");
+      return;
+    }
+
+    if (cell.iso === bookingDate) {
+      setBookingEndDate(cell.iso);
+      setHoverDate("");
+      return;
+    }
+
+    if (compareISODate(cell.iso, bookingDate) < 0) {
+      setBookingEndDate(bookingDate);
+      setBookingDate(cell.iso);
+      setHoverDate("");
+      return;
+    }
+
+    setBookingEndDate(cell.iso);
+    setHoverDate("");
   }
 
   function extractApiError(data: unknown, fallback: string) {
@@ -1350,14 +1837,39 @@ export default function BookGuruClient({
     };
   }
 
+  function getStepOneErrorMessage() {
+    if (!petName.trim()) return "Please choose or enter a pet before reviewing the booking.";
+
+    if (!bookingDate || isRangeSelectionIncomplete) {
+      return dateSelectionMode === "range"
+        ? "Please choose an available date range before reviewing the booking."
+        : "Please choose an available date before reviewing the booking.";
+    }
+
+    if (isSelectedDateUnavailable) {
+      return "The selected date is no longer available. Please choose another date.";
+    }
+
+    if (cleanZip(careZipCode).length !== 5) {
+      return "Please enter a valid 5-digit care ZIP code before reviewing the booking.";
+    }
+
+    if (!isCareLocationInsideGuruServiceArea) {
+      return (
+        serviceAreaMessage ||
+        "This Guru does not currently serve this care location. Please choose a Guru near the customer."
+      );
+    }
+
+    return "Please complete the booking details before reviewing the booking.";
+  }
+
   function handleNext() {
     setSubmitError("");
 
     if (step === 1) {
       if (!canContinueStep1) {
-        setSubmitError(
-          "Please choose a pet and an available date before reviewing the booking.",
-        );
+        setSubmitError(getStepOneErrorMessage());
         return;
       }
 
@@ -1386,7 +1898,7 @@ export default function BookGuruClient({
         return;
       }
 
-      if (!petName.trim() || !bookingDate) {
+      if (!petName.trim() || !bookingDate || isRangeSelectionIncomplete) {
         setSubmitError("Please complete the booking details before confirming.");
         return;
       }
@@ -1394,6 +1906,14 @@ export default function BookGuruClient({
       if (isSelectedDateUnavailable) {
         setSubmitError(
           "The selected date is no longer available. Please choose another date.",
+        );
+        return;
+      }
+
+      if (!isCareLocationInsideGuruServiceArea) {
+        setSubmitError(
+          serviceAreaMessage ||
+            "This Guru does not currently serve this care location. Please choose a Guru near the customer.",
         );
         return;
       }
@@ -1408,6 +1928,8 @@ export default function BookGuruClient({
       const finalName = customerName?.trim() || "SitGuru Customer";
       const finalEmail = customerEmail?.trim() || "customer@sitguru.com";
       const serviceLabel = serviceLabelFromKey(selectedService);
+      const resolvedCareLocalityName =
+        careLocalityName || [careCity, careState].filter(Boolean).join(", ");
 
       setSubmitting(true);
 
@@ -1434,8 +1956,20 @@ export default function BookGuruClient({
         service_key: selectedService,
         requestedDate: bookingDate,
         requested_date: bookingDate,
+        requestedStartDate: bookingDate,
+        requested_start_date: bookingDate,
+        requestedEndDate:
+          dateSelectionMode === "range" ? bookingEndDate : bookingDate,
+        requested_end_date:
+          dateSelectionMode === "range" ? bookingEndDate : bookingDate,
         booking_date: bookingDate,
         date: bookingDate,
+        dateSelectionMode: dateSelectionMode,
+        date_selection_mode: dateSelectionMode,
+        dateRangeLabel: dateRangeLabel,
+        date_range_label: dateRangeLabel,
+        selectedDates,
+        selected_dates: selectedDates,
         timeWindow: displayPreferredTime,
         time_window: displayPreferredTime,
         visitLength,
@@ -1446,6 +1980,23 @@ export default function BookGuruClient({
         care_city: careCity,
         careState,
         care_state: careState,
+        careLatitude,
+        care_latitude: careLatitude,
+        careLongitude,
+        care_longitude: careLongitude,
+        careLocalityName: resolvedCareLocalityName,
+        care_locality_name: resolvedCareLocalityName,
+
+        guruServiceLatitude,
+        guru_service_latitude: guruServiceLatitude,
+        guruServiceLongitude,
+        guru_service_longitude: guruServiceLongitude,
+        guruServiceRadiusMiles,
+        guru_service_radius_miles: guruServiceRadiusMiles,
+        calculatedDistanceMiles: serviceAreaDistanceMiles,
+        calculated_distance_miles: serviceAreaDistanceMiles,
+        serviceRadiusEligible: isCareLocationInsideGuruServiceArea,
+        service_radius_eligible: isCareLocationInsideGuruServiceArea,
 
         servicePrice,
         service_price: servicePrice,
@@ -1493,7 +2044,9 @@ export default function BookGuruClient({
         terms_accepted: true,
         notes: [
           `Service: ${serviceLabel}`,
-          `Requested date: ${bookingDate}`,
+          dateSelectionMode === "range"
+            ? `Requested dates: ${dateRangeLabel}`
+            : `Requested date: ${bookingDate}`,
           `Time window: ${displayPreferredTime}`,
           `Visit length: ${visitLength}`,
           careZipCode || careCity || careState
@@ -1501,6 +2054,24 @@ export default function BookGuruClient({
                 .filter(Boolean)
                 .join(" ")}`
             : "",
+          resolvedCareLocalityName
+            ? `Care locality: ${resolvedCareLocalityName}`
+            : "",
+          careLatitude !== null && careLongitude !== null
+            ? `Care coordinates: ${careLatitude}, ${careLongitude}`
+            : "",
+          guruServiceLatitude !== null && guruServiceLongitude !== null
+            ? `Guru service center: ${guruServiceLatitude}, ${guruServiceLongitude}`
+            : "",
+          `Guru service radius: ${guruServiceRadiusMiles} miles`,
+          serviceAreaDistanceMiles !== null
+            ? `Distance from Guru service center: ${formatDistanceMiles(
+                serviceAreaDistanceMiles,
+              )}`
+            : "",
+          `Service radius eligible: ${
+            isCareLocationInsideGuruServiceArea ? "Yes" : "No"
+          }`,
           "",
           notes.trim(),
           emergencyNotes.trim()
@@ -1508,7 +2079,9 @@ export default function BookGuruClient({
             : "",
           "",
           `Customer-facing SitGuru marketplace fee estimate: ${marketplaceFeePercent}%`,
-          `Guru tip selected: ${formatMoney(tipAmount)}. 100% of the tip goes directly to the Guru.`,
+          `Guru tip selected: ${formatMoney(
+            tipAmount,
+          )}. 100% of the tip goes directly to the Guru.`,
         ]
           .filter(Boolean)
           .join("\n"),
@@ -1696,17 +2269,85 @@ export default function BookGuruClient({
                     </select>
                   </SelectShell>
 
-                  <div>
+                  <div
+                    className={
+                      dateSelectionMode === "range" ? "md:col-span-2" : ""
+                    }
+                  >
                     <label className={labelClass()} htmlFor="requested-date">
-                      Requested Date
+                      {dateSelectionMode === "range"
+                        ? "Requested Dates"
+                        : "Requested Date"}
                     </label>
-                    <input
-                      id="requested-date"
-                      type="date"
-                      value={formatDateForInput(bookingDate)}
-                      onChange={(event) => setBookingDate(event.target.value)}
-                      className={fieldClass()}
-                    />
+
+                    <div className="mb-3 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 sm:grid-cols-2">
+                      {[
+                        {
+                          key: "single" as DateSelectionMode,
+                          label: "Single day",
+                        },
+                        {
+                          key: "range" as DateSelectionMode,
+                          label: "Date range",
+                        },
+                      ].map((option) => {
+                        const active = dateSelectionMode === option.key;
+
+                        return (
+                          <button
+                            key={option.key}
+                            type="button"
+                            onClick={() => handleDateModeChange(option.key)}
+                            className={[
+                              "rounded-xl px-3 py-2 text-xs font-black transition",
+                              active
+                                ? "bg-emerald-600 text-white shadow-sm"
+                                : "bg-transparent text-slate-600 hover:bg-white",
+                            ].join(" ")}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div
+                      className={
+                        dateSelectionMode === "range"
+                          ? "grid gap-3 sm:grid-cols-2"
+                          : ""
+                      }
+                    >
+                      <input
+                        id="requested-date"
+                        type="date"
+                        value={formatDateForInput(bookingDate)}
+                        onChange={(event) =>
+                          handleManualStartDateChange(event.target.value)
+                        }
+                        className={fieldClass()}
+                      />
+
+                      {dateSelectionMode === "range" ? (
+                        <input
+                          id="requested-end-date"
+                          type="date"
+                          value={formatDateForInput(bookingEndDate)}
+                          min={bookingDate || undefined}
+                          onChange={(event) =>
+                            handleManualEndDateChange(event.target.value)
+                          }
+                          className={fieldClass()}
+                          aria-label="Requested end date"
+                        />
+                      ) : null}
+                    </div>
+
+                    <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+                      {dateSelectionMode === "range"
+                        ? "Use the date fields or click a start date, hover to preview, then click an end date on the calendar."
+                        : "Use the date field or click a green available date on the calendar."}
+                    </p>
                   </div>
 
                   <SelectShell
@@ -1771,7 +2412,9 @@ export default function BookGuruClient({
                     <input
                       id="city"
                       value={careCity}
-                      onChange={(event) => setCareCity(event.target.value)}
+                      onChange={(event) =>
+                        handleCareCityChange(event.target.value)
+                      }
                       className={fieldClass()}
                       placeholder="Quakertown"
                     />
@@ -1781,7 +2424,9 @@ export default function BookGuruClient({
                     <select
                       id="state"
                       value={careState}
-                      onChange={(event) => setCareState(event.target.value)}
+                      onChange={(event) =>
+                        handleCareStateChange(event.target.value)
+                      }
                       className={`${fieldClass()} appearance-none pr-10`}
                       style={forcedSelectStyle}
                     >
@@ -1803,8 +2448,19 @@ export default function BookGuruClient({
                   ) : null}
 
                   {zipLookupStatus === "found" ? (
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">
-                      ZIP matched: {careCity}, {careState}
+                    <span
+                      className={[
+                        "rounded-full border px-3 py-1",
+                        serviceAreaBadgeClass,
+                      ].join(" ")}
+                    >
+                      {serviceAreaStatus === "inside"
+                        ? `In service area: ${careCity}, ${careState}`
+                        : serviceAreaStatus === "outside"
+                          ? `ZIP matched: ${careCity}, ${careState} · Outside service area`
+                          : serviceAreaStatus === "missing_guru_location"
+                            ? `ZIP matched: ${careCity}, ${careState} · Guru service area needs setup`
+                            : `ZIP matched: ${careCity}, ${careState} · Checking service area`}
                     </span>
                   ) : null}
 
@@ -1814,6 +2470,61 @@ export default function BookGuruClient({
                     </span>
                   ) : null}
                 </div>
+
+                {serviceAreaTitle && serviceAreaMessage ? (
+                  <div
+                    className={[
+                      "mt-4 rounded-2xl border p-4",
+                      serviceAreaStatus === "inside"
+                        ? "border-emerald-200 bg-emerald-50"
+                        : serviceAreaStatus === "outside" ||
+                            serviceAreaStatus === "missing_guru_location"
+                          ? "border-rose-200 bg-rose-50"
+                          : "border-sky-200 bg-sky-50",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={[
+                          "rounded-xl p-2 text-white",
+                          serviceAreaStatus === "inside"
+                            ? "bg-emerald-600"
+                            : serviceAreaStatus === "outside" ||
+                                serviceAreaStatus === "missing_guru_location"
+                              ? "bg-rose-600"
+                              : "bg-sky-600",
+                        ].join(" ")}
+                      >
+                        {serviceAreaStatus === "inside" ? (
+                          <CheckCircle2 className="h-5 w-5" />
+                        ) : serviceAreaStatus === "checking" ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5" />
+                        )}
+                      </div>
+
+                      <div>
+                        <p
+                          className={[
+                            "text-sm font-black",
+                            serviceAreaStatus === "inside"
+                              ? "text-emerald-900"
+                              : serviceAreaStatus === "outside" ||
+                                  serviceAreaStatus === "missing_guru_location"
+                                ? "text-rose-900"
+                                : "text-sky-900",
+                          ].join(" ")}
+                        >
+                          {serviceAreaTitle}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-700">
+                          {serviceAreaMessage}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 {!selectedPetId ? (
                   <div className="mt-5">
@@ -1854,8 +2565,20 @@ export default function BookGuruClient({
                     </p>
                     <p className="mt-1 text-sm font-semibold text-slate-600">
                       Green dates are available. Red dates are unavailable.
-                      Yellow dates are pending/request.
+                      Yellow dates are pending/request. For date ranges, click
+                      the first green date, hover to preview, then click the
+                      final green date.
                     </p>
+
+                    <div className="mt-3 inline-flex max-w-full items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800">
+                      {dateSelectionMode === "range"
+                        ? `Selected range: ${dateRangeLabel}${
+                            selectedDates.length > 1
+                              ? ` · ${selectedDates.length} days`
+                              : ""
+                          }`
+                        : `Selected date: ${formatDisplayDate(bookingDate)}`}
+                    </div>
                   </div>
 
                   <div className="mt-4 overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white">
@@ -1891,28 +2614,95 @@ export default function BookGuruClient({
                     ) : (
                       <div className="p-3 md:p-4">
                         <div className="grid grid-cols-7 gap-2 text-center text-xs font-black uppercase tracking-[0.08em] text-slate-500">
-                          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
-                            (day) => (
-                              <div key={day} className="py-2">
-                                {day}
-                              </div>
-                            ),
-                          )}
+                          {[
+                            "Sun",
+                            "Mon",
+                            "Tue",
+                            "Wed",
+                            "Thu",
+                            "Fri",
+                            "Sat",
+                          ].map((day) => (
+                            <div key={day} className="py-2">
+                              {day}
+                            </div>
+                          ))}
                         </div>
 
                         <div className="grid grid-cols-7 gap-2">
                           {calendarCells.map((cell) => {
-                            const selected = bookingDate === cell.iso;
                             const unavailable =
                               cell.status === "blackout" ||
                               cell.status === "closed" ||
                               cell.status === "pending";
+
+                            const selectedStart = bookingDate === cell.iso;
+                            const selectedEnd =
+                              dateSelectionMode === "range" &&
+                              bookingEndDate === cell.iso;
+                            const selectedSingle =
+                              dateSelectionMode === "single" &&
+                              bookingDate === cell.iso;
+
+                            const committedRange =
+                              dateSelectionMode === "range" &&
+                              bookingDate &&
+                              bookingEndDate &&
+                              isISODateBetween(
+                                cell.iso,
+                                bookingDate,
+                                bookingEndDate,
+                              );
+
+                            const previewRange =
+                              dateSelectionMode === "range" &&
+                              bookingDate &&
+                              !bookingEndDate &&
+                              hoverRangeEndDate &&
+                              isISODateBetween(
+                                cell.iso,
+                                compareISODate(
+                                  hoverRangeEndDate,
+                                  bookingDate,
+                                ) < 0
+                                  ? hoverRangeEndDate
+                                  : bookingDate,
+                                compareISODate(
+                                  hoverRangeEndDate,
+                                  bookingDate,
+                                ) < 0
+                                  ? bookingDate
+                                  : hoverRangeEndDate,
+                              );
+
+                            const rangeEdge = selectedStart || selectedEnd;
+                            const selected = selectedSingle || rangeEdge;
 
                             return (
                               <button
                                 key={cell.iso}
                                 type="button"
                                 onClick={() => handleDateSelect(cell)}
+                                onMouseEnter={() => {
+                                  if (
+                                    dateSelectionMode === "range" &&
+                                    bookingDate &&
+                                    !bookingEndDate &&
+                                    cell.inMonth &&
+                                    !unavailable
+                                  ) {
+                                    setHoverDate(cell.iso);
+                                  }
+                                }}
+                                onMouseLeave={() => {
+                                  if (
+                                    dateSelectionMode === "range" &&
+                                    bookingDate &&
+                                    !bookingEndDate
+                                  ) {
+                                    setHoverDate("");
+                                  }
+                                }}
                                 disabled={!cell.inMonth || unavailable}
                                 className={[
                                   "relative flex min-h-[52px] items-center justify-center overflow-hidden rounded-xl border text-sm font-black transition md:min-h-[58px]",
@@ -1925,6 +2715,12 @@ export default function BookGuruClient({
                                         : cell.status === "available"
                                           ? "border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                                           : "border-slate-100 bg-slate-50 text-slate-400",
+                                  committedRange && !rangeEdge
+                                    ? "border-emerald-200 bg-emerald-100 text-emerald-900"
+                                    : "",
+                                  previewRange && !rangeEdge
+                                    ? "border-emerald-200 bg-emerald-100/70 text-emerald-900"
+                                    : "",
                                   selected
                                     ? "bg-emerald-600 text-white ring-4 ring-emerald-500/20 hover:bg-emerald-600"
                                     : "",
@@ -1938,7 +2734,30 @@ export default function BookGuruClient({
                                   <X className="absolute h-4 w-4 opacity-40" />
                                 ) : null}
 
-                                <span>{cell.dayNumber}</span>
+                                {committedRange && !rangeEdge ? (
+                                  <span className="absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 bg-emerald-200/40" />
+                                ) : null}
+
+                                {previewRange && !rangeEdge ? (
+                                  <span className="absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 bg-emerald-200/30" />
+                                ) : null}
+
+                                <span className="relative z-10">
+                                  {cell.dayNumber}
+                                </span>
+
+                                {selectedStart &&
+                                dateSelectionMode === "range" ? (
+                                  <span className="absolute bottom-1 left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-white">
+                                    Start
+                                  </span>
+                                ) : null}
+
+                                {selectedEnd ? (
+                                  <span className="absolute bottom-1 left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-white">
+                                    End
+                                  </span>
+                                ) : null}
 
                                 {cell.inMonth && cell.status === "pending" ? (
                                   <Clock3 className="absolute bottom-2 right-2 h-3.5 w-3.5" />
@@ -2040,7 +2859,10 @@ export default function BookGuruClient({
                     ["Service", serviceLabelFromKey(selectedService)],
                     ["Booking type", bookingType],
                     ["Pet", petName || "Not selected"],
-                    ["Date", formatDisplayDate(bookingDate)],
+                    [
+                      dateSelectionMode === "range" ? "Dates" : "Date",
+                      dateRangeLabel,
+                    ],
                     ["Preferred time", displayPreferredTime],
                     ["Duration", visitLength],
                     [
@@ -2048,6 +2870,24 @@ export default function BookGuruClient({
                       [careCity, careState, careZipCode]
                         .filter(Boolean)
                         .join(", ") || "Not provided",
+                    ],
+                    [
+                      "Care locality",
+                      careLocalityName ||
+                        [careCity, careState].filter(Boolean).join(", ") ||
+                        "Not provided",
+                    ],
+                    [
+                      "Service area",
+                      serviceAreaStatus === "inside"
+                        ? `In range${
+                            serviceAreaDistanceMiles !== null
+                              ? ` · ${formatDistanceMiles(
+                                  serviceAreaDistanceMiles,
+                                )}`
+                              : ""
+                          }`
+                        : "Not eligible",
                     ],
                   ].map(([label, value]) => (
                     <div
@@ -2116,8 +2956,8 @@ export default function BookGuruClient({
 
                 <div className="mt-6 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 p-5">
                   <p className="flex items-center gap-2 text-lg font-black text-emerald-900">
-                    <CreditCard className="h-5 w-5" />
-                    A lower service fee than many leading care platforms
+                    <CreditCard className="h-5 w-5" />A lower service fee than
+                    many leading care platforms
                   </p>
                   <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">
                     SitGuru keeps marketplace fees competitive so more of your
@@ -2223,7 +3063,7 @@ export default function BookGuruClient({
                     {
                       checked: detailsAccepted,
                       setChecked: setDetailsAccepted,
-                      text: "I confirm the pet care details, requested date, duration, notes, and pricing are accurate.",
+                      text: "I confirm the pet care details, requested date(s), duration, notes, and pricing are accurate.",
                     },
                     {
                       checked: paymentAccepted,
@@ -2248,7 +3088,9 @@ export default function BookGuruClient({
                       <input
                         type="checkbox"
                         checked={item.checked}
-                        onChange={(event) => item.setChecked(event.target.checked)}
+                        onChange={(event) =>
+                          item.setChecked(event.target.checked)
+                        }
                         className="mt-1 h-5 w-5 rounded border-slate-300 accent-emerald-600"
                       />
                       <span className="text-sm font-semibold leading-7 text-slate-800">
@@ -2367,6 +3209,10 @@ export default function BookGuruClient({
                       {guruLocation}
                     </p>
                   ) : null}
+
+                  <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+                    Service radius: {guruServiceRadiusMiles} miles
+                  </p>
                 </div>
               </div>
 
@@ -2441,14 +3287,40 @@ export default function BookGuruClient({
                 {[
                   ["Service", serviceShortLabelFromKey(selectedService)],
                   ["Pet", petName || "Not selected"],
-                  ["Date", formatDisplayDate(bookingDate)],
+                  [
+                    dateSelectionMode === "range" ? "Dates" : "Date",
+                    dateRangeLabel,
+                  ],
                   ["Time", displayPreferredTime],
                   ["Duration", visitLength],
+                  ...(dateSelectionMode === "range" && selectedDates.length > 1
+                    ? [["Care days", `${selectedDates.length} days`]]
+                    : []),
                   [
                     "Care Location",
                     [careZipCode, careCity, careState]
                       .filter(Boolean)
                       .join(", ") || "Not provided",
+                  ],
+                  [
+                    "Locality",
+                    careLocalityName ||
+                      [careCity, careState].filter(Boolean).join(", ") ||
+                      "Not provided",
+                  ],
+                  [
+                    "Service Area",
+                    serviceAreaStatus === "inside"
+                      ? `In range${
+                          serviceAreaDistanceMiles !== null
+                            ? ` · ${formatDistanceMiles(
+                                serviceAreaDistanceMiles,
+                              )}`
+                            : ""
+                        }`
+                      : careZipCode
+                        ? "Not eligible"
+                        : "Enter ZIP",
                   ],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between gap-4">

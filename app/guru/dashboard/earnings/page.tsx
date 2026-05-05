@@ -21,7 +21,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-const SITGURU_FEE_PERCENT = 0.08;
+const DEFAULT_SITGURU_FEE_PERCENT = 0.15;
+const MIN_SITGURU_FEE_PERCENT = 15;
+const MAX_SITGURU_FEE_PERCENT = 20;
 
 type GuruProfile = {
   id?: string | number | null;
@@ -75,6 +77,20 @@ function toNumber(value: unknown) {
 
 function roundMoney(value: number) {
   return Number(value.toFixed(2));
+}
+
+function normalizeFeePercent(value: unknown) {
+  const parsed = toNumber(value);
+
+  if (parsed <= 0) return DEFAULT_SITGURU_FEE_PERCENT;
+
+  const percent = parsed > 1 ? parsed : parsed * 100;
+  const clamped = Math.min(
+    MAX_SITGURU_FEE_PERCENT,
+    Math.max(MIN_SITGURU_FEE_PERCENT, percent),
+  );
+
+  return clamped / 100;
 }
 
 function formatDate(value?: string | null) {
@@ -209,6 +225,8 @@ function getGrossAmount(booking: BookingRow) {
   if (subtotal > 0) return roundMoney(subtotal);
 
   const fallback =
+    toNumber(booking.booking_subtotal_amount) ||
+    toNumber(booking.service_price) ||
     toNumber(booking.total_amount) ||
     toNumber(booking.amount) ||
     toNumber(booking.price) ||
@@ -217,15 +235,30 @@ function getGrossAmount(booking: BookingRow) {
   return roundMoney(fallback);
 }
 
+function getFeePercent(booking: BookingRow) {
+  return normalizeFeePercent(
+    booking.marketplace_fee_percent ||
+      booking.sitguru_fee_percent ||
+      booking.platform_fee_percent,
+  );
+}
+
 function getFeeAmount(booking: BookingRow, gross: number) {
-  const storedFee = toNumber(booking.sitguru_fee_amount);
+  const storedFee =
+    toNumber(booking.marketplace_fee_amount) ||
+    toNumber(booking.sitguru_fee_amount) ||
+    toNumber(booking.platform_fee);
+
   if (storedFee > 0) return roundMoney(storedFee);
 
-  return roundMoney(gross * SITGURU_FEE_PERCENT);
+  return roundMoney(gross * getFeePercent(booking));
 }
 
 function getNetAmount(booking: BookingRow, gross: number, fee: number) {
-  const storedNet = toNumber(booking.guru_net_amount);
+  const storedNet =
+    toNumber(booking.guru_net_amount) ||
+    toNumber(booking.guru_estimated_base_payout);
+
   if (storedNet > 0) return roundMoney(storedNet);
 
   return roundMoney(gross - fee);
@@ -462,9 +495,10 @@ export default async function GuruDashboardEarningsPage() {
               </h1>
 
               <p className="mt-5 max-w-4xl text-base font-semibold leading-8 !text-slate-800 md:text-lg">
-                SitGuru is built to support Gurus with fair pay and transparent
-                payouts. Earnings shown here reflect completed bookings, payout
-                status, and what you take home after applicable deductions.
+                SitGuru is built to support Gurus with clear earnings and
+                transparent payouts. Earnings shown here reflect completed
+                bookings, payout status, and what you take home after the
+                applicable locality-based SitGuru fee.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -543,7 +577,7 @@ export default async function GuruDashboardEarningsPage() {
           <StatCard
             title="SitGuru Fees"
             value={currency(sitguruFees)}
-            description="Total platform fees deducted"
+            description="Total marketplace fees deducted"
             icon={<BadgeDollarSign className="h-6 w-6" />}
           />
         </section>
@@ -561,7 +595,7 @@ export default async function GuruDashboardEarningsPage() {
               </div>
 
               <p className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-black !text-emerald-700 ring-1 ring-emerald-100">
-                8% platform fee
+                15%–20% marketplace fee
               </p>
             </div>
 
@@ -737,7 +771,8 @@ export default async function GuruDashboardEarningsPage() {
                       Gross booking total
                     </p>
                     <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-                      The full service subtotal tied to the completed booking.
+                      The full service subtotal tied to the completed booking
+                      before the SitGuru fee is applied.
                     </p>
                   </div>
                 </div>
@@ -748,11 +783,12 @@ export default async function GuruDashboardEarningsPage() {
                   </div>
                   <div>
                     <p className="font-black !text-slate-950">
-                      SitGuru fee (8%)
+                      SitGuru fee (15%–20%)
                     </p>
                     <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-                      An introductory platform fee designed to stay
-                      Guru-friendly.
+                      A locality-based marketplace fee. The exact percentage
+                      varies by service area and is typically between 15% and
+                      20%.
                     </p>
                   </div>
                 </div>
@@ -764,7 +800,8 @@ export default async function GuruDashboardEarningsPage() {
                   <div>
                     <p className="font-black !text-slate-950">Net earnings</p>
                     <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-                      What you take home after the SitGuru fee is deducted.
+                      What you take home after the applicable SitGuru fee is
+                      deducted. Customer tips pass through 100% to you.
                     </p>
                   </div>
                 </div>
@@ -838,13 +875,14 @@ export default async function GuruDashboardEarningsPage() {
 
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
-                  Introductory 8% platform fee
+                  Locality-based 15%–20% marketplace fee
                 </p>
                 <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 !text-slate-700">
-                  SitGuru’s current model is designed to help Gurus keep more
-                  from each completed booking. Platform fees, payout timing,
-                  referral rewards, and affiliate options may evolve as SitGuru
-                  grows.
+                  SitGuru’s current model is designed to keep earnings clear for
+                  Gurus while supporting secure payments, customer support,
+                  safety tools, and platform growth. The applicable fee may vary
+                  by service area, and customer tips pass through 100% to the
+                  Guru.
                 </p>
               </div>
             </div>

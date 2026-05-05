@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { calculateDistanceMiles } from "@/lib/distance/calculateDistanceMiles";
 import {
   ArrowRight,
   CalendarDays,
@@ -24,6 +25,18 @@ type GuruRow = {
   name?: string | null;
   city?: string | null;
   state?: string | null;
+  zip_code?: string | null;
+
+  service_latitude?: number | string | null;
+  service_longitude?: number | string | null;
+  service_radius_miles?: number | string | null;
+  service_area_enabled?: boolean | null;
+
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
+
   profile_photo_url?: string | null;
   photo_url?: string | null;
   avatar_url?: string | null;
@@ -32,11 +45,31 @@ type GuruRow = {
   review_count?: number | null;
   hourly_rate?: number | null;
   rate?: number | null;
+
+  distance_miles?: number | null;
 };
 
 type CalendarSettingRow = {
   guru_slug: string;
   active: boolean;
+};
+
+type ZipLookupLocation = {
+  zip: string;
+  city: string;
+  state: string;
+  latitude: number;
+  longitude: number;
+};
+
+type FindCarePageProps = {
+  searchParams?:
+    | Promise<{
+        zip?: string;
+      }>
+    | {
+        zip?: string;
+      };
 };
 
 function initialsFromName(name: string) {
@@ -75,11 +108,76 @@ function guruRating(guru: GuruRow) {
   return guru.rating_avg ? guru.rating_avg.toFixed(1) : "5.0";
 }
 
-export default async function FindCarePage() {
+function cleanZip(value?: string | null) {
+  return String(value || "").replace(/\D/g, "").slice(0, 5);
+}
+
+function parseCoordinate(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getGuruLatitude(guru: GuruRow) {
+  return parseCoordinate(guru.service_latitude ?? guru.latitude ?? guru.lat);
+}
+
+function getGuruLongitude(guru: GuruRow) {
+  return parseCoordinate(guru.service_longitude ?? guru.longitude ?? guru.lng);
+}
+
+function getGuruRadius(guru: GuruRow) {
+  const parsed = Number(guru.service_radius_miles);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 25;
+}
+
+async function lookupZipLocation(zip: string): Promise<ZipLookupLocation | null> {
+  const clean = cleanZip(zip);
+
+  if (clean.length !== 5) return null;
+
+  try {
+    const response = await fetch(`https://api.zippopotam.us/us/${clean}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      next: {
+        revalidate: 60 * 60 * 24 * 30,
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const place = data?.places?.[0];
+
+    const latitude = parseCoordinate(place?.latitude);
+    const longitude = parseCoordinate(place?.longitude);
+
+    if (latitude === null || longitude === null) return null;
+
+    return {
+      zip: clean,
+      city: String(place?.["place name"] || ""),
+      state: String(place?.["state abbreviation"] || ""),
+      latitude,
+      longitude,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export default async function FindCarePage({ searchParams }: FindCarePageProps) {
+  const resolvedSearchParams = await searchParams;
+  const searchZip = cleanZip(resolvedSearchParams?.zip || "");
+  const customerLocation =
+    searchZip.length === 5 ? await lookupZipLocation(searchZip) : null;
+
   const { data: gurusData, error: gurusError } = await supabaseAdmin
     .from("gurus")
     .select(
-      "id,user_id,slug,display_name,full_name,name,city,state,profile_photo_url,photo_url,avatar_url,image_url,rating_avg,review_count,hourly_rate,rate",
+      "id,user_id,slug,display_name,full_name,name,city,state,zip_code,service_latitude,service_longitude,service_radius_miles,service_area_enabled,latitude,longitude,lat,lng,profile_photo_url,photo_url,avatar_url,image_url,rating_avg,review_count,hourly_rate,rate",
     )
     .order("display_name", { ascending: true });
 
@@ -94,7 +192,49 @@ export default async function FindCarePage() {
       .map((row) => row.guru_slug),
   );
 
-  const gurus = ((gurusData || []) as GuruRow[]).filter((guru) => guru.slug);
+  const gurus = ((gurusData || []) as GuruRow[])
+    .filter((guru) => guru.slug)
+    .map((guru) => {
+      if (!customerLocation) {
+        return {
+          ...guru,
+          distance_miles: null,
+        };
+      }
+
+      const guruLatitude = getGuruLatitude(guru);
+      const guruLongitude = getGuruLongitude(guru);
+
+      if (guruLatitude === null || guruLongitude === null) {
+        return {
+          ...guru,
+          distance_miles: null,
+        };
+      }
+
+      const distanceMiles = calculateDistanceMiles(
+        customerLocation.latitude,
+        customerLocation.longitude,
+        guruLatitude,
+        guruLongitude,
+      );
+
+      return {
+        ...guru,
+        distance_miles: distanceMiles,
+      };
+    })
+    .filter((guru) => {
+      if (!customerLocation) return true;
+
+      if (guru.service_area_enabled === false) return true;
+
+      if (guru.distance_miles === null || guru.distance_miles === undefined) {
+        return false;
+      }
+
+      return guru.distance_miles <= getGuruRadius(guru);
+    });
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffc_42%,#ecfdf5_100%)] text-slate-950">
@@ -154,6 +294,54 @@ export default async function FindCarePage() {
                 Choose a Guru first, then book with the modern availability-aware
                 calendar. Service-specific blackout dates are shown before checkout.
               </p>
+
+              <form
+                action="/find-care"
+                className="mt-7 rounded-[2rem] border border-emerald-100 bg-white/90 p-5 shadow-sm"
+              >
+                <label
+                  htmlFor="zip"
+                  className="block text-sm font-black uppercase tracking-[0.12em] text-emerald-700"
+                >
+                  Find Gurus near your sit location
+                </label>
+
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                  <input
+                    id="zip"
+                    name="zip"
+                    defaultValue={searchZip}
+                    inputMode="numeric"
+                    maxLength={5}
+                    placeholder="Enter ZIP code"
+                    className="min-h-[52px] flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                  />
+
+                  <button
+                    type="submit"
+                    className="inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+                  >
+                    Search
+                  </button>
+                </div>
+
+                {customerLocation ? (
+                  <p className="mt-3 text-sm font-bold text-emerald-800">
+                    Showing Gurus who serve {customerLocation.city},{" "}
+                    {customerLocation.state} {customerLocation.zip}.
+                  </p>
+                ) : searchZip ? (
+                  <p className="mt-3 text-sm font-bold text-amber-700">
+                    We could not verify that ZIP code. Please check it and try
+                    again.
+                  </p>
+                ) : (
+                  <p className="mt-3 text-sm font-semibold text-slate-600">
+                    Enter your care ZIP code to only see Gurus who serve your
+                    area.
+                  </p>
+                )}
+              </form>
 
               <div className="mt-7 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4 shadow-sm">
@@ -242,11 +430,12 @@ export default async function FindCarePage() {
             <div className="mt-6 rounded-[2rem] border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
               <PawPrint className="mx-auto h-10 w-10 text-emerald-700" />
               <h3 className="mt-4 text-2xl font-black text-slate-950">
-                No Gurus are visible yet
+                {customerLocation ? "No Gurus serve this location yet" : "No Gurus are visible yet"}
               </h3>
               <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-7 text-slate-600">
-                No Guru profiles with slugs were found yet. Once Gurus are
-                created, they will appear here for customers to book.
+                {customerLocation
+                  ? "No Guru profiles currently include this ZIP code inside their service radius. Try a nearby ZIP code or check back soon."
+                  : "No Guru profiles with slugs were found yet. Once Gurus are created, they will appear here for customers to book."}
               </p>
             </div>
           ) : null}
@@ -302,6 +491,14 @@ export default async function FindCarePage() {
                         <span className="inline-flex items-center gap-1">
                           <MapPin className="h-4 w-4 text-emerald-700" />
                           {location}
+                        </span>
+                      ) : null}
+
+                      {guru.distance_miles !== null &&
+                      guru.distance_miles !== undefined ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-700">
+                          <MapPin className="h-4 w-4 text-emerald-700" />
+                          {guru.distance_miles.toFixed(1)} miles away
                         </span>
                       ) : null}
                     </div>

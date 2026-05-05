@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { calculateDistanceMiles } from "@/lib/distance/calculateDistanceMiles";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +19,12 @@ const stripe = new Stripe(stripeSecretKey, {
 /**
  * SitGuru marketplace fee rules
  *
- * Old behavior:
- * - Hardcoded 8% fee.
- *
- * New behavior:
+ * Current behavior:
  * - Default marketplace fee starts at 15%.
  * - Locality rules can move the fee between 15% and 20%.
- * - Tips are not commissionable and should pass through to the Guru.
+ * - Exact ZIP rules win before radius rules.
+ * - Radius rules use booking care_latitude / care_longitude.
+ * - Tips are not commissionable and pass through to the Guru.
  */
 const DEFAULT_SITGURU_FEE_PERCENT = 15;
 const MIN_SITGURU_FEE_PERCENT = 15;
@@ -34,7 +34,6 @@ const TIP_PRESET_PERCENTAGES = [0, 10, 15, 20] as const;
 const MAX_TIP_CENTS = 50_000;
 
 // Stripe Tax code for general services.
-// This keeps Stripe automatic tax from failing during checkout.
 // Confirm final tax category before live production launch.
 const SITGURU_STRIPE_TAX_CODE = "txcd_20030000";
 
@@ -46,9 +45,21 @@ type LocalityFeeRuleRow = {
   state?: string | null;
   city?: string | null;
   postal_code?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  radius_miles?: number | string | null;
   fee_percent?: number | string | null;
   is_active?: boolean | null;
   priority?: number | null;
+};
+
+type MarketplaceFeeResolution = {
+  feePercent: number;
+  feeSource: string;
+  feeRuleId: string;
+  feeRuleName: string;
+  feeMatchType: string;
+  feeDistanceMiles: number | null;
 };
 
 type CheckoutLineItem = {
@@ -106,17 +117,32 @@ function firstNonEmpty(...values: unknown[]) {
   for (const value of values) {
     const cleaned = asTrimmedString(value);
     if (cleaned) return cleaned;
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
   }
 
   return "";
 }
 
 function normalizeComparable(value: unknown) {
-  return asTrimmedString(value).toLowerCase();
+  return firstNonEmpty(value).toLowerCase();
 }
 
 function normalizePostalCode(value: unknown) {
-  return asTrimmedString(value).replace(/\s+/g, "").toLowerCase();
+  return firstNonEmpty(value).replace(/\s+/g, "").toLowerCase();
+}
+
+function toNullableNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return null;
 }
 
 function clampMarketplaceFeePercent(value: unknown) {
@@ -128,7 +154,7 @@ function clampMarketplaceFeePercent(value: unknown) {
 
   return Math.min(
     MAX_SITGURU_FEE_PERCENT,
-    Math.max(MIN_SITGURU_FEE_PERCENT, parsed)
+    Math.max(MIN_SITGURU_FEE_PERCENT, parsed),
   );
 }
 
@@ -157,18 +183,18 @@ function toTipCents(value: unknown, subtotalCents: number) {
   }
 
   const wholeCents = Math.round(parsed);
-
   const cappedBySubtotal = Math.max(subtotalCents, MAX_TIP_CENTS);
+
   return Math.min(wholeCents, cappedBySubtotal);
 }
 
 function getTipCentsFromBody(
   body: Record<string, unknown> | null,
-  subtotalCents: number
+  subtotalCents: number,
 ) {
   const directTipCents = toTipCents(
     body?.tipCents ?? body?.tip_cents,
-    subtotalCents
+    subtotalCents,
   );
 
   if (directTipCents > 0) {
@@ -176,6 +202,7 @@ function getTipCentsFromBody(
   }
 
   const customTipAmount = body?.tipAmount ?? body?.tip_amount;
+
   if (
     customTipAmount !== null &&
     customTipAmount !== undefined &&
@@ -185,13 +212,13 @@ function getTipCentsFromBody(
   }
 
   const requestedPercentage = Number(
-    body?.tipPercent ?? body?.tip_percent ?? body?.tipPercentage
+    body?.tipPercent ?? body?.tip_percent ?? body?.tipPercentage,
   );
 
   if (
     Number.isFinite(requestedPercentage) &&
     TIP_PRESET_PERCENTAGES.includes(
-      requestedPercentage as (typeof TIP_PRESET_PERCENTAGES)[number]
+      requestedPercentage as (typeof TIP_PRESET_PERCENTAGES)[number],
     )
   ) {
     return Math.round(subtotalCents * (requestedPercentage / 100));
@@ -228,34 +255,37 @@ function getBookingCustomerEmail(booking: BookingRow) {
     booking.customer_email,
     booking.email,
     booking.user_email,
-    booking.owner_email
+    booking.owner_email,
   );
 }
 
 function getBookingCity(booking: BookingRow) {
   return firstNonEmpty(
+    booking.care_city,
     booking.city,
     booking.service_city,
     booking.booking_city,
     booking.customer_city,
     booking.pet_city,
-    booking.location_city
+    booking.location_city,
   );
 }
 
 function getBookingState(booking: BookingRow) {
   return firstNonEmpty(
+    booking.care_state,
     booking.state,
     booking.service_state,
     booking.booking_state,
     booking.customer_state,
     booking.pet_state,
-    booking.location_state
+    booking.location_state,
   );
 }
 
 function getBookingPostalCode(booking: BookingRow) {
   return firstNonEmpty(
+    booking.care_zip_code,
     booking.postal_code,
     booking.zip_code,
     booking.zip,
@@ -266,8 +296,245 @@ function getBookingPostalCode(booking: BookingRow) {
     booking.customer_postal_code,
     booking.customer_zip_code,
     booking.pet_postal_code,
-    booking.pet_zip_code
+    booking.pet_zip_code,
   );
+}
+
+function getBookingLatitude(booking: BookingRow) {
+  return toNullableNumber(
+    booking.care_latitude ??
+      booking.sit_latitude_at_booking ??
+      booking.customer_latitude ??
+      booking.latitude,
+  );
+}
+
+function getBookingLongitude(booking: BookingRow) {
+  return toNullableNumber(
+    booking.care_longitude ??
+      booking.sit_longitude_at_booking ??
+      booking.customer_longitude ??
+      booking.longitude,
+  );
+}
+
+function getBookingLocalityName(booking: BookingRow) {
+  return (
+    firstNonEmpty(booking.care_locality_name, booking.locality_name) ||
+    [getBookingCity(booking), getBookingState(booking)]
+      .filter(Boolean)
+      .join(", ")
+  );
+}
+
+function getBookingDateValue(booking: BookingRow, ...keys: string[]) {
+  for (const key of keys) {
+    const value = firstNonEmpty(booking[key]);
+
+    if (value) return value.slice(0, 10);
+  }
+
+  return "";
+}
+
+function getBookingDateRangeLabel(booking: BookingRow) {
+  const existingLabel = firstNonEmpty(
+    booking.date_range_label,
+    booking.dateRangeLabel,
+  );
+
+  if (existingLabel) return existingLabel;
+
+  const startDate = getBookingDateValue(
+    booking,
+    "requested_start_date",
+    "requested_date",
+    "booking_date",
+    "date",
+  );
+
+  const endDate = getBookingDateValue(booking, "requested_end_date");
+
+  if (!startDate) return "";
+  if (!endDate || startDate === endDate) return startDate;
+
+  return `${startDate} to ${endDate}`;
+}
+
+function getBookingSelectedDates(booking: BookingRow) {
+  const selectedDates = booking.selected_dates ?? booking.selectedDates;
+
+  if (Array.isArray(selectedDates)) {
+    return selectedDates.map((value) => firstNonEmpty(value)).filter(Boolean);
+  }
+
+  const asString = firstNonEmpty(selectedDates);
+
+  if (!asString) return [];
+
+  try {
+    const parsed = JSON.parse(asString);
+
+    if (Array.isArray(parsed)) {
+      return parsed.map((value) => firstNonEmpty(value)).filter(Boolean);
+    }
+  } catch {
+    return asString
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getBookingGuruName(booking: BookingRow) {
+  return firstNonEmpty(
+    booking.guru_name,
+    booking.sitter_name,
+    booking.provider_name,
+    booking.guru_display_name,
+    booking.guru_full_name,
+  );
+}
+
+function getBookingGuruAvatarUrl(booking: BookingRow) {
+  return firstNonEmpty(
+    booking.guru_avatar_url,
+    booking.guru_photo_url,
+    booking.sitter_avatar_url,
+    booking.sitter_photo_url,
+    booking.provider_avatar_url,
+    booking.provider_photo_url,
+  );
+}
+
+function getBookingPetPhotoUrl(booking: BookingRow) {
+  return firstNonEmpty(
+    booking.pet_photo_url,
+    booking.pet_avatar_url,
+    booking.pet_image_url,
+  );
+}
+
+function getPetPhotoUrl(pet: BookingRow | null) {
+  if (!pet) return "";
+
+  return firstNonEmpty(
+    pet.photo_url,
+    pet.pet_photo_url,
+    pet.avatar_url,
+    pet.profile_photo_url,
+  );
+}
+
+async function fetchPetDetailsForBooking(booking: BookingRow, userId: string) {
+  const petId = firstNonEmpty(
+    booking.pet_id,
+    booking.customer_pet_id,
+    booking.primary_pet_id,
+  );
+
+  const petName = firstNonEmpty(booking.pet_name, booking.petName);
+
+  const ownerColumns = ["owner_id", "user_id", "customer_id", "pet_owner_id"];
+
+  if (petId) {
+    for (const ownerColumn of ownerColumns) {
+      const { data, error } = await supabaseAdmin
+        .from("pets")
+        .select("*")
+        .eq("id", petId)
+        .eq(ownerColumn, userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data) return data as BookingRow;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("pets")
+      .select("*")
+      .eq("id", petId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) return data as BookingRow;
+  }
+
+  if (!petName) return null;
+
+  for (const ownerColumn of ownerColumns) {
+    const { data, error } = await supabaseAdmin
+      .from("pets")
+      .select("*")
+      .eq(ownerColumn, userId)
+      .ilike("name", petName)
+      .order("photo_url", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) return data as BookingRow;
+  }
+
+  return null;
+}
+
+function getGuruName(guru: BookingRow | null) {
+  if (!guru) return "";
+
+  return firstNonEmpty(
+    guru.display_name,
+    guru.full_name,
+    guru.public_name,
+    guru.business_name,
+    guru.name,
+    guru.first_name,
+  );
+}
+
+function getGuruAvatarUrl(guru: BookingRow | null) {
+  if (!guru) return "";
+
+  return firstNonEmpty(
+    guru.profile_photo_url,
+    guru.photo_url,
+    guru.avatar_url,
+    guru.image_url,
+    guru.headshot_url,
+    guru.profile_image_url,
+  );
+}
+
+async function fetchGuruDetailsForBooking(booking: BookingRow) {
+  const guruId = firstNonEmpty(
+    booking.guru_id,
+    booking.sitter_id,
+    booking.provider_id,
+    booking.provider_profile_id,
+  );
+
+  if (!guruId) return null;
+
+  const attempts = [
+    { column: "id", value: guruId },
+    { column: "profile_id", value: guruId },
+    { column: "user_id", value: guruId },
+  ];
+
+  for (const attempt of attempts) {
+    const { data, error } = await supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .eq(attempt.column, attempt.value)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) return data as BookingRow;
+  }
+
+  return null;
 }
 
 function firstRow<T>(value: T[] | null | undefined): T | null {
@@ -287,59 +554,206 @@ async function fetchBookingById(bookingId: string) {
   };
 }
 
-function ruleMatchesBooking(rule: LocalityFeeRuleRow, booking: BookingRow) {
-  const bookingCity = normalizeComparable(getBookingCity(booking));
-  const bookingState = normalizeComparable(getBookingState(booking));
-  const bookingPostalCode = normalizePostalCode(getBookingPostalCode(booking));
-
-  const ruleCity = normalizeComparable(rule.city);
-  const ruleState = normalizeComparable(rule.state);
-  const rulePostalCode = normalizePostalCode(rule.postal_code);
-
-  if (
-    rulePostalCode &&
-    bookingPostalCode &&
-    rulePostalCode === bookingPostalCode
-  ) {
-    return true;
-  }
-
-  if (ruleCity && ruleState && bookingCity && bookingState) {
-    return ruleCity === bookingCity && ruleState === bookingState;
-  }
-
-  if (ruleCity && bookingCity) {
-    return ruleCity === bookingCity;
-  }
-
-  if (ruleState && bookingState) {
-    return ruleState === bookingState;
-  }
-
-  const hasNoSpecificLocality = !rulePostalCode && !ruleCity && !ruleState;
-  return hasNoSpecificLocality;
-}
-
-async function getMarketplaceFeePercentForBooking(booking: BookingRow) {
+function isBookingFeeLocked(booking: BookingRow) {
   const existingFeePercent = firstNonEmpty(
     booking.marketplace_fee_percent,
     booking.sitguru_fee_percent,
-    booking.platform_fee_percent
+    booking.platform_fee_percent,
   );
 
-  if (existingFeePercent) {
+  if (!existingFeePercent) return false;
+
+  const paymentStatus = normalizeComparable(booking.payment_status);
+  const stripeSessionId = firstNonEmpty(
+    booking.stripe_session_id,
+    booking.stripe_checkout_session_id,
+  );
+
+  const feeSource = firstNonEmpty(
+    booking.marketplace_fee_source,
+    booking.sitguru_fee_source,
+    booking.platform_fee_source,
+  );
+
+  const feeRuleId = firstNonEmpty(booking.marketplace_fee_rule_id);
+  const feeRuleName = firstNonEmpty(booking.marketplace_fee_rule_name);
+
+  return Boolean(
+    stripeSessionId ||
+      feeRuleId ||
+      feeRuleName ||
+      feeSource ||
+      ["checkout_started", "paid", "succeeded", "complete", "completed"].includes(
+        paymentStatus,
+      ),
+  );
+}
+
+function postalRuleMatches(rule: LocalityFeeRuleRow, booking: BookingRow) {
+  const bookingPostalCode = normalizePostalCode(getBookingPostalCode(booking));
+  const rulePostalCode = normalizePostalCode(rule.postal_code);
+
+  return Boolean(
+    rulePostalCode && bookingPostalCode && rulePostalCode === bookingPostalCode,
+  );
+}
+
+function radiusRuleMatches(rule: LocalityFeeRuleRow, booking: BookingRow) {
+  const bookingLatitude = getBookingLatitude(booking);
+  const bookingLongitude = getBookingLongitude(booking);
+  const ruleLatitude = toNullableNumber(rule.latitude);
+  const ruleLongitude = toNullableNumber(rule.longitude);
+  const radiusMiles = toNullableNumber(rule.radius_miles);
+
+  if (
+    bookingLatitude === null ||
+    bookingLongitude === null ||
+    ruleLatitude === null ||
+    ruleLongitude === null ||
+    radiusMiles === null ||
+    radiusMiles <= 0
+  ) {
     return {
-      feePercent: clampMarketplaceFeePercent(existingFeePercent),
-      feeSource: "booking",
-      feeRuleId: "",
-      feeRuleName: "Existing booking fee",
+      matches: false,
+      distanceMiles: null,
+    };
+  }
+
+  const distanceMiles = calculateDistanceMiles(
+    bookingLatitude,
+    bookingLongitude,
+    ruleLatitude,
+    ruleLongitude,
+  );
+
+  return {
+    matches: distanceMiles <= radiusMiles,
+    distanceMiles,
+  };
+}
+
+function cityStateRuleMatches(rule: LocalityFeeRuleRow, booking: BookingRow) {
+  const bookingCity = normalizeComparable(getBookingCity(booking));
+  const bookingState = normalizeComparable(getBookingState(booking));
+  const ruleCity = normalizeComparable(rule.city);
+  const ruleState = normalizeComparable(rule.state);
+
+  return Boolean(
+    ruleCity &&
+      ruleState &&
+      bookingCity &&
+      bookingState &&
+      ruleCity === bookingCity &&
+      ruleState === bookingState,
+  );
+}
+
+function cityRuleMatches(rule: LocalityFeeRuleRow, booking: BookingRow) {
+  const bookingCity = normalizeComparable(getBookingCity(booking));
+  const ruleCity = normalizeComparable(rule.city);
+  const ruleState = normalizeComparable(rule.state);
+  const rulePostalCode = normalizePostalCode(rule.postal_code);
+  const hasRadiusFields =
+    toNullableNumber(rule.latitude) !== null ||
+    toNullableNumber(rule.longitude) !== null ||
+    toNullableNumber(rule.radius_miles) !== null;
+
+  return Boolean(
+    ruleCity &&
+      !ruleState &&
+      !rulePostalCode &&
+      !hasRadiusFields &&
+      bookingCity &&
+      ruleCity === bookingCity,
+  );
+}
+
+function stateRuleMatches(rule: LocalityFeeRuleRow, booking: BookingRow) {
+  const bookingState = normalizeComparable(getBookingState(booking));
+  const ruleState = normalizeComparable(rule.state);
+  const ruleCity = normalizeComparable(rule.city);
+  const rulePostalCode = normalizePostalCode(rule.postal_code);
+  const hasRadiusFields =
+    toNullableNumber(rule.latitude) !== null ||
+    toNullableNumber(rule.longitude) !== null ||
+    toNullableNumber(rule.radius_miles) !== null;
+
+  return Boolean(
+    ruleState &&
+      !ruleCity &&
+      !rulePostalCode &&
+      !hasRadiusFields &&
+      bookingState &&
+      ruleState === bookingState,
+  );
+}
+
+function defaultRuleMatches(rule: LocalityFeeRuleRow) {
+  const hasNoPostalCode = !normalizePostalCode(rule.postal_code);
+  const hasNoCity = !normalizeComparable(rule.city);
+  const hasNoState = !normalizeComparable(rule.state);
+  const hasNoLatitude = toNullableNumber(rule.latitude) === null;
+  const hasNoLongitude = toNullableNumber(rule.longitude) === null;
+  const hasNoRadius = toNullableNumber(rule.radius_miles) === null;
+
+  return (
+    hasNoPostalCode &&
+    hasNoCity &&
+    hasNoState &&
+    hasNoLatitude &&
+    hasNoLongitude &&
+    hasNoRadius
+  );
+}
+
+function buildRuleResolution({
+  rule,
+  matchType,
+  distanceMiles = null,
+}: {
+  rule: LocalityFeeRuleRow;
+  matchType: string;
+  distanceMiles?: number | null;
+}): MarketplaceFeeResolution {
+  return {
+    feePercent: clampMarketplaceFeePercent(rule.fee_percent),
+    feeSource: `marketplace_fee_rules:${matchType}`,
+    feeRuleId: asTrimmedString(rule.id),
+    feeRuleName:
+      asTrimmedString(rule.locality_name) ||
+      "Local SitGuru marketplace fee",
+    feeMatchType: matchType,
+    feeDistanceMiles: distanceMiles,
+  };
+}
+
+async function getMarketplaceFeePercentForBooking(
+  booking: BookingRow,
+): Promise<MarketplaceFeeResolution> {
+  if (isBookingFeeLocked(booking)) {
+    return {
+      feePercent: clampMarketplaceFeePercent(
+        firstNonEmpty(
+          booking.marketplace_fee_percent,
+          booking.sitguru_fee_percent,
+          booking.platform_fee_percent,
+        ),
+      ),
+      feeSource:
+        firstNonEmpty(booking.marketplace_fee_source) || "locked_booking_fee",
+      feeRuleId: firstNonEmpty(booking.marketplace_fee_rule_id),
+      feeRuleName:
+        firstNonEmpty(booking.marketplace_fee_rule_name) ||
+        "Existing booking fee",
+      feeMatchType: "locked_booking",
+      feeDistanceMiles: toNullableNumber(booking.marketplace_fee_distance_miles),
     };
   }
 
   const { data, error } = await supabaseAdmin
     .from("marketplace_fee_rules")
     .select(
-      "id, locality_name, state, city, postal_code, fee_percent, is_active, priority"
+      "id, locality_name, state, city, postal_code, latitude, longitude, radius_miles, fee_percent, is_active, priority, created_at",
     )
     .eq("is_active", true)
     .order("priority", { ascending: true })
@@ -359,6 +773,8 @@ async function getMarketplaceFeePercentForBooking(booking: BookingRow) {
         feeSource: "default",
         feeRuleId: "",
         feeRuleName: "Default SitGuru marketplace fee",
+        feeMatchType: "default",
+        feeDistanceMiles: null,
       };
     }
 
@@ -369,29 +785,79 @@ async function getMarketplaceFeePercentForBooking(booking: BookingRow) {
       feeSource: "default",
       feeRuleId: "",
       feeRuleName: "Default SitGuru marketplace fee",
+      feeMatchType: "default",
+      feeDistanceMiles: null,
     };
   }
 
-  const matchingRule = (data as LocalityFeeRuleRow[] | null | undefined)?.find(
-    (rule) => ruleMatchesBooking(rule, booking)
+  const rules = (data as LocalityFeeRuleRow[] | null | undefined) || [];
+
+  const postalRule = rules.find((rule) => postalRuleMatches(rule, booking));
+
+  if (postalRule) {
+    return buildRuleResolution({
+      rule: postalRule,
+      matchType: "postal_code",
+    });
+  }
+
+  for (const rule of rules) {
+    const radiusMatch = radiusRuleMatches(rule, booking);
+
+    if (radiusMatch.matches) {
+      return buildRuleResolution({
+        rule,
+        matchType: "radius",
+        distanceMiles: radiusMatch.distanceMiles,
+      });
+    }
+  }
+
+  const cityStateRule = rules.find((rule) =>
+    cityStateRuleMatches(rule, booking),
   );
 
-  if (!matchingRule) {
-    return {
-      feePercent: DEFAULT_SITGURU_FEE_PERCENT,
-      feeSource: "default",
-      feeRuleId: "",
-      feeRuleName: "Default SitGuru marketplace fee",
-    };
+  if (cityStateRule) {
+    return buildRuleResolution({
+      rule: cityStateRule,
+      matchType: "city_state",
+    });
+  }
+
+  const cityRule = rules.find((rule) => cityRuleMatches(rule, booking));
+
+  if (cityRule) {
+    return buildRuleResolution({
+      rule: cityRule,
+      matchType: "city",
+    });
+  }
+
+  const stateRule = rules.find((rule) => stateRuleMatches(rule, booking));
+
+  if (stateRule) {
+    return buildRuleResolution({
+      rule: stateRule,
+      matchType: "state",
+    });
+  }
+
+  const defaultRule = rules.find(defaultRuleMatches);
+
+  if (defaultRule) {
+    return buildRuleResolution({
+      rule: defaultRule,
+      matchType: "default",
+    });
   }
 
   return {
-    feePercent: clampMarketplaceFeePercent(matchingRule.fee_percent),
-    feeSource: "marketplace_fee_rules",
-    feeRuleId: asTrimmedString(matchingRule.id),
-    feeRuleName:
-      asTrimmedString(matchingRule.locality_name) ||
-      "Local SitGuru marketplace fee",
+    feePercent: DEFAULT_SITGURU_FEE_PERCENT,
+    feeSource: "default",
+    feeRuleId: "",
+    feeRuleName: "Default SitGuru marketplace fee",
+    feeMatchType: "default",
+    feeDistanceMiles: null,
   };
 }
 
@@ -407,9 +873,19 @@ async function updateCheckoutStarted(
     marketplaceFeeSource: string;
     marketplaceFeeRuleId: string;
     marketplaceFeeRuleName: string;
+    marketplaceFeeMatchType: string;
+    marketplaceFeeDistanceMiles: number | null;
     tipAmount: number;
     guruPayoutAmount: number;
-  }
+    guruName: string;
+    guruAvatarUrl: string;
+    petPhotoUrl: string;
+    requestedStartDate: string;
+    requestedEndDate: string;
+    dateSelectionMode: string;
+    dateRangeLabel: string;
+    selectedDates: string[];
+  },
 ) {
   const primaryUpdate = await supabaseAdmin
     .from("bookings")
@@ -420,15 +896,32 @@ async function updateCheckoutStarted(
       currency: "usd",
       subtotal_amount: values.subtotalAmount,
       sitguru_fee_amount: values.sitguruFeeAmount,
+      platform_fee: values.sitguruFeeAmount,
       marketplace_fee_amount: values.sitguruFeeAmount,
       marketplace_fee_percent: values.marketplaceFeePercent,
       marketplace_fee_source: values.marketplaceFeeSource,
       marketplace_fee_rule_id: values.marketplaceFeeRuleId || null,
       marketplace_fee_rule_name: values.marketplaceFeeRuleName,
+      marketplace_fee_match_type: values.marketplaceFeeMatchType,
+      marketplace_fee_distance_miles: values.marketplaceFeeDistanceMiles,
       guru_net_amount: values.guruNetAmount,
+      guru_estimated_base_payout: values.guruNetAmount,
       guru_payout_amount: values.guruPayoutAmount,
+      guru_estimated_total_payout: values.guruPayoutAmount,
       tip_amount: values.tipAmount,
+      guru_tip_amount: values.tipAmount,
       total_customer_paid: values.totalCustomerPaid,
+      customer_total_amount: values.totalCustomerPaid,
+      amount_total: values.totalCustomerPaid,
+      guru_name: values.guruName || null,
+      guru_avatar_url: values.guruAvatarUrl || null,
+      guru_photo_url: values.guruAvatarUrl || null,
+      pet_photo_url: values.petPhotoUrl || null,
+      requested_start_date: values.requestedStartDate || null,
+      requested_end_date: values.requestedEndDate || null,
+      date_selection_mode: values.dateSelectionMode || null,
+      date_range_label: values.dateRangeLabel || null,
+      selected_dates: values.selectedDates,
       tax_status: "stripe_automatic_tax_enabled",
       payout_status: "pending",
     })
@@ -445,15 +938,32 @@ async function updateCheckoutStarted(
     message.includes("stripe_checkout_session_id") ||
     message.includes("subtotal_amount") ||
     message.includes("sitguru_fee_amount") ||
+    message.includes("platform_fee") ||
     message.includes("marketplace_fee_amount") ||
     message.includes("marketplace_fee_percent") ||
     message.includes("marketplace_fee_source") ||
     message.includes("marketplace_fee_rule_id") ||
     message.includes("marketplace_fee_rule_name") ||
+    message.includes("marketplace_fee_match_type") ||
+    message.includes("marketplace_fee_distance_miles") ||
     message.includes("guru_net_amount") ||
+    message.includes("guru_estimated_base_payout") ||
     message.includes("guru_payout_amount") ||
+    message.includes("guru_estimated_total_payout") ||
     message.includes("tip_amount") ||
+    message.includes("guru_tip_amount") ||
     message.includes("total_customer_paid") ||
+    message.includes("customer_total_amount") ||
+    message.includes("amount_total") ||
+    message.includes("guru_name") ||
+    message.includes("guru_avatar_url") ||
+    message.includes("guru_photo_url") ||
+    message.includes("pet_photo_url") ||
+    message.includes("requested_start_date") ||
+    message.includes("requested_end_date") ||
+    message.includes("date_selection_mode") ||
+    message.includes("date_range_label") ||
+    message.includes("selected_dates") ||
     message.includes("tax_status") ||
     message.includes("column") ||
     message.includes("schema cache")
@@ -468,7 +978,7 @@ async function updateCheckoutStarted(
     if (fallbackUpdate.error) {
       console.error(
         "Booking checkout fallback status update error:",
-        fallbackUpdate.error
+        fallbackUpdate.error,
       );
     }
 
@@ -507,7 +1017,7 @@ export async function POST(req: NextRequest) {
     if (bookingResult.error || !booking) {
       return NextResponse.json(
         { error: bookingResult.error?.message || "Booking not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -523,14 +1033,14 @@ export async function POST(req: NextRequest) {
     if (ownerId && !hasOwnerMatch) {
       return NextResponse.json(
         { error: "You do not have access to this booking" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     if (!ownerId && bookingCustomerEmail && !hasEmailMatch) {
       return NextResponse.json(
         { error: "You do not have access to this booking" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -548,12 +1058,48 @@ export async function POST(req: NextRequest) {
       asTrimmedString(booking.booking_type) ||
       "General care";
 
+    const guruDetails = await fetchGuruDetailsForBooking(booking);
+    const resolvedGuruName =
+      getBookingGuruName(booking) || getGuruName(guruDetails) || "SitGuru";
+    const resolvedGuruAvatarUrl =
+      getBookingGuruAvatarUrl(booking) || getGuruAvatarUrl(guruDetails);
+    const petDetails = await fetchPetDetailsForBooking(booking, user.id);
+    const resolvedPetPhotoUrl =
+      getBookingPetPhotoUrl(booking) || getPetPhotoUrl(petDetails);
+
+    const requestedStartDate = getBookingDateValue(
+      booking,
+      "requested_start_date",
+      "requested_date",
+      "booking_date",
+      "date",
+    );
+
+    const requestedEndDate =
+      getBookingDateValue(booking, "requested_end_date") || requestedStartDate;
+
+    const dateSelectionMode =
+      firstNonEmpty(booking.date_selection_mode, booking.dateSelectionMode) ||
+      (requestedEndDate && requestedEndDate !== requestedStartDate
+        ? "range"
+        : "single");
+
+    const dateRangeLabel = getBookingDateRangeLabel(booking);
+    const selectedDates = getBookingSelectedDates(booking);
+    const normalizedSelectedDates =
+      selectedDates.length > 0
+        ? selectedDates
+        : [requestedStartDate, requestedEndDate].filter(Boolean);
+
     const subtotalCents = toStripeAmount(
-      booking.total_amount ??
+      booking.subtotal_amount ??
+        booking.service_price ??
+        booking.booking_subtotal_amount ??
+        booking.total_amount ??
         booking.amount ??
         booking.price ??
         booking.hourly_rate ??
-        25
+        25,
     );
 
     const {
@@ -561,18 +1107,27 @@ export async function POST(req: NextRequest) {
       feeSource: sitguruFeeSource,
       feeRuleId: sitguruFeeRuleId,
       feeRuleName: sitguruFeeRuleName,
+      feeMatchType: sitguruFeeMatchType,
+      feeDistanceMiles: sitguruFeeDistanceMiles,
     } = await getMarketplaceFeePercentForBooking(booking);
 
     const tipCents = getTipCentsFromBody(body, subtotalCents);
     const sitguruFeeCents = Math.round(
-      subtotalCents * (sitguruFeePercent / 100)
+      subtotalCents * (sitguruFeePercent / 100),
     );
     const guruNetCents = subtotalCents - sitguruFeeCents;
     const guruPayoutCents = guruNetCents + tipCents;
-    const totalCustomerPaidCents = subtotalCents + tipCents;
+    const totalCustomerPaidCents = subtotalCents + sitguruFeeCents + tipCents;
 
     const bookingIdString = String(booking.id);
     const bookingOwnerId = ownerId || user.id;
+
+    const bookingCareCity = getBookingCity(booking);
+    const bookingCareState = getBookingState(booking);
+    const bookingCareZipCode = getBookingPostalCode(booking);
+    const bookingCareLatitude = getBookingLatitude(booking);
+    const bookingCareLongitude = getBookingLongitude(booking);
+    const bookingCareLocalityName = getBookingLocalityName(booking);
 
     const checkoutLineItems: CheckoutLineItem[] = [
       {
@@ -589,6 +1144,23 @@ export async function POST(req: NextRequest) {
         quantity: 1,
       },
     ];
+
+    if (sitguruFeeCents > 0) {
+      checkoutLineItems.push({
+        price_data: {
+          currency: "usd",
+          unit_amount: sitguruFeeCents,
+          tax_behavior: "exclusive",
+          product_data: {
+            name: "SitGuru Service Fee",
+            description:
+              "Marketplace support, secure payments, care tools, customer support, and safety-focused platform features.",
+            tax_code: SITGURU_STRIPE_TAX_CODE,
+          },
+        },
+        quantity: 1,
+      });
+    }
 
     if (tipCents > 0) {
       checkoutLineItems.push({
@@ -610,18 +1182,40 @@ export async function POST(req: NextRequest) {
       booking_id: bookingIdString,
       booking_owner_id: bookingOwnerId,
       guru_id: asTrimmedString(booking.guru_id),
+      guru_name: resolvedGuruName,
+      guru_avatar_url: resolvedGuruAvatarUrl,
       sitter_id: asTrimmedString(booking.sitter_id),
       provider_profile_id: asTrimmedString(booking.provider_profile_id),
       guru_slug: asTrimmedString(booking.guru_slug),
-      pet_id: asTrimmedString(booking.pet_id),
+      pet_id: firstNonEmpty(booking.pet_id, petDetails?.id),
       pet_name: petName,
+      pet_photo_url: resolvedPetPhotoUrl,
       service: serviceName,
+      requested_start_date: requestedStartDate,
+      requested_end_date: requestedEndDate,
+      date_selection_mode: dateSelectionMode,
+      date_range_label: dateRangeLabel,
+      selected_dates: normalizedSelectedDates.join(","),
+      care_zip_code: bookingCareZipCode,
+      care_city: bookingCareCity,
+      care_state: bookingCareState,
+      care_locality_name: bookingCareLocalityName,
+      care_latitude:
+        bookingCareLatitude === null ? "" : String(bookingCareLatitude),
+      care_longitude:
+        bookingCareLongitude === null ? "" : String(bookingCareLongitude),
       subtotal_cents: String(subtotalCents),
       sitguru_fee_percent: String(sitguruFeePercent),
       sitguru_fee_source: sitguruFeeSource,
       sitguru_fee_rule_id: sitguruFeeRuleId,
       sitguru_fee_rule_name: sitguruFeeRuleName,
       marketplace_fee_percent: String(sitguruFeePercent),
+      marketplace_fee_source: sitguruFeeSource,
+      marketplace_fee_rule_id: sitguruFeeRuleId,
+      marketplace_fee_rule_name: sitguruFeeRuleName,
+      marketplace_fee_match_type: sitguruFeeMatchType,
+      marketplace_fee_distance_miles:
+        sitguruFeeDistanceMiles === null ? "" : String(sitguruFeeDistanceMiles),
       marketplace_fee_cents: String(sitguruFeeCents),
       sitguru_fee_cents: String(sitguruFeeCents),
       tip_cents: String(tipCents),
@@ -653,7 +1247,9 @@ export async function POST(req: NextRequest) {
           Stripe only allows application_fee_amount for Connect direct charges
           or destination charges. SitGuru is currently creating a normal platform
           Checkout Session, so the SitGuru fee is tracked in Supabase and metadata
-          for now. Later, when connected Guru Stripe accounts are wired, add:
+          for now.
+
+          Later, when connected Guru Stripe accounts are wired, add:
           transfer_data: { destination: guruStripeAccountId }
           application_fee_amount: sitguruFeeCents
 
@@ -680,24 +1276,39 @@ export async function POST(req: NextRequest) {
       marketplaceFeeSource: sitguruFeeSource,
       marketplaceFeeRuleId: sitguruFeeRuleId,
       marketplaceFeeRuleName: sitguruFeeRuleName,
+      marketplaceFeeMatchType: sitguruFeeMatchType,
+      marketplaceFeeDistanceMiles: sitguruFeeDistanceMiles,
       tipAmount: centsToDollars(tipCents),
       guruPayoutAmount: centsToDollars(guruPayoutCents),
+      guruName: resolvedGuruName,
+      guruAvatarUrl: resolvedGuruAvatarUrl,
+      petPhotoUrl: resolvedPetPhotoUrl,
+      requestedStartDate,
+      requestedEndDate,
+      dateSelectionMode,
+      dateRangeLabel,
+      selectedDates: normalizedSelectedDates,
     });
 
     if (!session.url) {
       return NextResponse.json(
         { error: "Stripe session did not return a checkout URL" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json({
       url: session.url,
+      checkoutUrl: session.url,
+      stripeSessionId: session.id,
       financialPreview: {
         subtotalAmount: centsToDollars(subtotalCents),
         marketplaceFeePercent: sitguruFeePercent,
         marketplaceFeeSource: sitguruFeeSource,
+        marketplaceFeeRuleId: sitguruFeeRuleId,
         marketplaceFeeRuleName: sitguruFeeRuleName,
+        marketplaceFeeMatchType: sitguruFeeMatchType,
+        marketplaceFeeDistanceMiles: sitguruFeeDistanceMiles,
         sitguruFeeAmount: centsToDollars(sitguruFeeCents),
         marketplaceFeeAmount: centsToDollars(sitguruFeeCents),
         tipAmount: centsToDollars(tipCents),
@@ -705,6 +1316,10 @@ export async function POST(req: NextRequest) {
         guruPayoutAmount: centsToDollars(guruPayoutCents),
         taxAmount: 0,
         totalCustomerPaid: centsToDollars(totalCustomerPaidCents),
+        careZipCode: bookingCareZipCode,
+        careCity: bookingCareCity,
+        careState: bookingCareState,
+        careLocalityName: bookingCareLocalityName,
         customerFeeMessage:
           "SitGuru keeps marketplace fees lower than many major care platforms.",
         tipMessage: "100% of your tip goes directly to your Guru.",
@@ -721,7 +1336,7 @@ export async function POST(req: NextRequest) {
           code: "code" in error ? error.code ?? null : null,
           statusCode: error.statusCode ?? null,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -729,7 +1344,7 @@ export async function POST(req: NextRequest) {
       {
         error: error instanceof Error ? error.message : "Checkout failed",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

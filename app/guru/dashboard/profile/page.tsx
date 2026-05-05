@@ -1281,7 +1281,10 @@ export default function GuruDashboardProfilePage() {
                       maxLength={5}
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                     />
-                    <p className="mt-2 text-xs font-bold text-slate-500">
+                    <p
+                      className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
+                      style={{ color: "#334155", WebkitTextFillColor: "#334155" }}
+                    >
                       Enter a 5-digit ZIP code to auto-fill city, state, and
                       map coordinates.
                     </p>
@@ -1292,7 +1295,7 @@ export default function GuruDashboardProfilePage() {
                       htmlFor="service_radius"
                       className="mb-2 block text-sm font-extrabold !text-slate-950"
                     >
-                      Service radius miles
+                      How far are you willing to travel?
                     </label>
                     <input
                       id="service_radius"
@@ -1304,6 +1307,14 @@ export default function GuruDashboardProfilePage() {
                       inputMode="decimal"
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                     />
+                    <p
+                      className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
+                      style={{ color: "#334155", WebkitTextFillColor: "#334155" }}
+                    >
+                      Enter the number of miles you are comfortable traveling
+                      from your service ZIP code. Customers outside this radius
+                      will not be able to book you.
+                    </p>
                   </div>
 
                   <div className="md:col-span-2">
@@ -1707,9 +1718,15 @@ export default function GuruDashboardProfilePage() {
 
                 <Link
                   href={routes.dashboard}
-                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-extrabold text-slate-900 transition hover:bg-slate-100"
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-extrabold shadow-sm transition hover:bg-slate-50"
+                  style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
                 >
-                  Return to Dashboard
+                  <span
+                    className="font-extrabold"
+                    style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
+                  >
+                    Return to Dashboard
+                  </span>
                 </Link>
               </div>
             </section>
