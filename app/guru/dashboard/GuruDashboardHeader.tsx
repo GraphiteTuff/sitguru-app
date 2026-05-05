@@ -122,7 +122,7 @@ const guruAccountMenuLinks = [
   { label: "Messages", href: "/guru/dashboard/messages" },
   { label: "Availability", href: "/guru/dashboard/availability" },
   { label: "Earnings", href: "/guru/dashboard/earnings" },
-  { label: "Guru Resources", href: "/guru/dashboard/resources" },
+  { label: "Guru Success Center", href: "/guru/success-center" },
 ];
 
 function asText(value: unknown) {
@@ -375,7 +375,7 @@ export default function GuruDashboardHeader({
   function renderGuruAvatar(sizeClass = "h-12 w-12") {
     return (
       <span
-        className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-black shadow-sm ring-1 ring-emerald-100`}
+        className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-semibold shadow-sm ring-1 ring-emerald-100`}
         style={{ color: "#047857" }}
       >
         {guruPhoto && !photoFailed ? (
@@ -394,11 +394,11 @@ export default function GuruDashboardHeader({
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
-      <div className="mx-auto flex h-[92px] w-full max-w-[1500px] items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
+    <header className="sg-guru-header sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
+      <div className="mx-auto flex h-[84px] w-full max-w-[1500px] items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
         <Link
           href="/guru/dashboard"
-          className="inline-flex h-14 w-[165px] shrink-0 items-center justify-start rounded-2xl transition hover:opacity-90 sm:w-[185px] lg:h-16 lg:w-[205px]"
+          className="inline-flex h-14 w-[155px] shrink-0 items-center justify-start rounded-2xl transition hover:opacity-90 sm:w-[175px] lg:h-16 lg:w-[195px]"
           aria-label="SitGuru Guru Dashboard"
         >
           <Image
@@ -407,7 +407,7 @@ export default function GuruDashboardHeader({
             width={190}
             height={70}
             priority
-            className="h-auto max-h-12 w-auto object-contain lg:max-h-14"
+            className="h-auto max-h-11 w-auto object-contain lg:max-h-12"
           />
         </Link>
 
@@ -421,20 +421,20 @@ export default function GuruDashboardHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative inline-flex h-[92px] items-center text-[15px] font-black tracking-[-0.01em] transition-colors hover:text-emerald-700 xl:text-base"
-                style={{ color: isActive ? "#020617" : "#0f172a" }}
+                className="sg-guru-nav-link relative inline-flex h-[84px] items-center text-[14px] font-semibold tracking-[-0.015em] transition-colors hover:text-emerald-700 xl:text-[15px]"
+                style={{ color: isActive ? "#020617" : "#334155" }}
               >
-                <span style={{ color: isActive ? "#020617" : "#0f172a" }}>
+                <span style={{ color: isActive ? "#020617" : "#334155" }}>
                   {item.label}
                 </span>
 
                 <span
                   className={[
-                    "absolute left-0 right-0 rounded-full bg-emerald-500 transition-all",
+                    "absolute left-0 right-0 rounded-full bg-emerald-500 transition-all duration-200",
                     isActive ? "opacity-100" : "opacity-0",
                   ].join(" ")}
                   style={{
-                    bottom: "16px",
+                    bottom: "14px",
                     height: "3px",
                     width: isActive ? "100%" : "0%",
                   }}
@@ -446,8 +446,8 @@ export default function GuruDashboardHeader({
 
         <div className="hidden items-center gap-3 lg:flex">
           <Link
-            href="/guru/dashboard/resources"
-            className="inline-flex h-12 min-w-[185px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+            href="/guru/success-center"
+            className="sg-guru-success-link inline-flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
             style={{ color: "#0f172a" }}
           >
             <BookOpen
@@ -455,10 +455,10 @@ export default function GuruDashboardHeader({
               style={{ color: "#0ea5e9" }}
             />
             <span
-              className="whitespace-nowrap text-sm font-black leading-none"
+              className="whitespace-nowrap text-sm font-semibold leading-none"
               style={{ color: "#0f172a" }}
             >
-              Guru Resources
+              Guru Success Center
             </span>
           </Link>
 
@@ -471,10 +471,10 @@ export default function GuruDashboardHeader({
               aria-expanded={accountMenuOpen}
               aria-label="Open Guru account menu"
             >
-              {renderGuruAvatar("h-11 w-11")}
+              {renderGuruAvatar("h-10 w-10")}
 
               <span
-                className="hidden max-w-[120px] truncate text-sm font-black xl:block"
+                className="hidden max-w-[120px] truncate text-sm font-semibold tracking-[-0.01em] xl:block"
                 style={{ color: "#0f172a" }}
               >
                 {guruName}
@@ -501,7 +501,7 @@ export default function GuruDashboardHeader({
 
                     <div className="min-w-0">
                       <p
-                        className="truncate text-xl font-black leading-tight"
+                        className="truncate text-xl font-semibold leading-tight tracking-[-0.025em]"
                         style={{ color: "#0f172a" }}
                       >
                         {guruName}
@@ -509,7 +509,7 @@ export default function GuruDashboardHeader({
 
                       {guruEmail ? (
                         <p
-                          className="mt-1 truncate text-sm font-semibold"
+                          className="mt-1 truncate text-sm font-medium"
                           style={{ color: "#475569" }}
                         >
                           {guruEmail}
@@ -517,7 +517,7 @@ export default function GuruDashboardHeader({
                       ) : null}
 
                       <p
-                        className="mt-1 text-base font-black"
+                        className="mt-1 text-base font-semibold tracking-[-0.01em]"
                         style={{ color: "#047857" }}
                       >
                         {tierLabel || "SitGuru Guru"}
@@ -525,7 +525,7 @@ export default function GuruDashboardHeader({
 
                       {profileCompletionLabel ? (
                         <p
-                          className="mt-1 text-xs font-bold"
+                          className="mt-1 text-xs font-medium"
                           style={{ color: "#475569" }}
                         >
                           {profileCompletionLabel}
@@ -543,7 +543,7 @@ export default function GuruDashboardHeader({
                       role="menuitem"
                       onClick={() => setAccountMenuOpen(false)}
                       style={{ color: "#0f172a" }}
-                      className="block rounded-2xl bg-white px-4 py-3 text-base font-black opacity-100 transition hover:bg-emerald-50"
+                      className="block rounded-2xl bg-white px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] opacity-100 transition hover:bg-emerald-50"
                     >
                       {item.label}
                     </Link>
@@ -553,7 +553,7 @@ export default function GuruDashboardHeader({
                     type="button"
                     role="menuitem"
                     onClick={handleSignOut}
-                    className="mt-2 flex w-full items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-base font-black text-white transition hover:bg-emerald-700"
+                    className="mt-2 flex w-full items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
                   >
                     <LogOut className="h-5 w-5" />
                     Log Out
@@ -565,7 +565,7 @@ export default function GuruDashboardHeader({
 
           <Link
             href="/guru/dashboard/messages"
-            className="relative flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm transition hover:bg-slate-50"
+            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm transition hover:bg-slate-50"
             aria-label="Notifications"
           >
             <Bell className="h-5 w-5" style={{ color: "#0f172a" }} />
@@ -577,7 +577,7 @@ export default function GuruDashboardHeader({
           <button
             type="button"
             onClick={() => setAccountMenuOpen((value) => !value)}
-            className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white shadow-sm"
+            className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold tracking-[-0.01em] text-white shadow-sm"
             aria-haspopup="menu"
             aria-expanded={accountMenuOpen}
           >
@@ -599,7 +599,7 @@ export default function GuruDashboardHeader({
                 key={item.href}
                 href={item.href}
                 className={[
-                  "inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-black transition",
+                  "inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold tracking-[-0.01em] transition",
                   isActive
                     ? "border-emerald-300 bg-emerald-50"
                     : "border-slate-200 bg-white hover:bg-slate-50",
@@ -613,12 +613,12 @@ export default function GuruDashboardHeader({
           })}
 
           <Link
-            href="/guru/dashboard/resources"
-            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black hover:bg-slate-50"
+            href="/guru/success-center"
+            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold tracking-[-0.01em] hover:bg-slate-50"
             style={{ color: "#334155" }}
           >
             <BookOpen className="h-4 w-4" />
-            Resources
+            Guru Success Center
           </Link>
         </div>
       </div>
@@ -635,7 +635,7 @@ export default function GuruDashboardHeader({
 
                 <div className="min-w-0">
                   <p
-                    className="truncate text-base font-black"
+                    className="truncate text-base font-semibold tracking-[-0.01em]"
                     style={{ color: "#0f172a" }}
                   >
                     {guruName}
@@ -643,7 +643,7 @@ export default function GuruDashboardHeader({
 
                   {guruEmail ? (
                     <p
-                      className="truncate text-xs font-semibold"
+                      className="truncate text-xs font-medium"
                       style={{ color: "#475569" }}
                     >
                       {guruEmail}
@@ -651,7 +651,7 @@ export default function GuruDashboardHeader({
                   ) : null}
 
                   <p
-                    className="text-sm font-bold"
+                    className="text-sm font-semibold tracking-[-0.01em]"
                     style={{ color: "#047857" }}
                   >
                     {tierLabel || "SitGuru Guru"}
@@ -659,7 +659,7 @@ export default function GuruDashboardHeader({
 
                   {profileCompletionLabel ? (
                     <p
-                      className="mt-1 text-xs font-bold"
+                      className="mt-1 text-xs font-medium"
                       style={{ color: "#475569" }}
                     >
                       {profileCompletionLabel}
@@ -675,7 +675,7 @@ export default function GuruDashboardHeader({
                 href={item.href}
                 onClick={() => setAccountMenuOpen(false)}
                 style={{ color: "#0f172a" }}
-                className="rounded-xl px-4 py-3 text-sm font-bold opacity-100 transition hover:bg-slate-50"
+                className="rounded-xl px-4 py-3 text-sm font-semibold tracking-[-0.01em] opacity-100 transition hover:bg-slate-50"
               >
                 {item.label}
               </Link>
@@ -684,7 +684,7 @@ export default function GuruDashboardHeader({
             <button
               type="button"
               onClick={handleSignOut}
-              className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-black text-white transition hover:bg-emerald-700"
+              className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
             >
               <LogOut className="h-4 w-4" />
               Log Out
@@ -692,6 +692,49 @@ export default function GuruDashboardHeader({
           </div>
         </div>
       ) : null}
+
+      <style jsx global>{`
+        .sg-guru-header {
+          font-family:
+            Inter,
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+        }
+
+        .sg-guru-header *,
+        .sg-guru-header a,
+        .sg-guru-header button,
+        .sg-guru-header span,
+        .sg-guru-header p {
+          font-family:
+            Inter,
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+          text-rendering: geometricPrecision;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+
+        .sg-guru-nav-link {
+          letter-spacing: -0.015em;
+        }
+
+        .sg-guru-nav-link:hover span {
+          color: #047857 !important;
+        }
+
+        .sg-guru-success-link:hover span {
+          color: #047857 !important;
+        }
+      `}</style>
     </header>
   );
 }

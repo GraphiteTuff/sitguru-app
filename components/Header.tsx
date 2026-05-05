@@ -116,7 +116,7 @@ function getHeaderMode(
     return "admin";
   }
 
-  if (path.startsWith("/guru/dashboard")) {
+  if (path.startsWith("/guru/dashboard") || path.startsWith("/guru/success-center")) {
     return "guru";
   }
 
@@ -379,7 +379,7 @@ export default function Header({ user = null }: HeaderProps) {
       : "/messages";
 
   const resourcesHref = isGuru
-    ? "/guru/dashboard/resources"
+    ? "/guru/success-center"
     : "/customer/dashboard/pawperks";
 
   const displayRole = isGuru
@@ -403,7 +403,7 @@ export default function Header({ user = null }: HeaderProps) {
         { label: "Messages", href: "/guru/dashboard/messages" },
         { label: "Availability", href: "/guru/dashboard/availability" },
         { label: "Earnings", href: "/guru/dashboard/earnings" },
-        { label: "Guru Resources", href: "/guru/dashboard/resources" },
+        { label: "Guru Success Center", href: "/guru/success-center" },
       ]
     : isAdmin
       ? [
@@ -487,7 +487,7 @@ export default function Header({ user = null }: HeaderProps) {
 
     return (
       <span
-        className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-black text-emerald-700 shadow-sm ring-1 ring-emerald-100`}
+        className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-100`}
       >
         {userAvatarUrl ? (
           <Image
@@ -506,24 +506,24 @@ export default function Header({ user = null }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
-      <div className="mx-auto flex h-[92px] max-w-[1500px] items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
+    <header className="sg-site-header sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
+      <div className="mx-auto flex h-[84px] max-w-[1500px] items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
         <Link
           href={logoHref}
-          className="inline-flex h-14 w-[165px] shrink-0 items-center justify-start rounded-2xl transition hover:opacity-90 sm:w-[185px] lg:h-16 lg:w-[205px]"
+          className="inline-flex h-14 w-[200px] shrink-0 items-center justify-start rounded-2xl transition hover:opacity-90 sm:w-[230px] lg:h-16 lg:w-[260px]"
           aria-label="Go to SitGuru homepage"
         >
           <Image
             src="/images/sitguru-logo-cropped.png"
             alt="SitGuru"
-            width={190}
-            height={70}
+            width={260}
+            height={90}
             priority
             className="h-auto max-h-12 w-auto object-contain lg:max-h-14"
           />
         </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-4 lg:flex xl:gap-6">
+        <nav className="hidden flex-1 items-center justify-center gap-4 lg:flex xl:gap-5">
           {navLinks.map((link) => {
             const active = isActive(link.href);
 
@@ -531,10 +531,10 @@ export default function Header({ user = null }: HeaderProps) {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative pb-5 text-[15px] font-black transition xl:text-base ${
+                className={`relative pb-5 text-[14px] font-semibold tracking-[-0.015em] transition xl:text-[15px] ${
                   active
                     ? "text-slate-950"
-                    : "text-slate-900 hover:text-emerald-700"
+                    : "text-slate-700 hover:text-emerald-700"
                 }`}
               >
                 {link.label}
@@ -549,23 +549,23 @@ export default function Header({ user = null }: HeaderProps) {
 
         <div className="hidden items-center gap-3 lg:flex">
           {loadingUser ? (
-            <div className="h-12 w-48 animate-pulse rounded-full bg-slate-100" />
+            <div className="h-11 w-48 animate-pulse rounded-full bg-slate-100" />
           ) : isLoggedIn ? (
             <>
               {isGuru ? (
                 <Link
                   href={resourcesHref}
-                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:bg-slate-50 xl:inline-flex"
+                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 xl:inline-flex"
                 >
                   <BookOpen className="h-4 w-4 text-sky-500" />
-                  Guru Resources
+                  Guru Success Center
                 </Link>
               ) : null}
 
               {isCustomer ? (
                 <Link
                   href={bookingsHref}
-                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:bg-slate-50 xl:inline-flex"
+                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 xl:inline-flex"
                 >
                   <CalendarDays className="h-4 w-4 text-emerald-600" />
                   My Care
@@ -583,7 +583,7 @@ export default function Header({ user = null }: HeaderProps) {
                 >
                   {renderAvatar()}
 
-                  <span className="hidden max-w-[120px] truncate text-sm font-black text-slate-950 xl:block">
+                  <span className="hidden max-w-[120px] truncate text-sm font-semibold tracking-[-0.01em] text-slate-950 xl:block">
                     {userName}
                   </span>
 
@@ -606,17 +606,17 @@ export default function Header({ user = null }: HeaderProps) {
                         {renderAvatar("h-16 w-16")}
 
                         <div className="min-w-0">
-                          <p className="truncate text-xl font-black leading-tight text-slate-950">
+                          <p className="truncate text-xl font-semibold leading-tight tracking-[-0.025em] text-slate-950">
                             {userName}
                           </p>
 
                           {userEmail ? (
-                            <p className="mt-1 truncate text-sm font-semibold text-slate-500">
+                            <p className="mt-1 truncate text-sm font-medium text-slate-500">
                               {userEmail}
                             </p>
                           ) : null}
 
-                          <p className="mt-1 text-base font-black text-emerald-700">
+                          <p className="mt-1 text-base font-semibold tracking-[-0.01em] text-emerald-700">
                             {displayRole}
                           </p>
                         </div>
@@ -630,7 +630,7 @@ export default function Header({ user = null }: HeaderProps) {
                           href={item.href}
                           role="menuitem"
                           onClick={() => setAvatarOpen(false)}
-                          className="rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+                          className="rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
                         >
                           {item.label}
                         </Link>
@@ -640,7 +640,7 @@ export default function Header({ user = null }: HeaderProps) {
                         type="button"
                         role="menuitem"
                         onClick={handleLogout}
-                        className="mt-2 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-base font-black text-white transition hover:bg-emerald-700"
+                        className="mt-2 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
                       >
                         <LogOut className="h-5 w-5" />
                         Log Out
@@ -656,21 +656,21 @@ export default function Header({ user = null }: HeaderProps) {
             <>
               <Link
                 href="/guru/login"
-                className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-800 shadow-sm transition hover:bg-emerald-50"
+                className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50"
               >
                 Guru Login
               </Link>
 
               <Link
                 href="/customer/login"
-                className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-extrabold text-slate-800 shadow-sm transition hover:bg-emerald-50"
+                className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50"
               >
                 Customer Login
               </Link>
 
               <Link
                 href="/signup"
-                className="rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-extrabold text-white shadow-md transition hover:bg-emerald-700"
+                className="rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-white shadow-md transition hover:bg-emerald-700"
               >
                 Sign Up Free
               </Link>
@@ -699,11 +699,11 @@ export default function Header({ user = null }: HeaderProps) {
                     {renderAvatar("h-12 w-12")}
 
                     <div className="min-w-0">
-                      <p className="truncate text-base font-black text-slate-950">
+                      <p className="truncate text-base font-semibold tracking-[-0.01em] text-slate-950">
                         {userName}
                       </p>
 
-                      <p className="text-sm font-bold text-emerald-700">
+                      <p className="text-sm font-semibold tracking-[-0.01em] text-emerald-700">
                         {displayRole}
                       </p>
                     </div>
@@ -719,7 +719,7 @@ export default function Header({ user = null }: HeaderProps) {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className={`rounded-xl px-4 py-3 text-sm font-bold transition ${
+                className={`rounded-xl px-4 py-3 text-sm font-semibold tracking-[-0.01em] transition ${
                   isActive(item.href)
                     ? "bg-emerald-50 text-emerald-700"
                     : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
@@ -736,7 +736,7 @@ export default function Header({ user = null }: HeaderProps) {
                     key={`mobile-${item.href}`}
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
-                    className="rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                    className="rounded-xl px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
                   >
                     {item.label}
                   </Link>
@@ -745,7 +745,7 @@ export default function Header({ user = null }: HeaderProps) {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-black text-white transition hover:bg-emerald-700"
+                  className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
                 >
                   <LogOut className="h-4 w-4" />
                   Log Out
@@ -756,7 +756,7 @@ export default function Header({ user = null }: HeaderProps) {
                 <Link
                   href="/guru/login"
                   onClick={() => setMobileOpen(false)}
-                  className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-slate-800"
+                  className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800"
                 >
                   Guru Login
                 </Link>
@@ -764,7 +764,7 @@ export default function Header({ user = null }: HeaderProps) {
                 <Link
                   href="/customer/login"
                   onClick={() => setMobileOpen(false)}
-                  className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-slate-800"
+                  className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800"
                 >
                   Customer Login
                 </Link>
@@ -772,7 +772,7 @@ export default function Header({ user = null }: HeaderProps) {
                 <Link
                   href="/signup"
                   onClick={() => setMobileOpen(false)}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white"
+                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-white"
                 >
                   Sign Up Free
                 </Link>
@@ -781,6 +781,41 @@ export default function Header({ user = null }: HeaderProps) {
           </div>
         </div>
       ) : null}
+
+      <style jsx global>{`
+        .sg-site-header {
+          font-family:
+            Inter,
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+        }
+
+        .sg-site-header *,
+        .sg-site-header a,
+        .sg-site-header button,
+        .sg-site-header span,
+        .sg-site-header p {
+          font-family:
+            Inter,
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+          text-rendering: geometricPrecision;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+
+        .sg-site-header a:hover {
+          text-decoration: none;
+        }
+      `}</style>
     </header>
   );
 }
