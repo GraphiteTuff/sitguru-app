@@ -1,7 +1,14 @@
 // app/customer/dashboard/page.tsx
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -47,8 +54,13 @@ type RawProfileRow = {
   phone?: string | null;
   phone_number?: string | null;
   service_address?: string | null;
+  street_address?: string | null;
   address?: string | null;
   home_address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+  postal_code?: string | null;
   emergency_contact?: string | null;
   emergency_contact_name?: string | null;
   care_preferences?: string | null;
@@ -205,6 +217,69 @@ type RawReferralProfileRow = {
   available_credit?: number | null;
 };
 
+type RawGuruRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  slug?: string | null;
+  display_name?: string | null;
+  full_name?: string | null;
+  name?: string | null;
+  title?: string | null;
+  bio?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+  service_latitude?: number | string | null;
+  service_longitude?: number | string | null;
+  service_radius_miles?: number | string | null;
+  service_area_enabled?: boolean | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  hourly_rate?: number | string | null;
+  rate?: number | string | null;
+  experience_years?: number | string | null;
+  is_verified?: boolean | null;
+  is_active?: boolean | null;
+  is_public?: boolean | null;
+  is_accepting_bookings?: boolean | null;
+  accepting_bookings?: boolean | null;
+  services?: string[] | null;
+  rating_avg?: number | string | null;
+  rating?: number | string | null;
+  review_count?: number | string | null;
+  profile_photo_url?: string | null;
+  photo_url?: string | null;
+  avatar_url?: string | null;
+  image_url?: string | null;
+};
+
+type NearbyGuru = {
+  id: string;
+  slug: string | null;
+  name: string;
+  role: string;
+  location: string;
+  image_url: string | null;
+  rating: number | null;
+  review_count: number;
+  rate: number | null;
+  services: string[];
+  distance_miles: number;
+  service_radius_miles: number;
+  is_verified: boolean;
+  href: string;
+};
+
+type ZipLookupLocation = {
+  zip: string;
+  city: string;
+  state: string;
+  latitude: number;
+  longitude: number;
+};
+
 type PetMediaKind = "photo" | "video";
 
 type UploadingPetMedia = {
@@ -281,6 +356,51 @@ const confettiColors = [
   "#a78bfa",
 ];
 
+const GURU_SELECT_ATTEMPTS = [
+  "id,user_id,slug,display_name,full_name,name,title,bio,city,state,zip_code,service_latitude,service_longitude,service_radius_miles,service_area_enabled,latitude,longitude,lat,lng,hourly_rate,rate,experience_years,is_verified,is_active,is_public,is_accepting_bookings,accepting_bookings,services,rating_avg,rating,review_count,profile_photo_url,photo_url,avatar_url,image_url",
+  "id,user_id,slug,display_name,full_name,name,title,bio,city,state,zip_code,service_latitude,service_longitude,service_radius_miles,service_area_enabled,hourly_rate,rate,experience_years,is_verified,is_active,is_public,is_accepting_bookings,accepting_bookings,services,rating_avg,rating,review_count,profile_photo_url,photo_url,avatar_url,image_url",
+  "id,user_id,slug,display_name,full_name,name,title,bio,city,state,zip_code,latitude,longitude,hourly_rate,rate,experience_years,is_verified,is_active,is_public,is_accepting_bookings,accepting_bookings,services,rating_avg,rating,review_count,profile_photo_url,photo_url,avatar_url,image_url",
+  "id,user_id,slug,display_name,full_name,name,title,bio,city,state,zip_code,hourly_rate,rate,experience_years,is_verified,is_active,is_public,services,rating_avg,rating,review_count,profile_photo_url,photo_url,avatar_url,image_url",
+];
+
+const ZIP_FALLBACK_LOCATIONS: Record<string, ZipLookupLocation> = {
+  "08030": {
+    zip: "08030",
+    city: "Camden",
+    state: "NJ",
+    latitude: 39.8912,
+    longitude: -75.1163,
+  },
+  "18018": {
+    zip: "18018",
+    city: "Bethlehem",
+    state: "PA",
+    latitude: 40.6259,
+    longitude: -75.3705,
+  },
+  "18101": {
+    zip: "18101",
+    city: "Allentown",
+    state: "PA",
+    latitude: 40.6023,
+    longitude: -75.4714,
+  },
+  "18951": {
+    zip: "18951",
+    city: "Quakertown",
+    state: "PA",
+    latitude: 40.4418,
+    longitude: -75.3416,
+  },
+  "19103": {
+    zip: "19103",
+    city: "Philadelphia",
+    state: "PA",
+    latitude: 39.9526,
+    longitude: -75.1746,
+  },
+};
+
 function createConfettiPieces() {
   return Array.from({ length: 90 }, (_, index) => ({
     id: index,
@@ -306,7 +426,349 @@ function readNumber(value: unknown, fallback = 0) {
   return fallback;
 }
 
-function parseMoneyFromText(source: string | null | undefined, patterns: RegExp[]) {
+function cleanZipCode(value?: string | null) {
+  return String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 5);
+}
+
+function extractZipCode(value?: string | null) {
+  const match = String(value || "").match(/\b\d{5}(?:-\d{4})?\b/);
+  return cleanZipCode(match?.[0] || "");
+}
+
+function parseCoordinate(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function calculateDistanceMilesLocal(
+  fromLatitude: number,
+  fromLongitude: number,
+  toLatitude: number,
+  toLongitude: number,
+) {
+  const earthRadiusMiles = 3958.8;
+  const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
+
+  const latitudeDifference = degreesToRadians(toLatitude - fromLatitude);
+  const longitudeDifference = degreesToRadians(toLongitude - fromLongitude);
+
+  const a =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(degreesToRadians(fromLatitude)) *
+      Math.cos(degreesToRadians(toLatitude)) *
+      Math.sin(longitudeDifference / 2) ** 2;
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusMiles * c;
+}
+
+function getGuruLatitude(guru: RawGuruRow) {
+  return parseCoordinate(guru.service_latitude ?? guru.latitude ?? guru.lat);
+}
+
+function getGuruLongitude(guru: RawGuruRow) {
+  return parseCoordinate(guru.service_longitude ?? guru.longitude ?? guru.lng);
+}
+
+function getGuruRadius(guru: RawGuruRow) {
+  const parsed = readNumber(guru.service_radius_miles, 25);
+  return parsed > 0 ? parsed : 25;
+}
+
+function getGuruDisplayName(guru: RawGuruRow) {
+  return (
+    readString(guru.display_name) ||
+    readString(guru.full_name) ||
+    readString(guru.name) ||
+    "SitGuru Care Guru"
+  );
+}
+
+function getGuruImageUrl(guru: RawGuruRow) {
+  return (
+    readString(guru.profile_photo_url) ||
+    readString(guru.photo_url) ||
+    readString(guru.avatar_url) ||
+    readString(guru.image_url)
+  );
+}
+
+function getGuruLocationLabel(guru: RawGuruRow) {
+  return (
+    [guru.city, guru.state].filter(Boolean).join(", ") ||
+    "Location listed on profile"
+  );
+}
+
+const STATE_ABBREVIATIONS: Record<string, string> = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+};
+
+function normalizeState(value?: string | null) {
+  const cleaned = String(value || "").trim();
+  if (!cleaned) return "";
+
+  if (cleaned.length === 2) return cleaned.toUpperCase();
+
+  return STATE_ABBREVIATIONS[cleaned.toLowerCase()] || cleaned.toUpperCase();
+}
+
+function valuesMatch(left?: string | null, right?: string | null) {
+  return String(left || "").trim().toLowerCase() === String(right || "").trim().toLowerCase();
+}
+
+function getGuruZipCode(guru: RawGuruRow) {
+  return cleanZipCode(guru.zip_code);
+}
+
+function getGuruFallbackDistance(
+  guru: RawGuruRow,
+  customerLocation: ZipLookupLocation,
+) {
+  const guruZip = getGuruZipCode(guru);
+
+  if (guruZip && guruZip === customerLocation.zip) {
+    return 0;
+  }
+
+  const guruCity = readString(guru.city);
+  const guruState = normalizeState(guru.state);
+  const customerCity = readString(customerLocation.city);
+  const customerState = normalizeState(customerLocation.state);
+
+  if (guruCity && customerCity && valuesMatch(guruCity, customerCity) && guruState === customerState) {
+    return 0;
+  }
+
+  return null;
+}
+
+function getGuruHref(guru: RawGuruRow) {
+  const slugOrId = guru.slug || guru.id;
+  return slugOrId
+    ? `/gurus/${encodeURIComponent(String(slugOrId))}`
+    : routes.findGuru;
+}
+
+function normalizeNearbyGuru(
+  guru: RawGuruRow,
+  distanceMiles: number,
+): NearbyGuru {
+  const rating = readNumber(guru.rating_avg ?? guru.rating, Number.NaN);
+  const rate = readNumber(guru.hourly_rate ?? guru.rate, Number.NaN);
+
+  return {
+    id: String(guru.id ?? guru.slug ?? crypto.randomUUID()),
+    slug: guru.slug || null,
+    name: getGuruDisplayName(guru),
+    role: readString(guru.title) || "Pet Care Guru",
+    location: getGuruLocationLabel(guru),
+    image_url: getGuruImageUrl(guru),
+    rating: Number.isFinite(rating) ? rating : null,
+    review_count: readNumber(guru.review_count, 0),
+    rate: Number.isFinite(rate) ? rate : null,
+    services: Array.isArray(guru.services) ? guru.services.filter(Boolean) : [],
+    distance_miles: distanceMiles,
+    service_radius_miles: getGuruRadius(guru),
+    is_verified: Boolean(guru.is_verified),
+    href: getGuruHref(guru),
+  };
+}
+
+function getLatestCareZip(
+  bookings: Booking[],
+  profile: CustomerProfile | null,
+) {
+  const upcomingZip = bookings
+    .filter(isUpcomingBooking)
+    .map((booking) => cleanZipCode(booking.care_zip_code))
+    .find((zip) => zip.length === 5);
+
+  if (upcomingZip) return upcomingZip;
+
+  const recentCareZip = bookings
+    .map((booking) => cleanZipCode(booking.care_zip_code))
+    .find((zip) => zip.length === 5);
+
+  if (recentCareZip) return recentCareZip;
+
+  return extractZipCode(profile?.service_address);
+}
+
+async function lookupCareZipLocation(
+  zipCode: string,
+): Promise<ZipLookupLocation | null> {
+  const cleanZip = cleanZipCode(zipCode);
+
+  if (cleanZip.length !== 5) return null;
+
+  if (ZIP_FALLBACK_LOCATIONS[cleanZip]) {
+    return ZIP_FALLBACK_LOCATIONS[cleanZip];
+  }
+
+  try {
+    const response = await fetch(`https://api.zippopotam.us/us/${cleanZip}`, {
+      headers: { Accept: "application/json" },
+    });
+
+    if (!response.ok) return null;
+
+    const payload = await response.json();
+    const place = payload?.places?.[0];
+    const latitude = parseCoordinate(place?.latitude);
+    const longitude = parseCoordinate(place?.longitude);
+
+    if (latitude === null || longitude === null) return null;
+
+    return {
+      zip: cleanZip,
+      city: String(place?.["place name"] || ""),
+      state: String(place?.["state abbreviation"] || place?.state || ""),
+      latitude,
+      longitude,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchNearbyGurusForCareLocation(zipCode: string) {
+  const customerLocation = await lookupCareZipLocation(zipCode);
+
+  if (!customerLocation) {
+    return {
+      gurus: [] as NearbyGuru[],
+      location: null as ZipLookupLocation | null,
+      message: "Enter a valid 5-digit care ZIP code to see nearby Gurus.",
+    };
+  }
+
+  let guruRows: RawGuruRow[] = [];
+  let lastError = "";
+
+  for (const selectColumns of GURU_SELECT_ATTEMPTS) {
+    const { data, error } = await supabase
+      .from("gurus")
+      .select(selectColumns)
+      .limit(80);
+
+    if (!error) {
+      guruRows = (data || []) as RawGuruRow[];
+      lastError = "";
+      break;
+    }
+
+    lastError = error.message || lastError;
+  }
+
+  if (lastError) {
+    return {
+      gurus: [] as NearbyGuru[],
+      location: customerLocation,
+      message:
+        "We could not load nearby Gurus right now. Please try the main search page.",
+    };
+  }
+
+  const nearbyGurus = guruRows
+    .filter((guru) => guru.is_active !== false)
+    .filter((guru) => guru.is_public !== false)
+    .filter((guru) => guru.is_accepting_bookings !== false)
+    .filter((guru) => guru.accepting_bookings !== false)
+    .map((guru) => {
+      const guruLatitude = getGuruLatitude(guru);
+      const guruLongitude = getGuruLongitude(guru);
+
+      const distanceMiles =
+        guruLatitude !== null && guruLongitude !== null
+          ? calculateDistanceMilesLocal(
+              customerLocation.latitude,
+              customerLocation.longitude,
+              guruLatitude,
+              guruLongitude,
+            )
+          : getGuruFallbackDistance(guru, customerLocation);
+
+      if (distanceMiles === null) return null;
+
+      if (guru.service_area_enabled === false) {
+        return normalizeNearbyGuru(guru, distanceMiles);
+      }
+
+      if (distanceMiles > getGuruRadius(guru)) return null;
+
+      return normalizeNearbyGuru(guru, distanceMiles);
+    })
+    .filter((guru): guru is NearbyGuru => Boolean(guru))
+    .sort((a, b) => a.distance_miles - b.distance_miles)
+    .slice(0, 10);
+
+  return {
+    gurus: nearbyGurus,
+    location: customerLocation,
+    message:
+      nearbyGurus.length > 0
+        ? ""
+        : "No available Gurus match this care ZIP yet. Check that Gurus have a matching ZIP/city or latitude/longitude plus service radius.",
+  };
+}
+
+function parseMoneyFromText(
+  source: string | null | undefined,
+  patterns: RegExp[],
+) {
   if (!source) return 0;
 
   for (const pattern of patterns) {
@@ -322,7 +784,11 @@ function parseMoneyFromText(source: string | null | undefined, patterns: RegExp[
   return 0;
 }
 
-function readBookingMoney(row: RawBookingRow, keys: Array<keyof RawBookingRow>, fallback = 0) {
+function readBookingMoney(
+  row: RawBookingRow,
+  keys: Array<keyof RawBookingRow>,
+  fallback = 0,
+) {
   for (const key of keys) {
     const parsed = readNumber(row[key], Number.NaN);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
@@ -343,7 +809,11 @@ function getBestBookingTip(row: RawBookingRow) {
 }
 
 function getBestBookingFee(row: RawBookingRow) {
-  const directFee = readBookingMoney(row, ["marketplace_fee_amount", "sitguru_fee_amount"], 0);
+  const directFee = readBookingMoney(
+    row,
+    ["marketplace_fee_amount", "sitguru_fee_amount"],
+    0,
+  );
   if (directFee > 0) return directFee;
 
   return parseMoneyFromText(row.notes, [
@@ -471,7 +941,9 @@ function formatTime(value: string | null | undefined) {
 function getStatusClasses(status: string) {
   const normalized = status.toLowerCase();
 
-  if (["pending", "requested", "checkout_started", "unpaid"].includes(normalized)) {
+  if (
+    ["pending", "requested", "checkout_started", "unpaid"].includes(normalized)
+  ) {
     return "bg-amber-50 text-amber-800 ring-1 ring-amber-200";
   }
 
@@ -491,7 +963,12 @@ function getStatusClasses(status: string) {
 }
 
 function getBookingDisplayDate(booking: Booking) {
-  return booking.start_time || booking.booking_date || booking.requested_date || booking.created_at;
+  return (
+    booking.start_time ||
+    booking.booking_date ||
+    booking.requested_date ||
+    booking.created_at
+  );
 }
 
 function isUpcomingBooking(booking: Booking) {
@@ -528,7 +1005,9 @@ function findPetForBooking(booking: Booking, pets: Pet[]) {
 
   return (
     pets.find((pet) => (bookingPetId ? pet.id === bookingPetId : false)) ||
-    pets.find((pet) => (bookingPetName ? pet.name.trim().toLowerCase() === bookingPetName : false)) ||
+    pets.find((pet) =>
+      bookingPetName ? pet.name.trim().toLowerCase() === bookingPetName : false,
+    ) ||
     (pets.length === 1 ? pets[0] : null)
   );
 }
@@ -557,7 +1036,10 @@ function getBookingNextStep(booking: Booking) {
     return "Your booking is saved and ready for final care coordination.";
   }
 
-  if (["confirmed", "paid", "succeeded"].includes(payment) || ["confirmed"].includes(status)) {
+  if (
+    ["confirmed", "paid", "succeeded"].includes(payment) ||
+    ["confirmed"].includes(status)
+  ) {
     return "You’re all set. Review your timing, pet details, and support options anytime.";
   }
 
@@ -566,6 +1048,28 @@ function getBookingNextStep(booking: Booking) {
   }
 
   return "Everything for this booking is organized in one place for easy, stress-free care.";
+}
+
+function buildReadableProfileAddress(row: RawProfileRow | null) {
+  const directAddress =
+    readString(row?.service_address) ||
+    readString(row?.street_address) ||
+    readString(row?.address) ||
+    readString(row?.home_address);
+
+  const city = readString(row?.city);
+  const state = readString(row?.state);
+  const zipCode = cleanZipCode(row?.zip_code || row?.postal_code || extractZipCode(directAddress));
+
+  if (!directAddress && !city && !state && !zipCode) return null;
+
+  const cityStateZip = [city, state, zipCode].filter(Boolean).join(" ");
+
+  if (directAddress && extractZipCode(directAddress)) return directAddress;
+  if (directAddress && cityStateZip) return `${directAddress}, ${cityStateZip}`;
+  if (directAddress) return directAddress;
+
+  return cityStateZip || null;
 }
 
 function buildCustomerProfile(
@@ -599,18 +1103,29 @@ function buildCustomerProfile(
       readString(row?.service_address) ||
       readString(row?.address) ||
       readString(row?.home_address) ||
-      readMetadataString(metadata, ["service_address", "address", "home_address"]) ||
+      readMetadataString(metadata, [
+        "service_address",
+        "address",
+        "home_address",
+      ]) ||
       null,
     emergency_contact:
       readString(row?.emergency_contact) ||
       readString(row?.emergency_contact_name) ||
-      readMetadataString(metadata, ["emergency_contact", "emergency_contact_name"]) ||
+      readMetadataString(metadata, [
+        "emergency_contact",
+        "emergency_contact_name",
+      ]) ||
       null,
     care_preferences:
       readString(row?.care_preferences) ||
       readString(row?.preferences) ||
       readString(row?.notes) ||
-      readMetadataString(metadata, ["care_preferences", "preferences", "notes"]) ||
+      readMetadataString(metadata, [
+        "care_preferences",
+        "preferences",
+        "notes",
+      ]) ||
       null,
     avatar_url:
       readString(row?.avatar_url) ||
@@ -628,7 +1143,9 @@ function buildCustomerProfile(
   };
 }
 
-function customerProfileToForm(profile: CustomerProfile | null): CustomerProfileForm {
+function customerProfileToForm(
+  profile: CustomerProfile | null,
+): CustomerProfileForm {
   return {
     full_name: profile?.full_name || profile?.first_name || "",
     phone: profile?.phone || "",
@@ -638,21 +1155,30 @@ function customerProfileToForm(profile: CustomerProfile | null): CustomerProfile
   };
 }
 
-function getSafeFirstName(profile: CustomerProfile | null, email?: string | null) {
+function getSafeFirstName(
+  profile: CustomerProfile | null,
+  email?: string | null,
+) {
   if (profile?.first_name?.trim()) return profile.first_name.trim();
-  if (profile?.full_name?.trim()) return profile.full_name.trim().split(" ")[0] || "there";
+  if (profile?.full_name?.trim())
+    return profile.full_name.trim().split(" ")[0] || "there";
 
   if (email?.trim()) {
     const emailPrefix = email.trim().split("@")[0];
-    if (emailPrefix) return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+    if (emailPrefix)
+      return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
   }
 
   return "there";
 }
 
 function getCustomerInitials(profile: CustomerProfile | null) {
-  const name = profile?.full_name || profile?.first_name || profile?.email || "Customer";
-  const parts = name.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean);
+  const name =
+    profile?.full_name || profile?.first_name || profile?.email || "Customer";
+  const parts = name
+    .replace(/@.*/, "")
+    .split(/[\s._-]+/)
+    .filter(Boolean);
 
   const firstInitial = parts[0]?.charAt(0) || "C";
   const secondInitial = parts[1]?.charAt(0) || "U";
@@ -665,11 +1191,15 @@ function getDisplayValue(value: string | null | undefined) {
 }
 
 function normalizeBookingRow(row: RawBookingRow): Booking {
-  const subtotal = readNumber(row.subtotal_amount ?? row.service_price ?? row.total_amount, 0);
+  const subtotal = readNumber(
+    row.subtotal_amount ?? row.service_price ?? row.total_amount,
+    0,
+  );
   const marketplaceFee = getBestBookingFee(row);
   const tip = getBestBookingTip(row);
   const customerTotal = getBestCustomerTotal(row);
-  const guruPayout = getBestBookingPayout(row) || Math.max(0, customerTotal - marketplaceFee);
+  const guruPayout =
+    getBestBookingPayout(row) || Math.max(0, customerTotal - marketplaceFee);
 
   return {
     id: String(row.id ?? crypto.randomUUID()),
@@ -711,7 +1241,8 @@ function normalizeBookingRow(row: RawBookingRow): Booking {
     tip_amount: tip,
     guru_payout_amount: guruPayout,
     total_customer_paid: customerTotal || subtotal + tip,
-    stripe_session_id: row.stripe_session_id ?? row.stripe_checkout_session_id ?? null,
+    stripe_session_id:
+      row.stripe_session_id ?? row.stripe_checkout_session_id ?? null,
     created_at: row.created_at ?? null,
   };
 }
@@ -732,7 +1263,9 @@ function normalizePetRow(row: RawPetRow): Pet {
   };
 }
 
-function normalizeReferralProfileRow(row: RawReferralProfileRow): ReferralProfile {
+function normalizeReferralProfileRow(
+  row: RawReferralProfileRow,
+): ReferralProfile {
   return {
     id: row.id ?? crypto.randomUUID(),
     user_id: row.user_id ?? "",
@@ -780,6 +1313,9 @@ function buildPetBookingHref(pet: Pet) {
 
 async function fetchCustomerProfile(user: SupabaseUserLike) {
   const selectAttempts = [
+    "first_name, full_name, phone, service_address, street_address, address, home_address, city, state, zip_code, postal_code, emergency_contact, care_preferences, avatar_url",
+    "first_name, full_name, phone, street_address, city, state, zip_code, emergency_contact, care_preferences, avatar_url",
+    "first_name, full_name, phone, address, city, state, zip_code, emergency_contact, care_preferences, avatar_url",
     "first_name, full_name, phone, service_address, emergency_contact, care_preferences, avatar_url",
     "first_name, full_name, phone, address, emergency_contact, care_preferences, avatar_url",
     "first_name, full_name, phone, service_address, emergency_contact, care_preferences, profile_photo_url",
@@ -910,11 +1446,13 @@ async function uploadCustomerProfilePhoto(userId: string, file: File) {
   let lastError = "We could not upload your profile picture right now.";
 
   for (const bucket of PROFILE_PHOTO_BUCKETS) {
-    const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
-      cacheControl: "3600",
-      contentType: file.type,
-      upsert: true,
-    });
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        contentType: file.type,
+        upsert: true,
+      });
 
     if (!error) {
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
@@ -923,7 +1461,8 @@ async function uploadCustomerProfilePhoto(userId: string, file: File) {
     }
 
     lastError =
-      error?.message || `We could not upload your profile picture to the ${bucket} bucket.`;
+      error?.message ||
+      `We could not upload your profile picture to the ${bucket} bucket.`;
   }
 
   throw new Error(
@@ -938,7 +1477,8 @@ async function saveCustomerProfilePhotoUrl(userId: string, avatarUrl: string) {
     { id: userId, photo_url: avatarUrl },
   ];
 
-  let lastError = "The photo uploaded, but we could not connect it to your profile.";
+  let lastError =
+    "The photo uploaded, but we could not connect it to your profile.";
 
   for (const payload of saveAttempts) {
     const { error } = await supabase
@@ -965,7 +1505,9 @@ function getPetMediaExtension(file: File, kind: PetMediaKind) {
   if (file.type === "video/quicktime") return "mov";
   if (file.type === "video/webm") return "webm";
 
-  return extension && ["mp4", "mov", "webm"].includes(extension) ? extension : "mp4";
+  return extension && ["mp4", "mov", "webm"].includes(extension)
+    ? extension
+    : "mp4";
 }
 
 function validatePetMediaFile(file: File, kind: PetMediaKind) {
@@ -1005,11 +1547,13 @@ async function uploadPetMedia(
   let lastError = `We could not upload your pet ${kind} right now.`;
 
   for (const bucket of buckets) {
-    const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
-      cacheControl: "3600",
-      contentType: file.type,
-      upsert: true,
-    });
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        contentType: file.type,
+        upsert: true,
+      });
 
     if (!error) {
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
@@ -1017,7 +1561,8 @@ async function uploadPetMedia(
       if (data.publicUrl) return data.publicUrl;
     }
 
-    lastError = error?.message || `We could not upload to the ${bucket} bucket.`;
+    lastError =
+      error?.message || `We could not upload to the ${bucket} bucket.`;
   }
 
   throw new Error(
@@ -1025,8 +1570,13 @@ async function uploadPetMedia(
   );
 }
 
-async function savePetMediaUrl(petId: string, kind: PetMediaKind, publicUrl: string) {
-  const payload = kind === "photo" ? { photo_url: publicUrl } : { video_url: publicUrl };
+async function savePetMediaUrl(
+  petId: string,
+  kind: PetMediaKind,
+  publicUrl: string,
+) {
+  const payload =
+    kind === "photo" ? { photo_url: publicUrl } : { video_url: publicUrl };
 
   const { error } = await supabase.from("pets").update(payload).eq("id", petId);
 
@@ -1042,7 +1592,8 @@ async function fetchBookingsForUser(userId: string, userEmail?: string | null) {
   const richSelect =
     "id,status,payment_status,payout_status,start_time,booking_date,requested_date,service_type,service_key,pet_name,guru_name,sitter_name,provider_name,guru_id,guru_avatar_url,guru_photo_url,sitter_avatar_url,sitter_photo_url,provider_avatar_url,provider_photo_url,pet_id,notes,time_window,visit_length,care_city,care_state,care_zip_code,subtotal_amount,service_price,total_amount,marketplace_fee_percent,marketplace_fee_amount,sitguru_fee_amount,tip_amount,guru_tip_amount,guru_payout_amount,guru_estimated_total_payout,total_customer_paid,customer_total_amount,amount_total,stripe_session_id,stripe_checkout_session_id,created_at";
 
-  const fallbackSelect = "id,status,start_time,booking_date,requested_date,notes,created_at";
+  const fallbackSelect =
+    "id,status,start_time,booking_date,requested_date,notes,created_at";
   const normalizedEmail = userEmail?.trim().toLowerCase() || null;
   let firstSuccessfulEmptyResult: Booking[] | null = null;
 
@@ -1052,15 +1603,60 @@ async function fetchBookingsForUser(userId: string, userEmail?: string | null) {
     dateColumn: "start_time" | "booking_date" | "requested_date" | "created_at";
     selectColumns: string;
   }> = [
-    { matchColumn: "pet_owner_id", matchValue: userId, dateColumn: "start_time", selectColumns: richSelect },
-    { matchColumn: "customer_id", matchValue: userId, dateColumn: "start_time", selectColumns: richSelect },
-    { matchColumn: "user_id", matchValue: userId, dateColumn: "start_time", selectColumns: richSelect },
-    { matchColumn: "pet_owner_id", matchValue: userId, dateColumn: "booking_date", selectColumns: richSelect },
-    { matchColumn: "customer_id", matchValue: userId, dateColumn: "booking_date", selectColumns: richSelect },
-    { matchColumn: "user_id", matchValue: userId, dateColumn: "booking_date", selectColumns: richSelect },
-    { matchColumn: "pet_owner_id", matchValue: userId, dateColumn: "created_at", selectColumns: fallbackSelect },
-    { matchColumn: "customer_id", matchValue: userId, dateColumn: "created_at", selectColumns: fallbackSelect },
-    { matchColumn: "user_id", matchValue: userId, dateColumn: "created_at", selectColumns: fallbackSelect },
+    {
+      matchColumn: "pet_owner_id",
+      matchValue: userId,
+      dateColumn: "start_time",
+      selectColumns: richSelect,
+    },
+    {
+      matchColumn: "customer_id",
+      matchValue: userId,
+      dateColumn: "start_time",
+      selectColumns: richSelect,
+    },
+    {
+      matchColumn: "user_id",
+      matchValue: userId,
+      dateColumn: "start_time",
+      selectColumns: richSelect,
+    },
+    {
+      matchColumn: "pet_owner_id",
+      matchValue: userId,
+      dateColumn: "booking_date",
+      selectColumns: richSelect,
+    },
+    {
+      matchColumn: "customer_id",
+      matchValue: userId,
+      dateColumn: "booking_date",
+      selectColumns: richSelect,
+    },
+    {
+      matchColumn: "user_id",
+      matchValue: userId,
+      dateColumn: "booking_date",
+      selectColumns: richSelect,
+    },
+    {
+      matchColumn: "pet_owner_id",
+      matchValue: userId,
+      dateColumn: "created_at",
+      selectColumns: fallbackSelect,
+    },
+    {
+      matchColumn: "customer_id",
+      matchValue: userId,
+      dateColumn: "created_at",
+      selectColumns: fallbackSelect,
+    },
+    {
+      matchColumn: "user_id",
+      matchValue: userId,
+      dateColumn: "created_at",
+      selectColumns: fallbackSelect,
+    },
   ];
 
   const emailAttempts: Array<{
@@ -1070,12 +1666,42 @@ async function fetchBookingsForUser(userId: string, userEmail?: string | null) {
     selectColumns: string;
   }> = normalizedEmail
     ? [
-        { matchColumn: "customer_email", matchValue: normalizedEmail, dateColumn: "start_time", selectColumns: richSelect },
-        { matchColumn: "email", matchValue: normalizedEmail, dateColumn: "start_time", selectColumns: richSelect },
-        { matchColumn: "customer_email", matchValue: normalizedEmail, dateColumn: "booking_date", selectColumns: richSelect },
-        { matchColumn: "email", matchValue: normalizedEmail, dateColumn: "booking_date", selectColumns: richSelect },
-        { matchColumn: "customer_email", matchValue: normalizedEmail, dateColumn: "created_at", selectColumns: fallbackSelect },
-        { matchColumn: "email", matchValue: normalizedEmail, dateColumn: "created_at", selectColumns: fallbackSelect },
+        {
+          matchColumn: "customer_email",
+          matchValue: normalizedEmail,
+          dateColumn: "start_time",
+          selectColumns: richSelect,
+        },
+        {
+          matchColumn: "email",
+          matchValue: normalizedEmail,
+          dateColumn: "start_time",
+          selectColumns: richSelect,
+        },
+        {
+          matchColumn: "customer_email",
+          matchValue: normalizedEmail,
+          dateColumn: "booking_date",
+          selectColumns: richSelect,
+        },
+        {
+          matchColumn: "email",
+          matchValue: normalizedEmail,
+          dateColumn: "booking_date",
+          selectColumns: richSelect,
+        },
+        {
+          matchColumn: "customer_email",
+          matchValue: normalizedEmail,
+          dateColumn: "created_at",
+          selectColumns: fallbackSelect,
+        },
+        {
+          matchColumn: "email",
+          matchValue: normalizedEmail,
+          dateColumn: "created_at",
+          selectColumns: fallbackSelect,
+        },
       ]
     : [];
 
@@ -1089,7 +1715,8 @@ async function fetchBookingsForUser(userId: string, userEmail?: string | null) {
 
     if (error) continue;
 
-    const normalizedRows = (data as RawBookingRow[] | null)?.map(normalizeBookingRow) || [];
+    const normalizedRows =
+      (data as RawBookingRow[] | null)?.map(normalizeBookingRow) || [];
 
     if (normalizedRows.length > 0) {
       return normalizedRows;
@@ -1132,15 +1759,17 @@ async function fetchPetsForUser(userId: string) {
 }
 
 async function getOrCreateReferralProfile(userId: string) {
+  const referralProfileSelect =
+    "id, user_id, role, referral_code, referral_link, total_invites, completed_referrals, pending_rewards, earned_rewards, paid_rewards, available_credit";
+
   const { data, error } = await supabase
     .from("referral_profiles")
-    .select(
-      "id, user_id, role, referral_code, referral_link, total_invites, completed_referrals, pending_rewards, earned_rewards, paid_rewards, available_credit",
-    )
+    .select(referralProfileSelect)
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (!error && data) return normalizeReferralProfileRow(data as RawReferralProfileRow);
+  if (!error && data)
+    return normalizeReferralProfileRow(data as RawReferralProfileRow);
 
   const referralCode = generateCustomerReferralCode(userId);
   const referralLink = buildCustomerReferralLink(referralCode);
@@ -1159,17 +1788,233 @@ async function getOrCreateReferralProfile(userId: string) {
       paid_rewards: 0,
       available_credit: 0,
     })
-    .select(
-      "id, user_id, role, referral_code, referral_link, total_invites, completed_referrals, pending_rewards, earned_rewards, paid_rewards, available_credit",
-    )
+    .select(referralProfileSelect)
     .maybeSingle();
 
-  if (createError || !createdProfile) {
-    console.error("Referral profile error:", createError);
+  if (!createError && createdProfile) {
+    return normalizeReferralProfileRow(createdProfile as RawReferralProfileRow);
+  }
+
+  if (createError?.code === "23505") {
+    const { data: recoveredProfile, error: recoveryError } = await supabase
+      .from("referral_profiles")
+      .select(referralProfileSelect)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!recoveryError && recoveredProfile) {
+      return normalizeReferralProfileRow(
+        recoveredProfile as RawReferralProfileRow,
+      );
+    }
+
+    console.error("Referral profile recovery error:", recoveryError);
     return null;
   }
 
-  return normalizeReferralProfileRow(createdProfile as RawReferralProfileRow);
+  console.error("Referral profile error:", createError);
+  return null;
+}
+
+function NearbyGurusCarousel({
+  gurus,
+  careZip,
+  careLocationLabel,
+  careZipInput,
+  loading,
+  message,
+  onCareZipInputChange,
+  onCareZipSubmit,
+}: {
+  gurus: NearbyGuru[];
+  careZip: string;
+  careLocationLabel: string;
+  careZipInput: string;
+  loading: boolean;
+  message: string;
+  onCareZipInputChange: (value: string) => void;
+  onCareZipSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="mt-6 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
+      <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#dff7ef_100%)] p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
+              Gurus near your care location
+            </p>
+
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+              Personalized care options based on your requested ZIP.
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              We use your latest booking care ZIP first, then your profile
+              service address. Traveling or booking care somewhere else? Enter
+              that ZIP to refresh this list.
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-100">
+                Care ZIP: {careZip || "Not set"}
+              </span>
+
+              {careLocationLabel ? (
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700 ring-1 ring-slate-200">
+                  {careLocationLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <form
+            onSubmit={onCareZipSubmit}
+            className="flex w-full flex-col gap-2 rounded-[1.4rem] bg-white p-3 shadow-sm ring-1 ring-emerald-100 sm:w-auto sm:min-w-[320px] sm:flex-row"
+          >
+            <input
+              value={careZipInput}
+              onChange={(event) => onCareZipInputChange(event.target.value)}
+              inputMode="numeric"
+              maxLength={5}
+              placeholder="Care ZIP"
+              className="min-h-[46px] flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+            />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="min-h-[46px] rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Checking..." : "Update"}
+            </button>
+          </form>
+        </div>
+
+        {message ? (
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold leading-6 text-amber-800">
+            {message}
+          </div>
+        ) : null}
+
+        {gurus.length > 0 ? (
+          <div className="mt-6 flex gap-4 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {gurus.map((guru) => (
+              <article
+                key={guru.id}
+                className="min-w-[280px] max-w-[280px] overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl sm:min-w-[320px] sm:max-w-[320px]"
+              >
+                <Link href={guru.href} className="block">
+                  <div className="relative h-48 overflow-hidden bg-emerald-50">
+                    {guru.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={guru.image_url}
+                        alt={guru.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-5xl">
+                        🐾
+                      </div>
+                    )}
+
+                    <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+                      {guru.is_verified ? (
+                        <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-emerald-700 shadow-sm">
+                          Verified
+                        </span>
+                      ) : null}
+
+                      <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-slate-700 shadow-sm">
+                        {guru.distance_miles.toFixed(1)} mi
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={guru.href}>
+                        <h3 className="truncate text-lg font-black text-slate-950 transition hover:text-emerald-700">
+                          {guru.name}
+                        </h3>
+                      </Link>
+
+                      <p className="mt-1 text-sm font-bold text-emerald-700">
+                        {guru.role}
+                      </p>
+                    </div>
+
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-100">
+                      {guru.rating ? guru.rating.toFixed(1) : "New"}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-sm font-semibold text-slate-600">
+                    {guru.location}
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
+                      Radius {guru.service_radius_miles} mi
+                    </span>
+
+                    {guru.rate ? (
+                      <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
+                        {formatMoney(guru.rate)}/hr
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {guru.services.length > 0 ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {guru.services.slice(0, 3).map((service) => (
+                        <span
+                          key={service}
+                          className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-800"
+                        >
+                          {service}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <Link
+                      href={guru.href}
+                      className="inline-flex min-h-[42px] items-center justify-center rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white transition hover:bg-emerald-700"
+                    >
+                      View Guru
+                    </Link>
+
+                    <Link
+                      href={`${routes.findGuru}?zip=${encodeURIComponent(careZip)}`}
+                      className="inline-flex min-h-[42px] items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
+                    >
+                      Search
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-6 rounded-[1.5rem] border border-dashed border-emerald-200 bg-white/70 p-6 text-center">
+            <Sparkles className="mx-auto h-9 w-9 text-emerald-600" />
+            <p className="mt-3 text-base font-black text-slate-950">
+              Personalized Guru matches will appear here.
+            </p>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+              Add a care ZIP, update your service address, or start a booking so
+              SitGuru can show Gurus who accept care inside their service
+              radius.
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function BookingCard({
@@ -1189,7 +2034,9 @@ function BookingCard({
     <article
       className={[
         "overflow-hidden rounded-[1.9rem] border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl",
-        featured ? "border-emerald-200 ring-4 ring-emerald-50" : "border-slate-200",
+        featured
+          ? "border-emerald-200 ring-4 ring-emerald-50"
+          : "border-slate-200",
       ].join(" ")}
     >
       <div
@@ -1208,10 +2055,14 @@ function BookingCard({
               <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-800">
                 Trusted care
               </span>
-              <span className={`rounded-full px-3 py-1 text-xs font-black ${getStatusClasses(booking.status)}`}>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-black ${getStatusClasses(booking.status)}`}
+              >
                 {formatStatus(booking.status)}
               </span>
-              <span className={`rounded-full px-3 py-1 text-xs font-black ${getStatusClasses(booking.payment_status)}`}>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-black ${getStatusClasses(booking.payment_status)}`}
+              >
                 {formatStatus(booking.payment_status)}
               </span>
             </div>
@@ -1221,7 +2072,11 @@ function BookingCard({
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[1.4rem] bg-white text-3xl shadow-sm ring-1 ring-slate-200">
                   {petPhotoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={petPhotoUrl} alt={booking.pet_name || "Pet"} className="h-full w-full object-cover" />
+                    <img
+                      src={petPhotoUrl}
+                      alt={booking.pet_name || "Pet"}
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <PawPrint className="h-7 w-7 text-emerald-600" />
                   )}
@@ -1230,7 +2085,11 @@ function BookingCard({
                 {booking.guru_avatar_url ? (
                   <div className="absolute -bottom-2 -right-2 h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm ring-1 ring-emerald-200">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={booking.guru_avatar_url} alt={booking.guru_name || "Guru"} className="h-full w-full object-cover" />
+                    <img
+                      src={booking.guru_avatar_url}
+                      alt={booking.guru_name || "Guru"}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                 ) : null}
               </div>
@@ -1296,12 +2155,14 @@ function BookingCard({
             </p>
 
             <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-800">
-              Need to adjust timing or care notes? Message your Guru or support first so we can help before you cancel.
+              Need to adjust timing or care notes? Message your Guru or support
+              first so we can help before you cancel.
             </div>
 
             {booking.tip_amount > 0 ? (
               <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700">
-                Includes {formatMoney(booking.tip_amount, true)} tip for your Guru
+                Includes {formatMoney(booking.tip_amount, true)} tip for your
+                Guru
               </div>
             ) : null}
           </div>
@@ -1346,13 +2207,16 @@ export default function CustomerDashboardPage() {
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
-  const [referralProfile, setReferralProfile] = useState<ReferralProfile | null>(null);
+  const [referralProfile, setReferralProfile] =
+    useState<ReferralProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [firstName, setFirstName] = useState("there");
-  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+  const [customerProfile, setCustomerProfile] =
+    useState<CustomerProfile | null>(null);
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState<CustomerProfileForm>(initialProfileForm);
+  const [profileForm, setProfileForm] =
+    useState<CustomerProfileForm>(initialProfileForm);
   const [profileError, setProfileError] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
   const [showPetForm, setShowPetForm] = useState(false);
@@ -1366,14 +2230,22 @@ export default function CustomerDashboardPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const [avatarMessage, setAvatarMessage] = useState("");
-  const [uploadingPetMedia, setUploadingPetMedia] = useState<UploadingPetMedia | null>(null);
+  const [uploadingPetMedia, setUploadingPetMedia] =
+    useState<UploadingPetMedia | null>(null);
   const [petMediaError, setPetMediaError] = useState("");
   const [petMediaMessage, setPetMediaMessage] = useState("");
+  const [nearbyGurus, setNearbyGurus] = useState<NearbyGuru[]>([]);
+  const [careZip, setCareZip] = useState("");
+  const [careZipInput, setCareZipInput] = useState("");
+  const [careLocationLabel, setCareLocationLabel] = useState("");
+  const [nearbyGuruMessage, setNearbyGuruMessage] = useState("");
+  const [loadingNearbyGurus, setLoadingNearbyGurus] = useState(false);
 
   const customerAvatarSrc =
     customerProfile?.avatar_url?.trim() || CUSTOMER_PROFILE_PHOTO_SRC;
 
-  const showCustomerProfilePhoto = Boolean(customerAvatarSrc) && !customerPhotoFailed;
+  const showCustomerProfilePhoto =
+    Boolean(customerAvatarSrc) && !customerPhotoFailed;
 
   const customerReferralLink = useMemo(() => {
     if (!referralProfile?.referral_code) return "https://sitguru.com/signup";
@@ -1381,7 +2253,8 @@ export default function CustomerDashboardPage() {
   }, [referralProfile]);
 
   const guruReferralLink = useMemo(() => {
-    if (!referralProfile?.referral_code) return "https://sitguru.com/become-a-guru";
+    if (!referralProfile?.referral_code)
+      return "https://sitguru.com/become-a-guru";
     return buildGuruReferralLink(referralProfile.referral_code);
   }, [referralProfile]);
 
@@ -1412,12 +2285,15 @@ export default function CustomerDashboardPage() {
       return;
     }
 
-    const [profileData, bookingsData, petsData, referralData] = await Promise.all([
-      fetchCustomerProfile(user),
-      fetchBookingsForUser(user.id, user.email),
-      fetchPetsForUser(user.id),
-      getOrCreateReferralProfile(user.id),
-    ]);
+    const [profileData, bookingsData, petsData, referralData] =
+      await Promise.all([
+        fetchCustomerProfile(user),
+        fetchBookingsForUser(user.id, user.email),
+        fetchPetsForUser(user.id),
+        getOrCreateReferralProfile(user.id),
+      ]);
+
+    const dashboardCareZip = getLatestCareZip(bookingsData, profileData);
 
     setCustomerProfile(profileData);
     setProfileForm(customerProfileToForm(profileData));
@@ -1425,6 +2301,30 @@ export default function CustomerDashboardPage() {
     setBookings(bookingsData);
     setPets(petsData);
     setReferralProfile(referralData);
+    setCareZip(dashboardCareZip);
+    setCareZipInput(dashboardCareZip);
+
+    if (dashboardCareZip) {
+      setLoadingNearbyGurus(true);
+      const nearbyResult =
+        await fetchNearbyGurusForCareLocation(dashboardCareZip);
+
+      setNearbyGurus(nearbyResult.gurus);
+      setCareLocationLabel(
+        nearbyResult.location
+          ? `${nearbyResult.location.city}, ${nearbyResult.location.state}`
+          : "",
+      );
+      setNearbyGuruMessage(nearbyResult.message);
+      setLoadingNearbyGurus(false);
+    } else {
+      setNearbyGurus([]);
+      setCareLocationLabel("");
+      setNearbyGuruMessage(
+        "Add a ZIP code to your service address or enter a care ZIP below to see Gurus near that location.",
+      );
+    }
+
     setLoading(false);
   }, [router]);
 
@@ -1463,7 +2363,8 @@ export default function CustomerDashboardPage() {
 
     if (bookingStatus !== "confirmed" && bookingStatus !== "created") return;
 
-    const bookingId = params.get("booking_id") || params.get("session_id") || "recent";
+    const bookingId =
+      params.get("booking_id") || params.get("session_id") || "recent";
     const celebrationKey = `sitguru-booking-celebration-${bookingId}`;
 
     if (window.sessionStorage.getItem(celebrationKey)) return;
@@ -1513,14 +2414,23 @@ export default function CustomerDashboardPage() {
       ["pending", "requested"].includes(booking.status.toLowerCase()),
     ).length;
 
-    const confirmed = bookings.filter((booking) =>
-      ["confirmed", "paid", "checkout_started"].includes(booking.status.toLowerCase()) ||
-      ["paid", "checkout_started"].includes(booking.payment_status.toLowerCase()),
+    const confirmed = bookings.filter(
+      (booking) =>
+        ["confirmed", "paid", "checkout_started"].includes(
+          booking.status.toLowerCase(),
+        ) ||
+        ["paid", "checkout_started"].includes(
+          booking.payment_status.toLowerCase(),
+        ),
     ).length;
 
-    const totalTips = bookings.reduce((sum, booking) => sum + booking.tip_amount, 0);
+    const totalTips = bookings.reduce(
+      (sum, booking) => sum + booking.tip_amount,
+      0,
+    );
     const totalSpent = bookings.reduce(
-      (sum, booking) => sum + (booking.total_customer_paid || booking.subtotal_amount || 0),
+      (sum, booking) =>
+        sum + (booking.total_customer_paid || booking.subtotal_amount || 0),
       0,
     );
 
@@ -1541,7 +2451,45 @@ export default function CustomerDashboardPage() {
     return formatShortDate(getBookingDisplayDate(stats.nextBooking));
   }, [stats.nextBooking]);
 
-  async function handleCustomerAvatarUpload(event: ChangeEvent<HTMLInputElement>) {
+  async function refreshNearbyGurusForZip(nextZip: string) {
+    const cleanZip = cleanZipCode(nextZip);
+
+    setCareZipInput(cleanZip);
+
+    if (cleanZip.length !== 5) {
+      setCareZip(cleanZip);
+      setNearbyGurus([]);
+      setCareLocationLabel("");
+      setNearbyGuruMessage(
+        "Enter a valid 5-digit care ZIP code to see nearby Gurus.",
+      );
+      return;
+    }
+
+    setLoadingNearbyGurus(true);
+    setNearbyGuruMessage("");
+
+    const nearbyResult = await fetchNearbyGurusForCareLocation(cleanZip);
+
+    setCareZip(cleanZip);
+    setNearbyGurus(nearbyResult.gurus);
+    setCareLocationLabel(
+      nearbyResult.location
+        ? `${nearbyResult.location.city}, ${nearbyResult.location.state}`
+        : "",
+    );
+    setNearbyGuruMessage(nearbyResult.message);
+    setLoadingNearbyGurus(false);
+  }
+
+  async function handleCareZipSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await refreshNearbyGurusForZip(careZipInput);
+  }
+
+  async function handleCustomerAvatarUpload(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
     const file = event.target.files?.[0];
 
     if (!file) return;
@@ -1671,7 +2619,9 @@ export default function CustomerDashboardPage() {
       );
     } catch (error) {
       setProfileError(
-        error instanceof Error ? error.message : "We could not save your profile right now.",
+        error instanceof Error
+          ? error.message
+          : "We could not save your profile right now.",
       );
     } finally {
       setSavingProfile(false);
@@ -1685,7 +2635,9 @@ export default function CustomerDashboardPage() {
       await navigator.clipboard.writeText(link);
       setReferralMessage(`${label} copied. Share it with your community.`);
     } catch {
-      setReferralMessage("We could not copy the link. Please copy it manually.");
+      setReferralMessage(
+        "We could not copy the link. Please copy it manually.",
+      );
     }
   }
 
@@ -1724,7 +2676,9 @@ export default function CustomerDashboardPage() {
       video_url: petForm.video_url.trim() || null,
     };
 
-    const { error: ownerError } = await supabase.from("pets").insert(ownerPayload);
+    const { error: ownerError } = await supabase
+      .from("pets")
+      .insert(ownerPayload);
 
     if (ownerError) {
       const userPayload = {
@@ -1741,10 +2695,14 @@ export default function CustomerDashboardPage() {
         video_url: petForm.video_url.trim() || null,
       };
 
-      const { error: userIdError } = await supabase.from("pets").insert(userPayload);
+      const { error: userIdError } = await supabase
+        .from("pets")
+        .insert(userPayload);
 
       if (userIdError) {
-        setFormError(userIdError.message || "We could not save your pet profile.");
+        setFormError(
+          userIdError.message || "We could not save your pet profile.",
+        );
         setSavingPet(false);
         return;
       }
@@ -1757,7 +2715,11 @@ export default function CustomerDashboardPage() {
   }
 
   const customerDisplayName = useMemo(() => {
-    return customerProfile?.full_name?.trim() || customerProfile?.first_name?.trim() || firstName;
+    return (
+      customerProfile?.full_name?.trim() ||
+      customerProfile?.first_name?.trim() ||
+      firstName
+    );
   }, [customerProfile, firstName]);
 
   const customerInitials = useMemo(
@@ -1823,7 +2785,9 @@ export default function CustomerDashboardPage() {
           <div className="absolute left-1/2 top-6 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-[2rem] border border-emerald-200 bg-white/95 p-5 text-center shadow-2xl backdrop-blur">
             <div
               className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-3xl shadow-lg"
-              style={{ animation: "sitguru-success-pop 0.35s ease-out forwards" }}
+              style={{
+                animation: "sitguru-success-pop 0.35s ease-out forwards",
+              }}
             >
               🎉
             </div>
@@ -1863,7 +2827,8 @@ export default function CustomerDashboardPage() {
                 </h1>
 
                 <p className="mt-5 max-w-3xl text-base leading-8 text-slate-900/75 md:text-xl">
-                  Manage your pets, book Gurus, review messages, and keep your care details organized in one simple place.
+                  Manage your pets, book Gurus, review messages, and keep your
+                  care details organized in one simple place.
                 </p>
 
                 <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -1990,7 +2955,9 @@ export default function CustomerDashboardPage() {
                   label: "Upcoming Booking",
                   value: nextBookingLabel,
                   helper: stats.nextBooking ? "View details" : "Book care",
-                  href: stats.nextBooking ? getBookingDetailHref(stats.nextBooking.id) : routes.findGuru,
+                  href: stats.nextBooking
+                    ? getBookingDetailHref(stats.nextBooking.id)
+                    : routes.findGuru,
                   icon: <CalendarDays className="h-5 w-5" />,
                 },
                 {
@@ -2029,7 +2996,9 @@ export default function CustomerDashboardPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-500">{item.label}</p>
+                      <p className="text-sm font-semibold text-slate-500">
+                        {item.label}
+                      </p>
                       <p className="mt-2 truncate text-2xl font-extrabold text-slate-950">
                         {item.value}
                       </p>
@@ -2046,6 +3015,19 @@ export default function CustomerDashboardPage() {
             </div>
           </section>
 
+          <NearbyGurusCarousel
+            gurus={nearbyGurus}
+            careZip={careZip}
+            careLocationLabel={careLocationLabel}
+            careZipInput={careZipInput}
+            loading={loadingNearbyGurus}
+            message={nearbyGuruMessage}
+            onCareZipInputChange={(value) =>
+              setCareZipInput(cleanZipCode(value))
+            }
+            onCareZipSubmit={handleCareZipSubmit}
+          />
+
           <section className="mt-6 grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
             <div className="space-y-6">
               <div className="overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
@@ -2059,7 +3041,8 @@ export default function CustomerDashboardPage() {
                         Grow SitGuru with PawPerks.
                       </h3>
                       <p className="mt-3 text-sm leading-6 text-slate-700">
-                        Invite Pet Parents and Gurus, earn rewards, and help SitGuru expand trusted pet care in more communities.
+                        Invite Pet Parents and Gurus, earn rewards, and help
+                        SitGuru expand trusted pet care in more communities.
                       </p>
                     </div>
 
@@ -2125,7 +3108,12 @@ export default function CustomerDashboardPage() {
 
                     <button
                       type="button"
-                      onClick={() => copyReferralLink(customerReferralLink, "Customer referral link")}
+                      onClick={() =>
+                        copyReferralLink(
+                          customerReferralLink,
+                          "Customer referral link",
+                        )
+                      }
                       className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
                     >
                       Copy Customer Invite
@@ -2133,7 +3121,9 @@ export default function CustomerDashboardPage() {
 
                     <button
                       type="button"
-                      onClick={() => copyReferralLink(guruReferralLink, "Guru invite link")}
+                      onClick={() =>
+                        copyReferralLink(guruReferralLink, "Guru invite link")
+                      }
                       className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
                     >
                       Copy Guru Invite
@@ -2161,7 +3151,8 @@ export default function CustomerDashboardPage() {
                       Your care account details
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Keep household notes, emergency contacts, and preferences ready for your Guru.
+                      Keep household notes, emergency contacts, and preferences
+                      ready for your Guru.
                     </p>
                   </div>
 
@@ -2182,8 +3173,12 @@ export default function CustomerDashboardPage() {
 
                 <div className="mt-5 rounded-[1.5rem] bg-emerald-50 p-4 ring-1 ring-emerald-100">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-black text-slate-950">Profile completion</p>
-                    <p className="text-sm font-black text-emerald-700">{profileCompletion}%</p>
+                    <p className="text-sm font-black text-slate-950">
+                      Profile completion
+                    </p>
+                    <p className="text-sm font-black text-emerald-700">
+                      {profileCompletion}%
+                    </p>
                   </div>
                   <div className="mt-3 h-3 overflow-hidden rounded-full bg-white ring-1 ring-emerald-100">
                     <div
@@ -2207,14 +3202,32 @@ export default function CustomerDashboardPage() {
 
                 <div className="mt-5 grid gap-3">
                   {[
-                    ["Name", getDisplayValue(customerProfile?.full_name || customerProfile?.first_name)],
+                    [
+                      "Name",
+                      getDisplayValue(
+                        customerProfile?.full_name ||
+                          customerProfile?.first_name,
+                      ),
+                    ],
                     ["Email", getDisplayValue(customerProfile?.email)],
                     ["Phone", getDisplayValue(customerProfile?.phone)],
-                    ["Service address", getDisplayValue(customerProfile?.service_address)],
-                    ["Emergency contact", getDisplayValue(customerProfile?.emergency_contact)],
-                    ["Care preferences", getDisplayValue(customerProfile?.care_preferences)],
+                    [
+                      "Service address",
+                      getDisplayValue(customerProfile?.service_address),
+                    ],
+                    [
+                      "Emergency contact",
+                      getDisplayValue(customerProfile?.emergency_contact),
+                    ],
+                    [
+                      "Care preferences",
+                      getDisplayValue(customerProfile?.care_preferences),
+                    ],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <div
+                      key={label}
+                      className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"
+                    >
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                         {label}
                       </p>
@@ -2259,13 +3272,19 @@ export default function CustomerDashboardPage() {
                 </div>
 
                 {showProfileForm ? (
-                  <form onSubmit={handleSaveProfile} className="mt-5 grid gap-3">
+                  <form
+                    onSubmit={handleSaveProfile}
+                    className="mt-5 grid gap-3"
+                  >
                     <input
                       type="text"
                       placeholder="Full name"
                       value={profileForm.full_name}
                       onChange={(e) =>
-                        setProfileForm({ ...profileForm, full_name: e.target.value })
+                        setProfileForm({
+                          ...profileForm,
+                          full_name: e.target.value,
+                        })
                       }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
@@ -2275,7 +3294,10 @@ export default function CustomerDashboardPage() {
                       placeholder="Phone number"
                       value={profileForm.phone}
                       onChange={(e) =>
-                        setProfileForm({ ...profileForm, phone: e.target.value })
+                        setProfileForm({
+                          ...profileForm,
+                          phone: e.target.value,
+                        })
                       }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
@@ -2285,7 +3307,10 @@ export default function CustomerDashboardPage() {
                       placeholder="Home or service address"
                       value={profileForm.service_address}
                       onChange={(e) =>
-                        setProfileForm({ ...profileForm, service_address: e.target.value })
+                        setProfileForm({
+                          ...profileForm,
+                          service_address: e.target.value,
+                        })
                       }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
@@ -2295,7 +3320,10 @@ export default function CustomerDashboardPage() {
                       placeholder="Emergency contact"
                       value={profileForm.emergency_contact}
                       onChange={(e) =>
-                        setProfileForm({ ...profileForm, emergency_contact: e.target.value })
+                        setProfileForm({
+                          ...profileForm,
+                          emergency_contact: e.target.value,
+                        })
                       }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
@@ -2305,7 +3333,10 @@ export default function CustomerDashboardPage() {
                       rows={4}
                       value={profileForm.care_preferences}
                       onChange={(e) =>
-                        setProfileForm({ ...profileForm, care_preferences: e.target.value })
+                        setProfileForm({
+                          ...profileForm,
+                          care_preferences: e.target.value,
+                        })
                       }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
@@ -2315,7 +3346,9 @@ export default function CustomerDashboardPage() {
                       disabled={savingProfile}
                       className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
                     >
-                      {savingProfile ? "Saving profile..." : "Save customer profile"}
+                      {savingProfile
+                        ? "Saving profile..."
+                        : "Save customer profile"}
                     </button>
                   </form>
                 ) : null}
@@ -2376,7 +3409,8 @@ export default function CustomerDashboardPage() {
                       Your next booking, clearly organized
                     </h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                      View details, message your Guru, rebook, or get help without being sent back to search.
+                      View details, message your Guru, rebook, or get help
+                      without being sent back to search.
                     </p>
                   </div>
 
@@ -2391,23 +3425,39 @@ export default function CustomerDashboardPage() {
                 <div className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <p className="text-sm font-black text-slate-950">A calmer customer experience, built for trust</p>
+                      <p className="text-sm font-black text-slate-950">
+                        A calmer customer experience, built for trust
+                      </p>
                       <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-                        Plans can change. If timing, notes, or details need an adjustment, message your Guru or support first and we’ll help keep your care on track.
+                        Plans can change. If timing, notes, or details need an
+                        adjustment, message your Guru or support first and we’ll
+                        help keep your care on track.
                       </p>
 
                       <div className="mt-4 grid gap-2 sm:grid-cols-3">
                         <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Confidence</p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">Care details stay organized.</p>
+                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                            Confidence
+                          </p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                            Care details stay organized.
+                          </p>
                         </div>
                         <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Support</p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">Message before canceling.</p>
+                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                            Support
+                          </p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                            Message before canceling.
+                          </p>
                         </div>
                         <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Updates</p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">Review every next step.</p>
+                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                            Updates
+                          </p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                            Review every next step.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -2428,7 +3478,8 @@ export default function CustomerDashboardPage() {
                       No upcoming bookings yet
                     </p>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Find a trusted Guru and book care when your pet needs support.
+                      Find a trusted Guru and book care when your pet needs
+                      support.
                     </p>
                     <Link
                       href={routes.findGuru}
@@ -2509,7 +3560,9 @@ export default function CustomerDashboardPage() {
                       type="text"
                       placeholder="Pet name"
                       value={petForm.name}
-                      onChange={(e) => setPetForm({ ...petForm, name: e.target.value })}
+                      onChange={(e) =>
+                        setPetForm({ ...petForm, name: e.target.value })
+                      }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
 
@@ -2528,7 +3581,9 @@ export default function CustomerDashboardPage() {
                         type="text"
                         placeholder="Breed"
                         value={petForm.breed}
-                        onChange={(e) => setPetForm({ ...petForm, breed: e.target.value })}
+                        onChange={(e) =>
+                          setPetForm({ ...petForm, breed: e.target.value })
+                        }
                         className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                       />
                     </div>
@@ -2538,7 +3593,9 @@ export default function CustomerDashboardPage() {
                         type="text"
                         placeholder="Age"
                         value={petForm.age}
-                        onChange={(e) => setPetForm({ ...petForm, age: e.target.value })}
+                        onChange={(e) =>
+                          setPetForm({ ...petForm, age: e.target.value })
+                        }
                         className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                       />
 
@@ -2597,7 +3654,9 @@ export default function CustomerDashboardPage() {
                       placeholder="Care notes for your Guru"
                       rows={4}
                       value={petForm.notes}
-                      onChange={(e) => setPetForm({ ...petForm, notes: e.target.value })}
+                      onChange={(e) =>
+                        setPetForm({ ...petForm, notes: e.target.value })
+                      }
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
                     />
 
@@ -2617,7 +3676,8 @@ export default function CustomerDashboardPage() {
                       No pet profiles yet.
                     </p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Add your first pet profile so booking and Guru communication feel easier.
+                      Add your first pet profile so booking and Guru
+                      communication feel easier.
                     </p>
                   </div>
                 ) : (
@@ -2665,7 +3725,9 @@ export default function CustomerDashboardPage() {
                             </div>
 
                             <p className="mt-1 text-sm text-slate-600">
-                              {[pet.breed, pet.age, pet.weight].filter(Boolean).join(" • ") ||
+                              {[pet.breed, pet.age, pet.weight]
+                                .filter(Boolean)
+                                .join(" • ") ||
                                 "Profile details can be added anytime."}
                             </p>
 
@@ -2701,7 +3763,9 @@ export default function CustomerDashboardPage() {
                                   type="file"
                                   accept="image/jpeg,image/png"
                                   disabled={Boolean(uploadingPetMedia)}
-                                  onChange={(event) => handlePetMediaUpload(event, pet, "photo")}
+                                  onChange={(event) =>
+                                    handlePetMediaUpload(event, pet, "photo")
+                                  }
                                   className="sr-only"
                                 />
                               </label>
@@ -2717,7 +3781,9 @@ export default function CustomerDashboardPage() {
                                   type="file"
                                   accept="video/mp4,video/quicktime,video/webm"
                                   disabled={Boolean(uploadingPetMedia)}
-                                  onChange={(event) => handlePetMediaUpload(event, pet, "video")}
+                                  onChange={(event) =>
+                                    handlePetMediaUpload(event, pet, "video")
+                                  }
                                   className="sr-only"
                                 />
                               </label>
@@ -2757,7 +3823,9 @@ export default function CustomerDashboardPage() {
                       Your pet care activity
                     </h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                      A cleaner timeline of requests, checkout, tips, payments, and care history. Use the full Bookings page for the Trust & Care overview.
+                      A cleaner timeline of requests, checkout, tips, payments,
+                      and care history. Use the full Bookings page for the Trust
+                      & Care overview.
                     </p>
                   </div>
 
@@ -2775,7 +3843,8 @@ export default function CustomerDashboardPage() {
                       No bookings yet
                     </p>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Start exploring trusted pet care options and request your first booking with a Guru who feels right for your pet.
+                      Start exploring trusted pet care options and request your
+                      first booking with a Guru who feels right for your pet.
                     </p>
 
                     <Link
@@ -2802,7 +3871,11 @@ export default function CustomerDashboardPage() {
                                 <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[1.1rem] bg-white shadow-sm ring-1 ring-slate-200">
                                   {matchedPet?.photo_url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={matchedPet.photo_url} alt={booking.pet_name || matchedPet.name} className="h-full w-full object-cover" />
+                                    <img
+                                      src={matchedPet.photo_url}
+                                      alt={booking.pet_name || matchedPet.name}
+                                      className="h-full w-full object-cover"
+                                    />
                                   ) : (
                                     <PawPrint className="h-6 w-6 text-emerald-600" />
                                   )}
@@ -2811,7 +3884,8 @@ export default function CustomerDashboardPage() {
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <p className="text-base font-black text-slate-900">
-                                      {booking.pet_name || "Pet Care"} • {booking.service_type || "Booking"}
+                                      {booking.pet_name || "Pet Care"} •{" "}
+                                      {booking.service_type || "Booking"}
                                     </p>
                                     <span
                                       className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-[11px] font-bold ${getStatusClasses(
@@ -2855,7 +3929,8 @@ export default function CustomerDashboardPage() {
                                   </p>
                                   <p className="mt-1 text-sm font-black text-slate-950">
                                     {formatMoney(
-                                      booking.total_customer_paid || booking.subtotal_amount,
+                                      booking.total_customer_paid ||
+                                        booking.subtotal_amount,
                                       true,
                                     )}
                                   </p>
