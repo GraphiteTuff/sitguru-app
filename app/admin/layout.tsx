@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
-  Activity,
+  ClipboardList,
   BarChart3,
   CalendarDays,
   CreditCard,
@@ -43,7 +43,7 @@ const adminRoutes = {
   commissions: "/admin/commissions",
   payouts: "/admin/payouts",
   exports: "/admin/exports",
-  activity: "/admin/activity",
+  auditTrail: "/admin/audit-trail",
   launchSignups: "/admin/launch-signups",
   programs: "/admin/programs",
   partners: "/admin/partners",
@@ -80,7 +80,7 @@ const navSections = [
     items: [
       { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
       { label: "Reports & Exports", href: adminRoutes.exports, icon: BarChart3 },
-      { label: "Activity Log", href: adminRoutes.activity, icon: Activity },
+      { label: "Audit Trail", href: adminRoutes.auditTrail, icon: ClipboardList },
     ],
   },
 ];
@@ -233,6 +233,7 @@ function AdminFooter() {
         { label: "Profit & Loss", href: adminRoutes.profitLoss },
         { label: "Balance Sheet", href: adminRoutes.balanceSheet },
         { label: "Cash Flow", href: adminRoutes.cashFlow },
+        { label: "Pro Forma", href: adminRoutes.proForma },
       ],
     },
     {
@@ -248,7 +249,7 @@ function AdminFooter() {
       title: "Admin",
       links: [
         { label: "Reports & Exports", href: adminRoutes.exports },
-        { label: "Activity Log", href: adminRoutes.activity },
+        { label: "Audit Trail", href: adminRoutes.auditTrail },
         { label: "Settings", href: adminRoutes.settings },
       ],
     },
@@ -321,8 +322,8 @@ function AdminFooter() {
             Exports
           </Link>
 
-          <Link href={adminRoutes.activity} className="transition hover:text-green-800">
-            Activity
+          <Link href={adminRoutes.auditTrail} className="transition hover:text-green-800">
+            Audit Trail
           </Link>
         </div>
       </div>

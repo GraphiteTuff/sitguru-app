@@ -74,6 +74,7 @@ type CreateExportRecordInput = {
   exportStatus: ExportStatusValue;
   notes?: string;
   metadata?: Record<string, unknown>;
+  openAfterCreate?: boolean;
 };
 
 type DeliveryOption = {
@@ -213,9 +214,9 @@ const exportPackages: ExportPackage[] = [
     title: "Daily / Weekly Reports",
     description:
       "Operational finance packages for daily and weekly owner review, exceptions, cash movement, bookings, payouts, commissions, and Stripe activity.",
-    href: "/admin/financials/exports?package=management",
-    packageType: "management",
-    reportType: "financial",
+    href: "/admin/reports",
+    packageType: "daily-weekly-reports",
+    reportType: "management",
     periodLabel: "Daily / Weekly Management Review",
     periodStart: null,
     periodEnd: null,
@@ -958,6 +959,10 @@ export default function AdminFinancialExportsPage() {
       const json = (await response.json()) as {
         ok: boolean;
         message?: string;
+        historyItem?: {
+          id: string;
+          href: string;
+        };
       };
 
       if (!response.ok || !json.ok) {
@@ -967,8 +972,18 @@ export default function AdminFinancialExportsPage() {
       }
 
       setActionTone("green");
-      setActionMessage(`${input.title} was added to export history.`);
+      setActionMessage(
+        input.openAfterCreate
+          ? `${input.title} was added to export history. Opening package...`
+          : `${input.title} was added to export history.`,
+      );
+
       await loadExportHistory();
+
+      if (input.openAfterCreate && json.historyItem?.href) {
+        window.location.href = json.historyItem.href;
+      }
+
       return true;
     } catch (error) {
       setActionTone("rose");
@@ -999,6 +1014,7 @@ export default function AdminFinancialExportsPage() {
         packageHref: item.href,
         packageEyebrow: item.eyebrow,
       },
+      openAfterCreate: true,
     });
   }
 
@@ -1373,7 +1389,7 @@ export default function AdminFinancialExportsPage() {
                 <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
                   <ActionLink href={item.href} label="Open package" primary />
                   <GenerateRecordButton
-                    label="Generate record"
+                    label="Generate package"
                     disabled={isCreatingRecord}
                     onClick={() => {
                       void createPackageRecord(item);
@@ -1420,7 +1436,7 @@ export default function AdminFinancialExportsPage() {
                   <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
                     <ActionLink href={format.href} label="Prepare format" />
                     <GenerateRecordButton
-                      label="Generate record"
+                      label="Log format"
                       disabled={isCreatingRecord}
                       onClick={() => {
                         void createFormatRecord(format);

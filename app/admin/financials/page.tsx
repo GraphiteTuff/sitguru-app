@@ -427,6 +427,14 @@ const coreStatements: ReportCard[] = [
     tone: "blue",
   },
   {
+    eyebrow: "Forecasting",
+    title: "Pro Forma",
+    description:
+      "Model projected bookings, platform revenue, Guru payouts, refunds, operating expenses, cash runway, and break-even timing.",
+    href: "/admin/financials/pro-forma",
+    tone: "green",
+  },
+  {
     eyebrow: "Ownership",
     title: "Shareholders' Equity",
     description:
@@ -513,6 +521,14 @@ const operatingFinance: ReportCard[] = [
     tone: "purple",
   },
   {
+    eyebrow: "Banking",
+    title: "Plaid Bank Connections",
+    description:
+      "Connect bank accounts through Plaid Link, view linked accounts, masks, balances, account types, and sync status.",
+    href: "/admin/financials/plaid",
+    tone: "green",
+  },
+  {
     eyebrow: "Expenses",
     title: "Vendor & Admin Expenses",
     description:
@@ -529,6 +545,29 @@ const cpaChecklist = [
   "Categorize vendor expenses by operating, administrative, payroll, contractor, and technology costs.",
   "Review A/R aging, A/P aging, balance sheet accounts, and general ledger detail.",
   "Export CPA-ready CSV files and supporting records for QuickBooks or bookkeeping review.",
+];
+
+const statementExportLinks = [
+  {
+    title: "Profit & Loss Export",
+    description: "CSV, Excel, Word, PDF/print, and email-ready P&L statement.",
+    href: "/api/admin/financials/profit-loss/export?format=excel",
+  },
+  {
+    title: "Balance Sheet Export",
+    description: "Assets, liabilities, equity, reconciliation notes, and CPA-ready account mapping.",
+    href: "/api/admin/financials/balance-sheet/export?format=excel",
+  },
+  {
+    title: "Cash Flow Export",
+    description: "Operating cash movement, Stripe payout deposits, Navy Federal activity, and transfers.",
+    href: "/api/admin/financials/cash-flow/export?format=excel",
+  },
+  {
+    title: "Pro Forma Export",
+    description: "Forecasted bookings, platform revenue, cash runway, net income, and scenario planning.",
+    href: "/api/admin/financials/pro-forma/export?format=excel",
+  },
 ];
 
 const rangeFilters = [
@@ -1168,7 +1207,7 @@ function ManagementAlerts({ alerts }: { alerts: ManagementAlert[] }) {
         </Link>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {alerts.map((alert) => (
           <Link
             key={alert.id}
@@ -1523,6 +1562,7 @@ export default function AdminFinancialsPage() {
     "gurus",
     "partners",
     "payouts",
+    "banking",
   ]);
 
   async function loadOverview() {
@@ -1576,8 +1616,8 @@ export default function AdminFinancialsPage() {
   }, [range, segment]);
 
   return (
-    <main className="min-h-screen bg-[#f7fbf8] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1600px] space-y-6">
+    <main className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1640px] space-y-6">
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
@@ -1631,6 +1671,22 @@ export default function AdminFinancialsPage() {
             </div>
 
             <div className="xl:min-w-[520px]">
+              <div className="mb-3 flex flex-wrap gap-2">
+                <Link
+                  href="/admin/financials/plaid"
+                  className="rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
+                >
+                  Plaid Bank Connections →
+                </Link>
+
+                <Link
+                  href="/admin/financials/reconciliation"
+                  className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+                >
+                  Bank Reconciliation
+                </Link>
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 {rangeFilters.map((filter) => (
                   <button
@@ -2020,8 +2076,8 @@ export default function AdminFinancialsPage() {
             <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
               <SectionHeader
                 eyebrow="SitGuru operating finance"
-                title="Marketplace, Guru, Partner, Stripe & Vendor Tracking"
-                description="Drill into the financial areas that matter most to SitGuru operations, including customer payments, guru earnings, partner payouts, affiliate commissions, vendor expenses, and payment exceptions."
+                title="Marketplace, Guru, Partner, Stripe, Banking & Vendor Tracking"
+                description="Drill into the financial areas that matter most to SitGuru operations, including customer payments, guru earnings, partner payouts, affiliate commissions, Plaid bank connections, vendor expenses, and payment exceptions."
               />
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -2132,6 +2188,36 @@ export default function AdminFinancialsPage() {
                 View Forecast Reports →
               </Link>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <SectionHeader
+            eyebrow="Statement Exports"
+            title="Core Statement Export Shortcuts"
+            description="Download the accounting-ready exports for the completed SitGuru financial statements. These routes match the P&L, Balance Sheet, Cash Flow, and Pro Forma pages that are now wired into the admin financial foundation."
+          />
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {statementExportLinks.map((item) => (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="group rounded-[1.5rem] border border-emerald-100 bg-[#fbfefd] p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:bg-white hover:shadow-lg"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-950">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                      {item.description}
+                    </p>
+                  </div>
+                  <ArrowCircle />
+                </div>
+              </Link>
+            ))}
           </div>
         </section>
 

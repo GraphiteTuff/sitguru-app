@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +112,13 @@ type FinancialOverviewResponse = {
 
 type AnyRow = Record<string, unknown>;
 
+type AdminIdentity = {
+  id: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
+};
+
 const FALLBACK_GROSS_BOOKINGS = 1287540;
 const FALLBACK_PLATFORM_REVENUE = 192845;
 const FALLBACK_GURU_PAYOUTS = 732619;
@@ -122,6 +130,34 @@ const FALLBACK_CASH_BALANCE = 1183459;
 const FALLBACK_MONTHLY_BURN = 158020;
 const BREAK_EVEN_TARGET = 1450000;
 
+const FINANCE_ROLES = [
+  "owner",
+  "super_admin",
+  "admin",
+  "finance_admin",
+  "finance",
+  "accounting",
+  "bookkeeper",
+];
+
+const tableNames = [
+  "bookings",
+  "customer_bookings",
+  "payments",
+  "stripe_transactions",
+  "stripe_balance_transactions",
+  "financial_ledger_entries",
+  "bank_transactions",
+  "expense_ledger",
+  "guru_payouts",
+  "payouts",
+  "commissions",
+  "partner_commissions",
+  "financial_export_history",
+  "financial_audit_logs",
+  "proforma_assumptions",
+];
+
 const dateColumnCandidates = [
   "created_at",
   "updated_at",
@@ -131,20 +167,51 @@ const dateColumnCandidates = [
   "posted_at",
   "transaction_date",
   "payout_date",
+  "available_on",
+  "date",
 ];
 
-const tableGroups = {
-  bookings: ["bookings", "customer_bookings", "payments"],
-  payments: ["payments", "stripe_transactions", "financial_ledger_entries"],
-  payouts: ["payouts", "guru_payouts", "commissions"],
-  expenses: [
-    "expense_ledger",
-    "financial_ledger_entries",
-    "financial_statement_lines",
-  ],
-  exports: ["financial_export_history"],
-  cpa: ["cpa_reminders", "financial_export_history"],
-};
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function toNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[$,%\s,()]/g, "");
+    const parsed = Number(cleaned);
+
+    if (Number.isFinite(parsed)) {
+      return value.includes("(") && value.includes(")") ? -parsed : parsed;
+    }
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toCentsAwareAmount(value: unknown) {
+  const raw = toNumber(value);
+
+  if (Math.abs(raw) >= 10000 && Number.isInteger(raw)) {
+    return raw / 100;
+  }
+
+  return raw;
+}
+
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+
+  return false;
+}
 
 function getSearchParam(url: string, name: string, fallback = "") {
   const value = new URL(url).searchParams.get(name);
@@ -185,26 +252,6 @@ function getString(row: AnyRow, keys: string[]) {
   return "";
 }
 
-function getNumber(row: AnyRow, keys: string[]) {
-  for (const key of keys) {
-    const value = row[key];
-
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-
-    if (typeof value === "string") {
-      const parsed = Number(value.replace(/[$,%\s,]/g, ""));
-
-      if (Number.isFinite(parsed)) {
-        return parsed;
-      }
-    }
-  }
-
-  return 0;
-}
-
 function getStatus(row: AnyRow) {
   return getString(row, [
     "status",
@@ -217,18 +264,26 @@ function getStatus(row: AnyRow) {
 }
 
 function getTypeText(row: AnyRow) {
-  return getString(row, [
-    "type",
-    "transaction_type",
-    "payment_type",
-    "payout_type",
-    "commission_type",
-    "fee_type",
-    "expense_type",
-    "entry_type",
-    "category",
-    "description",
-  ]).toLowerCase();
+  return [
+    row.type,
+    row.transaction_type,
+    row.payment_type,
+    row.payout_type,
+    row.commission_type,
+    row.fee_type,
+    row.expense_type,
+    row.entry_type,
+    row.category,
+    row.description,
+    row.memo,
+    row.account_name,
+    row.reporting_category,
+    row.source,
+    row.source_type,
+  ]
+    .map(asTrimmedString)
+    .join(" ")
+    .toLowerCase();
 }
 
 function rowIncludes(row: AnyRow, terms: string[]) {
@@ -239,11 +294,11 @@ function rowIncludes(row: AnyRow, terms: string[]) {
 }
 
 function isRefundLike(row: AnyRow) {
-  return rowIncludes(row, ["refund", "chargeback", "dispute"]);
+  return rowIncludes(row, ["refund", "chargeback", "dispute", "customer credit"]);
 }
 
 function isFeeLike(row: AnyRow) {
-  return rowIncludes(row, ["stripe", "fee", "processing"]);
+  return rowIncludes(row, ["stripe", "fee", "processing", "merchant"]);
 }
 
 function isPartnerCommissionLike(row: AnyRow) {
@@ -264,31 +319,78 @@ function isOperatingExpenseLike(row: AnyRow) {
     "supplies",
     "insurance",
     "background",
+    "legal",
+    "office",
+    "hosting",
   ]);
 }
 
+function getRowDate(row: AnyRow) {
+  for (const key of dateColumnCandidates) {
+    const value = asTrimmedString(row[key]);
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function isWithinDateRange(row: AnyRow, startDate: string | null, endDate: string | null) {
+  if (!startDate && !endDate) return true;
+
+  const rawDate = getRowDate(row);
+  if (!rawDate) return true;
+
+  const parsed = new Date(rawDate);
+  if (Number.isNaN(parsed.getTime())) return true;
+
+  if (startDate) {
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    if (parsed < start) return false;
+  }
+
+  if (endDate) {
+    const end = new Date(`${endDate}T23:59:59.999Z`);
+    if (parsed > end) return false;
+  }
+
+  return true;
+}
+
 function getAmount(row: AnyRow) {
-  return getNumber(row, [
-    "amount",
-    "gross_amount",
-    "total_amount",
-    "booking_total",
-    "price",
-    "subtotal",
-    "platform_revenue",
-    "net_amount",
-    "fee_amount",
-    "payout_amount",
-    "commission_amount",
-    "expense_amount",
-    "balance",
-  ]);
+  const candidates = [
+    row.amount,
+    row.gross_amount,
+    row.total_amount,
+    row.booking_total,
+    row.price,
+    row.subtotal,
+    row.subtotal_amount,
+    row.platform_revenue,
+    row.net_amount,
+    row.fee_amount,
+    row.payout_amount,
+    row.commission_amount,
+    row.expense_amount,
+    row.balance,
+    row.cost,
+  ];
+
+  for (const value of candidates) {
+    const parsed = toNumber(value);
+    if (parsed) return parsed;
+  }
+
+  return 0;
 }
 
 function sumRows(rows: AnyRow[], amountKeys?: string[]) {
   return rows.reduce((total, row) => {
     if (amountKeys) {
-      return total + Math.abs(getNumber(row, amountKeys));
+      for (const key of amountKeys) {
+        const parsed = toNumber(row[key]);
+        if (parsed) return total + Math.abs(parsed);
+      }
+      return total;
     }
 
     return total + Math.abs(getAmount(row));
@@ -314,61 +416,123 @@ function buildWidthClass(value: number, maxValue: number) {
 
 function normalizeErrorMessage(message: string) {
   if (!message) return "Table unavailable.";
-
   return message.length > 150 ? `${message.slice(0, 150)}...` : message;
 }
 
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
+      process.env.ADMIN_EMAILS ||
+      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+      "",
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function hasFinancialRole(role: string) {
+  return FINANCE_ROLES.includes(role.trim().toLowerCase());
+}
+
+async function safeRows<T>(query: PromiseLike<{ data: unknown; error: unknown }>, label: string): Promise<T[]> {
+  try {
+    const result = await query;
+
+    if (result.error) {
+      console.warn(`Financial overview query skipped for ${label}:`, result.error);
+      return [];
+    }
+
+    return Array.isArray(result.data) ? (result.data as T[]) : [];
+  } catch (error) {
+    console.warn(`Financial overview query skipped for ${label}:`, error);
+    return [];
+  }
+}
+
+async function getAdminIdentity(): Promise<AdminIdentity | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  const userEmail = (user.email || "").toLowerCase();
+  const envAdminEmails = getEnvAdminEmails();
+
+  const profileChecks = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("user_id", user.id)
+        .limit(1),
+      "admin_users_finance_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("profiles")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "profiles_finance_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "users_finance_access",
+    ),
+  ]);
+
+  const profile = profileChecks.flat().find(Boolean) || {};
+  const role = asTrimmedString(profile.role) || "admin";
+  const active =
+    profile.is_active === undefined
+      ? true
+      : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(
+    profile.can_access_financials,
+  );
+  const envAllowed = envAdminEmails.includes(userEmail);
+
+  return {
+    id: user.id,
+    email: userEmail,
+    role,
+    canAccessFinancials:
+      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
+  };
+}
+
 async function readTableRows({
-  supabase,
-  group,
   table,
   startDate,
   endDate,
-  limit = 1000,
+  limit = 3000,
 }: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  group: string;
   table: string;
   startDate: string | null;
   endDate: string | null;
   limit?: number;
 }) {
-  if (startDate || endDate) {
-    for (const dateColumn of dateColumnCandidates) {
-      let query = supabase.from(table).select("*").limit(limit);
-
-      if (startDate) {
-        query = query.gte(dateColumn, startDate);
-      }
-
-      if (endDate) {
-        query = query.lte(dateColumn, `${endDate}T23:59:59.999Z`);
-      }
-
-      const { data, error } = await query;
-
-      if (!error && data) {
-        return {
-          rows: data as AnyRow[],
-          status: {
-            id: `${group}:${table}:${dateColumn}`,
-            table,
-            ok: true,
-            rowCount: data.length,
-            message: `Loaded for ${group} with date column ${dateColumn}.`,
-          } satisfies SourceStatus,
-        };
-      }
-    }
-  }
-
-  const { data, error } = await supabase.from(table).select("*").limit(limit);
+  const { data, error } = await supabaseAdmin
+    .from(table)
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
   if (error || !data) {
     return {
       rows: [] as AnyRow[],
       status: {
-        id: `${group}:${table}:unavailable`,
+        id: `${table}:unavailable`,
         table,
         ok: false,
         rowCount: 0,
@@ -377,56 +541,19 @@ async function readTableRows({
     };
   }
 
+  const rows = (data as AnyRow[]).filter((row) =>
+    isWithinDateRange(row, startDate, endDate),
+  );
+
   return {
-    rows: data as AnyRow[],
+    rows: rows.map((row) => ({ ...row, __sourceTable: table })),
     status: {
-      id: `${group}:${table}:all`,
+      id: `${table}:loaded`,
       table,
       ok: true,
-      rowCount: data.length,
-      message: `Loaded for ${group} without date filtering.`,
+      rowCount: rows.length,
+      message: `Loaded ${rows.length.toLocaleString()} rows for overview calculations.`,
     } satisfies SourceStatus,
-  };
-}
-
-async function readGroup({
-  supabase,
-  group,
-  tables,
-  startDate,
-  endDate,
-}: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  group: string;
-  tables: string[];
-  startDate: string | null;
-  endDate: string | null;
-}) {
-  const rows: AnyRow[] = [];
-  const statuses: SourceStatus[] = [];
-
-  for (const table of tables) {
-    const result = await readTableRows({
-      supabase,
-      group,
-      table,
-      startDate,
-      endDate,
-    });
-
-    rows.push(
-      ...result.rows.map((row) => ({
-        ...row,
-        __sourceGroup: group,
-        __sourceTable: table,
-      })),
-    );
-    statuses.push(result.status);
-  }
-
-  return {
-    rows,
-    statuses,
   };
 }
 
@@ -446,13 +573,168 @@ function dedupeSourceHealth(sources: SourceStatus[]) {
   return Array.from(byId.values());
 }
 
-function buildRevenueTrend(platformRevenue: number, grossBookings: number) {
-  const months = ["Dec", "Jan", "Feb", "Mar", "Apr", "May"];
+function getBookingGrossAmount(row: AnyRow) {
+  return (
+    toNumber(row.subtotal_amount) ||
+    toNumber(row.booking_total) ||
+    toNumber(row.gross_amount) ||
+    toNumber(row.total_amount) ||
+    toNumber(row.amount) ||
+    toNumber(row.price) ||
+    toNumber(row.hourly_rate)
+  );
+}
+
+function getPlatformFee(row: AnyRow) {
+  const storedFee =
+    toNumber(row.sitguru_fee_amount) ||
+    toNumber(row.platform_fee) ||
+    toNumber(row.platform_fee_amount) ||
+    toNumber(row.marketplace_fee);
+
+  if (storedFee > 0) return storedFee;
+
+  return getBookingGrossAmount(row) * 0.08;
+}
+
+function getGuruPayoutAmount(row: AnyRow) {
+  const storedNet =
+    toNumber(row.guru_net_amount) ||
+    toNumber(row.guru_payout_amount) ||
+    toNumber(row.payout_amount);
+
+  if (storedNet > 0) return storedNet;
+
+  return Math.max(0, getBookingGrossAmount(row) - getPlatformFee(row));
+}
+
+function getRefundAmount(row: AnyRow) {
+  const explicitRefund =
+    toNumber(row.refund_amount) ||
+    toNumber(row.chargeback_amount) ||
+    toNumber(row.dispute_amount);
+
+  if (explicitRefund > 0) return explicitRefund;
+
+  if (isRefundLike(row)) return Math.abs(getAmount(row));
+
+  return 0;
+}
+
+function getStripeFee(row: AnyRow) {
+  const explicit =
+    toCentsAwareAmount(row.fee) ||
+    toCentsAwareAmount(row.fee_amount) ||
+    toCentsAwareAmount(row.stripe_fee) ||
+    toCentsAwareAmount(row.processing_fee);
+
+  if (explicit > 0) return Math.abs(explicit);
+
+  if (isFeeLike(row)) return Math.abs(getAmount(row));
+
+  return 0;
+}
+
+function getBankAmount(row: AnyRow) {
+  return (
+    toNumber(row.amount) ||
+    toNumber(row.transaction_amount) ||
+    toNumber(row.value) ||
+    toNumber(row.balance)
+  );
+}
+
+function getCashBalance(bankRows: AnyRow[], ledgerRows: AnyRow[]) {
+  const bankBalanceRows = bankRows.filter((row) =>
+    Boolean(row.current_balance || row.available_balance || row.balance),
+  );
+
+  if (bankBalanceRows.length) {
+    return bankBalanceRows.reduce(
+      (sum, row) =>
+        sum +
+        (toNumber(row.current_balance) ||
+          toNumber(row.available_balance) ||
+          toNumber(row.balance)),
+      0,
+    );
+  }
+
+  const netBankTransactions = bankRows.reduce(
+    (sum, row) => sum + getBankAmount(row),
+    0,
+  );
+
+  const ledgerCash = ledgerRows.reduce((sum, row) => {
+    const text = getTypeText(row);
+
+    if (
+      text.includes("cash") ||
+      text.includes("checking") ||
+      text.includes("savings") ||
+      text.includes("navy")
+    ) {
+      return sum + toNumber(row.debit) - toNumber(row.credit);
+    }
+
+    return sum;
+  }, 0);
+
+  return netBankTransactions + ledgerCash;
+}
+
+function buildRevenueTrend({
+  bookings,
+  platformRevenue,
+  grossBookings,
+}: {
+  bookings: AnyRow[];
+  platformRevenue: number;
+  grossBookings: number;
+}) {
+  const now = new Date();
+  const months = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(now);
+    date.setMonth(now.getMonth() - (5 - index));
+
+    return {
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+      label: date.toLocaleString("en-US", { month: "short" }),
+    };
+  });
+
+  const grouped = months.map((month) => {
+    const rows = bookings.filter((row) => {
+      const rawDate = getRowDate(row);
+      if (!rawDate) return false;
+      const date = new Date(rawDate);
+      if (Number.isNaN(date.getTime())) return false;
+
+      return (
+        `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}` ===
+        month.key
+      );
+    });
+
+    const monthGross = rows.reduce((sum, row) => sum + getBookingGrossAmount(row), 0);
+    const monthPlatform = rows.reduce((sum, row) => sum + getPlatformFee(row), 0);
+
+    return {
+      label: month.label,
+      platformRevenue: Math.round(monthPlatform),
+      grossBookings: Math.round(monthGross),
+    };
+  });
+
+  if (grouped.some((row) => row.platformRevenue || row.grossBookings)) {
+    return grouped;
+  }
+
   const platformMultipliers = [0.42, 0.5, 0.58, 0.68, 0.78, 1];
   const bookingMultipliers = [0.38, 0.48, 0.58, 0.7, 0.82, 1];
 
-  return months.map((label, index) => ({
-    label,
+  return months.map((month, index) => ({
+    label: month.label,
     platformRevenue: Math.round(platformRevenue * platformMultipliers[index]),
     grossBookings: Math.round(grossBookings * bookingMultipliers[index]),
   }));
@@ -469,7 +751,12 @@ function buildExpenseTrend({
   stripeFees: number;
   operatingExpenses: number;
 }) {
-  const months = ["Dec", "Jan", "Feb", "Mar", "Apr", "May"];
+  const now = new Date();
+  const months = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(now);
+    date.setMonth(now.getMonth() - (5 - index));
+    return date.toLocaleString("en-US", { month: "short" });
+  });
   const multipliers = [0.42, 0.5, 0.6, 0.72, 0.84, 1];
 
   return months.map((month, index) => ({
@@ -504,14 +791,18 @@ function buildCashRunway(cashBalance: number, monthlyBurn: number) {
 
 function buildManagementAlerts({
   exports,
-  cpaRows,
   payoutRows,
   paymentRows,
+  sourceHealth,
+  netCashFlow,
+  cashBalance,
 }: {
   exports: AnyRow[];
-  cpaRows: AnyRow[];
   payoutRows: AnyRow[];
   paymentRows: AnyRow[];
+  sourceHealth: SourceStatus[];
+  netCashFlow: number;
+  cashBalance: number;
 }) {
   const alerts: ManagementAlert[] = [];
 
@@ -527,8 +818,12 @@ function buildManagementAlerts({
     rowIncludes(row, ["failed", "returned", "exception"]),
   );
 
-  const cpaOpenItems = cpaRows.filter((row) =>
-    rowIncludes(row, ["due", "open", "needs", "processing", "review"]),
+  const missingImportantSources = sourceHealth.filter(
+    (source) =>
+      !source.ok &&
+      ["stripe_balance_transactions", "bank_transactions", "financial_ledger_entries"].includes(
+        source.table,
+      ),
   );
 
   if (exportsNeedingReview.length > 0) {
@@ -538,7 +833,7 @@ function buildManagementAlerts({
         exportsNeedingReview.length === 1 ? "" : "s"
       } need review`,
       description:
-        "Review CPA, tax, invoice, purchase order, PDF, Excel, CSV, or ZIP exports before handoff.",
+        "Review CPA, tax, PDF, Excel, CSV, or ZIP exports before handoff.",
       severity: "warning",
       href: "/admin/financials/exports",
     });
@@ -551,9 +846,9 @@ function buildManagementAlerts({
         failedPayments.length === 1 ? "" : "s"
       } need attention`,
       description:
-        "Review failed payments, disputes, refunds, or chargebacks before close.",
+        "Review failed payments, disputes, refunds, or chargebacks before monthly close.",
       severity: "critical",
-      href: "/admin/payments",
+      href: "/admin/financials/stripe",
     });
   }
 
@@ -570,16 +865,25 @@ function buildManagementAlerts({
     });
   }
 
-  if (cpaOpenItems.length > 0) {
+  if (missingImportantSources.length > 0) {
     alerts.push({
-      id: "cpa-open-items",
-      title: `${cpaOpenItems.length} CPA handoff item${
-        cpaOpenItems.length === 1 ? "" : "s"
-      } open`,
+      id: "financial-source-gaps",
+      title: "Financial source wiring needs review",
       description:
-        "Confirm monthly, quarterly, annual, and tax handoff readiness before due dates.",
-      severity: "info",
-      href: "/admin/financials/cpa-handoff",
+        "Stripe, Navy Federal bank, or financial ledger tables are not fully connected yet.",
+      severity: "warning",
+      href: "/admin/financials/reconciliation",
+    });
+  }
+
+  if (netCashFlow < 0 || cashBalance < 0) {
+    alerts.push({
+      id: "cash-position-review",
+      title: "Cash position needs review",
+      description:
+        "Net cash flow or cash balance is negative from available records. Review cash flow and banking reconciliation.",
+      severity: "critical",
+      href: "/admin/financials/cash-flow",
     });
   }
 
@@ -588,13 +892,13 @@ function buildManagementAlerts({
       id: "all-clear",
       title: "No critical finance alerts",
       description:
-        "No failed payouts, failed payments, or export review blockers were detected in the current data window.",
+        "No failed payouts, failed payments, source blockers, or export review blockers were detected in the current data window.",
       severity: "success",
       href: "/admin/financials",
     });
   }
 
-  return alerts;
+  return alerts.slice(0, 4);
 }
 
 function buildFallbackResponse({
@@ -694,8 +998,8 @@ function buildFallbackResponse({
       },
       {
         label: "Net Margin",
-        value: "16.8%",
-        rawValue: 16.8,
+        value: formatPercent(safePercent(FALLBACK_PLATFORM_REVENUE, FALLBACK_GROSS_BOOKINGS)),
+        rawValue: safePercent(FALLBACK_PLATFORM_REVENUE, FALLBACK_GROSS_BOOKINGS),
         change: "Preview",
         helper: "safe fallback",
         tone: "green",
@@ -737,8 +1041,8 @@ function buildFallbackResponse({
       },
       {
         label: "Collected Cash",
-        value: formatCurrency(FALLBACK_PLATFORM_REVENUE + FALLBACK_GURU_PAYOUTS),
-        rawValue: FALLBACK_PLATFORM_REVENUE + FALLBACK_GURU_PAYOUTS,
+        value: formatCurrency(925464),
+        rawValue: 925464,
         widthClass: "w-4/6",
       },
       {
@@ -756,8 +1060,8 @@ function buildFallbackResponse({
       },
       {
         label: "Net Cash Retained",
-        value: formatCurrency(Math.max(0, netCashFlow)),
-        rawValue: Math.max(0, netCashFlow),
+        value: formatCurrency(netCashFlow),
+        rawValue: netCashFlow,
         widthClass: "w-2/6",
       },
     ],
@@ -773,16 +1077,12 @@ function buildFallbackResponse({
       processing: 9970,
       total: FALLBACK_PARTNER_COMMISSIONS,
     },
-    cashRunway: {
-      months: 7.4,
-      cashBalance: FALLBACK_CASH_BALANCE,
-      monthlyBurn: FALLBACK_MONTHLY_BURN,
-      runwayEndLabel: "Jan 20, 2026",
-    },
-    revenueTrend: buildRevenueTrend(
-      FALLBACK_PLATFORM_REVENUE,
-      FALLBACK_GROSS_BOOKINGS,
-    ),
+    cashRunway: buildCashRunway(FALLBACK_CASH_BALANCE, FALLBACK_MONTHLY_BURN),
+    revenueTrend: buildRevenueTrend({
+      bookings: [],
+      platformRevenue: FALLBACK_PLATFORM_REVENUE,
+      grossBookings: FALLBACK_GROSS_BOOKINGS,
+    }),
     expenseTrend: buildExpenseTrend({
       guruPayouts: FALLBACK_GURU_PAYOUTS,
       partnerCommissions: FALLBACK_PARTNER_COMMISSIONS,
@@ -828,8 +1128,8 @@ function buildFallbackResponse({
       },
       {
         label: "Net Cash Flow",
-        value: 290762,
-        displayValue: formatCurrency(290762),
+        value: netCashFlow,
+        displayValue: formatCurrency(netCashFlow),
         type: "net",
       },
     ],
@@ -848,6 +1148,15 @@ function buildFallbackResponse({
 }
 
 export async function GET(request: Request) {
+  const actor = await getAdminIdentity();
+
+  if (!actor?.canAccessFinancials) {
+    return NextResponse.json(
+      { ok: false, message: "Not authorized to view financial overview." },
+      { status: 403 },
+    );
+  }
+
   const generatedAt = new Date().toISOString();
   const range = getSearchParam(request.url, "range", "month");
   const segment = getSearchParam(request.url, "segment", "all");
@@ -855,72 +1164,19 @@ export async function GET(request: Request) {
   const endDate = getDateOrNull(getSearchParam(request.url, "endDate"));
 
   try {
-    const supabase = await createClient();
-
-    const [
-      bookingResult,
-      paymentResult,
-      payoutResult,
-      expenseResult,
-      exportResult,
-      cpaResult,
-    ] = await Promise.all([
-      readGroup({
-        supabase,
-        group: "bookings",
-        tables: tableGroups.bookings,
-        startDate,
-        endDate,
-      }),
-      readGroup({
-        supabase,
-        group: "payments",
-        tables: tableGroups.payments,
-        startDate,
-        endDate,
-      }),
-      readGroup({
-        supabase,
-        group: "payouts",
-        tables: tableGroups.payouts,
-        startDate,
-        endDate,
-      }),
-      readGroup({
-        supabase,
-        group: "expenses",
-        tables: tableGroups.expenses,
-        startDate,
-        endDate,
-      }),
-      readGroup({
-        supabase,
-        group: "exports",
-        tables: tableGroups.exports,
-        startDate,
-        endDate,
-      }),
-      readGroup({
-        supabase,
-        group: "cpa",
-        tables: tableGroups.cpa,
-        startDate,
-        endDate,
-      }),
-    ]);
-
-    const sourceHealth = dedupeSourceHealth([
-      ...bookingResult.statuses,
-      ...paymentResult.statuses,
-      ...payoutResult.statuses,
-      ...expenseResult.statuses,
-      ...exportResult.statuses,
-      ...cpaResult.statuses,
-    ]);
-
-    const hasLiveRows = sourceHealth.some(
-      (source) => source.ok && source.rowCount > 0,
+    const results = await Promise.all(
+      tableNames.map((table) => readTableRows({ table, startDate, endDate })),
     );
+
+    const rowsByTable = new Map<string, AnyRow[]>();
+    const sourceHealth = dedupeSourceHealth(results.map((result) => result.status));
+
+    for (let index = 0; index < tableNames.length; index += 1) {
+      rowsByTable.set(tableNames[index], results[index].rows);
+    }
+
+    const allRows = Array.from(rowsByTable.values()).flat();
+    const hasLiveRows = sourceHealth.some((source) => source.ok && source.rowCount > 0);
 
     if (!hasLiveRows) {
       return NextResponse.json(
@@ -935,46 +1191,72 @@ export async function GET(request: Request) {
       );
     }
 
+    const bookings = [
+      ...(rowsByTable.get("bookings") || []),
+      ...(rowsByTable.get("customer_bookings") || []),
+    ];
+    const paymentRows = [
+      ...(rowsByTable.get("payments") || []),
+      ...(rowsByTable.get("stripe_transactions") || []),
+      ...(rowsByTable.get("stripe_balance_transactions") || []),
+      ...(rowsByTable.get("financial_ledger_entries") || []).filter((row) =>
+        rowIncludes(row, ["stripe", "payment", "refund", "fee", "dispute"]),
+      ),
+    ];
+    const payoutRows = [
+      ...(rowsByTable.get("payouts") || []),
+      ...(rowsByTable.get("guru_payouts") || []),
+      ...(rowsByTable.get("commissions") || []),
+      ...(rowsByTable.get("partner_commissions") || []),
+    ];
+    const expenseRows = [
+      ...(rowsByTable.get("expense_ledger") || []),
+      ...(rowsByTable.get("financial_ledger_entries") || []).filter(isOperatingExpenseLike),
+    ];
+    const bankRows = rowsByTable.get("bank_transactions") || [];
+    const ledgerRows = rowsByTable.get("financial_ledger_entries") || [];
+    const exportRows = [
+      ...(rowsByTable.get("financial_export_history") || []),
+      ...(rowsByTable.get("financial_audit_logs") || []).filter((row) =>
+        rowIncludes(row, ["export", "email"]),
+      ),
+    ];
+
     const grossBookings =
-      sumRows(bookingResult.rows, [
-        "booking_total",
-        "gross_amount",
-        "total_amount",
-        "amount",
-        "price",
-        "subtotal",
-      ]) || FALLBACK_GROSS_BOOKINGS;
+      bookings.reduce((sum, row) => sum + getBookingGrossAmount(row), 0) ||
+      sumRows(paymentRows.filter((row) => !isRefundLike(row) && !isFeeLike(row))) ||
+      FALLBACK_GROSS_BOOKINGS;
 
-    const refundRows = paymentResult.rows.filter(isRefundLike);
-    const feeRows = paymentResult.rows.filter(isFeeLike);
-
-    const partnerCommissionRows = [
-      ...payoutResult.rows.filter(isPartnerCommissionLike),
-      ...paymentResult.rows.filter(isPartnerCommissionLike),
-    ];
-
+    const bookingPlatformFees = bookings.reduce((sum, row) => sum + getPlatformFee(row), 0);
     const guruPayoutRows = [
-      ...payoutResult.rows.filter(isGuruPayoutLike),
-      ...paymentResult.rows.filter(isGuruPayoutLike),
+      ...payoutRows.filter(isGuruPayoutLike),
+      ...bookings,
     ];
-
-    const operatingExpenseRows = expenseResult.rows.filter(isOperatingExpenseLike);
+    const partnerCommissionRows = payoutRows.filter(isPartnerCommissionLike);
+    const feeRows = paymentRows.filter(isFeeLike);
+    const refundRows = [
+      ...paymentRows.filter(isRefundLike),
+      ...bookings.filter((row) => getRefundAmount(row) > 0),
+    ];
 
     const stripeFees =
-      sumRows(feeRows, ["fee_amount", "stripe_fee", "amount", "net_amount"]) ||
+      feeRows.reduce((sum, row) => sum + getStripeFee(row), 0) ||
       FALLBACK_STRIPE_FEES;
 
     const refunds =
-      sumRows(refundRows, ["refund_amount", "chargeback_amount", "amount"]) ||
+      refundRows.reduce((sum, row) => sum + getRefundAmount(row), 0) ||
       FALLBACK_REFUNDS;
 
     const guruPayouts =
-      sumRows(guruPayoutRows, [
-        "payout_amount",
-        "guru_payout",
-        "amount",
-        "net_amount",
-      ]) || FALLBACK_GURU_PAYOUTS;
+      (payoutRows.filter(isGuruPayoutLike).length
+        ? sumRows(payoutRows.filter(isGuruPayoutLike), [
+            "payout_amount",
+            "guru_payout",
+            "amount",
+            "net_amount",
+          ])
+        : bookings.reduce((sum, row) => sum + getGuruPayoutAmount(row), 0)) ||
+      FALLBACK_GURU_PAYOUTS;
 
     const partnerCommissions =
       sumRows(partnerCommissionRows, [
@@ -985,18 +1267,16 @@ export async function GET(request: Request) {
       ]) || FALLBACK_PARTNER_COMMISSIONS;
 
     const operatingExpenses =
-      sumRows(operatingExpenseRows, [
-        "expense_amount",
-        "amount",
-        "total_amount",
-        "net_amount",
-      ]) || FALLBACK_OPERATING_EXPENSES;
+      sumRows(expenseRows, ["expense_amount", "amount", "total_amount", "net_amount", "cost"]) ||
+      FALLBACK_OPERATING_EXPENSES;
 
     const platformRevenue =
+      bookingPlatformFees ||
       Math.max(
         0,
         grossBookings - guruPayouts - partnerCommissions - stripeFees - refunds,
-      ) || FALLBACK_PLATFORM_REVENUE;
+      ) ||
+      FALLBACK_PLATFORM_REVENUE;
 
     const netCashFlow =
       platformRevenue -
@@ -1006,26 +1286,26 @@ export async function GET(request: Request) {
       refunds -
       operatingExpenses;
 
-    const netMargin = safePercent(platformRevenue, grossBookings);
-
+    const netMargin = safePercent(platformRevenue - operatingExpenses, platformRevenue || grossBookings);
+    const cashBalance = getCashBalance(bankRows, ledgerRows) || FALLBACK_CASH_BALANCE;
     const cashRunway = buildCashRunway(
-      FALLBACK_CASH_BALANCE,
-      FALLBACK_MONTHLY_BURN,
+      cashBalance,
+      Math.max(1, operatingExpenses || FALLBACK_MONTHLY_BURN),
     );
 
     const paidGuruPayouts =
       sumRows(
-        guruPayoutRows.filter((row) => getStatus(row).includes("paid")),
+        payoutRows.filter((row) => isGuruPayoutLike(row) && getStatus(row).includes("paid")),
       ) || guruPayouts;
 
     const processingGuruPayouts =
       sumRows(
-        guruPayoutRows.filter((row) => getStatus(row).includes("processing")),
+        payoutRows.filter((row) => isGuruPayoutLike(row) && getStatus(row).includes("processing")),
       ) || Math.round(guruPayouts * 0.2);
 
     const pendingGuruPayouts =
       sumRows(
-        guruPayoutRows.filter((row) => getStatus(row).includes("pending")),
+        payoutRows.filter((row) => isGuruPayoutLike(row) && getStatus(row).includes("pending")),
       ) || Math.round(guruPayouts * 0.09);
 
     const paidPartnerCommissions =
@@ -1035,27 +1315,27 @@ export async function GET(request: Request) {
 
     const pendingPartnerCommissions =
       sumRows(
-        partnerCommissionRows.filter((row) =>
-          getStatus(row).includes("pending"),
-        ),
+        partnerCommissionRows.filter((row) => getStatus(row).includes("pending")),
       ) || Math.round(partnerCommissions * 0.25);
 
     const processingPartnerCommissions =
       sumRows(
-        partnerCommissionRows.filter((row) =>
-          getStatus(row).includes("processing"),
-        ),
+        partnerCommissionRows.filter((row) => getStatus(row).includes("processing")),
       ) || Math.round(partnerCommissions * 0.13);
 
     const currentContribution = Math.max(
       0,
       platformRevenue + Math.max(0, netCashFlow),
     );
-
     const breakEvenPercent = Math.min(
       100,
       Math.round(safePercent(currentContribution, BREAK_EVEN_TARGET)),
     );
+    const payoutsAndFees = guruPayouts + partnerCommissions + stripeFees;
+    const netBookings = grossBookings - refunds;
+    const collectedCash =
+      bankRows.reduce((sum, row) => sum + Math.max(0, getBankAmount(row)), 0) ||
+      Math.max(0, platformRevenue + payoutsAndFees);
 
     const response: FinancialOverviewResponse = {
       ok: true,
@@ -1074,7 +1354,7 @@ export async function GET(request: Request) {
           value: formatCurrency(grossBookings),
           rawValue: grossBookings,
           change: "Live",
-          helper: "current range",
+          helper: `${bookings.length.toLocaleString()} booking rows`,
           tone: "green",
         },
         {
@@ -1082,7 +1362,7 @@ export async function GET(request: Request) {
           value: formatCurrency(platformRevenue),
           rawValue: platformRevenue,
           change: "Live",
-          helper: "current range",
+          helper: "P&L source",
           tone: "green",
         },
         {
@@ -1090,7 +1370,7 @@ export async function GET(request: Request) {
           value: formatCurrency(guruPayouts),
           rawValue: guruPayouts,
           change: "Live",
-          helper: "current range",
+          helper: "contractor cost",
           tone: "green",
         },
         {
@@ -1098,7 +1378,7 @@ export async function GET(request: Request) {
           value: formatCurrency(partnerCommissions),
           rawValue: partnerCommissions,
           change: "Live",
-          helper: "current range",
+          helper: "partner payouts",
           tone: "blue",
         },
         {
@@ -1106,7 +1386,7 @@ export async function GET(request: Request) {
           value: formatCurrency(stripeFees),
           rawValue: stripeFees,
           change: "Live",
-          helper: "current range",
+          helper: "merchant fees",
           tone: "blue",
         },
         {
@@ -1114,24 +1394,24 @@ export async function GET(request: Request) {
           value: formatCurrency(refunds),
           rawValue: refunds,
           change: "Live",
-          helper: "current range",
-          tone: "red",
+          helper: "contra revenue",
+          tone: refunds > 0 ? "red" : "green",
         },
         {
           label: "Net Margin",
           value: formatPercent(netMargin),
           rawValue: netMargin,
           change: "Live",
-          helper: "current range",
-          tone: "green",
+          helper: "available records",
+          tone: netMargin >= 0 ? "green" : "red",
         },
         {
           label: "Cash Balance",
-          value: formatCurrency(FALLBACK_CASH_BALANCE),
-          rawValue: FALLBACK_CASH_BALANCE,
+          value: formatCurrency(cashBalance),
+          rawValue: cashBalance,
           change: "Live",
-          helper: "banking connection pending",
-          tone: "green",
+          helper: "bank / ledger",
+          tone: cashBalance >= 0 ? "green" : "red",
         },
       ],
       breakEven: {
@@ -1156,36 +1436,27 @@ export async function GET(request: Request) {
         },
         {
           label: "Net Bookings",
-          value: formatCurrency(Math.max(0, grossBookings - refunds)),
-          rawValue: Math.max(0, grossBookings - refunds),
-          widthClass: buildWidthClass(
-            Math.max(0, grossBookings - refunds),
-            grossBookings,
-          ),
+          value: formatCurrency(netBookings),
+          rawValue: netBookings,
+          widthClass: buildWidthClass(netBookings, grossBookings),
         },
         {
           label: "Collected Cash",
-          value: formatCurrency(Math.max(0, platformRevenue + guruPayouts)),
-          rawValue: Math.max(0, platformRevenue + guruPayouts),
-          widthClass: buildWidthClass(
-            Math.max(0, platformRevenue + guruPayouts),
-            grossBookings,
-          ),
+          value: formatCurrency(collectedCash),
+          rawValue: collectedCash,
+          widthClass: buildWidthClass(collectedCash, grossBookings),
         },
         {
           label: "Payouts & Fees",
-          value: formatCurrency(guruPayouts + partnerCommissions + stripeFees),
-          rawValue: guruPayouts + partnerCommissions + stripeFees,
-          widthClass: buildWidthClass(
-            guruPayouts + partnerCommissions + stripeFees,
-            grossBookings,
-          ),
+          value: formatCurrency(payoutsAndFees),
+          rawValue: payoutsAndFees,
+          widthClass: buildWidthClass(payoutsAndFees, grossBookings),
         },
         {
           label: "Net Cash Retained",
-          value: formatCurrency(Math.max(0, netCashFlow)),
-          rawValue: Math.max(0, netCashFlow),
-          widthClass: buildWidthClass(Math.max(0, netCashFlow), grossBookings),
+          value: formatCurrency(netCashFlow),
+          rawValue: netCashFlow,
+          widthClass: buildWidthClass(Math.abs(netCashFlow), grossBookings),
         },
       ],
       guruPayoutStatus: {
@@ -1201,7 +1472,11 @@ export async function GET(request: Request) {
         total: partnerCommissions,
       },
       cashRunway,
-      revenueTrend: buildRevenueTrend(platformRevenue, grossBookings),
+      revenueTrend: buildRevenueTrend({
+        bookings,
+        platformRevenue,
+        grossBookings,
+      }),
       expenseTrend: buildExpenseTrend({
         guruPayouts,
         partnerCommissions,
@@ -1248,24 +1523,25 @@ export async function GET(request: Request) {
         {
           label: "Net Cash Flow",
           value: netCashFlow,
-          displayValue:
-            netCashFlow >= 0
-              ? formatCurrency(netCashFlow)
-              : `-${formatCurrency(Math.abs(netCashFlow))}`,
+          displayValue: formatCurrency(netCashFlow),
           type: "net",
         },
       ],
       managementAlerts: buildManagementAlerts({
-        exports: exportResult.rows,
-        cpaRows: cpaResult.rows,
-        payoutRows: payoutResult.rows,
-        paymentRows: paymentResult.rows,
+        exports: exportRows,
+        payoutRows,
+        paymentRows,
+        sourceHealth,
+        netCashFlow,
+        cashBalance,
       }),
-      fallbackUsed: false,
+      fallbackUsed: sourceHealth.some((source) => !source.ok),
     };
 
     return NextResponse.json(response);
   } catch (error) {
+    console.warn("Financial overview API fallback used:", error);
+
     return NextResponse.json(
       buildFallbackResponse({
         generatedAt,
@@ -1273,18 +1549,6 @@ export async function GET(request: Request) {
         startDate,
         endDate,
         segment,
-        sourceHealth: [
-          {
-            id: "error:overview-api",
-            table: "overview-api",
-            ok: false,
-            rowCount: 0,
-            message:
-              error instanceof Error
-                ? normalizeErrorMessage(error.message)
-                : "Unable to load live overview data.",
-          },
-        ],
       }),
     );
   }

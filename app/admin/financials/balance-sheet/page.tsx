@@ -9,7 +9,17 @@ type BalanceSheetRow = Record<string, unknown>;
 type BookingRow = Record<string, unknown>;
 type PayoutRow = Record<string, unknown>;
 type ExpenseRow = Record<string, unknown>;
+type DisputeRow = Record<string, unknown>;
 type FinancialLedgerRow = Record<string, unknown>;
+type BankTransactionRow = Record<string, unknown>;
+type StripeTransactionRow = Record<string, unknown>;
+
+type AdminIdentity = {
+  id: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
+};
 
 type SafeQueryResponse = {
   data: unknown;
@@ -34,6 +44,12 @@ type BalanceLine = {
   displayOrder: number;
 };
 
+type BalanceReadinessItem = {
+  label: string;
+  status: "ready" | "needs_review" | "missing";
+  detail: string;
+};
+
 const SECTION_LABELS: Record<BalanceSectionKey, string> = {
   current_assets: "Current Assets",
   non_current_assets: "Non-Current Assets",
@@ -51,8 +67,9 @@ const SECTION_OPTIONS: { value: BalanceSectionKey; label: string }[] = [
 ];
 
 const LINE_PRESETS = [
+  { section: "current_assets", label: "Navy Federal Business Checking" },
+  { section: "current_assets", label: "Navy Federal Business Savings" },
   { section: "current_assets", label: "Cash / Operating Account" },
-  { section: "current_assets", label: "Petty Cash" },
   { section: "current_assets", label: "Stripe Balance / Pending Receipts" },
   { section: "current_assets", label: "Accounts Receivable" },
   { section: "current_assets", label: "Prepaid Expenses" },
@@ -65,6 +82,7 @@ const LINE_PRESETS = [
   { section: "current_liabilities", label: "Guru Payouts Payable" },
   { section: "current_liabilities", label: "Sales Tax Payable" },
   { section: "current_liabilities", label: "Refunds Payable" },
+  { section: "current_liabilities", label: "Disputes / Chargebacks Payable" },
   { section: "long_term_liabilities", label: "Bank Loan" },
   { section: "long_term_liabilities", label: "Long-Term Debt" },
   { section: "long_term_liabilities", label: "Lease Obligations" },
@@ -76,92 +94,123 @@ const LINE_PRESETS = [
 const DEFAULT_BALANCE_LINES: BalanceSheetRow[] = [
   {
     section: "current_assets",
-    label: "Cash / Operating Account",
+    label: "Navy Federal Business Checking",
     amount: 0,
-    display_order: 10,
-    notes: "Manual cash balance",
+    display_order: 5,
+    notes: "Bank-connected or manually entered operating cash.",
+  },
+  {
+    section: "current_assets",
+    label: "Navy Federal Business Savings",
+    amount: 0,
+    display_order: 8,
+    notes: "Bank-connected or manually entered savings and reserves.",
   },
   {
     section: "current_assets",
     label: "Stripe Balance / Pending Receipts",
     amount: 0,
     display_order: 20,
-    notes: "Manual or Stripe balance placeholder",
+    notes: "Stripe clearing balance and pending payout placeholder.",
   },
   {
     section: "current_assets",
     label: "Accounts Receivable",
     amount: 0,
     display_order: 30,
-    notes: "Uncollected customer balances",
+    notes: "Uncollected customer balances from unpaid bookings.",
   },
   {
     section: "current_assets",
     label: "Prepaid Expenses",
     amount: 0,
     display_order: 40,
-    notes: "Prepaid tools, insurance, or services",
+    notes: "Prepaid tools, insurance, or services.",
   },
   {
     section: "non_current_assets",
     label: "Equipment",
     amount: 0,
     display_order: 10,
-    notes: "Equipment owned by SitGuru",
+    notes: "Equipment owned by SitGuru.",
   },
   {
     section: "non_current_assets",
     label: "Intangible Assets / Software",
     amount: 0,
     display_order: 20,
-    notes: "Software or platform asset value",
+    notes: "Software or platform asset value.",
   },
   {
     section: "current_liabilities",
     label: "Guru Payouts Payable",
     amount: 0,
     display_order: 10,
-    notes: "Estimated from paid bookings not released",
+    notes: "Estimated from paid bookings that have not been released to gurus.",
   },
   {
     section: "current_liabilities",
     label: "Sales Tax Payable",
     amount: 0,
     display_order: 20,
-    notes: "Estimated from booking tax fields",
+    notes: "Estimated from booking tax fields.",
   },
   {
     section: "current_liabilities",
     label: "Refunds Payable",
     amount: 0,
     display_order: 30,
-    notes: "Estimated from refund-related bookings",
+    notes: "Estimated from refund-related bookings and customer credits.",
+  },
+  {
+    section: "current_liabilities",
+    label: "Disputes / Chargebacks Payable",
+    amount: 0,
+    display_order: 40,
+    notes: "Estimated from dispute cases with financial impact.",
   },
   {
     section: "long_term_liabilities",
     label: "Long-Term Debt",
     amount: 0,
     display_order: 10,
-    notes: "Manual long-term debt",
+    notes: "Manual long-term debt.",
   },
   {
     section: "equity",
     label: "Owner’s Capital",
     amount: 0,
     display_order: 10,
-    notes: "Manual owner contribution",
+    notes: "Manual owner contribution.",
   },
   {
     section: "equity",
     label: "Retained Earnings",
     amount: 0,
     display_order: 20,
-    notes: "Manual retained earnings",
+    notes: "Manual retained earnings from prior periods.",
+  },
+  {
+    section: "equity",
+    label: "Current Net Income / Loss",
+    amount: 0,
+    display_order: 30,
+    notes: "Estimated from current SitGuru P&L activity.",
   },
 ];
 
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+  return false;
 }
 
 function toNumber(value: unknown) {
@@ -215,7 +264,7 @@ function getBarWidth(value: number, max: number) {
 
 async function safeRows<T>(
   query: PromiseLike<SafeQueryResponse>,
-  label: string
+  label: string,
 ): Promise<T[]> {
   try {
     const result = await query;
@@ -232,8 +281,160 @@ async function safeRows<T>(
   }
 }
 
+function hasFinancialRole(role: string) {
+  return [
+    "owner",
+    "super_admin",
+    "admin",
+    "finance_admin",
+    "finance",
+    "accounting",
+    "bookkeeper",
+  ].includes(role.trim().toLowerCase());
+}
+
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
+      process.env.ADMIN_EMAILS ||
+      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+      "",
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+async function getAdminIdentity(): Promise<AdminIdentity | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  const userEmail = (user.email || "").toLowerCase();
+  const envAdminEmails = getEnvAdminEmails();
+
+  const profileChecks = await Promise.all([
+    safeRows<Record<string, unknown>>(
+      supabaseAdmin
+        .from("admin_users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("user_id", user.id)
+        .limit(1),
+      "admin_users_balance_sheet_access",
+    ),
+    safeRows<Record<string, unknown>>(
+      supabaseAdmin
+        .from("profiles")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "profiles_balance_sheet_access",
+    ),
+    safeRows<Record<string, unknown>>(
+      supabaseAdmin
+        .from("users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "users_balance_sheet_access",
+    ),
+  ]);
+
+  const profile = profileChecks.flat().find(Boolean) || {};
+  const role = asTrimmedString(profile.role) || "admin";
+  const active =
+    profile.is_active === undefined
+      ? true
+      : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(
+    profile.can_access_financials,
+  );
+  const envAllowed = envAdminEmails.includes(userEmail);
+  const canAccessFinancials =
+    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+
+  return {
+    id: user.id,
+    email: userEmail,
+    role,
+    canAccessFinancials,
+  };
+}
+
+async function requireFinancialAdminAction(action: string) {
+  const identity = await getAdminIdentity();
+
+  if (!identity?.canAccessFinancials) {
+    console.warn(`Blocked balance sheet admin action: ${action}`);
+    return null;
+  }
+
+  return identity;
+}
+
+async function writeFinancialAuditLog({
+  actor,
+  action,
+  targetType,
+  targetId,
+  metadata,
+}: {
+  actor: AdminIdentity;
+  action: string;
+  targetType: string;
+  targetId?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const payload = {
+    actor_id: actor.id,
+    actor_email: actor.email,
+    actor_role: actor.role,
+    action,
+    area: "financials.balance_sheet",
+    target_type: targetType,
+    target_id: targetId || null,
+    metadata: metadata || {},
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const { error } = await supabaseAdmin
+      .from("financial_audit_logs")
+      .insert(payload);
+    if (!error) return;
+  } catch {
+    // Keep finance actions from failing if the audit table has not been created yet.
+  }
+
+  try {
+    await supabaseAdmin.from("admin_audit_logs").insert(payload);
+  } catch (error) {
+    console.warn("Balance sheet audit log skipped:", error);
+  }
+}
+
+function isArchivedRow(row: Record<string, unknown>) {
+  return Boolean(
+    row.deleted_at ||
+      row.voided_at ||
+      row.archived_at ||
+      row.is_deleted === true ||
+      row.is_void === true ||
+      row.is_active === false,
+  );
+}
+
 async function addBalanceSheetLine(formData: FormData) {
   "use server";
+
+  const actor = await requireFinancialAdminAction("add_balance_sheet_line");
+
+  if (!actor) return;
 
   const section = String(formData.get("section") || "").trim();
   const preset = String(formData.get("preset") || "").trim();
@@ -243,23 +444,31 @@ async function addBalanceSheetLine(formData: FormData) {
 
   const isValidSection = SECTION_OPTIONS.some((item) => item.value === section);
 
-  if (!isValidSection) {
-    return;
-  }
+  if (!isValidSection) return;
 
   const label = customLabel || preset;
 
-  if (!label) {
-    return;
-  }
+  if (!label) return;
 
-  await supabaseAdmin.from("balance_sheet_lines").insert({
-    section,
-    label,
-    amount: Number.isFinite(amount) ? amount : 0,
-    notes,
-    display_order: 100,
-    is_active: true,
+  const { data: insertedLine } = await supabaseAdmin
+    .from("balance_sheet_lines")
+    .insert({
+      section,
+      label,
+      amount: Number.isFinite(amount) ? amount : 0,
+      notes,
+      display_order: 100,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+
+  await writeFinancialAuditLog({
+    actor,
+    action: "add_balance_sheet_line",
+    targetType: "balance_sheet_line",
+    targetId: asTrimmedString((insertedLine as Record<string, unknown> | null)?.id),
+    metadata: { section, label, amount, notes },
   });
 
   revalidatePath("/admin/financials/balance-sheet");
@@ -268,16 +477,25 @@ async function addBalanceSheetLine(formData: FormData) {
 async function deleteBalanceSheetLine(formData: FormData) {
   "use server";
 
+  const actor = await requireFinancialAdminAction("deactivate_balance_sheet_line");
+
+  if (!actor) return;
+
   const lineId = String(formData.get("lineId") || "").trim();
 
-  if (!lineId) {
-    return;
-  }
+  if (!lineId) return;
 
   await supabaseAdmin
     .from("balance_sheet_lines")
     .update({ is_active: false })
     .eq("id", lineId);
+
+  await writeFinancialAuditLog({
+    actor,
+    action: "deactivate_balance_sheet_line",
+    targetType: "balance_sheet_line",
+    targetId: lineId,
+  });
 
   revalidatePath("/admin/financials/balance-sheet");
 }
@@ -321,8 +539,7 @@ function getRefundAmount(booking: BookingRow) {
   if (explicitRefund > 0) return explicitRefund;
 
   const status = (
-    asTrimmedString(booking.payment_status) ||
-    asTrimmedString(booking.status)
+    asTrimmedString(booking.payment_status) || asTrimmedString(booking.status)
   ).toLowerCase();
 
   if (status.includes("refund")) {
@@ -380,6 +597,26 @@ function getExpenseName(expense: ExpenseRow) {
   );
 }
 
+function getExpenseCategory(expense: ExpenseRow) {
+  return (
+    asTrimmedString(expense.category) ||
+    asTrimmedString(expense.expense_category) ||
+    asTrimmedString(expense.type) ||
+    asTrimmedString(expense.name) ||
+    "other"
+  ).toLowerCase();
+}
+
+function getDisputeAmount(dispute: DisputeRow) {
+  return (
+    toNumber(dispute.amount) ||
+    toNumber(dispute.dispute_amount) ||
+    toNumber(dispute.refund_amount) ||
+    toNumber(dispute.financial_impact) ||
+    toNumber(dispute.total_amount)
+  );
+}
+
 function getLedgerDebit(row: FinancialLedgerRow) {
   return toNumber(row.debit);
 }
@@ -389,24 +626,97 @@ function getLedgerCredit(row: FinancialLedgerRow) {
 }
 
 function getLedgerAccountName(row: FinancialLedgerRow) {
-  return asTrimmedString(row.account_name).toLowerCase();
+  return asTrimmedString(row.account_name || row.account).toLowerCase();
 }
 
-function getLedgerNetForAccounts(
+function getLedgerText(row: FinancialLedgerRow) {
+  return [
+    row.source,
+    row.source_type,
+    row.account_name,
+    row.account,
+    row.description,
+    row.memo,
+    row.external_account_name,
+  ]
+    .map(asTrimmedString)
+    .join(" ")
+    .toLowerCase();
+}
+
+function getAnyRowText(row: Record<string, unknown>) {
+  return [
+    row.source,
+    row.source_type,
+    row.account_name,
+    row.account,
+    row.account_type,
+    row.institution_name,
+    row.description,
+    row.name,
+    row.memo,
+    row.category,
+    row.external_account_name,
+  ]
+    .map(asTrimmedString)
+    .join(" ")
+    .toLowerCase();
+}
+
+function getLedgerNetForAccountMatches(
   ledgerEntries: FinancialLedgerRow[],
-  accountNames: string[]
+  accountNameMatches: string[],
 ) {
-  const normalizedNames = accountNames.map((name) => name.toLowerCase());
+  const normalizedMatches = accountNameMatches.map((name) => name.toLowerCase());
 
   return ledgerEntries.reduce((sum, row) => {
     const accountName = getLedgerAccountName(row);
+    const text = getLedgerText(row);
+    const matches = normalizedMatches.some(
+      (match) => accountName.includes(match) || text.includes(match),
+    );
 
-    if (!normalizedNames.includes(accountName)) {
-      return sum;
-    }
+    if (!matches) return sum;
 
     return sum + getLedgerDebit(row) - getLedgerCredit(row);
   }, 0);
+}
+
+function getBankTransactionAmount(row: BankTransactionRow) {
+  if (row.amount !== undefined) return toNumber(row.amount);
+  return toNumber(row.credit) - toNumber(row.debit);
+}
+
+function getBankNetForMatches(
+  bankTransactions: BankTransactionRow[],
+  matches: string[],
+) {
+  const normalizedMatches = matches.map((match) => match.toLowerCase());
+
+  return bankTransactions.reduce((sum, row) => {
+    const text = getAnyRowText(row);
+    const matchesRow = normalizedMatches.some((match) => text.includes(match));
+
+    if (!matchesRow) return sum;
+
+    return sum + getBankTransactionAmount(row);
+  }, 0);
+}
+
+function getStripeTransactionNet(row: StripeTransactionRow) {
+  return (
+    toNumber(row.net) ||
+    toNumber(row.net_amount) ||
+    toNumber(row.amount) - toNumber(row.fee) ||
+    toNumber(row.balance_amount)
+  );
+}
+
+function getStripeBalanceEstimate(stripeTransactions: StripeTransactionRow[]) {
+  return stripeTransactions.reduce(
+    (sum, row) => sum + getStripeTransactionNet(row),
+    0,
+  );
 }
 
 function getLineSection(line: BalanceSheetRow): BalanceSectionKey {
@@ -436,45 +746,129 @@ function normalizeBalanceLabel(value: string) {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function getBalanceLineKey(line: BalanceSheetRow) {
+  return `${getLineSection(line)}:${normalizeBalanceLabel(asTrimmedString(line.label))}`;
+}
+
+function dedupeBalanceLines(lines: BalanceSheetRow[]) {
+  const byKey = new Map<string, BalanceSheetRow>();
+
+  for (const line of lines) {
+    byKey.set(getBalanceLineKey(line), line);
+  }
+
+  return Array.from(byKey.values()).sort(
+    (a, b) =>
+      (toNumber(a.display_order) || 100) - (toNumber(b.display_order) || 100) ||
+      asTrimmedString(a.label).localeCompare(asTrimmedString(b.label)),
+  );
+}
+
+function calculateCurrentNetIncome({
+  bookings,
+  expenses,
+  disputes,
+}: {
+  bookings: BookingRow[];
+  expenses: ExpenseRow[];
+  disputes: DisputeRow[];
+}) {
+  const bookingRevenue = bookings.reduce(
+    (sum, booking) => sum + getBookingGrossAmount(booking),
+    0,
+  );
+  const platformFees = bookings.reduce(
+    (sum, booking) => sum + getPlatformFee(booking),
+    0,
+  );
+  const guruPayouts = bookings.reduce(
+    (sum, booking) => sum + getGuruPayoutAmount(booking),
+    0,
+  );
+  const refunds = bookings.reduce(
+    (sum, booking) => sum + getRefundAmount(booking),
+    0,
+  );
+  const disputeLosses = disputes.reduce(
+    (sum, dispute) => sum + getDisputeAmount(dispute),
+    0,
+  );
+  const operatingExpenses = expenses
+    .filter((expense) => {
+      const category = getExpenseCategory(expense);
+      return !category.includes("asset") && !category.includes("prepaid");
+    })
+    .reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
+
+  return bookingRevenue + platformFees - guruPayouts - refunds - disputeLosses - operatingExpenses;
+}
+
 function getBalanceLineAmount({
   line,
   bookings,
+  expenses,
+  disputes,
   ledgerEntries,
+  bankTransactions,
+  stripeTransactions,
+  currentNetIncome,
 }: {
   line: BalanceSheetRow;
   bookings: BookingRow[];
+  expenses: ExpenseRow[];
+  disputes: DisputeRow[];
   ledgerEntries: FinancialLedgerRow[];
+  bankTransactions: BankTransactionRow[];
+  stripeTransactions: StripeTransactionRow[];
+  currentNetIncome: number;
 }) {
   const label = normalizeBalanceLabel(asTrimmedString(line.label));
   const storedAmount = toNumber(line.amount);
 
-  if (label === "cash" || label === "cash / operating account") {
+  if (
+    label.includes("navy federal business checking") ||
+    label.includes("checking") ||
+    label === "cash" ||
+    label === "cash / operating account"
+  ) {
     return (
       storedAmount +
-      getLedgerNetForAccounts(ledgerEntries, [
-        "Cash",
-        "Cash / Operating Account",
-      ])
+      getLedgerNetForAccountMatches(ledgerEntries, [
+        "cash",
+        "operating account",
+        "checking",
+        "navy federal business checking",
+      ]) +
+      getBankNetForMatches(bankTransactions, ["checking", "navy", "operating"])
     );
   }
 
-  if (label === "petty cash") {
-    return storedAmount + getLedgerNetForAccounts(ledgerEntries, ["Petty Cash"]);
-  }
-
-  if (label === "stripe balance / pending receipts") {
+  if (label.includes("savings")) {
     return (
       storedAmount +
-      getLedgerNetForAccounts(ledgerEntries, [
-        "Stripe Balance",
-        "Stripe Balance / Pending Receipts",
-        "Pending Receipts",
-      ])
+      getLedgerNetForAccountMatches(ledgerEntries, [
+        "savings",
+        "reserve",
+        "navy federal business savings",
+      ]) +
+      getBankNetForMatches(bankTransactions, ["savings", "reserve"])
+    );
+  }
+
+  if (label.includes("stripe") || label.includes("pending receipts")) {
+    return (
+      storedAmount +
+      getLedgerNetForAccountMatches(ledgerEntries, [
+        "stripe balance",
+        "stripe clearing",
+        "pending receipts",
+      ]) +
+      getStripeBalanceEstimate(stripeTransactions)
     );
   }
 
   if (label.includes("guru payout") || label.includes("payouts payable")) {
-    return bookings.reduce((sum, booking) => {
+    const bookingPendingPayouts = bookings.reduce((sum, booking) => {
       const payoutStatus = getBookingPayoutStatus(booking);
 
       if (isPaidBooking(booking) && !isPayoutReleased(payoutStatus)) {
@@ -483,14 +877,26 @@ function getBalanceLineAmount({
 
       return sum;
     }, 0);
+
+    return storedAmount + bookingPendingPayouts;
   }
 
   if (label.includes("sales tax")) {
-    return bookings.reduce((sum, booking) => sum + getBookingTaxAmount(booking), 0);
+    return (
+      storedAmount +
+      bookings.reduce((sum, booking) => sum + getBookingTaxAmount(booking), 0)
+    );
   }
 
   if (label.includes("refund")) {
-    return bookings.reduce((sum, booking) => sum + getRefundAmount(booking), 0);
+    return (
+      storedAmount +
+      bookings.reduce((sum, booking) => sum + getRefundAmount(booking), 0)
+    );
+  }
+
+  if (label.includes("dispute") || label.includes("chargeback")) {
+    return storedAmount + disputes.reduce((sum, dispute) => sum + getDisputeAmount(dispute), 0);
   }
 
   if (label.includes("receivable")) {
@@ -501,8 +907,20 @@ function getBalanceLineAmount({
     return (
       storedAmount +
       bookingReceivables +
-      getLedgerNetForAccounts(ledgerEntries, ["Accounts Receivable"])
+      getLedgerNetForAccountMatches(ledgerEntries, ["accounts receivable"])
     );
+  }
+
+  if (label.includes("prepaid")) {
+    const prepaidExpenses = expenses
+      .filter((expense) => getExpenseCategory(expense).includes("prepaid"))
+      .reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
+
+    return storedAmount + prepaidExpenses;
+  }
+
+  if (label.includes("current net income") || label.includes("current net loss")) {
+    return storedAmount + currentNetIncome;
   }
 
   return storedAmount;
@@ -520,22 +938,22 @@ function StatCard({
   tone?: "emerald" | "sky" | "violet" | "amber" | "rose";
 }) {
   const toneClass = {
-    emerald: "border-emerald-400/20 bg-emerald-400/10",
-    sky: "border-sky-400/20 bg-sky-400/10",
-    violet: "border-violet-400/20 bg-violet-400/10",
-    amber: "border-amber-400/20 bg-amber-400/10",
-    rose: "border-rose-400/20 bg-rose-400/10",
+    emerald: "border-emerald-100 bg-emerald-50",
+    sky: "border-sky-100 bg-sky-50",
+    violet: "border-violet-100 bg-violet-50",
+    amber: "border-amber-100 bg-amber-50",
+    rose: "border-rose-100 bg-rose-50",
   }[tone];
 
   return (
-    <div className={`rounded-3xl border p-5 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+    <div className={`rounded-[1.5rem] border p-5 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
         {label}
       </p>
-      <p className="mt-3 text-3xl font-black tracking-tight text-white">
+      <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
         {value}
       </p>
-      <p className="mt-3 text-sm leading-6 text-slate-400">{detail}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{detail}</p>
     </div>
   );
 }
@@ -553,7 +971,7 @@ function ActionLink({
     return (
       <Link
         href={href}
-        className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+        className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
       >
         {label}
       </Link>
@@ -563,10 +981,52 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:border-emerald-300/30 hover:bg-white/10"
+      className="inline-flex items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
     >
       {label}
     </Link>
+  );
+}
+
+function BalanceExportPanel() {
+  return (
+    <div className="w-full rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm xl:max-w-[560px]">
+      <div className="flex flex-wrap gap-2">
+        <ActionLink href="/admin/financials" label="Financials" />
+        <ActionLink href="/admin/financials/profit-loss" label="P&L" />
+        <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-slate-100 bg-[#fbfefd] p-4">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+          Statement Exports
+        </p>
+        <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+          Export routes are ready to wire to the same secure accounting package
+          pattern used by Profit & Loss.
+        </p>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <ActionLink
+            href="/api/admin/financials/balance-sheet/export?format=csv"
+            label="CSV"
+          />
+          <ActionLink
+            href="/api/admin/financials/balance-sheet/export?format=excel"
+            label="Excel"
+          />
+          <ActionLink
+            href="/api/admin/financials/balance-sheet/export?format=word"
+            label="Word"
+          />
+          <ActionLink
+            href="/api/admin/financials/balance-sheet/export?format=pdf"
+            label="PDF / Print"
+            primary
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -583,47 +1043,62 @@ function BalanceSection({
 }) {
   return (
     <div>
-      <div className="border-y border-emerald-400/20 bg-emerald-400/10 px-4 py-2">
-        <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-200">
+      <div className="border-y border-emerald-100 bg-emerald-50/80 px-4 py-3">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
           {title}
         </p>
       </div>
 
-      <div className="divide-y divide-white/10">
+      <div className="divide-y divide-slate-100">
         {lines.length ? (
           lines.map((line) => (
             <div
               key={line.id}
-              className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-3 text-slate-300"
+              className="grid gap-3 px-4 py-4 text-slate-600 sm:grid-cols-[minmax(0,1fr)_120px_96px] sm:items-center"
             >
-              <div>
-                <p className="pl-6">{line.label}</p>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-bold leading-tight text-slate-950">
+                    {line.label}
+                  </p>
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                      line.isSaved
+                        ? "border-blue-100 bg-blue-50 text-blue-700"
+                        : "border-emerald-100 bg-white text-emerald-700"
+                    }`}
+                  >
+                    {line.isSaved ? "Custom" : "Core"}
+                  </span>
+                </div>
                 {line.notes ? (
-                  <p className="mt-1 pl-6 text-xs text-slate-600">
+                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
                     {line.notes}
                   </p>
                 ) : null}
               </div>
 
-              <p className="font-bold tabular-nums text-white">
+              <p className="text-right text-sm font-black tabular-nums text-slate-950 sm:text-base">
                 {money(line.amount)}
               </p>
 
-              {line.isSaved ? (
-                <form action={deleteBalanceSheetLine}>
-                  <input type="hidden" name="lineId" value={line.dbId} />
-                  <button
-                    type="submit"
-                    className="rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1 text-xs font-bold text-rose-200 transition hover:bg-rose-400/20"
-                  >
-                    Delete
-                  </button>
-                </form>
-              ) : (
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-500">
-                  Default
-                </span>
-              )}
+              <div className="flex justify-end">
+                {line.isSaved ? (
+                  <form action={deleteBalanceSheetLine}>
+                    <input type="hidden" name="lineId" value={line.dbId} />
+                    <button
+                      type="submit"
+                      className="rounded-full border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+                    >
+                      Deactivate
+                    </button>
+                  </form>
+                ) : (
+                  <span className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-bold text-slate-500">
+                    Locked
+                  </span>
+                )}
+              </div>
             </div>
           ))
         ) : (
@@ -632,9 +1107,9 @@ function BalanceSection({
           </div>
         )}
 
-        <div className="grid grid-cols-[1fr_auto] gap-4 bg-white/5 px-4 py-3 font-black text-white">
+        <div className="grid grid-cols-[1fr_auto] gap-4 bg-slate-50 px-4 py-3 font-black text-slate-950">
           <p>{totalLabel}</p>
-          <p className={totalValue < 0 ? "text-rose-200" : "text-white"}>
+          <p className={totalValue < 0 ? "text-rose-700" : "text-slate-950"}>
             {money(totalValue)}
           </p>
         </div>
@@ -643,8 +1118,182 @@ function BalanceSection({
   );
 }
 
+function readinessClasses(status: BalanceReadinessItem["status"]) {
+  const classes = {
+    ready: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    needs_review: "border-amber-100 bg-amber-50 text-amber-800",
+    missing: "border-rose-100 bg-rose-50 text-rose-800",
+  };
+
+  return classes[status];
+}
+
+function BalanceReadinessPanel({ items }: { items: BalanceReadinessItem[] }) {
+  const readyCount = items.filter((item) => item.status === "ready").length;
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+            CPA / Balance Sheet Readiness
+          </p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+            Accounting-ready balance checks
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            This panel checks whether SitGuru has cash, bank, Stripe clearing,
+            receivable, payable, liability, equity, and reconciliation data ready
+            for CPA review and QuickBooks-style export mapping.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800">
+          {readyCount}/{items.length} ready
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-xl border p-4 ${readinessClasses(item.status)}`}
+          >
+            <p className="text-xs font-black uppercase tracking-[0.16em] opacity-80">
+              {item.status.replace("_", " ")}
+            </p>
+            <h3 className="mt-2 text-base font-black text-slate-950">
+              {item.label}
+            </h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              {item.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BalanceFlowPanel() {
+  const steps = [
+    "Stripe and booking activity create receivables, clearing balances, payouts payable, refunds, and tax liabilities.",
+    "Navy Federal checking and savings confirm real cash balances, deposits, transfers, and withdrawals.",
+    "Manual balance lines capture owner capital, retained earnings, loans, equipment, prepaid assets, and corrections.",
+    "Current net income/loss feeds from available P&L activity so equity stays connected to operations.",
+    "Financial Overview, Balance Sheet, Cash Flow, exports, and CPA handoff use the same accounting foundation.",
+  ];
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+        Balance Sheet Flow
+      </p>
+      <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+        How this statement should stay wired
+      </h2>
+      <div className="mt-6 grid gap-3 lg:grid-cols-5">
+        {steps.map((step, index) => (
+          <div
+            key={step}
+            className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
+              {index + 1}
+            </span>
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
+              {step}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function getReadinessItems({
+  balanceLineCount,
+  bankTransactions,
+  stripeTransactions,
+  ledgerEntries,
+  currentAssets,
+  totalLiabilities,
+  totalEquity,
+  isBalanced,
+}: {
+  balanceLineCount: number;
+  bankTransactions: BankTransactionRow[];
+  stripeTransactions: StripeTransactionRow[];
+  ledgerEntries: FinancialLedgerRow[];
+  currentAssets: number;
+  totalLiabilities: number;
+  totalEquity: number;
+  isBalanced: boolean;
+}): BalanceReadinessItem[] {
+  const bankRows = bankTransactions.length || ledgerEntries.filter((row) => {
+    const text = getLedgerText(row);
+    return text.includes("navy") || text.includes("checking") || text.includes("savings") || text.includes("bank");
+  }).length;
+  const stripeRows = stripeTransactions.length || ledgerEntries.filter((row) => getLedgerText(row).includes("stripe")).length;
+  const reconciliationRows = ledgerEntries.filter((entry) =>
+    Boolean(entry.reconciled_at || entry.matched_transaction_id || entry.reconciliation_id),
+  ).length;
+
+  return [
+    {
+      label: "Bank cash accounts",
+      status: bankRows ? "ready" : "needs_review",
+      detail: bankRows
+        ? `${bankRows.toLocaleString()} Navy Federal/bank-related rows are available for checking and savings support.`
+        : "Connect Plaid or import Navy Federal CSV/QBO/OFX records to support cash balances.",
+    },
+    {
+      label: "Stripe clearing balance",
+      status: stripeRows ? "ready" : "needs_review",
+      detail: stripeRows
+        ? `${stripeRows.toLocaleString()} Stripe-related rows can support pending receipts and clearing balances.`
+        : "Normalize Stripe balance transactions into the ledger so pending payouts and fees are supportable.",
+    },
+    {
+      label: "Manual balance lines",
+      status: balanceLineCount ? "ready" : "needs_review",
+      detail: balanceLineCount
+        ? `${balanceLineCount.toLocaleString()} custom balance sheet rows are saved for owner capital, debt, cash, or other adjustments.`
+        : "Add manual rows for owner capital, retained earnings, debt, fixed assets, and corrections.",
+    },
+    {
+      label: "Assets captured",
+      status: currentAssets ? "ready" : "needs_review",
+      detail: currentAssets
+        ? `${money(currentAssets)} in current assets is currently reflected.`
+        : "Cash, Stripe clearing, receivables, or prepaid asset rows need to be connected or entered.",
+    },
+    {
+      label: "Liabilities and equity",
+      status: totalLiabilities || totalEquity ? "ready" : "needs_review",
+      detail: `${money(totalLiabilities)} liabilities and ${money(totalEquity)} equity are currently reflected.` ,
+    },
+    {
+      label: "Balance equation",
+      status: isBalanced ? "ready" : "missing",
+      detail: isBalanced
+        ? "Assets equal liabilities plus equity within the current rounding threshold."
+        : "Add or adjust cash, owner capital, retained earnings, current income, debt, or liabilities until the equation balances.",
+    },
+  ];
+}
+
 async function getBalanceSheetData() {
-  const [savedLines, bookings, payouts, expenses, ledgerEntries] = await Promise.all([
+  const [
+    rawSavedLines,
+    rawBookings,
+    rawPayouts,
+    rawExpenses,
+    rawDisputes,
+    rawLedgerEntries,
+    rawBankTransactions,
+    rawStripeTransactions,
+  ] = await Promise.all([
     safeRows<BalanceSheetRow>(
       supabaseAdmin
         .from("balance_sheet_lines")
@@ -653,7 +1302,7 @@ async function getBalanceSheetData() {
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: true })
         .limit(500),
-      "balance_sheet_lines"
+      "balance_sheet_lines",
     ),
     safeRows<BookingRow>(
       supabaseAdmin
@@ -661,7 +1310,7 @@ async function getBalanceSheetData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "bookings"
+      "bookings",
     ),
     safeRows<PayoutRow>(
       supabaseAdmin
@@ -669,7 +1318,7 @@ async function getBalanceSheetData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "guru_payouts"
+      "guru_payouts",
     ),
     safeRows<ExpenseRow>(
       supabaseAdmin
@@ -677,7 +1326,15 @@ async function getBalanceSheetData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "expense_ledger"
+      "expense_ledger",
+    ),
+    safeRows<DisputeRow>(
+      supabaseAdmin
+        .from("dispute_cases")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1500),
+      "dispute_cases",
     ),
     safeRows<FinancialLedgerRow>(
       supabaseAdmin
@@ -685,121 +1342,84 @@ async function getBalanceSheetData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(3000),
-      "financial_ledger_entries"
+      "financial_ledger_entries",
+    ),
+    safeRows<BankTransactionRow>(
+      supabaseAdmin
+        .from("bank_transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3000),
+      "bank_transactions",
+    ),
+    safeRows<StripeTransactionRow>(
+      supabaseAdmin
+        .from("stripe_balance_transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3000),
+      "stripe_balance_transactions",
     ),
   ]);
 
-  const sourceLines = savedLines.length > 0 ? savedLines : DEFAULT_BALANCE_LINES;
+  const savedLines = rawSavedLines.filter((row) => !isArchivedRow(row));
+  const bookings = rawBookings.filter((row) => !isArchivedRow(row));
+  const payouts = rawPayouts.filter((row) => !isArchivedRow(row));
+  const expenses = rawExpenses.filter((row) => !isArchivedRow(row));
+  const disputes = rawDisputes.filter((row) => !isArchivedRow(row));
+  const ledgerEntries = rawLedgerEntries.filter((row) => !isArchivedRow(row));
+  const bankTransactions = rawBankTransactions.filter((row) => !isArchivedRow(row));
+  const stripeTransactions = rawStripeTransactions.filter((row) => !isArchivedRow(row));
 
-  let lines: BalanceLine[] = sourceLines
+  const defaultLineKeys = new Set(DEFAULT_BALANCE_LINES.map(getBalanceLineKey));
+  const sourceLines = dedupeBalanceLines([...DEFAULT_BALANCE_LINES, ...savedLines]);
+  const customSavedLineCount = savedLines.filter((line) => !defaultLineKeys.has(getBalanceLineKey(line))).length;
+  const currentNetIncome = calculateCurrentNetIncome({ bookings, expenses, disputes });
+
+  const lines: BalanceLine[] = sourceLines
     .map((line, index) => {
       const dbId = asTrimmedString(line.id);
+      const isCoreDefaultLine = defaultLineKeys.has(getBalanceLineKey(line));
 
       return {
         id: getLineId(line, index),
         dbId,
-        isSaved: Boolean(dbId && savedLines.length > 0),
+        isSaved: Boolean(dbId && !isCoreDefaultLine),
         section: getLineSection(line),
         label: asTrimmedString(line.label) || "Balance sheet line",
-        amount: getBalanceLineAmount({ line, bookings, ledgerEntries }),
+        amount: getBalanceLineAmount({
+          line,
+          bookings,
+          expenses,
+          disputes,
+          ledgerEntries,
+          bankTransactions,
+          stripeTransactions,
+          currentNetIncome,
+        }),
         notes: asTrimmedString(line.notes),
         displayOrder: toNumber(line.display_order) || 100,
       };
     })
-    .sort(
-      (a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label)
-    );
-
-  const hasCurrentNetIncomeLine = lines.some(
-    (line) =>
-      line.section === "equity" &&
-      normalizeBalanceLabel(line.label) === "current net income / loss"
-  );
-
-  if (hasCurrentNetIncomeLine) {
-    const preliminaryAssets = lines
-      .filter(
-        (line) =>
-          line.section === "current_assets" ||
-          line.section === "non_current_assets"
-      )
-      .reduce((sum, line) => sum + line.amount, 0);
-
-    const preliminaryLiabilities = lines
-      .filter(
-        (line) =>
-          line.section === "current_liabilities" ||
-          line.section === "long_term_liabilities"
-      )
-      .reduce((sum, line) => sum + line.amount, 0);
-
-    const manualEquity = lines
-      .filter(
-        (line) =>
-          line.section === "equity" &&
-          normalizeBalanceLabel(line.label) !== "current net income / loss"
-      )
-      .reduce((sum, line) => sum + line.amount, 0);
-
-    const currentNetIncomeOrLoss =
-      preliminaryAssets - preliminaryLiabilities - manualEquity;
-
-    lines = lines.map((line) => {
-      if (
-        line.section === "equity" &&
-        normalizeBalanceLabel(line.label) === "current net income / loss"
-      ) {
-        return {
-          ...line,
-          amount: currentNetIncomeOrLoss,
-          notes:
-            line.notes ||
-            "Auto-balancing current period income/loss from tracked assets, liabilities, and manual equity.",
-        };
-      }
-
-      return line;
-    });
-  }
+    .sort((a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label));
 
   const currentAssets = lines.filter((line) => line.section === "current_assets");
-  const nonCurrentAssets = lines.filter(
-    (line) => line.section === "non_current_assets"
-  );
-  const currentLiabilities = lines.filter(
-    (line) => line.section === "current_liabilities"
-  );
-  const longTermLiabilities = lines.filter(
-    (line) => line.section === "long_term_liabilities"
-  );
+  const nonCurrentAssets = lines.filter((line) => line.section === "non_current_assets");
+  const currentLiabilities = lines.filter((line) => line.section === "current_liabilities");
+  const longTermLiabilities = lines.filter((line) => line.section === "long_term_liabilities");
   const equityLines = lines.filter((line) => line.section === "equity");
 
-  const totalCurrentAssets = currentAssets.reduce(
-    (sum, line) => sum + line.amount,
-    0
-  );
-  const totalNonCurrentAssets = nonCurrentAssets.reduce(
-    (sum, line) => sum + line.amount,
-    0
-  );
+  const totalCurrentAssets = currentAssets.reduce((sum, line) => sum + line.amount, 0);
+  const totalNonCurrentAssets = nonCurrentAssets.reduce((sum, line) => sum + line.amount, 0);
   const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
-
-  const totalCurrentLiabilities = currentLiabilities.reduce(
-    (sum, line) => sum + line.amount,
-    0
-  );
-  const totalLongTermLiabilities = longTermLiabilities.reduce(
-    (sum, line) => sum + line.amount,
-    0
-  );
+  const totalCurrentLiabilities = currentLiabilities.reduce((sum, line) => sum + line.amount, 0);
+  const totalLongTermLiabilities = longTermLiabilities.reduce((sum, line) => sum + line.amount, 0);
   const totalLiabilities = totalCurrentLiabilities + totalLongTermLiabilities;
-
   const totalEquity = equityLines.reduce((sum, line) => sum + line.amount, 0);
   const liabilitiesPlusEquity = totalLiabilities + totalEquity;
   const balanceDifference = totalAssets - liabilitiesPlusEquity;
   const isBalanced = Math.abs(balanceDifference) < 1;
-
-  const maxVisualValue = Math.max(totalAssets, totalLiabilities, totalEquity, 1);
+  const maxVisualValue = Math.max(totalAssets, totalLiabilities, Math.abs(totalEquity), Math.abs(balanceDifference), 1);
 
   const recentExpenseAssets = expenses.slice(0, 5).map((expense, index) => ({
     id: asTrimmedString(expense.id) || `${getExpenseName(expense)}-${index}`,
@@ -820,6 +1440,17 @@ async function getBalanceSheetData() {
     return sum;
   }, 0);
 
+  const readinessItems = getReadinessItems({
+    balanceLineCount: customSavedLineCount,
+    bankTransactions,
+    stripeTransactions,
+    ledgerEntries,
+    currentAssets: totalCurrentAssets,
+    totalLiabilities,
+    totalEquity,
+    isBalanced,
+  });
+
   return {
     currentAssets,
     nonCurrentAssets,
@@ -827,7 +1458,8 @@ async function getBalanceSheetData() {
     longTermLiabilities,
     equityLines,
     recentExpenseAssets,
-    savedLineCount: savedLines.length,
+    savedLineCount: customSavedLineCount,
+    readinessItems,
     totals: {
       bookings: bookings.length,
       totalCurrentAssets,
@@ -841,20 +1473,18 @@ async function getBalanceSheetData() {
       balanceDifference,
       isBalanced,
       maxVisualValue,
+      currentNetIncome,
       pendingPayoutsFromPayoutTable,
+      bankRows: bankTransactions.length,
+      stripeRows: stripeTransactions.length,
     },
   };
 }
 
 export default async function AdminBalanceSheetPage() {
-  const supabase = await createClient();
+  const actor = await getAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  if (!actor?.canAccessFinancials) {
     return null;
   }
 
@@ -864,78 +1494,71 @@ export default async function AdminBalanceSheetPage() {
     {
       label: "Assets",
       value: balance.totals.totalAssets,
+      detail: "Total current and non-current assets",
       tone: "bg-emerald-400",
     },
     {
       label: "Liabilities",
       value: balance.totals.totalLiabilities,
+      detail: "Current and long-term obligations",
       tone: "bg-sky-400",
     },
     {
       label: "Equity",
       value: balance.totals.totalEquity,
+      detail: "Owner capital, retained earnings, and current income",
       tone: "bg-violet-400",
     },
     {
       label: "Difference",
       value: Math.abs(balance.totals.balanceDifference),
+      detail: balance.totals.isBalanced ? "Equation is balanced" : "Needs adjustment",
       tone: balance.totals.isBalanced ? "bg-emerald-400" : "bg-rose-400",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_30%),radial-gradient(circle_at_right,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-6 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-emerald-500/15 via-slate-950 to-sky-500/10 p-6 shadow-[0_12px_60px_rgba(0,0,0,0.28)] lg:p-8">
-          <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">
+    <div className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1640px] space-y-5 sm:space-y-6">
+        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(420px,620px)] 2xl:items-start">
+            <div className="max-w-5xl self-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">
                 Admin / Financials / Balance Sheet
               </p>
 
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+              <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[0.95] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
                 SitGuru Balance Sheet.
               </h1>
 
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                Snapshot of SitGuru assets, liabilities, and equity. The balance
-                sheet checks whether Assets equal Liabilities plus Equity.
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                Snapshot of SitGuru assets, liabilities, and equity. This page
+                pulls from bookings, payouts, Stripe clearing rows, Navy Federal
+                banking, expense records, manual balance lines, and current P&L
+                activity.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <ActionLink href="/admin/financials" label="Financials" />
-              <ActionLink href="/admin/financials/profit-loss" label="P&L" />
-              <ActionLink href="/admin/payments" label="Payments" />
-              <ActionLink href="/api/admin/financials/profit-loss/export?format=csv" label="CSV" />
-              <ActionLink href="/api/admin/financials/profit-loss/export?format=excel" label="Excel" />
-              <ActionLink href="/api/admin/financials/profit-loss/export?format=word" label="Word" primary />
-            </div>
+            <BalanceExportPanel />
           </div>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Total Assets"
               value={money(balance.totals.totalAssets)}
-              detail={`${money(balance.totals.totalCurrentAssets)} current assets + ${money(
-                balance.totals.totalNonCurrentAssets
-              )} non-current assets.`}
+              detail={`${money(balance.totals.totalCurrentAssets)} current assets + ${money(balance.totals.totalNonCurrentAssets)} non-current assets.`}
               tone="emerald"
             />
             <StatCard
               label="Total Liabilities"
               value={money(balance.totals.totalLiabilities)}
-              detail={`${money(
-                balance.totals.totalCurrentLiabilities
-              )} current liabilities + ${money(
-                balance.totals.totalLongTermLiabilities
-              )} long-term liabilities.`}
+              detail={`${money(balance.totals.totalCurrentLiabilities)} current liabilities + ${money(balance.totals.totalLongTermLiabilities)} long-term liabilities.`}
               tone="sky"
             />
             <StatCard
               label="Total Equity"
               value={money(balance.totals.totalEquity)}
-              detail="Owner’s capital, retained earnings, and other equity lines."
+              detail={`${money(balance.totals.currentNetIncome)} estimated current net income / loss.`}
               tone="violet"
             />
             <StatCard
@@ -947,32 +1570,36 @@ export default async function AdminBalanceSheetPage() {
           </div>
         </section>
 
+        <BalanceReadinessPanel items={balance.readinessItems} />
+
+        <BalanceFlowPanel />
+
         <section className="grid gap-8 xl:grid-cols-[1fr_1fr]">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                   Add Balance Sheet Line
                 </p>
-                <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                   Add assets, liabilities, or equity.
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Add manual balance sheet rows for cash, debt, owner capital,
-                  assets, or liabilities.
+                  assets, liabilities, opening balances, or CPA adjustments.
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-bold text-slate-300">
+              <div className="rounded-xl border border-slate-100 bg-[#fbfefd] px-4 py-3 text-sm font-bold text-slate-600">
                 {balance.savedLineCount > 0
-                  ? `${balance.savedLineCount} saved balance lines`
-                  : "Using default balance lines"}
+                  ? `${balance.savedLineCount} custom balance lines`
+                  : "Using core balance lines"}
               </div>
             </div>
 
             <form
               action={addBalanceSheetLine}
-              className="mt-6 grid gap-4 xl:grid-cols-[1fr_1fr]"
+              className="mt-6 grid gap-4 2xl:grid-cols-[1fr_1fr]"
             >
               <div>
                 <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -981,7 +1608,7 @@ export default async function AdminBalanceSheetPage() {
                 <select
                   name="section"
                   defaultValue=""
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                   required
                 >
                   <option value="" disabled>
@@ -1002,13 +1629,12 @@ export default async function AdminBalanceSheetPage() {
                 <select
                   name="preset"
                   defaultValue=""
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 >
                   <option value="">Optional preset...</option>
                   {LINE_PRESETS.map((item) => (
                     <option key={`${item.section}-${item.label}`} value={item.label}>
-                      {SECTION_LABELS[item.section as BalanceSectionKey]} —{" "}
-                      {item.label}
+                      {SECTION_LABELS[item.section as BalanceSectionKey]} — {item.label}
                     </option>
                   ))}
                 </select>
@@ -1021,8 +1647,8 @@ export default async function AdminBalanceSheetPage() {
                 <input
                   name="customLabel"
                   type="text"
-                  placeholder="Example: Cash, Bank Loan, Owner Capital..."
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                  placeholder="Example: Owner Capital, Bank Loan, Equipment..."
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -1035,96 +1661,82 @@ export default async function AdminBalanceSheetPage() {
                   type="number"
                   step="0.01"
                   placeholder="0.00"
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
-              <div className="xl:col-span-2">
+              <div className="2xl:col-span-2">
                 <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Notes
                 </label>
                 <input
                   name="notes"
                   type="text"
-                  placeholder="Optional notes"
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                  placeholder="Optional notes for CPA, opening balance, adjustment, or source reference"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
               <button
                 type="submit"
-                className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 xl:col-span-2"
+                className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800 2xl:col-span-2"
               >
                 Add Balance Line
               </button>
             </form>
           </div>
 
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
               Balance Check
             </p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
               Assets = Liabilities + Equity
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
+            <p className="mt-2 text-sm leading-6 text-slate-600">
               This card compares SitGuru’s total assets against total
-              liabilities plus total equity.
+              liabilities plus total equity and shows where the balance sheet
+              needs adjustment.
             </p>
 
-            <div className="mt-6 rounded-3xl border border-white/10 bg-slate-950/50 p-5">
-              <div className="flex items-center justify-between gap-4">
-                <p className="text-sm font-bold text-slate-400">Assets</p>
-                <p className="text-xl font-black text-white">
-                  {money(balance.totals.totalAssets)}
-                </p>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between gap-4">
-                <p className="text-sm font-bold text-slate-400">
-                  Liabilities + Equity
-                </p>
-                <p className="text-xl font-black text-white">
-                  {money(balance.totals.liabilitiesPlusEquity)}
-                </p>
-              </div>
-
-              <div className="mt-4 border-t border-white/10 pt-4">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm font-bold text-slate-400">Difference</p>
-                  <p
-                    className={`text-xl font-black ${
-                      balance.totals.isBalanced
-                        ? "text-emerald-200"
-                        : "text-rose-200"
-                    }`}
-                  >
+            <div className="mt-6 rounded-[1.5rem] border border-slate-100 bg-[#fbfefd] p-5">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4 text-sm font-black text-slate-950">
+                  <span>Assets</span>
+                  <span>{money(balance.totals.totalAssets)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4 text-sm font-black text-slate-950">
+                  <span>Liabilities + Equity</span>
+                  <span>{money(balance.totals.liabilitiesPlusEquity)}</span>
+                </div>
+                <div className="border-t border-slate-100 pt-4 flex items-center justify-between gap-4 text-sm font-black text-slate-950">
+                  <span>Difference</span>
+                  <span className={balance.totals.isBalanced ? "text-emerald-700" : "text-rose-700"}>
                     {money(balance.totals.balanceDifference)}
-                  </p>
+                  </span>
                 </div>
               </div>
 
               <div
                 className={`mt-5 rounded-2xl border p-4 ${
                   balance.totals.isBalanced
-                    ? "border-emerald-400/20 bg-emerald-400/10"
-                    : "border-rose-400/20 bg-rose-400/10"
+                    ? "border-emerald-100 bg-emerald-50"
+                    : "border-rose-100 bg-rose-50"
                 }`}
               >
                 <p
                   className={`text-sm font-bold ${
-                    balance.totals.isBalanced
-                      ? "text-emerald-100"
-                      : "text-rose-100"
+                    balance.totals.isBalanced ? "text-emerald-800" : "text-rose-800"
                   }`}
                 >
                   {balance.totals.isBalanced
                     ? "Balance sheet is balanced."
                     : "Balance sheet needs adjustment."}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  Add or adjust cash, owner capital, retained earnings, debt, or
-                  liabilities until the equation balances.
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Add or adjust Navy Federal cash, Stripe clearing, owner capital,
+                  retained earnings, debt, current income, or liabilities until
+                  the equation balances.
                 </p>
               </div>
             </div>
@@ -1133,20 +1745,20 @@ export default async function AdminBalanceSheetPage() {
               {visualRows.map((row) => (
                 <div key={row.label}>
                   <div className="mb-2 flex items-center justify-between gap-4">
-                    <p className="text-sm font-bold text-white">{row.label}</p>
-                    <p className="text-sm font-bold text-white">
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">{row.label}</p>
+                      <p className="text-xs text-slate-500">{row.detail}</p>
+                    </div>
+                    <p className="text-sm font-bold text-slate-950">
                       {money(row.value)}
                     </p>
                   </div>
 
-                  <div className="h-3 rounded-full bg-white/10">
+                  <div className="h-3 rounded-full bg-slate-100">
                     <div
                       className={`h-3 rounded-full ${row.tone}`}
                       style={{
-                        width: `${getBarWidth(
-                          row.value,
-                          balance.totals.maxVisualValue
-                        )}%`,
+                        width: `${getBarWidth(row.value, balance.totals.maxVisualValue)}%`,
                       }}
                     />
                   </div>
@@ -1157,31 +1769,31 @@ export default async function AdminBalanceSheetPage() {
         </section>
 
         <section className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <div className="border-b border-white/10 p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <div className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-sm">
+            <div className="border-b border-slate-100 p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                 Balance Sheet Statement
               </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                 Assets, Liabilities, and Equity
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Default lines use available SitGuru data where possible.
-                Manually added rows can be deleted.
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Core lines use available SitGuru data where possible. Custom
+                manual rows can be deactivated while core lines remain locked.
               </p>
             </div>
 
             <div className="p-4 sm:p-6">
-              <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/50">
-                <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-white/10 bg-white/5 px-4 py-4">
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-white">
+              <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-[#fbfefd]">
+                <div className="hidden grid-cols-[minmax(0,1fr)_120px_96px] gap-4 border-b border-slate-100 bg-slate-50 px-4 py-4 sm:grid">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-950">
                     Line Item
                   </p>
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-white">
+                  <p className="text-right text-xs font-black uppercase tracking-[0.2em] text-slate-950">
                     Current
                   </p>
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-white">
-                    Action
+                  <p className="text-right text-xs font-black uppercase tracking-[0.2em] text-slate-950">
+                    Status
                   </p>
                 </div>
 
@@ -1199,7 +1811,7 @@ export default async function AdminBalanceSheetPage() {
                   totalValue={balance.totals.totalNonCurrentAssets}
                 />
 
-                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-emerald-400/30 bg-emerald-400/10 px-4 py-4 font-black text-white">
+                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-slate-100 bg-slate-100 px-4 py-3 font-black text-slate-950">
                   <p>Total Assets</p>
                   <p>{money(balance.totals.totalAssets)}</p>
                 </div>
@@ -1218,7 +1830,7 @@ export default async function AdminBalanceSheetPage() {
                   totalValue={balance.totals.totalLongTermLiabilities}
                 />
 
-                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-white/10 bg-white/10 px-4 py-4 font-black text-white">
+                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-slate-100 bg-slate-100 px-4 py-3 font-black text-slate-950">
                   <p>Total Liabilities</p>
                   <p>{money(balance.totals.totalLiabilities)}</p>
                 </div>
@@ -1230,108 +1842,258 @@ export default async function AdminBalanceSheetPage() {
                   totalValue={balance.totals.totalEquity}
                 />
 
-                <div className="grid grid-cols-[1fr_auto] gap-4 border-t border-emerald-400/30 bg-emerald-400/10 px-4 py-4 font-black text-white">
+                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-slate-100 bg-slate-100 px-4 py-3 font-black text-slate-950">
                   <p>Total Liabilities + Equity</p>
                   <p>{money(balance.totals.liabilitiesPlusEquity)}</p>
+                </div>
+
+                <div
+                  className={`grid grid-cols-[1fr_auto] gap-4 border-t px-4 py-4 font-black ${
+                    balance.totals.isBalanced
+                      ? "border-emerald-400/30 bg-emerald-50 text-slate-950"
+                      : "border-rose-400/30 bg-rose-50 text-slate-950"
+                  }`}
+                >
+                  <p>Balance Difference</p>
+                  <p className={balance.totals.isBalanced ? "text-emerald-700" : "text-rose-700"}>
+                    {money(balance.totals.balanceDifference)}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="space-y-8">
-            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                Balance Sheet Visuals
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+                Balance Sheet Summary
               </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
-                Assets vs. liabilities and equity.
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                Assets, liabilities, equity, and difference.
               </h2>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <div className="mt-6 space-y-5">
+                {visualRows.map((row) => (
+                  <div key={row.label}>
+                    <div className="mb-2 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-bold text-slate-950">
+                          {row.label}
+                        </p>
+                        <p className="text-xs text-slate-500">{row.detail}</p>
+                      </div>
+                      <p className="text-sm font-bold text-slate-950">
+                        {money(row.value)}
+                      </p>
+                    </div>
+
+                    <div className="h-3 rounded-full bg-slate-100">
+                      <div
+                        className={`h-3 rounded-full ${row.tone}`}
+                        style={{
+                          width: `${getBarWidth(row.value, balance.totals.maxVisualValue)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Bank Rows
+                  </p>
+                  <p className="mt-2 text-xl font-black text-slate-950">
+                    {balance.totals.bankRows.toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Stripe Rows
+                  </p>
+                  <p className="mt-2 text-xl font-black text-slate-950">
+                    {balance.totals.stripeRows.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+                Support Snapshot
+              </p>
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Current Assets
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">
+                  <p className="mt-2 text-2xl font-black text-slate-950">
                     {money(balance.totals.totalCurrentAssets)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Non-Current Assets
-                  </p>
-                  <p className="mt-2 text-2xl font-black text-white">
-                    {money(balance.totals.totalNonCurrentAssets)}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Current Liabilities
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">
+                  <p className="mt-2 text-2xl font-black text-slate-950">
                     {money(balance.totals.totalCurrentLiabilities)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Long-Term Liabilities
+                    Current Net Income / Loss
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">
-                    {money(balance.totals.totalLongTermLiabilities)}
+                  <p
+                    className={`mt-2 text-2xl font-black ${
+                      balance.totals.currentNetIncome >= 0
+                        ? "text-emerald-700"
+                        : "text-rose-700"
+                    }`}
+                  >
+                    {money(balance.totals.currentNetIncome)}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    Bookings Used
+                  </p>
+                  <p className="mt-2 text-2xl font-black text-slate-950">
+                    {balance.totals.bookings.toLocaleString()}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                Recent Operating Activity
-              </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
-                Expense rows that may affect assets or equity.
-              </h2>
-
-              <div className="mt-6 space-y-4">
-                {balance.recentExpenseAssets.length ? (
-                  balance.recentExpenseAssets.map((expense) => (
-                    <div
-                      key={expense.id}
-                      className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="font-bold text-white">{expense.name}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {expense.date}
-                          </p>
-                        </div>
-                        <p className="font-black text-white">
-                          {moneyExact(expense.amount)}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
-                    No expense ledger rows found yet.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-[32px] border border-sky-400/20 bg-sky-400/10 p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">
+            <div className="rounded-[2rem] border border-sky-100 bg-sky-50 p-5 shadow-sm sm:p-6 lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
                 SitGuru Balance Sheet Notes
               </p>
-              <p className="mt-3 text-sm leading-7 text-sky-50/90">
-                Auto-estimated lines include Guru payouts payable, sales tax
-                payable, refund obligations, and accounts receivable when enough
-                booking data is available. Cash, owner capital, long-term debt,
-                and retained earnings should usually be entered manually.
+              <p className="mt-3 text-sm leading-7 text-slate-700">
+                Auto-estimated lines include guru payouts payable, sales tax
+                payable, refund obligations, dispute exposure, accounts
+                receivable, Stripe clearing, bank cash, and current net income
+                when source data is available. Owner capital, retained earnings,
+                long-term debt, equipment, and opening balances should usually
+                be entered or confirmed manually with your CPA.
               </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-8 xl:grid-cols-2">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+              Current Asset Detail
+            </p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+              Cash, Stripe, receivables, and prepaid assets
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              These are the asset lines that should tie back to bank accounts,
+              Stripe clearing activity, booking receivables, or manual CPA entries.
+            </p>
+
+            <div className="mt-6 space-y-5">
+              {balance.currentAssets.length ? (
+                balance.currentAssets.map((row, index) => {
+                  const tones = ["bg-emerald-400", "bg-sky-400", "bg-violet-400", "bg-amber-400", "bg-rose-400"];
+
+                  return (
+                    <div key={row.id}>
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-sm font-bold text-slate-950">
+                          {row.label}
+                        </p>
+                        <p className="text-sm font-bold text-slate-950">
+                          {money(row.amount)}
+                        </p>
+                      </div>
+                      <div className="h-3 rounded-full bg-slate-100">
+                        <div
+                          className={`h-3 rounded-full ${tones[index % tones.length]}`}
+                          style={{ width: `${getBarWidth(row.amount, Math.max(balance.totals.totalCurrentAssets, 1))}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+                  No current asset rows found yet.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+                  Recent Operating Activity
+                </p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                  Expense rows for balance review
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Latest expense ledger rows that may affect assets, liabilities,
+                  equity, or supporting schedules.
+                </p>
+              </div>
+
+              <ActionLink
+                href="/api/admin/financials/balance-sheet/export?format=csv"
+                label="Export"
+              />
+            </div>
+
+            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-100">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Activity
+                      </th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Amount
+                      </th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                        Date
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {balance.recentExpenseAssets.length ? (
+                      balance.recentExpenseAssets.map((expense) => (
+                        <tr key={expense.id} className="transition hover:bg-slate-50">
+                          <td className="px-4 py-4 font-semibold text-slate-950">
+                            {expense.name}
+                          </td>
+                          <td className="px-4 py-4 font-semibold text-slate-950">
+                            {moneyExact(expense.amount)}
+                          </td>
+                          <td className="px-4 py-4 text-slate-600">
+                            {expense.date}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-8 text-center text-slate-600">
+                          No recent expense ledger rows found yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>

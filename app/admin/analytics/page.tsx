@@ -286,7 +286,7 @@ function ActionLink({
     return (
       <Link
         href={href}
-        className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
+        className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
       >
         {label}
       </Link>
@@ -296,12 +296,13 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+      className="inline-flex items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
     >
       {label}
     </Link>
   );
 }
+
 
 function StatCard({
   label,
@@ -313,17 +314,18 @@ function StatCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+    <div className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
         {label}
       </p>
-      <p className="mt-3 text-3xl font-black tracking-tight text-white">
+      <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
         {value}
       </p>
-      <p className="mt-3 text-sm leading-6 text-slate-400">{detail}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{detail}</p>
     </div>
   );
 }
+
 
 function SectionCard({
   eyebrow,
@@ -339,16 +341,16 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)] lg:p-7">
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
             {eyebrow}
           </p>
-          <h2 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
+          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
             {title}
           </h2>
-          <p className="mt-3 text-sm leading-7 text-slate-300 sm:text-base">
+          <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
             {description}
           </p>
         </div>
@@ -360,6 +362,7 @@ function SectionCard({
     </section>
   );
 }
+
 
 function BarRow({
   label,
@@ -377,7 +380,7 @@ function BarRow({
   const width = max > 0 ? Math.max(4, calcPercent(value, max)) : 4;
 
   const toneClass = {
-    emerald: "bg-emerald-400",
+    emerald: "bg-emerald-500",
     sky: "bg-sky-400",
     violet: "bg-violet-400",
     amber: "bg-amber-400",
@@ -385,16 +388,16 @@ function BarRow({
   }[tone];
 
   return (
-    <div>
+    <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
       <div className="mb-2 flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-white">{label}</p>
-          <p className="text-xs text-slate-500">{detail}</p>
+          <p className="text-sm font-black text-slate-950">{label}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-500">{detail}</p>
         </div>
-        <p className="text-sm font-bold text-white">{value.toLocaleString()}</p>
+        <p className="text-sm font-black text-slate-950">{value.toLocaleString()}</p>
       </div>
 
-      <div className="h-2 rounded-full bg-white/10">
+      <div className="h-2.5 rounded-full bg-slate-100">
         <div
           className={`h-full rounded-full ${toneClass}`}
           style={{ width: `${width}%` }}
@@ -403,6 +406,7 @@ function BarRow({
     </div>
   );
 }
+
 
 function RevenueBarRow({
   label,
@@ -418,26 +422,27 @@ function RevenueBarRow({
   const width = max > 0 ? Math.max(4, calcPercent(revenue, max)) : 4;
 
   return (
-    <div>
+    <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
       <div className="mb-2 flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-white">{label}</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm font-black text-slate-950">{label}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-500">
             {bookings.toLocaleString()} bookings
           </p>
         </div>
-        <p className="text-sm font-bold text-white">{money(revenue)}</p>
+        <p className="text-sm font-black text-slate-950">{money(revenue)}</p>
       </div>
 
-      <div className="h-2 rounded-full bg-white/10">
+      <div className="h-2.5 rounded-full bg-slate-100">
         <div
-          className="h-full rounded-full bg-emerald-400"
+          className="h-full rounded-full bg-emerald-500"
           style={{ width: `${width}%` }}
         />
       </div>
     </div>
   );
 }
+
 
 function TableCard({
   headers,
@@ -447,27 +452,30 @@ function TableCard({
   rows: ReactNode[][];
 }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/10">
+    <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-white/5 text-slate-400">
+          <thead className="bg-slate-50 text-slate-600">
             <tr>
               {headers.map((header) => (
-                <th key={header} className="px-4 py-3 font-semibold">
+                <th
+                  key={header}
+                  className="px-4 py-3 text-xs font-black uppercase tracking-[0.16em]"
+                >
                   {header}
                 </th>
               ))}
             </tr>
           </thead>
 
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {rows.map((row, index) => (
               <tr
                 key={index}
-                className="border-t border-white/10 text-slate-300 transition hover:bg-white/5"
+                className="text-slate-600 transition hover:bg-slate-50"
               >
                 {row.map((cell, cellIndex) => (
-                  <td key={cellIndex} className="px-4 py-3">
+                  <td key={cellIndex} className="px-4 py-3 font-semibold">
                     {cell}
                   </td>
                 ))}
@@ -479,6 +487,7 @@ function TableCard({
     </div>
   );
 }
+
 
 function toneForIndex(index: number): Tone {
   if (index === 0) return "emerald";
@@ -852,19 +861,19 @@ export default async function AdminAnalyticsPage() {
   const analytics = await getAnalyticsData();
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_30%),radial-gradient(circle_at_right,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-emerald-500/15 via-slate-950 to-sky-500/10 p-6 shadow-[0_12px_60px_rgba(0,0,0,0.28)] lg:p-8">
+    <div className="min-h-screen bg-[#f7fbf8] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1600px] space-y-6">
+        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">
                 Platform Analytics
               </p>
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+              <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
                 Measure SitGuru growth, conversion, booking health, traffic,
                 and network strength.
               </h1>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 This dashboard combines marketplace tables with tracked analytics
                 events, including homepage visits, searches, profile views, CTA
                 clicks, launch signups, booking actions, referral activity,
@@ -876,6 +885,8 @@ export default async function AdminAnalyticsPage() {
               <ActionLink href="/admin" label="Admin Home" />
               <ActionLink href="/admin/users" label="Users" />
               <ActionLink href="/admin/bookings" label="Bookings" />
+              <ActionLink href="/admin/reports" label="Reports & Exports" />
+              <ActionLink href="/admin/audit-trail" label="Audit Trail" />
               <ActionLink href="/admin/financials" label="Financials" primary />
             </div>
           </div>
@@ -965,7 +976,7 @@ export default async function AdminAnalyticsPage() {
             description="These numbers come from the analytics_events table and show how visitors are moving through the platform."
             actions={
               <>
-                <ActionLink href="/admin/activity" label="Activity" />
+                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
                 <ActionLink href="/admin/exports" label="Export" />
               </>
             }
@@ -1182,7 +1193,7 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No analytics event source data yet.
                 </p>
               )}
@@ -1195,7 +1206,7 @@ export default async function AdminAnalyticsPage() {
             description="See which tracked actions are happening most often across the platform."
             actions={
               <>
-                <ActionLink href="/admin/activity" label="View Activity" />
+                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
                 <ActionLink href="/admin/exports" label="Export" />
               </>
             }
@@ -1215,7 +1226,7 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No analytics events found yet.
                 </p>
               )}
@@ -1250,7 +1261,7 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No launch source data yet.
                 </p>
               )}
@@ -1283,7 +1294,7 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No launch role data yet.
                 </p>
               )}
@@ -1315,7 +1326,7 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No service revenue data yet.
                 </p>
               )}
@@ -1345,7 +1356,7 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No market revenue data yet.
                 </p>
               )}
@@ -1380,34 +1391,34 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No booking status data yet.
                 </p>
               )}
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   Paid Rate
                 </p>
-                <p className="mt-2 text-2xl font-black text-white">
+                <p className="mt-2 text-2xl font-black text-slate-950">
                   {percent(analytics.totals.paidRate)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   Cancellation
                 </p>
-                <p className="mt-2 text-2xl font-black text-white">
+                <p className="mt-2 text-2xl font-black text-slate-950">
                   {percent(analytics.totals.cancellationRate)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   Guru Payouts
                 </p>
-                <p className="mt-2 text-2xl font-black text-white">
+                <p className="mt-2 text-2xl font-black text-slate-950">
                   {money(analytics.totals.guruPayouts)}
                 </p>
               </div>
@@ -1420,7 +1431,7 @@ export default async function AdminAnalyticsPage() {
             description="Simple month grouping based on booking, start, or created date."
             actions={
               <>
-                <ActionLink href="/admin/activity" label="Activity" />
+                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
                 <ActionLink href="/admin/exports" label="Export" />
               </>
             }
@@ -1438,7 +1449,7 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No monthly booking data yet.
                 </p>
               )}
@@ -1453,7 +1464,7 @@ export default async function AdminAnalyticsPage() {
             description="See broad categories like traffic, lead, navigation, search, profile, booking, and referral events."
             actions={
               <>
-                <ActionLink href="/admin/activity" label="Activity" />
+                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
                 <ActionLink href="/admin/exports" label="Export" />
               </>
             }
@@ -1473,7 +1484,7 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No event type data yet.
                 </p>
               )}
@@ -1486,7 +1497,7 @@ export default async function AdminAnalyticsPage() {
             description="See which pages are generating analytics events."
             actions={
               <>
-                <ActionLink href="/admin/activity" label="Activity" />
+                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
                 <ActionLink href="/admin/exports" label="Export" />
               </>
             }
@@ -1506,7 +1517,7 @@ export default async function AdminAnalyticsPage() {
                   />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                   No page path data yet.
                 </p>
               )}
@@ -1520,7 +1531,7 @@ export default async function AdminAnalyticsPage() {
           description="A quick readout of the latest analytics_events rows."
           actions={
             <>
-              <ActionLink href="/admin/activity" label="Activity" primary />
+              <ActionLink href="/admin/audit-trail" label="Audit Trail" primary />
               <ActionLink href="/admin/exports" label="Export Events" />
             </>
           }

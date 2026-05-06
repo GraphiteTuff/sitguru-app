@@ -44,8 +44,18 @@ const statusActions: {
   },
 ];
 
-function normalizeStatus(status: string) {
-  return status.toLowerCase().replace(/\s+/g, "_");
+function normalizeStatus(value: string): ExportStatus {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "ready") return "ready";
+  if (normalized === "processing") return "processing";
+  if (normalized === "sent") return "sent";
+  if (normalized === "failed") return "failed";
+  if (normalized === "needs_review" || normalized === "needs review") {
+    return "needs_review";
+  }
+
+  return "needs_review";
 }
 
 function buttonClasses({
@@ -57,27 +67,27 @@ function buttonClasses({
   primary?: boolean;
   value: ExportStatus;
 }) {
-  if (active) {
-    if (value === "failed") {
-      return "border-rose-200 bg-rose-600 text-white";
-    }
+  if (active && value === "failed") {
+    return "border-rose-200 bg-rose-50 text-rose-800";
+  }
 
-    if (value === "processing") {
-      return "border-blue-200 bg-blue-600 text-white";
-    }
+  if (active && value === "needs_review") {
+    return "border-amber-200 bg-amber-500 text-white shadow-lg shadow-amber-500/15";
+  }
 
-    if (value === "sent" || value === "ready") {
-      return "border-emerald-200 bg-emerald-700 text-white";
-    }
+  if (active && value === "processing") {
+    return "border-blue-200 bg-blue-50 text-blue-800";
+  }
 
-    return "border-amber-200 bg-amber-500 text-white";
+  if (active && (value === "ready" || value === "sent")) {
+    return "border-emerald-200 bg-emerald-700 text-white shadow-lg shadow-emerald-700/15";
   }
 
   if (primary) {
-    return "border-emerald-100 bg-emerald-700 text-white hover:bg-emerald-800";
+    return "border-emerald-100 bg-emerald-50 text-emerald-800 hover:border-emerald-300 hover:bg-white";
   }
 
-  return "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800";
+  return "border-slate-100 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900";
 }
 
 export default function ExportStatusActions({
@@ -85,8 +95,11 @@ export default function ExportStatusActions({
   currentStatus,
 }: ExportStatusActionsProps) {
   const router = useRouter();
-  const [loadingStatus, setLoadingStatus] = useState<ExportStatus | null>(null);
+  const [status, setStatus] = useState<ExportStatus>(
+    normalizeStatus(currentStatus),
+  );
   const [note, setNote] = useState("");
+  const [loadingStatus, setLoadingStatus] = useState<ExportStatus | null>(null);
   const [message, setMessage] = useState(
     "Update this export as it moves through owner review, CPA readiness, and delivery.",
   );
@@ -95,7 +108,7 @@ export default function ExportStatusActions({
   async function updateStatus(nextStatus: ExportStatus) {
     setLoadingStatus(nextStatus);
     setTone("amber");
-    setMessage(`Updating export status to ${nextStatus.replace("_", " ")}...`);
+    setMessage("Updating export status...");
 
     try {
       const response = await fetch("/api/admin/financials/export-history", {
@@ -106,8 +119,8 @@ export default function ExportStatusActions({
         cache: "no-store",
         body: JSON.stringify({
           exportId,
-          exportStatus: nextStatus,
-          statusNote: note,
+          status: nextStatus,
+          notes: note.trim() || undefined,
         }),
       });
 
@@ -122,8 +135,9 @@ export default function ExportStatusActions({
         return;
       }
 
+      setStatus(nextStatus);
       setTone("green");
-      setMessage(json.message || "Financial export status updated.");
+      setMessage(`Export status updated to ${nextStatus.replaceAll("_", " ")}.`);
       setNote("");
       router.refresh();
     } catch (error) {
@@ -138,7 +152,11 @@ export default function ExportStatusActions({
     }
   }
 
-  const normalizedCurrentStatus = normalizeStatus(currentStatus);
+  const toneClasses = {
+    green: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    amber: "border-amber-100 bg-amber-50 text-amber-800",
+    rose: "border-rose-100 bg-rose-50 text-rose-800",
+  }[tone];
 
   return (
     <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
@@ -146,55 +164,42 @@ export default function ExportStatusActions({
         Status Actions
       </p>
 
-      <h2 className="mt-2 text-2xl font-black text-slate-950">
+      <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
         Move Export Through Workflow
       </h2>
 
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+      <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
         Use these actions to track whether this package needs review, is being
         prepared, is ready, has been sent, or needs correction.
       </p>
 
-      <div
-        className={`mt-5 rounded-[1.25rem] border p-4 ${
-          tone === "green"
-            ? "border-emerald-100 bg-emerald-50"
-            : tone === "amber"
-              ? "border-amber-100 bg-amber-50"
-              : "border-rose-100 bg-rose-50"
-        }`}
-      >
-        <p
-          className={`text-xs font-black uppercase tracking-[0.16em] ${
-            tone === "green"
-              ? "text-emerald-700"
-              : tone === "amber"
-                ? "text-amber-700"
-                : "text-rose-700"
-          }`}
-        >
+      <div className={`mt-5 rounded-[1.25rem] border p-4 ${toneClasses}`}>
+        <p className="text-xs font-black uppercase tracking-[0.18em]">
           Workflow Status
         </p>
-        <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
-          {message}
-        </p>
+        <p className="mt-2 text-sm font-bold leading-6">{message}</p>
       </div>
 
-      <label className="mt-5 block">
-        <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+      <div className="mt-5">
+        <label
+          htmlFor="export-status-note"
+          className="text-xs font-black uppercase tracking-[0.18em] text-slate-500"
+        >
           Status Note
-        </span>
+        </label>
+
         <textarea
+          id="export-status-note"
           value={note}
           onChange={(event) => setNote(event.target.value)}
           placeholder="Optional note for CPA, bookkeeper, owner, or management..."
-          className="mt-2 min-h-[110px] w-full rounded-[1.25rem] border border-slate-200 bg-white p-4 text-sm font-semibold leading-6 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+          className="mt-2 min-h-[120px] w-full rounded-[1.25rem] border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
         />
-      </label>
+      </div>
 
       <div className="mt-5 grid gap-3">
         {statusActions.map((action) => {
-          const active = normalizedCurrentStatus === action.value;
+          const active = status === action.value;
           const loading = loadingStatus === action.value;
 
           return (

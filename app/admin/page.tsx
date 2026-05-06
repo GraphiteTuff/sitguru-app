@@ -1470,9 +1470,9 @@ export default async function AdminDashboardPage() {
                 </thead>
                 <tbody>
                   {data.topGurus.length ? (
-                    data.topGurus.map((guru) => (
+                    data.topGurus.map((guru, index) => (
                       <tr
-                        key={guru.name}
+                        key={`${guru.name}-${guru.city}-${index}`}
                         className="border-b border-[#f1f5f2] last:border-0"
                       >
                         <td className="py-3">
@@ -1533,9 +1533,9 @@ export default async function AdminDashboardPage() {
                 </thead>
                 <tbody>
                   {data.topCustomers.length ? (
-                    data.topCustomers.map((customer) => (
+                    data.topCustomers.map((customer, index) => (
                       <tr
-                        key={customer.name}
+                        key={`${customer.name}-${customer.spend}-${customer.bookings}-${index}`}
                         className="border-b border-[#f1f5f2] last:border-0"
                       >
                         <td className="py-3">

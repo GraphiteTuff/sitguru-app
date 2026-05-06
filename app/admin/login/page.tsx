@@ -18,6 +18,23 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
+function normalizeError(error: unknown) {
+  if (!error) return "Something went wrong.";
+
+  if (typeof error === "string") return error;
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return "Something went wrong.";
+}
+
 export default function AdminLoginPage() {
   const router = useRouter();
 
@@ -44,7 +61,50 @@ export default function AdminLoginPage() {
         return;
       }
 
-      router.push("/admin");
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setErrorMessage("Unable to verify your admin account.");
+        await supabase.auth.signOut();
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || profile?.role !== "admin") {
+        setErrorMessage("This account is not authorized for admin access.");
+        await supabase.auth.signOut();
+        return;
+      }
+
+      const { data: aalData, error: aalError } =
+        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+      if (aalError) {
+        setErrorMessage(normalizeError(aalError));
+        return;
+      }
+
+      if (aalData?.currentLevel === "aal2") {
+        router.push("/admin");
+        router.refresh();
+        return;
+      }
+
+      if (aalData?.nextLevel === "aal2") {
+        router.push("/admin/security/mfa/challenge");
+        router.refresh();
+        return;
+      }
+
+      router.push("/admin/security/mfa");
       router.refresh();
     } catch {
       setErrorMessage("Something went wrong while signing in.");
@@ -188,7 +248,9 @@ export default function AdminLoginPage() {
                       type="button"
                       onClick={() => setShowPassword((value) => !value)}
                       className="ml-3 rounded-full p-1 text-slate-500 transition hover:bg-white hover:text-green-800"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
                     >
                       {showPassword ? (
                         <EyeOff className="h-5 w-5" />
@@ -213,7 +275,7 @@ export default function AdminLoginPage() {
                   {submitting ? (
                     <>
                       <Sparkles className="h-5 w-5 animate-pulse" />
-                      Signing in...
+                      Checking security...
                     </>
                   ) : (
                     "Sign In"
@@ -222,7 +284,10 @@ export default function AdminLoginPage() {
               </form>
 
               <div className="mt-6 flex flex-col gap-3 text-sm font-bold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                <Link href="/" className="text-green-800 transition hover:text-green-900">
+                <Link
+                  href="/"
+                  className="text-green-800 transition hover:text-green-900"
+                >
                   Back to Homepage
                 </Link>
 
@@ -232,6 +297,16 @@ export default function AdminLoginPage() {
                 >
                   Forgot password?
                 </Link>
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                  MFA Enforcement
+                </p>
+                <p className="mt-1 text-sm font-semibold leading-6 text-emerald-900">
+                  Admin accounts with a verified MFA factor are redirected to
+                  the authenticator challenge before entering the dashboard.
+                </p>
               </div>
             </div>
           </div>

@@ -11,13 +11,26 @@ type ExpenseRow = Record<string, unknown>;
 type PayoutRow = Record<string, unknown>;
 type DisputeRow = Record<string, unknown>;
 type FinancialLedgerRow = Record<string, unknown>;
+type BankTransactionRow = Record<string, unknown>;
+type StripeBalanceTransactionRow = Record<string, unknown>;
 
 type SafeQueryResponse = {
   data: unknown;
   error: unknown;
 };
 
-type CashFlowSectionKey = "operating" | "investing" | "financing" | "cash_position";
+type AdminIdentity = {
+  id: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
+};
+
+type CashFlowSectionKey =
+  | "operating"
+  | "investing"
+  | "financing"
+  | "cash_position";
 
 type CashFlowLine = {
   id: string;
@@ -28,6 +41,21 @@ type CashFlowLine = {
   amount: number;
   notes: string;
   displayOrder: number;
+  source: string;
+};
+
+type CashFlowReadinessItem = {
+  label: string;
+  status: "ready" | "needs_review" | "missing";
+  detail: string;
+};
+
+type RecentCashActivity = {
+  id: string;
+  name: string;
+  source: string;
+  amount: number;
+  date: string;
 };
 
 const SECTION_LABELS: Record<CashFlowSectionKey, string> = {
@@ -46,21 +74,21 @@ const SECTION_OPTIONS: { value: CashFlowSectionKey; label: string }[] = [
 
 const LINE_PRESETS = [
   { section: "operating", label: "Cash Received from Bookings" },
+  { section: "operating", label: "Stripe Processing Fees" },
   { section: "operating", label: "Cash Paid to Gurus" },
   { section: "operating", label: "Cash Paid for Operating Expenses" },
   { section: "operating", label: "Cash Paid for Refunds / Credits" },
   { section: "operating", label: "Sales Tax Held / Paid" },
   { section: "operating", label: "Dispute Losses / Adjustments" },
-
   { section: "investing", label: "Equipment Purchases" },
   { section: "investing", label: "Software / Platform Asset Investment" },
   { section: "investing", label: "Other Long-Term Asset Activity" },
-
   { section: "financing", label: "Owner Contributions" },
   { section: "financing", label: "Loans Received" },
   { section: "financing", label: "Loan Repayments" },
+  { section: "financing", label: "Transfers to Savings / Reserves" },
+  { section: "financing", label: "Transfers from Savings / Reserves" },
   { section: "financing", label: "Other Financing Activity" },
-
   { section: "cash_position", label: "Beginning Cash Balance" },
   { section: "cash_position", label: "Manual Cash Adjustment" },
 ] as const;
@@ -71,79 +99,132 @@ const DEFAULT_CASH_FLOW_LINES: CashFlowRow[] = [
     label: "Cash Received from Bookings",
     amount: 0,
     display_order: 10,
-    notes: "Estimated from paid SitGuru booking rows",
+    notes: "Estimated from paid SitGuru booking rows and Stripe payment activity.",
+    source: "bookings/stripe",
+  },
+  {
+    section: "operating",
+    label: "Stripe Processing Fees",
+    amount: 0,
+    display_order: 15,
+    notes: "Estimated from Stripe balance transactions when available.",
+    source: "stripe_balance_transactions",
   },
   {
     section: "operating",
     label: "Cash Paid to Gurus",
     amount: 0,
     display_order: 20,
-    notes: "Estimated from Guru payout amounts",
+    notes: "Estimated from Guru payout records, with booking fallback.",
+    source: "guru_payouts/bookings",
   },
   {
     section: "operating",
     label: "Cash Paid for Operating Expenses",
     amount: 0,
     display_order: 30,
-    notes: "Estimated from expense_ledger rows",
+    notes: "Estimated from expense ledger and Navy Federal bank outflows.",
+    source: "expense_ledger/bank_transactions",
   },
   {
     section: "operating",
     label: "Cash Paid for Refunds / Credits",
     amount: 0,
     display_order: 40,
-    notes: "Estimated from refund-related booking rows",
+    notes: "Estimated from refunds in bookings, Stripe, and the financial ledger.",
+    source: "bookings/stripe/financial_ledger_entries",
   },
   {
     section: "operating",
     label: "Sales Tax Held / Paid",
     amount: 0,
     display_order: 50,
-    notes: "Estimated from booking sales tax fields",
+    notes: "Estimated from booking sales tax fields.",
+    source: "bookings",
+  },
+  {
+    section: "operating",
+    label: "Dispute Losses / Adjustments",
+    amount: 0,
+    display_order: 60,
+    notes: "Estimated from dispute records and chargeback activity.",
+    source: "dispute_cases/stripe",
   },
   {
     section: "investing",
     label: "Equipment Purchases",
     amount: 0,
     display_order: 10,
-    notes: "Manual investing activity",
+    notes: "Manual investing activity.",
+    source: "manual",
   },
   {
     section: "investing",
     label: "Software / Platform Asset Investment",
     amount: 0,
     display_order: 20,
-    notes: "Manual platform investment",
+    notes: "Manual platform investment.",
+    source: "manual",
   },
   {
     section: "financing",
     label: "Owner Contributions",
     amount: 0,
     display_order: 10,
-    notes: "Manual owner contribution",
+    notes: "Manual owner contribution or capital injection.",
+    source: "manual/bank_transactions",
   },
   {
     section: "financing",
     label: "Loans Received",
     amount: 0,
     display_order: 20,
-    notes: "Manual loan proceeds",
+    notes: "Manual loan proceeds.",
+    source: "manual/bank_transactions",
   },
   {
     section: "financing",
     label: "Loan Repayments",
     amount: 0,
     display_order: 30,
-    notes: "Manual loan repayment",
+    notes: "Manual loan repayment.",
+    source: "manual/bank_transactions",
+  },
+  {
+    section: "financing",
+    label: "Transfers to Savings / Reserves",
+    amount: 0,
+    display_order: 40,
+    notes: "Navy Federal transfer movement to savings, tax reserve, or emergency reserve.",
+    source: "bank_transactions",
+  },
+  {
+    section: "financing",
+    label: "Transfers from Savings / Reserves",
+    amount: 0,
+    display_order: 50,
+    notes: "Navy Federal transfer movement back to checking.",
+    source: "bank_transactions",
   },
   {
     section: "cash_position",
     label: "Beginning Cash Balance",
     amount: 0,
     display_order: 10,
-    notes: "Manual beginning cash balance",
+    notes: "Manual beginning cash balance or opening bank balance.",
+    source: "manual/bank_transactions",
   },
 ];
+
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+  return false;
+}
 
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -200,7 +281,7 @@ function getBarWidth(value: number, max: number) {
 
 async function safeRows<T>(
   query: PromiseLike<SafeQueryResponse>,
-  label: string
+  label: string,
 ): Promise<T[]> {
   try {
     const result = await query;
@@ -217,8 +298,159 @@ async function safeRows<T>(
   }
 }
 
+function hasFinancialRole(role: string) {
+  return [
+    "owner",
+    "super_admin",
+    "admin",
+    "finance_admin",
+    "finance",
+    "accounting",
+    "bookkeeper",
+  ].includes(role.trim().toLowerCase());
+}
+
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
+      process.env.ADMIN_EMAILS ||
+      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+      "",
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+async function getAdminIdentity(): Promise<AdminIdentity | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  const userEmail = (user.email || "").toLowerCase();
+  const envAdminEmails = getEnvAdminEmails();
+
+  const profileChecks = await Promise.all([
+    safeRows<Record<string, unknown>>(
+      supabaseAdmin
+        .from("admin_users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("user_id", user.id)
+        .limit(1),
+      "admin_users_finance_access",
+    ),
+    safeRows<Record<string, unknown>>(
+      supabaseAdmin
+        .from("profiles")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "profiles_finance_access",
+    ),
+    safeRows<Record<string, unknown>>(
+      supabaseAdmin
+        .from("users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "users_finance_access",
+    ),
+  ]);
+
+  const profile = profileChecks.flat().find(Boolean) || {};
+  const role = asTrimmedString(profile.role) || "admin";
+  const active =
+    profile.is_active === undefined
+      ? true
+      : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(
+    profile.can_access_financials,
+  );
+  const envAllowed = envAdminEmails.includes(userEmail);
+  const canAccessFinancials =
+    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+
+  return {
+    id: user.id,
+    email: userEmail,
+    role,
+    canAccessFinancials,
+  };
+}
+
+async function requireFinancialAdminAction(action: string) {
+  const identity = await getAdminIdentity();
+
+  if (!identity?.canAccessFinancials) {
+    console.warn(`Blocked financial admin action: ${action}`);
+    return null;
+  }
+
+  return identity;
+}
+
+async function writeFinancialAuditLog({
+  actor,
+  action,
+  targetType,
+  targetId,
+  metadata,
+}: {
+  actor: AdminIdentity;
+  action: string;
+  targetType: string;
+  targetId?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const payload = {
+    actor_id: actor.id,
+    actor_email: actor.email,
+    actor_role: actor.role,
+    action,
+    area: "financials.cash_flow",
+    target_type: targetType,
+    target_id: targetId || null,
+    metadata: metadata || {},
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const { error } = await supabaseAdmin
+      .from("financial_audit_logs")
+      .insert(payload);
+    if (!error) return;
+  } catch {
+    // Keep finance actions from failing if audit tables are not created yet.
+  }
+
+  try {
+    await supabaseAdmin.from("admin_audit_logs").insert(payload);
+  } catch (error) {
+    console.warn("Financial audit log skipped:", error);
+  }
+}
+
+function isArchivedRow(row: Record<string, unknown>) {
+  return Boolean(
+    row.deleted_at ||
+      row.voided_at ||
+      row.archived_at ||
+      row.is_deleted === true ||
+      row.is_void === true ||
+      row.is_active === false,
+  );
+}
+
 async function addCashFlowLine(formData: FormData) {
   "use server";
+
+  const actor = await requireFinancialAdminAction("add_cash_flow_line");
+  if (!actor) return;
 
   const section = String(formData.get("section") || "").trim();
   const preset = String(formData.get("preset") || "").trim();
@@ -227,24 +459,32 @@ async function addCashFlowLine(formData: FormData) {
   const notes = String(formData.get("notes") || "").trim();
 
   const isValidSection = SECTION_OPTIONS.some((item) => item.value === section);
-
-  if (!isValidSection) {
-    return;
-  }
+  if (!isValidSection) return;
 
   const label = customLabel || preset;
+  if (!label) return;
 
-  if (!label) {
-    return;
-  }
+  const { data: insertedLine } = await supabaseAdmin
+    .from("cash_flow_lines")
+    .insert({
+      section,
+      label,
+      amount: Number.isFinite(amount) ? amount : 0,
+      notes,
+      display_order: 100,
+      is_active: true,
+    })
+    .select("id")
+    .single();
 
-  await supabaseAdmin.from("cash_flow_lines").insert({
-    section,
-    label,
-    amount: Number.isFinite(amount) ? amount : 0,
-    notes,
-    display_order: 100,
-    is_active: true,
+  await writeFinancialAuditLog({
+    actor,
+    action: "add_cash_flow_line",
+    targetType: "cash_flow_line",
+    targetId: asTrimmedString(
+      (insertedLine as Record<string, unknown> | null)?.id,
+    ),
+    metadata: { section, label, amount, notes },
   });
 
   revalidatePath("/admin/financials/cash-flow");
@@ -253,16 +493,23 @@ async function addCashFlowLine(formData: FormData) {
 async function deleteCashFlowLine(formData: FormData) {
   "use server";
 
-  const lineId = String(formData.get("lineId") || "").trim();
+  const actor = await requireFinancialAdminAction("deactivate_cash_flow_line");
+  if (!actor) return;
 
-  if (!lineId) {
-    return;
-  }
+  const lineId = String(formData.get("lineId") || "").trim();
+  if (!lineId) return;
 
   await supabaseAdmin
     .from("cash_flow_lines")
     .update({ is_active: false })
     .eq("id", lineId);
+
+  await writeFinancialAuditLog({
+    actor,
+    action: "deactivate_cash_flow_line",
+    targetType: "cash_flow_line",
+    targetId: lineId,
+  });
 
   revalidatePath("/admin/financials/cash-flow");
 }
@@ -307,8 +554,7 @@ function getRefundAmount(booking: BookingRow) {
   if (explicitRefund > 0) return explicitRefund;
 
   const status = (
-    asTrimmedString(booking.payment_status) ||
-    asTrimmedString(booking.status)
+    asTrimmedString(booking.payment_status) || asTrimmedString(booking.status)
   ).toLowerCase();
 
   if (status.includes("refund")) {
@@ -348,6 +594,15 @@ function getExpenseName(expense: ExpenseRow) {
   );
 }
 
+function getExpenseCategory(expense: ExpenseRow) {
+  return (
+    asTrimmedString(expense.category) ||
+    asTrimmedString(expense.expense_category) ||
+    asTrimmedString(expense.type) ||
+    "Operating Expense"
+  );
+}
+
 function getDisputeAmount(dispute: DisputeRow) {
   return (
     toNumber(dispute.amount) ||
@@ -361,20 +616,46 @@ function getLedgerDebit(row: FinancialLedgerRow) {
   return toNumber(row.debit);
 }
 
-function getLedgerAccountName(row: FinancialLedgerRow) {
-  return asTrimmedString(row.account_name).toLowerCase();
+function getLedgerCredit(row: FinancialLedgerRow) {
+  return toNumber(row.credit);
+}
+
+function getLedgerAmount(row: FinancialLedgerRow) {
+  return (
+    toNumber(row.amount) ||
+    getLedgerDebit(row) - getLedgerCredit(row) ||
+    toNumber(row.net_amount)
+  );
+}
+
+function getLedgerText(row: Record<string, unknown>) {
+  return [
+    row.source,
+    row.source_type,
+    row.account_name,
+    row.account,
+    row.description,
+    row.memo,
+    row.name,
+    row.category,
+    row.external_account_name,
+    row.institution_name,
+  ]
+    .map(asTrimmedString)
+    .join(" ")
+    .toLowerCase();
 }
 
 function getLedgerRefundCashOutflow(ledgerEntries: FinancialLedgerRow[]) {
   return ledgerEntries.reduce((sum, row) => {
-    const accountName = getLedgerAccountName(row);
+    const text = getLedgerText(row);
 
     if (
-      accountName === "refunds / customer credits" ||
-      accountName === "refunds / credits" ||
-      accountName === "customer credits"
+      text.includes("refund") ||
+      text.includes("customer credit") ||
+      text.includes("customer credits")
     ) {
-      return sum + getLedgerDebit(row);
+      return sum + Math.abs(getLedgerAmount(row));
     }
 
     return sum;
@@ -415,6 +696,86 @@ function isPayoutReleased(payout: PayoutRow) {
   );
 }
 
+function getBankAmount(row: BankTransactionRow) {
+  return (
+    toNumber(row.amount) ||
+    toNumber(row.transaction_amount) ||
+    toNumber(row.net_amount) ||
+    toNumber(row.value)
+  );
+}
+
+function getBankName(row: BankTransactionRow) {
+  return (
+    asTrimmedString(row.name) ||
+    asTrimmedString(row.description) ||
+    asTrimmedString(row.merchant_name) ||
+    asTrimmedString(row.memo) ||
+    "Bank Transaction"
+  );
+}
+
+function getBankDate(row: BankTransactionRow) {
+  return (
+    asTrimmedString(row.date) ||
+    asTrimmedString(row.transaction_date) ||
+    asTrimmedString(row.posted_at) ||
+    asTrimmedString(row.created_at)
+  );
+}
+
+function isBankOutflow(row: BankTransactionRow) {
+  const amount = getBankAmount(row);
+  const direction = asTrimmedString(row.direction).toLowerCase();
+  const type = asTrimmedString(row.type).toLowerCase();
+
+  if (direction.includes("out") || type.includes("debit")) return true;
+  if (direction.includes("in") || type.includes("credit")) return false;
+
+  return amount < 0;
+}
+
+function isBankSavingsTransfer(row: BankTransactionRow) {
+  const text = getLedgerText(row);
+  return (
+    text.includes("savings") ||
+    text.includes("reserve") ||
+    text.includes("transfer")
+  );
+}
+
+function getStripeAmount(row: StripeBalanceTransactionRow) {
+  return (
+    toNumber(row.amount) ||
+    toNumber(row.gross_amount) ||
+    toNumber(row.net_amount) ||
+    toNumber(row.fee)
+  );
+}
+
+function getStripeFee(row: StripeBalanceTransactionRow) {
+  return Math.abs(toNumber(row.fee) || toNumber(row.fee_amount));
+}
+
+function getStripeText(row: StripeBalanceTransactionRow) {
+  return [
+    row.type,
+    row.reporting_category,
+    row.description,
+    row.source,
+    row.status,
+  ]
+    .map(asTrimmedString)
+    .join(" ")
+    .toLowerCase();
+}
+
+function isArchivedCashFlowLine(row: Record<string, unknown>) {
+  return Boolean(
+    row.deleted_at || row.archived_at || row.is_deleted === true || row.is_active === false,
+  );
+}
+
 function getCashFlowSection(line: CashFlowRow): CashFlowSectionKey {
   const section = asTrimmedString(line.section) as CashFlowSectionKey;
 
@@ -437,6 +798,36 @@ function getLineId(line: CashFlowRow, index: number) {
   );
 }
 
+function normalizeCashFlowLabel(value: string) {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function getDefaultLineKeys() {
+  return new Set(
+    DEFAULT_CASH_FLOW_LINES.map((line) =>
+      `${getCashFlowSection(line)}:${normalizeCashFlowLabel(asTrimmedString(line.label))}`,
+    ),
+  );
+}
+
+function getCashFlowLineKey(line: CashFlowRow) {
+  return `${getCashFlowSection(line)}:${normalizeCashFlowLabel(asTrimmedString(line.label))}`;
+}
+
+function dedupeCashFlowRows(lines: CashFlowRow[]) {
+  const byKey = new Map<string, CashFlowRow>();
+
+  for (const line of lines) {
+    byKey.set(getCashFlowLineKey(line), line);
+  }
+
+  return Array.from(byKey.values()).sort(
+    (a, b) =>
+      (toNumber(a.display_order) || 100) - (toNumber(b.display_order) || 100) ||
+      asTrimmedString(a.label).localeCompare(asTrimmedString(b.label)),
+  );
+}
+
 function getCashFlowLineAmount({
   line,
   bookings,
@@ -444,6 +835,8 @@ function getCashFlowLineAmount({
   payouts,
   disputes,
   ledgerEntries,
+  bankTransactions,
+  stripeBalanceTransactions,
 }: {
   line: CashFlowRow;
   bookings: BookingRow[];
@@ -451,14 +844,34 @@ function getCashFlowLineAmount({
   payouts: PayoutRow[];
   disputes: DisputeRow[];
   ledgerEntries: FinancialLedgerRow[];
+  bankTransactions: BankTransactionRow[];
+  stripeBalanceTransactions: StripeBalanceTransactionRow[];
 }) {
-  const label = asTrimmedString(line.label).toLowerCase();
+  const label = normalizeCashFlowLabel(asTrimmedString(line.label));
   const storedAmount = toNumber(line.amount);
 
   if (label.includes("cash received") && label.includes("booking")) {
+    const stripePayments = stripeBalanceTransactions
+      .filter((row) => {
+        const text = getStripeText(row);
+        return text.includes("charge") || text.includes("payment");
+      })
+      .reduce((sum, row) => sum + Math.abs(getStripeAmount(row)), 0);
+
+    if (stripePayments > 0) return stripePayments;
+
     return bookings
       .filter(isPaidBooking)
       .reduce((sum, booking) => sum + getBookingGrossAmount(booking), 0);
+  }
+
+  if (label.includes("stripe") && label.includes("fee")) {
+    const stripeFees = stripeBalanceTransactions.reduce(
+      (sum, row) => sum + getStripeFee(row),
+      0,
+    );
+
+    return -Math.abs(stripeFees);
   }
 
   if (label.includes("paid to guru") || label.includes("paid to gurus")) {
@@ -466,41 +879,55 @@ function getCashFlowLineAmount({
       .filter(isPayoutReleased)
       .reduce((sum, payout) => sum + getPayoutAmount(payout), 0);
 
-    if (payoutTableTotal > 0) {
-      return -Math.abs(payoutTableTotal);
-    }
+    if (payoutTableTotal > 0) return -Math.abs(payoutTableTotal);
 
     return -Math.abs(
       bookings
         .filter(isPaidBooking)
-        .reduce((sum, booking) => sum + getGuruPayoutAmount(booking), 0)
+        .reduce((sum, booking) => sum + getGuruPayoutAmount(booking), 0),
     );
   }
 
   if (label.includes("operating expense")) {
+    const bankOperatingOutflows = bankTransactions
+      .filter((row) => isBankOutflow(row) && !isBankSavingsTransfer(row))
+      .reduce((sum, row) => sum + Math.abs(getBankAmount(row)), 0);
+
+    if (bankOperatingOutflows > 0) return -Math.abs(bankOperatingOutflows);
+
     return -Math.abs(
-      expenses.reduce((sum, expense) => sum + getExpenseAmount(expense), 0)
+      expenses.reduce((sum, expense) => sum + getExpenseAmount(expense), 0),
     );
   }
 
   if (label.includes("refund") || label.includes("credit")) {
+    const stripeRefunds = stripeBalanceTransactions
+      .filter((row) => getStripeText(row).includes("refund"))
+      .reduce((sum, row) => sum + Math.abs(getStripeAmount(row)), 0);
     const ledgerRefunds = getLedgerRefundCashOutflow(ledgerEntries);
     const bookingRefunds = bookings.reduce(
       (sum, booking) => sum + getRefundAmount(booking),
-      0
+      0,
     );
 
-    return -Math.abs(ledgerRefunds > 0 ? ledgerRefunds : bookingRefunds);
+    return -Math.abs(stripeRefunds || ledgerRefunds || bookingRefunds);
   }
 
   if (label.includes("sales tax")) {
     return -Math.abs(
-      bookings.reduce((sum, booking) => sum + getBookingTaxAmount(booking), 0)
+      bookings.reduce((sum, booking) => sum + getBookingTaxAmount(booking), 0),
     );
   }
 
   if (label.includes("dispute")) {
-    return -Math.abs(getNonRefundDisputeCashImpact(disputes));
+    const stripeDisputes = stripeBalanceTransactions
+      .filter((row) => {
+        const text = getStripeText(row);
+        return text.includes("dispute") || text.includes("chargeback");
+      })
+      .reduce((sum, row) => sum + Math.abs(getStripeAmount(row)), 0);
+
+    return -Math.abs(stripeDisputes || getNonRefundDisputeCashImpact(disputes));
   }
 
   if (
@@ -516,7 +943,215 @@ function getCashFlowLineAmount({
     return -Math.abs(storedAmount);
   }
 
+  if (label.includes("transfers to savings")) {
+    const transfers = bankTransactions
+      .filter((row) => isBankOutflow(row) && isBankSavingsTransfer(row))
+      .reduce((sum, row) => sum + Math.abs(getBankAmount(row)), 0);
+    return -Math.abs(transfers || storedAmount);
+  }
+
+  if (label.includes("transfers from savings")) {
+    const transfers = bankTransactions
+      .filter((row) => !isBankOutflow(row) && isBankSavingsTransfer(row))
+      .reduce((sum, row) => sum + Math.abs(getBankAmount(row)), 0);
+    return Math.abs(transfers || storedAmount);
+  }
+
+  if (label.includes("beginning cash")) {
+    const earliestBalance = bankTransactions
+      .map((row) => toNumber(row.running_balance) || toNumber(row.balance))
+      .find((value) => value !== 0);
+    return storedAmount || earliestBalance || 0;
+  }
+
   return storedAmount;
+}
+
+function readinessClasses(status: CashFlowReadinessItem["status"]) {
+  const classes = {
+    ready: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    needs_review: "border-amber-100 bg-amber-50 text-amber-800",
+    missing: "border-rose-100 bg-rose-50 text-rose-800",
+  };
+
+  return classes[status];
+}
+
+function getCashFlowReadinessItems({
+  bookings,
+  expenses,
+  payouts,
+  disputes,
+  ledgerEntries,
+  bankTransactions,
+  stripeBalanceTransactions,
+}: {
+  bookings: BookingRow[];
+  expenses: ExpenseRow[];
+  payouts: PayoutRow[];
+  disputes: DisputeRow[];
+  ledgerEntries: FinancialLedgerRow[];
+  bankTransactions: BankTransactionRow[];
+  stripeBalanceTransactions: StripeBalanceTransactionRow[];
+}): CashFlowReadinessItem[] {
+  const reconciliationReady = [...ledgerEntries, ...bankTransactions].some(
+    (entry) =>
+      Boolean(
+        entry.reconciled_at ||
+          entry.matched_transaction_id ||
+          entry.reconciliation_id ||
+          entry.stripe_payout_id,
+      ),
+  );
+
+  const bankRows = bankTransactions.filter((entry) => {
+    const text = getLedgerText(entry);
+    return (
+      text.includes("navy") ||
+      text.includes("checking") ||
+      text.includes("savings") ||
+      text.includes("bank") ||
+      Object.keys(entry).length > 0
+    );
+  });
+
+  return [
+    {
+      label: "Booking cash receipts",
+      status: bookings.length ? "ready" : "needs_review",
+      detail: bookings.length
+        ? `${bookings.length.toLocaleString()} booking rows are available for operating cash receipt calculations.`
+        : "No booking rows were found yet. Operating cash received will remain incomplete until bookings are connected.",
+    },
+    {
+      label: "Stripe cash movement",
+      status: stripeBalanceTransactions.length ? "ready" : "needs_review",
+      detail: stripeBalanceTransactions.length
+        ? `${stripeBalanceTransactions.length.toLocaleString()} Stripe balance rows found for payments, fees, refunds, disputes, and payouts.`
+        : "Normalize Stripe balance transactions to improve cash flow accuracy.",
+    },
+    {
+      label: "Navy Federal banking",
+      status: bankRows.length ? "ready" : "needs_review",
+      detail: bankRows.length
+        ? `${bankRows.length.toLocaleString()} bank rows found for deposits, withdrawals, transfers, and cash balance support.`
+        : "Connect Plaid or import Navy Federal CSV/QBO/OFX statements to confirm cash movement.",
+    },
+    {
+      label: "Guru payout cash outflows",
+      status: payouts.length ? "ready" : bookings.length ? "needs_review" : "missing",
+      detail: payouts.length
+        ? `${payouts.length.toLocaleString()} payout rows available for Guru cash outflow support.`
+        : "Guru payouts are currently estimated from bookings until payout rows are connected.",
+    },
+    {
+      label: "Operating expense cash outflows",
+      status: expenses.length || bankTransactions.length ? "ready" : "needs_review",
+      detail: expenses.length
+        ? `${expenses.length.toLocaleString()} expense ledger rows are available for operating cash outflows.`
+        : "Add or import operating expenses so the Cash Flow statement reflects real admin costs.",
+    },
+    {
+      label: "Reconciliation status",
+      status: reconciliationReady ? "ready" : "missing",
+      detail: reconciliationReady
+        ? "At least one row has reconciliation metadata for matching Stripe payouts to bank deposits or transfers."
+        : "Add reconciliation IDs/matches so Stripe payouts and Navy Federal deposits are not double-counted.",
+    },
+    {
+      label: "Disputes and refunds",
+      status: disputes.length || stripeBalanceTransactions.length ? "ready" : "needs_review",
+      detail: `${disputes.length.toLocaleString()} dispute rows and ${stripeBalanceTransactions.length.toLocaleString()} Stripe rows are available for refund/dispute support.`,
+    },
+  ];
+}
+
+function CashFlowReadinessPanel({
+  items,
+}: {
+  items: CashFlowReadinessItem[];
+}) {
+  const readyCount = items.filter((item) => item.status === "ready").length;
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+            CPA / Cash Flow Readiness
+          </p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+            Cash-flow export checks
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            This panel checks whether the Cash Flow statement has the source
+            records your CPA will expect: bookings, Stripe cash movement, Navy
+            Federal activity, payouts, expenses, refunds, disputes, and
+            reconciliation matches.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800">
+          {readyCount}/{items.length} ready
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-xl border p-4 ${readinessClasses(item.status)}`}
+          >
+            <p className="text-xs font-black uppercase tracking-[0.16em] opacity-80">
+              {item.status.replace("_", " ")}
+            </p>
+            <h3 className="mt-2 text-base font-black text-slate-950">
+              {item.label}
+            </h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              {item.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CashFlowIntegrationPanel() {
+  const steps = [
+    "Customer booking creates gross cash receipt activity.",
+    "Stripe identifies gross payments, processing fees, refunds, disputes, and payouts.",
+    "Navy Federal checking/savings confirms deposits, withdrawals, transfers, and ending cash.",
+    "Reconciliation matches Stripe payouts to bank deposits so cash is not double-counted.",
+    "Financial Overview, P&L, Balance Sheet, Cash Flow, exports, and CPA handoff use the same ledger foundation.",
+  ];
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+        Stripe + Navy Federal Cash Flow
+      </p>
+      <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+        How this statement should reconcile
+      </h2>
+      <div className="mt-6 grid gap-3 lg:grid-cols-5">
+        {steps.map((step, index) => (
+          <div
+            key={step}
+            className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
+              {index + 1}
+            </span>
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
+              {step}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function StatCard({
@@ -531,22 +1166,22 @@ function StatCard({
   tone?: "emerald" | "sky" | "violet" | "amber" | "rose";
 }) {
   const toneClass = {
-    emerald: "border-emerald-400/20 bg-emerald-400/10",
-    sky: "border-sky-400/20 bg-sky-400/10",
-    violet: "border-violet-400/20 bg-violet-400/10",
-    amber: "border-amber-400/20 bg-amber-400/10",
-    rose: "border-rose-400/20 bg-rose-400/10",
+    emerald: "border-emerald-100 bg-emerald-50",
+    sky: "border-sky-100 bg-sky-50",
+    violet: "border-violet-100 bg-violet-50",
+    amber: "border-amber-100 bg-amber-50",
+    rose: "border-rose-100 bg-rose-50",
   }[tone];
 
   return (
-    <div className={`rounded-3xl border p-5 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+    <div className={`rounded-[1.5rem] border p-5 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
         {label}
       </p>
-      <p className="mt-3 text-3xl font-black tracking-tight text-white">
+      <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
         {value}
       </p>
-      <p className="mt-3 text-sm leading-6 text-slate-400">{detail}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{detail}</p>
     </div>
   );
 }
@@ -564,7 +1199,7 @@ function ActionLink({
     return (
       <Link
         href={href}
-        className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+        className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
       >
         {label}
       </Link>
@@ -574,7 +1209,18 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:border-emerald-300/30 hover:bg-white/10"
+      className="inline-flex items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:border-emerald-200 hover:bg-emerald-50"
+    >
+      {label}
+    </Link>
+  );
+}
+
+function ExportLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-xl border border-emerald-100 bg-white px-3 py-2 text-center text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
     >
       {label}
     </Link>
@@ -594,51 +1240,69 @@ function CashFlowSection({
 }) {
   return (
     <div>
-      <div className="border-y border-emerald-400/20 bg-emerald-400/10 px-4 py-2">
-        <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-200">
+      <div className="border-y border-emerald-100 bg-emerald-50/80 px-4 py-3">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
           {title}
         </p>
       </div>
 
-      <div className="divide-y divide-white/10">
+      <div className="divide-y divide-slate-100">
         {lines.length ? (
           lines.map((line) => (
             <div
               key={line.id}
-              className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-3 text-slate-300"
+              className="grid gap-3 px-4 py-4 text-slate-600 sm:grid-cols-[minmax(0,1fr)_130px_100px] sm:items-center"
             >
-              <div>
-                <p className="pl-6">{line.label}</p>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-bold leading-tight text-slate-950">
+                    {line.label}
+                  </p>
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                      line.isSaved
+                        ? "border-blue-100 bg-blue-50 text-blue-700"
+                        : "border-emerald-100 bg-white text-emerald-700"
+                    }`}
+                  >
+                    {line.isSaved ? "Custom" : "Core"}
+                  </span>
+                </div>
                 {line.notes ? (
-                  <p className="mt-1 pl-6 text-xs text-slate-600">
+                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
                     {line.notes}
                   </p>
                 ) : null}
+                <p className="mt-1 text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  {line.source}
+                </p>
               </div>
 
               <p
-                className={`font-bold tabular-nums ${
-                  line.amount < 0 ? "text-rose-200" : "text-white"
+                className={`text-right text-sm font-black tabular-nums sm:text-base ${
+                  line.amount < 0 ? "text-rose-700" : "text-slate-950"
                 }`}
               >
                 {money(line.amount)}
               </p>
 
-              {line.isSaved ? (
-                <form action={deleteCashFlowLine}>
-                  <input type="hidden" name="lineId" value={line.dbId} />
-                  <button
-                    type="submit"
-                    className="rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1 text-xs font-bold text-rose-200 transition hover:bg-rose-400/20"
-                  >
-                    Delete
-                  </button>
-                </form>
-              ) : (
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-500">
-                  Default
-                </span>
-              )}
+              <div className="flex justify-end">
+                {line.isSaved ? (
+                  <form action={deleteCashFlowLine}>
+                    <input type="hidden" name="lineId" value={line.dbId} />
+                    <button
+                      type="submit"
+                      className="rounded-full border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+                    >
+                      Deactivate
+                    </button>
+                  </form>
+                ) : (
+                  <span className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-bold text-slate-500">
+                    Locked
+                  </span>
+                )}
+              </div>
             </div>
           ))
         ) : (
@@ -647,9 +1311,9 @@ function CashFlowSection({
           </div>
         )}
 
-        <div className="grid grid-cols-[1fr_auto] gap-4 bg-white/5 px-4 py-3 font-black text-white">
+        <div className="grid grid-cols-[1fr_auto] gap-4 bg-slate-50 px-4 py-3 font-black text-slate-950">
           <p>{totalLabel}</p>
-          <p className={totalValue < 0 ? "text-rose-200" : "text-white"}>
+          <p className={totalValue < 0 ? "text-rose-700" : "text-slate-950"}>
             {money(totalValue)}
           </p>
         </div>
@@ -658,8 +1322,27 @@ function CashFlowSection({
   );
 }
 
+function isLikelyManualFinancing(entry: BankTransactionRow) {
+  const text = getLedgerText(entry);
+  return (
+    text.includes("owner") ||
+    text.includes("capital") ||
+    text.includes("loan") ||
+    text.includes("financing")
+  );
+}
+
 async function getCashFlowData() {
-  const [savedLines, bookings, expenses, payouts, disputes, ledgerEntries] = await Promise.all([
+  const [
+    rawSavedLines,
+    rawBookings,
+    rawExpenses,
+    rawPayouts,
+    rawDisputes,
+    rawLedgerEntries,
+    rawBankTransactions,
+    rawStripeBalanceTransactions,
+  ] = await Promise.all([
     safeRows<CashFlowRow>(
       supabaseAdmin
         .from("cash_flow_lines")
@@ -668,7 +1351,7 @@ async function getCashFlowData() {
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: true })
         .limit(500),
-      "cash_flow_lines"
+      "cash_flow_lines",
     ),
     safeRows<BookingRow>(
       supabaseAdmin
@@ -676,7 +1359,7 @@ async function getCashFlowData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "bookings"
+      "bookings",
     ),
     safeRows<ExpenseRow>(
       supabaseAdmin
@@ -684,7 +1367,7 @@ async function getCashFlowData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "expense_ledger"
+      "expense_ledger",
     ),
     safeRows<PayoutRow>(
       supabaseAdmin
@@ -692,7 +1375,7 @@ async function getCashFlowData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "guru_payouts"
+      "guru_payouts",
     ),
     safeRows<DisputeRow>(
       supabaseAdmin
@@ -700,7 +1383,7 @@ async function getCashFlowData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "dispute_cases"
+      "dispute_cases",
     ),
     safeRows<FinancialLedgerRow>(
       supabaseAdmin
@@ -708,20 +1391,56 @@ async function getCashFlowData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(3000),
-      "financial_ledger_entries"
+      "financial_ledger_entries",
+    ),
+    safeRows<BankTransactionRow>(
+      supabaseAdmin
+        .from("bank_transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3000),
+      "bank_transactions",
+    ),
+    safeRows<StripeBalanceTransactionRow>(
+      supabaseAdmin
+        .from("stripe_balance_transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3000),
+      "stripe_balance_transactions",
     ),
   ]);
 
-  const sourceLines = savedLines.length > 0 ? savedLines : DEFAULT_CASH_FLOW_LINES;
+  const savedLines = rawSavedLines.filter((row) => !isArchivedCashFlowLine(row));
+  const bookings = rawBookings.filter((row) => !isArchivedRow(row));
+  const expenses = rawExpenses.filter((row) => !isArchivedRow(row));
+  const payouts = rawPayouts.filter((row) => !isArchivedRow(row));
+  const disputes = rawDisputes.filter((row) => !isArchivedRow(row));
+  const ledgerEntries = rawLedgerEntries.filter((row) => !isArchivedRow(row));
+  const bankTransactions = rawBankTransactions.filter((row) => !isArchivedRow(row));
+  const stripeBalanceTransactions = rawStripeBalanceTransactions.filter(
+    (row) => !isArchivedRow(row),
+  );
+
+  const defaultLineKeys = getDefaultLineKeys();
+  const sourceLines = dedupeCashFlowRows([
+    ...DEFAULT_CASH_FLOW_LINES,
+    ...savedLines,
+  ]);
+
+  const customSavedLineCount = savedLines.filter(
+    (line) => !defaultLineKeys.has(getCashFlowLineKey(line)),
+  ).length;
 
   const lines: CashFlowLine[] = sourceLines
     .map((line, index) => {
       const dbId = asTrimmedString(line.id);
+      const isCoreDefaultLine = defaultLineKeys.has(getCashFlowLineKey(line));
 
       return {
         id: getLineId(line, index),
         dbId,
-        isSaved: Boolean(dbId && savedLines.length > 0),
+        isSaved: Boolean(dbId && !isCoreDefaultLine),
         section: getCashFlowSection(line),
         label: asTrimmedString(line.label) || "Cash flow line",
         amount: getCashFlowLineAmount({
@@ -731,43 +1450,45 @@ async function getCashFlowData() {
           payouts,
           disputes,
           ledgerEntries,
+          bankTransactions,
+          stripeBalanceTransactions,
         }),
         notes: asTrimmedString(line.notes),
+        source: asTrimmedString(line.source) || "manual",
         displayOrder: toNumber(line.display_order) || 100,
       };
     })
     .sort(
-      (a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label)
+      (a, b) =>
+        a.displayOrder - b.displayOrder || a.label.localeCompare(b.label),
     );
 
   const operatingLines = lines.filter((line) => line.section === "operating");
   const investingLines = lines.filter((line) => line.section === "investing");
   const financingLines = lines.filter((line) => line.section === "financing");
   const cashPositionLines = lines.filter(
-    (line) => line.section === "cash_position"
+    (line) => line.section === "cash_position",
   );
 
   const netOperatingCash = operatingLines.reduce(
     (sum, line) => sum + line.amount,
-    0
+    0,
   );
   const netInvestingCash = investingLines.reduce(
     (sum, line) => sum + line.amount,
-    0
+    0,
   );
   const netFinancingCash = financingLines.reduce(
     (sum, line) => sum + line.amount,
-    0
+    0,
   );
 
   const beginningCash = cashPositionLines.reduce(
     (sum, line) => sum + line.amount,
-    0
+    0,
   );
-
   const netChangeInCash =
     netOperatingCash + netInvestingCash + netFinancingCash;
-
   const endingCash = beginningCash + netChangeInCash;
 
   const maxVisualValue = Math.max(
@@ -776,29 +1497,60 @@ async function getCashFlowData() {
     Math.abs(netFinancingCash),
     Math.abs(netChangeInCash),
     Math.abs(endingCash),
-    1
+    1,
   );
 
   const paidBookings = bookings.filter(isPaidBooking);
-  const recentExpenses = expenses.slice(0, 6).map((expense, index) => ({
-    id: asTrimmedString(expense.id) || `${getExpenseName(expense)}-${index}`,
-    name: getExpenseName(expense),
-    amount: getExpenseAmount(expense),
-    date: formatDateShort(asTrimmedString(expense.created_at)),
-  }));
+
+  const recentCashActivity: RecentCashActivity[] = [
+    ...bankTransactions.slice(0, 8).map((transaction, index) => ({
+      id:
+        asTrimmedString(transaction.id) ||
+        asTrimmedString(transaction.transaction_id) ||
+        `bank-${index}`,
+      name: getBankName(transaction),
+      source: "Navy Federal / Bank",
+      amount: getBankAmount(transaction),
+      date: formatDateShort(getBankDate(transaction)),
+    })),
+    ...expenses.slice(0, 8).map((expense, index) => ({
+      id: asTrimmedString(expense.id) || `${getExpenseName(expense)}-${index}`,
+      name: getExpenseName(expense),
+      source: getExpenseCategory(expense),
+      amount: -Math.abs(getExpenseAmount(expense)),
+      date: formatDateShort(asTrimmedString(expense.created_at)),
+    })),
+  ].slice(0, 10);
+
+  const manualFinancingBankRows = bankTransactions.filter(isLikelyManualFinancing)
+    .length;
 
   return {
     operatingLines,
     investingLines,
     financingLines,
     cashPositionLines,
-    recentExpenses,
-    savedLineCount: savedLines.length,
+    recentCashActivity,
+    readinessItems: getCashFlowReadinessItems({
+      bookings,
+      expenses,
+      payouts,
+      disputes,
+      ledgerEntries,
+      bankTransactions,
+      stripeBalanceTransactions,
+    }),
+    savedLineCount: customSavedLineCount,
     totals: {
       bookings: bookings.length,
       paidBookings: paidBookings.length,
       expenseRows: expenses.length,
       payoutRows: payouts.length,
+      disputeRows: disputes.length,
+      ledgerRows: ledgerEntries.length,
+      bankRows: bankTransactions.length,
+      stripeRows: stripeBalanceTransactions.length,
+      manualFinancingBankRows,
       netOperatingCash,
       netInvestingCash,
       netFinancingCash,
@@ -811,14 +1563,9 @@ async function getCashFlowData() {
 }
 
 export default async function AdminCashFlowPage() {
-  const supabase = await createClient();
+  const actor = await getAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  if (!actor?.canAccessFinancials) {
     return null;
   }
 
@@ -828,6 +1575,7 @@ export default async function AdminCashFlowPage() {
     {
       label: "Operating Cash Flow",
       value: cashFlow.totals.netOperatingCash,
+      detail: "Booking cash receipts less payouts, expenses, fees, refunds, taxes, and disputes.",
       tone:
         cashFlow.totals.netOperatingCash >= 0
           ? "bg-emerald-400"
@@ -836,6 +1584,7 @@ export default async function AdminCashFlowPage() {
     {
       label: "Investing Cash Flow",
       value: cashFlow.totals.netInvestingCash,
+      detail: "Equipment, software, platform assets, and long-term asset movement.",
       tone:
         cashFlow.totals.netInvestingCash >= 0
           ? "bg-sky-400"
@@ -844,6 +1593,7 @@ export default async function AdminCashFlowPage() {
     {
       label: "Financing Cash Flow",
       value: cashFlow.totals.netFinancingCash,
+      detail: "Owner capital, loans, repayments, and checking/savings reserve transfers.",
       tone:
         cashFlow.totals.netFinancingCash >= 0
           ? "bg-violet-400"
@@ -852,6 +1602,7 @@ export default async function AdminCashFlowPage() {
     {
       label: "Net Change in Cash",
       value: cashFlow.totals.netChangeInCash,
+      detail: "Operating + investing + financing cash movement.",
       tone:
         cashFlow.totals.netChangeInCash >= 0
           ? "bg-emerald-400"
@@ -860,31 +1611,65 @@ export default async function AdminCashFlowPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_30%),radial-gradient(circle_at_right,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-6 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-emerald-500/15 via-slate-950 to-sky-500/10 p-6 shadow-[0_12px_60px_rgba(0,0,0,0.28)] lg:p-8">
-          <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">
+    <div className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1640px] space-y-5 sm:space-y-6">
+        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(420px,620px)] 2xl:items-start">
+            <div className="max-w-5xl self-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">
                 Admin / Financials / Cash Flow
               </p>
 
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+              <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[0.95] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
                 SitGuru Statement of Cash Flows.
               </h1>
 
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                Tracks cash moving through SitGuru from operating, investing,
-                and financing activities. Auto-estimates booking cash receipts,
-                Guru payouts, expenses, refunds, taxes, and dispute adjustments.
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                Tracks cash moving through SitGuru from operations, investing,
+                financing, Stripe activity, Navy Federal deposits, bank
+                withdrawals, transfers, refunds, disputes, and CPA-ready cash
+                reconciliation.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <ActionLink href="/admin/financials" label="Financials" />
-              <ActionLink href="/admin/financials/profit-loss" label="P&L" />
-              <ActionLink href="/admin/financials/balance-sheet" label="Balance Sheet" />
-              <ActionLink href="/admin/payments" label="Payments" primary />
+            <div className="rounded-[1.5rem] border border-emerald-100 bg-[#fbfefd] p-4 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                Cash Flow Actions
+              </p>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <ActionLink href="/admin/financials" label="Financials" />
+                <ActionLink href="/admin/financials/profit-loss" label="P&L" />
+                <ActionLink
+                  href="/admin/financials/balance-sheet"
+                  label="Balance Sheet"
+                />
+                <ActionLink href="/admin/financials/reconciliation" label="Reconcile" primary />
+              </div>
+
+              <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Export Statement
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <ExportLink
+                    href="/api/admin/financials/cash-flow/export?format=csv"
+                    label="CSV"
+                  />
+                  <ExportLink
+                    href="/api/admin/financials/cash-flow/export?format=excel"
+                    label="Excel"
+                  />
+                  <ExportLink
+                    href="/api/admin/financials/cash-flow/export?format=word"
+                    label="Word"
+                  />
+                  <ExportLink
+                    href="/api/admin/financials/cash-flow/export?format=pdf"
+                    label="PDF / Print"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -892,7 +1677,7 @@ export default async function AdminCashFlowPage() {
             <StatCard
               label="Operating Cash Flow"
               value={money(cashFlow.totals.netOperatingCash)}
-              detail="Booking receipts minus Guru payouts, expenses, refunds, and tax cash movement."
+              detail="Booking receipts minus Guru payouts, Stripe fees, expenses, refunds, taxes, and disputes."
               tone={cashFlow.totals.netOperatingCash >= 0 ? "emerald" : "rose"}
             />
             <StatCard
@@ -904,7 +1689,7 @@ export default async function AdminCashFlowPage() {
             <StatCard
               label="Financing Cash Flow"
               value={money(cashFlow.totals.netFinancingCash)}
-              detail="Owner contributions, loans received, loan repayments, and financing activity."
+              detail="Owner contributions, loans, repayments, and reserve transfers."
               tone={cashFlow.totals.netFinancingCash >= 0 ? "violet" : "rose"}
             />
             <StatCard
@@ -916,33 +1701,34 @@ export default async function AdminCashFlowPage() {
           </div>
         </section>
 
+        <CashFlowReadinessPanel items={cashFlow.readinessItems} />
+
+        <CashFlowIntegrationPanel />
+
         <section className="grid gap-8 xl:grid-cols-[1fr_1fr]">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                   Add Cash Flow Line
                 </p>
-                <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                   Add operating, investing, or financing cash lines.
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Add manual cash flow lines for loans, owner contributions,
-                  equipment, platform assets, or beginning cash.
+                  equipment, platform assets, reserve transfers, or beginning cash.
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-bold text-slate-300">
+              <div className="rounded-xl border border-slate-100 bg-[#fbfefd] px-4 py-3 text-sm font-bold text-slate-600">
                 {cashFlow.savedLineCount > 0
                   ? `${cashFlow.savedLineCount} saved cash flow lines`
                   : "Using default cash flow lines"}
               </div>
             </div>
 
-            <form
-              action={addCashFlowLine}
-              className="mt-6 grid gap-4 xl:grid-cols-[1fr_1fr]"
-            >
+            <form action={addCashFlowLine} className="mt-6 grid gap-4 xl:grid-cols-2">
               <div>
                 <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Section
@@ -950,7 +1736,7 @@ export default async function AdminCashFlowPage() {
                 <select
                   name="section"
                   defaultValue=""
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                   required
                 >
                   <option value="" disabled>
@@ -971,13 +1757,12 @@ export default async function AdminCashFlowPage() {
                 <select
                   name="preset"
                   defaultValue=""
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 >
                   <option value="">Optional preset...</option>
                   {LINE_PRESETS.map((item) => (
                     <option key={`${item.section}-${item.label}`} value={item.label}>
-                      {SECTION_LABELS[item.section as CashFlowSectionKey]} —{" "}
-                      {item.label}
+                      {SECTION_LABELS[item.section as CashFlowSectionKey]} — {item.label}
                     </option>
                   ))}
                 </select>
@@ -991,7 +1776,7 @@ export default async function AdminCashFlowPage() {
                   name="customLabel"
                   type="text"
                   placeholder="Example: Loan Received, Owner Contribution..."
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -1004,7 +1789,7 @@ export default async function AdminCashFlowPage() {
                   type="number"
                   step="0.01"
                   placeholder="0.00"
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
@@ -1016,48 +1801,51 @@ export default async function AdminCashFlowPage() {
                   name="notes"
                   type="text"
                   placeholder="Optional notes"
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
               <button
                 type="submit"
-                className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 xl:col-span-2"
+                className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800 xl:col-span-2"
               >
                 Add Cash Flow Line
               </button>
             </form>
           </div>
 
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
               Cash Flow Visuals
             </p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
               Operating, investing, financing, and net cash change.
             </h2>
 
             <div className="mt-6 space-y-5">
               {visualRows.map((row) => (
                 <div key={row.label}>
-                  <div className="mb-2 flex items-center justify-between gap-4">
-                    <p className="text-sm font-bold text-white">{row.label}</p>
+                  <div className="mb-2 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">{row.label}</p>
+                      <p className="mt-1 text-xs text-slate-500">{row.detail}</p>
+                    </div>
                     <p
                       className={`text-sm font-bold ${
-                        row.value < 0 ? "text-rose-200" : "text-white"
+                        row.value < 0 ? "text-rose-700" : "text-slate-950"
                       }`}
                     >
                       {money(row.value)}
                     </p>
                   </div>
 
-                  <div className="h-3 rounded-full bg-white/10">
+                  <div className="h-3 rounded-full bg-slate-100">
                     <div
                       className={`h-3 rounded-full ${row.tone}`}
                       style={{
                         width: `${getBarWidth(
                           row.value,
-                          cashFlow.totals.maxVisualValue
+                          cashFlow.totals.maxVisualValue,
                         )}%`,
                       }}
                     />
@@ -1067,45 +1855,39 @@ export default async function AdminCashFlowPage() {
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   Beginning Cash
                 </p>
-                <p className="mt-2 text-2xl font-black text-white">
+                <p className="mt-2 text-2xl font-black text-slate-950">
                   {money(cashFlow.totals.beginningCash)}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  Net Cash Change
+                  Ending Cash
                 </p>
-                <p
-                  className={`mt-2 text-2xl font-black ${
-                    cashFlow.totals.netChangeInCash >= 0
-                      ? "text-emerald-200"
-                      : "text-rose-200"
-                  }`}
-                >
-                  {money(cashFlow.totals.netChangeInCash)}
+                <p className="mt-2 text-2xl font-black text-slate-950">
+                  {money(cashFlow.totals.endingCash)}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  Paid Bookings
+                  Stripe Rows
                 </p>
-                <p className="mt-2 text-2xl font-black text-white">
-                  {cashFlow.totals.paidBookings.toLocaleString()}
+                <p className="mt-2 text-2xl font-black text-slate-950">
+                  {cashFlow.totals.stripeRows.toLocaleString()}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  Expense Rows
+                  Bank Rows
                 </p>
-                <p className="mt-2 text-2xl font-black text-white">
-                  {cashFlow.totals.expenseRows.toLocaleString()}
+                <p className="mt-2 text-2xl font-black text-slate-950">
+                  {cashFlow.totals.bankRows.toLocaleString()}
                 </p>
               </div>
             </div>
@@ -1113,54 +1895,68 @@ export default async function AdminCashFlowPage() {
         </section>
 
         <section className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <div className="border-b border-white/10 p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                Statement of Cash Flows
+          <div className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-sm">
+            <div className="border-b border-slate-100 p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+                Consolidated Statement
               </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
-                Cash movement by activity.
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                Statement of Cash Flows
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Default lines use available SitGuru data where possible.
-                Manually added rows can be deleted.
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Current live SitGuru cash flow statement from bookings, Stripe,
+                Navy Federal banking, payouts, expenses, disputes, financial
+                ledger entries, and saved manual cash flow lines.
               </p>
             </div>
 
             <div className="p-4 sm:p-6">
-              <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/50">
-                <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-white/10 bg-white/5 px-4 py-4">
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-white">
+              <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-[#fbfefd]">
+                <div className="hidden grid-cols-[minmax(0,1fr)_130px_100px] gap-4 border-b border-slate-100 bg-slate-50 px-4 py-4 sm:grid">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-950">
                     Line Item
                   </p>
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-white">
+                  <p className="text-right text-xs font-black uppercase tracking-[0.2em] text-slate-950">
                     Current
                   </p>
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-white">
-                    Action
+                  <p className="text-right text-xs font-black uppercase tracking-[0.2em] text-slate-950">
+                    Status
                   </p>
                 </div>
 
                 <CashFlowSection
-                  title="Cash Flows from Operating Activities"
+                  title="Operating Activities"
                   lines={cashFlow.operatingLines}
-                  totalLabel="Net Cash Provided / Used by Operating Activities"
+                  totalLabel="Net Cash from Operating Activities"
                   totalValue={cashFlow.totals.netOperatingCash}
                 />
 
                 <CashFlowSection
-                  title="Cash Flows from Investing Activities"
+                  title="Investing Activities"
                   lines={cashFlow.investingLines}
-                  totalLabel="Net Cash Provided / Used by Investing Activities"
+                  totalLabel="Net Cash from Investing Activities"
                   totalValue={cashFlow.totals.netInvestingCash}
                 />
 
                 <CashFlowSection
-                  title="Cash Flows from Financing Activities"
+                  title="Financing Activities"
                   lines={cashFlow.financingLines}
-                  totalLabel="Net Cash Provided / Used by Financing Activities"
+                  totalLabel="Net Cash from Financing Activities"
                   totalValue={cashFlow.totals.netFinancingCash}
                 />
+
+                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-slate-100 bg-slate-100 px-4 py-3 font-black text-slate-950">
+                  <p>Net Change in Cash</p>
+                  <p
+                    className={
+                      cashFlow.totals.netChangeInCash < 0
+                        ? "text-rose-700"
+                        : "text-slate-950"
+                    }
+                  >
+                    {money(cashFlow.totals.netChangeInCash)}
+                  </p>
+                </div>
 
                 <CashFlowSection
                   title="Cash Position"
@@ -1169,26 +1965,13 @@ export default async function AdminCashFlowPage() {
                   totalValue={cashFlow.totals.beginningCash}
                 />
 
-                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-white/10 bg-white/10 px-4 py-4 font-black text-white">
-                  <p>Net Increase / Decrease in Cash</p>
-                  <p
-                    className={
-                      cashFlow.totals.netChangeInCash < 0
-                        ? "text-rose-200"
-                        : "text-white"
-                    }
-                  >
-                    {money(cashFlow.totals.netChangeInCash)}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-[1fr_auto] gap-4 border-t border-emerald-400/30 bg-emerald-400/10 px-4 py-4 font-black text-white">
+                <div className="grid grid-cols-[1fr_auto] gap-4 border-t border-emerald-400/30 bg-emerald-50 px-4 py-4 font-black text-slate-950">
                   <p>Cash Balance at End of Period</p>
                   <p
                     className={
                       cashFlow.totals.endingCash < 0
-                        ? "text-rose-200"
-                        : "text-white"
+                        ? "text-rose-700"
+                        : "text-slate-950"
                     }
                   >
                     {money(cashFlow.totals.endingCash)}
@@ -1199,102 +1982,129 @@ export default async function AdminCashFlowPage() {
           </div>
 
           <div className="space-y-8">
-            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                 Cash Flow Health
               </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                 Liquidity and operating cash generation.
               </h2>
 
-              <div className="mt-6 grid gap-4">
-                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Operating Cash Flow
                   </p>
                   <p
                     className={`mt-2 text-2xl font-black ${
                       cashFlow.totals.netOperatingCash >= 0
-                        ? "text-emerald-200"
-                        : "text-rose-200"
+                        ? "text-emerald-700"
+                        : "text-rose-700"
                     }`}
                   >
                     {money(cashFlow.totals.netOperatingCash)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Ending Cash
                   </p>
                   <p
                     className={`mt-2 text-2xl font-black ${
                       cashFlow.totals.endingCash >= 0
-                        ? "text-emerald-200"
-                        : "text-rose-200"
+                        ? "text-emerald-700"
+                        : "text-rose-700"
                     }`}
                   >
                     {money(cashFlow.totals.endingCash)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Runway Signal
+                    Paid Bookings
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
-                    Cash flow becomes more meaningful once beginning cash and
-                    real recurring expenses are entered.
+                  <p className="mt-2 text-2xl font-black text-slate-950">
+                    {cashFlow.totals.paidBookings.toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    Expense Rows
+                  </p>
+                  <p className="mt-2 text-2xl font-black text-slate-950">
+                    {cashFlow.totals.expenseRows.toLocaleString()}
                   </p>
                 </div>
               </div>
+
+              <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
+                  Runway Signal
+                </p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Cash flow becomes most accurate once Stripe balance
+                  transactions are reconciled to Navy Federal checking/savings
+                  deposits and recurring expense outflows are categorized.
+                </p>
+              </div>
             </div>
 
-            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                Recent Cash Outflows
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+                Recent Cash Activity
               </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
-                Expense ledger activity.
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                Bank and expense movement.
               </h2>
 
               <div className="mt-6 space-y-4">
-                {cashFlow.recentExpenses.length ? (
-                  cashFlow.recentExpenses.map((expense) => (
+                {cashFlow.recentCashActivity.length ? (
+                  cashFlow.recentCashActivity.map((activity) => (
                     <div
-                      key={expense.id}
-                      className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"
+                      key={activity.id}
+                      className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4"
                     >
-                      <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-start justify-between gap-4">
                         <div>
-                          <p className="font-bold text-white">{expense.name}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {expense.date}
+                          <p className="font-bold text-slate-950">{activity.name}</p>
+                          <p className="mt-1 text-xs font-semibold text-slate-500">
+                            {activity.source} · {activity.date}
                           </p>
                         </div>
-                        <p className="font-black text-rose-200">
-                          ({moneyExact(expense.amount)})
+                        <p
+                          className={`font-black ${
+                            activity.amount < 0 ? "text-rose-700" : "text-slate-950"
+                          }`}
+                        >
+                          {moneyExact(activity.amount)}
                         </p>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
-                    No expense ledger rows found yet.
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+                    No bank or expense rows found yet. Connect Plaid, import Navy
+                    Federal statements, or add expense ledger activity to start
+                    building the cash flow detail.
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-sky-400/20 bg-sky-400/10 p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">
+            <div className="rounded-[2rem] border border-emerald-100 bg-emerald-50 p-5 sm:p-6 lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                 SitGuru Cash Flow Notes
               </p>
-              <p className="mt-3 text-sm leading-7 text-sky-50/90">
-                Operating cash flow is estimated from booking receipts, Guru
-                payout cash movement, expenses, refunds, sales tax, and dispute
-                data. Investing and financing lines are usually entered manually
-                as they occur.
+              <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
+                Cash received from customers should come from Stripe payments,
+                while cash confirmed in the bank should come from Navy Federal
+                deposits. Stripe payouts matched to bank deposits are cash
+                movement, not new revenue, so reconciliation prevents double
+                counting across P&L, Balance Sheet, Cash Flow, and Financial
+                Overview.
               </p>
             </div>
           </div>

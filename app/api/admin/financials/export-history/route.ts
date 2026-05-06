@@ -1,36 +1,42 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-type ExportStatus = "ready" | "processing" | "sent" | "needs_review" | "failed";
-type ExportFormat = "pdf" | "xlsx" | "csv" | "zip" | "word";
+type AnyRow = Record<string, unknown>;
 
-type FinancialExportHistoryRecord = {
+type ExportStatus = "ready" | "processing" | "sent" | "needs_review" | "failed";
+
+type AdminIdentity = {
   id: string;
-  title: string;
-  package_type: string;
-  report_type: string;
-  period_label: string;
-  period_start: string | null;
-  period_end: string | null;
-  export_format: ExportFormat;
-  export_status: ExportStatus;
-  created_by: string | null;
-  created_by_user_id: string | null;
-  sent_to_email: string | null;
-  sent_to_phone: string | null;
-  file_url: string | null;
-  storage_path: string | null;
-  notes: string | null;
-  metadata: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
 };
 
-const allowedFormats: ExportFormat[] = ["pdf", "xlsx", "csv", "zip", "word"];
+type ExportHistoryItem = {
+  id: string;
+  title: string;
+  period: string;
+  format: string;
+  status: "Ready" | "Processing" | "Sent" | "Needs Review" | "Failed";
+  createdBy: string;
+  createdAt: string;
+  href: string;
+};
 
-const allowedStatuses: ExportStatus[] = [
+const FINANCE_ROLES = [
+  "owner",
+  "super_admin",
+  "admin",
+  "finance_admin",
+  "finance",
+  "accounting",
+  "bookkeeper",
+];
+
+const VALID_STATUSES: ExportStatus[] = [
   "ready",
   "processing",
   "sent",
@@ -38,48 +44,23 @@ const allowedStatuses: ExportStatus[] = [
   "failed",
 ];
 
-const fallbackHistory = [
-  {
-    id: "preview-june-2026-monthly-cpa",
-    title: "June 2026 Monthly CPA Package",
-    period: "Jun 1–Jun 30, 2026",
-    format: "PDF / Excel / CSV / ZIP",
-    status: "Needs Review",
-    createdBy: "Admin User",
-    createdAt: "Pending first close",
-    href: "/admin/financials/exports",
-  },
-  {
-    id: "preview-q2-2026-partial-quarter",
-    title: "Q2 2026 Partial Quarter Package",
-    period: "Jun 1–Jun 30, 2026",
-    format: "PDF / Excel / CSV / ZIP",
-    status: "Processing",
-    createdBy: "Admin User",
-    createdAt: "Pending launch",
-    href: "/admin/financials/exports",
-  },
-  {
-    id: "preview-2026-annual-tax",
-    title: "2026 Annual Tax Package",
-    period: "Jun 1–Dec 31, 2026",
-    format: "PDF / Excel / CSV / ZIP",
-    status: "Processing",
-    createdBy: "Admin User",
-    createdAt: "Pending year-end",
-    href: "/admin/financials/exports",
-  },
-];
-
-function getString(value: unknown, fallback = "") {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
-function getNullableString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+
+  return false;
 }
 
-function getMetadata(value: unknown) {
+function safeMetadata(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
@@ -87,390 +68,515 @@ function getMetadata(value: unknown) {
   return value as Record<string, unknown>;
 }
 
-function getExportFormat(value: unknown): ExportFormat {
-  const normalized = getString(value, "pdf").toLowerCase();
+function normalizeStatus(value: unknown): ExportStatus {
+  const normalized = asTrimmedString(value).toLowerCase();
 
-  if (allowedFormats.includes(normalized as ExportFormat)) {
-    return normalized as ExportFormat;
-  }
-
-  return "pdf";
-}
-
-function getExportStatus(value: unknown): ExportStatus {
-  const normalized = getString(value, "needs_review").toLowerCase();
-
-  if (allowedStatuses.includes(normalized as ExportStatus)) {
+  if (VALID_STATUSES.includes(normalized as ExportStatus)) {
     return normalized as ExportStatus;
   }
 
-  return "needs_review";
+  if (normalized.includes("review")) return "needs_review";
+  if (normalized.includes("process") || normalized.includes("pending")) {
+    return "processing";
+  }
+  if (normalized.includes("sent") || normalized.includes("email")) return "sent";
+  if (normalized.includes("fail") || normalized.includes("error")) return "failed";
+
+  return "ready";
 }
 
-function normalizeStatus(status: string | null | undefined) {
-  const value = String(status || "needs_review").toLowerCase();
+function displayStatus(value: unknown): ExportHistoryItem["status"] {
+  const status = normalizeStatus(value);
 
-  if (value === "ready") return "Ready";
-  if (value === "processing") return "Processing";
-  if (value === "sent") return "Sent";
-  if (value === "failed") return "Failed";
+  const labels: Record<ExportStatus, ExportHistoryItem["status"]> = {
+    ready: "Ready",
+    processing: "Processing",
+    sent: "Sent",
+    needs_review: "Needs Review",
+    failed: "Failed",
+  };
 
-  return "Needs Review";
+  return labels[status];
 }
 
-function normalizeFormat(format: string | null | undefined) {
-  const value = String(format || "pdf").toLowerCase();
-
-  if (value === "xlsx") return "Excel";
-  if (value === "csv") return "CSV";
-  if (value === "zip") return "ZIP";
-  if (value === "word") return "Word";
-
-  return "PDF";
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
+      process.env.ADMIN_EMAILS ||
+      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+      "",
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
 }
 
-function formatCreatedAt(value: string | null | undefined) {
-  if (!value) return "Unknown";
+function hasFinancialRole(role: string) {
+  return FINANCE_ROLES.includes(role.trim().toLowerCase());
+}
 
-  const date = new Date(value);
+async function safeRows<T>(
+  query: PromiseLike<{ data: unknown; error: unknown }>,
+  label: string,
+): Promise<T[]> {
+  try {
+    const result = await query;
 
-  if (Number.isNaN(date.getTime())) return "Unknown";
+    if (result.error) {
+      console.warn(`Export history query skipped for ${label}:`, result.error);
+      return [];
+    }
+
+    return Array.isArray(result.data) ? (result.data as T[]) : [];
+  } catch (error) {
+    console.warn(`Export history query skipped for ${label}:`, error);
+    return [];
+  }
+}
+
+async function getAdminIdentity(): Promise<AdminIdentity | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  const userEmail = (user.email || "").toLowerCase();
+  const envAdminEmails = getEnvAdminEmails();
+
+  const profileChecks = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("user_id", user.id)
+        .limit(1),
+      "admin_users_finance_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("profiles")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "profiles_finance_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "users_finance_access",
+    ),
+  ]);
+
+  const profile = profileChecks.flat().find(Boolean) || {};
+  const role = asTrimmedString(profile.role) || "admin";
+  const active =
+    profile.is_active === undefined
+      ? true
+      : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(
+    profile.can_access_financials,
+  );
+  const envAllowed = envAdminEmails.includes(userEmail);
+
+  return {
+    id: user.id,
+    email: userEmail,
+    role,
+    canAccessFinancials:
+      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
+  };
+}
+
+async function requireFinancialAdmin() {
+  const identity = await getAdminIdentity();
+
+  if (!identity?.canAccessFinancials) {
+    return null;
+  }
+
+  return identity;
+}
+
+function getCreatedAt(row: AnyRow) {
+  const raw =
+    asTrimmedString(row.created_at) ||
+    asTrimmedString(row.generated_at) ||
+    asTrimmedString(row.updated_at);
+
+  const date = new Date(raw);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Recently";
+  }
 
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
 }
 
-function titleAlreadyIncludesPeriod(title: string, periodLabel: string) {
-  if (!periodLabel) return true;
+function getHistoryHref(row: AnyRow) {
+  const id = asTrimmedString(row.id);
 
-  const lowerTitle = title.toLowerCase();
-  const lowerPeriod = periodLabel.toLowerCase();
+  if (id) return `/admin/financials/exports/${id}`;
 
-  return lowerTitle.includes(lowerPeriod);
-}
+  const metadata = safeMetadata(row.metadata);
+  const area = asTrimmedString(row.area) || asTrimmedString(metadata.area);
+  const action = asTrimmedString(row.action);
 
-function shouldShowPeriodInTitle(record: FinancialExportHistoryRecord) {
-  const genericPeriods = [
-    "Export Format Request",
-    "Statement / Operations Export",
-    "Invoice Document",
-    "Purchase Order Document",
-    "Audit Backup Package",
-    "Custom / YTD Period",
-    "Daily / Weekly Management Review",
-  ];
-
-  if (!record.period_label) return false;
-  if (genericPeriods.includes(record.period_label)) return false;
-  if (titleAlreadyIncludesPeriod(record.title, record.period_label)) {
-    return false;
+  if (area.includes("profit_loss") || action.includes("profit_loss")) {
+    return "/admin/financials/profit-loss";
   }
 
-  return true;
-}
-
-function getDisplayTitle(record: FinancialExportHistoryRecord) {
-  if (shouldShowPeriodInTitle(record)) {
-    return `${record.title} — ${record.period_label}`;
+  if (area.includes("balance_sheet") || action.includes("balance_sheet")) {
+    return "/admin/financials/balance-sheet";
   }
 
-  return record.title;
+  if (area.includes("cash_flow") || action.includes("cash_flow")) {
+    return "/admin/financials/cash-flow";
+  }
+
+  if (area.includes("pro_forma") || action.includes("pro_forma")) {
+    return "/admin/financials/pro-forma";
+  }
+
+  return "/admin/financials/exports";
 }
 
-function buildExportHref(record: FinancialExportHistoryRecord) {
-  return `/admin/financials/exports/${encodeURIComponent(record.id)}`;
+function normalizeFormat(row: AnyRow) {
+  const metadata = safeMetadata(row.metadata);
+
+  return (
+    asTrimmedString(row.export_format) ||
+    asTrimmedString(row.format) ||
+    asTrimmedString(row.file_format) ||
+    asTrimmedString(metadata.format) ||
+    "export"
+  ).toUpperCase();
 }
 
-function mapRecord(record: FinancialExportHistoryRecord) {
+function rowToHistoryItem(row: AnyRow, index: number): ExportHistoryItem {
+  const metadata = safeMetadata(row.metadata);
+  const action = asTrimmedString(row.action);
+  const area = asTrimmedString(row.area);
+
+  const title =
+    asTrimmedString(row.title) ||
+    asTrimmedString(row.report_name) ||
+    asTrimmedString(metadata.reportName) ||
+    asTrimmedString(metadata.filename) ||
+    (area.includes("profit_loss") || action.includes("profit_loss")
+      ? "Profit & Loss Export"
+      : area.includes("balance_sheet") || action.includes("balance_sheet")
+        ? "Balance Sheet Export"
+        : area.includes("cash_flow") || action.includes("cash_flow")
+          ? "Cash Flow Export"
+          : area.includes("pro_forma") || action.includes("pro_forma")
+            ? "Pro Forma Export"
+            : action.includes("email")
+              ? "Financial Statement Email"
+              : "Financial Export");
+
+  const period =
+    asTrimmedString(row.period_label) ||
+    asTrimmedString(row.period) ||
+    [
+      asTrimmedString(row.period_start) || asTrimmedString(metadata.startDate),
+      asTrimmedString(row.period_end) || asTrimmedString(metadata.endDate),
+    ]
+      .filter(Boolean)
+      .join(" to ") ||
+    "Current period";
+
   return {
-    id: record.id,
-    title: getDisplayTitle(record),
-    period: record.period_label,
-    format: normalizeFormat(record.export_format),
-    status: normalizeStatus(record.export_status),
-    createdBy: record.created_by || "Admin User",
-    createdAt: formatCreatedAt(record.created_at),
-    href: buildExportHref(record),
-    raw: record,
+    id: asTrimmedString(row.id) || `export-history-${index}`,
+    title,
+    period,
+    format: normalizeFormat(row),
+    status: displayStatus(row.export_status || row.status || row.action),
+    createdBy:
+      asTrimmedString(row.created_by) ||
+      asTrimmedString(row.created_by_email) ||
+      asTrimmedString(row.actor_email) ||
+      "SitGuru Admin",
+    createdAt: getCreatedAt(row),
+    href: asTrimmedString(row.href) || getHistoryHref(row),
   };
 }
 
-function getDuplicateWindowIso() {
-  const duplicateWindowMs = 30_000;
-  return new Date(Date.now() - duplicateWindowMs).toISOString();
+async function writeAuditLog({
+  actor,
+  action,
+  targetId,
+  metadata,
+}: {
+  actor: AdminIdentity;
+  action: string;
+  targetId?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const payload = {
+    actor_id: actor.id,
+    actor_email: actor.email,
+    actor_role: actor.role,
+    action,
+    area: "financials.export_history",
+    target_type: "financial_export_history",
+    target_id: targetId || null,
+    metadata: metadata || {},
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const { error } = await supabaseAdmin
+      .from("financial_audit_logs")
+      .insert(payload);
+
+    if (!error) return;
+  } catch {
+    // Keep export-history updates from failing if audit table is not ready.
+  }
+
+  try {
+    await supabaseAdmin.from("admin_audit_logs").insert(payload);
+  } catch (error) {
+    console.warn("Export history audit log skipped:", error);
+  }
 }
 
 export async function GET() {
-  try {
-    const supabase = await createClient();
+  const actor = await requireFinancialAdmin();
 
-    const { data, error } = await supabase
-      .from("financial_export_history")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(25);
-
-    if (error || !data || data.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        isLive: false,
-        history: fallbackHistory,
-        message:
-          error?.message ||
-          "No export history records found yet. Showing preview history.",
-      });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      isLive: true,
-      history: (data as FinancialExportHistoryRecord[]).map(mapRecord),
-    });
-  } catch (error) {
-    return NextResponse.json({
-      ok: true,
-      isLive: false,
-      history: fallbackHistory,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Unable to load export history. Showing preview history.",
-    });
+  if (!actor) {
+    return NextResponse.json(
+      { ok: false, message: "Not authorized to view export history." },
+      { status: 403 },
+    );
   }
+
+  const [exportRows, auditRows] = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("financial_export_history")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(25),
+      "financial_export_history",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("financial_audit_logs")
+        .select("*")
+        .or("action.ilike.%export%,action.ilike.%email%")
+        .order("created_at", { ascending: false })
+        .limit(25),
+      "financial_audit_logs",
+    ),
+  ]);
+
+  const rows = [...exportRows, ...auditRows]
+    .sort((a, b) => {
+      const aTime = new Date(asTrimmedString(a.created_at)).getTime() || 0;
+      const bTime = new Date(asTrimmedString(b.created_at)).getTime() || 0;
+      return bTime - aTime;
+    })
+    .slice(0, 25);
+
+  return NextResponse.json({
+    ok: true,
+    isLive: rows.length > 0,
+    history: rows.map(rowToHistoryItem),
+    message:
+      rows.length > 0
+        ? "Live export history connected."
+        : "No export history rows found yet. Generate an export to populate this feed.",
+  });
 }
 
 export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as Record<string, unknown>;
+  const actor = await requireFinancialAdmin();
 
-    const title = getString(body.title);
-
-    if (!title) {
-      return NextResponse.json(
-        {
-          ok: false,
-          record: null,
-          message: "A title is required to create an export history record.",
-        },
-        { status: 400 },
-      );
-    }
-
-    const packageType = getString(body.packageType, "custom");
-    const reportType = getString(body.reportType, "financial");
-    const periodLabel = getString(body.periodLabel, "Custom Period");
-    const exportFormat = getExportFormat(body.exportFormat);
-    const exportStatus = getExportStatus(body.exportStatus);
-    const metadata = getMetadata(body.metadata);
-
-    const payload = {
-      title,
-      package_type: packageType,
-      report_type: reportType,
-      period_label: periodLabel,
-      period_start: getNullableString(body.periodStart),
-      period_end: getNullableString(body.periodEnd),
-      export_format: exportFormat,
-      export_status: exportStatus,
-      created_by: getString(body.createdBy, "Admin User"),
-      created_by_user_id: getNullableString(body.createdByUserId),
-      sent_to_email: getNullableString(body.sentToEmail),
-      sent_to_phone: getNullableString(body.sentToPhone),
-      file_url: getNullableString(body.fileUrl),
-      storage_path: getNullableString(body.storagePath),
-      notes: getNullableString(body.notes),
-      metadata: {
-        ...metadata,
-        duplicateProtectionWindowSeconds: 30,
-        generatedAt: new Date().toISOString(),
-      },
-    };
-
-    const supabase = await createClient();
-
-    const { data: duplicateData, error: duplicateError } = await supabase
-      .from("financial_export_history")
-      .select("*")
-      .eq("title", payload.title)
-      .eq("package_type", payload.package_type)
-      .eq("report_type", payload.report_type)
-      .eq("period_label", payload.period_label)
-      .eq("export_format", payload.export_format)
-      .gte("created_at", getDuplicateWindowIso())
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (!duplicateError && duplicateData && duplicateData.length > 0) {
-      const existingRecord = duplicateData[0] as FinancialExportHistoryRecord;
-
-      return NextResponse.json(
-        {
-          ok: true,
-          record: mapRecord(existingRecord),
-          duplicatePrevented: true,
-          message:
-            "Duplicate click prevented. The existing recent export record was reused.",
-        },
-        { status: 200 },
-      );
-    }
-
-    const { data, error } = await supabase
-      .from("financial_export_history")
-      .insert(payload)
-      .select("*")
-      .single();
-
-    if (error || !data) {
-      return NextResponse.json(
-        {
-          ok: false,
-          record: null,
-          message:
-            error?.message ||
-            "Unable to create financial export history record.",
-        },
-        { status: 500 },
-      );
-    }
-
+  if (!actor) {
     return NextResponse.json(
-      {
-        ok: true,
-        record: mapRecord(data as FinancialExportHistoryRecord),
-        duplicatePrevented: false,
-        message: "Financial export history record created.",
-      },
-      { status: 201 },
+      { ok: false, message: "Not authorized to create export records." },
+      { status: 403 },
     );
-  } catch (error) {
+  }
+
+  let body: AnyRow = {};
+
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const title = asTrimmedString(body.title);
+  const packageType = asTrimmedString(body.packageType || body.package_type);
+  const reportType = asTrimmedString(body.reportType || body.report_type);
+  const periodLabel =
+    asTrimmedString(body.periodLabel || body.period_label) || "Current period";
+  const exportFormat = asTrimmedString(
+    body.exportFormat || body.export_format || body.format,
+  ).toLowerCase();
+  const exportStatus = normalizeStatus(
+    body.exportStatus || body.export_status || "ready",
+  );
+  const metadata = safeMetadata(body.metadata);
+
+  if (!title) {
+    return NextResponse.json(
+      { ok: false, message: "Export title is required." },
+      { status: 400 },
+    );
+  }
+
+  const payload = {
+    title,
+    package_type: packageType || "financial",
+    report_type: reportType || "general",
+    period_label: periodLabel,
+    period_start: asTrimmedString(body.periodStart || body.period_start) || null,
+    period_end: asTrimmedString(body.periodEnd || body.period_end) || null,
+    export_format: exportFormat || "pdf",
+    export_status: exportStatus,
+    created_by: actor.email,
+    created_by_user_id: actor.id,
+    sent_to_email: asTrimmedString(body.sentToEmail || body.sent_to_email) || null,
+    sent_to_phone: asTrimmedString(body.sentToPhone || body.sent_to_phone) || null,
+    file_url: asTrimmedString(body.fileUrl || body.file_url) || null,
+    storage_path: asTrimmedString(body.storagePath || body.storage_path) || null,
+    notes: asTrimmedString(body.notes) || null,
+    metadata,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from("financial_export_history")
+    .insert(payload)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("Create export history error:", error);
+
     return NextResponse.json(
       {
         ok: false,
-        record: null,
         message:
-          error instanceof Error
-            ? error.message
-            : "Unable to create financial export history record.",
+          "Unable to create export record. Confirm financial_export_history exists.",
       },
       { status: 500 },
     );
   }
+
+  const createdRow = data as AnyRow;
+
+  await writeAuditLog({
+    actor,
+    action: "create_financial_export_record",
+    targetId: asTrimmedString(createdRow.id),
+    metadata: {
+      title,
+      packageType: payload.package_type,
+      reportType: payload.report_type,
+      exportFormat: payload.export_format,
+      exportStatus: payload.export_status,
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    export: createdRow,
+    historyItem: rowToHistoryItem(createdRow, 0),
+  });
 }
 
 export async function PATCH(request: Request) {
+  const actor = await requireFinancialAdmin();
+
+  if (!actor) {
+    return NextResponse.json(
+      { ok: false, message: "Not authorized to update export records." },
+      { status: 403 },
+    );
+  }
+
+  let body: AnyRow = {};
+
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    body = await request.json();
+  } catch {
+    body = {};
+  }
 
-    const exportId = getString(body.exportId);
-    const exportStatus = getExportStatus(body.exportStatus);
-    const statusNote = getNullableString(body.statusNote);
+  const exportId = asTrimmedString(body.exportId || body.id);
 
-    if (!exportId) {
-      return NextResponse.json(
-        {
-          ok: false,
-          record: null,
-          message: "An exportId is required to update export status.",
-        },
-        { status: 400 },
-      );
-    }
+  if (!exportId) {
+    return NextResponse.json(
+      { ok: false, message: "exportId is required." },
+      { status: 400 },
+    );
+  }
 
-    const supabase = await createClient();
+  const nextStatus = normalizeStatus(body.status || body.exportStatus);
+  const notes = asTrimmedString(body.notes);
 
-    const { data: existingData, error: existingError } = await supabase
-      .from("financial_export_history")
-      .select("*")
-      .eq("id", exportId)
-      .maybeSingle();
+  const updatePayload: AnyRow = {
+    export_status: nextStatus,
+    updated_at: new Date().toISOString(),
+  };
 
-    if (existingError || !existingData) {
-      return NextResponse.json(
-        {
-          ok: false,
-          record: null,
-          message:
-            existingError?.message ||
-            "Unable to find the export history record to update.",
-        },
-        { status: 404 },
-      );
-    }
+  if (notes) {
+    updatePayload.notes = notes;
+  }
 
-    const existingRecord = existingData as FinancialExportHistoryRecord;
-    const existingMetadata = existingRecord.metadata || {};
-    const existingStatusHistory = Array.isArray(
-      existingMetadata.statusHistory,
-    )
-      ? existingMetadata.statusHistory
-      : [];
+  const { data, error } = await supabaseAdmin
+    .from("financial_export_history")
+    .update(updatePayload)
+    .eq("id", exportId)
+    .select("*")
+    .single();
 
-    const updatedMetadata = {
-      ...existingMetadata,
-      lastStatusUpdate: {
-        from: existingRecord.export_status,
-        to: exportStatus,
-        note: statusNote,
-        updatedAt: new Date().toISOString(),
-        updatedBy: "Admin User",
-      },
-      statusHistory: [
-        ...existingStatusHistory,
-        {
-          from: existingRecord.export_status,
-          to: exportStatus,
-          note: statusNote,
-          updatedAt: new Date().toISOString(),
-          updatedBy: "Admin User",
-        },
-      ],
-    };
+  if (error) {
+    console.error("Update export history status error:", error);
 
-    const { data, error } = await supabase
-      .from("financial_export_history")
-      .update({
-        export_status: exportStatus,
-        notes: statusNote || existingRecord.notes,
-        metadata: updatedMetadata,
-      })
-      .eq("id", exportId)
-      .select("*")
-      .single();
-
-    if (error || !data) {
-      return NextResponse.json(
-        {
-          ok: false,
-          record: null,
-          message:
-            error?.message || "Unable to update financial export status.",
-        },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      record: mapRecord(data as FinancialExportHistoryRecord),
-      message: "Financial export status updated.",
-    });
-  } catch (error) {
     return NextResponse.json(
       {
         ok: false,
-        record: null,
         message:
-          error instanceof Error
-            ? error.message
-            : "Unable to update financial export status.",
+          "Unable to update export status. Confirm the export record exists.",
       },
       { status: 500 },
     );
   }
+
+  const updatedRow = data as AnyRow;
+
+  await writeAuditLog({
+    actor,
+    action: "update_financial_export_status",
+    targetId: exportId,
+    metadata: {
+      status: nextStatus,
+      notes: notes || null,
+      title: asTrimmedString(updatedRow.title),
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    export: updatedRow,
+    historyItem: rowToHistoryItem(updatedRow, 0),
+  });
 }

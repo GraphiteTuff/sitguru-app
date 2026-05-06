@@ -55,7 +55,7 @@ const financialNav = [
 const analyticsNav = [
   { label: "Analytics", href: "/admin/analytics", icon: Gauge },
   { label: "Reports & Exports", href: "/admin/reports", icon: FileText },
-  { label: "Activity Logs", href: "/admin/activity", icon: ClipboardList },
+  { label: "Audit Trail", href: "/admin/audit-trail", icon: ClipboardList },
 ];
 
 function NavItem({

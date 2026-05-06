@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ProfitLossExportActions from "@/components/admin/financials/ProfitLossExportActions";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -11,6 +12,18 @@ type PayoutRow = Record<string, unknown>;
 type DisputeRow = Record<string, unknown>;
 type FinancialLedgerRow = Record<string, unknown>;
 type FinancialLineRow = Record<string, unknown>;
+type AdminIdentity = {
+  id: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
+};
+
+type AccountingReadinessItem = {
+  label: string;
+  status: "ready" | "needs_review" | "missing";
+  detail: string;
+};
 
 type SafeQueryResponse = {
   data: unknown;
@@ -324,6 +337,16 @@ const DEFAULT_STATEMENT_LINES: FinancialLineConfig[] = [
   },
 ];
 
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+  return false;
+}
+
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -379,7 +402,7 @@ function formatDateShort(value?: string | null) {
 
 async function safeRows<T>(
   query: PromiseLike<SafeQueryResponse>,
-  label: string
+  label: string,
 ): Promise<T[]> {
   try {
     const result = await query;
@@ -396,14 +419,166 @@ async function safeRows<T>(
   }
 }
 
+function hasFinancialRole(role: string) {
+  return [
+    "owner",
+    "super_admin",
+    "admin",
+    "finance_admin",
+    "finance",
+    "accounting",
+    "bookkeeper",
+  ].includes(role.trim().toLowerCase());
+}
+
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
+      process.env.ADMIN_EMAILS ||
+      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+      "",
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+async function getAdminIdentity(): Promise<AdminIdentity | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  const userEmail = (user.email || "").toLowerCase();
+  const envAdminEmails = getEnvAdminEmails();
+
+  const profileChecks = await Promise.all([
+    safeRows<Record<string, unknown>>(
+      supabaseAdmin
+        .from("admin_users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("user_id", user.id)
+        .limit(1),
+      "admin_users_finance_access",
+    ),
+    safeRows<Record<string, unknown>>(
+      supabaseAdmin
+        .from("profiles")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "profiles_finance_access",
+    ),
+    safeRows<Record<string, unknown>>(
+      supabaseAdmin
+        .from("users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "users_finance_access",
+    ),
+  ]);
+
+  const profile = profileChecks.flat().find(Boolean) || {};
+  const role = asTrimmedString(profile.role) || "admin";
+  const active =
+    profile.is_active === undefined
+      ? true
+      : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(
+    profile.can_access_financials,
+  );
+  const envAllowed = envAdminEmails.includes(userEmail);
+  const canAccessFinancials =
+    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+
+  return {
+    id: user.id,
+    email: userEmail,
+    role,
+    canAccessFinancials,
+  };
+}
+
+async function requireFinancialAdminAction(action: string) {
+  const identity = await getAdminIdentity();
+
+  if (!identity?.canAccessFinancials) {
+    console.warn(`Blocked financial admin action: ${action}`);
+    return null;
+  }
+
+  return identity;
+}
+
+async function writeFinancialAuditLog({
+  actor,
+  action,
+  targetType,
+  targetId,
+  metadata,
+}: {
+  actor: AdminIdentity;
+  action: string;
+  targetType: string;
+  targetId?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const payload = {
+    actor_id: actor.id,
+    actor_email: actor.email,
+    actor_role: actor.role,
+    action,
+    area: "financials.profit_loss",
+    target_type: targetType,
+    target_id: targetId || null,
+    metadata: metadata || {},
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const { error } = await supabaseAdmin
+      .from("financial_audit_logs")
+      .insert(payload);
+    if (!error) return;
+  } catch {
+    // Keep finance actions from failing if the audit table has not been created yet.
+  }
+
+  try {
+    await supabaseAdmin.from("admin_audit_logs").insert(payload);
+  } catch (error) {
+    console.warn("Financial audit log skipped:", error);
+  }
+}
+
+function isArchivedRow(row: Record<string, unknown>) {
+  return Boolean(
+    row.deleted_at ||
+    row.voided_at ||
+    row.archived_at ||
+    row.is_deleted === true ||
+    row.is_void === true ||
+    row.is_active === false,
+  );
+}
+
 async function addStatementLine(formData: FormData) {
   "use server";
+
+  const actor = await requireFinancialAdminAction("add_statement_line");
+
+  if (!actor) return;
 
   const presetKey = String(formData.get("preset") || "").trim();
   const customLabel = String(formData.get("customLabel") || "").trim();
 
   const preset = CATEGORY_PRESETS.find(
-    (item) => `${item.section}:${item.categoryMatch}` === presetKey
+    (item) => `${item.section}:${item.categoryMatch}` === presetKey,
   );
 
   if (!preset) {
@@ -419,7 +594,7 @@ async function addStatementLine(formData: FormData) {
       .eq("section", preset.section)
       .eq("label", label)
       .limit(1),
-    "financial_statement_lines_duplicate_check"
+    "financial_statement_lines_duplicate_check",
   );
 
   if (existingLines.length > 0) {
@@ -427,13 +602,32 @@ async function addStatementLine(formData: FormData) {
     return;
   }
 
-  await supabaseAdmin.from("financial_statement_lines").insert({
-    section: preset.section,
-    label,
-    source_type: preset.sourceType,
-    category_match: preset.categoryMatch,
-    display_order: 100,
-    is_active: true,
+  const { data: insertedLine } = await supabaseAdmin
+    .from("financial_statement_lines")
+    .insert({
+      section: preset.section,
+      label,
+      source_type: preset.sourceType,
+      category_match: preset.categoryMatch,
+      display_order: 100,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+
+  await writeFinancialAuditLog({
+    actor,
+    action: "add_statement_line",
+    targetType: "financial_statement_line",
+    targetId: asTrimmedString(
+      (insertedLine as Record<string, unknown> | null)?.id,
+    ),
+    metadata: {
+      section: preset.section,
+      label,
+      sourceType: preset.sourceType,
+      categoryMatch: preset.categoryMatch,
+    },
   });
 
   revalidatePath("/admin/financials/profit-loss");
@@ -441,6 +635,10 @@ async function addStatementLine(formData: FormData) {
 
 async function deleteStatementLine(formData: FormData) {
   "use server";
+
+  const actor = await requireFinancialAdminAction("delete_statement_line");
+
+  if (!actor) return;
 
   const lineId = String(formData.get("lineId") || "").trim();
 
@@ -453,11 +651,22 @@ async function deleteStatementLine(formData: FormData) {
     .update({ is_active: false })
     .eq("id", lineId);
 
+  await writeFinancialAuditLog({
+    actor,
+    action: "deactivate_statement_line",
+    targetType: "financial_statement_line",
+    targetId: lineId,
+  });
+
   revalidatePath("/admin/financials/profit-loss");
 }
 
 async function addExpenseLedgerRow(formData: FormData) {
   "use server";
+
+  const actor = await requireFinancialAdminAction("add_expense_ledger_row");
+
+  if (!actor) return;
 
   const name = String(formData.get("expenseName") || "").trim();
   const category = String(formData.get("expenseCategory") || "").trim();
@@ -469,11 +678,26 @@ async function addExpenseLedgerRow(formData: FormData) {
   }
 
   try {
-    await supabaseAdmin.from("expense_ledger").insert({
-      name,
-      description,
-      category,
-      amount,
+    const { data: insertedExpense } = await supabaseAdmin
+      .from("expense_ledger")
+      .insert({
+        name,
+        description,
+        category,
+        amount,
+        source: "manual_admin",
+      })
+      .select("id")
+      .single();
+
+    await writeFinancialAuditLog({
+      actor,
+      action: "add_expense_ledger_row",
+      targetType: "expense_ledger",
+      targetId: asTrimmedString(
+        (insertedExpense as Record<string, unknown> | null)?.id,
+      ),
+      metadata: { name, category, amount },
     });
   } catch (error) {
     console.warn("Expense ledger insert skipped:", error);
@@ -485,6 +709,10 @@ async function addExpenseLedgerRow(formData: FormData) {
 async function deleteExpenseLedgerRow(formData: FormData) {
   "use server";
 
+  const actor = await requireFinancialAdminAction("void_expense_ledger_row");
+
+  if (!actor) return;
+
   const expenseId = String(formData.get("expenseId") || "").trim();
 
   if (!expenseId) {
@@ -492,9 +720,30 @@ async function deleteExpenseLedgerRow(formData: FormData) {
   }
 
   try {
-    await supabaseAdmin.from("expense_ledger").delete().eq("id", expenseId);
+    const { error } = await supabaseAdmin
+      .from("expense_ledger")
+      .update({
+        is_void: true,
+        voided_at: new Date().toISOString(),
+        voided_by: actor.id,
+      })
+      .eq("id", expenseId);
+
+    if (error) {
+      await supabaseAdmin
+        .from("expense_ledger")
+        .update({ is_active: false })
+        .eq("id", expenseId);
+    }
+
+    await writeFinancialAuditLog({
+      actor,
+      action: "void_expense_ledger_row",
+      targetType: "expense_ledger",
+      targetId: expenseId,
+    });
   } catch (error) {
-    console.warn("Expense ledger delete skipped:", error);
+    console.warn("Expense ledger void skipped:", error);
   }
 
   revalidatePath("/admin/financials/profit-loss");
@@ -539,8 +788,7 @@ function getRefundAmount(booking: BookingRow) {
   if (explicitRefund > 0) return explicitRefund;
 
   const status = (
-    asTrimmedString(booking.payment_status) ||
-    asTrimmedString(booking.status)
+    asTrimmedString(booking.payment_status) || asTrimmedString(booking.status)
   ).toLowerCase();
 
   if (status.includes("refund")) {
@@ -597,16 +845,24 @@ function getExpenseCategory(expense: ExpenseRow) {
     "Other"
   ).toLowerCase();
 
-  if (category.includes("market") || category.includes("advert")) return "marketing";
-  if (category.includes("software") || category.includes("tool")) return "software";
-  if (category.includes("payroll") || category.includes("contractor")) return "payroll";
+  if (category.includes("market") || category.includes("advert"))
+    return "marketing";
+  if (category.includes("software") || category.includes("tool"))
+    return "software";
+  if (category.includes("payroll") || category.includes("contractor"))
+    return "payroll";
   if (category.includes("admin") || category.includes("office")) return "admin";
-  if (category.includes("legal") || category.includes("accounting")) return "legal";
+  if (category.includes("legal") || category.includes("accounting"))
+    return "legal";
   if (category.includes("insurance")) return "insurance";
-  if (category.includes("travel") || category.includes("vehicle")) return "travel";
-  if (category.includes("maintenance") || category.includes("repair")) return "maintenance";
-  if (category.includes("payment") || category.includes("stripe")) return "payment_processing";
-  if (category.includes("refund") || category.includes("credit")) return "customer_credits";
+  if (category.includes("travel") || category.includes("vehicle"))
+    return "travel";
+  if (category.includes("maintenance") || category.includes("repair"))
+    return "maintenance";
+  if (category.includes("payment") || category.includes("stripe"))
+    return "payment_processing";
+  if (category.includes("refund") || category.includes("credit"))
+    return "customer_credits";
 
   return "other";
 }
@@ -627,7 +883,9 @@ function getDisputeAmount(dispute: DisputeRow) {
 
 function isRefundDispute(dispute: DisputeRow) {
   const issueType = asTrimmedString(dispute.issue_type).toLowerCase();
-  const financialAction = asTrimmedString(dispute.financial_action).toLowerCase();
+  const financialAction = asTrimmedString(
+    dispute.financial_action,
+  ).toLowerCase();
   const refundAmount = toNumber(dispute.refund_amount);
 
   return (
@@ -671,8 +929,12 @@ function getFinancialLedgerRefundAmount(entries: FinancialLedgerRow[]) {
     })
     .reduce(
       (sum, entry) =>
-        sum + Math.max(0, getFinancialLedgerDebit(entry) - getFinancialLedgerCredit(entry)),
-      0
+        sum +
+        Math.max(
+          0,
+          getFinancialLedgerDebit(entry) - getFinancialLedgerCredit(entry),
+        ),
+      0,
     );
 }
 
@@ -699,7 +961,9 @@ function getRefundsAndCustomerCreditsAmount({
   const ledgerRefunds = getFinancialLedgerRefundAmount(financialLedger);
   const expenseLedgerCredits = getExpenseCustomerCreditAmount(expenses);
 
-  return bookingRefunds + (ledgerRefunds > 0 ? ledgerRefunds : expenseLedgerCredits);
+  return (
+    bookingRefunds + (ledgerRefunds > 0 ? ledgerRefunds : expenseLedgerCredits)
+  );
 }
 
 function getPayoutAmount(payout: PayoutRow) {
@@ -805,7 +1069,9 @@ function getCanonicalLineSource(line: FinancialLineConfig) {
   return asTrimmedString(line.source_type).toLowerCase() || "manual";
 }
 
-function normalizeStatementLineConfig(line: FinancialLineConfig): FinancialLineConfig {
+function normalizeStatementLineConfig(
+  line: FinancialLineConfig,
+): FinancialLineConfig {
   const canonicalCategory = getCanonicalLineCategory(line);
 
   if (canonicalCategory === "refunds_customer_credits") {
@@ -831,7 +1097,13 @@ function normalizeStatementLineConfig(line: FinancialLineConfig): FinancialLineC
 
 function getCanonicalLineKey(line: FinancialLineConfig) {
   const normalized = normalizeStatementLineConfig(line);
-  return getLineSection(normalized) + ":" + getCanonicalLineSource(normalized) + ":" + getCanonicalLineCategory(normalized);
+  return (
+    getLineSection(normalized) +
+    ":" +
+    getCanonicalLineSource(normalized) +
+    ":" +
+    getCanonicalLineCategory(normalized)
+  );
 }
 
 function dedupeStatementLineConfigs(lines: FinancialLineConfig[]) {
@@ -845,7 +1117,7 @@ function dedupeStatementLineConfigs(lines: FinancialLineConfig[]) {
   return Array.from(byKey.values()).sort(
     (a, b) =>
       (a.display_order || 100) - (b.display_order || 100) ||
-      asTrimmedString(a.label).localeCompare(asTrimmedString(b.label))
+      asTrimmedString(a.label).localeCompare(asTrimmedString(b.label)),
   );
 }
 
@@ -869,44 +1141,79 @@ function getStatementLineAmount({
   const categoryMatch = normalizedLine.category_match.toLowerCase();
 
   if (sourceType === "bookings") {
-    if (categoryMatch === "booking_revenue" || categoryMatch === "gross_booking_volume") {
-      return bookings.reduce((sum, booking) => sum + getBookingGrossAmount(booking), 0);
+    if (
+      categoryMatch === "booking_revenue" ||
+      categoryMatch === "gross_booking_volume"
+    ) {
+      return bookings.reduce(
+        (sum, booking) => sum + getBookingGrossAmount(booking),
+        0,
+      );
     }
 
-    if (categoryMatch === "platform_fee" || categoryMatch === "marketplace_fees") {
-      return bookings.reduce((sum, booking) => sum + getPlatformFee(booking), 0);
+    if (
+      categoryMatch === "platform_fee" ||
+      categoryMatch === "marketplace_fees"
+    ) {
+      return bookings.reduce(
+        (sum, booking) => sum + getPlatformFee(booking),
+        0,
+      );
     }
 
     if (categoryMatch === "guru_payouts") {
-      return bookings.reduce((sum, booking) => sum + getGuruPayoutAmount(booking), 0);
+      return bookings.reduce(
+        (sum, booking) => sum + getGuruPayoutAmount(booking),
+        0,
+      );
     }
 
     if (categoryMatch === "refunds") {
-      return getRefundsAndCustomerCreditsAmount({ bookings, expenses, financialLedger });
+      return getRefundsAndCustomerCreditsAmount({
+        bookings,
+        expenses,
+        financialLedger,
+      });
     }
 
     if (categoryMatch === "tax_collected") {
-      return bookings.reduce((sum, booking) => sum + getBookingTaxAmount(booking), 0);
+      return bookings.reduce(
+        (sum, booking) => sum + getBookingTaxAmount(booking),
+        0,
+      );
     }
   }
 
   if (sourceType === "payouts") {
-    return payouts.filter(isPayoutPaid).reduce((sum, payout) => sum + getPayoutAmount(payout), 0);
+    return payouts
+      .filter(isPayoutPaid)
+      .reduce((sum, payout) => sum + getPayoutAmount(payout), 0);
   }
 
   if (sourceType === "disputes") {
-    return disputes.reduce((sum, dispute) => sum + getNonRefundDisputeAmount(dispute), 0);
+    return disputes.reduce(
+      (sum, dispute) => sum + getNonRefundDisputeAmount(dispute),
+      0,
+    );
   }
 
   if (sourceType === "financial_ledger") {
     if (categoryMatch === "refunds_customer_credits") {
-      return getRefundsAndCustomerCreditsAmount({ bookings, expenses, financialLedger });
+      return getRefundsAndCustomerCreditsAmount({
+        bookings,
+        expenses,
+        financialLedger,
+      });
     }
   }
 
   if (sourceType === "expense_ledger") {
     if (categoryMatch === "customer_credits") {
-      return getRefundsAndCustomerCreditsAmount({ bookings, expenses, financialLedger });
+      return getRefundsAndCustomerCreditsAmount({
+        bookings,
+        expenses,
+        financialLedger,
+      });
     }
 
     return expenses
@@ -915,6 +1222,196 @@ function getStatementLineAmount({
   }
 
   return 0;
+}
+
+function getLedgerText(entry: FinancialLedgerRow) {
+  return [
+    entry.source,
+    entry.source_type,
+    entry.account_name,
+    entry.account,
+    entry.description,
+    entry.memo,
+    entry.external_account_name,
+  ]
+    .map(asTrimmedString)
+    .join(" ")
+    .toLowerCase();
+}
+
+function getAccountingReadinessItems({
+  bookings,
+  expenses,
+  payouts,
+  disputes,
+  financialLedger,
+}: {
+  bookings: BookingRow[];
+  expenses: ExpenseRow[];
+  payouts: PayoutRow[];
+  disputes: DisputeRow[];
+  financialLedger: FinancialLedgerRow[];
+}): AccountingReadinessItem[] {
+  const stripeEntries = financialLedger.filter((entry) =>
+    getLedgerText(entry).includes("stripe"),
+  );
+  const bankEntries = financialLedger.filter((entry) => {
+    const text = getLedgerText(entry);
+    return (
+      text.includes("navy") ||
+      text.includes("checking") ||
+      text.includes("savings") ||
+      text.includes("bank")
+    );
+  });
+  const reconciliationReady = financialLedger.some((entry) =>
+    Boolean(
+      entry.reconciled_at ||
+      entry.matched_transaction_id ||
+      entry.reconciliation_id,
+    ),
+  );
+
+  return [
+    {
+      label: "Bookings revenue source",
+      status: bookings.length ? "ready" : "needs_review",
+      detail: bookings.length
+        ? `${bookings.length.toLocaleString()} booking rows are available for revenue and payout calculations.`
+        : "No booking rows were found yet. Revenue will remain incomplete until bookings are connected.",
+    },
+    {
+      label: "Stripe clearing activity",
+      status: stripeEntries.length ? "ready" : "needs_review",
+      detail: stripeEntries.length
+        ? `${stripeEntries.length.toLocaleString()} Stripe-related ledger rows found for fees, refunds, payouts, or clearing entries.`
+        : "Stripe balance transactions should be normalized into the ledger before CPA export.",
+    },
+    {
+      label: "Navy Federal bank activity",
+      status: bankEntries.length ? "ready" : "needs_review",
+      detail: bankEntries.length
+        ? `${bankEntries.length.toLocaleString()} bank/checking/savings ledger rows found for cash reconciliation.`
+        : "Connect Plaid or import Navy Federal CSV/QBO/OFX statements to match bank deposits and expenses.",
+    },
+    {
+      label: "Payout and dispute support",
+      status: payouts.length || disputes.length ? "ready" : "needs_review",
+      detail: `${payouts.length.toLocaleString()} payout rows and ${disputes.length.toLocaleString()} dispute rows available for support schedules.`,
+    },
+    {
+      label: "Manual expense ledger",
+      status: expenses.length ? "ready" : "needs_review",
+      detail: expenses.length
+        ? `${expenses.length.toLocaleString()} operating expense rows are categorized for P&L reporting.`
+        : "Add or import operating expenses so the P&L reflects real admin costs.",
+    },
+    {
+      label: "Reconciliation status",
+      status: reconciliationReady ? "ready" : "missing",
+      detail: reconciliationReady
+        ? "At least one ledger row has reconciliation metadata for matching deposits, payouts, or transfers."
+        : "Add reconciliation IDs/matches so Stripe payouts are not double-counted as revenue when they hit checking.",
+    },
+  ];
+}
+
+function readinessClasses(status: AccountingReadinessItem["status"]) {
+  const classes = {
+    ready: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    needs_review: "border-amber-100 bg-amber-50 text-amber-800",
+    missing: "border-rose-100 bg-rose-50 text-rose-800",
+  };
+
+  return classes[status];
+}
+
+function AccountingReadinessPanel({
+  items,
+}: {
+  items: AccountingReadinessItem[];
+}) {
+  const readyCount = items.filter((item) => item.status === "ready").length;
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+            CPA / QuickBooks Readiness
+          </p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+            Accounting-program export checks
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            This panel checks whether the P&amp;L has the source records your
+            CPA will expect: bookings, Stripe clearing entries, Navy Federal
+            bank activity, payouts, disputes, categorized expenses, and
+            reconciliation matches.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800">
+          {readyCount}/{items.length} ready
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-xl border p-4 ${readinessClasses(item.status)}`}
+          >
+            <p className="text-xs font-black uppercase tracking-[0.16em] opacity-80">
+              {item.status.replace("_", " ")}
+            </p>
+            <h3 className="mt-2 text-base font-black text-slate-950">
+              {item.label}
+            </h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              {item.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function IntegrationFlowPanel() {
+  const steps = [
+    "Customer booking creates revenue and payout records.",
+    "Stripe balance transactions identify gross payments, fees, refunds, disputes, and payouts.",
+    "Navy Federal checking/savings activity confirms cash deposits, transfers, and expenses.",
+    "Reconciliation matches Stripe payouts to bank deposits so revenue is not double-counted.",
+    "Financial Overview, P&L, Balance Sheet, Cash Flow, exports, and CPA handoff use the same ledger foundation.",
+  ];
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+        Stripe + Navy Federal Flow
+      </p>
+      <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+        How this statement should reconcile
+      </h2>
+      <div className="mt-6 grid gap-3 lg:grid-cols-5">
+        {steps.map((step, index) => (
+          <div
+            key={step}
+            className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
+              {index + 1}
+            </span>
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
+              {step}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function StatCard({
@@ -929,22 +1426,22 @@ function StatCard({
   tone?: "emerald" | "sky" | "violet" | "amber" | "rose";
 }) {
   const toneClass = {
-    emerald: "border-emerald-400/20 bg-emerald-400/10",
-    sky: "border-sky-400/20 bg-sky-400/10",
-    violet: "border-violet-400/20 bg-violet-400/10",
-    amber: "border-amber-400/20 bg-amber-400/10",
-    rose: "border-rose-400/20 bg-rose-400/10",
+    emerald: "border-emerald-100 bg-emerald-50",
+    sky: "border-sky-100 bg-sky-50",
+    violet: "border-violet-100 bg-violet-50",
+    amber: "border-amber-100 bg-amber-50",
+    rose: "border-rose-100 bg-rose-50",
   }[tone];
 
   return (
-    <div className={`rounded-3xl border p-5 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+    <div className={`rounded-[1.5rem] border p-5 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
         {label}
       </p>
-      <p className="mt-3 text-3xl font-black tracking-tight text-white">
+      <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
         {value}
       </p>
-      <p className="mt-3 text-sm leading-6 text-slate-400">{detail}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{detail}</p>
     </div>
   );
 }
@@ -962,7 +1459,7 @@ function ActionLink({
     return (
       <Link
         href={href}
-        className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+        className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
       >
         {label}
       </Link>
@@ -972,7 +1469,7 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:border-emerald-300/30 hover:bg-white/10"
+      className="inline-flex items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:border-emerald-200 hover:bg-emerald-50"
     >
       {label}
     </Link>
@@ -992,45 +1489,60 @@ function StatementSection({
 }) {
   return (
     <div>
-      <div className="border-y border-emerald-400/20 bg-emerald-400/10 px-4 py-2">
-        <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-200">
+      <div className="border-y border-emerald-100 bg-emerald-50/80 px-4 py-3">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
           {title}
         </p>
       </div>
 
-      <div className="divide-y divide-white/10">
+      <div className="divide-y divide-slate-100">
         {lines.length ? (
           lines.map((line) => (
             <div
               key={line.id}
-              className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-3 text-slate-300"
+              className="grid gap-3 px-4 py-4 text-slate-600 sm:grid-cols-[minmax(0,1fr)_120px_96px] sm:items-center"
             >
-              <div>
-                <p className="pl-6">{line.label}</p>
-                <p className="mt-1 pl-6 text-xs text-slate-600">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-bold leading-tight text-slate-950">
+                    {line.label}
+                  </p>
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                      line.isSaved
+                        ? "border-blue-100 bg-blue-50 text-blue-700"
+                        : "border-emerald-100 bg-white text-emerald-700"
+                    }`}
+                  >
+                    {line.isSaved ? "Custom" : "Core"}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
                   {line.sourceType} / {line.categoryMatch || "manual"}
                 </p>
               </div>
 
-              <p className="font-bold tabular-nums text-white">
+              <p className="text-right text-sm font-black tabular-nums text-slate-950 sm:text-base">
                 {money(line.value)}
               </p>
 
-              {line.isSaved ? (
-                <form action={deleteStatementLine}>
-                  <input type="hidden" name="lineId" value={line.dbId} />
-                  <button
-                    type="submit"
-                    className="rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1 text-xs font-bold text-rose-200 transition hover:bg-rose-400/20"
-                  >
-                    Delete
-                  </button>
-                </form>
-              ) : (
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-500">
-                  Default
-                </span>
-              )}
+              <div className="flex justify-end">
+                {line.isSaved ? (
+                  <form action={deleteStatementLine}>
+                    <input type="hidden" name="lineId" value={line.dbId} />
+                    <button
+                      type="submit"
+                      className="rounded-full border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+                    >
+                      Deactivate
+                    </button>
+                  </form>
+                ) : (
+                  <span className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-bold text-slate-500">
+                    Locked
+                  </span>
+                )}
+              </div>
             </div>
           ))
         ) : (
@@ -1039,9 +1551,9 @@ function StatementSection({
           </div>
         )}
 
-        <div className="grid grid-cols-[1fr_auto] gap-4 bg-white/5 px-4 py-3 font-black text-white">
+        <div className="grid grid-cols-[1fr_auto] gap-4 bg-slate-50 px-4 py-3 font-black text-slate-950">
           <p>{totalLabel}</p>
-          <p className={totalValue < 0 ? "text-rose-200" : "text-white"}>
+          <p className={totalValue < 0 ? "text-rose-700" : "text-slate-950"}>
             {money(totalValue)}
           </p>
         </div>
@@ -1051,14 +1563,21 @@ function StatementSection({
 }
 
 async function getProfitLossData() {
-  const [bookings, expenses, payouts, disputes, financialLedger, savedRows] = await Promise.all([
+  const [
+    rawBookings,
+    rawExpenses,
+    rawPayouts,
+    rawDisputes,
+    rawFinancialLedger,
+    savedRows,
+  ] = await Promise.all([
     safeRows<BookingRow>(
       supabaseAdmin
         .from("bookings")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "bookings"
+      "bookings",
     ),
     safeRows<ExpenseRow>(
       supabaseAdmin
@@ -1066,7 +1585,7 @@ async function getProfitLossData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "expense_ledger"
+      "expense_ledger",
     ),
     safeRows<PayoutRow>(
       supabaseAdmin
@@ -1074,7 +1593,7 @@ async function getProfitLossData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "guru_payouts"
+      "guru_payouts",
     ),
     safeRows<DisputeRow>(
       supabaseAdmin
@@ -1082,7 +1601,7 @@ async function getProfitLossData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "dispute_cases"
+      "dispute_cases",
     ),
     safeRows<FinancialLedgerRow>(
       supabaseAdmin
@@ -1090,7 +1609,7 @@ async function getProfitLossData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1500),
-      "financial_ledger_entries"
+      "financial_ledger_entries",
     ),
     safeRows<FinancialLineRow>(
       supabaseAdmin
@@ -1100,11 +1619,30 @@ async function getProfitLossData() {
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: true })
         .limit(500),
-      "financial_statement_lines"
+      "financial_statement_lines",
     ),
   ]);
 
+  const bookings = rawBookings.filter((row) => !isArchivedRow(row));
+  const expenses = rawExpenses.filter((row) => !isArchivedRow(row));
+  const payouts = rawPayouts.filter((row) => !isArchivedRow(row));
+  const disputes = rawDisputes.filter((row) => !isArchivedRow(row));
+  const financialLedger = rawFinancialLedger.filter(
+    (row) => !isArchivedRow(row),
+  );
+
   const savedLines = savedRows.map(normalizeFinancialLine);
+  const defaultLineKeys = new Set(
+    DEFAULT_STATEMENT_LINES.map((line) =>
+      getCanonicalLineKey(normalizeStatementLineConfig(line)),
+    ),
+  );
+  const customSavedLineCount = savedLines.filter(
+    (line) =>
+      !defaultLineKeys.has(
+        getCanonicalLineKey(normalizeStatementLineConfig(line)),
+      ),
+  ).length;
   const activeSourceLines: FinancialLineConfig[] = dedupeStatementLineConfigs([
     ...DEFAULT_STATEMENT_LINES,
     ...savedLines,
@@ -1114,11 +1652,14 @@ async function getProfitLossData() {
     .map((line, index) => {
       const normalizedLine = normalizeStatementLineConfig(line);
       const dbId = asTrimmedString(normalizedLine.id);
+      const isCoreDefaultLine = defaultLineKeys.has(
+        getCanonicalLineKey(normalizedLine),
+      );
 
       return {
         id: getLineIdentity(normalizedLine, index),
         dbId,
-        isSaved: Boolean(dbId && savedLines.length > 0),
+        isSaved: Boolean(dbId && !isCoreDefaultLine),
         section: getLineSection(normalizedLine),
         label: normalizedLine.label || "Statement line",
         sourceType: normalizedLine.source_type || "manual",
@@ -1135,58 +1676,70 @@ async function getProfitLossData() {
       };
     })
     .sort(
-      (a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label)
+      (a, b) =>
+        a.displayOrder - b.displayOrder || a.label.localeCompare(b.label),
     );
 
   const paidBookings = bookings.filter(isPaidBooking);
 
   const grossBookingVolume = bookings.reduce(
     (sum, booking) => sum + getBookingGrossAmount(booking),
-    0
+    0,
   );
 
   const paidBookingVolume = paidBookings.reduce(
     (sum, booking) => sum + getBookingGrossAmount(booking),
-    0
+    0,
   );
 
   const taxCollected = bookings.reduce(
     (sum, booking) => sum + getBookingTaxAmount(booking),
-    0
+    0,
   );
 
-  const revenueLines = statementLines.filter((line) => line.section === "revenue");
+  const revenueLines = statementLines.filter(
+    (line) => line.section === "revenue",
+  );
   const costLines = statementLines.filter(
-    (line) => line.section === "cost_of_revenue"
+    (line) => line.section === "cost_of_revenue",
   );
   const operatingLines = statementLines.filter(
-    (line) => line.section === "operating_expenses"
+    (line) => line.section === "operating_expenses",
   );
   const taxLines = statementLines.filter((line) => line.section === "taxes");
   const otherLines = statementLines.filter(
-    (line) => line.section === "other_income_expense"
+    (line) => line.section === "other_income_expense",
   );
 
   const totalRevenue = revenueLines.reduce((sum, line) => sum + line.value, 0);
-  const totalCostOfRevenue = costLines.reduce((sum, line) => sum + line.value, 0);
+  const totalCostOfRevenue = costLines.reduce(
+    (sum, line) => sum + line.value,
+    0,
+  );
   const grossProfit = totalRevenue - totalCostOfRevenue;
 
   const totalOperatingExpenses = operatingLines.reduce(
     (sum, line) => sum + line.value,
-    0
+    0,
   );
 
   const operatingIncome = grossProfit - totalOperatingExpenses;
 
   const totalTaxes = taxLines.reduce((sum, line) => sum + line.value, 0);
-  const otherIncomeExpense = otherLines.reduce((sum, line) => sum + line.value, 0);
+  const otherIncomeExpense = otherLines.reduce(
+    (sum, line) => sum + line.value,
+    0,
+  );
   const netIncome = operatingIncome + otherIncomeExpense - totalTaxes;
 
   const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
   const netMargin = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0;
   const costOfRevenueRatio = calcRatio(totalCostOfRevenue, totalRevenue);
   const operatingExpenseRatio = calcRatio(totalOperatingExpenses, totalRevenue);
-  const payoutToBookingRatio = calcRatio(totalCostOfRevenue, grossBookingVolume);
+  const payoutToBookingRatio = calcRatio(
+    totalCostOfRevenue,
+    grossBookingVolume,
+  );
 
   const maxVisualValue = Math.max(
     totalRevenue,
@@ -1195,7 +1748,7 @@ async function getProfitLossData() {
     Math.abs(netIncome),
     grossBookingVolume,
     paidBookingVolume,
-    1
+    1,
   );
 
   const expenseCategoryMap = new Map<string, number>();
@@ -1204,12 +1757,12 @@ async function getProfitLossData() {
     const category = getExpenseCategory(expense);
     expenseCategoryMap.set(
       category,
-      (expenseCategoryMap.get(category) || 0) + getExpenseAmount(expense)
+      (expenseCategoryMap.get(category) || 0) + getExpenseAmount(expense),
     );
   }
 
   const expenseCategorySummary: ExpenseCategorySummary[] = Array.from(
-    expenseCategoryMap.entries()
+    expenseCategoryMap.entries(),
   )
     .map(([category, value]) => ({
       category,
@@ -1261,20 +1814,22 @@ async function getProfitLossData() {
     otherLines,
     expenseCategorySummary,
     recentExpenses,
-    savedLineCount: savedLines.length,
+    accountingReadiness: getAccountingReadinessItems({
+      bookings,
+      expenses,
+      payouts,
+      disputes,
+      financialLedger,
+    }),
+    savedLineCount: customSavedLineCount,
     expenseCount: expenses.length,
   };
 }
 
 export default async function AdminProfitLossPage() {
-  const supabase = await createClient();
+  const actor = await getAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  if (!actor?.canAccessFinancials) {
     return null;
   }
 
@@ -1308,44 +1863,27 @@ export default async function AdminProfitLossPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_30%),radial-gradient(circle_at_right,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-6 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-emerald-500/15 via-slate-950 to-sky-500/10 p-6 shadow-[0_12px_60px_rgba(0,0,0,0.28)] lg:p-8">
-          <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">
+    <div className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1640px] space-y-5 sm:space-y-6">
+        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(420px,680px)] 2xl:items-start">
+            <div className="max-w-5xl self-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">
                 Admin / Financials / Profit & Loss
               </p>
 
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+              <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[0.95] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
                 SitGuru Statement of Operations.
               </h1>
 
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 Live Profit & Loss view using SitGuru bookings, Guru payouts,
                 expense ledger rows, refunds, dispute records, and custom
                 financial statement categories.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <ActionLink href="/admin/financials" label="Financials" />
-              <ActionLink href="/admin/commissions" label="Commissions" />
-              <ActionLink href="/admin/payments" label="Payments" />
-              <ActionLink
-                href="/api/admin/financials/profit-loss/export?format=csv"
-                label="CSV"
-              />
-              <ActionLink
-                href="/api/admin/financials/profit-loss/export?format=excel"
-                label="Excel"
-              />
-              <ActionLink
-                href="/api/admin/financials/profit-loss/export?format=word"
-                label="Word"
-                primary
-              />
-            </div>
+            <ProfitLossExportActions />
           </div>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1376,23 +1914,27 @@ export default async function AdminProfitLossPage() {
           </div>
         </section>
 
+        <AccountingReadinessPanel items={pnl.accountingReadiness} />
+
+        <IntegrationFlowPanel />
+
         <section className="grid gap-8 xl:grid-cols-[1fr_1fr]">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                   Add Statement Line
                 </p>
-                <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                   Add P&L categories from dropdown.
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Select a marketplace category, optionally rename it, and add it
-                  to the SitGuru statement.
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Select a marketplace category, optionally rename it, and add
+                  it to the SitGuru statement.
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-bold text-slate-300">
+              <div className="rounded-xl border border-slate-100 bg-[#fbfefd] px-4 py-3 text-sm font-bold text-slate-600">
                 {pnl.savedLineCount > 0
                   ? `${pnl.savedLineCount} saved statement lines`
                   : "Using default statement lines"}
@@ -1401,7 +1943,7 @@ export default async function AdminProfitLossPage() {
 
             <form
               action={addStatementLine}
-              className="mt-6 grid gap-4 xl:grid-cols-[1fr_1fr_auto]"
+              className="mt-6 grid gap-4 2xl:grid-cols-[1fr_1fr_auto]"
             >
               <div>
                 <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -1409,7 +1951,7 @@ export default async function AdminProfitLossPage() {
                 </label>
                 <select
                   name="preset"
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                   defaultValue=""
                   required
                 >
@@ -1436,27 +1978,27 @@ export default async function AdminProfitLossPage() {
                   name="customLabel"
                   type="text"
                   placeholder="Example: Instagram Ads, GoDaddy, Insurance..."
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                  className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
               <button
                 type="submit"
-                className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 xl:self-end"
+                className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800 xl:self-end"
               >
                 Add Line
               </button>
             </form>
           </div>
 
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
               Add Expense Ledger Row
             </p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
               Add real operating expenses.
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
+            <p className="mt-2 text-sm leading-6 text-slate-600">
               Add expenses like Instagram ads, software, insurance, legal,
               GoDaddy, tools, contractors, or admin costs.
             </p>
@@ -1471,7 +2013,7 @@ export default async function AdminProfitLossPage() {
                     name="expenseName"
                     type="text"
                     placeholder="Example: Instagram Ads"
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                    className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                     required
                   />
                 </div>
@@ -1486,7 +2028,7 @@ export default async function AdminProfitLossPage() {
                     step="0.01"
                     min="0"
                     placeholder="0.00"
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                    className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                     required
                   />
                 </div>
@@ -1500,7 +2042,7 @@ export default async function AdminProfitLossPage() {
                   <select
                     name="expenseCategory"
                     defaultValue=""
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-emerald-300/50"
+                    className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                     required
                   >
                     <option value="" disabled>
@@ -1522,13 +2064,13 @@ export default async function AdminProfitLossPage() {
                     name="expenseDescription"
                     type="text"
                     placeholder="Optional detail"
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300/50"
+                    className="mt-2 w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 sm:self-end"
+                  className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800 sm:self-end"
                 >
                   Add Expense
                 </button>
@@ -1538,32 +2080,32 @@ export default async function AdminProfitLossPage() {
         </section>
 
         <section className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <div className="border-b border-white/10 p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <div className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-sm">
+            <div className="border-b border-slate-100 p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                 Consolidated Statement
               </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                 Statement of Operations
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+              <p className="mt-2 text-sm leading-6 text-slate-600">
                 Current live SitGuru operating statement from available platform
                 records and saved categories. Added statement lines can be
-                removed with the Delete button.
+                deactivated when they are custom saved rows.
               </p>
             </div>
 
             <div className="p-4 sm:p-6">
-              <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/50">
-                <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-white/10 bg-white/5 px-4 py-4">
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-white">
+              <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-[#fbfefd]">
+                <div className="hidden grid-cols-[minmax(0,1fr)_120px_96px] gap-4 border-b border-slate-100 bg-slate-50 px-4 py-4 sm:grid">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-950">
                     Line Item
                   </p>
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-white">
+                  <p className="text-right text-xs font-black uppercase tracking-[0.2em] text-slate-950">
                     Current
                   </p>
-                  <p className="text-sm font-black uppercase tracking-[0.2em] text-white">
-                    Action
+                  <p className="text-right text-xs font-black uppercase tracking-[0.2em] text-slate-950">
+                    Status
                   </p>
                 </div>
 
@@ -1581,11 +2123,13 @@ export default async function AdminProfitLossPage() {
                   totalValue={pnl.totals.totalCostOfRevenue}
                 />
 
-                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-white/10 bg-white/10 px-4 py-3 font-black text-white">
+                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-slate-100 bg-slate-100 px-4 py-3 font-black text-slate-950">
                   <p>Gross Profit</p>
                   <p
                     className={
-                      pnl.totals.grossProfit < 0 ? "text-rose-200" : "text-white"
+                      pnl.totals.grossProfit < 0
+                        ? "text-rose-700"
+                        : "text-slate-950"
                     }
                   >
                     {money(pnl.totals.grossProfit)}
@@ -1599,13 +2143,13 @@ export default async function AdminProfitLossPage() {
                   totalValue={pnl.totals.totalOperatingExpenses}
                 />
 
-                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-white/10 bg-white/10 px-4 py-3 font-black text-white">
+                <div className="grid grid-cols-[1fr_auto] gap-4 border-y border-slate-100 bg-slate-100 px-4 py-3 font-black text-slate-950">
                   <p>Operating Income / Loss</p>
                   <p
                     className={
                       pnl.totals.operatingIncome < 0
-                        ? "text-rose-200"
-                        : "text-white"
+                        ? "text-rose-700"
+                        : "text-slate-950"
                     }
                   >
                     {money(pnl.totals.operatingIncome)}
@@ -1626,11 +2170,11 @@ export default async function AdminProfitLossPage() {
                   totalValue={pnl.totals.otherIncomeExpense}
                 />
 
-                <div className="grid grid-cols-[1fr_auto] gap-4 border-t border-emerald-400/30 bg-emerald-400/10 px-4 py-4 font-black text-white">
+                <div className="grid grid-cols-[1fr_auto] gap-4 border-t border-emerald-400/30 bg-emerald-50 px-4 py-4 font-black text-slate-950">
                   <p>Net Income / Loss</p>
                   <p
                     className={
-                      pnl.totals.netIncome < 0 ? "text-rose-200" : "text-white"
+                      pnl.totals.netIncome < 0 ? "text-rose-700" : "text-slate-950"
                     }
                   >
                     {money(pnl.totals.netIncome)}
@@ -1641,11 +2185,11 @@ export default async function AdminProfitLossPage() {
           </div>
 
           <div className="space-y-8">
-            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                 Visual P&L Summary
               </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                 Revenue, cost, expenses, and net result.
               </h2>
 
@@ -1654,21 +2198,23 @@ export default async function AdminProfitLossPage() {
                   <div key={row.label}>
                     <div className="mb-2 flex items-center justify-between gap-4">
                       <div>
-                        <p className="text-sm font-bold text-white">{row.label}</p>
+                        <p className="text-sm font-bold text-slate-950">
+                          {row.label}
+                        </p>
                         <p className="text-xs text-slate-500">{row.detail}</p>
                       </div>
-                      <p className="text-sm font-bold text-white">
+                      <p className="text-sm font-bold text-slate-950">
                         {money(row.value)}
                       </p>
                     </div>
 
-                    <div className="h-3 rounded-full bg-white/10">
+                    <div className="h-3 rounded-full bg-slate-100">
                       <div
                         className={`h-3 rounded-full ${row.tone}`}
                         style={{
                           width: `${getBarWidth(
                             row.value,
-                            pnl.totals.maxVisualValue
+                            pnl.totals.maxVisualValue,
                           )}%`,
                         }}
                       />
@@ -1678,88 +2224,88 @@ export default async function AdminProfitLossPage() {
               </div>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Gross Booking Volume
                   </p>
-                  <p className="mt-2 text-xl font-black text-white">
+                  <p className="mt-2 text-xl font-black text-slate-950">
                     {money(pnl.totals.grossBookingVolume)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Paid Booking Volume
                   </p>
-                  <p className="mt-2 text-xl font-black text-white">
+                  <p className="mt-2 text-xl font-black text-slate-950">
                     {money(pnl.totals.paidBookingVolume)}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-white/10 bg-slate-950/60 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                 Margin Snapshot
               </p>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Gross Margin
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">
+                  <p className="mt-2 text-2xl font-black text-slate-950">
                     {percent(pnl.totals.grossMargin)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Net Margin
                   </p>
                   <p
                     className={`mt-2 text-2xl font-black ${
                       pnl.totals.netMargin >= 0
-                        ? "text-emerald-200"
-                        : "text-rose-200"
+                        ? "text-emerald-700"
+                        : "text-rose-700"
                     }`}
                   >
                     {percent(pnl.totals.netMargin)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Cost of Revenue Ratio
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">
+                  <p className="mt-2 text-2xl font-black text-slate-950">
                     {percent(pnl.totals.costOfRevenueRatio)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Operating Expense Ratio
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">
+                  <p className="mt-2 text-2xl font-black text-slate-950">
                     {percent(pnl.totals.operatingExpenseRatio)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Tax Held
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">
+                  <p className="mt-2 text-2xl font-black text-slate-950">
                     {money(pnl.totals.taxCollected)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Bookings
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white">
+                  <p className="mt-2 text-2xl font-black text-slate-950">
                     {pnl.totals.bookings.toLocaleString()}
                   </p>
                 </div>
@@ -1769,14 +2315,14 @@ export default async function AdminProfitLossPage() {
         </section>
 
         <section className="grid gap-8 xl:grid-cols-2">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
               Operating Expense Detail
             </p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
               Expense category breakdown
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
+            <p className="mt-2 text-sm leading-6 text-slate-600">
               This is wired to the expense_ledger table and grouped by category.
             </p>
 
@@ -1794,14 +2340,14 @@ export default async function AdminProfitLossPage() {
                   return (
                     <div key={row.category}>
                       <div className="mb-2 flex items-center justify-between">
-                        <p className="text-sm font-bold text-white">
+                        <p className="text-sm font-bold text-slate-950">
                           {row.label}
                         </p>
-                        <p className="text-sm font-bold text-white">
+                        <p className="text-sm font-bold text-slate-950">
                           {money(row.value)}
                         </p>
                       </div>
-                      <div className="h-3 rounded-full bg-white/10">
+                      <div className="h-3 rounded-full bg-slate-100">
                         <div
                           className={`h-3 rounded-full ${
                             tones[index % tones.length]
@@ -1809,7 +2355,7 @@ export default async function AdminProfitLossPage() {
                           style={{
                             width: `${getBarWidth(
                               row.value,
-                              Math.max(pnl.totals.totalOperatingExpenses, 1)
+                              Math.max(pnl.totals.totalOperatingExpenses, 1),
                             )}%`,
                           }}
                         />
@@ -1818,24 +2364,24 @@ export default async function AdminProfitLossPage() {
                   );
                 })
               ) : (
-                <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
-                  No expense ledger categories found yet. Add an expense above to
-                  start building this chart.
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+                  No expense ledger categories found yet. Add an expense above
+                  to start building this chart.
                 </div>
               )}
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                   Recent Expenses
                 </p>
-                <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                   Expense ledger rows
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Latest live rows from the expense_ledger table.
                 </p>
               </div>
@@ -1846,10 +2392,10 @@ export default async function AdminProfitLossPage() {
               />
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-3xl border border-white/10">
+            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-100">
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
-                  <thead className="bg-white/5 text-slate-400">
+                  <thead className="bg-slate-50 text-slate-600">
                     <tr>
                       <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
                         Expense
@@ -1869,23 +2415,23 @@ export default async function AdminProfitLossPage() {
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-white/10 bg-slate-950/40">
+                  <tbody className="divide-y divide-slate-100 bg-white">
                     {pnl.recentExpenses.length ? (
                       pnl.recentExpenses.map((expense) => (
                         <tr
                           key={expense.id}
-                          className="transition hover:bg-white/5"
+                          className="transition hover:bg-slate-50"
                         >
-                          <td className="px-4 py-4 font-semibold text-white">
+                          <td className="px-4 py-4 font-semibold text-slate-950">
                             {expense.name}
                           </td>
-                          <td className="px-4 py-4 text-slate-300">
+                          <td className="px-4 py-4 text-slate-600">
                             {expense.category}
                           </td>
-                          <td className="px-4 py-4 font-semibold text-white">
+                          <td className="px-4 py-4 font-semibold text-slate-950">
                             {moneyExact(expense.amount)}
                           </td>
-                          <td className="px-4 py-4 text-slate-400">
+                          <td className="px-4 py-4 text-slate-600">
                             {expense.date}
                           </td>
                           <td className="px-4 py-4">
@@ -1897,9 +2443,9 @@ export default async function AdminProfitLossPage() {
                               />
                               <button
                                 type="submit"
-                                className="rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1 text-xs font-bold text-rose-200 transition hover:bg-rose-400/20"
+                                className="rounded-full border border-rose-100 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
                               >
-                                Delete
+                                Void
                               </button>
                             </form>
                           </td>
@@ -1909,7 +2455,7 @@ export default async function AdminProfitLossPage() {
                       <tr>
                         <td
                           colSpan={5}
-                          className="px-4 py-8 text-center text-slate-400"
+                          className="px-4 py-8 text-center text-slate-600"
                         >
                           No expense ledger rows found yet. Use the Add Expense
                           form above to start tracking operating expenses.
