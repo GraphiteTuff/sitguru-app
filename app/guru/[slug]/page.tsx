@@ -65,6 +65,37 @@ type GuruRecord = {
   photo_urls: string[] | null;
 };
 
+type GuruServiceRate = {
+  id: string;
+  guru_id: string;
+  service_key: string;
+  service_label: string;
+  is_enabled: boolean;
+  rate_amount: number | null;
+  rate_unit: string;
+  duration_minutes: number | null;
+  notes: string | null;
+};
+
+type PublicRateDisplay = {
+  label: string;
+  caption: string;
+  serviceLabel: string;
+  hasServiceRate: boolean;
+};
+
+type ServiceRateRawRow = {
+  id?: string | null;
+  guru_id?: string | null;
+  service_key?: string | null;
+  service_label?: string | null;
+  is_enabled?: boolean | null;
+  rate_amount?: number | string | null;
+  rate_unit?: string | null;
+  duration_minutes?: number | string | null;
+  notes?: string | null;
+};
+
 type ServiceKey =
   | "all_services"
   | "drop_in_visit"
@@ -182,6 +213,142 @@ function formatMoney(value: number | null | undefined) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function normalizeRateKey(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function toPublicRateNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function formatRateUnitLabel(unit: string | null | undefined) {
+  const normalized = normalizeRateKey(unit || "visit");
+
+  const labels: Record<string, string> = {
+    hour: "hour",
+    visit: "visit",
+    walk: "walk",
+    session: "session",
+    day: "day",
+    night: "night",
+    stay: "stay",
+    pet: "pet",
+    add_on: "add-on",
+    custom: "custom quote",
+  };
+
+  return labels[normalized] || normalized.replace(/_/g, " ");
+}
+
+function normalizeServiceRateRow(row: ServiceRateRawRow): GuruServiceRate | null {
+  const serviceKey = normalizeRateKey(row.service_key || row.service_label || "");
+  const serviceLabel = String(row.service_label || row.service_key || "").trim();
+
+  if (!row.id || !row.guru_id || !serviceKey || !serviceLabel) return null;
+
+  return {
+    id: row.id,
+    guru_id: row.guru_id,
+    service_key: serviceKey,
+    service_label: serviceLabel,
+    is_enabled: row.is_enabled !== false,
+    rate_amount: toPublicRateNumber(row.rate_amount),
+    rate_unit: normalizeRateKey(row.rate_unit || "visit"),
+    duration_minutes: toPublicRateNumber(row.duration_minutes),
+    notes: row.notes || null,
+  };
+}
+
+function getLowestPublicServiceRate(serviceRates: GuruServiceRate[]) {
+  return (
+    serviceRates
+      .filter(
+        (rate) =>
+          rate.is_enabled &&
+          typeof rate.rate_amount === "number" &&
+          Number.isFinite(rate.rate_amount),
+      )
+      .sort((first, second) => Number(first.rate_amount) - Number(second.rate_amount))[0] ||
+    serviceRates.find((rate) => rate.is_enabled) ||
+    null
+  );
+}
+
+function getPublicServiceRateForLabel(
+  serviceRates: GuruServiceRate[],
+  serviceLabel: string,
+) {
+  const serviceKey = normalizeRateKey(serviceLabel);
+
+  if (!serviceKey) return null;
+
+  return (
+    serviceRates.find((rate) => {
+      const labelKey = normalizeRateKey(rate.service_label);
+
+      return (
+        rate.is_enabled &&
+        (rate.service_key === serviceKey ||
+          labelKey === serviceKey ||
+          labelKey.includes(serviceKey) ||
+          serviceKey.includes(labelKey))
+      );
+    }) || null
+  );
+}
+
+function formatPublicRateDisplay({
+  rate,
+  fallbackAmount,
+  fromLabel = false,
+}: {
+  rate: GuruServiceRate | null;
+  fallbackAmount: number | null;
+  fromLabel?: boolean;
+}): PublicRateDisplay {
+  if (rate) {
+    if (rate.rate_unit === "custom") {
+      return {
+        label: "Custom quote",
+        caption: rate.service_label,
+        serviceLabel: rate.service_label,
+        hasServiceRate: true,
+      };
+    }
+
+    if (typeof rate.rate_amount === "number" && Number.isFinite(rate.rate_amount)) {
+      return {
+        label: `${fromLabel ? "From " : ""}${formatMoney(rate.rate_amount)} / ${formatRateUnitLabel(
+          rate.rate_unit,
+        )}`,
+        caption: rate.duration_minutes
+          ? `${rate.service_label} · ${rate.duration_minutes} min`
+          : rate.service_label,
+        serviceLabel: rate.service_label,
+        hasServiceRate: true,
+      };
+    }
+  }
+
+  return {
+    label: `${formatMoney(fallbackAmount)}/hr`,
+    caption: "Fallback hourly rate",
+    serviceLabel: "General care",
+    hasServiceRate: false,
+  };
 }
 
 function initialsFromName(name: string) {
@@ -955,6 +1122,28 @@ function monthLabel(date: Date) {
   }).format(date);
 }
 
+async function loadGuruServiceRates(guruId: string | null) {
+  if (!guruId || guruId.startsWith("fallback-")) return [] as GuruServiceRate[];
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("guru_service_rates")
+    .select("id, guru_id, service_key, service_label, is_enabled, rate_amount, rate_unit, duration_minutes, notes")
+    .eq("guru_id", guruId)
+    .eq("is_enabled", true)
+    .order("service_label", { ascending: true });
+
+  if (error) {
+    console.error("Error loading guru service rates:", error.message);
+    return [] as GuruServiceRate[];
+  }
+
+  return ((data || []) as ServiceRateRawRow[])
+    .map(normalizeServiceRateRow)
+    .filter(Boolean) as GuruServiceRate[];
+}
+
 async function loadPublicAvailability(userId: string | null) {
   if (!userId || userId.startsWith("fallback-")) {
     return {
@@ -1077,6 +1266,7 @@ export default async function GuruProfilePage({
   const { slug } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const { guru, isFallback } = await getGuruForPage(slug);
+  const serviceRates = await loadGuruServiceRates(guru.id);
 
   const displayName = getDisplayName(guru);
   const firstName = displayName.split(" ")[0] || "this Guru";
@@ -1090,7 +1280,13 @@ export default async function GuruProfilePage({
 
   const location = [guru.city, guru.state].filter(Boolean).join(", ");
   const numericRate = getRateValue(guru);
-  const rate = formatMoney(numericRate);
+  const lowestServiceRate = getLowestPublicServiceRate(serviceRates);
+  const defaultRateDisplay = formatPublicRateDisplay({
+    rate: lowestServiceRate,
+    fallbackAmount: numericRate,
+    fromLabel: Boolean(lowestServiceRate),
+  });
+  const rate = defaultRateDisplay.label;
   const years = getYearsText(guru);
   const ratingValue = getRatingValue(guru);
   const reviewText = getReviewText(guru);
@@ -1148,6 +1344,17 @@ export default async function GuruProfilePage({
     customerServiceOptions.find((option) => option.key === requestedServiceKey) ||
     customerServiceOptions[0] ||
     publicServiceOptions[0];
+  const selectedServiceRate =
+    getPublicServiceRateForLabel(serviceRates, selectedCustomerService.label) ||
+    lowestServiceRate;
+  const selectedRateDisplay = formatPublicRateDisplay({
+    rate: selectedServiceRate,
+    fallbackAmount: numericRate,
+    fromLabel: !getPublicServiceRateForLabel(
+      serviceRates,
+      selectedCustomerService.label,
+    ),
+  });
 
   const availabilityUserId = guru.user_id || guru.id;
   const { settings, weeklyAvailability, blackoutDates } =
@@ -1291,7 +1498,7 @@ export default async function GuruProfilePage({
                     <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-bold !text-slate-800">
                       <span>📍 {location || "Serving your area"}</span>
                       <span className="hidden !text-slate-400 sm:inline">|</span>
-                      <span>{rate}/hr starting rate</span>
+                      <span>{selectedRateDisplay.label}</span>
                       <span className="hidden !text-slate-400 sm:inline">|</span>
                       <span>{years} experience</span>
                     </div>
@@ -1392,7 +1599,7 @@ export default async function GuruProfilePage({
                 {[
                   {
                     label: "Starting rate",
-                    value: `${rate}/hr`,
+                    value: rate,
                   },
                   {
                     label: "Experience",
@@ -1454,6 +1661,65 @@ export default async function GuruProfilePage({
                   </div>
                 ))}
               </div>
+
+              {serviceRates.length > 0 ? (
+                <div className="mt-8 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-5">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
+                        Service rates
+                      </p>
+                      <p className="mt-1 text-sm font-semibold !text-slate-700">
+                        Rates are set by this Guru by service and billing parameter.
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-black !text-emerald-700 ring-1 ring-emerald-100">
+                      {serviceRates.length} active rate
+                      {serviceRates.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    {serviceRates.map((serviceRate) => {
+                      const display = formatPublicRateDisplay({
+                        rate: serviceRate,
+                        fallbackAmount: numericRate,
+                      });
+
+                      return (
+                        <div
+                          key={serviceRate.id}
+                          className="rounded-[1.2rem] border border-emerald-100 bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-base font-black !text-slate-950">
+                                {serviceRate.service_label}
+                              </p>
+                              {serviceRate.duration_minutes ? (
+                                <p className="mt-1 text-xs font-bold !text-slate-500">
+                                  {serviceRate.duration_minutes} minutes
+                                </p>
+                              ) : null}
+                            </div>
+
+                            <p className="text-right text-lg font-black !text-emerald-700">
+                              {display.label}
+                            </p>
+                          </div>
+
+                          {serviceRate.notes ? (
+                            <p className="mt-3 text-sm font-semibold leading-6 !text-slate-700">
+                              {serviceRate.notes}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-8 flex flex-wrap gap-3">
                 {specialties.map((specialty) => (
@@ -1762,7 +2028,7 @@ export default async function GuruProfilePage({
                       {primaryService}
                     </p>
                     <p className="mt-1 text-sm font-bold !text-emerald-700">
-                      {rate}/hr starting rate
+                      {selectedRateDisplay.label}
                     </p>
                   </div>
                 </div>
