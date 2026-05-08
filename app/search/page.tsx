@@ -16,6 +16,7 @@ import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
 type GuruRow = {
+  [key: string]: unknown;
   id: number;
   user_id?: string | null;
   slug?: string | null;
@@ -29,6 +30,11 @@ type GuruRow = {
   service_latitude?: number | string | null;
   service_longitude?: number | string | null;
   service_radius_miles?: number | string | null;
+  service_radius?: number | string | null;
+  radius_miles?: number | string | null;
+  radius?: number | string | null;
+  travel_radius_miles?: number | string | null;
+  travel_radius?: number | string | null;
   service_area_enabled?: boolean | null;
   latitude?: number | string | null;
   longitude?: number | string | null;
@@ -88,130 +94,7 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
   "cromwell,minnesota": [46.6766, -92.8802],
 };
 
-const GURU_SELECT_ATTEMPTS = [
-  `
-    id,
-    user_id,
-    slug,
-    display_name,
-    full_name,
-    title,
-    bio,
-    city,
-    state,
-    zip_code,
-    service_latitude,
-    service_longitude,
-    service_radius_miles,
-    service_area_enabled,
-    latitude,
-    longitude,
-    lat,
-    lng,
-    hourly_rate,
-    rate,
-    experience_years,
-    is_verified,
-    rating_avg,
-    rating,
-    review_count,
-    profile_photo_url,
-    photo_url,
-    avatar_url,
-    image_url,
-    is_public,
-    is_active,
-    is_accepting_bookings,
-    accepting_bookings,
-    services
-  `,
-  `
-    id,
-    user_id,
-    slug,
-    display_name,
-    full_name,
-    title,
-    bio,
-    city,
-    state,
-    zip_code,
-    service_latitude,
-    service_longitude,
-    service_radius_miles,
-    service_area_enabled,
-    hourly_rate,
-    rate,
-    experience_years,
-    is_verified,
-    rating_avg,
-    rating,
-    review_count,
-    profile_photo_url,
-    photo_url,
-    avatar_url,
-    image_url,
-    is_public,
-    is_active,
-    is_accepting_bookings,
-    accepting_bookings,
-    services
-  `,
-  `
-    id,
-    user_id,
-    slug,
-    display_name,
-    full_name,
-    title,
-    bio,
-    city,
-    state,
-    zip_code,
-    latitude,
-    longitude,
-    hourly_rate,
-    rate,
-    experience_years,
-    is_verified,
-    rating_avg,
-    rating,
-    review_count,
-    profile_photo_url,
-    photo_url,
-    avatar_url,
-    image_url,
-    is_public,
-    is_active,
-    services
-  `,
-  `
-    id,
-    user_id,
-    slug,
-    display_name,
-    full_name,
-    title,
-    bio,
-    city,
-    state,
-    zip_code,
-    hourly_rate,
-    rate,
-    experience_years,
-    is_verified,
-    rating_avg,
-    rating,
-    review_count,
-    profile_photo_url,
-    photo_url,
-    avatar_url,
-    image_url,
-    is_public,
-    is_active,
-    services
-  `,
-];
+const GURU_SELECT_ATTEMPTS = ["*"];
 
 function Card({
   children,
@@ -341,8 +224,63 @@ function getGuruLongitude(guru: GuruRow) {
 }
 
 function getGuruRadius(guru: GuruRow) {
-  const parsed = readNumber(guru.service_radius_miles, 25);
-  return parsed > 0 ? parsed : 25;
+  const radiusCandidateKeys = [
+    "service_radius_miles",
+    "serviceRadiusMiles",
+    "service_area_radius_miles",
+    "serviceAreaRadiusMiles",
+    "service_area_radius",
+    "serviceAreaRadius",
+    "travel_radius_miles",
+    "travelRadiusMiles",
+    "travel_radius",
+    "travelRadius",
+    "willing_to_travel_miles",
+    "willingToTravelMiles",
+    "willing_to_travel",
+    "willingToTravel",
+    "max_travel_miles",
+    "maxTravelMiles",
+    "max_travel_distance_miles",
+    "maxTravelDistanceMiles",
+    "max_distance_miles",
+    "maxDistanceMiles",
+    "service_distance_miles",
+    "serviceDistanceMiles",
+    "coverage_radius_miles",
+    "coverageRadiusMiles",
+    "radius_miles",
+    "radiusMiles",
+    "service_radius",
+    "serviceRadius",
+    "radius",
+  ];
+
+  const explicitRadius = radiusCandidateKeys
+    .map((key) => readNumber(guru[key], Number.NaN))
+    .find((value) => Number.isFinite(value) && value > 0);
+
+  if (typeof explicitRadius === "number") {
+    return Math.min(Math.round(explicitRadius), 100);
+  }
+
+  const discoveredRadius = Object.entries(guru)
+    .filter(([key]) => {
+      const normalizedKey = key.toLowerCase();
+      return (
+        normalizedKey.includes("radius") ||
+        normalizedKey.includes("travel") ||
+        normalizedKey.includes("distance")
+      );
+    })
+    .map(([, value]) => readNumber(value, Number.NaN))
+    .find((value) => Number.isFinite(value) && value > 0 && value <= 100);
+
+  if (typeof discoveredRadius === "number") {
+    return Math.min(Math.round(discoveredRadius), 100);
+  }
+
+  return 25;
 }
 
 function calculateDistanceMiles(
@@ -460,10 +398,13 @@ function enrichGuruWithDistance(
     ? 0
     : getDistanceFromSearchLocation(guru, searchLocation);
 
+  const normalizedServiceRadiusMiles = getGuruRadius(guru);
+
   return {
     ...guru,
+    service_radius_miles: normalizedServiceRadiusMiles,
+    service_radius_display: normalizedServiceRadiusMiles,
     distance_miles: distanceMiles,
-    service_radius_display: getGuruRadius(guru),
   };
 }
 
@@ -478,7 +419,7 @@ function GuruResultPhoto({
   const showPhoto = Boolean(photoUrl) && !imageFailed;
 
   return (
-    <div className="h-64 w-full shrink-0 overflow-hidden bg-slate-100 md:h-[320px] md:w-72">
+    <div className="h-80 w-full shrink-0 overflow-hidden bg-slate-100 md:h-full md:min-h-0 md:w-[300px] md:self-stretch xl:w-[320px]">
       {showPhoto ? (
         <img
           src={photoUrl}
@@ -487,7 +428,7 @@ function GuruResultPhoto({
           onError={() => setImageFailed(true)}
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-slate-100">
+        <div className="flex h-full min-h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-slate-100">
           <div className="flex h-24 w-24 items-center justify-center rounded-full border border-emerald-200 bg-white text-2xl font-black text-emerald-700 shadow-sm">
             {getInitials(guruName)}
           </div>
@@ -1293,7 +1234,7 @@ function SearchPageContent() {
             <p className="text-slate-600">Loading Gurus...</p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.18fr_0.82fr]">
             <div className="space-y-5">
               {filteredGurus.length === 0 ? (
                 <Card className="p-7">
@@ -1324,6 +1265,11 @@ function SearchPageContent() {
                   const guruRate = getGuruRate(guru);
                   const guruRating = getGuruRating(guru);
                   const services = guru.services || [];
+                  const visibleServices = services.slice(0, 4);
+                  const extraServiceCount = Math.max(
+                    services.length - visibleServices.length,
+                    0,
+                  );
                   const guruHasMapLocation = hasMapLocation(guru);
                   const guruRadius = Math.round(
                     guru.service_radius_display || getGuruRadius(guru),
@@ -1342,7 +1288,7 @@ function SearchPageContent() {
                   return (
                     <Card
                       key={guru.id}
-                      className={`overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                      className={`overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md md:h-[380px] ${
                         isSelectedGuru
                           ? "border-emerald-400 ring-4 ring-emerald-100"
                           : ""
@@ -1353,18 +1299,18 @@ function SearchPageContent() {
                       }}
                       onMouseLeave={() => setHighlightedGuruId(undefined)}
                     >
-                      <div className="flex h-full flex-col md:flex-row">
+                      <div className="flex min-h-[380px] flex-col md:h-full md:min-h-0 md:flex-row md:items-stretch">
                         <GuruResultPhoto
                           photoUrl={photoUrl}
                           guruName={guruName}
                         />
 
-                        <div className="flex min-w-0 flex-1 flex-col justify-between p-6">
-                          <div>
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex min-w-0 flex-1 flex-col p-5 md:h-full md:min-h-0 lg:p-6">
+                          <div className="min-h-0 flex-1 overflow-hidden">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl">
+                                  <h2 className="line-clamp-2 text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">
                                     {guruName}
                                   </h2>
 
@@ -1395,11 +1341,11 @@ function SearchPageContent() {
                                   )}
                                 </div>
 
-                                <p className="mt-2 text-base text-slate-600">
+                                <p className="mt-1 line-clamp-1 text-sm text-slate-600 sm:text-base">
                                   {guru.title || "Pet Care Guru"}
                                 </p>
 
-                                <p className="mt-1 text-sm text-slate-500">
+                                <p className="mt-1 line-clamp-1 text-sm text-slate-500">
                                   {formatLocation(guru.city, guru.state)}
                                   {guru.zip_code ? ` · ${guru.zip_code}` : ""}
                                 </p>
@@ -1415,8 +1361,8 @@ function SearchPageContent() {
                                 ) : null}
                               </div>
 
-                              <div className="grid shrink-0 grid-cols-2 gap-2 sm:min-w-[180px]">
-                                <div className="rounded-2xl bg-slate-50 px-3 py-3 text-center">
+                              <div className="grid shrink-0 grid-cols-2 gap-2 sm:min-w-[160px]">
+                                <div className="rounded-2xl bg-slate-50 px-3 py-2.5 text-center">
                                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Rating
                                   </div>
@@ -1427,7 +1373,7 @@ function SearchPageContent() {
                                   </div>
                                 </div>
 
-                                <div className="rounded-2xl bg-slate-50 px-3 py-3 text-center">
+                                <div className="rounded-2xl bg-slate-50 px-3 py-2.5 text-center">
                                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Reviews
                                   </div>
@@ -1438,7 +1384,7 @@ function SearchPageContent() {
                               </div>
                             </div>
 
-                            <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-700">
+                            <div className="mt-4 flex max-h-[66px] flex-wrap gap-2 overflow-hidden text-sm text-slate-700">
                               <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-medium">
                                 {formatRate(guruRate)}
                               </span>
@@ -1455,8 +1401,8 @@ function SearchPageContent() {
                             </div>
 
                             {services.length > 0 ? (
-                              <div className="mt-5 flex flex-wrap gap-2">
-                                {services.slice(0, 5).map((service) => (
+                              <div className="mt-4 flex max-h-[62px] flex-wrap gap-2 overflow-hidden">
+                                {visibleServices.map((service) => (
                                   <span
                                     key={service}
                                     className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
@@ -1464,23 +1410,29 @@ function SearchPageContent() {
                                     {service}
                                   </span>
                                 ))}
+
+                                {extraServiceCount > 0 ? (
+                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                                    +{extraServiceCount} more
+                                  </span>
+                                ) : null}
                               </div>
                             ) : null}
 
-                            <div className="mt-5">
+                            <div className="mt-4">
                               {guru.bio ? (
-                                <p className="line-clamp-4 text-sm leading-7 text-slate-600 sm:text-base">
+                                <p className="line-clamp-2 text-sm leading-6 text-slate-600 sm:text-base">
                                   {guru.bio}
                                 </p>
                               ) : (
-                                <p className="text-sm leading-7 text-slate-500 sm:text-base">
+                                <p className="line-clamp-2 text-sm leading-6 text-slate-500 sm:text-base">
                                   This Guru has not added a bio yet.
                                 </p>
                               )}
                             </div>
                           </div>
 
-                          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                             <Link
                               href={getGuruHref(guru)}
                               onClick={() =>
@@ -1545,7 +1497,11 @@ function SearchPageContent() {
                     markers={
                       filteredGurus as unknown as Record<string, unknown>[]
                     }
-                    center={mapCenter}
+                    center={
+                      cleanZip(zipFilter) || cityFilter.trim() || stateFilter.trim()
+                        ? mapCenter
+                        : undefined
+                    }
                     highlightedMarkerId={highlightedGuruId}
                   />
                 </div>
@@ -1598,7 +1554,7 @@ function SearchPageFallback() {
       </section>
 
       <section className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.18fr_0.82fr]">
           <div className="space-y-5">
             <Card className="p-7">
               <p className="text-slate-600">Loading Gurus...</p>
