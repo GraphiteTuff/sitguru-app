@@ -251,13 +251,16 @@ function getServices(marker: RawMarker) {
 
 function getProfileHref(marker: RawMarker) {
   const directHref = asString(marker.profileHref) || asString(marker.href);
-  if (directHref) return directHref;
+
+  if (directHref) {
+    return directHref.replace(/^\/gurus\//, "/guru/");
+  }
 
   const slug = asString(marker.slug);
-  if (slug) return `/gurus/${slug}`;
+  if (slug) return `/guru/${slug}`;
 
   const id = getId(marker);
-  return id ? `/gurus/${id}` : "/find-care";
+  return id ? `/guru/${id}` : "/find-care";
 }
 
 function getServiceRadiusMiles(marker: RawMarker) {
@@ -737,6 +740,7 @@ export default function MapContent({
           lng: marker.longitude,
           source: marker.source,
           radius: marker.serviceRadiusMiles,
+          profileHref: marker.profileHref,
         })),
       );
     }
@@ -1008,7 +1012,8 @@ export default function MapContent({
       `}</style>
 
       <div className="pointer-events-none absolute left-4 top-4 z-[950] rounded-full border border-emerald-100 bg-white/95 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700 shadow-lg shadow-slate-950/10 backdrop-blur">
-        {normalizedMarkers.length} Guru map pin{normalizedMarkers.length === 1 ? "" : "s"}
+        {normalizedMarkers.length} Guru map pin
+        {normalizedMarkers.length === 1 ? "" : "s"}
       </div>
 
       {mapError ? (
