@@ -67,16 +67,135 @@ type UploadResult = {
   publicUrl: string;
 };
 
-const SERVICE_OPTIONS = [
-  "Pet Sitting",
-  "Dog Walking",
-  "Boarding",
-  "Drop-In Care",
-  "House Sitting",
-  "Training",
-  "Pet Taxi",
-  "Medication Help",
+type RateUnit =
+  | "hour"
+  | "visit"
+  | "walk"
+  | "session"
+  | "day"
+  | "night"
+  | "stay"
+  | "pet"
+  | "add_on"
+  | "custom";
+
+type ServiceRateConfig = {
+  service_key: string;
+  service_label: string;
+  default_unit: RateUnit;
+  default_duration_minutes: number | null;
+  recommended_units: RateUnit[];
+};
+
+type GuruServiceRateRow = {
+  id?: string | null;
+  guru_id?: string | null;
+  service_key: string;
+  service_label: string;
+  is_enabled: boolean;
+  rate_amount: number | string | null;
+  rate_unit: RateUnit | string | null;
+  duration_minutes?: number | string | null;
+  notes?: string | null;
+};
+
+type ServiceRateState = {
+  service_key: string;
+  service_label: string;
+  is_enabled: boolean;
+  rate_amount: string;
+  rate_unit: RateUnit;
+  duration_minutes: string;
+  notes: string;
+};
+
+const RATE_UNIT_OPTIONS: { value: RateUnit; label: string }[] = [
+  { value: "hour", label: "Per hour" },
+  { value: "visit", label: "Per visit" },
+  { value: "walk", label: "Per walk" },
+  { value: "session", label: "Per session" },
+  { value: "day", label: "Per day" },
+  { value: "night", label: "Per night" },
+  { value: "stay", label: "Per stay" },
+  { value: "pet", label: "Per pet" },
+  { value: "add_on", label: "Add-on fee" },
+  { value: "custom", label: "Custom quote" },
 ];
+
+const SERVICE_RATE_CONFIGS: ServiceRateConfig[] = [
+  {
+    service_key: "pet_sitting",
+    service_label: "Pet Sitting",
+    default_unit: "visit",
+    default_duration_minutes: 30,
+    recommended_units: ["visit", "hour", "day"],
+  },
+  {
+    service_key: "dog_walking",
+    service_label: "Dog Walking",
+    default_unit: "walk",
+    default_duration_minutes: 30,
+    recommended_units: ["walk", "visit", "hour"],
+  },
+  {
+    service_key: "boarding",
+    service_label: "Boarding",
+    default_unit: "night",
+    default_duration_minutes: null,
+    recommended_units: ["night", "stay", "day"],
+  },
+  {
+    service_key: "drop_in_visits",
+    service_label: "Drop-In Visits",
+    default_unit: "visit",
+    default_duration_minutes: 30,
+    recommended_units: ["visit", "hour"],
+  },
+  {
+    service_key: "house_sitting",
+    service_label: "House Sitting",
+    default_unit: "night",
+    default_duration_minutes: null,
+    recommended_units: ["night", "stay", "day"],
+  },
+  {
+    service_key: "doggy_day_care",
+    service_label: "Doggy Day Care",
+    default_unit: "day",
+    default_duration_minutes: null,
+    recommended_units: ["day", "visit"],
+  },
+  {
+    service_key: "training_support",
+    service_label: "Training Support",
+    default_unit: "session",
+    default_duration_minutes: 60,
+    recommended_units: ["session", "hour"],
+  },
+  {
+    service_key: "pet_taxi",
+    service_label: "Pet Taxi",
+    default_unit: "visit",
+    default_duration_minutes: null,
+    recommended_units: ["visit", "hour", "add_on"],
+  },
+  {
+    service_key: "medication_help",
+    service_label: "Medication Help",
+    default_unit: "add_on",
+    default_duration_minutes: null,
+    recommended_units: ["add_on", "visit"],
+  },
+  {
+    service_key: "custom_care",
+    service_label: "Custom Care",
+    default_unit: "custom",
+    default_duration_minutes: null,
+    recommended_units: ["custom", "hour", "visit", "session"],
+  },
+];
+
+const SERVICE_OPTIONS = SERVICE_RATE_CONFIGS.map((service) => service.service_label);
 
 const PHOTO_BUCKETS = [
   "guru-photos",
@@ -124,6 +243,119 @@ function normalizeServices(value: GuruProfile["services"]): string[] {
       .filter(Boolean);
   }
   return [];
+}
+
+function isRateUnit(value: unknown): value is RateUnit {
+  return RATE_UNIT_OPTIONS.some((option) => option.value === value);
+}
+
+function formatRateUnitLabel(unit: RateUnit) {
+  return RATE_UNIT_OPTIONS.find((option) => option.value === unit)?.label || unit;
+}
+
+function buildDefaultServiceRates(enabledServices: string[] = []): ServiceRateState[] {
+  return SERVICE_RATE_CONFIGS.map((service) => ({
+    service_key: service.service_key,
+    service_label: service.service_label,
+    is_enabled: enabledServices.includes(service.service_label),
+    rate_amount: "",
+    rate_unit: service.default_unit,
+    duration_minutes:
+      service.default_duration_minutes === null
+        ? ""
+        : String(service.default_duration_minutes),
+    notes: "",
+  }));
+}
+
+function mergeServiceRates({
+  enabledServices,
+  savedRates,
+}: {
+  enabledServices: string[];
+  savedRates: GuruServiceRateRow[];
+}): ServiceRateState[] {
+  const savedByKey = new Map(
+    savedRates.map((rate) => [String(rate.service_key), rate]),
+  );
+
+  return SERVICE_RATE_CONFIGS.map((service) => {
+    const saved = savedByKey.get(service.service_key);
+    const savedUnit = saved?.rate_unit;
+
+    return {
+      service_key: service.service_key,
+      service_label: saved?.service_label || service.service_label,
+      is_enabled:
+        Boolean(saved?.is_enabled) || enabledServices.includes(service.service_label),
+      rate_amount:
+        saved?.rate_amount !== null && saved?.rate_amount !== undefined
+          ? String(saved.rate_amount)
+          : "",
+      rate_unit: isRateUnit(savedUnit) ? savedUnit : service.default_unit,
+      duration_minutes:
+        saved?.duration_minutes !== null && saved?.duration_minutes !== undefined
+          ? String(saved.duration_minutes)
+          : service.default_duration_minutes === null
+            ? ""
+            : String(service.default_duration_minutes),
+      notes: saved?.notes || "",
+    };
+  });
+}
+
+function getEnabledServiceLabels(serviceRates: ServiceRateState[]) {
+  return serviceRates
+    .filter((service) => service.is_enabled)
+    .map((service) => service.service_label);
+}
+
+async function loadGuruServiceRates(guruId: string, enabledServices: string[]) {
+  if (!guruId) return buildDefaultServiceRates(enabledServices);
+
+  const { data, error } = await supabase
+    .from("guru_service_rates")
+    .select("*")
+    .eq("guru_id", guruId)
+    .order("service_label", { ascending: true });
+
+  if (error) {
+    console.warn("Could not load guru service rates:", error.message);
+    return buildDefaultServiceRates(enabledServices);
+  }
+
+  return mergeServiceRates({
+    enabledServices,
+    savedRates: ((data || []) as unknown) as GuruServiceRateRow[],
+  });
+}
+
+async function saveGuruServiceRates(guruId: string, serviceRates: ServiceRateState[]) {
+  if (!guruId) return;
+
+  const now = new Date().toISOString();
+  const payload = serviceRates.map((service) => ({
+    guru_id: guruId,
+    service_key: service.service_key,
+    service_label: service.service_label,
+    is_enabled: service.is_enabled,
+    rate_amount:
+      service.rate_unit === "custom" || !service.rate_amount.trim()
+        ? null
+        : Number(service.rate_amount),
+    rate_unit: service.rate_unit,
+    duration_minutes: service.duration_minutes.trim()
+      ? Number(service.duration_minutes)
+      : null,
+    notes: service.notes.trim() || null,
+    updated_at: now,
+  }));
+
+  const { error } = await supabase
+    .from("guru_service_rates")
+    .upsert(payload, { onConflict: "guru_id,service_key" });
+
+  if (error) throw error;
 }
 
 function getFileExtension(file: File) {
@@ -309,6 +541,9 @@ export default function GuruDashboardProfilePage() {
   const [yearsExperience, setYearsExperience] = useState("");
   const [profilePhotoUrl, setProfilePhotoUrl] = useState("");
   const [services, setServices] = useState<string[]>([]);
+  const [serviceRates, setServiceRates] = useState<ServiceRateState[]>(() =>
+    buildDefaultServiceRates(),
+  );
   const [isPublic, setIsPublic] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState("");
@@ -375,6 +610,7 @@ export default function GuruDashboardProfilePage() {
           setYearsExperience("");
           setProfilePhotoUrl("");
           setServices([]);
+          setServiceRates(buildDefaultServiceRates());
           setIsPublic(false);
           setErrorMessage(
             `We could not read an existing guru profile yet: ${stringifyError(error)}`,
@@ -403,6 +639,7 @@ export default function GuruDashboardProfilePage() {
           setYearsExperience("");
           setProfilePhotoUrl("");
           setServices([]);
+          setServiceRates(buildDefaultServiceRates());
           setIsPublic(false);
           setLoading(false);
           return;
@@ -474,7 +711,11 @@ export default function GuruDashboardProfilePage() {
             profile.photo_url ||
             "",
         );
-        setServices(normalizeServices(profile.services));
+        const normalizedProfileServices = normalizeServices(profile.services);
+        setServices(normalizedProfileServices);
+        setServiceRates(
+          await loadGuruServiceRates(profile.id || "", normalizedProfileServices),
+        );
         setIsPublic(Boolean(profile.is_public));
         setLoading(false);
       } catch (error) {
@@ -569,11 +810,47 @@ export default function GuruDashboardProfilePage() {
   }
 
   function toggleService(service: string) {
-    setServices((current) =>
-      current.includes(service)
-        ? current.filter((item) => item !== service)
-        : [...current, service],
-    );
+    setServiceRates((current) => {
+      const updated = current.map((item) =>
+        item.service_label === service
+          ? { ...item, is_enabled: !item.is_enabled }
+          : item,
+      );
+
+      setServices(getEnabledServiceLabels(updated));
+      return updated;
+    });
+  }
+
+  function updateServiceRate(
+    serviceKey: string,
+    field: keyof Pick<
+      ServiceRateState,
+      "rate_amount" | "rate_unit" | "duration_minutes" | "notes"
+    >,
+    value: string,
+  ) {
+    setServiceRates((current) => {
+      const updated = current.map((item) => {
+        if (item.service_key !== serviceKey) return item;
+
+        if (field === "rate_unit") {
+          return {
+            ...item,
+            rate_unit: isRateUnit(value) ? value : item.rate_unit,
+            rate_amount: value === "custom" ? "" : item.rate_amount,
+          };
+        }
+
+        return {
+          ...item,
+          [field]: value,
+        };
+      });
+
+      setServices(getEnabledServiceLabels(updated));
+      return updated;
+    });
   }
 
   async function handlePhotoUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -633,7 +910,8 @@ export default function GuruDashboardProfilePage() {
     const parsedLatitude = latitude ? Number(latitude) : null;
     const parsedLongitude = longitude ? Number(longitude) : null;
     const cleanPhotoUrl = profilePhotoUrl.trim();
-    const cleanServices = normalizeServices(services);
+    const enabledServiceRates = serviceRates.filter((service) => service.is_enabled);
+    const cleanServices = getEnabledServiceLabels(serviceRates);
 
     const parsedRate = hourlyRate ? Number(hourlyRate) : null;
     const parsedExperience = yearsExperience ? Number(yearsExperience) : null;
@@ -674,6 +952,39 @@ export default function GuruDashboardProfilePage() {
       setErrorMessage("Service radius must be a valid non-negative number.");
       setSaving(false);
       return;
+    }
+
+    for (const service of enabledServiceRates) {
+      const parsedServiceRate = service.rate_amount.trim()
+        ? Number(service.rate_amount)
+        : null;
+      const parsedDuration = service.duration_minutes.trim()
+        ? Number(service.duration_minutes)
+        : null;
+
+      if (
+        service.rate_unit !== "custom" &&
+        (parsedServiceRate === null ||
+          Number.isNaN(parsedServiceRate) ||
+          parsedServiceRate < 0)
+      ) {
+        setErrorMessage(
+          `${service.service_label} needs a valid non-negative rate amount, or choose Custom quote.`,
+        );
+        setSaving(false);
+        return;
+      }
+
+      if (
+        parsedDuration !== null &&
+        (Number.isNaN(parsedDuration) || parsedDuration < 0)
+      ) {
+        setErrorMessage(
+          `${service.service_label} duration must be a valid non-negative number.`,
+        );
+        setSaving(false);
+        return;
+      }
     }
 
     if (
@@ -754,6 +1065,11 @@ export default function GuruDashboardProfilePage() {
         .limit(1);
 
       const refreshed = (freshRows?.[0] as GuruProfile | undefined) ?? null;
+      const savedGuruId = refreshed?.id || existingProfileId;
+
+      if (savedGuruId) {
+        await saveGuruServiceRates(savedGuruId, serviceRates);
+      }
 
       if (refreshed) {
         setExistingProfileId(refreshed.id ?? existingProfileId);
@@ -822,11 +1138,24 @@ export default function GuruDashboardProfilePage() {
             refreshed.photo_url ||
             "",
         );
-        setServices(normalizeServices(refreshed.services));
+        const refreshedServices = normalizeServices(refreshed.services);
+        setServices(refreshedServices);
+        setServiceRates((current) =>
+          current.map((service) => ({
+            ...service,
+            is_enabled: refreshedServices.includes(service.service_label),
+          })),
+        );
         setIsPublic(Boolean(refreshed.is_public));
       } else {
         setSlug(cleanSlug);
         setServices(cleanServices);
+        setServiceRates((current) =>
+          current.map((service) => ({
+            ...service,
+            is_enabled: cleanServices.includes(service.service_label),
+          })),
+        );
         setProfileExists(true);
       }
 
@@ -916,11 +1245,21 @@ export default function GuruDashboardProfilePage() {
   const publicPreviewBio =
     bio.trim() ||
     "Your customer-facing bio will appear here once added. Share how you care for pets, what makes you trustworthy, and the kind of families you are best suited to help.";
-  const publicPreviewRate = hourlyRate.trim()
-    ? `$${hourlyRate.trim()}/hr`
-    : "Rate pending";
+  const enabledServiceRates = serviceRates.filter((service) => service.is_enabled);
+  const firstPricedService = enabledServiceRates.find(
+    (service) => service.rate_unit === "custom" || service.rate_amount.trim(),
+  );
+  const publicPreviewRate = firstPricedService
+    ? firstPricedService.rate_unit === "custom"
+      ? "Custom quote"
+      : `$${firstPricedService.rate_amount}/${formatRateUnitLabel(
+          firstPricedService.rate_unit,
+        ).replace("Per ", "")}`
+    : hourlyRate.trim()
+      ? `$${hourlyRate.trim()}/hr`
+      : "Rate pending";
 
-  const publicProfileHref = `/gurus/${publicPreviewSlug}`;
+  const publicProfileHref = `/guru/${publicPreviewSlug}`;
 
   if (loading) {
     return (
@@ -1216,13 +1555,13 @@ export default function GuruDashboardProfilePage() {
                       htmlFor="hourly_rate"
                       className="mb-2 block text-sm font-extrabold !text-slate-950"
                     >
-                      Hourly rate
+                      Fallback hourly rate
                     </label>
                     <input
                       id="hourly_rate"
                       value={hourlyRate}
                       onChange={(event) => setHourlyRate(event.target.value)}
-                      placeholder="45"
+                      placeholder="Optional fallback rate"
                       inputMode="decimal"
                       className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                     />
@@ -1473,34 +1812,169 @@ export default function GuruDashboardProfilePage() {
                 </div>
 
                 <div>
-                  <p className="mb-3 text-sm font-extrabold !text-slate-950">
-                    Services
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {SERVICE_OPTIONS.map((service) => {
-                      const active = services.includes(service);
+                  <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-sm font-extrabold !text-slate-950">
+                        Services & rates
+                      </p>
+                      <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
+                        Enable each service you offer, then choose the pricing
+                        parameter customers should see and bookings should use.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-800">
+                      {enabledServiceRates.length} enabled
+                    </span>
+                  </div>
+
+                  <div className="space-y-4">
+                    {serviceRates.map((service) => {
+                      const active = service.is_enabled;
+                      const config = SERVICE_RATE_CONFIGS.find(
+                        (item) => item.service_key === service.service_key,
+                      );
+                      const recommendedUnits = config?.recommended_units || [service.rate_unit];
 
                       return (
-                        <button
-                          key={service}
-                          type="button"
-                          onClick={() => toggleService(service)}
-                          className={`rounded-2xl border px-4 py-3 text-left text-sm font-extrabold transition ${
+                        <div
+                          key={service.service_key}
+                          className={`rounded-[1.4rem] border p-4 transition ${
                             active
-                              ? "border-emerald-300 bg-emerald-500 shadow-sm"
-                              : "border-slate-200 bg-slate-50 hover:bg-emerald-50"
+                              ? "border-emerald-200 bg-emerald-50/70 shadow-sm"
+                              : "border-slate-200 bg-slate-50"
                           }`}
                         >
-                          <span
-                            className="font-extrabold"
-                            style={{
-                              color: active ? "#ffffff" : "#0f172a",
-                              WebkitTextFillColor: active ? "#ffffff" : "#0f172a",
-                            }}
-                          >
-                            {service}
-                          </span>
-                        </button>
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <button
+                              type="button"
+                              onClick={() => toggleService(service.service_label)}
+                              className={`inline-flex items-center justify-center rounded-2xl border px-4 py-3 text-sm font-extrabold transition sm:min-w-[210px] ${
+                                active
+                                  ? "border-emerald-500 bg-emerald-600 shadow-sm"
+                                  : "border-slate-300 bg-white shadow-sm hover:border-emerald-200 hover:bg-emerald-50"
+                              }`}
+                              style={{
+                                color: active ? "#ffffff" : "#0f172a",
+                                WebkitTextFillColor: active ? "#ffffff" : "#0f172a",
+                              }}
+                            >
+                              <span
+                                className="font-extrabold"
+                                style={{
+                                  color: active ? "#ffffff" : "#0f172a",
+                                  WebkitTextFillColor: active
+                                    ? "#ffffff"
+                                    : "#0f172a",
+                                }}
+                              >
+                                {active ? "Enabled" : "Enable"} · {service.service_label}
+                              </span>
+                            </button>
+
+                            <div className="flex flex-wrap gap-2 text-xs font-extrabold text-slate-600">
+                              {recommendedUnits.slice(0, 3).map((unit) => (
+                                <span
+                                  key={unit}
+                                  className="rounded-full border border-white bg-white px-3 py-1 font-extrabold shadow-sm"
+                                  style={{
+                                    color: "#065f46",
+                                    WebkitTextFillColor: "#065f46",
+                                  }}
+                                >
+                                  {formatRateUnitLabel(unit)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {active ? (
+                            <div className="mt-4 grid gap-3 md:grid-cols-[0.75fr_1fr_0.75fr]">
+                              <div>
+                                <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
+                                  Rate amount
+                                </label>
+                                <input
+                                  value={service.rate_amount}
+                                  onChange={(event) =>
+                                    updateServiceRate(
+                                      service.service_key,
+                                      "rate_amount",
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder={
+                                    service.rate_unit === "custom"
+                                      ? "Custom"
+                                      : "25"
+                                  }
+                                  inputMode="decimal"
+                                  disabled={service.rate_unit === "custom"}
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
+                                  Rate parameter
+                                </label>
+                                <select
+                                  value={service.rate_unit}
+                                  onChange={(event) =>
+                                    updateServiceRate(
+                                      service.service_key,
+                                      "rate_unit",
+                                      event.target.value,
+                                    )
+                                  }
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                >
+                                  {RATE_UNIT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
+                                  Duration minutes
+                                </label>
+                                <input
+                                  value={service.duration_minutes}
+                                  onChange={(event) =>
+                                    updateServiceRate(
+                                      service.service_key,
+                                      "duration_minutes",
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Optional"
+                                  inputMode="numeric"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                />
+                              </div>
+
+                              <div className="md:col-span-3">
+                                <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
+                                  Optional service notes
+                                </label>
+                                <input
+                                  value={service.notes}
+                                  onChange={(event) =>
+                                    updateServiceRate(
+                                      service.service_key,
+                                      "notes",
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Example: Includes feeding, water refresh, and quick photo update."
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
                       );
                     })}
                   </div>
@@ -1681,7 +2155,7 @@ export default function GuruDashboardProfilePage() {
                       Slug
                     </p>
                     <p className="mt-2 break-all text-lg font-extrabold !text-slate-950">
-                      /gurus/{publicPreviewSlug}
+                      /guru/{publicPreviewSlug}
                     </p>
                   </div>
                 </div>
@@ -1691,13 +2165,19 @@ export default function GuruDashboardProfilePage() {
                 </p>
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {services.length > 0 ? (
-                    services.map((service) => (
+                  {enabledServiceRates.length > 0 ? (
+                    enabledServiceRates.map((service) => (
                       <span
-                        key={service}
+                        key={service.service_key}
                         className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-800"
                       >
-                        {service}
+                        {service.service_label}: {service.rate_unit === "custom"
+                          ? "Custom quote"
+                          : service.rate_amount.trim()
+                            ? `$${service.rate_amount} ${formatRateUnitLabel(
+                                service.rate_unit,
+                              ).toLowerCase()}`
+                            : formatRateUnitLabel(service.rate_unit)}
                       </span>
                     ))
                   ) : (
@@ -1742,7 +2222,7 @@ export default function GuruDashboardProfilePage() {
               <div className="mt-6 space-y-3">
                 {[
                   "Updated display name and public title",
-                  "Location, pricing, and years of experience",
+                  "Location, service-specific rates, and years of experience",
                   "Service selections and profile visibility status",
                   "Photo, bio, and profile completion data",
                   "Customer-facing profile updates tied to your Guru record",
