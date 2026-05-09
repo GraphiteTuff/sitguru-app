@@ -39,6 +39,25 @@ type ScreeningReceiptDetails = {
   badgeLabel: string | null;
 };
 
+type GuruReceiptRow = {
+  id: string;
+  user_id: string | null;
+  email: string | null;
+  display_name: string | null;
+  full_name: string | null;
+  name: string | null;
+};
+
+type RefundGuruRow = {
+  id: string;
+};
+
+type PawstepGuruInvoiceRow = {
+  id: string;
+  background_check_reimbursement_balance: number | string | null;
+  background_check_monthly_payments_completed: number | string | null;
+};
+
 const PAY_IN_FULL_TOTAL_CENTS = 3799;
 const FLEXIBLE_PLAN_TOTAL_CENTS = 3999;
 const LAUNCH_TODAY_CENTS = 1500;
@@ -332,7 +351,9 @@ async function hasReceiptAlreadyBeenSent(stripeSessionId: string) {
     return false;
   }
 
-  return Boolean(data?.id);
+  const row = data as unknown as { id?: string | null } | null;
+
+  return Boolean(row?.id);
 }
 
 async function logReceiptEmail(params: {
@@ -505,11 +526,12 @@ async function updateTrustSafetyScreeningPaidFromCheckoutSession(
     return;
   }
 
-  const { data: guruBeforeUpdate, error: guruLookupError } = await supabaseAdmin
-    .from("gurus")
-    .select("id,user_id,email,display_name,full_name,name")
-    .eq("id", guruId)
-    .maybeSingle();
+  const { data: guruBeforeUpdateData, error: guruLookupError } =
+    await supabaseAdmin
+      .from("gurus")
+      .select("id,user_id,email,display_name,full_name,name")
+      .eq("id", guruId)
+      .maybeSingle();
 
   if (guruLookupError) {
     console.error(
@@ -517,6 +539,9 @@ async function updateTrustSafetyScreeningPaidFromCheckoutSession(
       guruLookupError,
     );
   }
+
+  const guruBeforeUpdate =
+    guruBeforeUpdateData as unknown as GuruReceiptRow | null;
 
   const { paymentIntentId } = await getPaymentIntentDetails(session);
 
@@ -561,8 +586,7 @@ async function updateTrustSafetyScreeningPaidFromCheckoutSession(
   }
 
   if (paymentOption === "pay_15_three_monthly") {
-    updatePayload.background_check_payment_plan_status =
-      "monthly_plan_active";
+    updatePayload.background_check_payment_plan_status = "monthly_plan_active";
     updatePayload.background_check_reimbursement_balance = centsToDollars(
       FLEXIBLE_REMAINING_CENTS,
     );
@@ -684,7 +708,7 @@ async function updateTrustSafetyScreeningRefundedFromCharge(
     return false;
   }
 
-  const { data: guru, error: lookupError } = await supabaseAdmin
+  const { data: guruData, error: lookupError } = await supabaseAdmin
     .from("gurus")
     .select("id")
     .eq("background_check_fee_payment_intent_id", paymentIntentId)
@@ -698,7 +722,9 @@ async function updateTrustSafetyScreeningRefundedFromCharge(
     return false;
   }
 
-  if (!guru?.id) {
+  const guru = guruData as unknown as RefundGuruRow | null;
+
+  if (!guru || !guru.id) {
     return false;
   }
 
@@ -752,7 +778,7 @@ async function updatePawstepInvoicePaid(invoice: Stripe.Invoice) {
       ? invoiceAny.amount_paid
       : PAWSTEP_MONTHLY_CENTS;
 
-  const { data: guru, error: lookupError } = await supabaseAdmin
+  const { data: guruData, error: lookupError } = await supabaseAdmin
     .from("gurus")
     .select(
       [
@@ -769,13 +795,16 @@ async function updatePawstepInvoicePaid(invoice: Stripe.Invoice) {
     return;
   }
 
-  if (!guru?.id) {
+  const guru = guruData as unknown as PawstepGuruInvoiceRow | null;
+
+  if (!guru || !guru.id) {
     return;
   }
 
   const currentBalance = Number(
     guru.background_check_reimbursement_balance ?? 0,
   );
+
   const currentCompleted = Number(
     guru.background_check_monthly_payments_completed ?? 0,
   );
@@ -784,6 +813,7 @@ async function updatePawstepInvoicePaid(invoice: Stripe.Invoice) {
     0,
     Number((currentBalance - centsToDollars(amountPaidCents)).toFixed(2)),
   );
+
   const nextCompleted = Number.isFinite(currentCompleted)
     ? currentCompleted + 1
     : 1;
@@ -845,7 +875,9 @@ async function updateBookingPaidFromCheckoutSession(
     typeof session.amount_subtotal === "number" ? session.amount_subtotal : 0;
 
   const totalCents =
-    typeof session.amount_total === "number" ? session.amount_total : subtotalCents;
+    typeof session.amount_total === "number"
+      ? session.amount_total
+      : subtotalCents;
 
   const taxDetailsAmount =
     session.total_details?.amount_tax &&
@@ -861,6 +893,7 @@ async function updateBookingPaidFromCheckoutSession(
   const sitguruFeeCents = Number.isFinite(sitguruFeeCentsRaw)
     ? sitguruFeeCentsRaw
     : 0;
+
   const guruNetCents = Number.isFinite(guruNetCentsRaw)
     ? guruNetCentsRaw
     : Math.max(subtotalCents - sitguruFeeCents, 0);
