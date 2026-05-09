@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ChangeEvent,
   FormEvent,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -579,10 +580,37 @@ async function saveGuruPayload({
   throw new Error(lastError);
 }
 
-export default function GuruDashboardProfilePage() {
+function GuruProfileLoadingFallback() {
+  return (
+    <main
+      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 font-light !text-slate-950 md:px-6 lg:px-8"
+      style={{
+        fontFamily:
+          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontWeight: 300,
+      }}
+    >
+      <div className="mx-auto flex max-w-6xl items-center justify-center">
+        <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
+          <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-600" />
+          <p className="mt-3 text-base font-semibold !text-slate-700">
+            Loading guru profile...
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function GuruDashboardProfilePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeStep = searchParams.get("step") === "2" ? "2" : searchParams.get("step") === "3" ? "3" : "1";
+  const activeStep =
+    searchParams.get("step") === "2"
+      ? "2"
+      : searchParams.get("step") === "3"
+        ? "3"
+        : "1";
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -1277,8 +1305,6 @@ export default function GuruDashboardProfilePage() {
       serviceRates,
     });
 
-    const completeCount = publicReadiness.checks.filter(Boolean).length;
-
     return Math.max(
       10,
       Math.round(
@@ -1359,25 +1385,7 @@ export default function GuruDashboardProfilePage() {
   const publicProfileHref = `/guru/${publicPreviewSlug}`;
 
   if (loading) {
-    return (
-      <main
-        className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 font-light !text-slate-950 md:px-6 lg:px-8"
-        style={{
-          fontFamily:
-            '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontWeight: 300,
-        }}
-      >
-        <div className="mx-auto flex max-w-6xl items-center justify-center">
-          <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
-            <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-600" />
-            <p className="mt-3 text-base font-semibold !text-slate-700">
-              Loading guru profile...
-            </p>
-          </div>
-        </div>
-      </main>
-    );
+    return <GuruProfileLoadingFallback />;
   }
 
   return (
@@ -1404,7 +1412,11 @@ export default function GuruDashboardProfilePage() {
 
                 <span className="inline-flex items-center gap-2 rounded-2xl bg-white/80 px-4 py-2 text-sm font-extrabold text-emerald-800 shadow-sm ring-1 ring-white/70">
                   <ShieldCheck className="h-4 w-4" />
-                  {activeStep === "1" ? "Step 1 Profile Builder" : activeStep === "2" ? "Step 2 Service Area" : "Step 3 Services & Public Request"}
+                  {activeStep === "1"
+                    ? "Step 1 Profile Builder"
+                    : activeStep === "2"
+                      ? "Step 2 Service Area"
+                      : "Step 3 Services & Public Request"}
                 </span>
               </div>
 
@@ -1417,14 +1429,20 @@ export default function GuruDashboardProfilePage() {
                 className="max-w-4xl text-4xl font-extrabold tracking-[-0.045em] !text-slate-950 md:text-6xl lg:text-7xl"
                 style={{ color: "#07112f" }}
               >
-                {activeStep === "1" ? "Step 1: Complete your Guru profile" : activeStep === "2" ? "Step 2: Set your service area" : "Step 3: Add services, pricing, and public request"}
+                {activeStep === "1"
+                  ? "Step 1: Complete your Guru profile"
+                  : activeStep === "2"
+                    ? "Step 2: Set your service area"
+                    : "Step 3: Add services, pricing, and public request"}
               </h1>
 
               <p
                 className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-slate-800 md:text-xl"
                 style={{ color: "#1f2937" }}
               >
-                Only this step is shown so you can focus. Save when finished, and SitGuru will return you to the dashboard so you can see this step turn green and know exactly what to do next.
+                Only this step is shown so you can focus. Save when finished, and
+                SitGuru will return you to the dashboard so you can see this step
+                turn green and know exactly what to do next.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -1604,290 +1622,552 @@ export default function GuruDashboardProfilePage() {
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 {activeStep === "1" ? (
-                <section
-                  id="profile"
-                  className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
-                >
-                  <div className="mb-5 rounded-[1.3rem] bg-[#07132f] px-5 py-4">
-                    <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
-                      Step 1
-                    </p>
-                    <h3 className="mt-1 text-2xl font-extrabold !text-white">
-                      Complete your Guru profile
-                    </h3>
-                    <p className="mt-2 text-sm font-bold leading-6 !text-white/85">
-                      Add your public name, headline, bio, experience, and photo
-                      so pet parents understand who you are.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-5 md:grid-cols-2">
-                    <div>
-                      <label
-                        htmlFor="display_name"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        Display name
-                      </label>
-                      <input
-                        id="display_name"
-                        value={displayName}
-                        onChange={(event) => setDisplayName(event.target.value)}
-                        placeholder="Your public display name"
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="slug"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        Public slug
-                      </label>
-                      <input
-                        id="slug"
-                        value={slug}
-                        onChange={(event) =>
-                          setSlug(slugify(event.target.value))
-                        }
-                        placeholder="your-public-slug"
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="headline"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        Headline
-                      </label>
-                      <input
-                        id="headline"
-                        value={headline}
-                        onChange={(event) => setHeadline(event.target.value)}
-                        placeholder="Ex: Trusted Pet Care Guru"
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="years_experience"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        Years of experience
-                      </label>
-                      <input
-                        id="years_experience"
-                        value={yearsExperience}
-                        onChange={(event) =>
-                          setYearsExperience(event.target.value)
-                        }
-                        placeholder="3"
-                        inputMode="numeric"
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label
-                        htmlFor="bio"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        Bio
-                      </label>
-                      <textarea
-                        id="bio"
-                        value={bio}
-                        onChange={(event) => setBio(event.target.value)}
-                        rows={6}
-                        placeholder="Tell pet parents who you are, how you care for pets, and why they can trust you."
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-extrabold !text-slate-950">
-                            Profile photo
-                          </p>
-                          <p className="mt-1 text-sm font-semibold !text-slate-600">
-                            Upload a JPG, PNG, or WEBP photo. This becomes your
-                            mini avatar across SitGuru.
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => photoInputRef.current?.click()}
-                          disabled={uploadingPhoto}
-                          className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-60"
-                        >
-                          {uploadingPhoto ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Camera className="h-4 w-4" />
-                          )}
-                          {uploadingPhoto ? "Uploading..." : "Upload photo"}
-                        </button>
-                      </div>
-
-                      <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4">
-                        {profilePhotoUrl ? (
-                          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                            <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-white shadow-sm ring-1 ring-emerald-100">
-                              <Image
-                                src={profilePhotoUrl}
-                                alt="Guru profile preview"
-                                fill
-                                sizes="112px"
-                                className="object-cover"
-                                unoptimized
-                              />
-                            </div>
-                            <div>
-                              <p className="text-sm font-extrabold !text-slate-950">
-                                Profile photo ready
-                              </p>
-                              <p className="mt-1 break-all text-sm font-semibold leading-6 !text-slate-700">
-                                {profilePhotoUrl}
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-3 !text-slate-700">
-                            <ImageIcon className="h-5 w-5 text-emerald-600" />
-                            <span className="text-sm font-semibold">
-                              No profile photo selected yet.
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label
-                        htmlFor="profile_photo_url"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        Profile image URL
-                      </label>
-                      <input
-                        id="profile_photo_url"
-                        value={profilePhotoUrl}
-                        onChange={(event) =>
-                          setProfilePhotoUrl(event.target.value)
-                        }
-                        placeholder="https://..."
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                    </div>
-                  </div>
-                </section>
-
-                ) : null}
-
-                {activeStep === "2" ? (
-                <section
-                  id="location"
-                  className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
-                >
-                  <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(135deg,#0f766e_0%,#10b981_100%)] px-5 py-4">
-                    <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
-                      Step 2
-                    </p>
-                    <h3 className="mt-1 text-2xl font-extrabold !text-white">
-                      Set your service area
-                    </h3>
-                    <p className="mt-2 text-sm font-bold leading-6 !text-white/85">
-                      Add your ZIP code, city, state, service area, and travel
-                      radius so SitGuru can match you with nearby pet parents.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-5 md:grid-cols-2">
-                    <div>
-                      <label
-                        htmlFor="city"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        City
-                      </label>
-                      <input
-                        id="city"
-                        value={city}
-                        onChange={(event) => setCity(event.target.value)}
-                        placeholder="Quakertown"
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="state"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        State
-                      </label>
-                      <input
-                        id="state"
-                        value={stateValue}
-                        onChange={(event) =>
-                          setStateValue(event.target.value.toUpperCase())
-                        }
-                        placeholder="PA"
-                        maxLength={2}
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="zip_code"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        ZIP code
-                      </label>
-                      <input
-                        id="zip_code"
-                        value={zipCode}
-                        onChange={(event) =>
-                          handleZipCodeChange(event.target.value)
-                        }
-                        placeholder="18951"
-                        inputMode="numeric"
-                        maxLength={5}
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                      <p
-                        className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
-                        style={{
-                          color: "#334155",
-                          WebkitTextFillColor: "#334155",
-                        }}
-                      >
-                        Enter a 5-digit ZIP code to auto-fill city, state, and
-                        map coordinates.
+                  <section
+                    id="profile"
+                    className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
+                  >
+                    <div className="mb-5 rounded-[1.3rem] bg-[#07132f] px-5 py-4">
+                      <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
+                        Step 1
+                      </p>
+                      <h3 className="mt-1 text-2xl font-extrabold !text-white">
+                        Complete your Guru profile
+                      </h3>
+                      <p className="mt-2 text-sm font-bold leading-6 !text-white/85">
+                        Add your public name, headline, bio, experience, and
+                        photo so pet parents understand who you are.
                       </p>
                     </div>
 
-                    <div>
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <div>
+                        <label
+                          htmlFor="display_name"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          Display name
+                        </label>
+                        <input
+                          id="display_name"
+                          value={displayName}
+                          onChange={(event) => setDisplayName(event.target.value)}
+                          placeholder="Your public display name"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="slug"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          Public slug
+                        </label>
+                        <input
+                          id="slug"
+                          value={slug}
+                          onChange={(event) =>
+                            setSlug(slugify(event.target.value))
+                          }
+                          placeholder="your-public-slug"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="headline"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          Headline
+                        </label>
+                        <input
+                          id="headline"
+                          value={headline}
+                          onChange={(event) => setHeadline(event.target.value)}
+                          placeholder="Ex: Trusted Pet Care Guru"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="years_experience"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          Years of experience
+                        </label>
+                        <input
+                          id="years_experience"
+                          value={yearsExperience}
+                          onChange={(event) =>
+                            setYearsExperience(event.target.value)
+                          }
+                          placeholder="3"
+                          inputMode="numeric"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label
+                          htmlFor="bio"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          Bio
+                        </label>
+                        <textarea
+                          id="bio"
+                          value={bio}
+                          onChange={(event) => setBio(event.target.value)}
+                          rows={6}
+                          placeholder="Tell pet parents who you are, how you care for pets, and why they can trust you."
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-extrabold !text-slate-950">
+                              Profile photo
+                            </p>
+                            <p className="mt-1 text-sm font-semibold !text-slate-600">
+                              Upload a JPG, PNG, or WEBP photo. This becomes your
+                              mini avatar across SitGuru.
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => photoInputRef.current?.click()}
+                            disabled={uploadingPhoto}
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                          >
+                            {uploadingPhoto ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Camera className="h-4 w-4" />
+                            )}
+                            {uploadingPhoto ? "Uploading..." : "Upload photo"}
+                          </button>
+                        </div>
+
+                        <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4">
+                          {profilePhotoUrl ? (
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                              <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-white shadow-sm ring-1 ring-emerald-100">
+                                <Image
+                                  src={profilePhotoUrl}
+                                  alt="Guru profile preview"
+                                  fill
+                                  sizes="112px"
+                                  className="object-cover"
+                                  unoptimized
+                                />
+                              </div>
+                              <div>
+                                <p className="text-sm font-extrabold !text-slate-950">
+                                  Profile photo ready
+                                </p>
+                                <p className="mt-1 break-all text-sm font-semibold leading-6 !text-slate-700">
+                                  {profilePhotoUrl}
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3 !text-slate-700">
+                              <ImageIcon className="h-5 w-5 text-emerald-600" />
+                              <span className="text-sm font-semibold">
+                                No profile photo selected yet.
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label
+                          htmlFor="profile_photo_url"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          Profile image URL
+                        </label>
+                        <input
+                          id="profile_photo_url"
+                          value={profilePhotoUrl}
+                          onChange={(event) =>
+                            setProfilePhotoUrl(event.target.value)
+                          }
+                          placeholder="https://..."
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+
+                {activeStep === "2" ? (
+                  <section
+                    id="location"
+                    className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
+                  >
+                    <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(135deg,#0f766e_0%,#10b981_100%)] px-5 py-4">
+                      <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
+                        Step 2
+                      </p>
+                      <h3 className="mt-1 text-2xl font-extrabold !text-white">
+                        Set your service area
+                      </h3>
+                      <p className="mt-2 text-sm font-bold leading-6 !text-white/85">
+                        Add your ZIP code, city, state, service area, and travel
+                        radius so SitGuru can match you with nearby pet parents.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <div>
+                        <label
+                          htmlFor="city"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          City
+                        </label>
+                        <input
+                          id="city"
+                          value={city}
+                          onChange={(event) => setCity(event.target.value)}
+                          placeholder="Quakertown"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="state"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          State
+                        </label>
+                        <input
+                          id="state"
+                          value={stateValue}
+                          onChange={(event) =>
+                            setStateValue(event.target.value.toUpperCase())
+                          }
+                          placeholder="PA"
+                          maxLength={2}
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="zip_code"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          ZIP code
+                        </label>
+                        <input
+                          id="zip_code"
+                          value={zipCode}
+                          onChange={(event) =>
+                            handleZipCodeChange(event.target.value)
+                          }
+                          placeholder="18951"
+                          inputMode="numeric"
+                          maxLength={5}
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                        <p
+                          className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
+                          style={{
+                            color: "#334155",
+                            WebkitTextFillColor: "#334155",
+                          }}
+                        >
+                          Enter a 5-digit ZIP code to auto-fill city, state, and
+                          map coordinates.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="service_radius"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          How far are you willing to travel?
+                        </label>
+                        <input
+                          id="service_radius"
+                          value={serviceRadius}
+                          onChange={(event) =>
+                            setServiceRadius(event.target.value)
+                          }
+                          placeholder="25"
+                          inputMode="decimal"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                        <p
+                          className="mt-2 text-xs font-extrabold leading-6 !text-slate-700"
+                          style={{
+                            color: "#334155",
+                            WebkitTextFillColor: "#334155",
+                          }}
+                        >
+                          Enter the number of miles you are comfortable traveling
+                          from your service ZIP code. Customers outside this
+                          radius will not be able to book you.
+                        </p>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label
+                          htmlFor="street_address"
+                          className="mb-2 block text-sm font-extrabold !text-slate-950"
+                        >
+                          Service address or general area
+                        </label>
+                        <input
+                          id="street_address"
+                          value={streetAddress}
+                          onChange={(event) =>
+                            setStreetAddress(event.target.value)
+                          }
+                          placeholder="Optional. Used by Admin/map setup, not shown as your exact public address."
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-bold text-emerald-900 md:col-span-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <span>{mapStatusLabel}</span>
+                          {zipLookupLoading ? (
+                            <span className="inline-flex items-center gap-2 text-emerald-800">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Checking ZIP
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-sm font-semibold leading-6 text-emerald-800">
+                          Gurus only enter ZIP, city, state, and service radius.
+                          SitGuru saves map latitude and longitude privately
+                          after ZIP lookup.
+                        </p>
+                        {zipLookupMessage ? (
+                          <p className="mt-2 text-sm font-extrabold text-emerald-950">
+                            {zipLookupMessage}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+
+                {activeStep === "3" ? (
+                  <section
+                    id="services"
+                    className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
+                  >
+                    <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(135deg,#1d4ed8_0%,#0ea5e9_100%)] px-5 py-4">
+                      <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
+                        Step 3
+                      </p>
+                      <h3 className="mt-1 text-2xl font-extrabold !text-white">
+                        Add services, pricing, and public request
+                      </h3>
+                      <p className="mt-2 text-sm font-bold leading-6 !text-white/85">
+                        Enable the services you offer, set pricing, then request
+                        public visibility once Steps 1, 2, and 3 are complete.
+                      </p>
+                    </div>
+
+                    <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p className="text-sm font-extrabold !text-slate-950">
+                          Services & rates
+                        </p>
+                        <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
+                          Enable each service you offer, then choose the pricing
+                          parameter customers should see and bookings should use.
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-800">
+                        {enabledServiceRates.length} enabled
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {serviceRates.map((service) => {
+                        const active = service.is_enabled;
+                        const config = SERVICE_RATE_CONFIGS.find(
+                          (item) => item.service_key === service.service_key,
+                        );
+                        const recommendedUnits =
+                          config?.recommended_units || [service.rate_unit];
+
+                        return (
+                          <div
+                            key={service.service_key}
+                            className={`rounded-[1.4rem] border p-4 transition ${
+                              active
+                                ? "border-emerald-200 bg-emerald-50/70 shadow-sm"
+                                : "border-slate-200 bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <button
+                                type="button"
+                                onClick={() => toggleService(service.service_label)}
+                                className={`inline-flex items-center justify-center rounded-2xl border px-4 py-3 text-sm font-extrabold transition sm:min-w-[210px] ${
+                                  active
+                                    ? "border-emerald-500 bg-emerald-600 shadow-sm"
+                                    : "border-slate-300 bg-white shadow-sm hover:border-emerald-200 hover:bg-emerald-50"
+                                }`}
+                                style={{
+                                  color: active ? "#ffffff" : "#0f172a",
+                                  WebkitTextFillColor: active
+                                    ? "#ffffff"
+                                    : "#0f172a",
+                                }}
+                              >
+                                <span
+                                  className="font-extrabold"
+                                  style={{
+                                    color: active ? "#ffffff" : "#0f172a",
+                                    WebkitTextFillColor: active
+                                      ? "#ffffff"
+                                      : "#0f172a",
+                                  }}
+                                >
+                                  {active ? "Enabled" : "Enable"} ·{" "}
+                                  {service.service_label}
+                                </span>
+                              </button>
+
+                              <div className="flex flex-wrap gap-2 text-xs font-extrabold text-slate-600">
+                                {recommendedUnits.slice(0, 3).map((unit) => (
+                                  <span
+                                    key={unit}
+                                    className="rounded-full border border-white bg-white px-3 py-1 font-extrabold shadow-sm"
+                                    style={{
+                                      color: "#065f46",
+                                      WebkitTextFillColor: "#065f46",
+                                    }}
+                                  >
+                                    {formatRateUnitLabel(unit)}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            {active ? (
+                              <div className="mt-4 grid gap-3 md:grid-cols-[0.75fr_1fr_0.75fr]">
+                                <div>
+                                  <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
+                                    Rate amount
+                                  </label>
+                                  <input
+                                    value={service.rate_amount}
+                                    onChange={(event) =>
+                                      updateServiceRate(
+                                        service.service_key,
+                                        "rate_amount",
+                                        event.target.value,
+                                      )
+                                    }
+                                    placeholder={
+                                      service.rate_unit === "custom"
+                                        ? "Custom"
+                                        : "25"
+                                    }
+                                    inputMode="decimal"
+                                    disabled={service.rate_unit === "custom"}
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
+                                    Rate parameter
+                                  </label>
+                                  <select
+                                    value={service.rate_unit}
+                                    onChange={(event) =>
+                                      updateServiceRate(
+                                        service.service_key,
+                                        "rate_unit",
+                                        event.target.value,
+                                      )
+                                    }
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                  >
+                                    {RATE_UNIT_OPTIONS.map((option) => (
+                                      <option
+                                        key={option.value}
+                                        value={option.value}
+                                      >
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
+                                    Duration minutes
+                                  </label>
+                                  <input
+                                    value={service.duration_minutes}
+                                    onChange={(event) =>
+                                      updateServiceRate(
+                                        service.service_key,
+                                        "duration_minutes",
+                                        event.target.value,
+                                      )
+                                    }
+                                    placeholder="Optional"
+                                    inputMode="numeric"
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                  />
+                                </div>
+
+                                <div className="md:col-span-3">
+                                  <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
+                                    Optional service notes
+                                  </label>
+                                  <input
+                                    value={service.notes}
+                                    onChange={(event) =>
+                                      updateServiceRate(
+                                        service.service_key,
+                                        "notes",
+                                        event.target.value,
+                                      )
+                                    }
+                                    placeholder="Example: Includes feeding, water refresh, and quick photo update."
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-5">
                       <label
-                        htmlFor="service_radius"
+                        htmlFor="hourly_rate"
                         className="mb-2 block text-sm font-extrabold !text-slate-950"
                       >
-                        How far are you willing to travel?
+                        Base hourly rate
                       </label>
                       <input
-                        id="service_radius"
-                        value={serviceRadius}
-                        onChange={(event) =>
-                          setServiceRadius(event.target.value)
-                        }
-                        placeholder="25"
+                        id="hourly_rate"
+                        value={hourlyRate}
+                        onChange={(event) => setHourlyRate(event.target.value)}
+                        placeholder="Optional standard hourly rate"
                         inputMode="decimal"
                         className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                       />
@@ -1898,323 +2178,71 @@ export default function GuruDashboardProfilePage() {
                           WebkitTextFillColor: "#334155",
                         }}
                       >
-                        Enter the number of miles you are comfortable traveling
-                        from your service ZIP code. Customers outside this
-                        radius will not be able to book you.
+                        This is optional. Service-specific pricing above is what
+                        customers should primarily see.
                       </p>
                     </div>
 
-                    <div className="md:col-span-2">
-                      <label
-                        htmlFor="street_address"
-                        className="mb-2 block text-sm font-extrabold !text-slate-950"
-                      >
-                        Service address or general area
-                      </label>
-                      <input
-                        id="street_address"
-                        value={streetAddress}
-                        onChange={(event) =>
-                          setStreetAddress(event.target.value)
-                        }
-                        placeholder="Optional. Used by Admin/map setup, not shown as your exact public address."
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      />
-                    </div>
-
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-bold text-emerald-900 md:col-span-2">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <span>{mapStatusLabel}</span>
-                        {zipLookupLoading ? (
-                          <span className="inline-flex items-center gap-2 text-emerald-800">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Checking ZIP
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-emerald-800">
-                        Gurus only enter ZIP, city, state, and service radius.
-                        SitGuru saves map latitude and longitude privately after
-                        ZIP lookup.
+                    <section className="mt-5 rounded-[1.75rem] border border-amber-200 bg-amber-50 p-5">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] !text-amber-800">
+                        Step 3 final action
                       </p>
-                      {zipLookupMessage ? (
-                        <p className="mt-2 text-sm font-extrabold text-emerald-950">
-                          {zipLookupMessage}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </section>
 
-                ) : null}
-
-                {activeStep === "3" ? (
-                <section
-                  id="services"
-                  className="rounded-[1.75rem] border border-slate-200 bg-slate-50/80 p-5"
-                >
-                  <div className="mb-5 rounded-[1.3rem] bg-[linear-gradient(135deg,#1d4ed8_0%,#0ea5e9_100%)] px-5 py-4">
-                    <p className="text-xs font-black uppercase tracking-[0.24em] !text-white/75">
-                      Step 3
-                    </p>
-                    <h3 className="mt-1 text-2xl font-extrabold !text-white">
-                      Add services, pricing, and public request
-                    </h3>
-                    <p className="mt-2 text-sm font-bold leading-6 !text-white/85">
-                      Enable the services you offer, set pricing, then request
-                      public visibility once Steps 1, 2, and 3 are complete.
-                    </p>
-                  </div>
-
-                  <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <p className="text-sm font-extrabold !text-slate-950">
-                        Services & rates
-                      </p>
-                      <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
-                        Enable each service you offer, then choose the pricing
-                        parameter customers should see and bookings should use.
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-800">
-                      {enabledServiceRates.length} enabled
-                    </span>
-                  </div>
-
-                  <div className="space-y-4">
-                    {serviceRates.map((service) => {
-                      const active = service.is_enabled;
-                      const config = SERVICE_RATE_CONFIGS.find(
-                        (item) => item.service_key === service.service_key,
-                      );
-                      const recommendedUnits =
-                        config?.recommended_units || [service.rate_unit];
-
-                      return (
-                        <div
-                          key={service.service_key}
-                          className={`rounded-[1.4rem] border p-4 transition ${
-                            active
-                              ? "border-emerald-200 bg-emerald-50/70 shadow-sm"
-                              : "border-slate-200 bg-slate-50"
-                          }`}
+                      <label className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-4 text-sm font-extrabold shadow-sm">
+                        <input
+                          type="checkbox"
+                          checked={isPublic}
+                          onChange={(event) => setIsPublic(event.target.checked)}
+                          className="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-600"
+                        />
+                        <span
+                          className="font-extrabold leading-6"
+                          style={{
+                            color: "#0f172a",
+                            WebkitTextFillColor: "#0f172a",
+                          }}
                         >
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <button
-                              type="button"
-                              onClick={() => toggleService(service.service_label)}
-                              className={`inline-flex items-center justify-center rounded-2xl border px-4 py-3 text-sm font-extrabold transition sm:min-w-[210px] ${
-                                active
-                                  ? "border-emerald-500 bg-emerald-600 shadow-sm"
-                                  : "border-slate-300 bg-white shadow-sm hover:border-emerald-200 hover:bg-emerald-50"
-                              }`}
-                              style={{
-                                color: active ? "#ffffff" : "#0f172a",
-                                WebkitTextFillColor: active ? "#ffffff" : "#0f172a",
-                              }}
-                            >
-                              <span
-                                className="font-extrabold"
-                                style={{
-                                  color: active ? "#ffffff" : "#0f172a",
-                                  WebkitTextFillColor: active
-                                    ? "#ffffff"
-                                    : "#0f172a",
-                                }}
-                              >
-                                {active ? "Enabled" : "Enable"} ·{" "}
-                                {service.service_label}
-                              </span>
-                            </button>
+                          Request to make this Guru profile public after Steps 1,
+                          2, and 3 are complete
+                        </span>
+                      </label>
 
-                            <div className="flex flex-wrap gap-2 text-xs font-extrabold text-slate-600">
-                              {recommendedUnits.slice(0, 3).map((unit) => (
+                      <div
+                        className={`mt-4 rounded-2xl border px-4 py-4 text-sm font-bold leading-6 ${
+                          publicProfileReady
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                            : "border-rose-200 bg-rose-50 text-rose-900"
+                        }`}
+                      >
+                        {publicProfileReady ? (
+                          <p>
+                            Steps 1, 2, and 3 are complete. If you request
+                            public visibility and save, this profile can be
+                            marked public. Booking eligibility may still depend
+                            on Step 4 Trust & Safety Screening, Step 5 Stripe
+                            payouts, and Admin approval.
+                          </p>
+                        ) : (
+                          <>
+                            <p className="font-extrabold">
+                              This profile will stay private until the missing
+                              setup items are completed.
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {missingItems.map((item) => (
                                 <span
-                                  key={unit}
-                                  className="rounded-full border border-white bg-white px-3 py-1 font-extrabold shadow-sm"
-                                  style={{
-                                    color: "#065f46",
-                                    WebkitTextFillColor: "#065f46",
-                                  }}
+                                  key={item}
+                                  className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-rose-800 ring-1 ring-rose-200"
                                 >
-                                  {formatRateUnitLabel(unit)}
+                                  {item}
                                 </span>
                               ))}
                             </div>
-                          </div>
-
-                          {active ? (
-                            <div className="mt-4 grid gap-3 md:grid-cols-[0.75fr_1fr_0.75fr]">
-                              <div>
-                                <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
-                                  Rate amount
-                                </label>
-                                <input
-                                  value={service.rate_amount}
-                                  onChange={(event) =>
-                                    updateServiceRate(
-                                      service.service_key,
-                                      "rate_amount",
-                                      event.target.value,
-                                    )
-                                  }
-                                  placeholder={
-                                    service.rate_unit === "custom"
-                                      ? "Custom"
-                                      : "25"
-                                  }
-                                  inputMode="decimal"
-                                  disabled={service.rate_unit === "custom"}
-                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
-                                  Rate parameter
-                                </label>
-                                <select
-                                  value={service.rate_unit}
-                                  onChange={(event) =>
-                                    updateServiceRate(
-                                      service.service_key,
-                                      "rate_unit",
-                                      event.target.value,
-                                    )
-                                  }
-                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                                >
-                                  {RATE_UNIT_OPTIONS.map((option) => (
-                                    <option
-                                      key={option.value}
-                                      value={option.value}
-                                    >
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <div>
-                                <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
-                                  Duration minutes
-                                </label>
-                                <input
-                                  value={service.duration_minutes}
-                                  onChange={(event) =>
-                                    updateServiceRate(
-                                      service.service_key,
-                                      "duration_minutes",
-                                      event.target.value,
-                                    )
-                                  }
-                                  placeholder="Optional"
-                                  inputMode="numeric"
-                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                                />
-                              </div>
-
-                              <div className="md:col-span-3">
-                                <label className="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] !text-slate-700">
-                                  Optional service notes
-                                </label>
-                                <input
-                                  value={service.notes}
-                                  onChange={(event) =>
-                                    updateServiceRate(
-                                      service.service_key,
-                                      "notes",
-                                      event.target.value,
-                                    )
-                                  }
-                                  placeholder="Example: Includes feeding, water refresh, and quick photo update."
-                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                                />
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-5">
-                    <label
-                      htmlFor="hourly_rate"
-                      className="mb-2 block text-sm font-extrabold !text-slate-950"
-                    >
-                      Fallback hourly rate
-                    </label>
-                    <input
-                      id="hourly_rate"
-                      value={hourlyRate}
-                      onChange={(event) => setHourlyRate(event.target.value)}
-                      placeholder="Optional fallback rate"
-                      inputMode="decimal"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-
-                  <section className="mt-5 rounded-[1.75rem] border border-amber-200 bg-amber-50 p-5">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] !text-amber-800">
-                      Step 3 final action
-                    </p>
-
-                  <label className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-4 text-sm font-extrabold shadow-sm">
-                    <input
-                      type="checkbox"
-                      checked={isPublic}
-                      onChange={(event) => setIsPublic(event.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-600"
-                    />
-                    <span
-                      className="font-extrabold leading-6"
-                      style={{
-                        color: "#0f172a",
-                        WebkitTextFillColor: "#0f172a",
-                      }}
-                    >
-                      Request to make this Guru profile public after Steps 1, 2,
-                      and 3 are complete
-                    </span>
-                  </label>
-
-                  <div
-                    className={`mt-4 rounded-2xl border px-4 py-4 text-sm font-bold leading-6 ${
-                      publicProfileReady
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                        : "border-rose-200 bg-rose-50 text-rose-900"
-                    }`}
-                  >
-                    {publicProfileReady ? (
-                      <p>
-                        Steps 1, 2, and 3 are complete. If you request public
-                        visibility and save, this profile can be marked public.
-                        Booking eligibility may still depend on Step 4 Trust & Safety Screening, Step 5 Stripe payouts,
-                        and Admin approval.
-                      </p>
-                    ) : (
-                      <>
-                        <p className="font-extrabold">
-                          This profile will stay private until the missing setup
-                          items are completed.
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {missingItems.map((item) => (
-                            <span
-                              key={item}
-                              className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-rose-800 ring-1 ring-rose-200"
-                            >
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                          </>
+                        )}
+                      </div>
+                    </section>
                   </section>
-                </section>
-
                 ) : null}
 
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -2243,7 +2271,11 @@ export default function GuruDashboardProfilePage() {
                         WebkitTextFillColor: "#ffffff",
                       }}
                     >
-                      {saving ? "Saving..." : justSaved ? "Saved" : `Save Step ${activeStep} & Return to Dashboard`}
+                      {saving
+                        ? "Saving..."
+                        : justSaved
+                          ? "Saved"
+                          : `Save Step ${activeStep} & Return to Dashboard`}
                     </span>
                   </button>
 
@@ -2482,9 +2514,9 @@ export default function GuruDashboardProfilePage() {
                 Better profile data strengthens the marketplace
               </h2>
               <p className="mt-3 text-sm font-semibold leading-7 !text-slate-700">
-                The stronger your Guru profile is, the better it can perform
-                for customer trust, search visibility, and Admin operations.
-                This page is one of the core pieces powering the Guru side of
+                The stronger your Guru profile is, the better it can perform for
+                customer trust, search visibility, and Admin operations. This
+                page is one of the core pieces powering the Guru side of
                 SitGuru.
               </p>
             </section>
@@ -2492,5 +2524,13 @@ export default function GuruDashboardProfilePage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function GuruDashboardProfilePage() {
+  return (
+    <Suspense fallback={<GuruProfileLoadingFallback />}>
+      <GuruDashboardProfilePageContent />
+    </Suspense>
   );
 }
