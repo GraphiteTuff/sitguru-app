@@ -37,6 +37,7 @@ type ScreeningReceiptDetails = {
   paymentStatus: "paid" | "partially_paid";
   stripeSessionId: string;
   badgeLabel: string | null;
+  guruAvatarUrl: string | null;
 };
 
 type GuruReceiptRow = {
@@ -46,6 +47,10 @@ type GuruReceiptRow = {
   display_name: string | null;
   full_name: string | null;
   name: string | null;
+  profile_photo_url: string | null;
+  image_url: string | null;
+  avatar_url: string | null;
+  photo_url: string | null;
 };
 
 type RefundGuruRow = {
@@ -93,6 +98,15 @@ function parseCents(value: unknown, fallback: number) {
   return fallback;
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function asScreeningPaymentOption(value: unknown): ScreeningPaymentOption | null {
   if (
     value === "pay_full_today" ||
@@ -125,6 +139,47 @@ function getBadgeLabel(paymentOption: ScreeningPaymentOption) {
   if (paymentOption === "pay_full_today") return "Launch Pro Guru";
   if (paymentOption === "pay_15_three_monthly") return "Pawstep Starter";
   return "Book & Bark Starter";
+}
+
+function getConfiguredSiteUrl() {
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL ||
+    "";
+
+  if (!configuredUrl) return "";
+
+  return configuredUrl.startsWith("http")
+    ? configuredUrl.replace(/\/$/, "")
+    : `https://${configuredUrl.replace(/\/$/, "")}`;
+}
+
+function getEmailLogoUrl() {
+  const configuredLogo = asTrimmedString(process.env.SITGURU_EMAIL_LOGO_URL);
+
+  if (configuredLogo) {
+    return configuredLogo;
+  }
+
+  const siteUrl = getConfiguredSiteUrl();
+
+  if (!siteUrl) {
+    return "";
+  }
+
+  return `${siteUrl}/sitguru-logo.png`;
+}
+
+function getGuruAvatarUrl(guru: GuruReceiptRow | null) {
+  return (
+    guru?.profile_photo_url ||
+    guru?.image_url ||
+    guru?.avatar_url ||
+    guru?.photo_url ||
+    null
+  );
 }
 
 function getFirstNameFromGuru(guru: {
@@ -229,16 +284,43 @@ Thank you for helping keep SitGuru trusted and safe for pet parents, pets, and G
 function buildScreeningReceiptHtml(details: ScreeningReceiptDetails) {
   const paidToday = formatMoneyFromCents(details.paidTodayCents);
   const remaining = formatMoneyFromCents(details.remainingCents);
+  const logoUrl = getEmailLogoUrl();
+  const safeFirstName = escapeHtml(details.firstName);
+  const safePlanLabel = escapeHtml(details.planLabel);
+  const safeBadgeLabel = details.badgeLabel ? escapeHtml(details.badgeLabel) : "";
+  const safeAvatarUrl = details.guruAvatarUrl
+    ? escapeHtml(details.guruAvatarUrl)
+    : "";
 
   const planSpecificNote =
     details.paymentOption === "pay_full_today"
-      ? `You selected the <strong>best-value plan</strong>, so there are no future screening-balance deductions. You also earned the <strong>${details.badgeLabel}</strong> badge for completing this onboarding payment in full.`
+      ? `You selected the <strong>best-value plan</strong>, so there are no future screening-balance deductions. You also earned the <strong>${safeBadgeLabel}</strong> badge for completing this onboarding payment in full.`
       : details.paymentOption === "pay_15_three_monthly"
         ? "Your remaining screening balance will be handled through your selected automatic monthly Stripe payment plan."
         : "Because you selected the Book & Bark Plan, SitGuru will recover the remaining balance from future completed booking payouts until it is fully covered.";
 
-  const badgeHtml = details.badgeLabel
-    ? `<span style="display:inline-block;margin-top:8px;padding:8px 12px;border-radius:999px;background:#ecfdf5;color:#047857;font-weight:800;font-size:13px;">${details.badgeLabel}</span>`
+  const logoHtml = logoUrl
+    ? `<img src="${escapeHtml(
+        logoUrl,
+      )}" width="148" alt="SitGuru" style="display:block;width:148px;max-width:148px;height:auto;border:0;outline:none;text-decoration:none;margin:0 0 14px;" />`
+    : `<div style="font-size:28px;font-weight:900;color:#07132f;letter-spacing:-0.04em;margin:0 0 14px;">SitGuru</div>`;
+
+  const avatarHtml = safeAvatarUrl
+    ? `
+      <td width="74" valign="top" style="padding:0 0 0 16px;">
+        <img src="${safeAvatarUrl}" width="64" height="64" alt="Guru profile photo" style="display:block;width:64px;height:64px;object-fit:cover;border-radius:999px;border:4px solid #ffffff;box-shadow:0 8px 18px rgba(15,23,42,0.16);" />
+      </td>
+    `
+    : `
+      <td width="74" valign="top" style="padding:0 0 0 16px;">
+        <div style="width:64px;height:64px;border-radius:999px;border:4px solid #ffffff;background:#ecfdf5;box-shadow:0 8px 18px rgba(15,23,42,0.16);text-align:center;line-height:64px;font-size:30px;">
+          🐾
+        </div>
+      </td>
+    `;
+
+  const badgeHtml = safeBadgeLabel
+    ? `<span style="display:inline-block;margin-top:8px;padding:8px 12px;border-radius:999px;background:#ecfdf5;color:#047857;font-weight:800;font-size:13px;">${safeBadgeLabel}</span>`
     : "";
 
   return `
@@ -249,16 +331,24 @@ function buildScreeningReceiptHtml(details: ScreeningReceiptDetails) {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #d7f5e7;border-radius:24px;overflow:hidden;box-shadow:0 14px 40px rgba(15,23,42,0.08);">
             <tr>
               <td style="padding:28px 28px 22px;background:linear-gradient(135deg,#d9fff3,#d8eefc);">
-                <div style="font-size:13px;letter-spacing:0.18em;text-transform:uppercase;font-weight:900;color:#047857;">
-                  SitGuru Trust &amp; Safety
-                </div>
-                <h1 style="margin:12px 0 0;font-size:30px;line-height:1.15;color:#07132f;">
-                  Payment received 🐾
-                </h1>
-                <p style="margin:12px 0 0;font-size:16px;line-height:1.6;color:#334155;font-weight:600;">
-                  Hi ${details.firstName}, thank you for starting your SitGuru Trust &amp; Safety Screening.
-                </p>
-                ${badgeHtml}
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td valign="top" style="padding:0;">
+                      ${logoHtml}
+                      <div style="font-size:13px;letter-spacing:0.18em;text-transform:uppercase;font-weight:900;color:#047857;">
+                        SitGuru Trust &amp; Safety
+                      </div>
+                      <h1 style="margin:12px 0 0;font-size:30px;line-height:1.15;color:#07132f;">
+                        Payment received 🐾
+                      </h1>
+                      <p style="margin:12px 0 0;font-size:16px;line-height:1.6;color:#334155;font-weight:600;">
+                        Hi ${safeFirstName}, thank you for starting your SitGuru Trust &amp; Safety Screening.
+                      </p>
+                      ${badgeHtml}
+                    </td>
+                    ${avatarHtml}
+                  </tr>
+                </table>
               </td>
             </tr>
 
@@ -272,7 +362,7 @@ function buildScreeningReceiptHtml(details: ScreeningReceiptDetails) {
                   <tr>
                     <td style="padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;">
                       <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.12em;font-weight:900;color:#64748b;">Plan selected</div>
-                      <div style="font-size:20px;font-weight:900;color:#07132f;margin-top:4px;">${details.planLabel}</div>
+                      <div style="font-size:20px;font-weight:900;color:#07132f;margin-top:4px;">${safePlanLabel}</div>
                     </td>
                   </tr>
                   <tr>
@@ -344,6 +434,7 @@ async function hasReceiptAlreadyBeenSent(stripeSessionId: string) {
     .select("id,status")
     .eq("event_type", "trust_safety_screening_payment_receipt")
     .eq("stripe_session_id", stripeSessionId)
+    .eq("status", "sent")
     .maybeSingle();
 
   if (error) {
@@ -424,6 +515,8 @@ async function sendTrustSafetyScreeningReceiptEmail(
         remaining_cents: details.remainingCents,
         payment_status: details.paymentStatus,
         badge_label: details.badgeLabel,
+        guru_avatar_url: details.guruAvatarUrl,
+        email_logo_url: getEmailLogoUrl(),
       },
     });
 
@@ -449,6 +542,8 @@ async function sendTrustSafetyScreeningReceiptEmail(
         remaining_cents: details.remainingCents,
         payment_status: details.paymentStatus,
         badge_label: details.badgeLabel,
+        guru_avatar_url: details.guruAvatarUrl,
+        email_logo_url: getEmailLogoUrl(),
       },
     });
   }
@@ -529,7 +624,20 @@ async function updateTrustSafetyScreeningPaidFromCheckoutSession(
   const { data: guruBeforeUpdateData, error: guruLookupError } =
     await supabaseAdmin
       .from("gurus")
-      .select("id,user_id,email,display_name,full_name,name")
+      .select(
+        [
+          "id",
+          "user_id",
+          "email",
+          "display_name",
+          "full_name",
+          "name",
+          "profile_photo_url",
+          "image_url",
+          "avatar_url",
+          "photo_url",
+        ].join(","),
+      )
       .eq("id", guruId)
       .maybeSingle();
 
@@ -666,6 +774,7 @@ async function updateTrustSafetyScreeningPaidFromCheckoutSession(
     paymentStatus,
     stripeSessionId: session.id,
     badgeLabel: getBadgeLabel(paymentOption),
+    guruAvatarUrl: getGuruAvatarUrl(guruBeforeUpdate),
   });
 }
 
