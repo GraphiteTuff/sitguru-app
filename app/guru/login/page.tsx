@@ -4,11 +4,11 @@ import { login } from "@/app/auth/actions";
 
 export default function GuruLoginPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-8 md:px-6 lg:px-8">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f8fffb_0%,#effaf3_52%,#ffffff_100%)] px-4 py-8 md:px-6 lg:px-8">
       <div className="mx-auto mb-8 flex w-full max-w-6xl items-center justify-end">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-white/15"
+          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-5 py-2.5 text-sm font-black !text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Home
@@ -16,62 +16,118 @@ export default function GuruLoginPage() {
       </div>
 
       <div className="mx-auto flex min-h-[76vh] w-full max-w-6xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 shadow-2xl backdrop-blur md:grid-cols-2">
-          <div className="flex flex-col justify-between border-b border-white/10 bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400 p-8 md:border-b-0 md:border-r">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/80">
-                SitGuru Pro
-              </p>
-
-              <h1 className="mt-4 text-4xl font-bold tracking-tight text-white md:text-5xl">
-                Guru Login
-              </h1>
-
-              <p className="mt-4 max-w-md text-sm leading-6 text-white/90">
-                Access your guru dashboard, manage bookings, respond to
-                messages, update availability, and grow your business on
-                SitGuru.
-              </p>
+        <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
+          <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-8 shadow-[0_24px_70px_rgba(15,23,42,0.08)] md:p-10">
+            <div className="inline-flex rounded-full bg-emerald-100 px-4 py-2 text-sm font-black uppercase tracking-[0.18em] !text-emerald-800">
+              SitGuru Guru Portal
             </div>
 
-            <div className="mt-8 grid gap-4">
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="text-sm font-medium text-white">
-                  Manage bookings
-                </p>
-                <p className="mt-1 text-sm text-white/80">
-                  Stay on top of pending, active, and completed services.
-                </p>
+            <h1 className="mt-5 max-w-3xl text-4xl font-black leading-[1.03] tracking-[-0.05em] !text-slate-950 sm:text-5xl lg:text-6xl">
+              Log in to earn with SitGuru.
+            </h1>
+
+            <p className="mt-5 max-w-2xl text-base font-semibold leading-8 !text-slate-700 sm:text-lg">
+              Access your Guru dashboard to manage services, availability,
+              bookings, messages, payouts, Trust &amp; Safety Screening, and
+              earning opportunities.
+            </p>
+
+            <div className="mt-8 rounded-[1.75rem] border border-emerald-100 bg-emerald-50 p-5 sm:p-6">
+              <div className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.18em] !text-emerald-800">
+                Build your Guru business
               </div>
 
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="text-sm font-medium text-white">
-                  Message customers
-                </p>
-                <p className="mt-1 text-sm text-white/80">
-                  Keep customer communication organized and professional.
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="text-sm font-medium text-white">
-                  Track earnings
-                </p>
-                <p className="mt-1 text-sm text-white/80">
-                  Review activity, performance, and payout-related information.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-8 md:p-10">
-            <div>
-              <h2 className="text-2xl font-semibold text-white md:text-4xl">
-                Welcome back
+              <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] !text-slate-950 sm:text-4xl">
+                Care for pets, help Pet Parents, and grow your earning
+                potential.
               </h2>
 
-              <p className="mt-2 text-sm text-slate-300">
-                Sign in to your guru account.
+              <p className="mt-3 text-sm font-semibold leading-6 !text-slate-700 sm:text-base">
+                SitGuru helps Gurus organize their pet care services, connect
+                with Pet Parents, manage bookings, and keep important setup
+                steps in one clean workspace.
+              </p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+                  <div className="text-2xl">🐾</div>
+                  <h3 className="mt-3 text-sm font-black !text-slate-950">
+                    Offer care
+                  </h3>
+                  <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                    Manage pet sitting, walks, drop-ins, boarding, and custom
+                    services.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+                  <div className="text-2xl">💬</div>
+                  <h3 className="mt-3 text-sm font-black !text-slate-950">
+                    Message Pet Parents
+                  </h3>
+                  <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                    Keep questions, care details, and updates organized.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+                  <div className="text-2xl">💚</div>
+                  <h3 className="mt-3 text-sm font-black !text-slate-950">
+                    Track earnings
+                  </h3>
+                  <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                    Review activity, payout setup, and earning opportunities.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="text-xl">✅</div>
+                <h3 className="mt-3 text-sm font-black !text-slate-950">
+                  Guru setup
+                </h3>
+                <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                  Continue profile, services, pricing, and visibility setup.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="text-xl">🛡️</div>
+                <h3 className="mt-3 text-sm font-black !text-slate-950">
+                  Trust &amp; Safety
+                </h3>
+                <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                  Monitor screening progress and approval readiness.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="text-xl">📅</div>
+                <h3 className="mt-3 text-sm font-black !text-slate-950">
+                  Availability
+                </h3>
+                <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                  Keep your schedule ready for future bookings.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] border border-emerald-100 bg-white p-8 shadow-[0_24px_70px_rgba(15,23,42,0.08)] md:p-10">
+            <div>
+              <p className="inline-flex rounded-full bg-emerald-100 px-4 py-2 text-sm font-black !text-emerald-800">
+                Guru Login
+              </p>
+
+              <h2 className="mt-4 text-3xl font-black tracking-[-0.04em] !text-slate-950 md:text-4xl">
+                Welcome back, Guru
+              </h2>
+
+              <p className="mt-2 text-base font-semibold leading-7 !text-slate-700">
+                Sign in to your Guru account to manage care, bookings, messages,
+                and earnings.
               </p>
             </div>
 
@@ -81,7 +137,7 @@ export default function GuruLoginPage() {
               <div className="space-y-2">
                 <label
                   htmlFor="email"
-                  className="block text-sm font-medium text-slate-200"
+                  className="block text-sm font-black !text-slate-900"
                 >
                   Email
                 </label>
@@ -93,14 +149,14 @@ export default function GuruLoginPage() {
                   required
                   autoComplete="email"
                   placeholder="guru@sitguru.com"
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-sky-400"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:!text-slate-400 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
               <div className="space-y-2">
                 <label
                   htmlFor="password"
-                  className="block text-sm font-medium text-slate-200"
+                  className="block text-sm font-black !text-slate-900"
                 >
                   Password
                 </label>
@@ -112,57 +168,67 @@ export default function GuruLoginPage() {
                   required
                   autoComplete="current-password"
                   placeholder="Enter your password"
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-sky-400"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold !text-slate-950 placeholder:!text-slate-400 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                 <Link
                   href="/forgot-password"
-                  className="text-slate-300 transition hover:text-white"
+                  className="font-bold !text-slate-700 transition hover:!text-slate-950 hover:underline"
                 >
                   Forgot password?
                 </Link>
 
                 <Link
                   href="/signup?accountType=guru"
-                  className="text-sky-300 transition hover:text-sky-200"
+                  className="font-black !text-emerald-700 transition hover:!text-emerald-800 hover:underline"
                 >
-                  Become a Guru
+                  Join free as a Guru
                 </Link>
               </div>
 
               <button
                 type="submit"
-                className="inline-flex w-full items-center justify-center rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-400"
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-black !text-white shadow-[0_12px_24px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 hover:bg-emerald-700"
               >
-                Sign In to Guru Portal
+                Sign in to earn with SitGuru
               </button>
             </form>
 
-            <div className="mt-8 rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-              <p className="text-sm text-slate-300">
-                Need customer access instead?
+            <div className="mt-8 rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
+              <p className="text-sm font-black !text-slate-950">
+                Want to book pet care?
+              </p>
+
+              <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
+                Pet Parents can log in here to find trusted care, save favorite
+                Gurus, and manage bookings.
               </p>
 
               <Link
-                href="/customer/login"
-                className="mt-2 inline-flex text-sm font-medium text-sky-300 transition hover:text-sky-200"
+                href="/login"
+                className="mt-4 inline-flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-white px-4 py-3 text-center text-sm font-black !text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition hover:-translate-y-0.5 hover:bg-emerald-100"
               >
-                Go to customer login
+                Pet Parent Login
               </Link>
             </div>
 
-            <div className="mt-4 text-sm text-slate-300">
-              Need an account?{" "}
+            <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <p className="text-sm font-semibold leading-6 !text-slate-700">
+                New to SitGuru? Create a free Guru account and start building
+                your services, profile, Trust &amp; Safety Screening, and earning
+                setup.
+              </p>
+
               <Link
                 href="/signup?accountType=guru"
-                className="font-medium text-sky-300 transition hover:text-sky-200"
+                className="mt-4 inline-flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-black !text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700"
               >
                 Get started as a Guru
               </Link>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </main>

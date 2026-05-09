@@ -17,6 +17,7 @@ import {
   Clock3,
   CreditCard,
   HeartHandshake,
+  LockKeyhole,
   MessageCircle,
   PawPrint,
   Receipt,
@@ -342,6 +343,7 @@ const routes = {
   adminMessages: "/customer/dashboard/messages?support=admin",
   pets: "/customer/dashboard/pets",
   profile: "/customer/dashboard/profile",
+  accountSecurity: "/customer/dashboard/account-security",
   pawPerks: "/customer/dashboard/pawperks",
   search: "/search",
   login: "/login",
@@ -3336,6 +3338,14 @@ export default function CustomerDashboardPage() {
                       className="sr-only"
                     />
                   </label>
+
+                  <Link
+                    href={routes.accountSecurity}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
+                  >
+                    <LockKeyhole className="h-4 w-4" />
+                    Account Security
+                  </Link>
 
                   <Link
                     href={routes.adminMessages}

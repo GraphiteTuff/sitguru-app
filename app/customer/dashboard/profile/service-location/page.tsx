@@ -18,7 +18,7 @@ import {
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 
-type CustomerLocationProfile = {
+type ServiceLocationProfile = {
   id: string;
   email: string | null;
   service_address: string | null;
@@ -38,6 +38,7 @@ type RawProfileRow = {
   service_address?: string | null;
   address?: string | null;
   home_address?: string | null;
+  street_address?: string | null;
   service_city?: string | null;
   city?: string | null;
   home_city?: string | null;
@@ -57,12 +58,22 @@ type SupabaseUserLike = {
   user_metadata?: Record<string, unknown> | null;
 };
 
-type ZipLookupResult = {
+type SetupStatus = {
+  basicInfoComplete: boolean;
+  serviceLocationComplete: boolean;
+  petPassportsComplete: boolean;
+  careNotesComplete: boolean;
+  emergencyContactComplete: boolean;
+  notificationsComplete: boolean;
+};
+
+type SetupStepStatus = "complete" | "required" | "recommended";
+
+type ZipLookupLocation = {
+  zip: string;
   city: string;
   state: string;
 };
-
-type SetupStepStatus = "complete" | "required" | "recommended" | "optional";
 
 const routes = {
   setupHub: "/customer/dashboard/profile",
@@ -72,8 +83,6 @@ const routes = {
   careNotes: "/customer/dashboard/profile/care-notes",
   emergencyContact: "/customer/dashboard/profile/emergency-contact",
   notifications: "/customer/dashboard/profile/notifications",
-  savedGurus: "/customer/dashboard/profile/saved-gurus",
-  findCare: "/find-care",
   login: "/login",
 };
 
@@ -94,31 +103,28 @@ function readMetadataString(
 ) {
   for (const key of keys) {
     const value = readString(metadata?.[key]);
+
     if (value) return value;
   }
 
   return null;
 }
 
-function normalizeZip(value: string) {
+function cleanZip(value: string) {
   return value.replace(/\D/g, "").slice(0, 5);
 }
 
-function normalizeState(value: string) {
-  return value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 2);
-}
-
-function formatLocation(profile: CustomerLocationProfile | null, form: ServiceLocationForm) {
-  const street = form.service_address.trim() || profile?.service_address?.trim();
-  const city = form.service_city.trim() || profile?.service_city?.trim();
-  const state = form.service_state.trim() || profile?.service_state?.trim();
-  const zip = form.service_zip.trim() || profile?.service_zip?.trim();
+function buildAddressLine(profile: ServiceLocationProfile | null) {
+  const street = profile?.service_address?.trim();
+  const city = profile?.service_city?.trim();
+  const state = profile?.service_state?.trim();
+  const zip = profile?.service_zip?.trim();
 
   const cityState = [city, state].filter(Boolean).join(", ");
   const cityStateZip = [cityState, zip].filter(Boolean).join(" ");
 
   if (street && cityStateZip) return `${street}, ${cityStateZip}`;
-  return street || cityStateZip || "Location not added yet";
+  return street || cityStateZip || "Not added yet";
 }
 
 function getStepBadgeClassName(status: SetupStepStatus) {
@@ -130,49 +136,13 @@ function getStepBadgeClassName(status: SetupStepStatus) {
     return "border-red-200 bg-red-50 text-red-700";
   }
 
-  if (status === "recommended") {
-    return "border-amber-200 bg-amber-50 text-amber-800";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return "border-amber-200 bg-amber-50 text-amber-800";
 }
 
-async function lookupZipCode(zip: string): Promise<ZipLookupResult | null> {
-  const normalizedZip = normalizeZip(zip);
-
-  if (normalizedZip.length !== 5) {
-    return null;
-  }
-
-  const response = await fetch(`https://api.zippopotam.us/us/${normalizedZip}`);
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const data = (await response.json()) as {
-    places?: Array<{
-      "place name"?: string;
-      "state abbreviation"?: string;
-    }>;
-  };
-
-  const firstPlace = data.places?.[0];
-
-  if (!firstPlace?.["place name"] || !firstPlace?.["state abbreviation"]) {
-    return null;
-  }
-
-  return {
-    city: firstPlace["place name"],
-    state: firstPlace["state abbreviation"],
-  };
-}
-
-function buildLocationProfile(
+function buildServiceLocationProfile(
   row: RawProfileRow | null,
   user: SupabaseUserLike,
-): CustomerLocationProfile {
+): ServiceLocationProfile {
   const metadata = user.user_metadata ?? null;
 
   return {
@@ -182,10 +152,12 @@ function buildLocationProfile(
       readString(row?.service_address) ||
       readString(row?.address) ||
       readString(row?.home_address) ||
+      readString(row?.street_address) ||
       readMetadataString(metadata, [
         "service_address",
         "address",
         "home_address",
+        "street_address",
       ]) ||
       null,
     service_city:
@@ -217,96 +189,211 @@ function buildLocationProfile(
   };
 }
 
-function profileToForm(profile: CustomerLocationProfile | null): ServiceLocationForm {
+function profileToForm(
+  profile: ServiceLocationProfile | null,
+): ServiceLocationForm {
   return {
     service_address: profile?.service_address || "",
     service_city: profile?.service_city || "",
     service_state: profile?.service_state || "",
-    service_zip: profile?.service_zip || "",
+    service_zip: cleanZip(profile?.service_zip || ""),
   };
 }
 
-async function fetchLocationProfile(user: SupabaseUserLike) {
-  const { data, error } = await supabase
+async function lookupZipLocation(zip: string): Promise<ZipLookupLocation | null> {
+  const clean = cleanZip(zip);
+
+  if (clean.length !== 5) return null;
+
+  try {
+    const response = await fetch(`https://api.zippopotam.us/us/${clean}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const place = data?.places?.[0];
+
+    if (!place) return null;
+
+    return {
+      zip: clean,
+      city: String(place?.["place name"] || ""),
+      state: String(place?.["state abbreviation"] || ""),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchServiceLocationProfile(user: SupabaseUserLike) {
+  const selectAttempts = [
+    "service_address, address, home_address, street_address, service_city, city, home_city, service_state, state, home_state, service_zip, zip, zip_code, zipcode, postal_code",
+    "service_address, service_city, service_state, service_zip",
+    "address, city, state, zip_code",
+    "address, city, state, zip",
+  ];
+
+  for (const selectColumns of selectAttempts) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(selectColumns)
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!error) {
+      return buildServiceLocationProfile(
+        (data as RawProfileRow | null) ?? null,
+        user,
+      );
+    }
+  }
+
+  return buildServiceLocationProfile(null, user);
+}
+
+async function fetchSetupStatus(userId: string): Promise<SetupStatus> {
+  const { data: profile } = await supabase
     .from("profiles")
-    .select("service_address, service_city, service_state, service_zip")
-    .eq("id", user.id)
+    .select(
+      "full_name, first_name, phone, service_address, service_city, service_state, service_zip, care_preferences, emergency_contact, emergency_contact_name, emergency_contact_phone, email_notifications, push_notifications, text_notifications",
+    )
+    .eq("id", userId)
     .maybeSingle();
 
-  if (!error) {
-    return buildLocationProfile((data as RawProfileRow | null) ?? null, user);
+  const { data: pets } = await supabase
+    .from("pets")
+    .select("id")
+    .eq("owner_id", userId)
+    .limit(1);
+
+  return {
+    basicInfoComplete: Boolean(
+      profile && (profile.full_name || profile.first_name) && profile.phone,
+    ),
+    serviceLocationComplete: Boolean(
+      profile &&
+        profile.service_address &&
+        profile.service_city &&
+        profile.service_state &&
+        profile.service_zip,
+    ),
+    petPassportsComplete: Boolean(pets && pets.length > 0),
+    careNotesComplete: Boolean(profile?.care_preferences),
+    emergencyContactComplete: Boolean(
+      profile?.emergency_contact ||
+        (profile?.emergency_contact_name && profile?.emergency_contact_phone),
+    ),
+    notificationsComplete: Boolean(
+      profile?.email_notifications ||
+        profile?.push_notifications ||
+        profile?.text_notifications,
+    ),
+  };
+}
+
+async function updateProfileWithPayload(
+  userId: string,
+  payload: Record<string, string | null>,
+) {
+  const { error } = await supabase
+    .from("profiles")
+    .update(payload)
+    .eq("id", userId);
+
+  return error;
+}
+
+async function saveServiceLocation(
+  userId: string,
+  form: ServiceLocationForm,
+) {
+  const cleanServiceAddress = form.service_address.trim() || null;
+  const cleanServiceCity = form.service_city.trim() || null;
+  const cleanServiceState = form.service_state.trim().toUpperCase() || null;
+  const cleanServiceZip = cleanZip(form.service_zip) || null;
+
+  const payloadAttempts: Array<Record<string, string | null>> = [
+    {
+      service_address: cleanServiceAddress,
+      service_city: cleanServiceCity,
+      service_state: cleanServiceState,
+      service_zip: cleanServiceZip,
+    },
+    {
+      address: cleanServiceAddress,
+      city: cleanServiceCity,
+      state: cleanServiceState,
+      zip_code: cleanServiceZip,
+    },
+    {
+      address: cleanServiceAddress,
+      city: cleanServiceCity,
+      state: cleanServiceState,
+      zip: cleanServiceZip,
+    },
+  ];
+
+  let lastErrorMessage = "";
+
+  for (const payload of payloadAttempts) {
+    const error = await updateProfileWithPayload(userId, payload);
+
+    if (!error) return;
+
+    lastErrorMessage = error.message;
   }
 
   throw new Error(
-    `Service Location could not load: ${error.message}. Make sure the profiles table has service_address, service_city, service_state, and service_zip columns.`,
+    `Service Location did not save: ${
+      lastErrorMessage || "Unknown database error"
+    }`,
   );
 }
 
-async function saveServiceLocation(userId: string, form: ServiceLocationForm) {
-  const payload = {
-    id: userId,
-    service_address: form.service_address.trim() || null,
-    service_city: form.service_city.trim() || null,
-    service_state: normalizeState(form.service_state) || null,
-    service_zip: normalizeZip(form.service_zip) || null,
-  };
-
-  const { error } = await supabase
-    .from("profiles")
-    .upsert(payload, { onConflict: "id" });
-
-  if (error) {
-    throw new Error(`Service Location did not save: ${error.message}`);
-  }
-}
-
-function SetupNavigation({
-  serviceLocationComplete,
-}: {
-  serviceLocationComplete: boolean;
-}) {
+function SetupNavigation({ setupStatus }: { setupStatus: SetupStatus }) {
   const steps = [
     {
       number: 1,
       label: "Basic Info",
       href: routes.basicInfo,
-      status: "complete",
+      status: setupStatus.basicInfoComplete ? "complete" : "required",
     },
     {
       number: 2,
       label: "Service Location",
       href: routes.serviceLocation,
-      status: serviceLocationComplete ? "complete" : "required",
+      status: setupStatus.serviceLocationComplete ? "complete" : "required",
     },
     {
       number: 3,
       label: "Pet Passports",
       href: routes.pets,
-      status: "required",
+      status: setupStatus.petPassportsComplete ? "complete" : "required",
     },
     {
       number: 4,
       label: "Care Notes",
       href: routes.careNotes,
-      status: "recommended",
+      status: setupStatus.careNotesComplete ? "complete" : "recommended",
     },
     {
       number: 5,
       label: "Emergency",
       href: routes.emergencyContact,
-      status: "recommended",
+      status: setupStatus.emergencyContactComplete
+        ? "complete"
+        : "recommended",
     },
     {
       number: 6,
       label: "Notifications",
       href: routes.notifications,
-      status: "recommended",
-    },
-    {
-      number: 7,
-      label: "Saved Gurus",
-      href: routes.savedGurus,
-      status: "optional",
+      status: setupStatus.notificationsComplete ? "complete" : "recommended",
     },
   ] satisfies Array<{
     number: number;
@@ -316,7 +403,7 @@ function SetupNavigation({
   }>;
 
   return (
-    <div className="grid gap-2 md:grid-cols-7">
+    <div className="grid gap-2 md:grid-cols-6">
       {steps.map((step) => {
         const active = step.number === 2;
 
@@ -347,39 +434,64 @@ function SetupNavigation({
   );
 }
 
+function CompletionPill({
+  label,
+  complete,
+}: {
+  label: string;
+  complete: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border px-4 py-3 text-sm font-black ${
+        complete
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          : "border-red-200 bg-red-50 text-red-700"
+      }`}
+    >
+      {complete ? "✓" : "!"} {label}
+    </div>
+  );
+}
+
 export default function CustomerServiceLocationPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<CustomerLocationProfile | null>(null);
+  const [profile, setProfile] = useState<ServiceLocationProfile | null>(null);
   const [form, setForm] = useState<ServiceLocationForm>(initialForm);
+  const [setupStatus, setSetupStatus] = useState<SetupStatus>({
+    basicInfoComplete: false,
+    serviceLocationComplete: false,
+    petPassportsComplete: false,
+    careNotesComplete: false,
+    emergencyContactComplete: false,
+    notificationsComplete: false,
+  });
+
   const [saving, setSaving] = useState(false);
-  const [zipLookupLoading, setZipLookupLoading] = useState(false);
-  const [zipLookupMessage, setZipLookupMessage] = useState("");
-  const [zipLookupError, setZipLookupError] = useState("");
+  const [zipLoading, setZipLoading] = useState(false);
+  const [zipMessage, setZipMessage] = useState("");
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
+  const streetComplete = Boolean(form.service_address.trim());
+  const zipComplete = cleanZip(form.service_zip).length === 5;
+  const cityComplete = Boolean(form.service_city.trim());
+  const stateComplete = Boolean(form.service_state.trim());
+
   const serviceLocationComplete = useMemo(() => {
     return Boolean(
-      form.service_address.trim() &&
-        form.service_city.trim() &&
-        form.service_state.trim() &&
-        normalizeZip(form.service_zip).length === 5,
+      streetComplete && zipComplete && cityComplete && stateComplete,
     );
-  }, [form]);
+  }, [streetComplete, zipComplete, cityComplete, stateComplete]);
 
   const statusLabel = serviceLocationComplete ? "Complete" : "Required";
   const statusTone = serviceLocationComplete
     ? "border-emerald-200 bg-emerald-50 text-emerald-800"
     : "border-red-200 bg-red-50 text-red-700";
 
-  const fullAddress = useMemo(
-    () => formatLocation(profile, form),
-    [form, profile],
-  );
-
-  const loadProfile = useCallback(async () => {
+  const loadPage = useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
 
@@ -394,9 +506,14 @@ export default function CustomerServiceLocationPage() {
     }
 
     try {
-      const profileData = await fetchLocationProfile(user);
+      const [profileData, setupData] = await Promise.all([
+        fetchServiceLocationProfile(user),
+        fetchSetupStatus(user.id),
+      ]);
+
       setProfile(profileData);
       setForm(profileToForm(profileData));
+      setSetupStatus(setupData);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -409,7 +526,7 @@ export default function CustomerServiceLocationPage() {
   }, [router]);
 
   useEffect(() => {
-    void loadProfile();
+    void loadPage();
 
     const {
       data: { subscription },
@@ -422,114 +539,112 @@ export default function CustomerServiceLocationPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [loadProfile, router]);
+  }, [loadPage, router]);
 
-  useEffect(() => {
-    const normalizedZip = normalizeZip(form.service_zip);
+  async function handleZipChange(value: string) {
+    const nextZip = cleanZip(value);
 
-    if (normalizedZip.length !== 5) {
-      setZipLookupMessage("");
-      setZipLookupError("");
-      return;
-    }
+    setForm((current) => ({
+      ...current,
+      service_zip: nextZip,
+    }));
 
-    const timer = window.setTimeout(() => {
-      void handleZipLookup(normalizedZip);
-    }, 450);
+    setZipMessage("");
 
-    return () => {
-      window.clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.service_zip]);
+    if (nextZip.length !== 5) return;
 
-  async function handleZipLookup(zip: string) {
-    const normalizedZip = normalizeZip(zip);
-
-    if (normalizedZip.length !== 5) {
-      return;
-    }
-
-    setZipLookupLoading(true);
-    setZipLookupMessage("");
-    setZipLookupError("");
+    setZipLoading(true);
 
     try {
-      const result = await lookupZipCode(normalizedZip);
+      const location = await lookupZipLocation(nextZip);
 
-      if (!result) {
-        setZipLookupError("We could not find a city and state for that ZIP code.");
+      if (!location) {
+        setZipMessage("ZIP code found, but city/state could not be filled.");
         return;
       }
 
-      setForm((currentForm) => ({
-        ...currentForm,
-        service_zip: normalizedZip,
-        service_city: result.city,
-        service_state: result.state,
+      setForm((current) => ({
+        ...current,
+        service_zip: location.zip,
+        service_city: location.city,
+        service_state: location.state,
       }));
 
-      setZipLookupMessage(`City and state filled: ${result.city}, ${result.state}`);
-    } catch {
-      setZipLookupError("City/state autofill is unavailable right now.");
+      setZipMessage(`City and state filled: ${location.city}, ${location.state}`);
     } finally {
-      setZipLookupLoading(false);
+      setZipLoading(false);
     }
   }
 
   async function handleSave(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
 
-    if (!profile?.id || saving) return;
+    if (!profile?.id || saving) return false;
 
     setSaving(true);
     setMessage("");
     setErrorMessage("");
 
     if (!form.service_address.trim()) {
-      setErrorMessage("Please enter the street address where care will happen.");
+      setErrorMessage("Please enter your street address.");
       setSaving(false);
-      return;
+      return false;
     }
 
-    if (normalizeZip(form.service_zip).length !== 5) {
+    if (cleanZip(form.service_zip).length !== 5) {
       setErrorMessage("Please enter a valid 5-digit ZIP code.");
       setSaving(false);
-      return;
+      return false;
     }
 
-    if (!form.service_city.trim() || !form.service_state.trim()) {
-      setErrorMessage("Please complete city and state. ZIP autofill can help.");
+    if (!form.service_city.trim()) {
+      setErrorMessage("Please enter your city.");
       setSaving(false);
-      return;
+      return false;
+    }
+
+    if (!form.service_state.trim()) {
+      setErrorMessage("Please enter your state.");
+      setSaving(false);
+      return false;
     }
 
     try {
       await saveServiceLocation(profile.id, form);
-      const refreshedProfile = await fetchLocationProfile({
-        id: profile.id,
-        email: profile.email,
-        user_metadata: {},
-      });
 
-      setProfile(refreshedProfile);
-      setForm(profileToForm(refreshedProfile));
+      const [profileData, setupData] = await Promise.all([
+        fetchServiceLocationProfile({
+          id: profile.id,
+          email: profile.email,
+          user_metadata: {},
+        }),
+        fetchSetupStatus(profile.id),
+      ]);
+
+      setProfile(profileData);
+      setForm(profileToForm(profileData));
+      setSetupStatus(setupData);
       setMessage("Service Location saved. Step 2 is complete.");
       router.refresh();
+      return true;
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
           : "We could not save your Service Location.",
       );
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
   async function handleSaveAndContinue() {
-    await handleSave();
-    router.push(routes.pets);
+    const saved = await handleSave();
+
+    if (saved) {
+      router.push(routes.pets);
+    }
   }
 
   if (loading) {
@@ -562,7 +677,9 @@ export default function CustomerServiceLocationPage() {
             Back to Setup Hub
           </Link>
 
-          <div className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ${statusTone}`}>
+          <div
+            className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ${statusTone}`}
+          >
             Step 2 · {statusLabel}
           </div>
         </div>
@@ -570,7 +687,7 @@ export default function CustomerServiceLocationPage() {
         <div className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
           <div className="bg-[linear-gradient(120deg,#10b981_0%,#34d399_52%,#a7f3d0_100%)] px-6 py-8 sm:px-8 lg:px-10">
             <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-950/80">
-              Pet Parent Setup · Step 2 of 7
+              Pet Parent Setup · Step 2 of 6
             </p>
 
             <h1 className="mt-4 text-5xl font-black tracking-[-0.065em] text-slate-950 md:text-6xl">
@@ -578,14 +695,13 @@ export default function CustomerServiceLocationPage() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-slate-800/75">
-              Add the location where care will happen so SitGuru can support
-              local Guru matching, service-radius filtering, maps, and booking
-              details.
+              Add the primary care location SitGuru uses for Guru matching,
+              booking details, radius filtering, maps, and local availability.
             </p>
           </div>
 
           <div className="p-5 sm:p-6 lg:p-8">
-            <SetupNavigation serviceLocationComplete={serviceLocationComplete} />
+            <SetupNavigation setupStatus={setupStatus} />
 
             {message || errorMessage ? (
               <div
@@ -607,17 +723,19 @@ export default function CustomerServiceLocationPage() {
             <div className="mt-6 grid gap-6 lg:grid-cols-[0.78fr_1.22fr]">
               <div className="rounded-[2rem] border border-emerald-100 bg-emerald-50 p-6">
                 <div className="rounded-[1.7rem] border border-emerald-100 bg-white p-5 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-                      <MapPin className="h-6 w-6" />
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                      <MapPin className="h-7 w-7" />
                     </div>
 
                     <div>
-                      <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-700">
-                        Current service location
+                      <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+                        Current Service Location
                       </p>
-                      <h2 className="mt-1 text-2xl font-black text-slate-950">
-                        {serviceLocationComplete ? "Location Ready" : "Needs Location"}
+                      <h2 className="mt-1 text-4xl font-black tracking-[-0.05em] text-slate-950">
+                        {serviceLocationComplete
+                          ? "Location Ready"
+                          : "Location Needed"}
                       </h2>
                     </div>
                   </div>
@@ -627,28 +745,25 @@ export default function CustomerServiceLocationPage() {
                       Care address
                     </p>
                     <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                      {fullAddress}
+                      {buildAddressLine({
+                        id: profile?.id || "",
+                        email: profile?.email || null,
+                        service_address: form.service_address || null,
+                        service_city: form.service_city || null,
+                        service_state: form.service_state || null,
+                        service_zip: form.service_zip || null,
+                      })}
                     </p>
                   </div>
 
                   <div className="mt-5 grid gap-2">
-                    {[
-                      ["Street Address", Boolean(form.service_address.trim())],
-                      ["ZIP Code", normalizeZip(form.service_zip).length === 5],
-                      ["City", Boolean(form.service_city.trim())],
-                      ["State", Boolean(form.service_state.trim())],
-                    ].map(([label, complete]) => (
-                      <div
-                        key={String(label)}
-                        className={`rounded-2xl border px-4 py-3 text-sm font-black ${
-                          complete
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                            : "border-red-200 bg-red-50 text-red-700"
-                        }`}
-                      >
-                        {complete ? "✓" : "!"} {String(label)}
-                      </div>
-                    ))}
+                    <CompletionPill
+                      label="Street Address"
+                      complete={streetComplete}
+                    />
+                    <CompletionPill label="ZIP Code" complete={zipComplete} />
+                    <CompletionPill label="City" complete={cityComplete} />
+                    <CompletionPill label="State" complete={stateComplete} />
                   </div>
                 </div>
 
@@ -678,7 +793,7 @@ export default function CustomerServiceLocationPage() {
                   </div>
 
                   <div>
-                    <h2 className="text-3xl font-black tracking-tight text-slate-950">
+                    <h2 className="text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
                       Where will care happen?
                     </h2>
                     <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
@@ -689,12 +804,12 @@ export default function CustomerServiceLocationPage() {
                 </div>
 
                 <div className="grid gap-5">
-                  <label className="grid gap-2 text-sm">
-                    <span className="font-black text-slate-700">
+                  <label htmlFor="service_address" className="grid gap-2">
+                    <span className="text-sm font-black text-slate-950">
                       Street Address
                     </span>
                     <input
-                      type="text"
+                      id="service_address"
                       value={form.service_address}
                       onChange={(event) =>
                         setForm({
@@ -702,59 +817,54 @@ export default function CustomerServiceLocationPage() {
                           service_address: event.target.value,
                         })
                       }
-                      placeholder="Example: 123 Main Street"
-                      className="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5 font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                      placeholder="Example: 100 Main Street"
+                      className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                     />
                   </label>
 
-                  <label className="grid gap-2 text-sm">
-                    <span className="font-black text-slate-700">ZIP Code</span>
+                  <label htmlFor="service_zip" className="grid gap-2">
+                    <span className="text-sm font-black text-slate-950">
+                      ZIP Code
+                    </span>
                     <div className="relative">
                       <input
-                        type="text"
+                        id="service_zip"
+                        value={form.service_zip}
                         inputMode="numeric"
                         maxLength={5}
-                        value={form.service_zip}
-                        onChange={(event) =>
-                          setForm({
-                            ...form,
-                            service_zip: normalizeZip(event.target.value),
-                          })
-                        }
-                        onBlur={() => void handleZipLookup(form.service_zip)}
-                        placeholder="Example: 08030"
-                        className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5 pr-12 font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                        onChange={(event) => void handleZipChange(event.target.value)}
+                        placeholder="Example: 18951"
+                        className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5 pr-12 text-sm font-bold text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                       />
-                      {zipLookupLoading ? (
-                        <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-emerald-600" />
-                      ) : (
-                        <LocateFixed className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600" />
-                      )}
+
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-700">
+                        {zipLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <LocateFixed className="h-4 w-4" />
+                        )}
+                      </div>
                     </div>
 
-                    {zipLookupMessage ? (
-                      <span className="text-xs font-bold text-emerald-700">
-                        {zipLookupMessage}
+                    {zipMessage ? (
+                      <span className="text-xs font-black text-emerald-700">
+                        {zipMessage}
                       </span>
-                    ) : null}
-
-                    {zipLookupError ? (
-                      <span className="text-xs font-bold text-amber-700">
-                        {zipLookupError}
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-500">
+                        Enter a ZIP code and SitGuru will autofill city/state
+                        when available.
                       </span>
-                    ) : null}
-
-                    <span className="text-xs font-semibold leading-5 text-slate-500">
-                      Enter a ZIP code and SitGuru will autofill city/state when
-                      available.
-                    </span>
+                    )}
                   </label>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-2 text-sm">
-                      <span className="font-black text-slate-700">City</span>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <label htmlFor="service_city" className="grid gap-2">
+                      <span className="text-sm font-black text-slate-950">
+                        City
+                      </span>
                       <input
-                        type="text"
+                        id="service_city"
                         value={form.service_city}
                         onChange={(event) =>
                           setForm({
@@ -762,25 +872,27 @@ export default function CustomerServiceLocationPage() {
                             service_city: event.target.value,
                           })
                         }
-                        placeholder="Auto-filled from ZIP"
-                        className="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5 font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                        placeholder="Example: Quakertown"
+                        className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                       />
                     </label>
 
-                    <label className="grid gap-2 text-sm">
-                      <span className="font-black text-slate-700">State</span>
+                    <label htmlFor="service_state" className="grid gap-2">
+                      <span className="text-sm font-black text-slate-950">
+                        State
+                      </span>
                       <input
-                        type="text"
+                        id="service_state"
                         value={form.service_state}
+                        maxLength={2}
                         onChange={(event) =>
                           setForm({
                             ...form,
-                            service_state: normalizeState(event.target.value),
+                            service_state: event.target.value.toUpperCase(),
                           })
                         }
-                        placeholder="NJ"
-                        maxLength={2}
-                        className="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5 font-bold uppercase text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                        placeholder="Example: PA"
+                        className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5 text-sm font-bold uppercase text-slate-950 placeholder:normal-case placeholder:text-slate-400 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                       />
                     </label>
                   </div>

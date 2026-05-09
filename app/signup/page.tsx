@@ -36,7 +36,7 @@ const rewardsHighlights = [
   {
     title: "Refer Pet Parents",
     description:
-      "Invite pet owners to join SitGuru and help them discover trusted local care.",
+      "Invite Pet Parents to join SitGuru and help them discover trusted local care.",
     icon: "🐾",
   },
   {
@@ -55,19 +55,19 @@ const rewardsHighlights = [
 
 const signupBenefits = [
   {
+    title: "Free Account",
+    description: "Join SitGuru for free and get started today.",
+    icon: "✨",
+  },
+  {
     title: "Book Care",
-    description: "Find trusted pet care near you.",
+    description: "Pet Parents can find trusted pet care nearby.",
     icon: "🔎",
   },
   {
-    title: "Save Gurus",
-    description: "Keep track of favorite providers.",
+    title: "Earn as a Guru",
+    description: "Future Gurus can offer pet care services.",
     icon: "💚",
-  },
-  {
-    title: "Join Free",
-    description: "Create your account and get started.",
-    icon: "✨",
   },
 ];
 
@@ -79,7 +79,7 @@ const accountTypeOptions: {
 }[] = [
   {
     value: "customer",
-    label: "Pet Owner",
+    label: "Pet Parent",
     description: "I want to find and book trusted pet care.",
     icon: "🐶",
   },
@@ -118,6 +118,36 @@ function getSignupSourceFromUrl() {
   return source.trim() || "direct";
 }
 
+function getAccountTypeFromUrl(): AccountType | null {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const value = String(
+    params.get("accountType") ||
+      params.get("account_type") ||
+      params.get("role") ||
+      params.get("type") ||
+      "",
+  )
+    .trim()
+    .toLowerCase();
+
+  if (value === "guru" || value === "provider" || value === "sitter") {
+    return "guru";
+  }
+
+  if (
+    value === "customer" ||
+    value === "pet-parent" ||
+    value === "pet_parent" ||
+    value === "parent"
+  ) {
+    return "customer";
+  }
+
+  return null;
+}
+
 export default function SignupPage() {
   const [form, setForm] = useState<SignupFormState>(initialSignupFormState);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,15 +163,23 @@ export default function SignupPage() {
   const passwordIsLongEnough = form.password.length >= 8;
   const passwordHasValue = form.password.length > 0;
 
+  const loginHref = form.accountType === "guru" ? "/guru/login" : "/login";
+  const loginLabel =
+    form.accountType === "guru" ? "Guru Login" : "Pet Parent Login";
+
+  const alternateLoginHref = form.accountType === "guru" ? "/login" : "/guru/login";
+  const alternateLoginLabel =
+    form.accountType === "guru" ? "Pet Parent Login" : "Guru Login";
+
   useEffect(() => {
     const referralCode = getReferralFromUrl();
+    const accountTypeFromUrl = getAccountTypeFromUrl();
 
-    if (referralCode) {
-      setForm((prev) => ({
-        ...prev,
-        referralCode,
-      }));
-    }
+    setForm((prev) => ({
+      ...prev,
+      referralCode: referralCode || prev.referralCode,
+      accountType: accountTypeFromUrl || prev.accountType,
+    }));
   }, []);
 
   function updateField<K extends keyof SignupFormState>(
@@ -209,8 +247,8 @@ export default function SignupPage() {
 
       setSignupSuccess(
         form.accountType === "guru"
-          ? "Your account has been created. Check your email to confirm your account, then continue your Guru setup."
-          : "Your account has been created. Check your email to confirm your account, then start finding trusted pet care.",
+          ? "Your free Guru account has been created. Check your email to confirm your account, then log in through the Guru portal to continue setup."
+          : "Your free Pet Parent account has been created. Check your email to confirm your account, then start finding trusted pet care.",
       );
 
       setShouldCelebrateSignup(true);
@@ -234,15 +272,15 @@ export default function SignupPage() {
 
   return (
     <main
-      className={`${openSans.className} min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,216,166,0.16),transparent_32%),radial-gradient(circle_at_top_right,rgba(124,201,244,0.22),transparent_34%),linear-gradient(180deg,#f8fcfd_0%,#eef7f8_55%,#ffffff_100%)] px-4 py-8 text-slate-950 sm:px-6 lg:px-8`}
+      className={`${openSans.className} min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,216,166,0.16),transparent_32%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.14),transparent_34%),linear-gradient(180deg,#f8fffb_0%,#effaf3_55%,#ffffff_100%)] px-4 py-8 text-slate-950 sm:px-6 lg:px-8`}
     >
       <WelcomeConfetti
         shouldCelebrate={shouldCelebrateSignup}
         hasSeenWelcomeConfetti={hasSeenWelcomeConfetti}
         message={
           form.accountType === "guru"
-            ? "Your Guru account was created successfully."
-            : "Your SitGuru account was created successfully."
+            ? "Your free Guru account was created successfully."
+            : "Your free SitGuru account was created successfully."
         }
         onCelebrate={() => {
           setHasSeenWelcomeConfetti(true);
@@ -252,16 +290,16 @@ export default function SignupPage() {
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center">
         <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
           <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:p-8 lg:p-10">
-            <div className="inline-flex items-center rounded-full bg-gradient-to-r from-emerald-100 to-sky-100 px-4 py-2 text-sm font-black text-emerald-700">
-              Join SitGuru
+            <div className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-700">
+              Join SitGuru Free
             </div>
 
             <h1 className="mt-5 max-w-3xl text-4xl font-black leading-[1.03] tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
-              Create your account and get started with trusted pet care.
+              Create your free account and get started with trusted pet care.
             </h1>
 
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-              Sign up as a pet owner or begin your path as a Guru with a
+              Join for free as a Pet Parent or begin your path as a Guru with a
               cleaner, more modern experience built to grow with SitGuru.
             </p>
 
@@ -271,14 +309,14 @@ export default function SignupPage() {
               </div>
 
               <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-4xl">
-                Referrals are tracked when new members join.
+                Join free, refer others, and help the SitGuru community grow.
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
                 If you arrived through a SitGuru referral link, we’ll connect
                 your signup to that referral after your account is created.
-                Members can help grow the SitGuru community by inviting pet
-                parents, future Gurus, and local partners.
+                Members can help grow the SitGuru community by inviting Pet
+                Parents, future Gurus, and local partners.
               </p>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -318,17 +356,17 @@ export default function SignupPage() {
           </section>
 
           <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:p-8 lg:p-10">
-            <div className="inline-flex items-center rounded-full bg-gradient-to-r from-emerald-100 to-sky-100 px-4 py-2 text-sm font-black text-emerald-700">
-              Create account
+            <div className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-700">
+              Free Account
             </div>
 
             <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-4xl">
-              Start using SitGuru
+              Start using SitGuru for free
             </h2>
 
             <p className="mt-2 text-base leading-7 text-slate-600">
-              Create an account to book pet care, save favorite Gurus, or begin
-              offering services.
+              Create your free account to book pet care, save favorite Gurus, or
+              begin offering services.
             </p>
 
             <form onSubmit={handleSignup} className="mt-7 space-y-5">
@@ -350,6 +388,7 @@ export default function SignupPage() {
                     className="input w-full"
                     placeholder="First name"
                     autoComplete="given-name"
+                    suppressHydrationWarning
                     required
                   />
                 </div>
@@ -371,6 +410,7 @@ export default function SignupPage() {
                     className="input w-full"
                     placeholder="Last name"
                     autoComplete="family-name"
+                    suppressHydrationWarning
                     required
                   />
                 </div>
@@ -391,6 +431,7 @@ export default function SignupPage() {
                   className="input w-full"
                   placeholder="you@example.com"
                   autoComplete="email"
+                  suppressHydrationWarning
                   required
                 />
               </div>
@@ -452,6 +493,7 @@ export default function SignupPage() {
                   className="input w-full"
                   placeholder="Referral code or invite link code"
                   autoComplete="off"
+                  suppressHydrationWarning
                 />
 
                 <p className="mt-2 text-xs leading-5 text-slate-500">
@@ -478,6 +520,7 @@ export default function SignupPage() {
                   className="input w-full"
                   placeholder="Create a password"
                   autoComplete="new-password"
+                  suppressHydrationWarning
                   required
                 />
 
@@ -511,30 +554,38 @@ export default function SignupPage() {
                 disabled={isSubmitting}
                 className="btn-primary h-12 w-full text-base disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSubmitting ? "Creating account..." : "Create account"}
+                {isSubmitting ? "Creating free account..." : "Create free account"}
               </button>
             </form>
 
             <div className="mt-7 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm text-slate-600">
-                Already have an account?{" "}
-                <Link
-                  href="/login"
-                  className="font-black text-emerald-700 hover:text-emerald-800 hover:underline"
-                >
-                  Log in
-                </Link>
+              <p className="text-sm font-bold text-slate-700">
+                Already have an account?
               </p>
 
-              <p className="mt-2 text-sm text-slate-600">
-                Want to offer pet care?{" "}
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <Link
-                  href="/become-a-guru"
-                  className="font-black text-emerald-700 hover:text-emerald-800 hover:underline"
+                  href={loginHref}
+                  className="flex min-h-[52px] items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700"
                 >
-                  Apply free as a Guru
+                  {loginLabel}
                 </Link>
-              </p>
+
+                <Link
+                  href={alternateLoginHref}
+                  className="flex min-h-[52px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-black text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50"
+                >
+                  {alternateLoginLabel}
+                </Link>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-4">
+                <p className="text-sm font-bold leading-6 text-slate-600">
+                  {form.accountType === "guru"
+                    ? "You selected Future Guru, so your main login button goes to the Guru portal. Need to book care instead? Use Pet Parent Login."
+                    : "You selected Pet Parent, so your main login button goes to the Pet Parent portal. Want to offer pet care? Use Guru Login."}
+                </p>
+              </div>
             </div>
           </section>
         </div>
