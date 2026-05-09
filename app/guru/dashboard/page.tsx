@@ -43,6 +43,7 @@ type GuruProfile = {
   services?: string[] | string | null;
   application_status?: string | null;
   status?: string | null;
+  is_public?: boolean | null;
   is_bookable?: boolean | null;
   stripe_account_id?: string | null;
   stripe_onboarding_complete?: boolean | null;
@@ -513,6 +514,7 @@ async function getGuruProfile(
         application_status: "profile_incomplete",
         status: "profile_incomplete",
         is_bookable: false,
+        is_public: false,
       };
     }
   }
@@ -1260,7 +1262,6 @@ function GuruSetupChecklist({
     </section>
   );
 }
-
 
 export default async function GuruDashboardPage() {
   const supabase = await createClient();
