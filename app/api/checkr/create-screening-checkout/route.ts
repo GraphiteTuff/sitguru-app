@@ -6,13 +6,25 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-02-24.acacia",
+  apiVersion: "2026-03-25.dahlia",
 });
 
 type PaymentOption =
   | "pay_full_today"
   | "pay_15_three_monthly"
   | "pay_15_booking_deductions";
+
+type GuruForScreeningCheckout = {
+  id: string;
+  user_id: string | null;
+  email: string | null;
+  display_name: string | null;
+  full_name: string | null;
+  name: string | null;
+  background_check_fee_status: string | null;
+  background_check_fee_payment_option: string | null;
+  background_check_fee_paid_at: string | null;
+};
 
 type PaymentOptionConfig = {
   label: string;
@@ -35,7 +47,6 @@ const FLEXIBLE_REMAINING_CENTS =
   FLEXIBLE_PLAN_TOTAL_CENTS - LAUNCH_TODAY_CENTS;
 const PAWSTEP_MONTHLY_CENTS = 833;
 const PAWSTEP_TRIAL_DAYS = 30;
-const PAWSTEP_CANCEL_AFTER_DAYS = 122;
 
 const PAYMENT_OPTIONS: Record<PaymentOption, PaymentOptionConfig> = {
   pay_full_today: {
@@ -137,6 +148,8 @@ function getCheckoutMetadata(params: {
     paid_today_cents: String(params.option.payTodayCents),
     remaining_cents: String(params.option.remainingCents),
     monthly_cents: String(params.option.monthlyCents || 0),
+    monthly_payments_total:
+      params.paymentOption === "pay_15_three_monthly" ? "3" : "0",
     launch_badge: params.option.badge,
   };
 }
@@ -179,7 +192,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: guru, error: guruError } = await supabaseAdmin
+    const { data: guruData, error: guruError } = await supabaseAdmin
       .from("gurus")
       .select(
         [
@@ -203,6 +216,8 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
+
+    const guru = guruData as GuruForScreeningCheckout | null;
 
     if (!guru) {
       return NextResponse.json(
@@ -288,9 +303,6 @@ export async function POST(req: NextRequest) {
             metadata,
             subscription_data: {
               trial_period_days: PAWSTEP_TRIAL_DAYS,
-              cancel_at:
-                Math.floor(Date.now() / 1000) +
-                PAWSTEP_CANCEL_AFTER_DAYS * 24 * 60 * 60,
               metadata,
             },
             success_url: successUrl,
