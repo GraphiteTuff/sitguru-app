@@ -10,7 +10,7 @@ import {
   Users,
   WalletCards,
 } from "lucide-react";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type AnyRow = Record<string, unknown>;
 
@@ -165,11 +165,8 @@ function getPlatformRevenue(booking: AnyRow) {
 }
 
 function getBookingStatus(booking: AnyRow) {
-  return getText(
-    booking,
-    ["status", "booking_status", "payment_status"],
-    "",
-  ).toLowerCase();
+  return getText(booking, ["status", "booking_status", "payment_status"], "")
+    .toLowerCase();
 }
 
 function isCompletedOrPaidBooking(booking: AnyRow) {
@@ -191,7 +188,10 @@ async function safeAdminQuery(
     const result = await query;
 
     if (result.error) {
-      console.warn(`Guru financial dashboard query skipped for ${label}:`, result.error);
+      console.warn(
+        `Guru financial dashboard query skipped for ${label}:`,
+        result.error,
+      );
       return { data: [], error: null };
     }
 
@@ -203,6 +203,8 @@ async function safeAdminQuery(
 }
 
 async function getGuruFinancialSnapshot(): Promise<GuruFinancialSnapshot> {
+  const supabaseAdmin = createSupabaseAdminClient();
+
   const bookingsResult = await safeAdminQuery(
     supabaseAdmin
       .from("bookings")
@@ -293,7 +295,9 @@ async function getGuruFinancialSnapshot(): Promise<GuruFinancialSnapshot> {
     activeRevenueGurus > 0 ? completedRevenue / activeRevenueGurus : 0;
 
   const averageBookingValue =
-    completedBookings.length > 0 ? completedRevenue / completedBookings.length : 0;
+    completedBookings.length > 0
+      ? completedRevenue / completedBookings.length
+      : 0;
 
   const topGuru = [...gurus].sort((a, b) => b.revenue - a.revenue)[0];
 
@@ -350,7 +354,9 @@ function SnapshotTile({
 
       <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
 
-      <p className="mt-2 text-xs font-bold leading-5 text-slate-500">{detail}</p>
+      <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+        {detail}
+      </p>
     </Link>
   );
 }

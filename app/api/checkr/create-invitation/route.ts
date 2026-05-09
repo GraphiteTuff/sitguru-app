@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -12,6 +13,7 @@ type CreateInvitationBody = {
 
 type GuruForCheckrInvite = {
   id: string;
+  user_id: string | null;
   email: string | null;
   name: string | null;
   full_name: string | null;
@@ -20,7 +22,12 @@ type GuruForCheckrInvite = {
   city: string | null;
   state: string | null;
   checkr_candidate_id: string | null;
+  checkr_invitation_id: string | null;
+  checkr_invitation_url: string | null;
   background_check_status: string | null;
+  background_check_fee_status: string | null;
+  background_check_fee_paid_at: string | null;
+  background_check_fee_payment_option: string | null;
 };
 
 type CheckrCandidate = {
@@ -51,6 +58,35 @@ function getCheckrApiKey() {
   }
 
   return apiKey;
+}
+
+function isScreeningPaymentAllowed(guru: GuruForCheckrInvite) {
+  const feeStatus = String(guru.background_check_fee_status || "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    feeStatus === "paid" ||
+    feeStatus === "partially_paid" ||
+    feeStatus === "waived" ||
+    Boolean(guru.background_check_fee_paid_at)
+  );
+}
+
+function getScreeningPaymentBlockMessage(guru: GuruForCheckrInvite) {
+  const feeStatus = String(guru.background_check_fee_status || "unpaid")
+    .trim()
+    .toLowerCase();
+
+  if (feeStatus === "checkout_started" || feeStatus === "pending") {
+    return "Your Trust & Safety Screening payment is still pending. Please complete Stripe Checkout or refresh your status before starting the secure screening form.";
+  }
+
+  if (feeStatus === "refunded") {
+    return "Your Trust & Safety Screening payment was refunded. Please choose a new screening plan before starting the secure screening form.";
+  }
+
+  return "Please choose and start a Trust & Safety Screening payment plan before starting the secure screening form.";
 }
 
 async function checkrRequest<T>(
@@ -164,8 +200,22 @@ function splitName(name?: string | null) {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as CreateInvitationBody;
-    const guruId = body.guruId;
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: "You must be logged in to start your secure screening." },
+        { status: 401 },
+      );
+    }
+
+    const body = (await request.json().catch(() => ({}))) as CreateInvitationBody;
+    const guruId = String(body.guruId || "").trim();
 
     if (!guruId) {
       return NextResponse.json({ error: "Missing guruId." }, { status: 400 });
@@ -185,6 +235,7 @@ export async function POST(request: Request) {
       .select(
         [
           "id",
+          "user_id",
           "email",
           "name",
           "full_name",
@@ -193,7 +244,12 @@ export async function POST(request: Request) {
           "city",
           "state",
           "checkr_candidate_id",
+          "checkr_invitation_id",
+          "checkr_invitation_url",
           "background_check_status",
+          "background_check_fee_status",
+          "background_check_fee_paid_at",
+          "background_check_fee_payment_option",
         ].join(","),
       )
       .eq("id", guruId)
@@ -207,11 +263,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Guru not found." }, { status: 404 });
     }
 
+    if (guru.user_id && guru.user_id !== user.id) {
+      return NextResponse.json(
+        { error: "You can only start screening for your own Guru profile." },
+        { status: 403 },
+      );
+    }
+
+    if (!isScreeningPaymentAllowed(guru)) {
+      return NextResponse.json(
+        { error: getScreeningPaymentBlockMessage(guru) },
+        { status: 402 },
+      );
+    }
+
     if (!guru.email) {
       return NextResponse.json(
-        { error: "Guru must have an email before starting a background check." },
+        {
+          error:
+            "Your Guru profile must have an email before starting the secure screening form.",
+        },
         { status: 400 },
       );
+    }
+
+    if (guru.checkr_invitation_id && guru.checkr_invitation_url) {
+      return NextResponse.json({
+        success: true,
+        status: guru.background_check_status || "invited",
+        guruId: guru.id,
+        candidateId: guru.checkr_candidate_id,
+        invitationId: guru.checkr_invitation_id,
+        reportId: null,
+        invitationUrl: guru.checkr_invitation_url,
+        invitation_url: guru.checkr_invitation_url,
+        message:
+          "Your secure screening invitation already exists. Continuing your existing screening form.",
+      });
     }
 
     const displayName =
@@ -265,10 +353,10 @@ export async function POST(request: Request) {
       );
 
     if (backgroundCheckError) {
-      console.error("Background check upsert error:", backgroundCheckError);
+      console.error("Trust & Safety Screening upsert error:", backgroundCheckError);
 
       return NextResponse.json(
-        { error: "Failed to save background check invitation." },
+        { error: "Failed to save secure screening invitation." },
         { status: 500 },
       );
     }
@@ -283,14 +371,15 @@ export async function POST(request: Request) {
         checkr_report_id: reportId,
         background_check_status: "invited",
         checkr_last_webhook_at: now,
+        updated_at: now,
       })
       .eq("id", guru.id);
 
     if (guruUpdateError) {
-      console.error("Guru Checkr update error:", guruUpdateError);
+      console.error("Guru secure screening update error:", guruUpdateError);
 
       return NextResponse.json(
-        { error: "Failed to update Guru background check status." },
+        { error: "Failed to update Guru Trust & Safety Screening status." },
         { status: 500 },
       );
     }
@@ -303,16 +392,17 @@ export async function POST(request: Request) {
       invitationId,
       reportId,
       invitationUrl,
+      invitation_url: invitationUrl,
     });
   } catch (error) {
-    console.error("Create Checkr invitation route error:", error);
+    console.error("Create secure screening invitation route error:", error);
 
     return NextResponse.json(
       {
         error:
           error instanceof Error
             ? error.message
-            : "Failed to create Checkr invitation.",
+            : "Failed to create secure screening invitation.",
       },
       { status: 500 },
     );

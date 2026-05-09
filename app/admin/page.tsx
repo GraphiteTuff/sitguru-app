@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AccountLifecycleRollupCard from "@/components/admin/AccountLifecycleRollupCard";
 import GuruFinancialDashboardSnapshot from "./GuruFinancialDashboardSnapshot";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,9 @@ type SafeAdminQueryResponse = {
 
 const adminRoutes = {
   dashboard: "/admin",
+  accounts: "/admin/accounts",
+  customerAccountLifecycle: "/admin/customers/account-lifecycle",
+  guruAccountLifecycle: "/admin/gurus/account-lifecycle",
   bookings: "/admin/bookings",
   newBooking: "/admin/bookings/new",
   customers: "/admin/customers",
@@ -1149,9 +1153,9 @@ export default async function AdminDashboardPage() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
-        <div>
+    <div className="w-full min-w-0 space-y-4">
+      <div className="flex w-full min-w-0 flex-col justify-between gap-4 xl:flex-row xl:items-end">
+        <div className="min-w-0">
           <div className="mb-1 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl 2xl:text-[3.25rem] 2xl:leading-none">
               Welcome back, Admin
@@ -1164,7 +1168,7 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
           <Link
             href={adminRoutes.exports}
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
@@ -1183,10 +1187,16 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      <section className="grid gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-4">
         <DataHealthTile label="Supabase Source" value="Live data" />
-        <DataHealthTile label="Bookings Loaded" value={number(data.bookings.length)} />
-        <DataHealthTile label="Profiles Loaded" value={number(data.profiles.length)} />
+        <DataHealthTile
+          label="Bookings Loaded"
+          value={number(data.bookings.length)}
+        />
+        <DataHealthTile
+          label="Profiles Loaded"
+          value={number(data.profiles.length)}
+        />
         <DataHealthTile
           label="Network Rows"
           value={number(
@@ -1197,12 +1207,12 @@ export default async function AdminDashboardPage() {
         />
       </section>
 
-      <section className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-5">
+      <section className="grid w-full min-w-0 items-start gap-4 lg:grid-cols-2 2xl:grid-cols-5">
         {metrics.map((metric) => (
           <Link
             key={metric.title}
             href={metric.href}
-            className="group rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-lg"
+            className="group min-w-0 rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-lg"
           >
             <div className="mb-4 flex items-start gap-4">
               <div
@@ -1250,10 +1260,47 @@ export default async function AdminDashboardPage() {
         ))}
       </section>
 
-      <GuruFinancialDashboardSnapshot />
+      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-4">
+          <div className="overflow-hidden rounded-[28px] bg-gradient-to-br from-green-900 via-green-700 to-emerald-800 p-6 text-white shadow-xl shadow-emerald-900/20">
+            <div className="mb-7 flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-black text-white">Cash Position</h2>
+                <p className="text-sm font-semibold text-white/75">
+                  Available balance after pending payouts
+                </p>
+              </div>
+              <Bell className="text-white/80" />
+            </div>
 
-      <section className="grid items-start gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-4">
+            <p className="text-4xl font-black tracking-tight text-white">
+              {money(cashPosition)}
+            </p>
+            <p className="mt-2 text-sm font-bold text-white/75">
+              Updated just now from Supabase bookings and payouts
+            </p>
+
+            <div className="mt-8 h-[70px] rounded-2xl border border-white/10 bg-white/5 p-3">
+              <svg viewBox="0 0 280 80" className="h-full w-full">
+                <path
+                  d="M3 60 C 35 55, 33 42, 56 48 S 83 62, 104 44 S 132 28, 153 38 S 181 55, 199 33 S 223 8, 240 27 S 260 46, 277 5"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.9)"
+                  strokeLinecap="round"
+                  strokeWidth="5"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="min-w-0 xl:col-span-8">
+          <GuruFinancialDashboardSnapshot />
+        </div>
+      </section>
+
+      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-4">
           <DashboardCard>
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -1313,7 +1360,7 @@ export default async function AdminDashboardPage() {
           </DashboardCard>
         </div>
 
-        <div className="xl:col-span-3">
+        <div className="min-w-0 xl:col-span-3">
           <DashboardCard>
             <div className="mb-5">
               <h2 className="text-lg font-black text-slate-950">
@@ -1378,7 +1425,7 @@ export default async function AdminDashboardPage() {
           </DashboardCard>
         </div>
 
-        <div className="xl:col-span-5">
+        <div className="min-w-0 xl:col-span-5">
           <DashboardCard>
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -1448,8 +1495,8 @@ export default async function AdminDashboardPage() {
         </div>
       </section>
 
-      <section className="grid items-start gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-4">
+      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-4">
           <DashboardCard>
             <TableHeader
               title="Top Performing Gurus"
@@ -1513,7 +1560,7 @@ export default async function AdminDashboardPage() {
           </DashboardCard>
         </div>
 
-        <div className="xl:col-span-4">
+        <div className="min-w-0 xl:col-span-4">
           <DashboardCard>
             <TableHeader
               title="Top Customers"
@@ -1576,7 +1623,7 @@ export default async function AdminDashboardPage() {
           </DashboardCard>
         </div>
 
-        <div className="xl:col-span-4">
+        <div className="min-w-0 xl:col-span-4">
           <DashboardCard>
             <TableHeader
               title="SitGuru Network Programs"
@@ -1674,95 +1721,69 @@ export default async function AdminDashboardPage() {
         </div>
       </section>
 
-      <section className="grid items-start gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-8">
-          <DashboardCard>
-            <h2 className="mb-5 text-lg font-black text-slate-950">
-              Quick Actions
-            </h2>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-9">
-              <QuickAction
-                href={adminRoutes.newBooking}
-                icon={<CalendarDays />}
-                label="New Booking"
-              />
-              <QuickAction
-                href={adminRoutes.newGuru}
-                icon={<UserPlus />}
-                label="Add Guru"
-              />
-              <QuickAction
-                href={adminRoutes.newCustomer}
-                icon={<Users />}
-                label="Add Customer"
-              />
-              <QuickAction
-                href={adminRoutes.messages}
-                icon={<MessageCircle />}
-                label="Send Message"
-              />
-              <QuickAction
-                href={adminRoutes.guruPerformance}
-                icon={<BarChart3 />}
-                label="Guru Financials"
-              />
-              <QuickAction
-                href={adminRoutes.reports}
-                icon={<FileBarChart />}
-                label="Run Report"
-              />
-              <QuickAction
-                href={adminRoutes.exports}
-                icon={<Download />}
-                label="Export Data"
-              />
-              <QuickAction
-                href={adminRoutes.partners}
-                icon={<BriefcaseBusiness />}
-                label="Partner Admin"
-              />
-              <QuickAction
-                href={adminRoutes.settings}
-                icon={<Settings />}
-                label="System Settings"
-              />
-            </div>
-          </DashboardCard>
+      <section className="w-full min-w-0 space-y-4">
+        <div className="w-full min-w-0">
+          <AccountLifecycleRollupCard />
         </div>
 
-        <div className="xl:col-span-4">
-          <div className="overflow-hidden rounded-[28px] bg-gradient-to-br from-green-900 via-green-700 to-emerald-800 p-6 text-white shadow-xl shadow-emerald-900/20">
-            <div className="mb-7 flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-black text-white">Cash Position</h2>
-                <p className="text-sm font-semibold text-white/75">
-                  Available balance after pending payouts
-                </p>
-              </div>
-              <Bell className="text-white/80" />
-            </div>
+        <DashboardCard>
+          <h2 className="mb-5 text-lg font-black text-slate-950">
+            Quick Actions
+          </h2>
 
-            <p className="text-4xl font-black tracking-tight text-white">
-              {money(cashPosition)}
-            </p>
-            <p className="mt-2 text-sm font-bold text-white/75">
-              Updated just now from Supabase bookings and payouts
-            </p>
-
-            <div className="mt-8 h-[70px] rounded-2xl border border-white/10 bg-white/5 p-3">
-              <svg viewBox="0 0 280 80" className="h-full w-full">
-                <path
-                  d="M3 60 C 35 55, 33 42, 56 48 S 83 62, 104 44 S 132 28, 153 38 S 181 55, 199 33 S 223 8, 240 27 S 260 46, 277 5"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.9)"
-                  strokeLinecap="round"
-                  strokeWidth="5"
-                />
-              </svg>
-            </div>
+          <div className="grid w-full min-w-0 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
+            <QuickAction
+              href={adminRoutes.accounts}
+              icon={<ShieldCheck />}
+              label="Lifecycle"
+            />
+            <QuickAction
+              href={adminRoutes.newBooking}
+              icon={<CalendarDays />}
+              label="New Booking"
+            />
+            <QuickAction
+              href={adminRoutes.newGuru}
+              icon={<UserPlus />}
+              label="Add Guru"
+            />
+            <QuickAction
+              href={adminRoutes.newCustomer}
+              icon={<Users />}
+              label="Add Customer"
+            />
+            <QuickAction
+              href={adminRoutes.messages}
+              icon={<MessageCircle />}
+              label="Send Message"
+            />
+            <QuickAction
+              href={adminRoutes.guruPerformance}
+              icon={<BarChart3 />}
+              label="Guru Financials"
+            />
+            <QuickAction
+              href={adminRoutes.reports}
+              icon={<FileBarChart />}
+              label="Run Report"
+            />
+            <QuickAction
+              href={adminRoutes.exports}
+              icon={<Download />}
+              label="Export Data"
+            />
+            <QuickAction
+              href={adminRoutes.partners}
+              icon={<BriefcaseBusiness />}
+              label="Partner Admin"
+            />
+            <QuickAction
+              href={adminRoutes.settings}
+              icon={<Settings />}
+              label="System Settings"
+            />
           </div>
-        </div>
+        </DashboardCard>
       </section>
 
       <DesignSystem />
@@ -1783,7 +1804,7 @@ function DataHealthTile({ label, value }: { label: string; value: string }) {
 
 function DashboardCard({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
+    <div className="w-full min-w-0 rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
       {children}
     </div>
   );
@@ -1950,12 +1971,14 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="group flex flex-col items-center gap-3 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 text-center transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
+      className="group flex min-w-0 flex-col items-center gap-3 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 text-center transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-green-800 transition group-hover:bg-green-800 group-hover:text-white">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800 transition group-hover:bg-green-800 group-hover:text-white">
         {icon}
       </div>
-      <span className="text-xs font-black text-slate-700">{label}</span>
+      <span className="text-xs font-black leading-tight text-slate-700">
+        {label}
+      </span>
     </Link>
   );
 }
@@ -1983,7 +2006,7 @@ function ColorSwatch({
 
 function DesignSystem() {
   return (
-    <section className="rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
+    <section className="w-full min-w-0 rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
       <h2 className="mb-5 text-lg font-black uppercase tracking-wide text-slate-950">
         Design System
       </h2>

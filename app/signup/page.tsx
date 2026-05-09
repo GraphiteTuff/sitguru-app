@@ -3,6 +3,7 @@
 import { Open_Sans } from "next/font/google";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import WelcomeConfetti from "@/components/WelcomeConfetti";
 import { supabase } from "@/lib/supabase";
 
 const openSans = Open_Sans({
@@ -122,6 +123,8 @@ export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupError, setSignupError] = useState("");
   const [signupSuccess, setSignupSuccess] = useState("");
+  const [shouldCelebrateSignup, setShouldCelebrateSignup] = useState(false);
+  const [hasSeenWelcomeConfetti, setHasSeenWelcomeConfetti] = useState(false);
 
   const fullName = useMemo(() => {
     return `${form.firstName.trim()} ${form.lastName.trim()}`.trim();
@@ -156,6 +159,7 @@ export default function SignupPage() {
 
     setSignupError("");
     setSignupSuccess("");
+    setShouldCelebrateSignup(false);
 
     if (!form.firstName.trim()) {
       setSignupError("Please enter your first name.");
@@ -180,8 +184,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      const origin =
-        typeof window !== "undefined" ? window.location.origin : "";
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
 
       const { error } = await supabase.auth.signUp({
         email: form.email.trim(),
@@ -193,6 +196,7 @@ export default function SignupPage() {
             last_name: form.lastName.trim(),
             full_name: fullName,
             account_type: form.accountType,
+            role: form.accountType,
             referral_code: form.referralCode.trim(),
             signup_source: getSignupSourceFromUrl(),
           },
@@ -208,6 +212,8 @@ export default function SignupPage() {
           ? "Your account has been created. Check your email to confirm your account, then continue your Guru setup."
           : "Your account has been created. Check your email to confirm your account, then start finding trusted pet care.",
       );
+
+      setShouldCelebrateSignup(true);
 
       setForm((prev) => ({
         ...initialSignupFormState,
@@ -230,6 +236,19 @@ export default function SignupPage() {
     <main
       className={`${openSans.className} min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,216,166,0.16),transparent_32%),radial-gradient(circle_at_top_right,rgba(124,201,244,0.22),transparent_34%),linear-gradient(180deg,#f8fcfd_0%,#eef7f8_55%,#ffffff_100%)] px-4 py-8 text-slate-950 sm:px-6 lg:px-8`}
     >
+      <WelcomeConfetti
+        shouldCelebrate={shouldCelebrateSignup}
+        hasSeenWelcomeConfetti={hasSeenWelcomeConfetti}
+        message={
+          form.accountType === "guru"
+            ? "Your Guru account was created successfully."
+            : "Your SitGuru account was created successfully."
+        }
+        onCelebrate={() => {
+          setHasSeenWelcomeConfetti(true);
+        }}
+      />
+
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center">
         <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
           <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:p-8 lg:p-10">
@@ -420,10 +439,9 @@ export default function SignupPage() {
                   className="mb-2 block text-sm font-bold text-slate-800"
                 >
                   Referral code{" "}
-                  <span className="font-medium text-slate-400">
-                    optional
-                  </span>
+                  <span className="font-medium text-slate-400">optional</span>
                 </label>
+
                 <input
                   id="referralCode"
                   type="text"
@@ -449,6 +467,7 @@ export default function SignupPage() {
                 >
                   Password
                 </label>
+
                 <input
                   id="password"
                   type="password"
