@@ -5,13 +5,13 @@ import { redirect } from "next/navigation";
 import {
   ArrowLeft,
   BadgeCheck,
-  Building2,
   CheckCircle2,
   Clock3,
   Download,
   ExternalLink,
   FileText,
   GraduationCap,
+  Handshake,
   Mail,
   Medal,
   MessageCircle,
@@ -30,8 +30,8 @@ type SearchParams = Record<string, string | string[] | undefined>;
 
 type ProgramKey =
   | "student-hire"
-  | "community-hire"
-  | "military-hire"
+  | "veterans-hire"
+  | "ambassador-program"
   | "skillbridge-interest";
 
 type StatusKey =
@@ -99,9 +99,10 @@ const adminRoutes = {
   dashboard: "/admin",
   programs: "/admin/programs",
   programApplications: "/admin/program-applications",
-  communityApplications: "/admin/program-applications?program=community-hire",
   studentApplications: "/admin/program-applications?program=student-hire",
-  militaryApplications: "/admin/program-applications?program=military-hire",
+  veteransApplications: "/admin/program-applications?program=veterans-hire",
+  ambassadorApplications:
+    "/admin/program-applications?program=ambassador-program",
   skillbridgeApplications:
     "/admin/program-applications?program=skillbridge-interest",
 };
@@ -129,24 +130,24 @@ const programOptions: {
       "Students, recent grads, summer workers, and school-break applicants.",
   },
   {
-    key: "community-hire",
-    label: "Community Hire Program",
-    shortLabel: "Community",
-    icon: <Building2 size={18} />,
-    description:
-      "Workforce, nonprofit, re-entry, job-readiness, and community partner referrals.",
-  },
-  {
-    key: "military-hire",
-    label: "Military Hire Program",
-    shortLabel: "Military",
+    key: "veterans-hire",
+    label: "Veterans Hire Program",
+    shortLabel: "Veterans",
     icon: <Medal size={18} />,
     description:
-      "Veterans, transitioning service members, spouses, Guard, reserve, and military-connected applicants.",
+      "Veterans, eligible service members, spouses, dependents, Guard, reserve, and military-connected applicants.",
+  },
+  {
+    key: "ambassador-program",
+    label: "Ambassador Program",
+    shortLabel: "Ambassador",
+    icon: <Handshake size={18} />,
+    description:
+      "Vet Techs, Veterinarians, Trainers, pet-care professionals, and trusted community supporters.",
   },
   {
     key: "skillbridge-interest",
-    label: "SkillBridge Interest List",
+    label: "SkillBridge Interest / Veterans Pathway",
     shortLabel: "SkillBridge",
     icon: <ShieldCheck size={18} />,
     description: "Future SkillBridge-style transition pathway interest.",
@@ -190,8 +191,8 @@ const statusOptions: {
   },
   {
     key: "checkr_pending",
-    label: "Checkr Pending",
-    description: "Background check step is in progress or waiting.",
+    label: "Trust & Safety Review",
+    description: "Trust and safety review step is in progress or waiting.",
   },
   {
     key: "approved",
@@ -264,10 +265,10 @@ const statusEmailCopy: Record<
     next: "SitGuru may send next steps related to your profile, training, documents, and readiness.",
   },
   checkr_pending: {
-    subject: "Your SitGuru background check step is pending",
-    headline: "Your background check step is pending or being prepared.",
-    body: "A Checkr background check step may be part of the approval process.",
-    next: "Please watch for Checkr or SitGuru instructions and complete any requested steps promptly.",
+    subject: "Your SitGuru trust and safety review step is pending",
+    headline: "Your trust and safety review step is pending or being prepared.",
+    body: "A SitGuru trust and safety review step may be part of the approval process.",
+    next: "Please watch for SitGuru instructions and complete any requested steps promptly.",
   },
   approved: {
     subject: "Your SitGuru application has been approved for next steps",
@@ -304,7 +305,24 @@ function asBoolean(value: unknown) {
 
 function asArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter(Boolean);
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>;
+          return (
+            asString(record.file_url) ||
+            asString(record.url) ||
+            asString(record.signed_url) ||
+            asString(record.file_path) ||
+            asString(record.file_name)
+          );
+        }
+
+        return String(item).trim();
+      })
+      .filter(Boolean);
   }
 
   if (typeof value === "string") {
@@ -315,7 +333,7 @@ function asArray(value: unknown): string[] {
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item).trim()).filter(Boolean);
+        return asArray(parsed);
       }
     } catch {
       return trimmed
@@ -365,7 +383,12 @@ function normalizeStatus(value: string): StatusKey {
 
   if (normalized === "pending") return "new";
   if (normalized === "in_review") return "reviewing";
-  if (normalized === "checkr" || normalized === "background_check") {
+  if (
+    normalized === "checkr" ||
+    normalized === "background_check" ||
+    normalized === "trust_safety" ||
+    normalized === "trust_and_safety"
+  ) {
     return "checkr_pending";
   }
   if (normalized === "rejected" || normalized === "declined") {
@@ -407,20 +430,28 @@ function normalizeProgram(value: string): ProgramKey | "" {
 
   if (
     normalized === "student-hire" ||
-    normalized === "community-hire" ||
-    normalized === "military-hire" ||
+    normalized === "veterans-hire" ||
+    normalized === "ambassador-program" ||
     normalized === "skillbridge-interest"
   ) {
     return normalized;
   }
 
+  if (normalized === "military-hire" || normalized.includes("military")) {
+    return "veterans-hire";
+  }
+
+  if (
+    normalized === "community-hire" ||
+    normalized.includes("community") ||
+    normalized.includes("workforce") ||
+    normalized.includes("ambassador")
+  ) {
+    return "ambassador-program";
+  }
+
   if (normalized.includes("student")) return "student-hire";
-  if (normalized.includes("community") || normalized.includes("workforce")) {
-    return "community-hire";
-  }
-  if (normalized.includes("military") || normalized.includes("veteran")) {
-    return "military-hire";
-  }
+  if (normalized.includes("veteran")) return "veterans-hire";
   if (normalized.includes("skillbridge")) return "skillbridge-interest";
 
   return "";
@@ -785,7 +816,7 @@ async function sendProgramStatusEmail({
                 </div>
 
                 <p style="margin:18px 0 0; color:#64748b; font-size:12px; line-height:1.7; font-weight:600;">
-                  Applying through a SitGuru program does not guarantee approval, bookings, earnings, employment, commissions, benefits, placement, or full Guru status. Opportunities may depend on eligibility, onboarding, background check results, availability, customer demand, performance, trust, and SitGuru program needs.
+                  Applying through a SitGuru program does not guarantee approval, bookings, earnings, employment, commissions, benefits, placement, referral rewards, SkillBridge participation, or full Guru status. Opportunities may depend on eligibility, onboarding, SitGuru trust and safety review steps, availability, customer demand, performance, trust, and SitGuru program needs.
                 </p>
               </td>
             </tr>
@@ -854,6 +885,7 @@ function applicationMatchesSearch(
   const haystack = [
     application.id,
     application.program,
+    getProgramLabel(application.program),
     application.full_name,
     application.email,
     application.phone,
@@ -1070,10 +1102,10 @@ function ProgramBadge({ program }: { program: string }) {
   const classes =
     normalized === "student-hire"
       ? "border-amber-200 bg-amber-50 text-amber-900"
-      : normalized === "community-hire"
-        ? "border-blue-200 bg-blue-50 text-blue-900"
-        : normalized === "military-hire"
-          ? "border-green-200 bg-green-50 text-green-900"
+      : normalized === "veterans-hire"
+        ? "border-green-200 bg-green-50 text-green-900"
+        : normalized === "ambassador-program"
+          ? "border-blue-200 bg-blue-50 text-blue-900"
           : "border-slate-200 bg-slate-50 text-slate-700";
 
   return (
@@ -1181,11 +1213,11 @@ function ApplicationCard({
 }: {
   application: ProgramApplication;
 }) {
-  const isCommunity = normalizeProgram(application.program) === "community-hire";
-  const isStudent = normalizeProgram(application.program) === "student-hire";
-  const isMilitary = normalizeProgram(application.program) === "military-hire";
-  const isSkillBridge =
-    normalizeProgram(application.program) === "skillbridge-interest";
+  const normalizedProgram = normalizeProgram(application.program);
+  const isAmbassador = normalizedProgram === "ambassador-program";
+  const isStudent = normalizedProgram === "student-hire";
+  const isVeterans = normalizedProgram === "veterans-hire";
+  const isSkillBridge = normalizedProgram === "skillbridge-interest";
 
   return (
     <article className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
@@ -1196,16 +1228,16 @@ function ApplicationCard({
             <StatusBadge status={application.status} />
 
             <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-600">
-              Checkr: {getCheckrStatusLabel(application.checkr_status)}
+              Trust & Safety: {getCheckrStatusLabel(application.checkr_status)}
             </span>
 
             {application.background_check_consent ? (
               <span className="inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-black text-green-800">
-                Background consent
+                Trust & safety acknowledged
               </span>
             ) : (
               <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-800">
-                Consent missing
+                Trust & safety missing
               </span>
             )}
           </div>
@@ -1276,24 +1308,21 @@ function ApplicationCard({
         </div>
       </div>
 
-      {isCommunity ? (
+      {isAmbassador ? (
         <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
           <div className="flex gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-800 shadow-sm">
-              <ShieldCheck size={21} />
+              <Handshake size={21} />
             </div>
 
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-800">
-                Community Hire fair review
+                Ambassador growth review
               </p>
               <p className="mt-1 text-sm font-bold leading-6 text-blue-950">
-                SitGuru follows EEOC guidance for fair, consistent,
-                role-related background check review. Review background check
-                information in relation to pet care responsibilities, home
-                access, safety, trust, and customer needs. Background check
-                information should be reviewed in context and does not
-                automatically disqualify every applicant.
+                Review Ambassador applicants for pet-care trust, referral reach,
+                local credibility, community connection, and ability to help
+                refer Gurus and Pet Parents while supporting SitGuru growth.
               </p>
             </div>
           </div>
@@ -1313,7 +1342,7 @@ function ApplicationCard({
         <DetailRow label="Availability" value={application.availability} />
 
         <DetailRow
-          label={isCommunity ? "Partner / referral source" : "Referral source"}
+          label={isAmbassador ? "Referral / community source" : "Referral source"}
           value={application.referral_source}
         />
 
@@ -1339,7 +1368,7 @@ function ApplicationCard({
       </div>
 
       {(isStudent ||
-        isMilitary ||
+        isVeterans ||
         isSkillBridge ||
         application.school_name ||
         application.student_status ||
@@ -1360,11 +1389,11 @@ function ApplicationCard({
             />
           ) : null}
 
-          {isMilitary ||
+          {isVeterans ||
           isSkillBridge ||
           application.military_connected_background ? (
             <DetailRow
-              label="Military / transferable experience"
+              label="Military-connected / transferable experience"
               value={application.military_connected_background}
             />
           ) : null}
@@ -1376,10 +1405,10 @@ function ApplicationCard({
           label={
             isStudent
               ? "Why SitGuru is a good way to make extra cash"
-              : isCommunity
-                ? "Why Community Hire is a good pathway"
+              : isAmbassador
+                ? "Why this applicant may be a strong Ambassador"
                 : isSkillBridge
-                  ? "SkillBridge interest"
+                  ? "SkillBridge / Veterans Pathway interest"
                   : "Experience / reason"
           }
           value={application.experience}
@@ -1502,7 +1531,7 @@ function ApplicationCard({
 
           <div>
             <label className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-green-900">
-              Checkr status
+              Trust & Safety Status
             </label>
             <select
               name="checkr_status"
@@ -1525,7 +1554,7 @@ function ApplicationCard({
               name="next_step"
               defaultValue={application.next_step}
               className="w-full rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none placeholder:text-slate-400 focus:border-green-600 focus:ring-4 focus:ring-green-100"
-              placeholder="Example: Send onboarding email, invite to Checkr, request resume..."
+              placeholder="Example: Send onboarding email, start trust and safety review, request resume..."
             />
           </div>
         </div>
@@ -1540,8 +1569,8 @@ function ApplicationCard({
             rows={3}
             className="min-h-[100px] w-full resize-y rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none placeholder:text-slate-400 focus:border-green-600 focus:ring-4 focus:ring-green-100"
             placeholder={
-              isCommunity
-                ? "Document role-related review notes, partner source, context, outreach, and fair-review considerations."
+              isAmbassador
+                ? "Document Ambassador fit, pet-care trust, local network, referral potential, outreach, and next steps."
                 : "Add review notes, outreach updates, onboarding progress, or next steps."
             }
           />
@@ -1641,7 +1670,7 @@ export default async function AdminProgramApplicationsPage({
     onboarding: applications.filter(
       (item) => normalizeStatus(item.status) === "onboarding",
     ).length,
-    checkrPending: applications.filter(
+    trustSafetyPending: applications.filter(
       (item) => normalizeStatus(item.status) === "checkr_pending",
     ).length,
     approved: applications.filter(
@@ -1650,14 +1679,14 @@ export default async function AdminProgramApplicationsPage({
     notApproved: applications.filter(
       (item) => normalizeStatus(item.status) === "not_approved",
     ).length,
-    community: applications.filter(
-      (item) => normalizeProgram(item.program) === "community-hire",
-    ).length,
     student: applications.filter(
       (item) => normalizeProgram(item.program) === "student-hire",
     ).length,
-    military: applications.filter(
-      (item) => normalizeProgram(item.program) === "military-hire",
+    veterans: applications.filter(
+      (item) => normalizeProgram(item.program) === "veterans-hire",
+    ).length,
+    ambassador: applications.filter(
+      (item) => normalizeProgram(item.program) === "ambassador-program",
     ).length,
     skillbridge: applications.filter(
       (item) => normalizeProgram(item.program) === "skillbridge-interest",
@@ -1692,10 +1721,10 @@ export default async function AdminProgramApplicationsPage({
                 </h1>
 
                 <p className="mt-1 max-w-5xl text-base font-semibold text-slate-600">
-                  Review and action Student Hire, Community Hire, Military Hire,
-                  and SkillBridge Interest applicants. Update status, Checkr
-                  stage, notes, and next steps. Status changes send an applicant
-                  email update.
+                  Review and action Student Hire, Veterans Hire, Ambassador
+                  Program, and SkillBridge Interest applicants. Update status,
+                  trust and safety stage, notes, and next steps. Status changes
+                  send an applicant email update.
                 </p>
               </div>
             </div>
@@ -1731,35 +1760,33 @@ export default async function AdminProgramApplicationsPage({
           </div>
         </section>
 
-        <section className="rounded-[30px] border border-blue-200 bg-blue-50 p-5 shadow-sm">
+        <section className="rounded-[30px] border border-green-200 bg-green-50 p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-800 shadow-sm">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-green-800 shadow-sm">
                 <ShieldCheck size={24} />
               </div>
 
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-800">
-                  Community Hire review standard
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
+                  Admin review standard
                 </p>
-                <h2 className="mt-1 text-2xl font-black text-blue-950">
-                  Follow EEOC guidance for fair, consistent, role-related review.
+                <h2 className="mt-1 text-2xl font-black text-green-950">
+                  Review applicants for fit, trust, readiness, and next steps.
                 </h2>
-                <p className="mt-2 max-w-5xl text-sm font-bold leading-6 text-blue-950">
-                  Community Hire is a referral and readiness pathway, not
-                  full-time employment, part-time employment, or guaranteed job
-                  placement. Background check information should be reviewed in
-                  context and in relation to pet care responsibilities, home
-                  access, safety, trust, and customer needs.
+                <p className="mt-2 max-w-5xl text-sm font-bold leading-6 text-green-950">
+                  Use this page to track program routing, contact details,
+                  availability, services, documents, trust and safety
+                  acknowledgment, onboarding readiness, and approval decisions.
                 </p>
               </div>
             </div>
 
             <Link
-              href={adminRoutes.communityApplications}
-              className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-blue-300 bg-white px-5 py-3 text-sm font-black text-blue-900 shadow-sm transition hover:border-blue-400 hover:bg-blue-100"
+              href={adminRoutes.veteransApplications}
+              className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-green-300 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:border-green-400 hover:bg-green-100"
             >
-              Review Community Applicants →
+              Review Veterans Applicants →
             </Link>
           </div>
         </section>
@@ -1790,9 +1817,9 @@ export default async function AdminProgramApplicationsPage({
 
           <StatCard
             icon={<ShieldCheck size={22} />}
-            label="Checkr Pending"
-            value={number(counts.checkrPending)}
-            detail="Background check workflow"
+            label="Trust & Safety"
+            value={number(counts.trustSafetyPending)}
+            detail="Review workflow"
             href={buildHref(resolvedSearchParams, {
               status: "checkr_pending",
             })}
@@ -1817,19 +1844,19 @@ export default async function AdminProgramApplicationsPage({
           />
 
           <StatCard
-            icon={<Building2 size={22} />}
-            label="Community Hire"
-            value={number(counts.community)}
-            detail="Workforce and partner referrals"
-            href={adminRoutes.communityApplications}
+            icon={<Medal size={22} />}
+            label="Veterans Hire"
+            value={number(counts.veterans)}
+            detail="Military-connected applicants"
+            href={adminRoutes.veteransApplications}
           />
 
           <StatCard
-            icon={<Medal size={22} />}
-            label="Military Hire"
-            value={number(counts.military)}
-            detail="Military-connected applicants"
-            href={adminRoutes.militaryApplications}
+            icon={<Handshake size={22} />}
+            label="Ambassador Program"
+            value={number(counts.ambassador)}
+            detail="Referral and community growth"
+            href={adminRoutes.ambassadorApplications}
           />
 
           <StatCard
@@ -1960,7 +1987,7 @@ export default async function AdminProgramApplicationsPage({
               </p>
               <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
                 Confirm program routing, contact info, services, location,
-                background consent, resume, and notes.
+                trust and safety acknowledgment, resume, and notes.
               </p>
             </div>
 
@@ -1970,17 +1997,18 @@ export default async function AdminProgramApplicationsPage({
               </p>
               <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
                 Email or text the applicant. Request missing resume, documents,
-                availability, or partner/source details.
+                availability, school, Ambassador source, or Veterans pathway
+                details.
               </p>
             </div>
 
             <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-green-800">
-                3. Onboarding / Checkr
+                3. Onboarding / Trust & Safety
               </p>
               <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
                 Move qualified applicants through onboarding, profile readiness,
-                training, and background check steps.
+                training, and SitGuru trust and safety review steps.
               </p>
             </div>
 

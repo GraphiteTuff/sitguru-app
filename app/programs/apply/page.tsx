@@ -38,9 +38,9 @@ const openSans = Open_Sans({
 });
 
 type ProgramKey =
-  | "military-hire"
+  | "veterans-hire"
   | "student-hire"
-  | "community-hire"
+  | "ambassador-program"
   | "skillbridge-interest";
 
 type ProgramSelection = ProgramKey | "";
@@ -52,6 +52,15 @@ type ZipLookupResult = {
 };
 
 type ZipLookupStatus = "idle" | "loading" | "found" | "not-found" | "error";
+
+type SchoolSearchResult = {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  website: string | null;
+  label: string;
+};
 
 type ProgramOption = {
   key: ProgramKey;
@@ -145,33 +154,6 @@ const zipCodeFallbackMap: Record<
 
 const programOptions: ProgramOption[] = [
   {
-    key: "military-hire",
-    title: "Military Hire Program",
-    shortTitle: "Military Hire",
-    eyebrow: "Military-connected pathway",
-    icon: <Medal size={28} />,
-    description:
-      "For veterans, transitioning service members, National Guard and reserve members, military spouses, and qualified military-connected applicants age 18 or older who want flexible pet care opportunities and a path toward full Guru status.",
-    earningMessage:
-      "Bring your reliability, accountability, service mindset, communication, adaptability, and care for others into flexible pet care opportunities with SitGuru.",
-    idealFor: [
-      "Veterans",
-      "Transitioning service members",
-      "National Guard and reserve members",
-      "Military spouses",
-      "Qualified dependents over 18",
-      "Military-connected applicants ready to work, learn, and grow",
-    ],
-    growthPath: [
-      "Apply through the Military Hire Program",
-      "Share transferable experience you would like SitGuru to consider",
-      "Upload a resume and optional supporting documents",
-      "Complete onboarding and training guidance",
-      "Complete a background check through Checkr",
-      "Work toward full Guru status with greater commissions and future benefits",
-    ],
-  },
-  {
     key: "student-hire",
     title: "Student Hire Program",
     shortTitle: "Student Hire",
@@ -195,59 +177,87 @@ const programOptions: ProgramOption[] = [
       "Tell us your school schedule, summer availability, and goals",
       "Pick the pet care services you’re interested in",
       "Upload a resume, profile link, or supporting docs if you have them",
-      "Complete onboarding and Checkr background check steps when eligible",
+      "Complete onboarding and SitGuru trust and safety steps when eligible",
       "Earn, build experience, tell friends, and grow toward full Guru status",
     ],
   },
   {
-    key: "community-hire",
-    title: "Community Hire Program",
-    shortTitle: "Community Hire",
-    eyebrow: "Community workforce pathway",
-    icon: <Handshake size={28} />,
+    key: "veterans-hire",
+    title: "Veterans Hire Program",
+    shortTitle: "Veterans Hire",
+    eyebrow: "Military-connected pathway",
+    icon: <Medal size={28} />,
     description:
-      "For qualified applicants connected through workforce programs, nonprofits, city, state, federal, community organizations, re-entry support programs, job-readiness programs, and local employment-support partners who want a flexible pathway into trusted pet care opportunities.",
+      "For veterans, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and approved SkillBridge applicants who want flexible pet care opportunities and a path to grow with SitGuru.",
     earningMessage:
-      "Need a flexible way to build income and experience? Community Hire helps qualified applicants apply for local pet care opportunities with SitGuru. This is a supported pathway, not full-time employment, part-time employment, or guaranteed job placement.",
+      "Bring your reliability, accountability, service mindset, communication, adaptability, and care for others into flexible pet care opportunities with SitGuru.",
     idealFor: [
-      "Workforce program participants",
-      "Nonprofit partner referrals",
-      "City, state, and federal program referrals",
-      "Job-readiness program participants",
-      "Re-entry support program participants",
-      "Community organization referrals",
-      "People seeking flexible local work opportunities",
-      "Applicants ready to learn, communicate, and show reliability",
+      "Veterans",
+      "Eligible service members",
+      "National Guard and reserve members",
+      "Military spouses",
+      "Qualified dependents over 18",
+      "Approved SkillBridge applicants",
+      "Military-connected applicants ready to work, learn, and grow",
     ],
     growthPath: [
-      "Apply through the Community Hire Program",
-      "Share your workforce, nonprofit, or community partner source",
-      "Upload a resume, profile link, or supporting documents if available",
+      "Apply through the Veterans Hire Program",
+      "Share transferable experience you would like SitGuru to consider",
+      "Upload a resume and optional supporting documents",
       "Complete onboarding and training guidance",
-      "Complete a fair, role-related Checkr background check process when required",
-      "Grow toward full Guru status through reliability and performance",
+      "Complete SitGuru trust and safety review steps when required",
+      "Work toward full Guru status with greater commissions and future benefits",
+    ],
+  },
+  {
+    key: "ambassador-program",
+    title: "Ambassador Program",
+    shortTitle: "Ambassador Program",
+    eyebrow: "Together, we grow together",
+    icon: <Handshake size={28} />,
+    description:
+      "For Vet Techs, Veterinarians, Trainers, pet-care professionals, and trusted community supporters who want to refer Gurus and Pet Parents while helping SitGuru grow.",
+    earningMessage:
+      "Help SitGuru grow by referring trusted Gurus and Pet Parents. Ambassadors can support the pet community, earn referral rewards, and help build local trust around SitGuru.",
+    idealFor: [
+      "Vet Techs",
+      "Veterinarians",
+      "Dog trainers",
+      "Pet-care professionals",
+      "Groomers and pet service providers",
+      "Community supporters",
+      "Trusted local voices who know great pet caregivers",
+      "People who want to help refer Gurus and Pet Parents",
+    ],
+    growthPath: [
+      "Apply through the Ambassador Program",
+      "Tell us your pet-care background, network, or community connection",
+      "Refer qualified Gurus and Pet Parents to SitGuru",
+      "Help grow trust and awareness in your local pet community",
+      "Earn referral rewards when eligible program terms are met",
+      "Top Ambassadors may be recognized publicly with consent as SitGuru grows",
     ],
   },
   {
     key: "skillbridge-interest",
-    title: "SkillBridge Interest List",
+    title: "SkillBridge Interest / Veterans Pathway",
     shortTitle: "SkillBridge Interest",
     eyebrow: "Exploring future SkillBridge pathway",
     icon: <ShieldCheck size={28} />,
     description:
-      "For active-duty transitioning service members interested in future SitGuru training pathways around pet care operations, trust and safety, customer experience, local services, and post-transition opportunities.",
+      "For active-duty transitioning service members and approved SkillBridge applicants interested in future SitGuru training pathways around pet care operations, trust and safety, customer experience, local services, and post-transition opportunities.",
     earningMessage:
-      "Join the interest list for a future SkillBridge-style training pathway SitGuru is exploring for transitioning service members.",
+      "Join the interest list for a future SkillBridge-style training pathway SitGuru is exploring for transitioning service members and approved military-connected applicants.",
     idealFor: [
       "Active-duty transitioning service members",
+      "Approved SkillBridge applicants",
       "Service members exploring civilian pet care operations",
       "Applicants interested in customer trust and safety",
       "Applicants interested in local services and operations",
-      "Transitioning service members with command approval when applicable",
       "People planning post-transition flexible opportunities",
     ],
     growthPath: [
-      "Join the SkillBridge Interest List",
+      "Join the SkillBridge Interest / Veterans Pathway list",
       "Share your transition timeline and transferable experience",
       "Upload optional supporting documents if you choose",
       "Receive updates if SitGuru launches or partners on a SkillBridge pathway",
@@ -295,6 +305,9 @@ const serviceOptions = [
   "Customer support",
   "Local market support",
   "Custom pet care",
+  "Guru referrals",
+  "Pet Parent referrals",
+  "Community outreach",
 ];
 
 const initialFormState: ApplicationFormState = {
@@ -321,9 +334,9 @@ const initialFormState: ApplicationFormState = {
 
 function isProgramKey(value: string | null): value is ProgramKey {
   return (
-    value === "military-hire" ||
+    value === "veterans-hire" ||
     value === "student-hire" ||
-    value === "community-hire" ||
+    value === "ambassador-program" ||
     value === "skillbridge-interest"
   );
 }
@@ -388,6 +401,7 @@ function ProgramApplyContent() {
   const searchParams = useSearchParams();
   const programParam = searchParams.get("program");
   const confirmationRef = useRef<HTMLDivElement | null>(null);
+  const schoolSearchContainerRef = useRef<HTMLDivElement | null>(null);
 
   const selectedProgramFromUrl = isProgramKey(programParam)
     ? programParam
@@ -405,8 +419,15 @@ function ProgramApplyContent() {
   const [zipLookupStatus, setZipLookupStatus] =
     useState<ZipLookupStatus>("idle");
   const [zipLookupMessage, setZipLookupMessage] = useState("");
+  const [schoolSearchResults, setSchoolSearchResults] = useState<
+    SchoolSearchResult[]
+  >([]);
+  const [isSchoolSearchLoading, setIsSchoolSearchLoading] = useState(false);
+  const [schoolSearchMessage, setSchoolSearchMessage] = useState("");
+  const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false);
+  const [selectedSchoolResultId, setSelectedSchoolResultId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [applicationConfirmation, setApplicationConfirmation] =
     useState<ApplicationConfirmation | null>(null);
@@ -416,12 +437,12 @@ function ProgramApplyContent() {
     return getProgramByKey(formState.program);
   }, [formState.program]);
 
-  const isMilitaryProgram = formState.program === "military-hire";
+  const isVeteransProgram = formState.program === "veterans-hire";
   const isStudentProgram = formState.program === "student-hire";
-  const isCommunityProgram = formState.program === "community-hire";
+  const isAmbassadorProgram = formState.program === "ambassador-program";
   const isSkillBridgeProgram = formState.program === "skillbridge-interest";
   const shouldShowMilitaryBackground =
-    isMilitaryProgram || isSkillBridgeProgram;
+    isVeteransProgram || isSkillBridgeProgram;
 
   useEffect(() => {
     setFormState((prev) => ({
@@ -524,6 +545,121 @@ function ProgramApplyContent() {
   }, [formState.zipCode, formState.program]);
 
   useEffect(() => {
+    if (!isStudentProgram) {
+      setSchoolSearchResults([]);
+      setIsSchoolSearchLoading(false);
+      setSchoolSearchMessage("");
+      setIsSchoolDropdownOpen(false);
+      setSelectedSchoolResultId("");
+      return;
+    }
+
+    const schoolQuery = formState.schoolName.trim();
+
+    if (schoolQuery.length < 2) {
+      setSchoolSearchResults([]);
+      setIsSchoolSearchLoading(false);
+      setSchoolSearchMessage("");
+      return;
+    }
+
+    let isMounted = true;
+    const controller = new AbortController();
+
+    async function searchSchools() {
+      setIsSchoolSearchLoading(true);
+      setSchoolSearchMessage("");
+
+      try {
+        const response = await fetch(
+          `/api/schools/search?q=${encodeURIComponent(schoolQuery)}`,
+          {
+            method: "GET",
+            signal: controller.signal,
+          },
+        );
+
+        const payload = await response.json().catch(() => null);
+
+        if (!isMounted) return;
+
+        if (!response.ok || !payload?.success) {
+          setSchoolSearchResults([]);
+          setSchoolSearchMessage(
+            payload?.error ||
+              "School search is unavailable right now. You can still type your school manually.",
+          );
+          setIsSchoolDropdownOpen(true);
+          return;
+        }
+
+        const schools = Array.isArray(payload.schools)
+          ? (payload.schools as SchoolSearchResult[])
+          : [];
+
+        setSchoolSearchResults(schools);
+        setSchoolSearchMessage(
+          schools.length === 0
+            ? "No school matches found yet. You can keep typing or enter it manually."
+            : "",
+        );
+        setIsSchoolDropdownOpen(true);
+
+        trackEvent({
+          eventName: "program_application_school_search_results_loaded",
+          eventType: "lead",
+          role: "guru",
+          source: "programs_apply",
+          metadata: {
+            selected_program: formState.program || "not_selected",
+            query_length: schoolQuery.length,
+            result_count: schools.length,
+            source: payload?.source || "unknown",
+          },
+        });
+      } catch (error) {
+        if (!isMounted || controller.signal.aborted) return;
+
+        console.error("School search failed:", error);
+        setSchoolSearchResults([]);
+        setSchoolSearchMessage(
+          "School search is unavailable right now. You can still type your school manually.",
+        );
+        setIsSchoolDropdownOpen(true);
+      } finally {
+        if (isMounted) {
+          setIsSchoolSearchLoading(false);
+        }
+      }
+    }
+
+    const timeout = window.setTimeout(searchSchools, 350);
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [formState.schoolName, formState.program, isStudentProgram]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        schoolSearchContainerRef.current &&
+        !schoolSearchContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsSchoolDropdownOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!applicationConfirmation) return;
 
     window.setTimeout(() => {
@@ -567,6 +703,27 @@ function ProgramApplyContent() {
       metadata: {
         selected_program: program,
         program_title: getProgramByKey(program)?.title || program,
+      },
+    });
+  }
+
+  function selectSchoolResult(school: SchoolSearchResult) {
+    updateField("schoolName", school.name);
+    setSelectedSchoolResultId(school.id);
+    setIsSchoolDropdownOpen(false);
+    setSchoolSearchMessage("");
+
+    trackEvent({
+      eventName: "program_application_school_selected",
+      eventType: "lead",
+      role: "guru",
+      source: "programs_apply",
+      metadata: {
+        selected_program: formState.program || "not_selected",
+        school_id: school.id,
+        school_name: school.name,
+        school_city: school.city,
+        school_state: school.state,
       },
     });
   }
@@ -705,6 +862,11 @@ function ProgramApplyContent() {
     setAdditionalDocumentError("");
     setZipLookupStatus("idle");
     setZipLookupMessage("");
+    setSchoolSearchResults([]);
+    setIsSchoolSearchLoading(false);
+    setSchoolSearchMessage("");
+    setIsSchoolDropdownOpen(false);
+    setSelectedSchoolResultId("");
 
     setFormState({
       ...initialFormState,
@@ -740,12 +902,13 @@ function ProgramApplyContent() {
         has_resume_file: Boolean(resumeFile),
         has_resume_link: Boolean(formState.resumeLink.trim()),
         has_school_name: Boolean(formState.schoolName.trim()),
+        selected_school_result_id: selectedSchoolResultId || "",
         has_student_status: Boolean(formState.studentStatus.trim()),
         has_student_background: Boolean(formState.studentBackground.trim()),
         additional_document_count: additionalDocuments.length,
         selected_service_count: formState.servicesInterested.length,
         selected_services: formState.servicesInterested,
-        background_check_consent: formState.backgroundCheckConsent,
+        trust_and_safety_acknowledged: formState.backgroundCheckConsent,
       },
     });
 
@@ -760,11 +923,11 @@ function ProgramApplyContent() {
 
       if (!formState.backgroundCheckConsent) {
         throw new Error(
-          isCommunityProgram
-            ? "Please confirm that you understand SitGuru follows EEOC guidance and that a Checkr background check may be part of the fair review process."
+          isAmbassadorProgram
+            ? "Please confirm that you understand SitGuru may review Ambassador applicants before approval and referral reward eligibility."
             : isSkillBridgeProgram
-              ? "Please confirm that you understand future onboarding or approved opportunities may require a background check through Checkr."
-              : "Please confirm that you understand a background check through Checkr is part of the approval process.",
+              ? "Please confirm that you understand future onboarding or approved opportunities may require SitGuru trust and safety review steps."
+              : "Please confirm that you understand SitGuru trust and safety review steps are part of the approval process.",
         );
       }
 
@@ -785,6 +948,10 @@ function ProgramApplyContent() {
 
         applicationData.append(key, String(value));
       });
+
+      if (selectedSchoolResultId) {
+        applicationData.append("selectedSchoolResultId", selectedSchoolResultId);
+      }
 
       if (resumeFile) {
         applicationData.append("resume", resumeFile);
@@ -831,12 +998,13 @@ function ProgramApplyContent() {
           has_resume_file: Boolean(resumeFile),
           has_resume_link: Boolean(formState.resumeLink.trim()),
           has_school_name: Boolean(formState.schoolName.trim()),
+          selected_school_result_id: selectedSchoolResultId || "",
           has_student_status: Boolean(formState.studentStatus.trim()),
           has_student_background: Boolean(formState.studentBackground.trim()),
           additional_document_count: additionalDocuments.length,
           selected_service_count: formState.servicesInterested.length,
           selected_services: formState.servicesInterested,
-          background_check_consent: formState.backgroundCheckConsent,
+          trust_and_safety_acknowledged: formState.backgroundCheckConsent,
         },
       });
 
@@ -851,6 +1019,11 @@ function ProgramApplyContent() {
       setAdditionalDocumentError("");
       setZipLookupStatus("idle");
       setZipLookupMessage("");
+      setSchoolSearchResults([]);
+      setIsSchoolSearchLoading(false);
+      setSchoolSearchMessage("");
+      setIsSchoolDropdownOpen(false);
+      setSelectedSchoolResultId("");
 
       setFormState({
         ...initialFormState,
@@ -912,19 +1085,21 @@ function ProgramApplyContent() {
                 <WalletCards size={15} />
                 {isStudentProgram
                   ? "Extra cash around school"
-                  : isCommunityProgram
-                    ? "Community workforce pathway"
-                    : "Flexible pet care opportunities"}
+                  : isAmbassadorProgram
+                    ? "Together, we grow together"
+                    : isSkillBridgeProgram
+                      ? "SkillBridge interest"
+                      : "Flexible pet care opportunities"}
               </div>
 
               <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight tracking-tight text-green-950 sm:text-5xl lg:text-6xl">
                 {selectedProgram
                   ? isStudentProgram
                     ? "Broke between classes? Earn extra cash with SitGuru."
-                    : isCommunityProgram
-                      ? "Need a flexible way to build income and experience?"
+                    : isAmbassadorProgram
+                      ? "Help SitGuru grow in the pet community."
                       : isSkillBridgeProgram
-                        ? "Join the SkillBridge Interest List."
+                        ? "Join the SkillBridge Interest / Veterans Pathway."
                         : `Apply for the ${selectedProgram.title}.`
                   : "Choose your SitGuru program."}
               </h1>
@@ -933,30 +1108,30 @@ function ProgramApplyContent() {
                 {selectedProgram
                   ? isStudentProgram
                     ? "Walk dogs, do drop-ins, pet sit, or help local pet parents when your schedule allows. Great for after class, between classes, weekends, school breaks, and summer money."
-                    : isCommunityProgram
-                      ? "Community Hire is a supported application pathway for qualified applicants connected through workforce, nonprofit, city, state, federal, and community programs. It is not full-time employment, part-time employment, or guaranteed job placement."
+                    : isAmbassadorProgram
+                      ? "Ambassadors help refer Gurus and Pet Parents, support local pet-care awareness, and grow with SitGuru through community trust, referral rewards, and recognition opportunities."
                       : isSkillBridgeProgram
                         ? "SitGuru is exploring a future SkillBridge-style training pathway. Join the interest list to share your background, transition goals, and areas of interest."
-                        : `You are applying for the ${selectedProgram.title}. Qualified applicants complete onboarding, a Checkr background check, and may grow into full Guru status with greater commissions and future benefits over time.`
-                  : "Select Military Hire, Student Hire, Community Hire, or SkillBridge Interest before submitting. This keeps your application routed correctly."}
+                        : `You are applying for the ${selectedProgram.title}. Qualified applicants complete onboarding, SitGuru trust and safety review steps when required, and may grow into full Guru status with greater commissions and future benefits over time.`
+                  : "Select Student Hire, Veterans Hire, Ambassador Program, or SkillBridge Interest / Veterans Pathway before submitting. This keeps your application routed correctly."}
               </p>
 
               <div className="mt-7 grid gap-3 sm:grid-cols-3">
                 {[
                   isStudentProgram
                     ? "Easy extra cash"
-                    : isCommunityProgram
-                      ? "Workforce-friendly pathway"
+                    : isAmbassadorProgram
+                      ? "Refer Gurus"
                       : "Resume upload",
                   isStudentProgram
                     ? "Summer + breaks"
-                    : isCommunityProgram
-                      ? "EEOC-guided review"
+                    : isAmbassadorProgram
+                      ? "Refer Pet Parents"
                       : "Additional documents",
                   isStudentProgram
                     ? "Tell your friends"
-                    : isCommunityProgram
-                      ? "Fair background process"
+                    : isAmbassadorProgram
+                      ? "Community growth"
                       : "Exact program routing",
                 ].map((item) => (
                   <div
@@ -1014,7 +1189,7 @@ function ProgramApplyContent() {
                 </div>
               ) : null}
 
-              {isCommunityProgram ? (
+              {isAmbassadorProgram ? (
                 <div className="mt-7 rounded-[30px] border border-green-200 bg-gradient-to-br from-green-50 via-white to-emerald-50 p-5 shadow-sm sm:p-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-green-800 text-white shadow-lg shadow-emerald-900/15">
@@ -1023,24 +1198,25 @@ function ProgramApplyContent() {
 
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
-                        Community workforce pathway
+                        Ambassador Program
                       </p>
 
                       <h2 className="mt-2 text-2xl font-black text-green-950">
-                        A supported pathway, not a guaranteed job placement.
+                        Refer. Support. Grow with SitGuru.
                       </h2>
 
                       <p className="mt-3 text-sm font-bold leading-7 text-slate-700 sm:text-base">
-                        Community Hire helps qualified applicants connected
-                        through workforce programs, nonprofits, re-entry support,
-                        job-readiness programs, and community partners apply for
-                        flexible local pet care opportunities with SitGuru.
+                        SitGuru Ambassadors help connect trusted Gurus and Pet
+                        Parents to the platform. This is a community growth
+                        pathway for pet-care professionals and trusted local
+                        supporters who want to help SitGuru grow.
                       </p>
 
                       <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold leading-6 text-amber-900">
-                        Approved Gurus provide services as independent
-                        contractors. Community Hire is not full-time employment,
-                        part-time employment, or guaranteed job placement.
+                        Ambassador approval, referral rewards, public
+                        recognition, and performance highlights depend on
+                        SitGuru program terms, eligible referrals, consent, and
+                        platform needs.
                       </p>
                     </div>
                   </div>
@@ -1161,51 +1337,10 @@ function ProgramApplyContent() {
                   Approved Gurus provide services as independent contractors.
                   Applying or joining an interest list does not guarantee
                   approval, bookings, earnings, commissions, benefits, placement,
-                  employment, or full Guru status.
+                  employment, referral rewards, SkillBridge participation, or
+                  full Guru status.
                 </p>
               </div>
-
-              {isCommunityProgram ? (
-                <div className="mt-7 rounded-[30px] border border-blue-200 bg-blue-50 p-5 shadow-sm sm:p-6">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-white text-blue-800 shadow-sm">
-                      <ShieldCheck size={26} />
-                    </div>
-
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-800">
-                        Background check fairness
-                      </p>
-
-                      <h2 className="mt-2 text-2xl font-black text-blue-950">
-                        SitGuru follows EEOC guidance for fair review.
-                      </h2>
-
-                      <p className="mt-3 text-sm font-semibold leading-7 text-blue-950">
-                        A background check through Checkr may be part of the
-                        approval process. SitGuru reviews background check
-                        information fairly, consistently, and in relation to pet
-                        care responsibilities, home access, safety, trust, and
-                        customer needs.
-                      </p>
-
-                      <p className="mt-3 text-sm font-semibold leading-7 text-blue-950">
-                        Background check information is reviewed in context and
-                        does not automatically disqualify every applicant. When
-                        appropriate, SitGuru may consider the nature of the
-                        information, how much time has passed, its relationship
-                        to the services requested, and any additional context the
-                        applicant provides.
-                      </p>
-
-                      <p className="mt-3 rounded-2xl border border-blue-200 bg-white px-4 py-3 text-xs font-bold leading-6 text-blue-900">
-                        If background check information may affect eligibility,
-                        SitGuru follows applicable review and notice processes.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
 
               {isStudentProgram ? (
                 <div className="mt-7 rounded-[30px] border border-green-100 bg-white p-5 shadow-sm sm:p-6">
@@ -1275,9 +1410,9 @@ function ProgramApplyContent() {
                         </h2>
 
                         <p className="mt-3 text-sm font-bold leading-6 text-slate-700">
-                          Your submission is now saved in SitGuru’s admin
-                          system for review. We’ll use your details to review
-                          program fit, onboarding, documents, and next steps.
+                          Your submission is now saved in SitGuru’s admin system
+                          for review. We’ll use your details to review program
+                          fit, onboarding, documents, and next steps.
                         </p>
 
                         <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -1320,8 +1455,8 @@ function ProgramApplyContent() {
                               next-step instructions.
                             </p>
                             <p>
-                              3. Approved opportunities may require a Checkr
-                              background check before eligible services.
+                              3. Approved opportunities may require SitGuru trust
+                              and safety review steps before eligible services.
                             </p>
                           </div>
                         </div>
@@ -1383,8 +1518,8 @@ function ProgramApplyContent() {
                           ? "Interest list"
                           : isStudentProgram
                             ? "Start earning"
-                            : isCommunityProgram
-                              ? "Community pathway"
+                            : isAmbassadorProgram
+                              ? "Ambassador application"
                               : "Apply today"}
                       </div>
 
@@ -1392,10 +1527,10 @@ function ProgramApplyContent() {
                         {selectedProgram
                           ? isStudentProgram
                             ? "Apply to start earning extra cash"
-                            : isCommunityProgram
-                              ? "Apply through Community Hire"
+                            : isAmbassadorProgram
+                              ? "Apply to become a SitGuru Ambassador"
                               : isSkillBridgeProgram
-                                ? "Join the SkillBridge Interest List"
+                                ? "Join the SkillBridge Interest / Veterans Pathway"
                                 : `Apply for ${selectedProgram.title}`
                           : "Choose a program to start"}
                       </h2>
@@ -1404,12 +1539,12 @@ function ProgramApplyContent() {
                         {selectedProgram
                           ? isStudentProgram
                             ? "This application will be submitted as Student Hire. Pick your services, schedule, and school details so SitGuru can review your fit."
-                            : isCommunityProgram
-                              ? "This application will be submitted as Community Hire. SitGuru will review your information, partner/referral source, availability, documents, and background-check process fairly and consistently."
+                            : isAmbassadorProgram
+                              ? "This application will be submitted as Ambassador Program. Tell us your pet-care background, referral network, and how you want to help SitGuru grow."
                               : isSkillBridgeProgram
-                                ? "This will be submitted as SkillBridge Interest List."
+                                ? "This will be submitted as SkillBridge Interest / Veterans Pathway."
                                 : `This application will be submitted as ${selectedProgram.title}.`
-                          : "Pick Military Hire, Student Hire, Community Hire, or SkillBridge Interest before submitting."}
+                          : "Pick Student Hire, Veterans Hire, Ambassador Program, or SkillBridge Interest / Veterans Pathway before submitting."}
                       </p>
                     </div>
 
@@ -1589,19 +1724,93 @@ function ProgramApplyContent() {
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2">
-                          <div>
+                          <div
+                            className="relative"
+                            ref={schoolSearchContainerRef}
+                          >
                             <label className="mb-2 block text-sm font-black text-green-950">
                               School, college, or program
                             </label>
                             <input
                               type="text"
                               value={formState.schoolName}
-                              onChange={(event) =>
-                                updateField("schoolName", event.target.value)
-                              }
-                              className="w-full rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
-                              placeholder="School, college, trade school, or program"
+                              onChange={(event) => {
+                                setSelectedSchoolResultId("");
+                                updateField("schoolName", event.target.value);
+                                setIsSchoolDropdownOpen(true);
+                              }}
+                              onFocus={() => {
+                                if (
+                                  formState.schoolName.trim().length >= 2 ||
+                                  schoolSearchResults.length > 0
+                                ) {
+                                  setIsSchoolDropdownOpen(true);
+                                }
+                              }}
+                              autoComplete="organization"
+                              className="w-full rounded-2xl border border-green-200 bg-white px-4 py-3 pr-12 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                              placeholder="Start typing: Penn, Temple, Rutgers..."
                             />
+
+                            {isSchoolSearchLoading ? (
+                              <div className="pointer-events-none absolute right-4 top-[43px] h-5 w-5 animate-spin rounded-full border-2 border-green-200 border-t-green-700" />
+                            ) : selectedSchoolResultId ? (
+                              <CheckCircle2
+                                size={20}
+                                className="pointer-events-none absolute right-4 top-[43px] text-green-700"
+                              />
+                            ) : null}
+
+                            {isSchoolDropdownOpen &&
+                            (schoolSearchResults.length > 0 ||
+                              isSchoolSearchLoading ||
+                              schoolSearchMessage) ? (
+                              <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-3xl border border-green-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
+                                {schoolSearchResults.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {schoolSearchResults.map((school) => (
+                                      <button
+                                        key={school.id}
+                                        type="button"
+                                        onClick={() =>
+                                          selectSchoolResult(school)
+                                        }
+                                        className="w-full rounded-2xl px-4 py-3 text-left transition hover:bg-green-50 focus:bg-green-50 focus:outline-none"
+                                      >
+                                        <span className="block text-sm font-black text-green-950">
+                                          {school.name}
+                                        </span>
+                                        <span className="mt-1 block text-xs font-bold text-slate-500">
+                                          {[school.city, school.state]
+                                            .filter(Boolean)
+                                            .join(", ")}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : null}
+
+                                {isSchoolSearchLoading ? (
+                                  <p className="px-4 py-3 text-xs font-bold text-slate-500">
+                                    Searching schools...
+                                  </p>
+                                ) : null}
+
+                                {schoolSearchMessage &&
+                                !isSchoolSearchLoading ? (
+                                  <p className="px-4 py-3 text-xs font-bold leading-5 text-amber-800">
+                                    {schoolSearchMessage}
+                                  </p>
+                                ) : null}
+
+                                <div className="mt-2 border-t border-slate-100 px-4 py-3">
+                                  <p className="text-xs font-semibold leading-5 text-slate-500">
+                                    Can’t find your school? Keep your typed entry
+                                    and submit it manually.
+                                  </p>
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
 
                           <div>
@@ -1650,7 +1859,10 @@ function ProgramApplyContent() {
                           <textarea
                             value={formState.studentBackground}
                             onChange={(event) =>
-                              updateField("studentBackground", event.target.value)
+                              updateField(
+                                "studentBackground",
+                                event.target.value,
+                              )
                             }
                             rows={4}
                             className="min-h-[110px] w-full resize-y rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
@@ -1660,20 +1872,19 @@ function ProgramApplyContent() {
                       </div>
                     ) : null}
 
-                    {isCommunityProgram ? (
+                    {isAmbassadorProgram ? (
                       <div className="rounded-[28px] border border-green-100 bg-green-50 p-4">
                         <div>
                           <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
-                            Community partner or workforce source
+                            Ambassador details
                           </p>
                           <h3 className="mt-1 text-lg font-black text-green-950">
-                            Tell us how you are connected to Community Hire.
+                            Tell us how you can help SitGuru grow.
                           </h3>
                           <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
-                            This may include a workforce program, nonprofit,
-                            city/state/federal program, re-entry support
-                            organization, job-readiness program, community
-                            organization, or local employment-support partner.
+                            This may include Vet Tech, Veterinarian, Trainer,
+                            grooming, rescue, shelter, pet-care, social media,
+                            community, or referral experience.
                           </p>
                         </div>
                       </div>
@@ -1685,8 +1896,8 @@ function ProgramApplyContent() {
                           ? "Availability or transition timing"
                           : isStudentProgram
                             ? "When can you earn?"
-                            : isCommunityProgram
-                              ? "When are you available for local opportunities?"
+                            : isAmbassadorProgram
+                              ? "When can you help refer and support SitGuru?"
                               : "When can you earn?"}
                       </label>
                       <select
@@ -1702,8 +1913,8 @@ function ProgramApplyContent() {
                             ? "Choose availability or transition timing"
                             : isStudentProgram
                               ? "Choose when you want extra cash"
-                              : isCommunityProgram
-                                ? "Choose your availability"
+                              : isAmbassadorProgram
+                                ? "Choose when you can help"
                                 : "Choose availability"}
                         </option>
                         {availabilityOptions.map((option) => (
@@ -1722,8 +1933,8 @@ function ProgramApplyContent() {
                               ? "What areas interest you?"
                               : isStudentProgram
                                 ? "How do you want to make money?"
-                                : isCommunityProgram
-                                  ? "What local pet care opportunities interest you?"
+                                : isAmbassadorProgram
+                                  ? "How would you like to support SitGuru?"
                                   : "How would you like to earn?"}
                           </label>
                           <p className="mt-1 text-xs font-semibold text-slate-500">
@@ -1814,8 +2025,8 @@ function ProgramApplyContent() {
                         placeholder={
                           isStudentProgram
                             ? "School, friend, teammate, roommate, club, campus group, social media, etc."
-                            : isCommunityProgram
-                              ? "Workforce program, nonprofit, community organization, re-entry support, job-readiness program, referral partner, etc."
+                            : isAmbassadorProgram
+                              ? "Vet clinic, trainer network, rescue, shelter, grooming shop, social media, community group, etc."
                               : "School, military org, workforce partner, nonprofit, social media, etc."
                         }
                       />
@@ -1899,11 +2110,11 @@ function ProgramApplyContent() {
                             Additional documents
                           </label>
                           <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                            Optional: upload supporting documents such as DD214,
+                            Optional: upload supporting documents such as
                             certifications, training documents, references,
-                            student paperwork, workforce partner paperwork, or
-                            program paperwork. PDF, DOC, DOCX, JPG, or PNG
-                            accepted. Max 10MB each.
+                            student paperwork, military-connected paperwork,
+                            pet-care credentials, or program paperwork. PDF,
+                            DOC, DOCX, JPG, or PNG accepted. Max 10MB each.
                           </p>
                           <p className="mt-2 text-xs font-bold leading-5 text-amber-800">
                             Please do not upload documents with sensitive
@@ -1975,8 +2186,8 @@ function ProgramApplyContent() {
                           ? "Why are you interested in a future SitGuru SkillBridge pathway?"
                           : isStudentProgram
                             ? "Why is SitGuru a good way for you to make extra cash?"
-                            : isCommunityProgram
-                              ? "Why would Community Hire be a good pathway for you?"
+                            : isAmbassadorProgram
+                              ? "Why would you be a strong SitGuru Ambassador?"
                               : "Why would SitGuru be a good way for you to earn extra money?"}
                       </label>
                       <textarea
@@ -1991,50 +2202,28 @@ function ProgramApplyContent() {
                             ? "Tell us about your transition goals, pet care interest, customer service, operations, leadership, or local service experience."
                             : isStudentProgram
                               ? "Tell us why this fits your schedule — after class, between classes, weekends, breaks, summer, pets, extra cash, friends, goals, whatever makes sense."
-                              : isCommunityProgram
-                                ? "Tell us about your goals, work readiness, community program, pet care interest, customer service, local service experience, or what support would help you succeed."
+                              : isAmbassadorProgram
+                                ? "Tell us about your pet-care background, local network, referral reach, community involvement, or why Pet Parents and Gurus would trust your recommendation."
                                 : "Tell us about your pet care, work, school, military, or community experience."
                         }
                         required
                       />
                     </div>
 
-                    {isCommunityProgram ? (
-                      <div className="rounded-[28px] border border-blue-200 bg-blue-50 p-4">
-                        <div className="flex gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-800 shadow-sm">
-                            <ShieldCheck size={21} />
-                          </div>
+                    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">
+                        Independent Contractor & Tax Information
+                      </p>
 
-                          <div>
-                            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-800">
-                              Background check fairness
-                            </p>
-
-                            <h3 className="mt-1 text-lg font-black text-blue-950">
-                              SitGuru follows EEOC guidance.
-                            </h3>
-
-                            <p className="mt-2 text-sm font-semibold leading-6 text-blue-950">
-                              A background check through Checkr may be part of
-                              the approval process. SitGuru reviews background
-                              check information fairly, consistently, and in
-                              relation to pet care responsibilities, home
-                              access, safety, trust, and customer needs.
-                            </p>
-
-                            <p className="mt-2 text-sm font-semibold leading-6 text-blue-950">
-                              Background check information is reviewed in
-                              context and does not automatically disqualify every
-                              applicant. When appropriate, SitGuru may consider
-                              the nature of the information, how much time has
-                              passed, its relationship to the services requested,
-                              and any additional context the applicant provides.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
+                      <p className="mt-2 text-sm font-semibold leading-6 text-amber-950">
+                        Gurus provide services as independent contractors. Gurus
+                        are responsible for reporting and paying their own
+                        federal, state, local, and self-employment taxes.
+                        SitGuru or its payment processor may request tax
+                        information and may issue applicable tax forms when
+                        required by law.
+                      </p>
+                    </div>
 
                     <div className="rounded-3xl border border-green-100 bg-green-50 p-4">
                       <label className="flex gap-3">
@@ -2051,16 +2240,16 @@ function ProgramApplyContent() {
                         />
                         <span>
                           <span className="block text-sm font-black text-green-950">
-                            {isCommunityProgram
-                              ? "I understand that a background check through Checkr may be part of the approval process. SitGuru follows EEOC guidance and reviews background check information fairly, consistently, and in relation to pet care responsibilities, home access, safety, trust, and customer needs."
+                            {isAmbassadorProgram
+                              ? "I understand SitGuru may review Ambassador applicants before approval, referral reward eligibility, or public recognition."
                               : isSkillBridgeProgram
-                                ? "I understand future onboarding or approved opportunities may require a background check through Checkr."
-                                : "I understand a background check through Checkr is part of the approval process."}
+                                ? "I understand future onboarding or approved opportunities may require SitGuru trust and safety review steps."
+                                : "I understand SitGuru trust and safety review steps are part of the approval process."}
                           </span>
                           <span className="mt-1 block text-sm font-semibold leading-6 text-slate-600">
-                            {isCommunityProgram
-                              ? "Background check information is reviewed in context and does not automatically disqualify every applicant. If background check information may affect eligibility, SitGuru follows applicable review and notice processes."
-                              : "SitGuru uses background checks to help protect pets, pet parents, Gurus, and the broader SitGuru community."}
+                            SitGuru uses trust and safety review steps to help
+                            protect pets, Pet Parents, Gurus, Ambassadors, and
+                            the broader SitGuru community.
                           </span>
                         </span>
                       </label>
@@ -2080,8 +2269,8 @@ function ProgramApplyContent() {
                         placeholder={
                           isStudentProgram
                             ? "Optional: Drop your goals, questions, friend referrals, campus groups, clubs, or anything else."
-                            : isCommunityProgram
-                              ? "Optional: Share goals, support needs, community partner details, questions, or context you want SitGuru to consider."
+                            : isAmbassadorProgram
+                              ? "Optional: Share goals, referral ideas, pet community connections, social media reach, or questions."
                               : "Optional notes, goals, questions, or details."
                         }
                       />
@@ -2097,10 +2286,10 @@ function ProgramApplyContent() {
                         : formState.program
                           ? isStudentProgram
                             ? "Apply to Start Earning"
-                            : isCommunityProgram
-                              ? "Apply Through Community Hire"
+                            : isAmbassadorProgram
+                              ? "Apply to Become an Ambassador"
                               : isSkillBridgeProgram
-                                ? "Join SkillBridge Interest List"
+                                ? "Join SkillBridge Interest / Veterans Pathway"
                                 : `Apply to ${getProgramLabel(formState.program)}`
                           : "Choose Program to Apply"}
                       {!isSubmitting ? <ArrowRight size={18} /> : null}
@@ -2110,12 +2299,12 @@ function ProgramApplyContent() {
                       Approved Gurus provide services as independent
                       contractors. Applying or joining an interest list does not
                       guarantee approval, bookings, earnings, commissions,
-                      benefits, employment, job placement, SkillBridge
-                      participation, or full Guru status. Program participation
-                      and future opportunities may depend on eligibility,
-                      onboarding, background check results, availability,
-                      performance, trust, customer demand, and SitGuru program
-                      needs.
+                      benefits, employment, job placement, referral rewards,
+                      SkillBridge participation, or full Guru status. Program
+                      participation and future opportunities may depend on
+                      eligibility, onboarding, SitGuru trust and safety review
+                      steps, availability, performance, trust, customer demand,
+                      and SitGuru program needs.
                     </p>
                   </form>
                 </>
@@ -2135,15 +2324,15 @@ function ProgramApplyContent() {
               <h3 className="text-xl font-black text-green-950">
                 {isStudentProgram
                   ? "1. Pick your money window"
-                  : isCommunityProgram
-                    ? "1. Apply through a supported pathway"
+                  : isAmbassadorProgram
+                    ? "1. Tell us your network"
                     : "1. Choose and submit"}
               </h3>
               <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
                 {isStudentProgram
                   ? "Tell us when you want to earn: after class, between classes, weekends, breaks, or summer."
-                  : isCommunityProgram
-                    ? "Submit your program, partner, location, availability, experience, resume, and local opportunity interests."
+                  : isAmbassadorProgram
+                    ? "Share your pet-care background, community reach, referral ideas, and how you can help connect trusted Gurus and Pet Parents."
                     : "Choose the exact SitGuru program, then submit your location, availability, experience, resume, optional documents, and areas of interest."}
               </p>
             </div>
@@ -2155,16 +2344,16 @@ function ProgramApplyContent() {
               <h3 className="text-xl font-black text-green-950">
                 {isStudentProgram
                   ? "2. Get reviewed and onboarded"
-                  : isCommunityProgram
-                    ? "2. Fair review and Checkr steps"
+                  : isAmbassadorProgram
+                    ? "2. Build trust and awareness"
                     : "2. Review and next steps"}
               </h3>
               <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
                 {isStudentProgram
-                  ? "SitGuru reviews your application and may share onboarding, profile, and Checkr next steps before eligible bookings."
-                  : isCommunityProgram
-                    ? "SitGuru follows EEOC guidance for fair, consistent, role-related background check review when a Checkr background check is part of the process."
-                    : "SitGuru reviews your submission and may share onboarding, training, SkillBridge-interest updates, or Checkr next steps."}
+                  ? "SitGuru reviews your application and may share onboarding, profile, and trust and safety next steps before eligible bookings."
+                  : isAmbassadorProgram
+                    ? "SitGuru reviews Ambassador applicants for community fit, trust, referral alignment, and growth potential."
+                    : "SitGuru reviews your submission and may share onboarding, training, SkillBridge-interest updates, or trust and safety next steps."}
               </p>
             </div>
 
@@ -2175,15 +2364,15 @@ function ProgramApplyContent() {
               <h3 className="text-xl font-black text-green-950">
                 {isStudentProgram
                   ? "3. Earn, learn, and tell friends"
-                  : isCommunityProgram
-                    ? "3. Build reliability and grow"
+                  : isAmbassadorProgram
+                    ? "3. Refer, support, and grow"
                     : "3. Grow into more"}
               </h3>
               <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
                 {isStudentProgram
                   ? "Build pet care and customer service experience, earn extra cash when booked, and spread Student Hire around campus."
-                  : isCommunityProgram
-                    ? "Approved applicants may build income, confidence, local service experience, and a pathway toward full Guru status over time."
+                  : isAmbassadorProgram
+                    ? "Approved Ambassadors may refer Gurus and Pet Parents, support local awareness, earn eligible rewards, and be recognized as SitGuru grows."
                     : "Reliable participants may build toward full Guru status, greater commissions, future benefits, or future training pathways as SitGuru grows."}
               </p>
             </div>

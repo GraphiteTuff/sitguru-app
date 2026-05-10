@@ -1291,7 +1291,11 @@ function TrustSafetyFinancialsPanel({
 }: {
   financials: TrustSafetyFinancialsResponse;
 }) {
-  const totals = financials.totals;
+  const safeFinancials = financials ?? fallbackTrustSafetyFinancials;
+  const totals = safeFinancials.totals ?? fallbackTrustSafetyFinancials.totals;
+  const plans = Array.isArray(safeFinancials.plans)
+    ? safeFinancials.plans
+    : fallbackTrustSafetyFinancials.plans;
 
   return (
     <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
@@ -1313,12 +1317,12 @@ function TrustSafetyFinancialsPanel({
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
-              financials.isLive
+              safeFinancials.isLive
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border-amber-200 bg-amber-50 text-amber-800"
             }`}
           >
-            {financials.isLive ? "Live Supabase" : "Preview / Offline"}
+            {safeFinancials.isLive ? "Live Supabase" : "Preview / Offline"}
           </span>
 
           <Link
@@ -1369,7 +1373,7 @@ function TrustSafetyFinancialsPanel({
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        {financials.plans.map((plan) => (
+        {plans.map((plan) => (
           <Link
             key={plan.planKey}
             href={`/admin/background-checks?plan=${encodeURIComponent(plan.planKey)}`}

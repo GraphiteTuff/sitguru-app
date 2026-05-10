@@ -9,6 +9,7 @@ import {
   Download,
   GraduationCap,
   Handshake,
+  HeartHandshake,
   Medal,
   MessageCircle,
   ShieldCheck,
@@ -31,13 +32,14 @@ type SafeAdminQueryResponse = {
 type ProgramKey =
   | "student-hire"
   | "community-hire"
-  | "military-hire"
-  | "skillbridge-interest";
+  | "veterans-hire"
+  | "ambassador-program";
 
 type ProgramDefinition = {
   key: ProgramKey;
   title: string;
   shortTitle: string;
+  campaign: string;
   eyebrow: string;
   description: string;
   href: string;
@@ -57,8 +59,8 @@ const adminRoutes = {
   programsExport: "/admin/programs/export",
   studentHire: "/admin/programs/student-hire",
   communityHire: "/admin/programs/community-hire",
-  militaryHire: "/admin/programs/military-hire",
-  skillbridgeInterest: "/admin/programs/skillbridge-interest",
+  veteransHire: "/admin/programs/veterans-hire",
+  ambassadorProgram: "/admin/programs/ambassadors",
   partners: "/admin/partners",
   gurus: "/admin/gurus",
   messages: "/admin/messages",
@@ -69,6 +71,7 @@ const programDefinitions: ProgramDefinition[] = [
     key: "student-hire",
     title: "Student Hire Program",
     shortTitle: "Student Hire",
+    campaign: "Earn with the Pack",
     eyebrow: "Extra cash for students",
     description:
       "Flexible pet care opportunities for students, recent grads, high school seniors 18+, trade school students, gap-year students, and summer workers who want to earn around class, weekends, school breaks, and summer.",
@@ -92,12 +95,14 @@ const programDefinitions: ProgramDefinition[] = [
       "Athletic teams and clubs",
       "Summer work programs",
       "Local education partners",
+      "Campus ambassadors",
     ],
     goals: [
       "Increase student Guru applicants",
       "Create flexible earning opportunities around school",
       "Track school, availability, services, resume, and onboarding readiness",
       "Encourage students to share Student Hire with friends",
+      "Identify strong Student Ambassadors who can grow SitGuru locally",
     ],
     requirements: [
       "Independent contractor marketplace model",
@@ -121,12 +126,16 @@ const programDefinitions: ProgramDefinition[] = [
       "summer",
       "after class",
       "between classes",
+      "earn with the pack",
+      "student ambassador",
+      "campus ambassador",
     ],
   },
   {
     key: "community-hire",
     title: "Community Hire Program",
     shortTitle: "Community Hire",
+    campaign: "Work with the Pack",
     eyebrow: "Community workforce pathway",
     description:
       "A supported referral and readiness pathway for qualified applicants connected through workforce programs, nonprofits, city, state, federal, community organizations, re-entry support programs, job-readiness programs, and local employment-support partners.",
@@ -159,6 +168,7 @@ const programDefinitions: ProgramDefinition[] = [
       "Track partner/referral source and readiness",
       "Apply fair, consistent, role-related background check review",
       "Move qualified applicants toward onboarding and full Guru status",
+      "Identify community partners who can become long-term growth sources",
     ],
     requirements: [
       "Independent contractor marketplace model",
@@ -186,17 +196,20 @@ const programDefinitions: ProgramDefinition[] = [
       "federal",
       "careerlink",
       "work program",
+      "work with the pack",
+      "community ambassador",
     ],
   },
   {
-    key: "military-hire",
-    title: "Military Hire Program",
-    shortTitle: "Military Hire",
-    eyebrow: "Military-connected pathway",
+    key: "veterans-hire",
+    title: "Veterans Hire Program",
+    shortTitle: "Veterans Hire",
+    campaign: "Serve with the Pack",
+    eyebrow: "Veterans and military-connected pathway",
     description:
-      "A supported pathway for veterans, transitioning service members, eligible service members, National Guard, reservists, military spouses, and qualified military-connected applicants over 18 who want flexible pet care opportunities.",
-    href: adminRoutes.militaryHire,
-    applicationsHref: `${adminRoutes.programApplications}?program=military-hire`,
+      "A SitGuru pathway for veterans, transitioning service members, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and SkillBridge-interested active-duty members exploring future pet care, operations, and local service opportunities.",
+    href: adminRoutes.veteransHire,
+    applicationsHref: `${adminRoutes.programApplications}?program=veterans-hire`,
     icon: <Medal size={26} />,
     audience: [
       "Veterans",
@@ -205,6 +218,7 @@ const programDefinitions: ProgramDefinition[] = [
       "National Guard and reservists",
       "Military spouses",
       "Qualified dependents over 18",
+      "SkillBridge-interested active-duty service members",
       "Military-connected applicants ready to work, learn, and grow",
     ],
     partners: [
@@ -213,12 +227,17 @@ const programDefinitions: ProgramDefinition[] = [
       "Military spouse support networks",
       "Base community partners",
       "Guard and reserve networks",
+      "Transition assistance programs",
+      "Military education offices",
+      "SkillBridge-related transition partners",
     ],
     goals: [
       "Increase qualified military-connected Guru applicants",
       "Track transferable experience and supporting documents",
       "Support onboarding, training, trust, and background check readiness",
       "Move strong applicants toward full Guru status",
+      "Track SkillBridge interest without presenting it as guaranteed placement",
+      "Identify Veteran Ambassadors who can support local community growth",
     ],
     requirements: [
       "Independent contractor marketplace model",
@@ -228,13 +247,17 @@ const programDefinitions: ProgramDefinition[] = [
       "Checkr background check when required",
       "Profile readiness",
       "Bookable Guru status when approved",
+      "SkillBridge interest is tracked as an interest list only unless formally approved later",
     ],
     keywords: [
+      "veterans-hire",
+      "veterans hire",
+      "veteran hire",
+      "veteran",
+      "veterans",
       "military-hire",
       "military hire",
       "military",
-      "veteran",
-      "veterans",
       "service member",
       "servicemember",
       "spouse",
@@ -242,57 +265,97 @@ const programDefinitions: ProgramDefinition[] = [
       "guard",
       "reservist",
       "transition",
-    ],
-  },
-  {
-    key: "skillbridge-interest",
-    title: "SkillBridge Interest List",
-    shortTitle: "SkillBridge",
-    eyebrow: "Future transition pathway",
-    description:
-      "An interest list for active-duty transitioning service members interested in future SitGuru training pathways around pet care operations, trust and safety, customer experience, local services, and post-transition opportunities.",
-    href: adminRoutes.skillbridgeInterest,
-    applicationsHref: `${adminRoutes.programApplications}?program=skillbridge-interest`,
-    icon: <ShieldCheck size={26} />,
-    audience: [
-      "Active-duty transitioning service members",
-      "Service members exploring civilian pet care operations",
-      "Applicants interested in customer trust and safety",
-      "Applicants interested in local services and operations",
-      "Transitioning service members with command approval when applicable",
-      "People planning post-transition flexible opportunities",
-    ],
-    partners: [
-      "Transition assistance programs",
-      "Military education offices",
-      "SkillBridge providers",
-      "Veteran transition partners",
-      "Local workforce partners",
-    ],
-    goals: [
-      "Track interest in a future SkillBridge-style pathway",
-      "Collect transition timelines and transferable experience",
-      "Evaluate future training and provider partnership options",
-      "Route interested applicants into future SitGuru pathways",
-    ],
-    requirements: [
-      "Interest list only",
-      "No guaranteed SkillBridge participation",
-      "No guaranteed placement or bookings",
-      "Transition timeline review",
-      "Supporting document review when provided",
-      "Future pathway evaluation",
-    ],
-    keywords: [
-      "skillbridge-interest",
-      "skillbridge interest",
-      "skillbridge",
-      "transition",
       "transitioning",
       "active duty",
       "active-duty",
+      "skillbridge-interest",
+      "skillbridge interest",
+      "skillbridge",
       "military education",
       "training pathway",
+      "serve with the pack",
+      "veteran ambassador",
+      "military ambassador",
+    ],
+  },
+  {
+    key: "ambassador-program",
+    title: "Ambassador Program",
+    shortTitle: "Ambassadors",
+    campaign: "Lead the Pack",
+    eyebrow: "Referral growth and Pack Leader recognition",
+    description:
+      "A profession-based community growth program for students, Vet Techs, veterinarians, trainers, groomers, rescue advocates, veterans, military spouses, community leaders, and existing Gurus who help refer Gurus and Pet Parents while promoting trusted pet care in their local communities.",
+    href: adminRoutes.ambassadorProgram,
+    applicationsHref: `${adminRoutes.programApplications}?program=ambassador-program`,
+    icon: <HeartHandshake size={26} />,
+    audience: [
+      "Vet Techs",
+      "Veterinarians",
+      "Trainers",
+      "Groomers and pet care professionals",
+      "Students and campus leaders",
+      "Veterans and military spouses",
+      "Rescue and shelter advocates",
+      "Community leaders",
+      "Existing Gurus",
+      "Medical and pet-care professionals who support responsible pet care",
+    ],
+    partners: [
+      "Veterinary clinics",
+      "Animal hospitals",
+      "Training businesses",
+      "Grooming businesses",
+      "Pet stores",
+      "Shelters and rescues",
+      "Campus organizations",
+      "Military and veteran groups",
+      "Local community groups",
+      "Existing SitGuru Gurus",
+    ],
+    goals: [
+      "Track which Ambassador types drive the strongest growth",
+      "Track referred Gurus and Pet Parents",
+      "Track completed bookings created from referrals",
+      "Calculate referral rewards and commission costs",
+      "Identify top-performing Pack Leaders",
+      "Feature top Ambassadors publicly with consent",
+      "Create local marketing and flyer opportunities by profession",
+    ],
+    requirements: [
+      "Ambassador application review",
+      "Referral source tracking",
+      "Unique referral code or referral link",
+      "Consent required before public homepage or carousel recognition",
+      "Commission and bonus rules controlled by SitGuru terms",
+      "No guaranteed earnings, commissions, placement, or bookings",
+      "Rewards paid only when referrals meet qualified program rules",
+    ],
+    keywords: [
+      "ambassador-program",
+      "ambassador program",
+      "ambassador",
+      "ambassadors",
+      "lead the pack",
+      "grow the pack",
+      "pack leader",
+      "pack leaders",
+      "referral",
+      "referrals",
+      "commission",
+      "reward",
+      "bonus",
+      "vet tech",
+      "veterinarian",
+      "trainer",
+      "groomer",
+      "rescue",
+      "shelter",
+      "student ambassador",
+      "guru ambassador",
+      "community ambassador",
+      "veteran ambassador",
+      "military ambassador",
     ],
   },
 ];
@@ -439,6 +502,15 @@ function isCompletedBookingStatus(row: AnyRow) {
   );
 }
 
+function isFeaturedPackLeader(row: AnyRow) {
+  return (
+    row.featured_on_homepage === true ||
+    row.is_featured === true ||
+    row.homepage_featured === true ||
+    row.pack_leader_featured === true
+  );
+}
+
 function getDate(row: AnyRow) {
   return (
     asString(row.created_at) ||
@@ -463,6 +535,29 @@ function formatDate(value?: string | null) {
   });
 }
 
+function normalizeProgramKey(value: string) {
+  const normalized = value.toLowerCase().trim().replace(/\s+/g, "-");
+
+  if (
+    normalized === "military-hire" ||
+    normalized === "skillbridge-interest" ||
+    normalized === "skillbridge" ||
+    normalized === "military"
+  ) {
+    return "veterans-hire";
+  }
+
+  if (
+    normalized === "ambassadors" ||
+    normalized === "ambassador" ||
+    normalized === "ambassador-program"
+  ) {
+    return "ambassador-program";
+  }
+
+  return normalized;
+}
+
 function getProgramSourceText(row: AnyRow) {
   return [
     getText(row, [
@@ -478,6 +573,11 @@ function getProgramSourceText(row: AnyRow) {
       "partner_source",
       "source",
       "referral_source",
+      "referral_code",
+      "ambassador_code",
+      "ambassador_type",
+      "profession",
+      "profession_type",
       "affiliation",
       "affiliation_type",
       "community_source",
@@ -488,6 +588,8 @@ function getProgramSourceText(row: AnyRow) {
       "student_status",
       "student_background",
       "military_connected_background",
+      "veteran_status",
+      "skillbridge_status",
       "notes",
       "message",
       "description",
@@ -502,14 +604,9 @@ function getProgramSourceText(row: AnyRow) {
 }
 
 function rowMatchesProgram(row: AnyRow, program: ProgramDefinition) {
-  const exactProgram = getText(row, [
-    "program",
-    "program_key",
-    "program_slug",
-    "program_type",
-  ])
-    .toLowerCase()
-    .replace(/\s+/g, "-");
+  const exactProgram = normalizeProgramKey(
+    getText(row, ["program", "program_key", "program_slug", "program_type"]),
+  );
 
   if (exactProgram === program.key) return true;
 
@@ -559,6 +656,10 @@ async function getProgramData() {
   const [
     programApplicationsResult,
     programsResult,
+    ambassadorProfilesResult,
+    referralEventsResult,
+    commissionLedgerResult,
+    featuredPackLeadersResult,
     networkProgramsResult,
     networkParticipantsResult,
     networkReferralsResult,
@@ -580,6 +681,22 @@ async function getProgramData() {
     safeAdminQuery(
       supabaseAdmin.from("programs").select("*").limit(1000),
       "programs",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("ambassador_profiles").select("*").limit(5000),
+      "ambassador_profiles",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("referral_events").select("*").limit(5000),
+      "referral_events",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("commission_ledger").select("*").limit(5000),
+      "commission_ledger",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("featured_pack_leaders").select("*").limit(5000),
+      "featured_pack_leaders",
     ),
     safeAdminQuery(
       supabaseAdmin.from("network_programs").select("*").limit(1000),
@@ -630,6 +747,18 @@ async function getProgramData() {
     (programApplicationsResult.data || []) as AnyRow[]
   ).filter(Boolean);
   const programs = ((programsResult.data || []) as AnyRow[]).filter(Boolean);
+  const ambassadorProfiles = (
+    (ambassadorProfilesResult.data || []) as AnyRow[]
+  ).filter(Boolean);
+  const referralEvents = ((referralEventsResult.data || []) as AnyRow[]).filter(
+    Boolean,
+  );
+  const commissionLedger = (
+    (commissionLedgerResult.data || []) as AnyRow[]
+  ).filter(Boolean);
+  const featuredPackLeaders = (
+    (featuredPackLeadersResult.data || []) as AnyRow[]
+  ).filter(Boolean);
   const networkPrograms = ((networkProgramsResult.data || []) as AnyRow[]).filter(
     Boolean,
   );
@@ -655,6 +784,10 @@ async function getProgramData() {
   const allProgramRows = [
     ...programApplications,
     ...programs,
+    ...ambassadorProfiles,
+    ...referralEvents,
+    ...commissionLedger,
+    ...featuredPackLeaders,
     ...networkPrograms,
     ...networkParticipants,
     ...networkReferrals,
@@ -670,6 +803,13 @@ async function getProgramData() {
     const matchingApplications = rowsForProgram(programApplications, program);
     const matchingLegacyApplications = rowsForProgram(
       [...partnerApplications, ...partnerLeads],
+      program,
+    );
+    const matchingAmbassadors = rowsForProgram(ambassadorProfiles, program);
+    const matchingReferralEvents = rowsForProgram(referralEvents, program);
+    const matchingCommissionLedger = rowsForProgram(commissionLedger, program);
+    const matchingFeaturedPackLeaders = rowsForProgram(
+      featuredPackLeaders,
       program,
     );
     const matchingParticipants = rowsForProgram(networkParticipants, program);
@@ -693,7 +833,8 @@ async function getProgramData() {
     const approvedParticipants =
       approvedApplications ||
       matchingParticipants.filter(isApprovedStatus).length ||
-      matchingGurus.filter(isApprovedStatus).length;
+      matchingGurus.filter(isApprovedStatus).length ||
+      matchingAmbassadors.filter(isApprovedStatus).length;
 
     const onboarding =
       onboardingApplications ||
@@ -736,17 +877,36 @@ async function getProgramData() {
       "total",
     ]);
 
+    const commissionPending = matchingCommissionLedger.filter(isPendingStatus);
+    const commissionPendingAmount = sumRows(commissionPending, [
+      "amount",
+      "commission_amount",
+      "reward_amount",
+      "payout_amount",
+      "total",
+    ]);
+
+    const totalCommissionCost = sumRows(matchingCommissionLedger, [
+      "amount",
+      "commission_amount",
+      "reward_amount",
+      "payout_amount",
+      "total",
+    ]);
+
     const conversionRate =
       applications > 0 ? (approvedParticipants / applications) * 100 : 0;
 
     const readinessScore = Math.round(
       Math.min(
         100,
-        approvedParticipants * 22 +
-          onboarding * 12 +
-          backgroundChecks * 16 +
-          bookable * 26 +
-          completedBookings * 8,
+        approvedParticipants * 18 +
+          onboarding * 10 +
+          backgroundChecks * 14 +
+          bookable * 22 +
+          completedBookings * 6 +
+          matchingReferralEvents.length * 4 +
+          matchingAmbassadors.length * 8,
       ),
     );
 
@@ -762,13 +922,19 @@ async function getProgramData() {
       onboarding,
       backgroundChecks,
       bookable,
-      referrals: matchingReferrals.length,
+      referrals: matchingReferrals.length + matchingReferralEvents.length,
+      referralEvents: matchingReferralEvents.length,
+      ambassadors: matchingAmbassadors.length,
+      featuredPackLeaders:
+        matchingFeaturedPackLeaders.length ||
+        matchingAmbassadors.filter(isFeaturedPackLeader).length,
       messages: matchingMessages.length,
       completedBookings,
       participantEarnings,
       totalBookingValue,
-      rewardsPending: rewardsPending.length,
-      rewardsPendingAmount,
+      rewardsPending: rewardsPending.length + commissionPending.length,
+      rewardsPendingAmount: rewardsPendingAmount + commissionPendingAmount,
+      totalCommissionCost,
       conversionRate,
       readinessScore,
       latestActivity: latestDateFromRows(matchingRows),
@@ -820,11 +986,25 @@ async function getProgramData() {
       (sum, item) => sum + item.rewardsPendingAmount,
       0,
     ),
+    totalCommissionCost: programStats.reduce(
+      (sum, item) => sum + item.totalCommissionCost,
+      0,
+    ),
+    referrals: programStats.reduce((sum, item) => sum + item.referrals, 0),
+    ambassadors: programStats.reduce((sum, item) => sum + item.ambassadors, 0),
+    featuredPackLeaders: programStats.reduce(
+      (sum, item) => sum + item.featuredPackLeaders,
+      0,
+    ),
   };
 
   return {
     programApplications,
     programs,
+    ambassadorProfiles,
+    referralEvents,
+    commissionLedger,
+    featuredPackLeaders,
     networkPrograms,
     networkParticipants,
     networkReferrals,
@@ -960,6 +1140,8 @@ function ProgramCard({
   program: Awaited<ReturnType<typeof getProgramData>>["programStats"][number];
 }) {
   const isCommunity = program.key === "community-hire";
+  const isVeterans = program.key === "veterans-hire";
+  const isAmbassador = program.key === "ambassador-program";
 
   return (
     <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
@@ -976,6 +1158,9 @@ function ProgramCard({
             <h2 className="mt-1 text-2xl font-black text-green-950">
               {program.title}
             </h2>
+            <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-amber-700">
+              {program.campaign}
+            </p>
             <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
               {program.description}
             </p>
@@ -1006,19 +1191,26 @@ function ProgramCard({
           value={number(program.pendingApplications)}
         />
         <MiniMetric
-          label="Onboarding"
-          value={number(program.onboarding)}
+          label={isAmbassador ? "Ambassadors" : "Onboarding"}
+          value={number(isAmbassador ? program.ambassadors : program.onboarding)}
         />
         <MiniMetric
-          label="Checkr / Background"
-          value={number(program.backgroundChecks)}
+          label={isAmbassador ? "Referrals" : "Checkr / Background"}
+          value={number(
+            isAmbassador ? program.referrals : program.backgroundChecks,
+          )}
         />
-        <MiniMetric label="Bookable" value={number(program.bookable)} />
+        <MiniMetric
+          label={isAmbassador ? "Pack Leaders" : "Bookable"}
+          value={number(
+            isAmbassador ? program.featuredPackLeaders : program.bookable,
+          )}
+        />
       </div>
 
       <div className="mt-5">
         <ProgressBar
-          label="Program readiness"
+          label={isAmbassador ? "Growth readiness" : "Program readiness"}
           value={program.readinessScore}
         />
       </div>
@@ -1047,6 +1239,50 @@ function ProgramCard({
         </div>
       ) : null}
 
+      {isVeterans ? (
+        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-amber-800 shadow-sm">
+              <Medal size={21} />
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">
+                Veterans Hire includes Military Hire and SkillBridge interest
+              </p>
+              <p className="mt-1 text-sm font-bold leading-6 text-amber-950">
+                This program now combines the prior Military Hire pathway and
+                SkillBridge Interest List into one Veterans Hire Program.
+                SkillBridge remains an interest-tracking pathway unless SitGuru
+                later creates a formally approved training program.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isAmbassador ? (
+        <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-green-800 shadow-sm">
+              <Trophy size={21} />
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
+                Pack Leader recognition and commission tracking
+              </p>
+              <p className="mt-1 text-sm font-bold leading-6 text-green-950">
+                Track Ambassadors by profession, referrals, commission costs,
+                bonuses, completed bookings, and homepage Pack Leader
+                eligibility. Ambassadors should only be publicly featured with
+                their consent.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-5 grid gap-4 lg:grid-cols-4">
         <InfoList title="Who it supports" items={program.audience} />
         <InfoList title="Partner sources" items={program.partners} />
@@ -1057,8 +1293,11 @@ function ProgramCard({
       <div className="mt-5 flex flex-wrap gap-2">
         <Badge>{number(program.approvedParticipants)} approved</Badge>
         <Badge>{number(program.legacyApplications)} legacy signals</Badge>
+        <Badge>{number(program.referrals)} referrals</Badge>
         <Badge>{number(program.completedBookings)} bookings</Badge>
-        <Badge>{money(program.participantEarnings)} earnings</Badge>
+        <Badge>{money(program.totalBookingValue)} booking value</Badge>
+        <Badge>{money(program.rewardsPendingAmount)} pending rewards</Badge>
+        <Badge>{money(program.totalCommissionCost)} commission cost</Badge>
         <Badge>{number(program.messages)} messages</Badge>
         <Badge>{formatDate(program.latestActivity)} latest activity</Badge>
       </div>
@@ -1084,7 +1323,11 @@ function ProgramChart({
     | "participantEarnings"
     | "completedBookings"
     | "messages"
-    | "backgroundChecks";
+    | "backgroundChecks"
+    | "referrals"
+    | "ambassadors"
+    | "totalCommissionCost"
+    | "rewardsPendingAmount";
   valueFormatter?: (value: number) => string;
 }) {
   const maxValue = Math.max(
@@ -1116,7 +1359,7 @@ function ProgramChart({
                     {item.title}
                   </p>
                   <p className="truncate text-xs font-bold text-slate-500">
-                    {item.eyebrow}
+                    {item.campaign}
                   </p>
                 </div>
 
@@ -1157,6 +1400,9 @@ export default async function AdminProgramsPage() {
       ? (data.totals.approvedParticipants / data.totals.applications) * 100
       : 0;
 
+  const netTrackedProgramValue =
+    data.totals.bookingValue - data.totals.totalCommissionCost;
+
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1600px] space-y-5">
@@ -1177,18 +1423,18 @@ export default async function AdminProgramsPage() {
 
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
-                  Admin / Operations / Programs
+                  Admin / Operations / Growth Programs
                 </p>
 
                 <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                  SitGuru Program Operations
+                  SitGuru Growth Programs Command Center
                 </h1>
 
                 <p className="mt-1 max-w-5xl text-base font-semibold text-slate-600">
-                  Track Student Hire, Community Hire, Military Hire, and
-                  SkillBridge Interest applications, onboarding, Checkr /
-                  background check readiness, partner sources, and progress
-                  toward bookable Guru status.
+                  Track Student Hire, Community Hire, Veterans Hire, and
+                  Ambassador Program applications, referrals, onboarding,
+                  Checkr / background check readiness, Pack Leader recognition,
+                  commission costs, and progress toward bookable Guru status.
                 </p>
               </div>
             </div>
@@ -1225,27 +1471,26 @@ export default async function AdminProgramsPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
-                Program Work Model
+                Join the Pack program structure
               </p>
               <h2 className="mt-1 text-2xl font-black text-green-950">
-                Supported pathways into independent-contractor pet care
-                opportunities
+                Four public pathways feeding one growth and operations system
               </h2>
               <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
                 SitGuru programs are designed to help qualified applicants apply
-                for flexible local pet care opportunities. Approved Gurus
-                provide services as independent contractors. Program
-                participation does not guarantee approval, bookings, earnings,
-                employment, commissions, benefits, placement, or full Guru
-                status.
+                for flexible local pet care opportunities and to help trusted
+                Ambassadors grow the SitGuru community. Approved Gurus provide
+                services as independent contractors. Program participation does
+                not guarantee approval, bookings, earnings, employment,
+                commissions, benefits, placement, or full Guru status.
               </p>
             </div>
 
             <div className="grid shrink-0 gap-3 sm:grid-cols-2">
-              <Badge>Student → Community → Military → SkillBridge</Badge>
-              <Badge>Admin applicant tracking</Badge>
-              <Badge>Checkr readiness</Badge>
-              <Badge>No guaranteed employment</Badge>
+              <Badge>Earn with the Pack</Badge>
+              <Badge>Work with the Pack</Badge>
+              <Badge>Serve with the Pack</Badge>
+              <Badge>Lead the Pack</Badge>
             </div>
           </div>
         </section>
@@ -1259,17 +1504,19 @@ export default async function AdminProgramsPage() {
 
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-800">
-                  Community Hire fair review
+                  Compliance and fair review reminder
                 </p>
                 <h2 className="mt-1 text-2xl font-black text-blue-950">
-                  SitGuru follows EEOC guidance for background check review.
+                  Keep program language accurate and review applicants fairly.
                 </h2>
                 <p className="mt-2 max-w-5xl text-sm font-bold leading-6 text-blue-950">
-                  For Community Hire applicants, background check information
-                  should be reviewed fairly, consistently, and in relation to
-                  pet care responsibilities, home access, safety, trust, and
-                  customer needs. Background check information is reviewed in
-                  context and does not automatically disqualify every applicant.
+                  Community Hire applicants should be reviewed fairly,
+                  consistently, and in relation to pet care responsibilities,
+                  home access, safety, trust, and customer needs. Ambassador
+                  commissions and bonuses should be calculated only under
+                  approved SitGuru program terms. Public Pack Leader recognition
+                  should require consent before displaying names, photos,
+                  testimonials, or performance highlights.
                 </p>
               </div>
             </div>
@@ -1292,7 +1539,7 @@ export default async function AdminProgramsPage() {
             icon={<BriefcaseBusiness size={22} />}
             label="Programs"
             value={number(programDefinitions.length)}
-            detail="Student, Community, Military, SkillBridge"
+            detail="Student, Community, Veterans, Ambassadors"
             href={adminRoutes.programs}
           />
 
@@ -1312,10 +1559,10 @@ export default async function AdminProgramsPage() {
           />
 
           <StatCard
-            icon={<ShieldCheck size={22} />}
-            label="Checkr / Background"
-            value={number(data.totals.backgroundChecks)}
-            detail="Trust and safety readiness signal"
+            icon={<HeartHandshake size={22} />}
+            label="Ambassadors"
+            value={number(data.totals.ambassadors)}
+            detail={`${number(data.totals.referrals)} referral signals tracked`}
           />
 
           <StatCard
@@ -1336,9 +1583,16 @@ export default async function AdminProgramsPage() {
 
           <StatCard
             icon={<Trophy size={22} />}
-            label="Participant Earnings"
-            value={money(data.totals.earnings)}
-            detail={`${money(data.totals.bookingValue)} booking value tracked`}
+            label="Booking Value"
+            value={money(data.totals.bookingValue)}
+            detail={`${money(netTrackedProgramValue)} after tracked commissions`}
+          />
+
+          <StatCard
+            icon={<Medal size={22} />}
+            label="Commission Cost"
+            value={money(data.totals.totalCommissionCost)}
+            detail={`${money(data.totals.rewardsPendingAmount)} pending rewards`}
           />
 
           <StatCard
@@ -1347,14 +1601,6 @@ export default async function AdminProgramsPage() {
             value={number(data.totals.messages)}
             detail="Program-related message activity"
             href={adminRoutes.messages}
-          />
-
-          <StatCard
-            icon={<UsersRound size={22} />}
-            label="Gurus"
-            value={number(data.gurus.length)}
-            detail="Total Guru rows loaded"
-            href={adminRoutes.gurus}
           />
         </section>
 
@@ -1380,14 +1626,21 @@ export default async function AdminProgramsPage() {
           />
 
           <ProgramChart
+            title="Referrals by Program"
+            subtitle="Which pathway is creating the most referral activity."
+            items={data.programStats}
+            valueKey="referrals"
+          />
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-3">
+          <ProgramChart
             title="Background Checks by Program"
             subtitle="Which program is moving candidates through trust and safety."
             items={data.programStats}
             valueKey="backgroundChecks"
           />
-        </section>
 
-        <section className="grid gap-5 xl:grid-cols-3">
           <ProgramChart
             title="Bookable Readiness"
             subtitle="Participants connected to bookable readiness signals."
@@ -1401,7 +1654,9 @@ export default async function AdminProgramsPage() {
             items={data.programStats}
             valueKey="completedBookings"
           />
+        </section>
 
+        <section className="grid gap-5 xl:grid-cols-3">
           <ProgramChart
             title="Participant Earnings"
             subtitle="Income opportunity impact created through each program."
@@ -1409,16 +1664,33 @@ export default async function AdminProgramsPage() {
             valueKey="participantEarnings"
             valueFormatter={money}
           />
+
+          <ProgramChart
+            title="Commission Costs"
+            subtitle="Tracked referral, reward, and Ambassador commission cost."
+            items={data.programStats}
+            valueKey="totalCommissionCost"
+            valueFormatter={money}
+          />
+
+          <ProgramChart
+            title="Pending Rewards"
+            subtitle="Rewards or commissions that may need finance review."
+            items={data.programStats}
+            valueKey="rewardsPendingAmount"
+            valueFormatter={money}
+          />
         </section>
 
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
           <div className="mb-5">
             <h2 className="text-xl font-black text-slate-950">
-              Program Admin Workflow
+              Growth Programs Admin Workflow
             </h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">
               Use this dashboard to see program health. Use Program
-              Applications to action individual applicants.
+              Applications to action individual applicants and Ambassador
+              submissions.
             </p>
           </div>
 
@@ -1454,15 +1726,57 @@ export default async function AdminProgramsPage() {
             />
 
             <InfoList
-              title="Growth Path"
+              title="Growth and Finance"
               items={[
-                "Onboarding started",
-                "Profile readiness",
-                "Approved",
-                "Full Guru status tracking",
+                "Referral code tracked",
+                "Qualified booking verified",
+                "Commission calculated",
+                "Pack Leader eligibility reviewed",
               ]}
             />
           </div>
+        </section>
+
+        <section className="rounded-[30px] border border-green-100 bg-white p-5 shadow-sm">
+          <div className="mb-5">
+            <h2 className="text-xl font-black text-slate-950">
+              Pack Leader Recognition Model
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Top-performing Ambassadors can be recognized publicly after
+              consent is captured and approved.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <MiniMetric
+              label="Tracked Ambassadors"
+              value={number(data.totals.ambassadors)}
+            />
+            <MiniMetric
+              label="Referral Signals"
+              value={number(data.totals.referrals)}
+            />
+            <MiniMetric
+              label="Featured Pack Leaders"
+              value={number(data.totals.featuredPackLeaders)}
+            />
+            <MiniMetric
+              label="Pending Rewards"
+              value={money(data.totals.rewardsPendingAmount)}
+            />
+            <MiniMetric
+              label="Commission Cost"
+              value={money(data.totals.totalCommissionCost)}
+            />
+          </div>
+
+          <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
+            Future homepage carousel controls should allow Admin to choose
+            whether an Ambassador is featured, which photo is shown, whether
+            first name or full name appears, what performance highlight is
+            displayed, and how long the Ambassador remains featured.
+          </p>
         </section>
 
         <div className="rounded-[26px] border border-green-100 bg-white p-4 text-sm font-semibold text-slate-500 shadow-sm">
@@ -1470,13 +1784,15 @@ export default async function AdminProgramsPage() {
             Supabase coordination:
           </span>{" "}
           this page safely reads <code>program_applications</code>,{" "}
-          <code>programs</code>, <code>network_programs</code>,{" "}
+          <code>programs</code>, <code>ambassador_profiles</code>,{" "}
+          <code>referral_events</code>, <code>commission_ledger</code>,{" "}
+          <code>featured_pack_leaders</code>, <code>network_programs</code>,{" "}
           <code>network_program_participants</code>,{" "}
           <code>network_referrals</code>, <code>network_rewards</code>,{" "}
-          <code>network_partner_leads</code>,{" "}
-          <code>partner_applications</code>, <code>messages</code>,{" "}
-          <code>gurus</code>, and <code>bookings</code> when those tables exist.
-          The main applicant source is now <code>program_applications</code>.
+          <code>network_partner_leads</code>, <code>partner_applications</code>,{" "}
+          <code>messages</code>, <code>gurus</code>, and <code>bookings</code>{" "}
+          when those tables exist. Missing tables are skipped safely, so this
+          page can be deployed before every future tracking table is created.
         </div>
       </div>
     </main>

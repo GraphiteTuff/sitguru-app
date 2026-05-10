@@ -135,7 +135,7 @@ const pillars = [
     number: "01",
     title: "Find a Guru",
     description:
-      "Search local Gurus by service, profile, location, and availability with a cleaner browsing experience built for pet parents.",
+      "Search local Gurus by service, profile, location, and availability with a cleaner browsing experience built for Pet Parents.",
   },
   {
     number: "02",
@@ -204,7 +204,7 @@ const testimonials = [
     quote:
       "This feels easier to understand than older pet care platforms. I can quickly compare providers and actually tell what makes each one different.",
     name: "Danielle R.",
-    role: "Pet Owner, Pennsylvania",
+    role: "Pet Parent, Pennsylvania",
   },
   {
     quote:
@@ -216,7 +216,7 @@ const testimonials = [
     quote:
       "It feels more modern, less cluttered, and more focused on what matters when choosing care for a pet.",
     name: "Marcus T.",
-    role: "Pet Owner, Allentown",
+    role: "Pet Parent, Allentown",
   },
 ];
 
@@ -226,7 +226,7 @@ const guruTypes = [
   "Boarding providers",
   "Drop-in caregivers",
   "Dog trainers",
-  "Experienced pet parents",
+  "Experienced Pet Parents",
   "Students",
   "Professionals",
   "Trusted local helpers",
@@ -234,7 +234,7 @@ const guruTypes = [
 
 const launchHighlights = [
   "Something new is coming to pet care",
-  "Early access for pet parents and future Gurus",
+  "Early access for Pet Parents and future Gurus",
   "Warm, premium, pet-friendly brand feel",
   "Capture leads from Instagram, Facebook, TikTok, and more",
 ];
@@ -242,50 +242,44 @@ const launchHighlights = [
 const homepagePrograms = [
   {
     title: "Student Hire Program",
-    eyebrow: "Extra cash for students",
+    eyebrow: "Featured earning pathway",
     description:
-      "Broke between classes? Earn extra cash after class, between classes, weekends, school breaks, or all summer helping local pet families.",
+      "For students, recent grads, summer workers, and pet lovers who want a flexible way to earn extra cash after class, between classes, on weekends, during school breaks, or all summer.",
     href: "/programs#student-hire",
     applyHref: "/programs/apply?program=student-hire",
     icon: "🎓",
-    primaryCta: "Start Earning",
+    image: "/images/ambassadors/student-hire2.jpg",
+    imageAlt: "Student pet caregiver taking a selfie with a dog",
+    primaryCta: "Start Student Hire",
     secondaryCta: "Student Details",
     featured: true,
   },
   {
-    title: "Community Hire Program",
-    eyebrow: "Community workforce pathway",
-    description:
-      "For qualified people connected through city, state, federal, nonprofit, and community workforce programs who are ready to work, learn, and grow with SitGuru.",
-    href: "/programs#community-hire",
-    applyHref: "/programs/apply?program=community-hire",
-    icon: "🤝",
-    primaryCta: "Apply Today",
-    secondaryCta: "Program Details",
-    featured: false,
-  },
-  {
-    title: "Military Hire Program",
+    title: "Veterans Hire Program",
     eyebrow: "Military-connected pathway",
     description:
-      "For veterans, eligible service members, National Guard, reservists, military spouses, and qualified dependents over 18 who want to grow into trusted SitGuru Gurus.",
-    href: "/programs#military-hire",
-    applyHref: "/programs/apply?program=military-hire",
+      "For veterans, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and approved SkillBridge applicants who want to grow with SitGuru.",
+    href: "/programs#veterans-hire",
+    applyHref: "/programs/apply?program=veterans-hire",
     icon: "🎖️",
+    image: "/images/ambassadors/veteran-ambassador2.jpg",
+    imageAlt: "Veteran or military-connected pet caregiver relaxing with a dog",
     primaryCta: "Apply Today",
-    secondaryCta: "Program Details",
+    secondaryCta: "Veterans Details",
     featured: false,
   },
   {
-    title: "SkillBridge Interest List",
-    eyebrow: "Future transition pathway",
+    title: "Ambassador Program",
+    eyebrow: "Together, we grow together",
     description:
-      "For active-duty transitioning service members interested in future SitGuru training pathways around pet care operations, local services, and post-transition opportunities.",
-    href: "/programs#skillbridge-interest",
-    applyHref: "/programs/apply?program=skillbridge-interest",
-    icon: "🛡️",
-    primaryCta: "Join Interest List",
-    secondaryCta: "Learn More",
+      "For Vet Techs, Veterinarians, Trainers, pet-care professionals, and community supporters who want to refer Gurus and Pet Parents while helping SitGuru grow.",
+    href: "/programs/ambassadors",
+    applyHref: "/programs/ambassadors/apply",
+    icon: "🤝",
+    image: "/images/ambassadors/ambassador-program2.jpg",
+    imageAlt: "Veterinary professionals smiling while caring for a kitten",
+    primaryCta: "Become an Ambassador",
+    secondaryCta: "Ambassador Details",
     featured: false,
   },
 ];
@@ -592,7 +586,7 @@ function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
             <div className="section-kicker">Trusted local pet care</div>
 
             <h2 className="mt-4 text-slate-950">
-              Meet local Gurus pet owners can feel good about
+              Meet local Gurus Pet Parents can feel good about
             </h2>
 
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
@@ -1236,7 +1230,7 @@ export default function HomePage() {
 
               <div className="mt-5 space-y-4">
                 <p className="max-w-3xl text-lg font-medium leading-8 text-slate-800 sm:text-xl">
-                  SitGuru helps pet parents discover trusted local caregivers
+                  SitGuru helps Pet Parents discover trusted local caregivers
                   for{" "}
                   <span className="font-semibold text-emerald-700">
                     walking, sitting, boarding, day care, training support,
@@ -1343,7 +1337,7 @@ export default function HomePage() {
                     Join the SitGuru launch list
                   </h2>
                   <p className="mt-2 text-sm text-slate-600">
-                    Be first to hear what’s coming. Join as a pet parent, future
+                    Be first to hear what’s coming. Join as a Pet Parent, future
                     Guru, or both.
                   </p>
                 </div>
@@ -1613,21 +1607,22 @@ export default function HomePage() {
                 </div>
 
                 <h2 className="mt-4 !text-3xl !font-bold !leading-tight text-slate-950 sm:!text-4xl">
-                  Broke between classes? Start with Student Hire.
+                  Flexible pathways to earn, serve, and grow with SitGuru.
                 </h2>
 
                 <p className="mt-4 text-base leading-7 text-slate-700">
-                  Student Hire is built for students, recent grads, summer
-                  workers, and pet lovers who want a flexible way to earn extra
-                  cash after class, between classes, on weekends, during school
-                  breaks, or all summer.
+                  SitGuru gives students, veterans, approved SkillBridge
+                  applicants, pet-care professionals, and community supporters a
+                  public pathway to earn, refer, support local Pet Parents, and
+                  grow with the SitGuru Pet Community.
                 </p>
 
                 <p className="mt-4 text-base leading-7 text-slate-700">
-                  SitGuru also offers Community Hire, Military Hire, and a
-                  SkillBridge Interest List so qualified applicants can find the
-                  right pathway, complete onboarding, and grow toward full Guru
-                  status over time.
+                  Student Hire stays highlighted for flexible earning. Veterans
+                  Hire brings together military-connected applicants and
+                  SkillBridge interest. The Ambassador Program gives Vet Techs,
+                  Veterinarians, Trainers, and trusted community voices a way to
+                  support referrals and community growth.
                 </p>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -1661,87 +1656,112 @@ export default function HomePage() {
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <span className="chip">Extra cash</span>
-                  <span className="chip">After class</span>
-                  <span className="chip">Summer money</span>
-                  <span className="chip">Training and support</span>
-                  <span className="chip">Background checks required</span>
-                  <span className="chip">Pathway to full Guru status</span>
+                  <span className="chip">Student Hire</span>
+                  <span className="chip">Veterans Hire</span>
+                  <span className="chip">SkillBridge applicants</span>
+                  <span className="chip">Ambassador Program</span>
+                  <span className="chip">Referral rewards</span>
+                  <span className="chip">Community growth</span>
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-3">
                 {homepagePrograms.map((program) => (
                   <div
                     key={program.title}
-                    className={`rounded-[26px] border p-5 transition ${
+                    className={`overflow-hidden rounded-[26px] border transition ${
                       program.featured
                         ? "border-amber-200 bg-amber-50 hover:border-amber-300 hover:bg-amber-100/70"
                         : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/40"
                     }`}
                   >
                     <div
-                      className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-lg ${
-                        program.featured
-                          ? "bg-amber-400 text-amber-950 shadow-amber-900/10"
-                          : "bg-emerald-700 text-white shadow-emerald-900/15"
+                      className={`relative overflow-hidden ${
+                        program.title === "Student Hire Program"
+                          ? "h-80 bg-sky-100 md:h-52 lg:h-56"
+                          : "h-64 md:h-52 lg:h-56"
                       }`}
                     >
-                      {program.icon}
+                      <img
+                        src={program.image}
+                        alt={program.imageAlt}
+                        className={`h-full w-full transition duration-500 hover:scale-105 ${
+                          program.title === "Student Hire Program"
+                            ? "object-contain object-center md:object-cover md:object-center"
+                            : "object-cover object-top"
+                        }`}
+                        loading="lazy"
+                      />
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/45 via-slate-950/10 to-transparent" />
+
+                      <div
+                        className={`absolute bottom-4 left-4 flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-lg ${
+                          program.featured
+                            ? "bg-amber-400 text-amber-950 shadow-amber-900/10"
+                            : "bg-emerald-700 text-white shadow-emerald-900/15"
+                        }`}
+                      >
+                        {program.icon}
+                      </div>
                     </div>
 
-                    <p
-                      className={`text-xs font-bold uppercase tracking-[0.16em] ${
-                        program.featured ? "text-amber-700" : "text-emerald-700"
-                      }`}
-                    >
-                      {program.eyebrow}
-                    </p>
-
-                    <h3 className="mt-2 text-lg font-bold text-slate-950">
-                      {program.title}
-                    </h3>
-
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      {program.description}
-                    </p>
-
-                    <div className="mt-5 flex flex-col gap-2">
-                      <Link
-                        href={program.applyHref}
-                        className={`inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                    <div className="p-5">
+                      <p
+                        className={`text-xs font-bold uppercase tracking-[0.16em] ${
                           program.featured
-                            ? "bg-amber-400 text-amber-950 hover:bg-amber-300"
-                            : "bg-emerald-700 text-white hover:bg-emerald-800"
+                            ? "text-amber-700"
+                            : "text-emerald-700"
                         }`}
-                        onClick={() =>
-                          trackHomepageClick(
-                            `${program.primaryCta} ${program.title}`,
-                            "homepage_programs_card",
-                            program.applyHref,
-                          )
-                        }
                       >
-                        {program.primaryCta}
-                      </Link>
+                        {program.eyebrow}
+                      </p>
 
-                      <Link
-                        href={program.href}
-                        className={`inline-flex items-center justify-center rounded-full border bg-white px-4 py-2.5 text-sm font-semibold transition ${
-                          program.featured
-                            ? "border-amber-300 text-amber-900 hover:bg-amber-50"
-                            : "border-emerald-200 text-emerald-800 hover:bg-emerald-50"
-                        }`}
-                        onClick={() =>
-                          trackHomepageClick(
-                            `${program.secondaryCta} ${program.title}`,
-                            "homepage_programs_card",
-                            program.href,
-                          )
-                        }
-                      >
-                        {program.secondaryCta}
-                      </Link>
+                      <h3 className="mt-2 text-lg font-bold text-slate-950">
+                        {program.title}
+                      </h3>
+
+                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                        {program.description}
+                      </p>
+
+                      <div className="mt-5 flex flex-col gap-2">
+                        <Link
+                          href={program.applyHref}
+                          className={`inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                            program.featured
+                              ? "bg-amber-400 text-amber-950 hover:bg-amber-300"
+                              : "bg-emerald-700 text-white hover:bg-emerald-800"
+                          }`}
+                          onClick={() =>
+                            trackHomepageClick(
+                              `${program.primaryCta} ${program.title}`,
+                              "homepage_programs_card",
+                              program.applyHref,
+                            )
+                          }
+                        >
+                          {program.primaryCta}
+                        </Link>
+
+                        <Link
+                          href={program.href}
+                          className={`inline-flex items-center justify-center rounded-full border bg-white px-4 py-2.5 text-sm font-semibold transition ${
+                            program.featured
+                              ? "border-amber-300 text-amber-900 hover:bg-amber-50"
+                              : "border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                          }`}
+                          onClick={() =>
+                            trackHomepageClick(
+                              `${program.secondaryCta} ${program.title}`,
+                              "homepage_programs_card",
+                              program.href,
+                            )
+                          }
+                        >
+                          {program.secondaryCta}
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1923,8 +1943,8 @@ export default function HomePage() {
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
               The word Guru is flexible on purpose. It supports different types
-              of pet care and trusted local providers while staying easy for pet
-              parents to understand.
+              of pet care and trusted local providers while staying easy for Pet
+              Parents to understand.
             </p>
           </div>
 
@@ -1946,7 +1966,7 @@ export default function HomePage() {
         <div className="page-container">
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
-              <div className="section-kicker">For pet parents</div>
+              <div className="section-kicker">For Pet Parents</div>
               <h2 className="mt-4 text-slate-950">
                 Find care that feels more trustworthy from the start
               </h2>
@@ -1987,7 +2007,7 @@ export default function HomePage() {
               </h2>
               <p className="mt-4 text-base leading-7 !text-slate-100">
                 SitGuru gives care providers a more modern way to show services,
-                build trust, and connect with local pet owners looking for help.
+                build trust, and connect with local Pet Parents looking for help.
               </p>
               <ul className="mt-6 space-y-3 text-sm leading-7 !text-slate-100">
                 <li>• Explain what makes you different</li>
@@ -2016,14 +2036,14 @@ export default function HomePage() {
         <div className="page-container">
           <div className="mx-auto max-w-3xl text-center">
             <div className="section-kicker">
-              Why pet parents will choose SitGuru
+              Why Pet Parents will choose SitGuru
             </div>
             <h2 className="mt-4 text-slate-950">
               Cleaner, clearer, warmer, and more trust-first
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              SitGuru is being built to make discovery feel modern for pet
-              parents while making it easier to search, compare, and choose
+              SitGuru is being built to make discovery feel modern for Pet
+              Parents while making it easier to search, compare, and choose
               care.
             </p>
           </div>
@@ -2057,9 +2077,9 @@ export default function HomePage() {
                 Trust signals should be visible, not buried
               </h2>
               <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-                Pet owners need reassurance. SitGuru should visibly support that
-                through cleaner profiles, stronger trust presentation, and more
-                understandable service information.
+                Pet Parents need reassurance. SitGuru should visibly support
+                that through cleaner profiles, stronger trust presentation, and
+                more understandable service information.
               </p>
             </div>
 

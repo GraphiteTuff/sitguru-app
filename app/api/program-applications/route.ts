@@ -4,9 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 
 type ProgramKey =
-  | "military-hire"
+  | "veterans-hire"
   | "student-hire"
-  | "community-hire"
+  | "ambassador-program"
   | "skillbridge-interest";
 
 type UploadedApplicationDocument = {
@@ -69,17 +69,17 @@ const allowedAdditionalDocumentTypes = [
 ];
 
 const allowedPrograms: ProgramKey[] = [
-  "military-hire",
   "student-hire",
-  "community-hire",
+  "veterans-hire",
+  "ambassador-program",
   "skillbridge-interest",
 ];
 
 const programLabels: Record<ProgramKey, string> = {
-  "military-hire": "Military Hire Program",
   "student-hire": "Student Hire Program",
-  "community-hire": "Community Hire Program",
-  "skillbridge-interest": "SkillBridge Interest List",
+  "veterans-hire": "Veterans Hire Program",
+  "ambassador-program": "Ambassador Program",
+  "skillbridge-interest": "SkillBridge Interest / Veterans Pathway",
 };
 
 function getSupabaseAdminClient() {
@@ -223,9 +223,11 @@ Program: ${programLabel}
 Status: ${application.status}
 Submitted: ${applicationDate}
 
-If you are a fit for the next step, we will share onboarding instructions and information about the Checkr background check process.
+If you are a fit for the next step, we will share onboarding instructions and information about SitGuru trust and safety review steps.
 
-Approved Gurus provide services as independent contractors. Applying does not guarantee approval, bookings, earnings, commissions, benefits, or full Guru status. Program participation and future opportunities may depend on eligibility, background check results, availability, performance, trust, customer demand, and SitGuru program needs.
+Approved Gurus provide services as independent contractors. Gurus are responsible for reporting and paying their own federal, state, local, and self-employment taxes. SitGuru or its payment processor may request tax information and may issue applicable tax forms when required by law.
+
+Applying does not guarantee approval, bookings, earnings, commissions, benefits, referral rewards, SkillBridge participation, or full Guru status. Program participation and future opportunities may depend on eligibility, onboarding, SitGuru trust and safety review steps, availability, performance, trust, customer demand, and SitGuru program needs.
 
 Thank you,
 The SitGuru Team
@@ -342,8 +344,8 @@ The SitGuru Team
                         <div style="width:30px; height:30px; border-radius:999px; background:#047857; color:#ffffff; text-align:center; line-height:30px; font-size:13px; font-weight:900;">3</div>
                       </td>
                       <td>
-                        <p style="margin:0; color:#0f172a; font-size:15px; line-height:1.55; font-weight:800;">Checkr background check</p>
-                        <p style="margin:4px 0 0 0; color:#475569; font-size:14px; line-height:1.65; font-weight:600;">Before eligible opportunities, applicants complete the required background check process through Checkr.</p>
+                        <p style="margin:0; color:#0f172a; font-size:15px; line-height:1.55; font-weight:800;">Trust and safety review</p>
+                        <p style="margin:4px 0 0 0; color:#475569; font-size:14px; line-height:1.65; font-weight:600;">Before eligible opportunities, approved applicants may need to complete SitGuru trust and safety review steps.</p>
                       </td>
                     </tr>
                   </table>
@@ -351,7 +353,13 @@ The SitGuru Team
 
                 <div style="margin-top:18px; background:#fffbeb; border:1px solid #fde68a; border-radius:18px; padding:16px;">
                   <p style="margin:0; color:#92400e; font-size:12px; line-height:1.7; font-weight:700;">
-                    Approved Gurus provide services as independent contractors. Applying does not guarantee approval, bookings, earnings, commissions, benefits, or full Guru status. Program participation and future opportunities may depend on eligibility, background check results, availability, performance, trust, customer demand, and SitGuru program needs.
+                    Approved Gurus provide services as independent contractors. Gurus are responsible for reporting and paying their own federal, state, local, and self-employment taxes. SitGuru or its payment processor may request tax information and may issue applicable tax forms when required by law.
+                  </p>
+                </div>
+
+                <div style="margin-top:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:18px; padding:16px;">
+                  <p style="margin:0; color:#475569; font-size:12px; line-height:1.7; font-weight:700;">
+                    Applying does not guarantee approval, bookings, earnings, commissions, benefits, referral rewards, SkillBridge participation, or full Guru status. Program participation and future opportunities may depend on eligibility, onboarding, SitGuru trust and safety review steps, availability, performance, trust, customer demand, and SitGuru program needs.
                   </p>
                 </div>
 
@@ -612,6 +620,26 @@ async function uploadAdditionalDocuments({
   return uploadedDocuments;
 }
 
+function getApplicationSource(program: ProgramKey) {
+  if (program === "skillbridge-interest") {
+    return "skillbridge_interest_page";
+  }
+
+  if (program === "ambassador-program") {
+    return "ambassador_program_application_page";
+  }
+
+  if (program === "veterans-hire") {
+    return "veterans_hire_application_page";
+  }
+
+  if (program === "student-hire") {
+    return "student_hire_application_page";
+  }
+
+  return "program_application_page";
+}
+
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get("content-type") || "";
@@ -647,7 +675,7 @@ export async function POST(request: NextRequest) {
       formData.get("referralSource"),
     );
     const resumeLink = normalizeOptionalString(formData.get("resumeLink"));
-    const backgroundCheckConsent = normalizeBoolean(
+    const trustAndSafetyAcknowledged = normalizeBoolean(
       formData.get("backgroundCheckConsent"),
     );
     const notes = normalizeOptionalString(formData.get("notes"));
@@ -658,9 +686,13 @@ export async function POST(request: NextRequest) {
     validateRequiredField(servicesInterested, "Services interested");
     validateRequiredField(experience, "Experience");
 
-    if (!backgroundCheckConsent) {
+    if (!trustAndSafetyAcknowledged) {
       throw new Error(
-        "Please confirm that you understand a background check through Checkr is part of the approval process.",
+        program === "ambassador-program"
+          ? "Please confirm that you understand SitGuru may review Ambassador applicants before approval and referral reward eligibility."
+          : program === "skillbridge-interest"
+            ? "Please confirm that you understand future onboarding or approved opportunities may require SitGuru trust and safety review steps."
+            : "Please confirm that you understand SitGuru trust and safety review steps are part of the approval process.",
       );
     }
 
@@ -710,13 +742,10 @@ export async function POST(request: NextRequest) {
       resume_file_type: resumeFileType,
       resume_file_size_bytes: resumeFileSizeBytes,
       additional_documents: additionalDocuments,
-      background_check_consent: backgroundCheckConsent,
+      background_check_consent: trustAndSafetyAcknowledged,
       notes,
       status: "new",
-      source:
-        program === "skillbridge-interest"
-          ? "skillbridge_interest_page"
-          : "program_application_page",
+      source: getApplicationSource(program),
     };
 
     const { data, error } = await supabase
@@ -727,7 +756,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       throw new Error(
-        `Application could not be saved. Please confirm the program_applications table has the latest columns and constraints. ${error.message}`,
+        `Application could not be saved. Please confirm the program_applications table accepts the current program values: student-hire, veterans-hire, ambassador-program, and skillbridge-interest. ${error.message}`,
       );
     }
 
