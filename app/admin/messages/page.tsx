@@ -1,20 +1,20 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import {
-  ArrowLeft,
   BadgeHelp,
-  BarChart3,
-  Download,
   CalendarCheck,
   CheckCircle2,
   Clock3,
   CreditCard,
+  Download,
   Handshake,
   Inbox,
   MessageCircle,
   MessagesSquare,
   Search,
+  Send,
   ShieldAlert,
   ShieldCheck,
   UserRound,
@@ -41,6 +41,14 @@ type SearchParams = {
   filter?: string;
   inquiry?: string;
   q?: string;
+  threadType?: string;
+  recipientId?: string;
+  recipientEmail?: string;
+  recipientName?: string;
+  recipientRole?: string;
+  department?: string;
+  departmentLabel?: string;
+  source?: string;
 };
 
 type PageProps = {
@@ -108,12 +116,20 @@ type ConversationParticipantRow = {
   role?: string | null;
 };
 
+type AdminAccessRow = {
+  user_id?: string | null;
+  email?: string | null;
+  role_key?: string | null;
+  department_key?: string | null;
+  is_active?: boolean | string | null;
+};
+
 type AdminThreadCard = {
   id: string;
   subject: string;
   preview: string;
   href: string;
-  type: "guru-customer" | "guru-admin" | "customer-admin" | "general";
+  type: "guru-customer" | "guru-admin" | "customer-admin" | "internal" | "general";
   inquiryType: InquiryKey;
   inquiryLabel: string;
   lastActivity: string | null;
@@ -147,10 +163,17 @@ const adminRoutes = {
   customers: "/admin/customers",
   gurus: "/admin/gurus",
   bookings: "/admin/bookings",
+  users: "/admin/users",
+  settings: "/admin/settings",
 };
 
 const filterLinks = [
   { key: "all", label: "All", href: "/admin/messages" },
+  {
+    key: "internal",
+    label: "Internal HQ",
+    href: "/admin/messages?filter=internal",
+  },
   {
     key: "guru-customer",
     label: "Guru ↔ Customer",
@@ -202,7 +225,7 @@ const inquiryTypes: Array<{
   {
     key: "customer-support",
     label: "Customer Support",
-    description: "Pet parent account, care, and general customer questions",
+    description: "Pet Parent account, care, and general customer questions",
     href: "/admin/messages?inquiry=customer-support",
   },
   {
@@ -231,6 +254,39 @@ const inquiryTypes: Array<{
   },
 ];
 
+const departmentShortcuts = [
+  {
+    key: "executive",
+    label: "Executive / Founder",
+    description: "CEO, founders, owners, and super users.",
+  },
+  {
+    key: "billing_finance",
+    label: "Billing & Finance",
+    description: "Stripe, payouts, financial statements, NFCU/Plaid, and reconciliation.",
+  },
+  {
+    key: "customer_service",
+    label: "Customer Service",
+    description: "Pet Parents, Gurus, bookings, messages, and support issues.",
+  },
+  {
+    key: "trust_safety",
+    label: "Trust & Safety",
+    description: "Guru approvals, Checkr, screening, safety, and bookable readiness.",
+  },
+  {
+    key: "tech_support",
+    label: "Tech Support",
+    description: "Logins, MFA, bugs, integrations, webhooks, and system health.",
+  },
+  {
+    key: "sales_marketing",
+    label: "Sales & Marketing",
+    description: "Partners, affiliates, referrals, campaigns, and growth programs.",
+  },
+];
+
 const chartColors = [
   "#166534",
   "#16a34a",
@@ -248,15 +304,16 @@ function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getText(row: AnyRow | null | undefined, keys: string[], fallback = "") {
-  if (!row) return fallback;
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
 
-  for (const key of keys) {
-    const value = asString(row[key]);
-    if (value) return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
   }
 
-  return fallback;
+  return Boolean(value);
 }
 
 function number(value: number) {
@@ -280,7 +337,10 @@ function normalizeRole(role?: string | null) {
     value === "site_admin" ||
     value === "site-admin" ||
     value === "admin_user" ||
-    value === "admin-user"
+    value === "admin-user" ||
+    value.includes("admin") ||
+    value === "founder" ||
+    value === "owner"
   ) {
     return "admin";
   }
@@ -406,11 +466,7 @@ function getStoredInquiryType(
   conversation?: ConversationRow | null,
   message?: MessageRow | null,
 ): InquiryKey | "" {
-  const raw = [
-    conversation?.topic,
-    message?.topic,
-    message?.message_type,
-  ]
+  const raw = [conversation?.topic, message?.topic, message?.message_type]
     .filter(Boolean)
     .join(" ")
     .trim()
@@ -432,8 +488,7 @@ function getStoredInquiryType(
     raw.includes("payout") ||
     raw.includes("billing") ||
     raw.includes("dispute") ||
-    raw.includes("stripe") ||
-    raw.includes("stripe / payout")
+    raw.includes("stripe")
   ) {
     return "payment";
   }
@@ -480,6 +535,7 @@ function getStoredInquiryType(
     return "customer-support";
   }
 
+  if (raw.includes("internal") || raw.includes("department")) return "general";
   if (raw.includes("other")) return "general";
 
   return "";
@@ -549,7 +605,9 @@ function classifyInquiryType(
     search.includes("app") ||
     search.includes("website") ||
     search.includes("button") ||
-    search.includes("technical")
+    search.includes("technical") ||
+    search.includes("webhook") ||
+    search.includes("mfa")
   ) {
     return "technical";
   }
@@ -575,8 +633,7 @@ function classifyInquiryType(
     search.includes("appointment") ||
     search.includes("availability") ||
     search.includes("confirmed") ||
-    search.includes("confirmation") ||
-    search.includes("application question")
+    search.includes("confirmation")
   ) {
     return "booking";
   }
@@ -639,6 +696,7 @@ function isEscalationThread(thread: AdminThreadCard) {
 }
 
 function getThreadTypeLabel(type: AdminThreadCard["type"]) {
+  if (type === "internal") return "Internal HQ";
   if (type === "guru-admin") return "Guru ↔ Admin";
   if (type === "guru-customer") return "Guru ↔ Customer";
   if (type === "customer-admin") return "Customer ↔ Admin";
@@ -646,6 +704,10 @@ function getThreadTypeLabel(type: AdminThreadCard["type"]) {
 }
 
 function getThreadTypeClasses(type: AdminThreadCard["type"]) {
+  if (type === "internal") {
+    return "border-violet-200 bg-violet-100 text-violet-900";
+  }
+
   if (type === "guru-admin") {
     return "border-amber-200 bg-amber-100 text-amber-900";
   }
@@ -684,6 +746,7 @@ function getThreadKeyFromMessage(message: MessageRow) {
 
 function buildThreadTypeChart(threads: AdminThreadCard[]) {
   const types: Array<AdminThreadCard["type"]> = [
+    "internal",
     "guru-customer",
     "guru-admin",
     "customer-admin",
@@ -747,6 +810,46 @@ function buildUnreadInquiryChart(threads: AdminThreadCard[]) {
     .sort((a, b) => b.value - a.value);
 }
 
+function getIntentFromParams(params: SearchParams) {
+  const threadType = asString(params.threadType);
+  const recipientId = asString(params.recipientId);
+  const recipientEmail = asString(params.recipientEmail);
+  const recipientName = asString(params.recipientName);
+  const recipientRole = asString(params.recipientRole);
+  const department = asString(params.department);
+  const departmentLabel = asString(params.departmentLabel);
+  const source = asString(params.source);
+
+  if (!threadType && !recipientId && !recipientEmail && !department) {
+    return null;
+  }
+
+  return {
+    threadType: threadType || (department ? "internal_department" : "internal"),
+    recipientId,
+    recipientEmail,
+    recipientName,
+    recipientRole,
+    department,
+    departmentLabel,
+    source,
+    isDepartment: Boolean(department),
+  };
+}
+
+function getDepartmentMessageHref(params: {
+  department: string;
+  departmentLabel: string;
+}) {
+  const query = new URLSearchParams({
+    threadType: "internal_department",
+    department: params.department,
+    departmentLabel: params.departmentLabel,
+  });
+
+  return `/admin/messages?${query.toString()}`;
+}
+
 async function safeAdminQuery(
   query: PromiseLike<SafeAdminQueryResponse>,
   label: string,
@@ -764,6 +867,173 @@ async function safeAdminQuery(
     console.warn(`Admin messages query skipped for ${label}:`, error);
     return { data: [], error: null };
   }
+}
+
+async function safeRows<T>(
+  query: PromiseLike<SafeAdminQueryResponse>,
+  label: string,
+): Promise<T[]> {
+  const result = await safeAdminQuery(query, label);
+
+  return Array.isArray(result.data) ? (result.data as unknown as T[]) : [];
+}
+
+async function createInternalThread(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    redirect("/admin/login");
+  }
+
+  const threadType = String(formData.get("threadType") || "internal").trim();
+  const recipientId = String(formData.get("recipientId") || "").trim();
+  const recipientEmail = String(formData.get("recipientEmail") || "").trim();
+  const recipientName = String(formData.get("recipientName") || "").trim();
+  const recipientRole = String(formData.get("recipientRole") || "").trim();
+  const department = String(formData.get("department") || "").trim();
+  const departmentLabel = String(formData.get("departmentLabel") || "").trim();
+  const source = String(formData.get("source") || "").trim();
+  const subject =
+    String(formData.get("subject") || "").trim() ||
+    (departmentLabel
+      ? `Internal message: ${departmentLabel}`
+      : recipientName
+        ? `Internal message: ${recipientName}`
+        : "Internal SitGuru HQ message");
+  const body =
+    String(formData.get("body") || "").trim() ||
+    "Starting an internal SitGuru HQ conversation.";
+
+  const now = new Date().toISOString();
+  const topic = department ? "internal_department" : "internal";
+  const preview = body.slice(0, 240);
+
+  const { data: conversation, error: conversationError } = await supabaseAdmin
+    .from("conversations")
+    .insert({
+      subject,
+      status: "open",
+      topic,
+      started_by_user_id: user.id,
+      last_message_at: now,
+      last_message_preview: preview,
+      created_at: now,
+      updated_at: now,
+    })
+    .select("id")
+    .single();
+
+  if (conversationError || !conversation?.id) {
+    console.error("Internal conversation create failed:", conversationError);
+    redirect(
+      `/admin/messages?compose_error=${encodeURIComponent(
+        conversationError?.message || "Could not create internal message thread.",
+      )}`,
+    );
+  }
+
+  const conversationId = String(conversation.id);
+
+  const participantRows: ConversationParticipantRow[] = [
+    {
+      conversation_id: conversationId,
+      user_id: user.id,
+      role: "admin",
+    },
+  ];
+
+  if (recipientId && recipientId !== user.id) {
+    participantRows.push({
+      conversation_id: conversationId,
+      user_id: recipientId,
+      role: normalizeRole(recipientRole) || "user",
+    });
+  }
+
+  if (department) {
+    const departmentMembers = await safeRows<AdminAccessRow>(
+      supabaseAdmin
+        .from("admin_user_access")
+        .select("user_id,email,role_key,department_key,is_active")
+        .eq("department_key", department)
+        .limit(100),
+      "admin_user_access_department_participants",
+    );
+
+    for (const member of departmentMembers) {
+      const memberId = asString(member.user_id);
+      const active = member.is_active === undefined ? true : getOptionalBoolean(member.is_active);
+
+      if (!active || !memberId || memberId === user.id) continue;
+
+      participantRows.push({
+        conversation_id: conversationId,
+        user_id: memberId,
+        role: normalizeRole(member.role_key) || "admin",
+      });
+    }
+  }
+
+  const uniqueParticipants = Array.from(
+    new Map(participantRows.map((row) => [row.user_id, row])).values(),
+  );
+
+  if (uniqueParticipants.length > 0) {
+    const { error: participantError } = await supabaseAdmin
+      .from("conversation_participants")
+      .insert(uniqueParticipants);
+
+    if (participantError) {
+      console.warn("Internal conversation participants skipped:", participantError);
+    }
+  }
+
+  const { error: messageError } = await supabaseAdmin.from("messages").insert({
+    conversation_id: conversationId,
+    sender_id: user.id,
+    recipient_id: recipientId || null,
+    content: body,
+    body,
+    message_type: threadType,
+    topic,
+    status: "unread",
+    is_read: false,
+    created_at: now,
+  });
+
+  if (messageError) {
+    console.error("Internal message create failed:", messageError);
+  }
+
+  await supabaseAdmin.from("admin_audit_logs").insert({
+    actor_id: user.id,
+    actor_email: user.email || null,
+    action: "internal_message_thread_created",
+    area: "admin.messages",
+    target_type: "conversation",
+    target_id: conversationId,
+    metadata: {
+      thread_type: threadType,
+      recipient_id: recipientId || null,
+      recipient_email: recipientEmail || null,
+      recipient_name: recipientName || null,
+      recipient_role: recipientRole || null,
+      department: department || null,
+      department_label: departmentLabel || null,
+      source: source || null,
+    },
+    created_at: now,
+  });
+
+  revalidatePath("/admin/messages");
+  redirect(`/admin/messages/${conversationId}`);
 }
 
 function Avatar({
@@ -877,83 +1147,6 @@ function InquiryStatCard({
   );
 }
 
-function DonutChart({
-  title,
-  total,
-  items,
-}: {
-  title: string;
-  total: number;
-  items: ChartItem[];
-}) {
-  const safeTotal = items.reduce((sum, item) => sum + item.value, 0);
-  let start = 0;
-
-  const gradient =
-    safeTotal > 0
-      ? items
-          .map((item, index) => {
-            const size = (item.value / safeTotal) * 360;
-            const end = start + size;
-            const segment = `${chartColors[index % chartColors.length]} ${start}deg ${end}deg`;
-            start = end;
-            return segment;
-          })
-          .join(", ")
-      : "#e5e7eb 0deg 360deg";
-
-  return (
-    <div className="grid items-center gap-5 sm:grid-cols-[180px_1fr] xl:grid-cols-1 2xl:grid-cols-[180px_1fr]">
-      <div className="relative mx-auto h-[180px] w-[180px]">
-        <div
-          className="h-full w-full rounded-full"
-          style={{ background: `conic-gradient(${gradient})` }}
-        />
-        <div className="absolute inset-[34px] flex flex-col items-center justify-center rounded-full bg-white shadow-inner">
-          <span className="text-3xl font-black text-slate-950">
-            {number(total)}
-          </span>
-          <span className="text-xs font-bold text-slate-500">{title}</span>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {items.length ? (
-          items.map((item, index) => (
-            <Link
-              href={item.href || adminRoutes.messages}
-              key={item.label}
-              className="flex items-center justify-between gap-3 rounded-2xl p-2 text-sm font-bold transition hover:bg-green-50"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: chartColors[index % chartColors.length],
-                  }}
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-slate-700">{item.label}</p>
-                  <p className="truncate text-xs text-slate-400">
-                    {item.helper}
-                  </p>
-                </div>
-              </div>
-              <span className="shrink-0 text-slate-950">
-                {number(item.value)}
-              </span>
-            </Link>
-          ))
-        ) : (
-          <div className="rounded-2xl bg-white p-4 text-sm font-bold text-slate-500">
-            No chart data yet.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function HorizontalBarChart({
   title,
   valueLabel,
@@ -1032,6 +1225,115 @@ function HorizontalBarChart({
         )}
       </div>
     </div>
+  );
+}
+
+function InternalComposer({
+  intent,
+}: {
+  intent: NonNullable<ReturnType<typeof getIntentFromParams>>;
+}) {
+  const recipientLabel =
+    intent.departmentLabel ||
+    intent.recipientName ||
+    intent.recipientEmail ||
+    "SitGuru HQ";
+
+  const defaultSubject = intent.isDepartment
+    ? `Internal message: ${recipientLabel}`
+    : `Internal message: ${recipientLabel}`;
+
+  const defaultBody = intent.isDepartment
+    ? `Hi ${recipientLabel},\n\n`
+    : `Hi ${recipientLabel},\n\n`;
+
+  return (
+    <section className="rounded-[30px] border border-green-200 bg-green-50 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
+            Internal Message Draft
+          </p>
+          <h2 className="mt-2 text-2xl font-black tracking-tight text-green-950">
+            Message {recipientLabel}
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-green-900">
+            This composer was opened from the User Directory or a department
+            shortcut. Sending creates an internal SitGuru HQ thread and logs the
+            first message in the Message Center.
+          </p>
+        </div>
+
+        <Link
+          href="/admin/messages"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-100"
+        >
+          <X size={16} />
+          Clear draft
+        </Link>
+      </div>
+
+      <form action={createInternalThread} className="mt-5 grid gap-4">
+        <input type="hidden" name="threadType" value={intent.threadType} />
+        <input type="hidden" name="recipientId" value={intent.recipientId} />
+        <input type="hidden" name="recipientEmail" value={intent.recipientEmail} />
+        <input type="hidden" name="recipientName" value={intent.recipientName} />
+        <input type="hidden" name="recipientRole" value={intent.recipientRole} />
+        <input type="hidden" name="department" value={intent.department} />
+        <input type="hidden" name="departmentLabel" value={intent.departmentLabel} />
+        <input type="hidden" name="source" value={intent.source} />
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
+          <div className="grid gap-4">
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
+                Subject
+              </span>
+              <input
+                name="subject"
+                defaultValue={defaultSubject}
+                className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
+                Message
+              </span>
+              <textarea
+                name="body"
+                defaultValue={defaultBody}
+                rows={6}
+                className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+              />
+            </label>
+          </div>
+
+          <div className="rounded-[26px] border border-green-200 bg-white p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+              Recipient
+            </p>
+            <p className="mt-2 text-xl font-black text-slate-950">
+              {recipientLabel}
+            </p>
+            <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
+              {intent.recipientEmail ? <p>Email: {intent.recipientEmail}</p> : null}
+              {intent.recipientRole ? <p>Role: {intent.recipientRole}</p> : null}
+              {intent.department ? <p>Department: {intent.department}</p> : null}
+              {intent.source ? <p>Source: {intent.source}</p> : null}
+            </div>
+
+            <button
+              type="submit"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+            >
+              <Send size={17} />
+              Create Internal Thread
+            </button>
+          </div>
+        </div>
+      </form>
+    </section>
   );
 }
 
@@ -1182,6 +1484,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
   const activeFilter = params.filter || "all";
   const activeInquiry = (params.inquiry || "all") as InquiryKey | "all";
   const query = String(params.q || "").trim().toLowerCase();
+  const composeIntent = getIntentFromParams(params);
 
   const supabase = await createClient();
 
@@ -1295,16 +1598,13 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
     ),
   );
 
-  const profilesResult = profileIds.length
-    ? await safeAdminQuery(
-        supabaseAdmin
-          .from("profiles")
-          .select("*")
-          .in("id", profileIds)
-          .limit(5000),
-        "profiles",
-      )
-    : { data: [], error: null };
+  const profilesResult =
+    profileIds.length > 0
+      ? await safeAdminQuery(
+          supabaseAdmin.from("profiles").select("*").in("id", profileIds),
+          "profiles",
+        )
+      : { data: [], error: null };
 
   const profileMap = new Map<string, ProfileRow>();
 
@@ -1316,387 +1616,254 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
     profileMap.set(adminProfile.id, adminProfile);
   }
 
-  const allThreads: AdminThreadCard[] = allThreadKeys
-    .map((threadKey) => {
-      const conversation =
-        conversationMap.get(threadKey) ||
-        ({
-          id: threadKey,
-          subject: null,
-          status: "open",
-          created_at: null,
-          updated_at: null,
-          last_message_at: null,
-          last_message_preview: null,
-          topic: null,
-        } as ConversationRow);
+  const allThreads: AdminThreadCard[] = allThreadKeys.map((threadKey) => {
+    const conversation = conversationMap.get(threadKey) || null;
+    const messages = (threadMessageMap.get(threadKey) || []).sort((a, b) => {
+      const aTime = new Date(a.created_at || "").getTime();
+      const bTime = new Date(b.created_at || "").getTime();
 
-      const threadMessages = (threadMessageMap.get(threadKey) || []).sort(
-        (a, b) => {
-          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return bTime - aTime;
-        },
+      return (
+        (Number.isFinite(aTime) ? aTime : 0) -
+        (Number.isFinite(bTime) ? bTime : 0)
       );
-
-      const latestMessage = threadMessages[0] || null;
-
-      const participantsForConversation =
-        participantMap.get(conversation.id) || [];
-
-      const participantProfiles = participantsForConversation
-        .map((participant) => profileMap.get(participant.user_id))
-        .filter(Boolean) as ProfileRow[];
-
-      const messageProfileIds = Array.from(
-        new Set(
-          threadMessages.flatMap((message) => [
-            message.sender_id || "",
-            message.recipient_id || "",
-          ]),
-        ),
-      ).filter(Boolean);
-
-      const messageProfiles = messageProfileIds
-        .map((profileId) => profileMap.get(profileId))
-        .filter(Boolean) as ProfileRow[];
-
-      const allProfiles = [...participantProfiles, ...messageProfiles];
-
-      const participantRoles = participantsForConversation.map((participant) =>
-        normalizeRole(participant.role),
-      );
-
-      const hasAdminParticipant =
-        participantRoles.includes("admin") ||
-        allProfiles.some((profile) => getProfileRole(profile) === "admin") ||
-        messageProfileIds.includes(user.id);
-
-      const hasGuruParticipant =
-        participantRoles.includes("guru") ||
-        allProfiles.some((profile) => getProfileRole(profile) === "guru") ||
-        Boolean(conversation.guru_id);
-
-      const hasCustomerParticipant =
-        participantRoles.includes("customer") ||
-        allProfiles.some((profile) => getProfileRole(profile) === "customer") ||
-        Boolean(conversation.customer_id);
-
-      const subjectText = String(conversation.subject || "")
-        .trim()
-        .toLowerCase();
-      const statusText = String(conversation.status || "")
-        .trim()
-        .toLowerCase();
-
-      const looksLikeAdminSupport =
-        subjectText.includes("admin") ||
-        subjectText.includes("support") ||
-        subjectText.includes("payout") ||
-        subjectText.includes("refund") ||
-        subjectText.includes("dispute") ||
-        subjectText.includes("escalation") ||
-        statusText.includes("escalation");
-
-      let threadType: AdminThreadCard["type"] = "general";
-
-      if (hasGuruParticipant && hasCustomerParticipant && !hasAdminParticipant) {
-        threadType = "guru-customer";
-      } else if (
-        hasGuruParticipant &&
-        (hasAdminParticipant || looksLikeAdminSupport)
-      ) {
-        threadType = "guru-admin";
-      } else if (
-        hasCustomerParticipant &&
-        (hasAdminParticipant || looksLikeAdminSupport)
-      ) {
-        threadType = "customer-admin";
-      } else if (hasAdminParticipant || looksLikeAdminSupport) {
-        threadType = "customer-admin";
-      }
-
-      const guruProfile = conversation.guru_id
-        ? profileMap.get(conversation.guru_id)
-        : allProfiles.find((profile) => getProfileRole(profile) === "guru");
-
-      const customerProfile = conversation.customer_id
-        ? profileMap.get(conversation.customer_id)
-        : allProfiles.find((profile) => getProfileRole(profile) === "customer");
-
-      const adminDisplayProfile =
-        allProfiles.find((profile) => getProfileRole(profile) === "admin") ||
-        profileMap.get(user.id) ||
-        adminProfile;
-
-      const unreadCount = threadMessages.filter(isUnreadMessage).length;
-
-      const preview =
-        getMessageBody(latestMessage) ||
-        String(conversation.last_message_preview || "").trim() ||
-        "No messages yet.";
-
-      const inquiryType = classifyInquiryType(
-        conversation,
-        latestMessage,
-        preview,
-      );
-
-      const topic =
-        asString(latestMessage?.topic) ||
-        asString(conversation.topic) ||
-        asString(latestMessage?.message_type);
-
-      const subject =
-        String(conversation.subject || "").trim() ||
-        topic ||
-        (threadType === "guru-admin"
-          ? "Admin support conversation"
-          : threadType === "guru-customer"
-            ? "Customer care conversation"
-            : "SitGuru conversation");
-
-      return {
-        id: conversation.id,
-        subject,
-        preview,
-        href: `/admin/messages/${conversation.id}`,
-        type: threadType,
-        inquiryType,
-        inquiryLabel: getInquiryLabel(inquiryType),
-        lastActivity:
-          latestMessage?.created_at ||
-          conversation.last_message_at ||
-          conversation.updated_at ||
-          conversation.created_at ||
-          null,
-        customerName:
-          hasCustomerParticipant || conversation.customer_id
-            ? getProfileName(customerProfile || null)
-            : null,
-        customerAvatar: getProfileAvatar(customerProfile || null),
-        guruName:
-          hasGuruParticipant || conversation.guru_id
-            ? getProfileName(guruProfile || null)
-            : null,
-        guruAvatar: getProfileAvatar(guruProfile || null),
-        adminName:
-          hasAdminParticipant || looksLikeAdminSupport
-            ? getProfileName(adminDisplayProfile || null) || "Admin HQ"
-            : null,
-        adminAvatar: getAdminAvatar(adminDisplayProfile || null),
-        unreadCount,
-        status: conversation.status || "",
-        messageCount: threadMessages.length,
-        topic,
-      };
-    })
-    .sort((a, b) => {
-      const aTime = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-      const bTime = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
-      return bTime - aTime;
     });
 
-  const filteredThreads = allThreads.filter((thread) => {
-    const searchText = [
-      thread.subject,
-      thread.preview,
-      thread.type,
-      thread.inquiryLabel,
-      thread.topic,
-      thread.customerName,
-      thread.guruName,
-      thread.adminName,
-      thread.status,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
+    const latestMessage = messages[messages.length - 1] || null;
+    const preview =
+      conversation?.last_message_preview ||
+      getMessageBody(latestMessage) ||
+      "No message preview available yet.";
+    const lastActivity =
+      conversation?.last_message_at ||
+      conversation?.updated_at ||
+      latestMessage?.created_at ||
+      conversation?.created_at ||
+      null;
+    const participants = participantMap.get(threadKey) || [];
+    const participantRoleMap = new Map(
+      participants.map((participant) => [
+        participant.user_id,
+        normalizeRole(participant.role),
+      ]),
+    );
 
-    if (query && !searchText.includes(query)) return false;
+    const customerId =
+      conversation?.customer_id ||
+      participants.find((participant) => normalizeRole(participant.role) === "customer")
+        ?.user_id ||
+      messages.find((message) => {
+        const senderRole = getProfileRole(profileMap.get(message.sender_id || ""));
+        return senderRole === "customer";
+      })?.sender_id ||
+      "";
+    const guruId =
+      conversation?.guru_id ||
+      participants.find((participant) => normalizeRole(participant.role) === "guru")
+        ?.user_id ||
+      messages.find((message) => {
+        const senderRole = getProfileRole(profileMap.get(message.sender_id || ""));
+        return senderRole === "guru";
+      })?.sender_id ||
+      "";
+    const adminId =
+      participants.find((participant) => normalizeRole(participant.role) === "admin")
+        ?.user_id ||
+      messages.find((message) => {
+        const senderRole = getProfileRole(profileMap.get(message.sender_id || ""));
+        return senderRole === "admin" || message.sender_id === user.id;
+      })?.sender_id ||
+      conversation?.started_by_user_id ||
+      "";
 
-    if (activeFilter === "unread" && thread.unreadCount <= 0) return false;
-    if (activeFilter === "read" && thread.unreadCount > 0) return false;
-    if (activeFilter === "escalations" && !isEscalationThread(thread)) {
-      return false;
-    }
+    const customerProfile = customerId ? profileMap.get(customerId) || null : null;
+    const guruProfile = guruId ? profileMap.get(guruId) || null : null;
+    const adminProfileForThread = adminId ? profileMap.get(adminId) || null : null;
+    const topic = conversation?.topic || latestMessage?.topic || latestMessage?.message_type || "";
+    const normalizedTopic = topic.toLowerCase();
+    const subject = conversation?.subject || "SitGuru Message Thread";
+
+    let type: AdminThreadCard["type"] = "general";
 
     if (
-      activeFilter !== "all" &&
-      activeFilter !== "unread" &&
-      activeFilter !== "read" &&
-      activeFilter !== "escalations" &&
-      thread.type !== activeFilter
+      normalizedTopic.includes("internal") ||
+      subject.toLowerCase().includes("internal message")
     ) {
-      return false;
+      type = "internal";
+    } else if (customerId && guruId && !adminId) {
+      type = "guru-customer";
+    } else if (guruId && adminId) {
+      type = "guru-admin";
+    } else if (customerId && adminId) {
+      type = "customer-admin";
+    } else if (adminId && !customerId && !guruId) {
+      type = "internal";
     }
 
-    if (activeInquiry !== "all" && thread.inquiryType !== activeInquiry) {
-      return false;
-    }
+    const inquiryType = classifyInquiryType(conversation, latestMessage, preview);
 
-    return true;
+    const unreadCount = messages.filter(isUnreadMessage).length;
+
+    const status =
+      conversation?.status ||
+      latestMessage?.status ||
+      (unreadCount > 0 ? "Unread" : "Open");
+
+    return {
+      id: threadKey,
+      subject,
+      preview,
+      href: `${adminRoutes.messages}/${encodeURIComponent(threadKey)}`,
+      type,
+      inquiryType,
+      inquiryLabel: getInquiryLabel(inquiryType),
+      lastActivity,
+      customerName: customerProfile ? getProfileName(customerProfile) : null,
+      customerAvatar: getProfileAvatar(customerProfile),
+      guruName: guruProfile ? getProfileName(guruProfile) : null,
+      guruAvatar: getProfileAvatar(guruProfile),
+      adminName: adminProfileForThread
+        ? getProfileName(adminProfileForThread)
+        : adminId
+          ? "SitGuru Admin"
+          : null,
+      adminAvatar: getAdminAvatar(adminProfileForThread),
+      unreadCount,
+      status,
+      messageCount: messages.length,
+      topic,
+    };
   });
 
-  const guruCustomerCount = allThreads.filter(
-    (thread) => thread.type === "guru-customer",
-  ).length;
+  const filteredThreads = allThreads
+    .filter((thread) => {
+      if (activeFilter === "unread") return thread.unreadCount > 0;
+      if (activeFilter === "read") return thread.unreadCount === 0;
+      if (activeFilter === "escalations") return isEscalationThread(thread);
+      if (
+        ["internal", "guru-customer", "guru-admin", "customer-admin", "general"].includes(
+          activeFilter,
+        )
+      ) {
+        return thread.type === activeFilter;
+      }
 
-  const guruAdminCount = allThreads.filter(
-    (thread) => thread.type === "guru-admin",
-  ).length;
+      return true;
+    })
+    .filter((thread) => {
+      if (activeInquiry === "all") return true;
+      return thread.inquiryType === activeInquiry;
+    })
+    .filter((thread) => {
+      if (!query) return true;
 
-  const customerAdminCount = allThreads.filter(
-    (thread) => thread.type === "customer-admin",
-  ).length;
+      const haystack = [
+        thread.subject,
+        thread.preview,
+        thread.customerName,
+        thread.guruName,
+        thread.adminName,
+        thread.inquiryLabel,
+        thread.status,
+        thread.topic,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-  const unreadThreads = allThreads.filter(
-    (thread) => thread.unreadCount > 0,
-  ).length;
+      return haystack.includes(query);
+    })
+    .sort((a, b) => {
+      const aTime = new Date(a.lastActivity || "").getTime();
+      const bTime = new Date(b.lastActivity || "").getTime();
 
-  const escalationThreads = allThreads.filter(isEscalationThread).length;
+      return (
+        (Number.isFinite(bTime) ? bTime : 0) -
+        (Number.isFinite(aTime) ? aTime : 0)
+      );
+    });
 
   const unreadMessages = allThreads.reduce(
     (sum, thread) => sum + thread.unreadCount,
     0,
   );
-
-  const activeInquiryMeta =
-    activeInquiry === "all"
-      ? null
-      : inquiryTypes.find((item) => item.key === activeInquiry);
-
+  const unreadThreads = allThreads.filter((thread) => thread.unreadCount > 0).length;
+  const escalationThreads = allThreads.filter(isEscalationThread).length;
+  const internalThreads = allThreads.filter((thread) => thread.type === "internal").length;
+  const threadTypeChart = buildThreadTypeChart(allThreads);
   const inquiryChart = buildInquiryChart(allThreads);
   const unreadInquiryChart = buildUnreadInquiryChart(allThreads);
-  const threadTypeChart = buildThreadTypeChart(allThreads);
 
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <div className="flex flex-col justify-between gap-4 rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm lg:flex-row lg:items-end">
-          <div>
-            <Link
-              href={adminRoutes.dashboard}
-              className="mb-4 inline-flex items-center gap-2 text-sm font-black text-green-800 transition hover:text-green-950"
-            >
-              <ArrowLeft size={17} />
-              Back to Admin Dashboard
-            </Link>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-800 text-white">
-                <MessagesSquare size={26} />
-              </div>
-
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
-                  Admin / Message Center Intelligence
-                </p>
-                <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                  Message Center
-                </h1>
-                <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
-                  Communicate across SitGuru while measuring what customers,
-                  Gurus, admins, and partners are asking about so issues can be
-                  spotted and reduced.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/admin/messages/export"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-            >
-              <Download size={17} />
-              Export CSV
-            </Link>
-
-            <Link
-              href={adminRoutes.customers}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-            >
-              <UserRound size={17} />
-              Customers
-            </Link>
-
-            <Link
-              href={adminRoutes.gurus}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-            >
-              <UsersRound size={17} />
-              Gurus
-            </Link>
-
-            <Link
-              href={adminRoutes.bookings}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-            >
-              <Inbox size={18} />
-              Bookings
-            </Link>
-          </div>
-        </div>
-
-        {(activeFilter !== "all" || activeInquiry !== "all" || query) ? (
-          <section className="flex flex-col justify-between gap-4 rounded-[26px] border border-green-100 bg-white p-4 shadow-sm lg:flex-row lg:items-center">
+        <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
-                Active Drill-Down
-              </p>
-              <p className="mt-1 text-sm font-bold text-slate-600">
-                Showing {number(filteredThreads.length)} of{" "}
-                {number(allThreads.length)} threads
-                {activeFilter !== "all" ? ` · Filter: ${activeFilter}` : ""}
-                {activeInquiryMeta ? ` · Inquiry: ${activeInquiryMeta.label}` : ""}
-                {query ? ` · Search: ${query}` : ""}
-              </p>
+              <Link
+                href={adminRoutes.dashboard}
+                className="mb-4 inline-flex items-center gap-2 text-sm font-black text-green-800 transition hover:text-green-950"
+              >
+                ← Back to Admin Dashboard
+              </Link>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-800 text-white">
+                  <MessagesSquare size={26} />
+                </div>
+
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
+                    Admin / Message Center
+                  </p>
+                  <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
+                    SitGuru Message Center
+                  </h1>
+                  <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
+                    Manage customer, Guru, support, safety, payment, technical,
+                    partner, and internal HQ conversations from one Admin inbox.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <Link
-              href={adminRoutes.messages}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 transition hover:bg-green-50"
-            >
-              <X size={16} />
-              Clear Drill-Down
-            </Link>
-          </section>
-        ) : null}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href={adminRoutes.users}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+              >
+                <UsersRound size={17} />
+                User Directory
+              </Link>
+
+              <Link
+                href="/admin/messages/export"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+              >
+                <Download size={17} />
+                Export
+              </Link>
+
+              <Link
+                href="/admin/messages?threadType=internal"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+              >
+                <Send size={17} />
+                New Internal Thread
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {composeIntent ? <InternalComposer intent={composeIntent} /> : null}
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
-            icon={<MessagesSquare size={22} />}
-            label="Total Threads"
+            icon={<Inbox size={22} />}
+            label="Threads"
             value={number(allThreads.length)}
-            detail={`${number(filteredThreads.length)} visible with filters`}
-            href={adminRoutes.messages}
+            detail={`${number(filteredThreads.length)} visible with current filters`}
+            href="/admin/messages"
           />
-
-          <StatCard
-            icon={<UsersRound size={22} />}
-            label="Guru ↔ Customer"
-            value={number(guruCustomerCount)}
-            detail="Customer care conversations"
-            href="/admin/messages?filter=guru-customer"
-          />
-
-          <StatCard
-            icon={<ShieldAlert size={22} />}
-            label="Guru ↔ Admin"
-            value={number(guruAdminCount)}
-            detail="Admin support and Guru operations"
-            href="/admin/messages?filter=guru-admin"
-          />
-
-          <StatCard
-            icon={<UserRound size={22} />}
-            label="Customer ↔ Admin"
-            value={number(customerAdminCount)}
-            detail="Customer support conversations"
-            href="/admin/messages?filter=customer-admin"
-          />
-
           <StatCard
             icon={<Clock3 size={22} />}
             label="Unread"
@@ -1704,9 +1871,6 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
             detail={`${number(unreadThreads)} threads need attention`}
             href="/admin/messages?filter=unread"
           />
-        </section>
-
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             icon={<ShieldAlert size={22} />}
             label="Escalations"
@@ -1714,83 +1878,80 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
             detail="Refund, payout, dispute, support, or safety review"
             href="/admin/messages?filter=escalations"
           />
-
           <StatCard
-            icon={<CheckCircle2 size={22} />}
-            label="Read Threads"
-            value={number(allThreads.length - unreadThreads)}
-            detail="Threads without unread messages"
-            href="/admin/messages?filter=read"
+            icon={<MessagesSquare size={22} />}
+            label="Internal HQ"
+            value={number(internalThreads)}
+            detail="Department and staff conversations"
+            href="/admin/messages?filter=internal"
           />
-
           <StatCard
             icon={<MessageCircle size={22} />}
             label="Messages Loaded"
             value={number(safeMessages.length)}
             detail="Direct from Supabase messages table"
           />
-
-          <StatCard
-            icon={<UsersRound size={22} />}
-            label="Participants"
-            value={number(safeParticipants.length)}
-            detail="Conversation participant rows"
-          />
         </section>
 
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-          <div className="mb-5">
-            <h2 className="text-xl font-black text-slate-950">
-              Inquiry Type KPIs
-            </h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              Measure what people are communicating about so SitGuru can reduce
-              recurring booking, payment, safety, technical, and support issues.
-            </p>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-xl font-black text-slate-950">
+                HQ Department Messaging
+              </h2>
+              <p className="mt-1 max-w-4xl text-sm font-semibold text-slate-500">
+                Start internal conversations with SitGuru departments directly
+                from the Message Center.
+              </p>
+            </div>
+
+            <Link
+              href={adminRoutes.settings}
+              className="inline-flex items-center justify-center rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-black text-green-900 transition hover:bg-green-100"
+            >
+              Manage HQ Access
+            </Link>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {inquiryTypes.map((inquiry) => {
-              const matching = allThreads.filter(
-                (thread) => thread.inquiryType === inquiry.key,
-              );
-              const unread = matching.reduce(
-                (sum, thread) => sum + thread.unreadCount,
-                0,
-              );
-              const reviewCount = matching.filter(isEscalationThread).length;
-
-              return (
-                <InquiryStatCard
-                  key={inquiry.key}
-                  inquiry={inquiry}
-                  value={matching.length}
-                  unread={unread}
-                  reviewCount={reviewCount}
-                />
-              );
-            })}
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {departmentShortcuts.map((department) => (
+              <Link
+                key={department.key}
+                href={getDepartmentMessageHref({
+                  department: department.key,
+                  departmentLabel: department.label,
+                })}
+                className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-4 transition hover:border-green-200 hover:bg-green-50"
+              >
+                <h3 className="text-lg font-black text-slate-950">
+                  {department.label}
+                </h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                  {department.description}
+                </p>
+                <p className="mt-4 text-sm font-black text-green-800">
+                  Message department →
+                </p>
+              </Link>
+            ))}
           </div>
         </section>
 
         <section className="grid items-start gap-5 xl:grid-cols-12">
           <div className="xl:col-span-4">
             <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-              <div className="mb-5 flex items-center gap-3">
-                <BarChart3 className="text-green-800" size={22} />
-                <div>
-                  <h2 className="text-xl font-black text-slate-950">
-                    Thread Type Mix
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Who is communicating with whom.
-                  </p>
-                </div>
+              <div className="mb-5">
+                <h2 className="text-xl font-black text-slate-950">
+                  Thread Types
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Conversation mix by operational relationship.
+                </p>
               </div>
 
-              <DonutChart
-                title="Threads"
-                total={allThreads.length}
+              <HorizontalBarChart
+                title="Thread Mix"
+                valueLabel="Threads"
                 items={threadTypeChart}
               />
             </div>
@@ -1800,129 +1961,139 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
             <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
               <div className="mb-5">
                 <h2 className="text-xl font-black text-slate-950">
-                  Message Intelligence Charts
+                  Inquiry Type KPIs
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Drill into issue categories and unread work by inquiry type.
+                  Measure what people are communicating about so SitGuru can
+                  reduce recurring booking, payment, safety, technical, and
+                  support issues.
                 </p>
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-2">
-                <HorizontalBarChart
-                  title="Threads by Inquiry Type"
-                  valueLabel="Threads"
-                  items={inquiryChart}
-                />
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {inquiryTypes.map((inquiry) => {
+                  const matching = allThreads.filter(
+                    (thread) => thread.inquiryType === inquiry.key,
+                  );
+                  const unread = matching.reduce(
+                    (sum, thread) => sum + thread.unreadCount,
+                    0,
+                  );
+                  const reviewCount = matching.filter(isEscalationThread).length;
 
-                <HorizontalBarChart
-                  title="Unread by Inquiry Type"
-                  valueLabel="Unread"
-                  items={unreadInquiryChart}
-                  emptyLabel="No unread inquiry data found yet."
-                />
+                  return (
+                    <InquiryStatCard
+                      key={inquiry.key}
+                      inquiry={inquiry}
+                      value={matching.length}
+                      unread={unread}
+                      reviewCount={reviewCount}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>
         </section>
 
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-          <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-xl font-black text-slate-950">
-                Conversation Records
+                Message Queues
               </h2>
               <p className="mt-1 text-sm font-semibold text-slate-500">
-                Search, filter, drill down, and open admin-visible message
-                threads.
+                Filter by thread type, unread status, escalation level, inquiry
+                type, or search terms.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {filterLinks.map((filter) => (
-                <Link
-                  key={filter.key}
-                  href={filter.href}
-                  className={filterButtonClasses(activeFilter === filter.key)}
-                >
-                  {filter.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-5 rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-4">
-            <form
-              action={adminRoutes.messages}
-              className="grid gap-3 xl:grid-cols-[1.3fr_1fr_auto_auto]"
-            >
+            <form className="flex w-full max-w-xl items-center gap-2 rounded-2xl border border-[#e3ece5] bg-white px-4 py-3 shadow-sm">
+              <Search size={17} className="text-slate-400" />
+              <input
+                name="q"
+                defaultValue={params.q || ""}
+                placeholder="Search messages, names, subjects..."
+                className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
+              />
               {activeFilter !== "all" ? (
                 <input type="hidden" name="filter" value={activeFilter} />
               ) : null}
-
-              <label className="relative">
-                <span className="sr-only">Search messages</span>
-                <Search
-                  size={17}
-                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  name="q"
-                  defaultValue={params.q || ""}
-                  placeholder="Search subject, preview, customer, Guru, admin, topic..."
-                  className="h-12 w-full rounded-2xl border border-green-100 bg-white pl-11 pr-4 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-green-300 focus:ring-4 focus:ring-green-100"
-                />
-              </label>
-
-              <select
-                name="inquiry"
-                defaultValue={activeInquiry}
-                className="h-12 w-full rounded-2xl border border-green-100 bg-white px-4 text-sm font-black text-slate-800 outline-none transition focus:border-green-300 focus:ring-4 focus:ring-green-100"
-              >
-                <option value="all">Inquiry Type: All</option>
-                {inquiryTypes.map((inquiry) => (
-                  <option key={inquiry.key} value={inquiry.key}>
-                    Inquiry Type: {inquiry.label}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="submit"
-                className="inline-flex h-12 items-center justify-center rounded-2xl bg-green-800 px-5 text-sm font-black text-white transition hover:bg-green-900"
-              >
-                Search
-              </button>
-
-              <Link
-                href={adminRoutes.messages}
-                className="inline-flex h-12 items-center justify-center rounded-2xl border border-green-200 bg-white px-5 text-sm font-black text-green-900 transition hover:bg-green-50"
-              >
-                Reset
-              </Link>
+              {activeInquiry !== "all" ? (
+                <input type="hidden" name="inquiry" value={activeInquiry} />
+              ) : null}
             </form>
+          </div>
+
+          <div className="mb-5 flex flex-wrap gap-2">
+            {filterLinks.map((filter) => (
+              <Link
+                key={filter.key}
+                href={filter.href}
+                className={filterButtonClasses(activeFilter === filter.key)}
+              >
+                {filter.label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="grid gap-4">
+            {filteredThreads.length ? (
+              filteredThreads.map((thread) => (
+                <MessageBubblePreview key={thread.id} thread={thread} />
+              ))
+            ) : (
+              <EmptyState />
+            )}
           </div>
         </section>
 
-        <section className="space-y-4">
-          {filteredThreads.length ? (
-            filteredThreads.map((thread) => (
-              <MessageBubblePreview key={thread.id} thread={thread} />
-            ))
-          ) : (
-            <EmptyState />
-          )}
+        <section className="grid gap-5 xl:grid-cols-2">
+          <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
+            <div className="mb-5">
+              <h2 className="text-xl font-black text-slate-950">
+                Inquiry Distribution
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Threads grouped by business function.
+              </p>
+            </div>
+
+            <HorizontalBarChart
+              title="Inquiry Types"
+              valueLabel="Threads"
+              items={inquiryChart}
+            />
+          </div>
+
+          <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
+            <div className="mb-5">
+              <h2 className="text-xl font-black text-slate-950">
+                Unread Priority
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Unread messages grouped by inquiry type.
+              </p>
+            </div>
+
+            <HorizontalBarChart
+              title="Unread by Type"
+              valueLabel="Unread"
+              items={unreadInquiryChart}
+              emptyLabel="No unread message queues found."
+            />
+          </div>
         </section>
 
         <div className="rounded-[26px] border border-green-100 bg-white p-4 text-sm font-semibold text-slate-500 shadow-sm">
           <span className="font-black text-green-900">
             Supabase coordination:
           </span>{" "}
-          this page now reads directly from `messages` first, then connects
-          matching rows from `conversations`, `conversation_participants`, and
-          `profiles`. This fixes missing test messages when message rows exist
-          but conversation data is incomplete. Inquiry type uses `topic`,
-          `message_type`, subject, and message body to classify communication
-          patterns.
+          this page reads `conversations`, `messages`,
+          `conversation_participants`, and `profiles`. Internal HQ messaging is
+          created from User Directory or department shortcuts and writes new
+          rows back to `conversations`, `conversation_participants`, and
+          `messages`.
         </div>
       </div>
     </main>

@@ -25,17 +25,12 @@ type UserDisplayRow = {
   risk: string;
   joined: string;
   source: string;
+  messageHref: string;
+  profileHref: string;
 };
 
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function toNumber(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function formatDateShort(value?: string | null) {
@@ -69,7 +64,7 @@ function isWithinLastDays(value: unknown, days: number) {
 
 async function safeRows<T>(
   query: PromiseLike<SafeQueryResponse>,
-  label: string
+  label: string,
 ): Promise<T[]> {
   try {
     const result = await query;
@@ -264,65 +259,123 @@ function mergeLaunchRows(...groups: LaunchSignupRow[][]) {
 
 function statusStyle(status: string) {
   if (status.includes("Active") || status.includes("Verified")) {
-    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
   if (status.includes("Pending") || status.includes("Review")) {
-    return "border-amber-400/20 bg-amber-400/10 text-amber-200";
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
   if (status.includes("Suspended")) {
-    return "border-rose-400/20 bg-rose-400/10 text-rose-200";
+    return "border-rose-200 bg-rose-50 text-rose-700";
   }
 
-  return "border-slate-500/30 bg-slate-500/10 text-slate-200";
+  return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
 function riskStyle(risk: string) {
   if (risk === "High") {
-    return "border-rose-400/20 bg-rose-400/10 text-rose-200";
+    return "border-rose-200 bg-rose-50 text-rose-700";
   }
 
   if (risk === "Medium") {
-    return "border-amber-400/20 bg-amber-400/10 text-amber-200";
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
 
-  return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
 
 function statToneClasses(tone: Tone) {
   if (tone === "emerald") {
     return {
-      card: "border-emerald-400/20 bg-emerald-400/10",
-      badge: "border-emerald-400/20 bg-emerald-400/10 text-emerald-200",
+      card: "border-emerald-100 bg-emerald-50",
+      icon: "bg-emerald-100 text-emerald-800",
+      accent: "text-emerald-700",
     };
   }
 
   if (tone === "sky") {
     return {
-      card: "border-sky-400/20 bg-sky-400/10",
-      badge: "border-sky-400/20 bg-sky-400/10 text-sky-200",
+      card: "border-sky-100 bg-sky-50",
+      icon: "bg-sky-100 text-sky-800",
+      accent: "text-sky-700",
     };
   }
 
   if (tone === "violet") {
     return {
-      card: "border-violet-400/20 bg-violet-400/10",
-      badge: "border-violet-400/20 bg-violet-400/10 text-violet-200",
+      card: "border-violet-100 bg-violet-50",
+      icon: "bg-violet-100 text-violet-800",
+      accent: "text-violet-700",
     };
   }
 
   if (tone === "amber") {
     return {
-      card: "border-amber-400/20 bg-amber-400/10",
-      badge: "border-amber-400/20 bg-amber-400/10 text-amber-200",
+      card: "border-amber-100 bg-amber-50",
+      icon: "bg-amber-100 text-amber-800",
+      accent: "text-amber-700",
     };
   }
 
   return {
-    card: "border-rose-400/20 bg-rose-400/10",
-    badge: "border-rose-400/20 bg-rose-400/10 text-rose-200",
+    card: "border-rose-100 bg-rose-50",
+    icon: "bg-rose-100 text-rose-800",
+    accent: "text-rose-700",
   };
+}
+
+function getMessageHref(user: {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  source: string;
+}) {
+  const params = new URLSearchParams({
+    threadType: "internal",
+    recipientId: user.id,
+    recipientEmail: user.email,
+    recipientName: user.name,
+    recipientRole: user.role,
+    source: user.source,
+  });
+
+  return `/admin/messages?${params.toString()}`;
+}
+
+function getDepartmentMessageHref(params: {
+  department: string;
+  label: string;
+}) {
+  const query = new URLSearchParams({
+    threadType: "internal_department",
+    department: params.department,
+    departmentLabel: params.label,
+  });
+
+  return `/admin/messages?${query.toString()}`;
+}
+
+function getProfileHref(user: {
+  id: string;
+  email: string;
+  role: string;
+  source: string;
+}) {
+  if (user.role === "Guru") {
+    return `/admin/gurus?guru=${encodeURIComponent(user.id)}`;
+  }
+
+  if (user.role.includes("Pet Parent")) {
+    return `/admin/customers?user=${encodeURIComponent(user.id)}`;
+  }
+
+  if (user.source === "Launch") {
+    return `/admin/launch-signups?email=${encodeURIComponent(user.email)}`;
+  }
+
+  return `/admin/users?user=${encodeURIComponent(user.id)}`;
 }
 
 function ActionLink({
@@ -338,7 +391,7 @@ function ActionLink({
     return (
       <Link
         href={href}
-        className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+        className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
       >
         {label}
       </Link>
@@ -348,7 +401,7 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:border-emerald-300/30 hover:bg-white/10"
+      className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
     >
       {label}
     </Link>
@@ -369,7 +422,7 @@ async function getAdminUsersData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "profiles"
+      "profiles",
     ),
     safeRows<GuruRow>(
       supabaseAdmin
@@ -377,7 +430,7 @@ async function getAdminUsersData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "gurus"
+      "gurus",
     ),
     safeRows<BookingRow>(
       supabaseAdmin
@@ -385,7 +438,7 @@ async function getAdminUsersData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "bookings"
+      "bookings",
     ),
     safeRows<LaunchSignupRow>(
       supabaseAdmin
@@ -393,7 +446,7 @@ async function getAdminUsersData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "launch_signups"
+      "launch_signups",
     ),
     safeRows<LaunchSignupRow>(
       supabaseAdmin
@@ -401,22 +454,11 @@ async function getAdminUsersData() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "launch_waitlist"
+      "launch_waitlist",
     ),
   ]);
 
   const launchRows = mergeLaunchRows(launchSignups, launchWaitlist);
-
-  const profileMap = new Map<string, ProfileRow>();
-
-  for (const profile of profiles) {
-    const id = getProfileId(profile);
-
-    if (id) {
-      profileMap.set(id, profile);
-    }
-  }
-
   const guruIdSet = new Set<string>();
 
   for (const guru of gurus) {
@@ -443,16 +485,25 @@ async function getAdminUsersData() {
   const profileRows: UserDisplayRow[] = profiles.map((profile) => {
     const id = getProfileId(profile);
     const role = guruIdSet.has(id) ? "Guru" : getProfileRole(profile);
+    const email = getProfileEmail(profile);
+    const name = getProfileName(profile);
+    const source = "Profile";
+
+    const baseUser = {
+      id: id || email,
+      email,
+      name,
+      role,
+      source,
+    };
 
     return {
-      id: id || getProfileEmail(profile),
-      name: getProfileName(profile),
-      email: getProfileEmail(profile),
-      role,
+      ...baseUser,
       status: role === "Guru" ? "Active" : getProfileStatus(profile),
       risk: getRiskLabel(profile),
       joined: formatDateShort(asTrimmedString(profile.created_at)),
-      source: "Profile",
+      messageHref: getMessageHref(baseUser),
+      profileHref: getProfileHref(baseUser),
     };
   });
 
@@ -460,7 +511,7 @@ async function getAdminUsersData() {
     profileRows.flatMap((row) => [
       row.id.toLowerCase(),
       row.email.toLowerCase(),
-    ])
+    ]),
   );
 
   const guruRows: UserDisplayRow[] = gurus
@@ -470,26 +521,40 @@ async function getAdminUsersData() {
 
       return !knownUserKeys.has(id) && !knownUserKeys.has(email);
     })
-    .map((guru) => ({
-      id: getGuruId(guru) || asTrimmedString(guru.slug) || "guru",
-      name:
+    .map((guru) => {
+      const id = getGuruId(guru) || asTrimmedString(guru.slug) || "guru";
+      const email = asTrimmedString(guru.email) || "—";
+      const name =
         asTrimmedString(guru.display_name) ||
         asTrimmedString(guru.full_name) ||
         asTrimmedString(guru.name) ||
-        "Guru",
-      email: asTrimmedString(guru.email) || "—",
-      role: "Guru",
-      status: getGuruStatus(guru),
-      risk: getRiskLabel(guru),
-      joined: formatDateShort(asTrimmedString(guru.created_at)),
-      source: "Guru",
-    }));
+        "Guru";
+      const source = "Guru";
+      const role = "Guru";
+
+      const baseUser = {
+        id,
+        email,
+        name,
+        role,
+        source,
+      };
+
+      return {
+        ...baseUser,
+        status: getGuruStatus(guru),
+        risk: getRiskLabel(guru),
+        joined: formatDateShort(asTrimmedString(guru.created_at)),
+        messageHref: getMessageHref(baseUser),
+        profileHref: getProfileHref(baseUser),
+      };
+    });
 
   const knownAfterGurus = new Set(
     [...profileRows, ...guruRows].flatMap((row) => [
       row.id.toLowerCase(),
       row.email.toLowerCase(),
-    ])
+    ]),
   );
 
   const launchDisplayRows: UserDisplayRow[] = launchRows
@@ -500,31 +565,35 @@ async function getAdminUsersData() {
       return !knownAfterGurus.has(id) && !knownAfterGurus.has(email);
     })
     .slice(0, 250)
-    .map((row) => ({
-      id: getLaunchIdentity(row) || asTrimmedString(row.email) || "launch",
-      name: getLaunchName(row),
-      email: asTrimmedString(row.email) || "—",
-      role: getLaunchRole(row),
-      status: "Lead",
-      risk: "Low",
-      joined: formatDateShort(asTrimmedString(row.created_at)),
-      source:
+    .map((row) => {
+      const id = getLaunchIdentity(row) || asTrimmedString(row.email) || "launch";
+      const email = asTrimmedString(row.email) || "—";
+      const name = getLaunchName(row);
+      const role = getLaunchRole(row);
+      const source =
         asTrimmedString(row.source) ||
         asTrimmedString(row.utm_source) ||
-        "Launch",
-    }));
+        "Launch";
 
-  const users = [...profileRows, ...guruRows, ...launchDisplayRows].sort(
-    (a, b) => {
-      const aDate = new Date(a.joined).getTime();
-      const bDate = new Date(b.joined).getTime();
+      const baseUser = {
+        id,
+        email,
+        name,
+        role,
+        source,
+      };
 
-      return (
-        (Number.isFinite(bDate) ? bDate : 0) -
-        (Number.isFinite(aDate) ? aDate : 0)
-      );
-    }
-  );
+      return {
+        ...baseUser,
+        status: "Lead",
+        risk: "Low",
+        joined: formatDateShort(asTrimmedString(row.created_at)),
+        messageHref: getMessageHref(baseUser),
+        profileHref: getProfileHref(baseUser),
+      };
+    });
+
+  const users = [...profileRows, ...guruRows, ...launchDisplayRows];
 
   const totalUsers = users.length;
   const newThisWeek =
@@ -535,11 +604,11 @@ async function getAdminUsersData() {
   const verifiedGurus = gurus.filter(
     (guru) =>
       Boolean(guru.is_verified || guru.verified) ||
-      getGuruStatus(guru) === "Verified"
+      getGuruStatus(guru) === "Verified",
   ).length;
 
   const flaggedAccounts = users.filter(
-    (user) => user.risk === "High" || user.status === "Suspended"
+    (user) => user.risk === "High" || user.status === "Suspended",
   ).length;
 
   const roleCounts = {
@@ -547,13 +616,13 @@ async function getAdminUsersData() {
       (user) =>
         user.role === "Pet Parent" ||
         user.role === "Pet Parent Lead" ||
-        user.role === "Customer + Guru Lead"
+        user.role === "Customer + Guru Lead",
     ).length,
     gurus: users.filter(
       (user) =>
         user.role === "Guru" ||
         user.role === "Future Guru Lead" ||
-        user.role === "Customer + Guru Lead"
+        user.role === "Customer + Guru Lead",
     ).length,
     vendors: users.filter((user) => user.role === "Vendor").length,
     educators: users.filter((user) => user.role === "Educator").length,
@@ -566,11 +635,11 @@ async function getAdminUsersData() {
       ? 0
       : Math.max(
           0,
-          Math.min(100, Math.round(100 - (flaggedAccounts / totalUsers) * 100))
+          Math.min(100, Math.round(100 - (flaggedAccounts / totalUsers) * 100)),
         );
 
   return {
-    users: users.slice(0, 25),
+    users: users.slice(0, 75),
     totals: {
       totalUsers,
       newThisWeek,
@@ -632,57 +701,136 @@ export default async function AdminUsersPage() {
       title: "Pet Parents",
       value: data.roleCounts.petParents,
       href: "/admin/users/pet-owners",
+      messageHref: getDepartmentMessageHref({
+        department: "customer_service",
+        label: "Pet Parents / Customer Service",
+      }),
     },
     {
       title: "Gurus",
       value: data.roleCounts.gurus,
       href: "/admin/gurus",
+      messageHref: getDepartmentMessageHref({
+        department: "trust_safety",
+        label: "Gurus / Trust & Safety",
+      }),
     },
     {
       title: "Vendors",
       value: data.roleCounts.vendors,
       href: "/admin/vendor-approvals",
+      messageHref: getDepartmentMessageHref({
+        department: "partners",
+        label: "Vendors / Partners",
+      }),
     },
     {
       title: "Educators",
       value: data.roleCounts.educators,
       href: "/admin/users/educators",
+      messageHref: getDepartmentMessageHref({
+        department: "programs",
+        label: "Educators / Programs",
+      }),
     },
     {
       title: "Medical Pros",
       value: data.roleCounts.medical,
       href: "/admin/users/medical",
+      messageHref: getDepartmentMessageHref({
+        department: "trust_safety",
+        label: "Medical Pros / Trust & Safety",
+      }),
     },
     {
       title: "Admins",
       value: data.roleCounts.admins,
       href: "/admin/users/admins",
+      messageHref: getDepartmentMessageHref({
+        department: "executive",
+        label: "Admins / Executive",
+      }),
+    },
+  ];
+
+  const departmentLinks = [
+    {
+      title: "Executive / Founder",
+      description: "CEO, founders, owners, and super user communication.",
+      href: getDepartmentMessageHref({
+        department: "executive",
+        label: "Executive / Founder",
+      }),
+    },
+    {
+      title: "Billing & Finance",
+      description:
+        "Financial statements, Stripe, payouts, NFCU, Plaid, and reconciliation.",
+      href: getDepartmentMessageHref({
+        department: "billing_finance",
+        label: "Billing & Finance",
+      }),
+    },
+    {
+      title: "Customer Service",
+      description: "Pet Parents, Gurus, bookings, support issues, and messages.",
+      href: getDepartmentMessageHref({
+        department: "customer_service",
+        label: "Customer Service",
+      }),
+    },
+    {
+      title: "Trust & Safety",
+      description:
+        "Guru approvals, Checkr, screening, profile readiness, and bookable status.",
+      href: getDepartmentMessageHref({
+        department: "trust_safety",
+        label: "Trust & Safety",
+      }),
+    },
+    {
+      title: "Tech Support",
+      description: "Login issues, MFA, bugs, integrations, webhooks, and system health.",
+      href: getDepartmentMessageHref({
+        department: "tech_support",
+        label: "Tech Support",
+      }),
+    },
+    {
+      title: "Sales & Marketing",
+      description: "Partners, affiliates, referrals, campaigns, and growth programs.",
+      href: getDepartmentMessageHref({
+        department: "sales_marketing",
+        label: "Sales & Marketing",
+      }),
     },
   ];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_30%),radial-gradient(circle_at_right,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-6 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-emerald-500/15 via-slate-950 to-sky-500/10 p-6 shadow-[0_12px_60px_rgba(0,0,0,0.28)] lg:p-8">
-          <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">
-                User Management
+    <main className="min-h-screen bg-[#f9faf5] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1640px] space-y-6">
+        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.13),transparent_32%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_56%,#f8fafc_100%)] p-6 shadow-sm sm:p-8">
+          <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+                User Directory / Internal Communications
               </p>
 
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
-                Live SitGuru users, roles, trust signals, and account oversight.
+              <h1 className="mt-3 max-w-5xl text-4xl font-black leading-[0.96] tracking-tight text-slate-950 sm:text-5xl">
+                Live SitGuru users, roles, trust signals, and messaging.
               </h1>
 
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                This page is now wired to SitGuru data from profiles, Gurus,
-                bookings, and launch signups so admin user counts match the live
-                platform instead of static sample content.
+              <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
+                This page is wired to SitGuru profiles, Gurus, bookings, and
+                launch signups. It connects directly into the Admin Message
+                Center so HQ teams can message users, departments, and role
+                groups from one clean directory.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 xl:justify-end">
               <ActionLink href="/admin" label="Overview" />
+              <ActionLink href="/admin/messages" label="Open Message Center" />
               <ActionLink href="/admin/guru-approvals" label="Review Gurus" />
               <ActionLink href="/admin/launch-signups" label="Launch Leads" />
               <ActionLink href="/admin/exports" label="Export Users" primary />
@@ -696,98 +844,141 @@ export default async function AdminUsersPage() {
               return (
                 <div
                   key={stat.label}
-                  className={`rounded-3xl border p-5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${tone.card}`}
+                  className={`rounded-[1.5rem] border p-5 shadow-sm ${tone.card}`}
                 >
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  <div className={`mb-4 h-2 w-14 rounded-full ${tone.icon}`} />
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">
                     {stat.label}
                   </p>
-                  <p className="mt-3 text-4xl font-black tracking-tight text-white">
+                  <p className="mt-3 text-4xl font-black tracking-tight text-slate-950">
                     {stat.value}
                   </p>
-                  <div
-                    className={`mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${tone.badge}`}
-                  >
+                  <p className={`mt-3 text-sm font-black ${tone.accent}`}>
                     {stat.sub}
-                  </div>
+                  </p>
                 </div>
               );
             })}
           </div>
         </section>
 
-        <section className="grid gap-8 xl:grid-cols-[1.25fr_0.75fr]">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+                HQ Department Messaging
+              </p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                Message internal teams from the directory.
+              </h2>
+              <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
+                Start department-level internal threads with Finance, Tech
+                Support, Customer Service, Trust & Safety, leadership, and Sales
+                & Marketing.
+              </p>
+            </div>
+
+            <ActionLink href="/admin/settings" label="Manage HQ Access" />
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {departmentLinks.map((department) => (
+              <Link
+                key={department.title}
+                href={department.href}
+                className="group rounded-[1.5rem] border border-slate-200 bg-[#fbfefd] p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50"
+              >
+                <h3 className="text-lg font-black text-slate-950">
+                  {department.title}
+                </h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  {department.description}
+                </p>
+                <p className="mt-4 text-sm font-black text-emerald-700">
+                  Message department →
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                   Recent Accounts
                 </p>
-                <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
-                  Live user activity and trust signals
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                  Live user activity and trust signals.
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Recent rows from SitGuru profiles, Guru records, and launch
-                  lead submissions.
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Each row includes message and review actions for internal
+                  SitGuru support, customer care, Trust & Safety, and Tech
+                  Support.
                 </p>
               </div>
 
               <ActionLink href="/admin/users" label="Refresh" />
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-3xl border border-white/10">
+            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
               <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-white/5 text-slate-400">
+                <table className="min-w-[1180px] text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-600">
                     <tr>
-                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em]">
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
                         Name
                       </th>
-                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em]">
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
                         Email
                       </th>
-                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em]">
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
                         Role
                       </th>
-                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em]">
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
                         Status
                       </th>
-                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em]">
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
                         Risk
                       </th>
-                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em]">
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
                         Source
                       </th>
-                      <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em]">
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
                         Joined
+                      </th>
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
+                        Actions
                       </th>
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-white/10 bg-slate-950/40">
+                  <tbody className="divide-y divide-slate-100">
                     {data.users.length ? (
                       data.users.map((sitGuruUser) => (
                         <tr
                           key={`${sitGuruUser.id}-${sitGuruUser.email}-${sitGuruUser.source}`}
-                          className="transition hover:bg-white/5"
+                          className="transition hover:bg-emerald-50/40"
                         >
                           <td className="px-5 py-4">
-                            <div className="font-bold text-white">
+                            <div className="font-black text-slate-950">
                               {sitGuruUser.name}
                             </div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              SitGuru account
+                            <div className="mt-1 max-w-[260px] break-all text-xs font-semibold text-slate-400">
+                              {sitGuruUser.id}
                             </div>
                           </td>
-                          <td className="px-5 py-4 text-slate-300">
+                          <td className="px-5 py-4 font-semibold text-slate-600">
                             {sitGuruUser.email}
                           </td>
-                          <td className="px-5 py-4 text-slate-300">
+                          <td className="px-5 py-4 font-black text-slate-700">
                             {sitGuruUser.role}
                           </td>
                           <td className="px-5 py-4">
                             <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${statusStyle(
-                                sitGuruUser.status
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${statusStyle(
+                                sitGuruUser.status,
                               )}`}
                             >
                               {sitGuruUser.status}
@@ -795,26 +986,42 @@ export default async function AdminUsersPage() {
                           </td>
                           <td className="px-5 py-4">
                             <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${riskStyle(
-                                sitGuruUser.risk
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${riskStyle(
+                                sitGuruUser.risk,
                               )}`}
                             >
                               {sitGuruUser.risk}
                             </span>
                           </td>
-                          <td className="px-5 py-4 text-slate-400">
+                          <td className="px-5 py-4 font-semibold text-slate-500">
                             {sitGuruUser.source}
                           </td>
-                          <td className="px-5 py-4 text-slate-400">
+                          <td className="px-5 py-4 font-semibold text-slate-500">
                             {sitGuruUser.joined}
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex min-w-[190px] flex-col gap-2">
+                              <Link
+                                href={sitGuruUser.messageHref}
+                                className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
+                              >
+                                Message
+                              </Link>
+                              <Link
+                                href={sitGuruUser.profileHref}
+                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                              >
+                                Review
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td
-                          colSpan={7}
-                          className="px-5 py-8 text-center text-slate-400"
+                          colSpan={8}
+                          className="px-5 py-12 text-center text-slate-500"
                         >
                           No SitGuru users found yet.
                         </td>
@@ -826,101 +1033,178 @@ export default async function AdminUsersPage() {
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <aside className="space-y-5">
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+                Communication Actions
+              </p>
+              <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+                Directory-powered messaging.
+              </h3>
+              <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
+                Route issues between Customer Service, Trust & Safety, Finance,
+                Tech Support, and leadership without leaving the Admin portal.
+              </p>
+
+              <div className="mt-5 space-y-3">
+                <Link
+                  href="/admin/messages?threadType=internal"
+                  className="flex w-full items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
+                >
+                  Start Internal Message
+                </Link>
+
+                <Link
+                  href={getDepartmentMessageHref({
+                    department: "tech_support",
+                    label: "Tech Support",
+                  })}
+                  className="flex w-full items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-black text-sky-800 transition hover:bg-sky-100"
+                >
+                  Message Tech Support
+                </Link>
+
+                <Link
+                  href={getDepartmentMessageHref({
+                    department: "customer_service",
+                    label: "Customer Service",
+                  })}
+                  className="flex w-full items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-black text-violet-800 transition hover:bg-violet-100"
+                >
+                  Message Customer Service
+                </Link>
+
+                <Link
+                  href={getDepartmentMessageHref({
+                    department: "billing_finance",
+                    label: "Billing & Finance",
+                  })}
+                  className="flex w-full items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 transition hover:bg-amber-100"
+                >
+                  Message Billing & Finance
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                 Moderation
               </p>
-              <h3 className="mt-3 text-2xl font-black tracking-tight text-white">
-                Account actions
+              <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+                Account actions.
               </h3>
-              <p className="mt-3 text-sm leading-7 text-slate-400">
-                Use the linked admin areas to review Gurus, support users, and
+              <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
+                Use linked Admin areas to review Gurus, support users, and
                 monitor account health.
               </p>
 
               <div className="mt-5 space-y-3">
                 <Link
                   href="/admin/guru-approvals"
-                  className="flex w-full items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-bold text-amber-100 transition hover:bg-amber-400/15"
+                  className="flex w-full items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 transition hover:bg-amber-100"
                 >
                   Review Guru Applications
                 </Link>
 
                 <Link
                   href="/admin/messages"
-                  className="flex w-full items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-bold text-sky-100 transition hover:bg-sky-400/15"
+                  className="flex w-full items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-black text-sky-800 transition hover:bg-sky-100"
                 >
                   Open Message Center
                 </Link>
 
                 <Link
                   href="/admin/fraud"
-                  className="flex w-full items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-bold text-rose-100 transition hover:bg-rose-400/15"
+                  className="flex w-full items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-800 transition hover:bg-rose-100"
                 >
                   Fraud / Trust Review
                 </Link>
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-emerald-400/20 bg-emerald-400/10 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+            <div className="rounded-[2rem] border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                 User Health Score
               </p>
-              <p className="mt-3 text-5xl font-black tracking-tight text-white">
+              <p className="mt-3 text-5xl font-black tracking-tight text-slate-950">
                 {data.totals.healthScore}%
               </p>
-              <p className="mt-3 text-sm leading-7 text-emerald-50/90">
+              <p className="mt-3 text-sm font-semibold leading-7 text-emerald-800">
                 Based on total live users compared with high-risk or suspended
                 accounts detected in available SitGuru account fields.
               </p>
             </div>
-          </div>
+          </aside>
         </section>
 
-        <section className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                 Role Navigation
               </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
-                Manage live SitGuru user groups
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                Manage and message live SitGuru user groups.
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Counts below are calculated from profiles, Guru records, bookings,
-                and launch lead data.
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                Counts are calculated from profiles, Guru records, bookings, and
+                launch lead data.
               </p>
             </div>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {roleLinks.map((role) => (
-              <Link
+              <div
                 key={role.title}
-                href={role.href}
-                className="group rounded-3xl border border-white/10 bg-slate-950/40 p-5 transition hover:border-emerald-300/30 hover:bg-white/10"
+                className="rounded-[1.5rem] border border-slate-200 bg-[#fbfefd] p-5 shadow-sm"
               >
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h4 className="text-lg font-black text-white">
+                    <h4 className="text-lg font-black text-slate-950">
                       {role.title}
                     </h4>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                       {role.value.toLocaleString()} live record
                       {role.value === 1 ? "" : "s"} detected.
                     </p>
                   </div>
 
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-emerald-300 transition group-hover:bg-emerald-400/10">
-                    Manage →
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+                    {role.value.toLocaleString()}
                   </span>
                 </div>
-              </Link>
+
+                <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                  <Link
+                    href={role.href}
+                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Manage
+                  </Link>
+                  <Link
+                    href={role.messageHref}
+                    className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-800"
+                  >
+                    Message
+                  </Link>
+                </div>
+              </div>
             ))}
           </div>
         </section>
+
+        <section className="rounded-[2rem] border border-sky-100 bg-sky-50 p-5 shadow-sm sm:p-6 lg:p-8">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-sky-700">
+            User Directory Messaging Notes
+          </p>
+          <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
+            Message links pass recipient, role, source, thread type, and
+            department details into `/admin/messages`. The Message Center can
+            now read those values and create internal HQ threads.
+          </p>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

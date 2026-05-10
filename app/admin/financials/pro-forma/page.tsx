@@ -10,6 +10,20 @@ type ProFormaRow = Record<string, unknown>;
 type TrustSafetyPurchaseRow = Record<string, unknown>;
 type TrustSafetyFinancialEventRow = Record<string, unknown>;
 
+type ScenarioRepositoryItem = {
+  id: string;
+  scenarioName: string;
+  isActive: boolean;
+  forecastMonths: number;
+  monthlyBookings: number;
+  averageBookingValue: number;
+  platformFeeRate: number;
+  monthlyGrowthRate: number;
+  newGurusPerMonth: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type SafeQueryResponse = {
   data: unknown;
   error: unknown;
@@ -42,6 +56,14 @@ type Assumptions = {
   loanRepayments: number;
   monthlyGrowthRate: number;
   forecastMonths: number;
+  newGurusPerMonth: number;
+  pawInFullMixRate: number;
+  pawstepMixRate: number;
+  bookAndBarkMixRate: number;
+  checkrCostPerGuru: number;
+  trustSafetyStripeFeeRate: number;
+  pawstepCollectionRate: number;
+  bookAndBarkRecoveryRate: number;
 };
 
 type TrustSafetyActuals = {
@@ -91,22 +113,30 @@ const DEFAULT_ASSUMPTIONS: Assumptions = {
   id: "",
   scenarioName: "Base Case",
   monthlyBookings: 25,
-  averageBookingValue: 75,
-  platformFeeRate: 8,
-  guruPayoutRate: 92,
-  refundRate: 2,
-  monthlyMarketingSpend: 250,
-  monthlySoftwareSpend: 100,
-  monthlyAdminSpend: 150,
-  monthlyInsuranceSpend: 75,
+  averageBookingValue: 90,
+  platformFeeRate: 18,
+  guruPayoutRate: 82,
+  refundRate: 2.5,
+  monthlyMarketingSpend: 500,
+  monthlySoftwareSpend: 200,
+  monthlyAdminSpend: 300,
+  monthlyInsuranceSpend: 125,
   monthlyLegalSpend: 100,
-  otherMonthlyExpenses: 100,
+  otherMonthlyExpenses: 150,
   beginningCash: 0,
   ownerContribution: 0,
   loanProceeds: 0,
   loanRepayments: 0,
   monthlyGrowthRate: 10,
   forecastMonths: 12,
+  newGurusPerMonth: 5,
+  pawInFullMixRate: 35,
+  pawstepMixRate: 40,
+  bookAndBarkMixRate: 25,
+  checkrCostPerGuru: 25,
+  trustSafetyStripeFeeRate: 3.2,
+  pawstepCollectionRate: 90,
+  bookAndBarkRecoveryRate: 75,
 };
 
 const TRUST_SAFETY_PLAN_CENTS = {
@@ -376,19 +406,51 @@ function rowToAssumptions(row?: ProFormaRow): Assumptions {
       1,
       Math.min(36, Math.round(toNumber(row.forecast_months) || 12)),
     ),
+    newGurusPerMonth:
+      toNumber(row.new_gurus_per_month) || DEFAULT_ASSUMPTIONS.newGurusPerMonth,
+    pawInFullMixRate:
+      toNumber(row.paw_in_full_mix_rate) || DEFAULT_ASSUMPTIONS.pawInFullMixRate,
+    pawstepMixRate:
+      toNumber(row.pawstep_mix_rate) || DEFAULT_ASSUMPTIONS.pawstepMixRate,
+    bookAndBarkMixRate:
+      toNumber(row.book_bark_mix_rate) || DEFAULT_ASSUMPTIONS.bookAndBarkMixRate,
+    checkrCostPerGuru:
+      toNumber(row.checkr_cost_per_guru) || DEFAULT_ASSUMPTIONS.checkrCostPerGuru,
+    trustSafetyStripeFeeRate:
+      toNumber(row.trust_safety_stripe_fee_rate) ||
+      DEFAULT_ASSUMPTIONS.trustSafetyStripeFeeRate,
+    pawstepCollectionRate:
+      toNumber(row.pawstep_collection_rate) || DEFAULT_ASSUMPTIONS.pawstepCollectionRate,
+    bookAndBarkRecoveryRate:
+      toNumber(row.book_bark_recovery_rate) || DEFAULT_ASSUMPTIONS.bookAndBarkRecoveryRate,
   };
 }
 
-async function saveProFormaAssumptions(formData: FormData) {
-  "use server";
+function rowToScenarioRepositoryItem(row: ProFormaRow): ScenarioRepositoryItem {
+  const assumptions = rowToAssumptions(row);
 
-  const actor = await requireFinancialAdminAction("save_pro_forma_assumptions");
+  return {
+    id: assumptions.id,
+    scenarioName: assumptions.scenarioName,
+    isActive: getOptionalBoolean(row.is_active),
+    forecastMonths: assumptions.forecastMonths,
+    monthlyBookings: assumptions.monthlyBookings,
+    averageBookingValue: assumptions.averageBookingValue,
+    platformFeeRate: assumptions.platformFeeRate,
+    monthlyGrowthRate: assumptions.monthlyGrowthRate,
+    newGurusPerMonth: assumptions.newGurusPerMonth,
+    createdAt: asTrimmedString(row.created_at),
+    updatedAt: asTrimmedString(row.updated_at),
+  };
+}
 
-  if (!actor) return;
+function buildProFormaPayload(formData: FormData) {
+  const forecastMonths = Math.max(
+    1,
+    Math.min(36, Math.round(Number(formData.get("forecastMonths") || 12))),
+  );
 
-  const id = String(formData.get("id") || "").trim();
-
-  const payload = {
+  return {
     scenario_name:
       String(formData.get("scenarioName") || "Base Case").trim() ||
       "Base Case",
@@ -412,21 +474,62 @@ async function saveProFormaAssumptions(formData: FormData) {
     loan_proceeds: Number(formData.get("loanProceeds") || 0),
     loan_repayments: Number(formData.get("loanRepayments") || 0),
     monthly_growth_rate: Number(formData.get("monthlyGrowthRate") || 0),
-    forecast_months: Math.max(
-      1,
-      Math.min(36, Math.round(Number(formData.get("forecastMonths") || 12))),
+    forecast_months: forecastMonths,
+    new_gurus_per_month: Number(formData.get("newGurusPerMonth") || 0),
+    paw_in_full_mix_rate: Number(formData.get("pawInFullMixRate") || 0),
+    pawstep_mix_rate: Number(formData.get("pawstepMixRate") || 0),
+    book_bark_mix_rate: Number(formData.get("bookAndBarkMixRate") || 0),
+    checkr_cost_per_guru: Number(formData.get("checkrCostPerGuru") || 0),
+    trust_safety_stripe_fee_rate: Number(
+      formData.get("trustSafetyStripeFeeRate") || 0,
     ),
+    pawstep_collection_rate: Number(formData.get("pawstepCollectionRate") || 0),
+    book_bark_recovery_rate: Number(formData.get("bookAndBarkRecoveryRate") || 0),
     is_active: true,
+    updated_at: new Date().toISOString(),
   };
+}
+
+async function deactivateOtherProFormaScenarios(activeId?: string) {
+  let query = supabaseAdmin
+    .from("proforma_assumptions")
+    .update({
+      is_active: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("is_active", true);
+
+  if (activeId) {
+    query = query.neq("id", activeId);
+  }
+
+  await query;
+}
+
+async function saveProFormaAssumptions(formData: FormData) {
+  "use server";
+
+  const actor = await requireFinancialAdminAction("save_pro_forma_assumptions");
+
+  if (!actor) return;
+
+  const id = String(formData.get("id") || "").trim();
+  const payload = buildProFormaPayload(formData);
 
   let savedId = id;
 
   if (id) {
+    await deactivateOtherProFormaScenarios(id);
     await supabaseAdmin.from("proforma_assumptions").update(payload).eq("id", id);
   } else {
+    await deactivateOtherProFormaScenarios();
+
     const { data } = await supabaseAdmin
       .from("proforma_assumptions")
-      .insert(payload)
+      .insert({
+        ...payload,
+        created_at: new Date().toISOString(),
+      })
       .select("id")
       .single();
 
@@ -444,7 +547,109 @@ async function saveProFormaAssumptions(formData: FormData) {
       monthlyBookings: payload.monthly_bookings,
       averageBookingValue: payload.average_booking_value,
       platformFeeRate: payload.platform_fee_rate,
+      newGurusPerMonth: payload.new_gurus_per_month,
+      trustSafetyPlanMix: {
+        pawInFull: payload.paw_in_full_mix_rate,
+        pawstep: payload.pawstep_mix_rate,
+        bookAndBark: payload.book_bark_mix_rate,
+      },
     },
+  });
+
+  revalidatePath("/admin/financials/pro-forma");
+}
+
+async function setActiveProFormaScenario(formData: FormData) {
+  "use server";
+
+  const actor = await requireFinancialAdminAction("set_active_pro_forma_scenario");
+  if (!actor) return;
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id) return;
+
+  await deactivateOtherProFormaScenarios(id);
+  await supabaseAdmin
+    .from("proforma_assumptions")
+    .update({ is_active: true, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  await writeFinancialAuditLog({
+    actor,
+    action: "set_active_pro_forma_scenario",
+    targetType: "proforma_assumptions",
+    targetId: id,
+  });
+
+  revalidatePath("/admin/financials/pro-forma");
+}
+
+async function cloneProFormaScenario(formData: FormData) {
+  "use server";
+
+  const actor = await requireFinancialAdminAction("clone_pro_forma_scenario");
+  if (!actor) return;
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id) return;
+
+  const { data } = await supabaseAdmin
+    .from("proforma_assumptions")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  const source = (data || {}) as ProFormaRow;
+  const sourceName = asTrimmedString(source.scenario_name) || "Forecast Scenario";
+  const now = new Date().toISOString();
+
+  const clone = {
+    ...source,
+    id: undefined,
+    scenario_name: `${sourceName} Copy`,
+    is_active: false,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const { data: inserted } = await supabaseAdmin
+    .from("proforma_assumptions")
+    .insert(clone)
+    .select("id")
+    .single();
+
+  const clonedId = asTrimmedString((inserted as Record<string, unknown> | null)?.id);
+
+  await writeFinancialAuditLog({
+    actor,
+    action: "clone_pro_forma_scenario",
+    targetType: "proforma_assumptions",
+    targetId: clonedId,
+    metadata: { sourceId: id, sourceName },
+  });
+
+  revalidatePath("/admin/financials/pro-forma");
+}
+
+async function archiveProFormaScenario(formData: FormData) {
+  "use server";
+
+  const actor = await requireFinancialAdminAction("archive_pro_forma_scenario");
+  if (!actor) return;
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id) return;
+
+  await supabaseAdmin
+    .from("proforma_assumptions")
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  await writeFinancialAuditLog({
+    actor,
+    action: "archive_pro_forma_scenario",
+    targetType: "proforma_assumptions",
+    targetId: id,
   });
 
   revalidatePath("/admin/financials/pro-forma");
@@ -538,16 +743,24 @@ function buildForecast(
     const refunds = grossBookingVolume * (assumptions.refundRate / 100);
 
     const projectedTrustSafetyGurus = Math.max(
-      1,
-      trustSafetyActuals.purchaseCount
-        ? trustSafetyActuals.monthlyPlanStarts * growthMultiplier
-        : projectedBookings * 0.2,
+      0,
+      (assumptions.newGurusPerMonth || trustSafetyActuals.monthlyPlanStarts) *
+        growthMultiplier,
     );
 
-    const pawInFullCount = projectedTrustSafetyGurus * TRUST_SAFETY_PLAN_MIX.pawInFull;
-    const pawstepCount = projectedTrustSafetyGurus * TRUST_SAFETY_PLAN_MIX.pawstep;
-    const bookAndBarkCount =
-      projectedTrustSafetyGurus * TRUST_SAFETY_PLAN_MIX.bookAndBark;
+    const totalMix = Math.max(
+      1,
+      assumptions.pawInFullMixRate +
+        assumptions.pawstepMixRate +
+        assumptions.bookAndBarkMixRate,
+    );
+    const pawInFullMix = assumptions.pawInFullMixRate / totalMix;
+    const pawstepMix = assumptions.pawstepMixRate / totalMix;
+    const bookAndBarkMix = assumptions.bookAndBarkMixRate / totalMix;
+
+    const pawInFullCount = projectedTrustSafetyGurus * pawInFullMix;
+    const pawstepCount = projectedTrustSafetyGurus * pawstepMix;
+    const bookAndBarkCount = projectedTrustSafetyGurus * bookAndBarkMix;
 
     const pawInFullRevenue =
       pawInFullCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.pawInFullTotal);
@@ -566,9 +779,15 @@ function buildForecast(
 
     const recoveryRamp = Math.min(monthNumber, 3) / 3;
     const trustSafetyInstallmentRecovery =
-      pawstepCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleRemaining) * recoveryRamp;
+      pawstepCount *
+      centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleRemaining) *
+      recoveryRamp *
+      (assumptions.pawstepCollectionRate / 100);
     const trustSafetyBookingDeductionRecovery =
-      bookAndBarkCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleRemaining) * recoveryRamp;
+      bookAndBarkCount *
+      centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleRemaining) *
+      recoveryRamp *
+      (assumptions.bookAndBarkRecoveryRate / 100);
 
     const trustSafetyCashCollected =
       trustSafetyCashToday +
@@ -576,11 +795,10 @@ function buildForecast(
       trustSafetyBookingDeductionRecovery;
 
     const trustSafetyVendorCosts =
-      projectedTrustSafetyGurus *
-      centsToDollars(TRUST_SAFETY_PLAN_CENTS.projectedCheckrVendorCost);
+      projectedTrustSafetyGurus * assumptions.checkrCostPerGuru;
 
     const trustSafetyStripeFees =
-      trustSafetyCashCollected * 0.029 + projectedTrustSafetyGurus * 0.3;
+      trustSafetyCashCollected * (assumptions.trustSafetyStripeFeeRate / 100);
 
     const trustSafetyNetCash =
       trustSafetyCashCollected - trustSafetyVendorCosts - trustSafetyStripeFees;
@@ -857,7 +1075,7 @@ function getForecastReadinessItems({
       status: savedScenarioCount > 0 ? "ready" : "needs_review",
       detail:
         savedScenarioCount > 0
-          ? `${savedScenarioCount.toLocaleString()} active pro forma scenario record found.`
+          ? `${savedScenarioCount.toLocaleString()} saved pro forma scenario record${savedScenarioCount === 1 ? "" : "s"} found.`
           : "Using default assumptions until a scenario is saved.",
     },
     {
@@ -908,15 +1126,143 @@ function getForecastReadinessItems({
   ];
 }
 
+
+function ScenarioRepository({
+  scenarios,
+  activeId,
+}: {
+  scenarios: ScenarioRepositoryItem[];
+  activeId: string;
+}) {
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+            Saved Forecast Scenarios
+          </p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+            Scenario repository for SitGuru planning.
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            Save Soft Launch, Base Case, Growth Case, Investor Case, or custom planning models. Set one active scenario to drive the Pro Forma forecast, clone it before changing assumptions, or archive scenarios you no longer want in the active planning list.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800">
+          {scenarios.length.toLocaleString()} saved
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        {scenarios.length ? (
+          scenarios.map((scenario) => (
+            <article
+              key={scenario.id}
+              className={`rounded-[1.5rem] border p-4 ${
+                scenario.id === activeId || scenario.isActive
+                  ? "border-emerald-200 bg-emerald-50"
+                  : "border-slate-100 bg-[#fbfefd]"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-black text-slate-950">
+                    {scenario.scenarioName}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    {scenario.forecastMonths} months · {number(scenario.monthlyBookings)} bookings/mo · {moneyExact(scenario.averageBookingValue)} ABV
+                  </p>
+                </div>
+
+                <span
+                  className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${
+                    scenario.id === activeId || scenario.isActive
+                      ? "border-emerald-200 bg-white text-emerald-700"
+                      : "border-slate-200 bg-white text-slate-500"
+                  }`}
+                >
+                  {scenario.id === activeId || scenario.isActive ? "Active" : "Saved"}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-2">
+                <div className="rounded-xl border border-white bg-white p-3">
+                  <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Fee</span>
+                  {percent(scenario.platformFeeRate)}
+                </div>
+                <div className="rounded-xl border border-white bg-white p-3">
+                  <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Growth</span>
+                  {percent(scenario.monthlyGrowthRate)}
+                </div>
+                <div className="rounded-xl border border-white bg-white p-3">
+                  <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">New Gurus</span>
+                  {number(scenario.newGurusPerMonth)}/mo
+                </div>
+                <div className="rounded-xl border border-white bg-white p-3">
+                  <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Updated</span>
+                  {scenario.updatedAt ? scenario.updatedAt.slice(0, 10) : "—"}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <form action={setActiveProFormaScenario}>
+                  <input type="hidden" name="id" value={scenario.id} />
+                  <button
+                    type="submit"
+                    disabled={scenario.id === activeId || scenario.isActive}
+                    className={`w-full rounded-xl px-3 py-2 text-xs font-black transition ${
+                      scenario.id === activeId || scenario.isActive
+                        ? "cursor-not-allowed bg-emerald-100 text-emerald-700"
+                        : "bg-emerald-700 text-white hover:bg-emerald-800"
+                    }`}
+                  >
+                    Set Active
+                  </button>
+                </form>
+
+                <form action={cloneProFormaScenario}>
+                  <input type="hidden" name="id" value={scenario.id} />
+                  <button
+                    type="submit"
+                    className="w-full rounded-xl border border-slate-100 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50"
+                  >
+                    Clone
+                  </button>
+                </form>
+
+                <form action={archiveProFormaScenario}>
+                  <input type="hidden" name="id" value={scenario.id} />
+                  <button
+                    type="submit"
+                    className="w-full rounded-xl border border-rose-100 bg-white px-3 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-50"
+                  >
+                    Archive
+                  </button>
+                </form>
+              </div>
+            </article>
+          ))
+        ) : (
+          <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-sm font-semibold text-slate-600 lg:col-span-3">
+            No saved forecast scenarios yet. Save the form below to create your first active Base Case scenario.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 async function getProFormaData() {
   const [rows, trustSafetyPurchases, trustSafetyEvents] = await Promise.all([
     safeRows<ProFormaRow>(
       supabaseAdmin
         .from("proforma_assumptions")
         .select("*")
-        .eq("is_active", true)
+        .order("is_active", { ascending: false })
+        .order("updated_at", { ascending: false })
         .order("created_at", { ascending: false })
-        .limit(1),
+        .limit(50),
       "proforma_assumptions",
     ),
     safeRows<TrustSafetyPurchaseRow>(
@@ -937,7 +1283,12 @@ async function getProFormaData() {
     ),
   ]);
 
-  const assumptions = rowToAssumptions(rows[0]);
+  const scenarioRows = rows;
+  const activeScenario =
+    scenarioRows.find((row) => getOptionalBoolean(row.is_active)) ||
+    scenarioRows[0];
+  const scenarios = scenarioRows.map(rowToScenarioRepositoryItem);
+  const assumptions = rowToAssumptions(activeScenario);
   const trustSafetyActuals = getTrustSafetyActuals({
     purchases: trustSafetyPurchases,
     events: trustSafetyEvents,
@@ -1013,12 +1364,13 @@ async function getProFormaData() {
 
   return {
     assumptions,
+    scenarios,
     trustSafetyActuals,
     forecast,
     readinessItems: getForecastReadinessItems({
       assumptions,
       forecast,
-      savedScenarioCount: rows.length,
+      savedScenarioCount: scenarioRows.length,
       trustSafetyActuals,
     }),
     totals: {
@@ -1164,6 +1516,11 @@ export default async function AdminProFormaPage() {
           </div>
         </section>
 
+        <ScenarioRepository
+          scenarios={proForma.scenarios}
+          activeId={assumptions.id}
+        />
+
         <ForecastReadinessPanel items={proForma.readinessItems} />
 
         <IntegrationFlowPanel />
@@ -1177,9 +1534,7 @@ export default async function AdminProFormaPage() {
               Update SitGuru forecast inputs.
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              These assumptions save to the existing pro forma table. Trust &
-              Safety projections are layered on top from the locked plan model
-              and current Trust & Safety purchase history.
+              These assumptions save into the pro forma scenario repository. The active scenario drives this forecast, and Trust & Safety assumptions now model Guru starts, plan mix, Checkr costs, Stripe fees, Pawstep collections, and Book & Bark recovery.
             </p>
 
             <form action={saveProFormaAssumptions} className="mt-6 grid gap-5">
@@ -1284,6 +1639,63 @@ export default async function AdminProFormaPage() {
                 </div>
               </div>
 
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Trust & Safety forecast assumptions
+                </p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <NumberInput
+                    label="New Gurus Per Month"
+                    name="newGurusPerMonth"
+                    defaultValue={assumptions.newGurusPerMonth}
+                    step="0.01"
+                  />
+                  <NumberInput
+                    label="Paw in Full Mix %"
+                    name="pawInFullMixRate"
+                    defaultValue={assumptions.pawInFullMixRate}
+                    step="0.01"
+                  />
+                  <NumberInput
+                    label="Pawstep Mix %"
+                    name="pawstepMixRate"
+                    defaultValue={assumptions.pawstepMixRate}
+                    step="0.01"
+                  />
+                  <NumberInput
+                    label="Book & Bark Mix %"
+                    name="bookAndBarkMixRate"
+                    defaultValue={assumptions.bookAndBarkMixRate}
+                    step="0.01"
+                  />
+                  <NumberInput
+                    label="Checkr Cost Per Guru"
+                    name="checkrCostPerGuru"
+                    defaultValue={assumptions.checkrCostPerGuru}
+                    step="0.01"
+                  />
+                  <NumberInput
+                    label="Trust & Safety Stripe Fee %"
+                    name="trustSafetyStripeFeeRate"
+                    defaultValue={assumptions.trustSafetyStripeFeeRate}
+                    step="0.01"
+                  />
+                  <NumberInput
+                    label="Pawstep Collection Rate %"
+                    name="pawstepCollectionRate"
+                    defaultValue={assumptions.pawstepCollectionRate}
+                    step="0.01"
+                  />
+                  <NumberInput
+                    label="Book & Bark Recovery Rate %"
+                    name="bookAndBarkRecoveryRate"
+                    defaultValue={assumptions.bookAndBarkRecoveryRate}
+                    step="0.01"
+                  />
+                </div>
+              </div>
+
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
                   Cash and financing assumptions
@@ -1374,7 +1786,7 @@ export default async function AdminProFormaPage() {
 
               <div className="mt-6 rounded-[1.5rem] border border-slate-100 bg-[#fbfefd] p-5">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                  Default Plan Mix
+                  Active Scenario Plan Mix
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl border border-slate-100 bg-white p-4">
