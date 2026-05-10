@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
@@ -134,7 +135,7 @@ async function updateWithColumnFallback({
       if (removedColumns.length > 0) {
         console.warn(
           `${table} update succeeded after removing missing optional columns:`,
-          removedColumns
+          removedColumns,
         );
       }
 
@@ -234,20 +235,20 @@ function statusClasses(status: ApplicationStatus) {
   switch (status) {
     case "bookable":
     case "approved":
-      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
     case "pre_approved":
     case "verification_pending":
-      return "border-sky-400/20 bg-sky-400/10 text-sky-200";
+      return "border-sky-200 bg-sky-50 text-sky-700";
     case "reviewing":
-      return "border-violet-400/20 bg-violet-400/10 text-violet-200";
+      return "border-violet-200 bg-violet-50 text-violet-700";
     case "needs_info":
     case "new":
-      return "border-amber-400/20 bg-amber-400/10 text-amber-200";
+      return "border-amber-200 bg-amber-50 text-amber-700";
     case "rejected":
     case "suspended":
-      return "border-rose-400/20 bg-rose-400/10 text-rose-200";
+      return "border-rose-200 bg-rose-50 text-rose-700";
     default:
-      return "border-white/10 bg-white/5 text-slate-200";
+      return "border-slate-200 bg-slate-50 text-slate-700";
   }
 }
 
@@ -280,18 +281,18 @@ function credentialClasses(status: string) {
     normalized === "cleared" ||
     normalized === "approved"
   ) {
-    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
   if (normalized === "pending" || normalized === "in progress") {
-    return "border-sky-400/20 bg-sky-400/10 text-sky-200";
+    return "border-sky-200 bg-sky-50 text-sky-700";
   }
 
   if (normalized === "rejected" || normalized === "failed") {
-    return "border-rose-400/20 bg-rose-400/10 text-rose-200";
+    return "border-rose-200 bg-rose-50 text-rose-700";
   }
 
-  return "border-white/10 bg-white/5 text-slate-300";
+  return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
 function getGuruId(guru: GuruRow) {
@@ -393,7 +394,7 @@ function getProfileCompletion(guru: GuruRow) {
     Boolean(
       asTrimmedString(guru.display_name) ||
         asTrimmedString(guru.full_name) ||
-        asTrimmedString(guru.name)
+        asTrimmedString(guru.name),
     ),
     Boolean(asTrimmedString(guru.bio)),
     Boolean(asTrimmedString(guru.city) || asTrimmedString(guru.state)),
@@ -401,7 +402,8 @@ function getProfileCompletion(guru: GuruRow) {
     Boolean(
       asTrimmedString(guru.avatar_url) ||
         asTrimmedString(guru.photo_url) ||
-        asTrimmedString(guru.image_url)
+        asTrimmedString(guru.image_url) ||
+        asTrimmedString(guru.profile_photo_url),
     ),
     toNumber(guru.hourly_rate) > 0 || toNumber(guru.price) > 0,
   ];
@@ -463,22 +465,22 @@ function getActionDescription(action: AdminAction) {
 
 function getActionButtonClasses(action: AdminAction) {
   if (action === "bookable") {
-    return "bg-emerald-500 text-slate-950 hover:bg-emerald-400";
+    return "bg-emerald-600 text-white shadow-emerald-600/20 hover:bg-emerald-700";
   }
 
   if (action === "rejected" || action === "suspended") {
-    return "border border-rose-400/25 bg-rose-400/10 text-rose-100 hover:bg-rose-400/15";
+    return "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100";
   }
 
   if (action === "approved" || action === "pre_approved") {
-    return "border border-emerald-400/25 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/15";
+    return "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
   }
 
   if (action === "verification_pending") {
-    return "border border-sky-400/25 bg-sky-400/10 text-sky-100 hover:bg-sky-400/15";
+    return "border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100";
   }
 
-  return "border border-white/10 bg-white/5 text-white hover:bg-white/10";
+  return "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
 }
 
 function buildStatusPayload({
@@ -708,8 +710,8 @@ async function updateGuruStatusAction(formData: FormData) {
   if (!guruId || !allowedActions.includes(action)) {
     redirect(
       `/admin/gurus/${encodeURIComponent(guruId || "missing")}?error=${encodeURIComponent(
-        "Invalid Admin action."
-      )}`
+        "Invalid Admin action.",
+      )}`,
     );
   }
 
@@ -718,8 +720,8 @@ async function updateGuruStatusAction(formData: FormData) {
   if (!guru) {
     redirect(
       `/admin/gurus?error=${encodeURIComponent(
-        "Guru record could not be found."
-      )}`
+        "Guru record could not be found.",
+      )}`,
     );
   }
 
@@ -742,8 +744,8 @@ async function updateGuruStatusAction(formData: FormData) {
   if (updateError) {
     redirect(
       `/admin/gurus/${encodeURIComponent(realGuruId)}?error=${encodeURIComponent(
-        updateError.message || "Unable to update Guru status."
-      )}`
+        updateError.message || "Unable to update Guru status.",
+      )}`,
     );
   }
 
@@ -775,11 +777,11 @@ function DetailItem({
   value: string | number;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
         {label}
       </p>
-      <p className="mt-2 break-words text-sm font-semibold text-white">
+      <p className="mt-2 break-words text-sm font-black text-slate-950">
         {value || "—"}
       </p>
     </div>
@@ -795,7 +797,7 @@ function CredentialPill({
 }) {
   return (
     <div className={`rounded-2xl border px-4 py-3 ${credentialClasses(value)}`}>
-      <p className="text-xs font-bold uppercase tracking-[0.18em] opacity-80">
+      <p className="text-xs font-black uppercase tracking-[0.18em] opacity-80">
         {label}
       </p>
       <p className="mt-2 text-sm font-black">{value}</p>
@@ -809,14 +811,14 @@ function AdminNavButton({
   primary = false,
 }: {
   href: string;
-  children: React.ReactNode;
+  children: ReactNode;
   primary?: boolean;
 }) {
   if (primary) {
     return (
       <Link
         href={href}
-        className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-emerald-400"
+        className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
       >
         {children}
       </Link>
@@ -826,7 +828,7 @@ function AdminNavButton({
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
     >
       {children}
     </Link>
@@ -835,16 +837,16 @@ function AdminNavButton({
 
 function AdminNavigationPanel() {
   return (
-    <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
         Admin Navigation
       </p>
 
-      <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+      <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
         Move between Guru approval pages
       </h2>
 
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
+      <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-slate-600">
         Use these shortcuts to move between the Guru review center, filtered
         application lists, and the main Admin dashboard.
       </p>
@@ -885,15 +887,15 @@ function AdminActionCard({
   return (
     <form
       action={updateGuruStatusAction}
-      className="rounded-3xl border border-white/10 bg-white/5 p-4"
+      className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
     >
       <input type="hidden" name="guruId" value={guruId} />
       <input type="hidden" name="action" value={action} />
 
       <div className="flex min-h-[92px] flex-col justify-between gap-4">
         <div>
-          <p className="font-black text-white">{getActionLabel(action)}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
+          <p className="font-black text-slate-950">{getActionLabel(action)}</p>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
             {getActionDescription(action)}
           </p>
         </div>
@@ -902,7 +904,7 @@ function AdminActionCard({
           <textarea
             name="note"
             rows={3}
-            className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-400/50"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
             placeholder={
               action === "needs_info"
                 ? "Tell the Guru what they need to update..."
@@ -914,8 +916,8 @@ function AdminActionCard({
 
         <button
           type="submit"
-          className={`inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-black transition ${getActionButtonClasses(
-            action
+          className={`inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-black shadow-sm transition ${getActionButtonClasses(
+            action,
           )}`}
         >
           {getActionLabel(action)}
@@ -965,7 +967,7 @@ export default async function AdminGuruDetailPage({
   const events = await getApplicationEvents(guruId);
 
   const identityStatus = getCredentialStatus(
-    guru.stripe_identity_status || guru.identity_status
+    guru.stripe_identity_status || guru.identity_status,
   );
   const backgroundStatus = getCredentialStatus(guru.background_check_status);
   const safetyStatus = getCredentialStatus(guru.safety_cert_status);
@@ -975,56 +977,56 @@ export default async function AdminGuruDetailPage({
     <main className="space-y-8">
       <AdminNavigationPanel />
 
-      <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_24%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] p-6 sm:p-8">
+      <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.13),transparent_28%),linear-gradient(135deg,#ecfdf5_0%,#ffffff_52%,#f8fafc_100%)] p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/admin/gurus"
-                className="inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+                className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
               >
                 ← Back to Guru Records
               </Link>
 
               <Link
                 href="/admin/guru-approvals"
-                className="inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+                className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 Guru Approvals
               </Link>
 
               <Link
                 href="/admin/gurus?status=new"
-                className="inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+                className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 New Applications
               </Link>
 
               <Link
                 href="/admin/gurus?status=bookable"
-                className="inline-flex rounded-full bg-emerald-500 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-emerald-400"
+                className="inline-flex rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
               >
                 Bookable Gurus
               </Link>
 
               <Link
                 href="/admin"
-                className="inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+                className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 Admin Home
               </Link>
             </div>
 
             <div className="mt-6">
-              <span className="inline-flex rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+              <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                 Guru Application Review
               </span>
 
-              <h1 className="mt-4 text-4xl font-black tracking-tight text-white sm:text-5xl">
+              <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
                 {name}
               </h1>
 
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
+              <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
                 Review this Guru’s application, profile readiness, trust checks,
                 and Admin status. Only make a Guru bookable when they are ready
                 to appear in customer search.
@@ -1032,20 +1034,20 @@ export default async function AdminGuruDetailPage({
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 lg:min-w-[320px]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:min-w-[320px]">
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">
               Current Status
             </p>
 
             <div
               className={`mt-3 inline-flex rounded-full border px-4 py-2 text-sm font-black ${statusClasses(
-                status
+                status,
               )}`}
             >
               {statusLabel}
             </div>
 
-            <p className="mt-4 text-sm leading-6 text-slate-400">
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
               {toBoolean(guru.is_bookable) || status === "bookable"
                 ? "This Guru is visible to customers if search is filtering by is_bookable."
                 : "This Guru should remain hidden from customer search until made bookable."}
@@ -1054,14 +1056,14 @@ export default async function AdminGuruDetailPage({
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
                 href={publicHref}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
               >
                 View Public
               </Link>
 
               <Link
                 href="/admin/gurus?status=pending"
-                className="rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-emerald-400"
+                className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-black text-white transition hover:bg-emerald-700"
               >
                 Pending List
               </Link>
@@ -1070,25 +1072,25 @@ export default async function AdminGuruDetailPage({
         </div>
 
         {resolvedSearchParams.saved ? (
-          <div className="mt-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm font-bold text-emerald-100">
+          <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
             Guru status updated successfully.
           </div>
         ) : null}
 
         {resolvedSearchParams.error ? (
-          <div className="mt-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm font-bold text-rose-100">
+          <div className="mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm font-black text-rose-700">
             {resolvedSearchParams.error}
           </div>
         ) : null}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
             Applicant Details
           </p>
 
-          <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+          <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
             Profile and application snapshot
           </h2>
 
@@ -1103,8 +1105,8 @@ export default async function AdminGuruDetailPage({
             <DetailItem label="User ID" value={userId || "—"} />
           </div>
 
-          <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+          <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">
               Services
             </p>
 
@@ -1112,7 +1114,7 @@ export default async function AdminGuruDetailPage({
               {services.map((service) => (
                 <span
                   key={service}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-200"
+                  className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700"
                 >
                   {service}
                 </span>
@@ -1120,12 +1122,12 @@ export default async function AdminGuruDetailPage({
             </div>
           </div>
 
-          <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+          <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">
               Bio / Notes
             </p>
 
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-300">
+            <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-7 text-slate-700">
               {asTrimmedString(guru.bio) ||
                 asTrimmedString(profile?.bio) ||
                 "No bio listed yet."}
@@ -1133,32 +1135,32 @@ export default async function AdminGuruDetailPage({
           </div>
         </div>
 
-        <div className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
             Trust & Safety
           </p>
 
-          <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+          <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
             Approval readiness
           </h2>
 
-          <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
+          <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-black text-white">
+                <p className="text-sm font-black text-slate-950">
                   Profile Completion
                 </p>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm font-semibold text-slate-600">
                   Stronger profiles convert better and reduce customer doubt.
                 </p>
               </div>
 
-              <p className="text-2xl font-black text-white">
+              <p className="text-2xl font-black text-slate-950">
                 {profileCompletion}%
               </p>
             </div>
 
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
               <div
                 className="h-full rounded-full bg-emerald-500"
                 style={{ width: `${profileCompletion}%` }}
@@ -1173,11 +1175,11 @@ export default async function AdminGuruDetailPage({
             <CredentialPill label="Safety Cert" value={safetyStatus} />
           </div>
 
-          <div className="mt-6 rounded-3xl border border-emerald-400/15 bg-emerald-400/10 p-5">
-            <p className="text-sm font-black text-emerald-100">
+          <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+            <p className="text-sm font-black text-emerald-800">
               Bookable is the final switch
             </p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
+            <p className="mt-2 text-sm font-semibold leading-6 text-emerald-700">
               Make a Guru bookable only after SitGuru is comfortable with their
               public profile, verification progress, and customer trust
               readiness.
@@ -1186,114 +1188,91 @@ export default async function AdminGuruDetailPage({
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-          Admin Actions
-        </p>
-
-        <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
-          Move this Guru through the approval process
-        </h2>
-
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
-          These actions update the Guru’s application status. New Gurus stay in
-          a limited dashboard until Admin makes them bookable.
-        </p>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <AdminActionCard action="reviewing" guruId={guruId} />
-          <AdminActionCard action="needs_info" guruId={guruId} />
-          <AdminActionCard action="pre_approved" guruId={guruId} />
-          <AdminActionCard action="verification_pending" guruId={guruId} />
-          <AdminActionCard action="approved" guruId={guruId} />
-          <AdminActionCard action="bookable" guruId={guruId} />
-          <AdminActionCard action="rejected" guruId={guruId} />
-          <AdminActionCard action="suspended" guruId={guruId} />
-        </div>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-            Admin Notes
+      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+            Admin Decision
           </p>
 
-          <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-            Current internal note
+          <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+            Update Guru application status
           </h2>
 
-          <p className="mt-4 whitespace-pre-wrap rounded-3xl border border-white/10 bg-white/5 p-5 text-sm leading-7 text-slate-300">
-            {asTrimmedString(guru.admin_notes) ||
-              asTrimmedString(guru.needs_info_message) ||
-              asTrimmedString(guru.rejection_reason) ||
-              "No Admin notes recorded yet."}
+          <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
+            Use these actions to move a Guru through review. The final bookable
+            action should only be used when profile, payout, and trust readiness
+            are complete.
           </p>
 
-          <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-            <p className="text-sm font-black text-white">Important dates</p>
-
-            <div className="mt-4 grid gap-3">
-              <DetailItem label="Created" value={formatDate(guru.created_at)} />
-              <DetailItem label="Reviewed" value={formatDate(guru.reviewed_at)} />
-              <DetailItem
-                label="Pre-Approved"
-                value={formatDate(guru.pre_approved_at)}
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {[
+              "reviewing",
+              "needs_info",
+              "pre_approved",
+              "verification_pending",
+              "approved",
+              "bookable",
+              "rejected",
+              "suspended",
+            ].map((action) => (
+              <AdminActionCard
+                key={action}
+                action={action as AdminAction}
+                guruId={guruId}
               />
-              <DetailItem label="Approved" value={formatDate(guru.approved_at)} />
-              <DetailItem label="Bookable" value={formatDate(guru.bookable_at)} />
-              <DetailItem label="Rejected" value={formatDate(guru.rejected_at)} />
-            </div>
+            ))}
           </div>
         </div>
 
-        <div className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-            Application History
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+            Review Timeline
           </p>
 
-          <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-            Recent Admin events
+          <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+            Recent Admin activity
           </h2>
 
           <div className="mt-6 space-y-3">
-            {events.length ? (
-              events.map((event) => (
-                <div
-                  key={asTrimmedString(event.id) || Math.random().toString()}
-                  className="rounded-3xl border border-white/10 bg-white/5 p-5"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="font-black text-white">
-                        {getApplicationStatusLabel(
-                          normalizeApplicationStatus({
-                            application_status: event.new_status,
-                          })
-                        )}
-                      </p>
+            {events.length > 0 ? (
+              events.map((event) => {
+                const eventRow = event as Record<string, unknown>;
+                const eventType = asTrimmedString(eventRow.event_type);
+                const note = asTrimmedString(eventRow.note);
+                const createdAt = asTrimmedString(eventRow.created_at);
 
-                      <p className="mt-2 text-sm leading-6 text-slate-400">
-                        {asTrimmedString(event.note) || "No note added."}
-                      </p>
+                return (
+                  <div
+                    key={`${eventType}-${createdAt}-${note}`}
+                    className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-slate-950">
+                          {eventType || "Guru event"}
+                        </p>
+                        {note ? (
+                          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                            {note}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-500">
+                        {formatDate(createdAt)}
+                      </span>
                     </div>
-
-                    <p className="text-xs font-semibold text-slate-500">
-                      {formatDate(event.created_at)}
-                    </p>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-sm leading-7 text-slate-400">
-                No application events recorded yet. Once Admin actions are
-                taken, they will appear here if the event table exists.
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm font-semibold leading-7 text-slate-600">
+                No review events have been recorded yet.
               </div>
             )}
           </div>
         </div>
       </section>
-
-      <AdminNavigationPanel />
     </main>
   );
 }

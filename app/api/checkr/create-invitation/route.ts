@@ -31,6 +31,27 @@ type GuruForCheckrInvite = {
   background_check_fee_payment_option: string | null;
 };
 
+type TrustSafetyPurchase = {
+  id: string;
+  guru_id: string | null;
+  user_id: string | null;
+  email: string | null;
+  plan_key: string;
+  plan_name: string;
+  payment_model: string;
+  payment_status: string;
+  repayment_status: string;
+  management_approval_required: boolean;
+  management_approval_status: string;
+  booking_deduction_required: boolean;
+  booking_deduction_agreement_accepted: boolean;
+  amount_paid_cents: number;
+  due_today_cents: number;
+  remaining_balance_cents: number;
+  checkr_invite_allowed: boolean;
+  checkr_invite_blocked_reason: string | null;
+};
+
 type CheckrCandidate = {
   id: string;
   object?: string;
@@ -62,6 +83,7 @@ type CheckrGuidanceEmailDetails = {
   invitationUrl: string | null;
   packageSlug: string;
   paymentOption: string | null;
+  planName: string | null;
 };
 
 function getCheckrApiKey() {
@@ -74,7 +96,80 @@ function getCheckrApiKey() {
   return apiKey;
 }
 
-function isScreeningPaymentAllowed(guru: GuruForCheckrInvite) {
+function getPlanLabelFromPaymentOption(paymentOption?: string | null) {
+  if (paymentOption === "pay_full_today") return "Paw in Full";
+  if (paymentOption === "pay_15_three_monthly") return "Pawstep Plan";
+  if (paymentOption === "pay_15_booking_deductions") return "Book & Bark Plan";
+
+  return "Trust & Safety Screening";
+}
+
+function getPlanLabel(params: {
+  purchase?: TrustSafetyPurchase | null;
+  paymentOption?: string | null;
+}) {
+  return (
+    params.purchase?.plan_name ||
+    getPlanLabelFromPaymentOption(params.paymentOption)
+  );
+}
+
+async function getIsAdminUser(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not check Admin role for Checkr invite:", error);
+    return false;
+  }
+
+  const role = String(data?.role || "").toLowerCase();
+
+  return role === "admin" || role === "super_admin" || role === "owner";
+}
+
+async function getLatestTrustSafetyPurchase(guruId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("guru_trust_safety_plan_purchases")
+    .select(
+      [
+        "id",
+        "guru_id",
+        "user_id",
+        "email",
+        "plan_key",
+        "plan_name",
+        "payment_model",
+        "payment_status",
+        "repayment_status",
+        "management_approval_required",
+        "management_approval_status",
+        "booking_deduction_required",
+        "booking_deduction_agreement_accepted",
+        "amount_paid_cents",
+        "due_today_cents",
+        "remaining_balance_cents",
+        "checkr_invite_allowed",
+        "checkr_invite_blocked_reason",
+      ].join(","),
+    )
+    .eq("guru_id", guruId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not load Trust & Safety purchase:", error);
+    throw new Error("Could not verify Trust & Safety plan readiness.");
+  }
+
+  return data as TrustSafetyPurchase | null;
+}
+
+function isLegacyScreeningPaymentAllowed(guru: GuruForCheckrInvite) {
   const feeStatus = String(guru.background_check_fee_status || "")
     .trim()
     .toLowerCase();
@@ -87,7 +182,7 @@ function isScreeningPaymentAllowed(guru: GuruForCheckrInvite) {
   );
 }
 
-function getScreeningPaymentBlockMessage(guru: GuruForCheckrInvite) {
+function getLegacyScreeningPaymentBlockMessage(guru: GuruForCheckrInvite) {
   const feeStatus = String(guru.background_check_fee_status || "unpaid")
     .trim()
     .toLowerCase();
@@ -101,6 +196,54 @@ function getScreeningPaymentBlockMessage(guru: GuruForCheckrInvite) {
   }
 
   return "Please choose and start a Trust & Safety Screening payment plan before starting the secure screening form.";
+}
+
+function getTrustSafetyBlockMessage(params: {
+  guru: GuruForCheckrInvite;
+  purchase: TrustSafetyPurchase | null;
+}) {
+  const { guru, purchase } = params;
+
+  if (!purchase) {
+    return getLegacyScreeningPaymentBlockMessage(guru);
+  }
+
+  if (purchase.checkr_invite_blocked_reason) {
+    return purchase.checkr_invite_blocked_reason;
+  }
+
+  if (
+    purchase.management_approval_required &&
+    purchase.management_approval_status !== "approved"
+  ) {
+    return `${purchase.plan_name} requires management approval before Checkr can start.`;
+  }
+
+  if (purchase.amount_paid_cents < purchase.due_today_cents) {
+    return `${purchase.plan_name} requires the initial payment to clear before Checkr can start.`;
+  }
+
+  if (
+    purchase.booking_deduction_required &&
+    !purchase.booking_deduction_agreement_accepted
+  ) {
+    return `${purchase.plan_name} requires the booking deduction agreement before Checkr can start.`;
+  }
+
+  return `${purchase.plan_name} is not financially cleared for Checkr yet.`;
+}
+
+function isTrustSafetyReadyForCheckr(params: {
+  guru: GuruForCheckrInvite;
+  purchase: TrustSafetyPurchase | null;
+}) {
+  const { guru, purchase } = params;
+
+  if (purchase) {
+    return Boolean(purchase.checkr_invite_allowed);
+  }
+
+  return isLegacyScreeningPaymentAllowed(guru);
 }
 
 async function checkrRequest<T>(
@@ -279,14 +422,6 @@ function getFirstName(value?: string | null) {
   return String(value || "Guru").trim().split(/\s+/)[0] || "Guru";
 }
 
-function getPaymentPlanLabel(paymentOption?: string | null) {
-  if (paymentOption === "pay_full_today") return "Paw in Full";
-  if (paymentOption === "pay_15_three_monthly") return "Pawstep Plan";
-  if (paymentOption === "pay_15_booking_deductions") return "Book & Bark Plan";
-
-  return "Trust & Safety Screening";
-}
-
 function getPackageDisplayName(packageSlug: string) {
   return packageSlug
     .split("_")
@@ -297,7 +432,8 @@ function getPackageDisplayName(packageSlug: string) {
 
 function buildCheckrGuidanceEmailText(details: CheckrGuidanceEmailDetails) {
   const dashboardUrl = getGuruDashboardUrl();
-  const planLabel = getPaymentPlanLabel(details.paymentOption);
+  const planLabel =
+    details.planName || getPlanLabelFromPaymentOption(details.paymentOption);
   const packageName = getPackageDisplayName(details.packageSlug);
 
   return `Hi ${details.firstName},
@@ -330,7 +466,8 @@ If you do not see the Checkr email, check your spam, junk, Other, or promotions 
 function buildCheckrGuidanceEmailHtml(details: CheckrGuidanceEmailDetails) {
   const dashboardUrl = getGuruDashboardUrl();
   const logoUrl = getEmailLogoUrl();
-  const planLabel = getPaymentPlanLabel(details.paymentOption);
+  const planLabel =
+    details.planName || getPlanLabelFromPaymentOption(details.paymentOption);
   const packageName = getPackageDisplayName(details.packageSlug);
   const safeFirstName = escapeHtml(details.firstName);
   const safePlanLabel = escapeHtml(planLabel);
@@ -531,6 +668,7 @@ async function sendCheckrGuidanceEmail(details: CheckrGuidanceEmailDetails) {
         checkr_invitation_url: details.invitationUrl,
         package_slug: details.packageSlug,
         payment_option: details.paymentOption,
+        plan_name: details.planName,
         dashboard_url: getGuruDashboardUrl(),
         email_logo_url: getEmailLogoUrl(),
       },
@@ -553,6 +691,7 @@ async function sendCheckrGuidanceEmail(details: CheckrGuidanceEmailDetails) {
         checkr_invitation_url: details.invitationUrl,
         package_slug: details.packageSlug,
         payment_option: details.paymentOption,
+        plan_name: details.planName,
         dashboard_url: getGuruDashboardUrl(),
         email_logo_url: getEmailLogoUrl(),
       },
@@ -625,16 +764,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Guru not found." }, { status: 404 });
     }
 
-    if (guru.user_id && guru.user_id !== user.id) {
+    const isAdminUser = await getIsAdminUser(user.id);
+
+    if (guru.user_id && guru.user_id !== user.id && !isAdminUser) {
       return NextResponse.json(
         { error: "You can only start screening for your own Guru profile." },
         { status: 403 },
       );
     }
 
-    if (!isScreeningPaymentAllowed(guru)) {
+    const trustSafetyPurchase = await getLatestTrustSafetyPurchase(guru.id);
+
+    if (
+      !isTrustSafetyReadyForCheckr({
+        guru,
+        purchase: trustSafetyPurchase,
+      })
+    ) {
       return NextResponse.json(
-        { error: getScreeningPaymentBlockMessage(guru) },
+        {
+          error: getTrustSafetyBlockMessage({
+            guru,
+            purchase: trustSafetyPurchase,
+          }),
+          plan_name: getPlanLabel({
+            purchase: trustSafetyPurchase,
+            paymentOption: guru.background_check_fee_payment_option,
+          }),
+          management_approval_status:
+            trustSafetyPurchase?.management_approval_status || null,
+          payment_status: trustSafetyPurchase?.payment_status || null,
+          checkr_invite_allowed:
+            trustSafetyPurchase?.checkr_invite_allowed || false,
+          checkr_invite_blocked_reason:
+            trustSafetyPurchase?.checkr_invite_blocked_reason || null,
+        },
         { status: 402 },
       );
     }
@@ -650,6 +814,10 @@ export async function POST(request: Request) {
     }
 
     const displayName = getGuruDisplayName(guru);
+    const planName = getPlanLabel({
+      purchase: trustSafetyPurchase,
+      paymentOption: guru.background_check_fee_payment_option,
+    });
 
     if (guru.checkr_invitation_id && guru.checkr_invitation_url) {
       await sendCheckrGuidanceEmail({
@@ -663,6 +831,7 @@ export async function POST(request: Request) {
         invitationUrl: guru.checkr_invitation_url,
         packageSlug,
         paymentOption: guru.background_check_fee_payment_option,
+        planName,
       });
 
       return NextResponse.json({
@@ -674,6 +843,8 @@ export async function POST(request: Request) {
         reportId: null,
         invitationUrl: guru.checkr_invitation_url,
         invitation_url: guru.checkr_invitation_url,
+        trust_safety_purchase_id: trustSafetyPurchase?.id || null,
+        plan_name: planName,
         message:
           "Your secure screening invitation already exists. Continuing your existing screening form.",
       });
@@ -761,6 +932,37 @@ export async function POST(request: Request) {
       );
     }
 
+    if (trustSafetyPurchase?.id) {
+      await supabaseAdmin.from("trust_safety_financial_events").insert({
+        purchase_id: trustSafetyPurchase.id,
+        guru_id: guru.id,
+        user_id: guru.user_id,
+        event_type: "ledger_adjustment",
+        category: "trust_safety",
+        source: "sitguru",
+        status: "posted",
+        plan_key: trustSafetyPurchase.plan_key,
+        plan_name: trustSafetyPurchase.plan_name,
+        gross_amount_cents: 0,
+        fee_amount_cents: 0,
+        net_amount_cents: 0,
+        currency: "usd",
+        description: "Checkr invitation created after Trust & Safety financial clearance.",
+        metadata: {
+          checkr_candidate_id: candidateId,
+          checkr_invitation_id: invitationId,
+          checkr_report_id: reportId,
+          checkr_invitation_url: invitationUrl,
+          package_slug: packageSlug,
+          created_by_user_id: user.id,
+          created_by_admin: isAdminUser,
+        },
+        occurred_at: now,
+        created_at: now,
+        updated_at: now,
+      });
+    }
+
     await sendCheckrGuidanceEmail({
       guruId: guru.id,
       userId: guru.user_id,
@@ -772,6 +974,7 @@ export async function POST(request: Request) {
       invitationUrl,
       packageSlug,
       paymentOption: guru.background_check_fee_payment_option,
+      planName,
     });
 
     return NextResponse.json({
@@ -783,6 +986,8 @@ export async function POST(request: Request) {
       reportId,
       invitationUrl,
       invitation_url: invitationUrl,
+      trust_safety_purchase_id: trustSafetyPurchase?.id || null,
+      plan_name: planName,
     });
   } catch (error) {
     console.error("Create secure screening invitation route error:", error);

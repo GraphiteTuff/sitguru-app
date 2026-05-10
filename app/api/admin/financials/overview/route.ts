@@ -156,6 +156,9 @@ const tableNames = [
   "financial_export_history",
   "financial_audit_logs",
   "proforma_assumptions",
+  "guru_trust_safety_plan_purchases",
+  "trust_safety_financial_events",
+  "booking_trust_safety_deductions",
 ];
 
 const dateColumnCandidates = [
@@ -635,6 +638,55 @@ function getStripeFee(row: AnyRow) {
   return 0;
 }
 
+function centsToDollars(value: unknown) {
+  return toNumber(value) / 100;
+}
+
+function getTrustSafetyEventAmount(row: AnyRow) {
+  const gross = centsToDollars(row.gross_amount_cents);
+  const net = centsToDollars(row.net_amount_cents);
+  const fee = centsToDollars(row.fee_amount_cents);
+
+  if (gross) return Math.abs(gross);
+  if (net) return Math.abs(net);
+  if (fee) return Math.abs(fee);
+
+  return 0;
+}
+
+function getTrustSafetyEventType(row: AnyRow) {
+  return asTrimmedString(row.event_type).toLowerCase();
+}
+
+function getTrustSafetyRevenueFromPurchases(rows: AnyRow[]) {
+  return rows.reduce((sum, row) => sum + centsToDollars(row.amount_paid_cents), 0);
+}
+
+function getTrustSafetyOutstandingBalance(rows: AnyRow[]) {
+  return rows.reduce(
+    (sum, row) => sum + centsToDollars(row.remaining_balance_cents),
+    0,
+  );
+}
+
+function getTrustSafetyInstallmentReceivable(rows: AnyRow[]) {
+  return rows
+    .filter((row) => asTrimmedString(row.plan_key) === "pawstep_plan")
+    .reduce((sum, row) => sum + centsToDollars(row.remaining_balance_cents), 0);
+}
+
+function getTrustSafetyBookingDeductionReceivable(rows: AnyRow[]) {
+  return rows
+    .filter((row) => asTrimmedString(row.plan_key) === "book_and_bark_plan")
+    .reduce(
+      (sum, row) =>
+        sum +
+        (centsToDollars(row.booking_deduction_remaining_cents) ||
+          centsToDollars(row.remaining_balance_cents)),
+      0,
+    );
+}
+
 function getBankAmount(row: AnyRow) {
   return (
     toNumber(row.amount) ||
@@ -796,6 +848,7 @@ function buildManagementAlerts({
   sourceHealth,
   netCashFlow,
   cashBalance,
+  trustSafetyApprovalNeeded,
 }: {
   exports: AnyRow[];
   payoutRows: AnyRow[];
@@ -803,6 +856,7 @@ function buildManagementAlerts({
   sourceHealth: SourceStatus[];
   netCashFlow: number;
   cashBalance: number;
+  trustSafetyApprovalNeeded: number;
 }) {
   const alerts: ManagementAlert[] = [];
 
@@ -862,6 +916,19 @@ function buildManagementAlerts({
         "Review failed, returned, or exception payout activity for gurus and partners.",
       severity: "critical",
       href: "/admin/financials/payouts",
+    });
+  }
+
+  if (trustSafetyApprovalNeeded > 0) {
+    alerts.push({
+      id: "trust-safety-approval-needed",
+      title: `${trustSafetyApprovalNeeded} Trust & Safety plan${
+        trustSafetyApprovalNeeded === 1 ? "" : "s"
+      } need approval`,
+      description:
+        "Review Pawstep or Book & Bark financing approvals before Checkr can start.",
+      severity: "warning",
+      href: "/admin/background-checks?approval=pending",
     });
   }
 
@@ -1215,6 +1282,9 @@ export async function GET(request: Request) {
     ];
     const bankRows = rowsByTable.get("bank_transactions") || [];
     const ledgerRows = rowsByTable.get("financial_ledger_entries") || [];
+    const trustSafetyPurchases = rowsByTable.get("guru_trust_safety_plan_purchases") || [];
+    const trustSafetyEvents = rowsByTable.get("trust_safety_financial_events") || [];
+    const trustSafetyBookingDeductions = rowsByTable.get("booking_trust_safety_deductions") || [];
     const exportRows = [
       ...(rowsByTable.get("financial_export_history") || []),
       ...(rowsByTable.get("financial_audit_logs") || []).filter((row) =>
@@ -1239,12 +1309,69 @@ export async function GET(request: Request) {
       ...bookings.filter((row) => getRefundAmount(row) > 0),
     ];
 
+    const trustSafetyPaymentEvents = trustSafetyEvents.filter((row) =>
+      [
+        "payment_collected",
+        "down_payment_collected",
+        "installment_collected",
+        "booking_deduction_collected",
+      ].includes(getTrustSafetyEventType(row)),
+    );
+    const trustSafetyStripeFeeEvents = trustSafetyEvents.filter(
+      (row) => getTrustSafetyEventType(row) === "stripe_fee",
+    );
+    const trustSafetyRefundEvents = trustSafetyEvents.filter(
+      (row) => getTrustSafetyEventType(row) === "refund",
+    );
+    const trustSafetyCheckrCostEvents = trustSafetyEvents.filter((row) =>
+      ["checkr_vendor_cost", "sitguru_fronted_cost"].includes(
+        getTrustSafetyEventType(row),
+      ),
+    );
+
+    const trustSafetyRevenue =
+      trustSafetyPaymentEvents.reduce(
+        (sum, row) => sum + getTrustSafetyEventAmount(row),
+        0,
+      ) || getTrustSafetyRevenueFromPurchases(trustSafetyPurchases);
+    const trustSafetyStripeFees = trustSafetyStripeFeeEvents.reduce(
+      (sum, row) => sum + getTrustSafetyEventAmount(row),
+      0,
+    );
+    const trustSafetyRefunds = trustSafetyRefundEvents.reduce(
+      (sum, row) => sum + getTrustSafetyEventAmount(row),
+      0,
+    );
+    const trustSafetyCheckrCosts = trustSafetyCheckrCostEvents.reduce(
+      (sum, row) => sum + getTrustSafetyEventAmount(row),
+      0,
+    );
+    const trustSafetyOutstandingReceivables = getTrustSafetyOutstandingBalance(
+      trustSafetyPurchases,
+    );
+    const trustSafetyInstallmentReceivable = getTrustSafetyInstallmentReceivable(
+      trustSafetyPurchases,
+    );
+    const trustSafetyBookingDeductionReceivable =
+      getTrustSafetyBookingDeductionReceivable(trustSafetyPurchases);
+    const trustSafetyBookingDeductionsCollected = trustSafetyBookingDeductions
+      .filter((row) => getStatus(row) === "collected")
+      .reduce((sum, row) => sum + centsToDollars(row.deduction_amount_cents), 0);
+    const trustSafetyApprovalNeeded = trustSafetyPurchases.filter(
+      (row) =>
+        getOptionalBoolean(row.management_approval_required) &&
+        asTrimmedString(row.management_approval_status).toLowerCase() ===
+          "pending",
+    ).length;
+
     const stripeFees =
-      feeRows.reduce((sum, row) => sum + getStripeFee(row), 0) ||
+      feeRows.reduce((sum, row) => sum + getStripeFee(row), 0) +
+        trustSafetyStripeFees ||
       FALLBACK_STRIPE_FEES;
 
     const refunds =
-      refundRows.reduce((sum, row) => sum + getRefundAmount(row), 0) ||
+      refundRows.reduce((sum, row) => sum + getRefundAmount(row), 0) +
+        trustSafetyRefunds ||
       FALLBACK_REFUNDS;
 
     const guruPayouts =
@@ -1267,16 +1394,19 @@ export async function GET(request: Request) {
       ]) || FALLBACK_PARTNER_COMMISSIONS;
 
     const operatingExpenses =
-      sumRows(expenseRows, ["expense_amount", "amount", "total_amount", "net_amount", "cost"]) ||
+      sumRows(expenseRows, ["expense_amount", "amount", "total_amount", "net_amount", "cost"]) +
+        trustSafetyCheckrCosts ||
       FALLBACK_OPERATING_EXPENSES;
 
-    const platformRevenue =
+    const marketplacePlatformRevenue =
       bookingPlatformFees ||
       Math.max(
         0,
         grossBookings - guruPayouts - partnerCommissions - stripeFees - refunds,
       ) ||
       FALLBACK_PLATFORM_REVENUE;
+
+    const platformRevenue = marketplacePlatformRevenue + trustSafetyRevenue;
 
     const netCashFlow =
       platformRevenue -
@@ -1362,8 +1492,24 @@ export async function GET(request: Request) {
           value: formatCurrency(platformRevenue),
           rawValue: platformRevenue,
           change: "Live",
-          helper: "P&L source",
+          helper: trustSafetyRevenue > 0 ? "marketplace + Trust & Safety" : "P&L source",
           tone: "green",
+        },
+        {
+          label: "Trust & Safety Revenue",
+          value: formatCurrency(trustSafetyRevenue),
+          rawValue: trustSafetyRevenue,
+          change: "Live",
+          helper: "screening plans",
+          tone: "green",
+        },
+        {
+          label: "Trust & Safety Receivable",
+          value: formatCurrency(trustSafetyOutstandingReceivables),
+          rawValue: trustSafetyOutstandingReceivables,
+          change: "Live",
+          helper: "Pawstep + Book & Bark",
+          tone: trustSafetyOutstandingReceivables > 0 ? "blue" : "green",
         },
         {
           label: "Guru Payouts",
@@ -1447,6 +1593,12 @@ export async function GET(request: Request) {
           widthClass: buildWidthClass(collectedCash, grossBookings),
         },
         {
+          label: "Trust & Safety Cash",
+          value: formatCurrency(trustSafetyRevenue),
+          rawValue: trustSafetyRevenue,
+          widthClass: buildWidthClass(trustSafetyRevenue, grossBookings),
+        },
+        {
           label: "Payouts & Fees",
           value: formatCurrency(payoutsAndFees),
           rawValue: payoutsAndFees,
@@ -1489,6 +1641,36 @@ export async function GET(request: Request) {
           value: platformRevenue,
           displayValue: formatCurrency(platformRevenue),
           type: "inflow",
+        },
+        {
+          label: "Trust & Safety Revenue",
+          value: trustSafetyRevenue,
+          displayValue: formatCurrency(trustSafetyRevenue),
+          type: "inflow",
+        },
+        {
+          label: "Pawstep Receivable",
+          value: trustSafetyInstallmentReceivable,
+          displayValue: formatCurrency(trustSafetyInstallmentReceivable),
+          type: "inflow",
+        },
+        {
+          label: "Book & Bark Receivable",
+          value: trustSafetyBookingDeductionReceivable,
+          displayValue: formatCurrency(trustSafetyBookingDeductionReceivable),
+          type: "inflow",
+        },
+        {
+          label: "Book & Bark Deductions Collected",
+          value: trustSafetyBookingDeductionsCollected,
+          displayValue: formatCurrency(trustSafetyBookingDeductionsCollected),
+          type: "inflow",
+        },
+        {
+          label: "Checkr Vendor Costs",
+          value: -trustSafetyCheckrCosts,
+          displayValue: `-${formatCurrency(trustSafetyCheckrCosts)}`,
+          type: "outflow",
         },
         {
           label: "Payouts",
@@ -1534,6 +1716,7 @@ export async function GET(request: Request) {
         sourceHealth,
         netCashFlow,
         cashBalance,
+        trustSafetyApprovalNeeded,
       }),
       fallbackUsed: sourceHealth.some((source) => !source.ok),
     };

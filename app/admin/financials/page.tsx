@@ -141,6 +141,92 @@ type ExportHistoryResponse = {
   message?: string;
 };
 
+type TrustSafetyPlanRollup = {
+  planKey: string;
+  planName: string;
+  purchases: number;
+  revenueCents: number;
+  outstandingCents: number;
+  bookingDeductionRemainingCents: number;
+  approvalPending: number;
+  checkrReady: number;
+  clearCount: number;
+  bookableCount: number;
+};
+
+type TrustSafetyFinancialsResponse = {
+  ok: boolean;
+  isLive: boolean;
+  generatedAt: string;
+  message?: string;
+  totals: {
+    purchases: number;
+    revenueCents: number;
+    outstandingCents: number;
+    bookingDeductionRemainingCents: number;
+    approvalPending: number;
+    checkrReady: number;
+    clearCount: number;
+    bookableCount: number;
+  };
+  plans: TrustSafetyPlanRollup[];
+};
+
+const fallbackTrustSafetyFinancials: TrustSafetyFinancialsResponse = {
+  ok: true,
+  isLive: false,
+  generatedAt: new Date().toISOString(),
+  message: "Trust & Safety financial data is loading.",
+  totals: {
+    purchases: 0,
+    revenueCents: 0,
+    outstandingCents: 0,
+    bookingDeductionRemainingCents: 0,
+    approvalPending: 0,
+    checkrReady: 0,
+    clearCount: 0,
+    bookableCount: 0,
+  },
+  plans: [
+    {
+      planKey: "paw_in_full",
+      planName: "Paw in Full",
+      purchases: 0,
+      revenueCents: 0,
+      outstandingCents: 0,
+      bookingDeductionRemainingCents: 0,
+      approvalPending: 0,
+      checkrReady: 0,
+      clearCount: 0,
+      bookableCount: 0,
+    },
+    {
+      planKey: "pawstep_plan",
+      planName: "Pawstep Plan",
+      purchases: 0,
+      revenueCents: 0,
+      outstandingCents: 0,
+      bookingDeductionRemainingCents: 0,
+      approvalPending: 0,
+      checkrReady: 0,
+      clearCount: 0,
+      bookableCount: 0,
+    },
+    {
+      planKey: "book_and_bark_plan",
+      planName: "Book & Bark Plan",
+      purchases: 0,
+      revenueCents: 0,
+      outstandingCents: 0,
+      bookingDeductionRemainingCents: 0,
+      approvalPending: 0,
+      checkrReady: 0,
+      clearCount: 0,
+      bookableCount: 0,
+    },
+  ],
+};
+
 const fallbackOverview: FinancialOverviewResponse = {
   ok: true,
   isLive: false,
@@ -536,6 +622,14 @@ const operatingFinance: ReportCard[] = [
     href: "/admin/financials/vendors",
     tone: "slate",
   },
+  {
+    eyebrow: "Trust & Safety",
+    title: "Screening Plan Financials",
+    description:
+      "Review Paw in Full, Pawstep, and Book & Bark plan revenue, balances, approvals, and Checkr-ready financial clearance.",
+    href: "/admin/background-checks",
+    tone: "green",
+  },
 ];
 
 const cpaChecklist = [
@@ -587,6 +681,7 @@ const segmentFilters = [
   { label: "Partners", value: "partners" },
   { label: "Payouts", value: "payouts" },
   { label: "Banking", value: "banking" },
+  { label: "Trust & Safety", value: "trust-safety" },
 ];
 
 function toneClasses(tone: ReportCard["tone"] | KpiTone) {
@@ -631,6 +726,15 @@ function formatCurrency(value: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(Math.round(value || 0));
+}
+
+function formatCents(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format((value || 0) / 100);
 }
 
 function formatDateTime(value: string) {
@@ -694,6 +798,7 @@ function getVisibleKpis(kpis: KpiCard[], segment: string) {
     partners: ["Partner Commissions", "Net Margin"],
     payouts: ["Guru Payouts", "Partner Commissions", "Stripe Fees", "Refunds / Chargebacks"],
     banking: ["Cash Balance", "Platform Revenue", "Stripe Fees", "Refunds / Chargebacks", "Net Margin"],
+    "trust-safety": ["Platform Revenue", "Stripe Fees", "Net Margin", "Cash Balance"],
   };
 
   const allowed = allowedBySegment[segment] || [];
@@ -1181,6 +1286,132 @@ function CashFlowByCategoryChart({ data }: { data: CashFlowCategory[] }) {
   );
 }
 
+function TrustSafetyFinancialsPanel({
+  financials,
+}: {
+  financials: TrustSafetyFinancialsResponse;
+}) {
+  const totals = financials.totals;
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+            Trust &amp; Safety Financials
+          </p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+            Screening Plan Revenue, Balances &amp; Recovery
+          </h2>
+          <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
+            Track Paw in Full, Pawstep Plan, and Book &amp; Bark Plan revenue,
+            outstanding balances, booking deduction recovery, management approval
+            exposure, and Checkr-ready financial clearance.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
+              financials.isLive
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-amber-200 bg-amber-50 text-amber-800"
+            }`}
+          >
+            {financials.isLive ? "Live Supabase" : "Preview / Offline"}
+          </span>
+
+          <Link
+            href="/admin/background-checks"
+            className="rounded-full bg-emerald-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
+          >
+            Open Trust &amp; Safety
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <div className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Revenue</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">{formatCents(totals.revenueCents)}</p>
+          <p className="mt-1 text-xs font-bold text-slate-600">Trust &amp; Safety collected</p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-blue-100 bg-blue-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">Purchases</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">{totals.purchases.toLocaleString()}</p>
+          <p className="mt-1 text-xs font-bold text-slate-600">Plans selected</p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-amber-100 bg-amber-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Outstanding</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">{formatCents(totals.outstandingCents)}</p>
+          <p className="mt-1 text-xs font-bold text-slate-600">Remaining balances</p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-orange-100 bg-orange-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Book &amp; Bark</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">{formatCents(totals.bookingDeductionRemainingCents)}</p>
+          <p className="mt-1 text-xs font-bold text-slate-600">Booking deduction recovery</p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-rose-100 bg-rose-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-700">Approval Exposure</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">{totals.approvalPending.toLocaleString()}</p>
+          <p className="mt-1 text-xs font-bold text-slate-600">Financed plans pending</p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Checkr Ready</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">{totals.checkrReady.toLocaleString()}</p>
+          <p className="mt-1 text-xs font-bold text-slate-600">Financially cleared</p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        {financials.plans.map((plan) => (
+          <Link
+            key={plan.planKey}
+            href={`/admin/background-checks?plan=${encodeURIComponent(plan.planKey)}`}
+            className="group rounded-[1.5rem] border border-slate-100 bg-[#fbfefd] p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:bg-white hover:shadow-lg"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Plan Performance</p>
+                <h3 className="mt-2 text-xl font-black text-slate-950">{plan.planName}</h3>
+              </div>
+              <ArrowCircle />
+            </div>
+
+            <div className="mt-5 grid gap-3 text-sm font-bold text-slate-600">
+              <p className="flex justify-between gap-4">
+                <span>Purchases</span>
+                <span className="text-slate-950">{plan.purchases.toLocaleString()}</span>
+              </p>
+              <p className="flex justify-between gap-4">
+                <span>Revenue</span>
+                <span className="text-slate-950">{formatCents(plan.revenueCents)}</span>
+              </p>
+              <p className="flex justify-between gap-4">
+                <span>Outstanding</span>
+                <span className="text-slate-950">{formatCents(plan.outstandingCents)}</span>
+              </p>
+              <p className="flex justify-between gap-4">
+                <span>Approvals Pending</span>
+                <span className="text-slate-950">{plan.approvalPending.toLocaleString()}</span>
+              </p>
+              <p className="flex justify-between gap-4">
+                <span>Checkr Ready</span>
+                <span className="text-slate-950">{plan.checkrReady.toLocaleString()}</span>
+              </p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function ManagementAlerts({ alerts }: { alerts: ManagementAlert[] }) {
   return (
     <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
@@ -1523,6 +1754,8 @@ function SourceHealthPanel({
 export default function AdminFinancialsPage() {
   const [overview, setOverview] =
     useState<FinancialOverviewResponse>(fallbackOverview);
+  const [trustSafetyFinancials, setTrustSafetyFinancials] =
+    useState<TrustSafetyFinancialsResponse>(fallbackTrustSafetyFinancials);
   const [range, setRange] = useState("month");
   const [segment, setSegment] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -1556,6 +1789,12 @@ export default function AdminFinancialsPage() {
   const showCashFlowChart = sectionVisible(segment, ["banking", "payouts"]);
   const showReportingCenter = sectionVisible(segment, ["banking", "payouts"]);
   const showStatements = sectionVisible(segment, ["banking"]);
+  const showTrustSafetyFinancials = sectionVisible(segment, [
+    "trust-safety",
+    "gurus",
+    "payouts",
+    "banking",
+  ]);
   const showOperatingFinance = sectionVisible(segment, [
     "bookings",
     "customers",
@@ -1563,7 +1802,36 @@ export default function AdminFinancialsPage() {
     "partners",
     "payouts",
     "banking",
+    "trust-safety",
   ]);
+
+  async function loadTrustSafetyFinancials() {
+    try {
+      const response = await fetch("/api/admin/financials/trust-safety", {
+        cache: "no-store",
+      });
+
+      const json = (await response.json()) as TrustSafetyFinancialsResponse;
+
+      if (!response.ok || !json.ok) {
+        setTrustSafetyFinancials({
+          ...fallbackTrustSafetyFinancials,
+          message: json.message || "Unable to load Trust & Safety financials.",
+        });
+        return;
+      }
+
+      setTrustSafetyFinancials(json);
+    } catch (error) {
+      setTrustSafetyFinancials({
+        ...fallbackTrustSafetyFinancials,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to load Trust & Safety financials.",
+      });
+    }
+  }
 
   async function loadOverview() {
     setLoading(true);
@@ -1612,6 +1880,7 @@ export default function AdminFinancialsPage() {
 
   useEffect(() => {
     void loadOverview();
+    void loadTrustSafetyFinancials();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range, segment]);
 
@@ -1961,6 +2230,10 @@ export default function AdminFinancialsPage() {
             ) : null}
           </div>
         </section>
+
+        {showTrustSafetyFinancials ? (
+          <TrustSafetyFinancialsPanel financials={trustSafetyFinancials} />
+        ) : null}
 
         <ManagementAlerts alerts={overview.managementAlerts} />
 

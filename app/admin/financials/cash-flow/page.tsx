@@ -13,6 +13,9 @@ type DisputeRow = Record<string, unknown>;
 type FinancialLedgerRow = Record<string, unknown>;
 type BankTransactionRow = Record<string, unknown>;
 type StripeBalanceTransactionRow = Record<string, unknown>;
+type TrustSafetyPurchaseRow = Record<string, unknown>;
+type TrustSafetyFinancialEventRow = Record<string, unknown>;
+type BookingTrustSafetyDeductionRow = Record<string, unknown>;
 
 type SafeQueryResponse = {
   data: unknown;
@@ -74,6 +77,11 @@ const SECTION_OPTIONS: { value: CashFlowSectionKey; label: string }[] = [
 
 const LINE_PRESETS = [
   { section: "operating", label: "Cash Received from Bookings" },
+  { section: "operating", label: "Trust & Safety Cash Collected" },
+  { section: "operating", label: "Book & Bark Deductions Collected" },
+  { section: "operating", label: "Checkr Vendor Costs" },
+  { section: "operating", label: "Trust & Safety Stripe Fees" },
+  { section: "operating", label: "Trust & Safety Refunds" },
   { section: "operating", label: "Stripe Processing Fees" },
   { section: "operating", label: "Cash Paid to Gurus" },
   { section: "operating", label: "Cash Paid for Operating Expenses" },
@@ -101,6 +109,46 @@ const DEFAULT_CASH_FLOW_LINES: CashFlowRow[] = [
     display_order: 10,
     notes: "Estimated from paid SitGuru booking rows and Stripe payment activity.",
     source: "bookings/stripe",
+  },
+  {
+    section: "operating",
+    label: "Trust & Safety Cash Collected",
+    amount: 0,
+    display_order: 11,
+    notes: "Cash collected from Paw in Full, Pawstep, and Book & Bark Trust & Safety screening plans.",
+    source: "guru_trust_safety_plan_purchases/trust_safety_financial_events",
+  },
+  {
+    section: "operating",
+    label: "Book & Bark Deductions Collected",
+    amount: 0,
+    display_order: 12,
+    notes: "Cash recovered from future Guru booking payouts for Book & Bark Trust & Safety balances.",
+    source: "booking_trust_safety_deductions",
+  },
+  {
+    section: "operating",
+    label: "Checkr Vendor Costs",
+    amount: 0,
+    display_order: 16,
+    notes: "Cash outflows or accrued cash impact for Checkr screening costs paid or fronted by SitGuru.",
+    source: "trust_safety_financial_events",
+  },
+  {
+    section: "operating",
+    label: "Trust & Safety Stripe Fees",
+    amount: 0,
+    display_order: 17,
+    notes: "Stripe processing fees tied to Trust & Safety screening plan payments.",
+    source: "trust_safety_financial_events/stripe",
+  },
+  {
+    section: "operating",
+    label: "Trust & Safety Refunds",
+    amount: 0,
+    display_order: 18,
+    notes: "Refunds and reversals tied to Trust & Safety screening plan payments.",
+    source: "trust_safety_financial_events/stripe",
   },
   {
     section: "operating",
@@ -828,6 +876,88 @@ function dedupeCashFlowRows(lines: CashFlowRow[]) {
   );
 }
 
+
+function getTrustSafetyPaymentCashCollected(purchases: TrustSafetyPurchaseRow[]) {
+  return purchases.reduce((sum, purchase) => {
+    const status = asTrimmedString(purchase.payment_status).toLowerCase();
+    const amountPaidCents = toNumber(purchase.amount_paid_cents);
+
+    if (status === "paid" || status === "partially_paid") {
+      return sum + amountPaidCents / 100;
+    }
+
+    return sum;
+  }, 0);
+}
+
+function getTrustSafetyEventAmountDollars(event: TrustSafetyFinancialEventRow) {
+  const netAmountCents = toNumber(event.net_amount_cents);
+  const grossAmountCents = toNumber(event.gross_amount_cents);
+  const feeAmountCents = toNumber(event.fee_amount_cents);
+
+  if (netAmountCents) return Math.abs(netAmountCents) / 100;
+  if (grossAmountCents) return Math.abs(grossAmountCents) / 100;
+  if (feeAmountCents) return Math.abs(feeAmountCents) / 100;
+
+  return Math.abs(toNumber(event.amount) || toNumber(event.net_amount) || 0);
+}
+
+function getTrustSafetyCashCollectedFromEvents(events: TrustSafetyFinancialEventRow[]) {
+  return events
+    .filter((event) => {
+      const type = asTrimmedString(event.event_type).toLowerCase();
+      const status = asTrimmedString(event.status).toLowerCase();
+
+      return (
+        [
+          "payment_collected",
+          "down_payment_collected",
+          "installment_collected",
+          "booking_deduction_collected",
+        ].includes(type) &&
+        status !== "failed" &&
+        status !== "voided" &&
+        status !== "refunded"
+      );
+    })
+    .reduce((sum, event) => sum + getTrustSafetyEventAmountDollars(event), 0);
+}
+
+function getTrustSafetyFinancialEventTotal(
+  events: TrustSafetyFinancialEventRow[],
+  eventTypes: string[],
+) {
+  const normalizedTypes = eventTypes.map((type) => type.toLowerCase());
+
+  return events
+    .filter((event) =>
+      normalizedTypes.includes(asTrimmedString(event.event_type).toLowerCase()),
+    )
+    .reduce((sum, event) => sum + getTrustSafetyEventAmountDollars(event), 0);
+}
+
+function getBookAndBarkDeductionCashCollected(
+  deductions: BookingTrustSafetyDeductionRow[],
+  events: TrustSafetyFinancialEventRow[],
+) {
+  const collectedFromDeductions = deductions
+    .filter(
+      (deduction) =>
+        asTrimmedString(deduction.deduction_status).toLowerCase() ===
+        "collected",
+    )
+    .reduce(
+      (sum, deduction) => sum + toNumber(deduction.deduction_amount_cents) / 100,
+      0,
+    );
+
+  if (collectedFromDeductions > 0) return collectedFromDeductions;
+
+  return getTrustSafetyFinancialEventTotal(events, [
+    "booking_deduction_collected",
+  ]);
+}
+
 function getCashFlowLineAmount({
   line,
   bookings,
@@ -837,6 +967,9 @@ function getCashFlowLineAmount({
   ledgerEntries,
   bankTransactions,
   stripeBalanceTransactions,
+  trustSafetyPurchases,
+  trustSafetyFinancialEvents,
+  bookingTrustSafetyDeductions,
 }: {
   line: CashFlowRow;
   bookings: BookingRow[];
@@ -846,9 +979,63 @@ function getCashFlowLineAmount({
   ledgerEntries: FinancialLedgerRow[];
   bankTransactions: BankTransactionRow[];
   stripeBalanceTransactions: StripeBalanceTransactionRow[];
+  trustSafetyPurchases: TrustSafetyPurchaseRow[];
+  trustSafetyFinancialEvents: TrustSafetyFinancialEventRow[];
+  bookingTrustSafetyDeductions: BookingTrustSafetyDeductionRow[];
 }) {
   const label = normalizeCashFlowLabel(asTrimmedString(line.label));
   const storedAmount = toNumber(line.amount);
+
+  if (label.includes("trust & safety cash") || label.includes("trust and safety cash")) {
+    const eventCash = getTrustSafetyCashCollectedFromEvents(
+      trustSafetyFinancialEvents,
+    );
+    const purchaseCash = getTrustSafetyPaymentCashCollected(
+      trustSafetyPurchases,
+    );
+
+    return eventCash || purchaseCash || storedAmount;
+  }
+
+  if (label.includes("book & bark") && label.includes("deduction")) {
+    return (
+      getBookAndBarkDeductionCashCollected(
+        bookingTrustSafetyDeductions,
+        trustSafetyFinancialEvents,
+      ) || storedAmount
+    );
+  }
+
+  if (label.includes("checkr") && label.includes("cost")) {
+    const checkrCosts = getTrustSafetyFinancialEventTotal(
+      trustSafetyFinancialEvents,
+      ["checkr_vendor_cost", "sitguru_fronted_cost"],
+    );
+
+    return -Math.abs(checkrCosts || storedAmount);
+  }
+
+  if (
+    label.includes("trust & safety stripe") ||
+    label.includes("trust and safety stripe")
+  ) {
+    const fees = getTrustSafetyFinancialEventTotal(trustSafetyFinancialEvents, [
+      "stripe_fee",
+    ]);
+
+    return -Math.abs(fees || storedAmount);
+  }
+
+  if (
+    label.includes("trust & safety refund") ||
+    label.includes("trust and safety refund")
+  ) {
+    const refunds = getTrustSafetyFinancialEventTotal(trustSafetyFinancialEvents, [
+      "refund",
+    ]);
+
+    return -Math.abs(refunds || storedAmount);
+  }
 
   if (label.includes("cash received") && label.includes("booking")) {
     const stripePayments = stripeBalanceTransactions
@@ -985,6 +1172,9 @@ function getCashFlowReadinessItems({
   ledgerEntries,
   bankTransactions,
   stripeBalanceTransactions,
+  trustSafetyPurchases,
+  trustSafetyFinancialEvents,
+  bookingTrustSafetyDeductions,
 }: {
   bookings: BookingRow[];
   expenses: ExpenseRow[];
@@ -993,6 +1183,9 @@ function getCashFlowReadinessItems({
   ledgerEntries: FinancialLedgerRow[];
   bankTransactions: BankTransactionRow[];
   stripeBalanceTransactions: StripeBalanceTransactionRow[];
+  trustSafetyPurchases: TrustSafetyPurchaseRow[];
+  trustSafetyFinancialEvents: TrustSafetyFinancialEventRow[];
+  bookingTrustSafetyDeductions: BookingTrustSafetyDeductionRow[];
 }): CashFlowReadinessItem[] {
   const reconciliationReady = [...ledgerEntries, ...bankTransactions].some(
     (entry) =>
@@ -1057,6 +1250,17 @@ function getCashFlowReadinessItems({
       detail: reconciliationReady
         ? "At least one row has reconciliation metadata for matching Stripe payouts to bank deposits or transfers."
         : "Add reconciliation IDs/matches so Stripe payouts and Navy Federal deposits are not double-counted.",
+    },
+    {
+      label: "Trust & Safety cash tracking",
+      status:
+        trustSafetyPurchases.length || trustSafetyFinancialEvents.length
+          ? "ready"
+          : "needs_review",
+      detail:
+        trustSafetyPurchases.length || trustSafetyFinancialEvents.length
+          ? `${trustSafetyPurchases.length.toLocaleString()} Trust & Safety plan rows and ${trustSafetyFinancialEvents.length.toLocaleString()} Trust & Safety financial event rows support screening cash flow.`
+          : "Trust & Safety plan payments, Checkr costs, Stripe fees, and Book & Bark deductions will appear here after plan activity is recorded.",
     },
     {
       label: "Disputes and refunds",
@@ -1342,6 +1546,9 @@ async function getCashFlowData() {
     rawLedgerEntries,
     rawBankTransactions,
     rawStripeBalanceTransactions,
+    rawTrustSafetyPurchases,
+    rawTrustSafetyFinancialEvents,
+    rawBookingTrustSafetyDeductions,
   ] = await Promise.all([
     safeRows<CashFlowRow>(
       supabaseAdmin
@@ -1409,6 +1616,30 @@ async function getCashFlowData() {
         .limit(3000),
       "stripe_balance_transactions",
     ),
+    safeRows<TrustSafetyPurchaseRow>(
+      supabaseAdmin
+        .from("guru_trust_safety_plan_purchases")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3000),
+      "guru_trust_safety_plan_purchases",
+    ),
+    safeRows<TrustSafetyFinancialEventRow>(
+      supabaseAdmin
+        .from("trust_safety_financial_events")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3000),
+      "trust_safety_financial_events",
+    ),
+    safeRows<BookingTrustSafetyDeductionRow>(
+      supabaseAdmin
+        .from("booking_trust_safety_deductions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3000),
+      "booking_trust_safety_deductions",
+    ),
   ]);
 
   const savedLines = rawSavedLines.filter((row) => !isArchivedCashFlowLine(row));
@@ -1419,6 +1650,16 @@ async function getCashFlowData() {
   const ledgerEntries = rawLedgerEntries.filter((row) => !isArchivedRow(row));
   const bankTransactions = rawBankTransactions.filter((row) => !isArchivedRow(row));
   const stripeBalanceTransactions = rawStripeBalanceTransactions.filter(
+    (row) => !isArchivedRow(row),
+  );
+
+  const trustSafetyPurchases = rawTrustSafetyPurchases.filter(
+    (row) => !isArchivedRow(row),
+  );
+  const trustSafetyFinancialEvents = rawTrustSafetyFinancialEvents.filter(
+    (row) => !isArchivedRow(row),
+  );
+  const bookingTrustSafetyDeductions = rawBookingTrustSafetyDeductions.filter(
     (row) => !isArchivedRow(row),
   );
 
@@ -1452,6 +1693,9 @@ async function getCashFlowData() {
           ledgerEntries,
           bankTransactions,
           stripeBalanceTransactions,
+          trustSafetyPurchases,
+          trustSafetyFinancialEvents,
+          bookingTrustSafetyDeductions,
         }),
         notes: asTrimmedString(line.notes),
         source: asTrimmedString(line.source) || "manual",
@@ -1539,6 +1783,9 @@ async function getCashFlowData() {
       ledgerEntries,
       bankTransactions,
       stripeBalanceTransactions,
+      trustSafetyPurchases,
+      trustSafetyFinancialEvents,
+      bookingTrustSafetyDeductions,
     }),
     savedLineCount: customSavedLineCount,
     totals: {
@@ -1550,6 +1797,27 @@ async function getCashFlowData() {
       ledgerRows: ledgerEntries.length,
       bankRows: bankTransactions.length,
       stripeRows: stripeBalanceTransactions.length,
+      trustSafetyPlanRows: trustSafetyPurchases.length,
+      trustSafetyEventRows: trustSafetyFinancialEvents.length,
+      trustSafetyCashCollected:
+        getTrustSafetyCashCollectedFromEvents(trustSafetyFinancialEvents) ||
+        getTrustSafetyPaymentCashCollected(trustSafetyPurchases),
+      bookAndBarkDeductionsCollected: getBookAndBarkDeductionCashCollected(
+        bookingTrustSafetyDeductions,
+        trustSafetyFinancialEvents,
+      ),
+      checkrVendorCosts: getTrustSafetyFinancialEventTotal(
+        trustSafetyFinancialEvents,
+        ["checkr_vendor_cost", "sitguru_fronted_cost"],
+      ),
+      trustSafetyStripeFees: getTrustSafetyFinancialEventTotal(
+        trustSafetyFinancialEvents,
+        ["stripe_fee"],
+      ),
+      trustSafetyRefunds: getTrustSafetyFinancialEventTotal(
+        trustSafetyFinancialEvents,
+        ["refund"],
+      ),
       manualFinancingBankRows,
       netOperatingCash,
       netInvestingCash,
@@ -1626,9 +1894,9 @@ export default async function AdminCashFlowPage() {
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 Tracks cash moving through SitGuru from operations, investing,
-                financing, Stripe activity, Navy Federal deposits, bank
-                withdrawals, transfers, refunds, disputes, and CPA-ready cash
-                reconciliation.
+                financing, Stripe activity, Trust & Safety screening payments, Book & Bark deductions,
+                Navy Federal deposits, bank withdrawals, transfers, refunds,
+                disputes, and CPA-ready cash reconciliation.
               </p>
             </div>
 
@@ -1699,6 +1967,33 @@ export default async function AdminCashFlowPage() {
               tone={cashFlow.totals.endingCash >= 0 ? "emerald" : "rose"}
             />
           </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Trust & Safety Cash Collected"
+            value={money(cashFlow.totals.trustSafetyCashCollected)}
+            detail="Paw in Full, Pawstep, and Book & Bark cash received."
+            tone="emerald"
+          />
+          <StatCard
+            label="Book & Bark Recovery"
+            value={money(cashFlow.totals.bookAndBarkDeductionsCollected)}
+            detail="Booking-deduction cash recovered from future Guru payouts."
+            tone="sky"
+          />
+          <StatCard
+            label="Checkr Cash Outflow"
+            value={money(-Math.abs(cashFlow.totals.checkrVendorCosts))}
+            detail="Checkr vendor costs and SitGuru-fronted screening cost events."
+            tone="amber"
+          />
+          <StatCard
+            label="Trust & Safety Fees / Refunds"
+            value={money(-Math.abs(cashFlow.totals.trustSafetyStripeFees + cashFlow.totals.trustSafetyRefunds))}
+            detail="Stripe processing fees and refunds tied to screening plans."
+            tone="rose"
+          />
         </section>
 
         <CashFlowReadinessPanel items={cashFlow.readinessItems} />
@@ -2101,10 +2396,12 @@ export default async function AdminCashFlowPage() {
               <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
                 Cash received from customers should come from Stripe payments,
                 while cash confirmed in the bank should come from Navy Federal
-                deposits. Stripe payouts matched to bank deposits are cash
-                movement, not new revenue, so reconciliation prevents double
-                counting across P&L, Balance Sheet, Cash Flow, and Financial
-                Overview.
+                deposits. Trust & Safety screening payments, Checkr vendor costs,
+                Stripe fees, refunds, and Book & Bark booking deductions are now
+                included in operating cash flow. Stripe payouts matched to bank
+                deposits are cash movement, not new revenue, so reconciliation
+                prevents double counting across P&L, Balance Sheet, Cash Flow,
+                and Financial Overview.
               </p>
             </div>
           </div>

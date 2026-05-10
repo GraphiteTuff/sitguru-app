@@ -13,6 +13,7 @@ type DisputeRow = Record<string, unknown>;
 type FinancialLedgerRow = Record<string, unknown>;
 type BankTransactionRow = Record<string, unknown>;
 type StripeTransactionRow = Record<string, unknown>;
+type TrustSafetyPurchaseRow = Record<string, unknown>;
 
 type AdminIdentity = {
   id: string;
@@ -72,6 +73,9 @@ const LINE_PRESETS = [
   { section: "current_assets", label: "Cash / Operating Account" },
   { section: "current_assets", label: "Stripe Balance / Pending Receipts" },
   { section: "current_assets", label: "Accounts Receivable" },
+  { section: "current_assets", label: "Trust & Safety Receivables" },
+  { section: "current_assets", label: "Pawstep Installment Receivable" },
+  { section: "current_assets", label: "Book & Bark Booking Deduction Receivable" },
   { section: "current_assets", label: "Prepaid Expenses" },
   { section: "non_current_assets", label: "Equipment" },
   { section: "non_current_assets", label: "Office Furniture" },
@@ -119,6 +123,27 @@ const DEFAULT_BALANCE_LINES: BalanceSheetRow[] = [
     amount: 0,
     display_order: 30,
     notes: "Uncollected customer balances from unpaid bookings.",
+  },
+  {
+    section: "current_assets",
+    label: "Trust & Safety Receivables",
+    amount: 0,
+    display_order: 34,
+    notes: "Outstanding Pawstep and Book & Bark Trust & Safety plan balances expected to be collected from Gurus.",
+  },
+  {
+    section: "current_assets",
+    label: "Pawstep Installment Receivable",
+    amount: 0,
+    display_order: 35,
+    notes: "Remaining Pawstep Plan balances expected through automatic monthly Stripe installment payments.",
+  },
+  {
+    section: "current_assets",
+    label: "Book & Bark Booking Deduction Receivable",
+    amount: 0,
+    display_order: 36,
+    notes: "Remaining Book & Bark balances expected to be recovered from future completed booking payouts.",
   },
   {
     section: "current_assets",
@@ -719,6 +744,90 @@ function getStripeBalanceEstimate(stripeTransactions: StripeTransactionRow[]) {
   );
 }
 
+function centsToDollarsAmount(value: unknown) {
+  return toNumber(value) / 100;
+}
+
+function getTrustSafetyPlanKey(purchase: TrustSafetyPurchaseRow) {
+  return asTrimmedString(purchase.plan_key).toLowerCase();
+}
+
+function isActiveTrustSafetyPurchase(purchase: TrustSafetyPurchaseRow) {
+  const paymentStatus = asTrimmedString(purchase.payment_status).toLowerCase();
+  const repaymentStatus = asTrimmedString(purchase.repayment_status).toLowerCase();
+
+  return ![
+    "canceled",
+    "cancelled",
+    "refunded",
+    "voided",
+    "failed",
+  ].includes(paymentStatus) && repaymentStatus !== "canceled";
+}
+
+function getTrustSafetyRemainingBalance(purchase: TrustSafetyPurchaseRow) {
+  if (!isActiveTrustSafetyPurchase(purchase)) return 0;
+
+  return Math.max(0, centsToDollarsAmount(purchase.remaining_balance_cents));
+}
+
+function getTrustSafetyBookingDeductionRemaining(purchase: TrustSafetyPurchaseRow) {
+  if (!isActiveTrustSafetyPurchase(purchase)) return 0;
+
+  const bookingDeductionRemaining = centsToDollarsAmount(
+    purchase.booking_deduction_remaining_cents,
+  );
+
+  return Math.max(
+    0,
+    bookingDeductionRemaining || getTrustSafetyRemainingBalance(purchase),
+  );
+}
+
+function getTrustSafetyAmountPaid(purchase: TrustSafetyPurchaseRow) {
+  const paymentStatus = asTrimmedString(purchase.payment_status).toLowerCase();
+
+  if (["canceled", "cancelled", "refunded", "voided", "failed"].includes(paymentStatus)) {
+    return 0;
+  }
+
+  return Math.max(0, centsToDollarsAmount(purchase.amount_paid_cents));
+}
+
+function getTrustSafetyReceivableTotal(purchases: TrustSafetyPurchaseRow[]) {
+  return purchases.reduce(
+    (sum, purchase) => sum + getTrustSafetyRemainingBalance(purchase),
+    0,
+  );
+}
+
+function getTrustSafetyReceivableForPlan(
+  purchases: TrustSafetyPurchaseRow[],
+  planKey: string,
+) {
+  return purchases
+    .filter((purchase) => getTrustSafetyPlanKey(purchase) === planKey)
+    .reduce((sum, purchase) => sum + getTrustSafetyRemainingBalance(purchase), 0);
+}
+
+function getTrustSafetyBookingDeductionReceivable(
+  purchases: TrustSafetyPurchaseRow[],
+) {
+  return purchases
+    .filter((purchase) => getTrustSafetyPlanKey(purchase) === "book_and_bark_plan")
+    .reduce(
+      (sum, purchase) => sum + getTrustSafetyBookingDeductionRemaining(purchase),
+      0,
+    );
+}
+
+function getTrustSafetyRevenueCollected(purchases: TrustSafetyPurchaseRow[]) {
+  return purchases.reduce(
+    (sum, purchase) => sum + getTrustSafetyAmountPaid(purchase),
+    0,
+  );
+}
+
 function getLineSection(line: BalanceSheetRow): BalanceSectionKey {
   const section = asTrimmedString(line.section) as BalanceSectionKey;
 
@@ -768,10 +877,12 @@ function calculateCurrentNetIncome({
   bookings,
   expenses,
   disputes,
+  trustSafetyPurchases,
 }: {
   bookings: BookingRow[];
   expenses: ExpenseRow[];
   disputes: DisputeRow[];
+  trustSafetyPurchases: TrustSafetyPurchaseRow[];
 }) {
   const bookingRevenue = bookings.reduce(
     (sum, booking) => sum + getBookingGrossAmount(booking),
@@ -799,8 +910,9 @@ function calculateCurrentNetIncome({
       return !category.includes("asset") && !category.includes("prepaid");
     })
     .reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
+  const trustSafetyRevenue = getTrustSafetyRevenueCollected(trustSafetyPurchases);
 
-  return bookingRevenue + platformFees - guruPayouts - refunds - disputeLosses - operatingExpenses;
+  return bookingRevenue + platformFees + trustSafetyRevenue - guruPayouts - refunds - disputeLosses - operatingExpenses;
 }
 
 function getBalanceLineAmount({
@@ -811,6 +923,7 @@ function getBalanceLineAmount({
   ledgerEntries,
   bankTransactions,
   stripeTransactions,
+  trustSafetyPurchases,
   currentNetIncome,
 }: {
   line: BalanceSheetRow;
@@ -820,6 +933,7 @@ function getBalanceLineAmount({
   ledgerEntries: FinancialLedgerRow[];
   bankTransactions: BankTransactionRow[];
   stripeTransactions: StripeTransactionRow[];
+  trustSafetyPurchases: TrustSafetyPurchaseRow[];
   currentNetIncome: number;
 }) {
   const label = normalizeBalanceLabel(asTrimmedString(line.label));
@@ -897,6 +1011,23 @@ function getBalanceLineAmount({
 
   if (label.includes("dispute") || label.includes("chargeback")) {
     return storedAmount + disputes.reduce((sum, dispute) => sum + getDisputeAmount(dispute), 0);
+  }
+
+  if (label.includes("trust & safety") && label.includes("receivable")) {
+    return storedAmount + getTrustSafetyReceivableTotal(trustSafetyPurchases);
+  }
+
+  if (label.includes("pawstep") && label.includes("receivable")) {
+    return storedAmount + getTrustSafetyReceivableForPlan(
+      trustSafetyPurchases,
+      "pawstep_plan",
+    );
+  }
+
+  if (label.includes("book & bark") && label.includes("receivable")) {
+    return storedAmount + getTrustSafetyBookingDeductionReceivable(
+      trustSafetyPurchases,
+    );
   }
 
   if (label.includes("receivable")) {
@@ -1177,7 +1308,7 @@ function BalanceReadinessPanel({ items }: { items: BalanceReadinessItem[] }) {
 
 function BalanceFlowPanel() {
   const steps = [
-    "Stripe and booking activity create receivables, clearing balances, payouts payable, refunds, and tax liabilities.",
+    "Stripe, booking, and Trust & Safety activity create receivables, clearing balances, payouts payable, refunds, and tax liabilities.",
     "Navy Federal checking and savings confirm real cash balances, deposits, transfers, and withdrawals.",
     "Manual balance lines capture owner capital, retained earnings, loans, equipment, prepaid assets, and corrections.",
     "Current net income/loss feeds from available P&L activity so equity stays connected to operations.",
@@ -1220,6 +1351,7 @@ function getReadinessItems({
   totalLiabilities,
   totalEquity,
   isBalanced,
+  trustSafetyReceivableTotal,
 }: {
   balanceLineCount: number;
   bankTransactions: BankTransactionRow[];
@@ -1229,6 +1361,7 @@ function getReadinessItems({
   totalLiabilities: number;
   totalEquity: number;
   isBalanced: boolean;
+  trustSafetyReceivableTotal: number;
 }): BalanceReadinessItem[] {
   const bankRows = bankTransactions.length || ledgerEntries.filter((row) => {
     const text = getLedgerText(row);
@@ -1253,6 +1386,13 @@ function getReadinessItems({
       detail: stripeRows
         ? `${stripeRows.toLocaleString()} Stripe-related rows can support pending receipts and clearing balances.`
         : "Normalize Stripe balance transactions into the ledger so pending payouts and fees are supportable.",
+    },
+    {
+      label: "Trust & Safety receivables",
+      status: trustSafetyReceivableTotal ? "ready" : "needs_review",
+      detail: trustSafetyReceivableTotal
+        ? `${money(trustSafetyReceivableTotal)} in Pawstep and Book & Bark Trust & Safety receivables is reflected as current assets.`
+        : "No outstanding Trust & Safety receivables are currently reflected from financed plans.",
     },
     {
       label: "Manual balance lines",
@@ -1293,6 +1433,7 @@ async function getBalanceSheetData() {
     rawLedgerEntries,
     rawBankTransactions,
     rawStripeTransactions,
+    rawTrustSafetyPurchases,
   ] = await Promise.all([
     safeRows<BalanceSheetRow>(
       supabaseAdmin
@@ -1360,6 +1501,14 @@ async function getBalanceSheetData() {
         .limit(3000),
       "stripe_balance_transactions",
     ),
+    safeRows<TrustSafetyPurchaseRow>(
+      supabaseAdmin
+        .from("guru_trust_safety_plan_purchases")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3000),
+      "guru_trust_safety_plan_purchases",
+    ),
   ]);
 
   const savedLines = rawSavedLines.filter((row) => !isArchivedRow(row));
@@ -1370,11 +1519,17 @@ async function getBalanceSheetData() {
   const ledgerEntries = rawLedgerEntries.filter((row) => !isArchivedRow(row));
   const bankTransactions = rawBankTransactions.filter((row) => !isArchivedRow(row));
   const stripeTransactions = rawStripeTransactions.filter((row) => !isArchivedRow(row));
+  const trustSafetyPurchases = rawTrustSafetyPurchases.filter((row) => !isArchivedRow(row));
 
   const defaultLineKeys = new Set(DEFAULT_BALANCE_LINES.map(getBalanceLineKey));
   const sourceLines = dedupeBalanceLines([...DEFAULT_BALANCE_LINES, ...savedLines]);
   const customSavedLineCount = savedLines.filter((line) => !defaultLineKeys.has(getBalanceLineKey(line))).length;
-  const currentNetIncome = calculateCurrentNetIncome({ bookings, expenses, disputes });
+  const currentNetIncome = calculateCurrentNetIncome({
+    bookings,
+    expenses,
+    disputes,
+    trustSafetyPurchases,
+  });
 
   const lines: BalanceLine[] = sourceLines
     .map((line, index) => {
@@ -1395,6 +1550,7 @@ async function getBalanceSheetData() {
           ledgerEntries,
           bankTransactions,
           stripeTransactions,
+          trustSafetyPurchases,
           currentNetIncome,
         }),
         notes: asTrimmedString(line.notes),
@@ -1420,6 +1576,10 @@ async function getBalanceSheetData() {
   const balanceDifference = totalAssets - liabilitiesPlusEquity;
   const isBalanced = Math.abs(balanceDifference) < 1;
   const maxVisualValue = Math.max(totalAssets, totalLiabilities, Math.abs(totalEquity), Math.abs(balanceDifference), 1);
+  const trustSafetyReceivableTotal = getTrustSafetyReceivableTotal(trustSafetyPurchases);
+  const pawstepReceivable = getTrustSafetyReceivableForPlan(trustSafetyPurchases, "pawstep_plan");
+  const bookAndBarkReceivable = getTrustSafetyBookingDeductionReceivable(trustSafetyPurchases);
+  const trustSafetyRevenueCollected = getTrustSafetyRevenueCollected(trustSafetyPurchases);
 
   const recentExpenseAssets = expenses.slice(0, 5).map((expense, index) => ({
     id: asTrimmedString(expense.id) || `${getExpenseName(expense)}-${index}`,
@@ -1449,6 +1609,7 @@ async function getBalanceSheetData() {
     totalLiabilities,
     totalEquity,
     isBalanced,
+    trustSafetyReceivableTotal,
   });
 
   return {
@@ -1475,6 +1636,10 @@ async function getBalanceSheetData() {
       maxVisualValue,
       currentNetIncome,
       pendingPayoutsFromPayoutTable,
+      trustSafetyReceivableTotal,
+      pawstepReceivable,
+      bookAndBarkReceivable,
+      trustSafetyRevenueCollected,
       bankRows: bankTransactions.length,
       stripeRows: stripeTransactions.length,
     },
@@ -1534,15 +1699,15 @@ export default async function AdminBalanceSheetPage() {
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 Snapshot of SitGuru assets, liabilities, and equity. This page
                 pulls from bookings, payouts, Stripe clearing rows, Navy Federal
-                banking, expense records, manual balance lines, and current P&L
-                activity.
+                banking, Trust & Safety plan receivables, expense records,
+                manual balance lines, and current P&L activity.
               </p>
             </div>
 
             <BalanceExportPanel />
           </div>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <StatCard
               label="Total Assets"
               value={money(balance.totals.totalAssets)}
@@ -1560,6 +1725,12 @@ export default async function AdminBalanceSheetPage() {
               value={money(balance.totals.totalEquity)}
               detail={`${money(balance.totals.currentNetIncome)} estimated current net income / loss.`}
               tone="violet"
+            />
+            <StatCard
+              label="Trust & Safety Receivables"
+              value={money(balance.totals.trustSafetyReceivableTotal)}
+              detail={`${money(balance.totals.pawstepReceivable)} Pawstep + ${money(balance.totals.bookAndBarkReceivable)} Book & Bark.`}
+              tone="amber"
             />
             <StatCard
               label={balance.totals.isBalanced ? "Balanced" : "Out of Balance"}
@@ -1977,8 +2148,8 @@ export default async function AdminBalanceSheetPage() {
               <p className="mt-3 text-sm leading-7 text-slate-700">
                 Auto-estimated lines include guru payouts payable, sales tax
                 payable, refund obligations, dispute exposure, accounts
-                receivable, Stripe clearing, bank cash, and current net income
-                when source data is available. Owner capital, retained earnings,
+                receivable, Trust & Safety receivables, Stripe clearing, bank cash,
+                and current net income when source data is available. Owner capital, retained earnings,
                 long-term debt, equipment, and opening balances should usually
                 be entered or confirmed manually with your CPA.
               </p>

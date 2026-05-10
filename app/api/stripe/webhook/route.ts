@@ -63,6 +63,36 @@ type PawstepGuruInvoiceRow = {
   background_check_monthly_payments_completed: number | string | null;
 };
 
+
+type TrustSafetyPurchaseRow = {
+  id: string;
+  guru_id: string | null;
+  user_id: string | null;
+  email: string | null;
+  plan_key: string | null;
+  plan_name: string | null;
+  payment_model: string | null;
+  gross_plan_value_cents: number | null;
+  due_today_cents: number | null;
+  amount_paid_cents: number | null;
+  remaining_balance_cents: number | null;
+  installment_count: number | null;
+  installment_amount_cents: number | null;
+  installments_paid_count: number | null;
+  booking_deduction_required: boolean | null;
+  booking_deduction_agreement_accepted: boolean | null;
+  booking_deduction_collected_cents: number | null;
+  booking_deduction_remaining_cents: number | null;
+  management_approval_required: boolean | null;
+  management_approval_status: string | null;
+  payment_status: string | null;
+  repayment_status: string | null;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+};
+
 const PAY_IN_FULL_TOTAL_CENTS = 3799;
 const FLEXIBLE_PLAN_TOTAL_CENTS = 3999;
 const LAUNCH_TODAY_CENTS = 1500;
@@ -139,6 +169,60 @@ function getBadgeLabel(paymentOption: ScreeningPaymentOption) {
   if (paymentOption === "pay_full_today") return "Launch Pro Guru";
   if (paymentOption === "pay_15_three_monthly") return "Pawstep Starter";
   return "Book & Bark Starter";
+}
+
+
+function getPlanKey(paymentOption: ScreeningPaymentOption) {
+  if (paymentOption === "pay_full_today") return "paw_in_full";
+  if (paymentOption === "pay_15_three_monthly") return "pawstep_plan";
+  return "book_and_bark_plan";
+}
+
+function getPaymentModel(paymentOption: ScreeningPaymentOption) {
+  if (paymentOption === "pay_full_today") return "paid_in_full";
+  if (paymentOption === "pay_15_three_monthly") return "monthly_installments";
+  return "booking_deductions";
+}
+
+function getTotalCents(paymentOption: ScreeningPaymentOption) {
+  return paymentOption === "pay_full_today"
+    ? PAY_IN_FULL_TOTAL_CENTS
+    : FLEXIBLE_PLAN_TOTAL_CENTS;
+}
+
+function getDueTodayCents(paymentOption: ScreeningPaymentOption) {
+  return paymentOption === "pay_full_today"
+    ? PAY_IN_FULL_TOTAL_CENTS
+    : LAUNCH_TODAY_CENTS;
+}
+
+function getRemainingAfterTodayCents(paymentOption: ScreeningPaymentOption) {
+  return paymentOption === "pay_full_today" ? 0 : FLEXIBLE_REMAINING_CENTS;
+}
+
+function isFinancedTrustSafetyPlan(paymentOption: ScreeningPaymentOption) {
+  return paymentOption === "pay_15_three_monthly" ||
+    paymentOption === "pay_15_booking_deductions";
+}
+
+function getManagementApprovalStatusForPayment(
+  paymentOption: ScreeningPaymentOption,
+  currentStatus?: string | null,
+) {
+  if (!isFinancedTrustSafetyPlan(paymentOption)) {
+    return "not_required";
+  }
+
+  if (currentStatus === "approved" || currentStatus === "denied") {
+    return currentStatus;
+  }
+
+  return "pending";
+}
+
+function safeCents(value: unknown, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed) : fallback;
 }
 
 function getConfiguredSiteUrl() {
@@ -472,6 +556,126 @@ async function logReceiptEmail(params: {
   }
 }
 
+
+async function getTrustSafetyPurchaseBySessionId(sessionId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("guru_trust_safety_plan_purchases")
+    .select("*")
+    .eq("stripe_checkout_session_id", sessionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not load Trust & Safety purchase by session:", error);
+    return null;
+  }
+
+  return data as TrustSafetyPurchaseRow | null;
+}
+
+async function getTrustSafetyPurchaseByPaymentIntent(paymentIntentId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("guru_trust_safety_plan_purchases")
+    .select("*")
+    .eq("stripe_payment_intent_id", paymentIntentId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "Could not load Trust & Safety purchase by payment intent:",
+      error,
+    );
+    return null;
+  }
+
+  return data as TrustSafetyPurchaseRow | null;
+}
+
+async function getTrustSafetyPurchaseBySubscriptionId(subscriptionId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("guru_trust_safety_plan_purchases")
+    .select("*")
+    .eq("stripe_subscription_id", subscriptionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "Could not load Trust & Safety purchase by subscription:",
+      error,
+    );
+    return null;
+  }
+
+  return data as TrustSafetyPurchaseRow | null;
+}
+
+async function writeTrustSafetyFinancialEvent(params: {
+  purchaseId?: string | null;
+  guruId?: string | null;
+  userId?: string | null;
+  eventType:
+    | "payment_collected"
+    | "down_payment_collected"
+    | "installment_collected"
+    | "refund"
+    | "ledger_adjustment";
+  status?: "pending" | "posted" | "failed" | "voided" | "refunded" | "reconciled";
+  planKey?: string | null;
+  planName?: string | null;
+  grossAmountCents?: number;
+  feeAmountCents?: number;
+  netAmountCents?: number;
+  stripeCheckoutSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
+  stripeChargeId?: string | null;
+  description: string;
+  metadata?: Record<string, unknown>;
+  occurredAt?: string;
+}) {
+  const now = new Date().toISOString();
+  const grossAmountCents = params.grossAmountCents || 0;
+  const feeAmountCents = params.feeAmountCents || 0;
+  const netAmountCents =
+    typeof params.netAmountCents === "number"
+      ? params.netAmountCents
+      : grossAmountCents - feeAmountCents;
+
+  const { error } = await supabaseAdmin
+    .from("trust_safety_financial_events")
+    .insert({
+      purchase_id: params.purchaseId || null,
+      guru_id: params.guruId || null,
+      user_id: params.userId || null,
+      event_type: params.eventType,
+      category: "trust_safety",
+      source: "stripe",
+      status: params.status || "posted",
+      plan_key: params.planKey || null,
+      plan_name: params.planName || null,
+      gross_amount_cents: grossAmountCents,
+      fee_amount_cents: feeAmountCents,
+      net_amount_cents: netAmountCents,
+      currency: "usd",
+      stripe_checkout_session_id: params.stripeCheckoutSessionId || null,
+      stripe_payment_intent_id: params.stripePaymentIntentId || null,
+      stripe_charge_id: params.stripeChargeId || null,
+      description: params.description,
+      metadata: params.metadata || {},
+      occurred_at: params.occurredAt || now,
+      created_at: now,
+      updated_at: now,
+    });
+
+  if (error) {
+    console.error("Could not write Trust & Safety financial event:", error);
+  }
+}
+
 async function sendTrustSafetyScreeningReceiptEmail(
   details: ScreeningReceiptDetails,
 ) {
@@ -651,31 +855,130 @@ async function updateTrustSafetyScreeningPaidFromCheckoutSession(
   const guruBeforeUpdate =
     guruBeforeUpdateData as unknown as GuruReceiptRow | null;
 
-  const { paymentIntentId } = await getPaymentIntentDetails(session);
+  const { paymentIntentId, stripeChargeId, paymentIntentStatus } =
+    await getPaymentIntentDetails(session);
 
   const now = new Date().toISOString();
+  const totalCents = getTotalCents(paymentOption);
+  const dueTodayCents = getDueTodayCents(paymentOption);
+  const remainingAfterTodayCents = getRemainingAfterTodayCents(paymentOption);
 
   const paidTodayCents =
     typeof session.amount_total === "number"
       ? session.amount_total
-      : parseCents(session.metadata?.paid_today_cents, LAUNCH_TODAY_CENTS);
-
-  const totalCents =
-    paymentOption === "pay_full_today"
-      ? PAY_IN_FULL_TOTAL_CENTS
-      : FLEXIBLE_PLAN_TOTAL_CENTS;
-
-  const remainingCents =
-    paymentOption === "pay_full_today" ? 0 : FLEXIBLE_REMAINING_CENTS;
+      : parseCents(session.metadata?.paid_today_cents, dueTodayCents);
 
   const paymentStatus =
     paymentOption === "pay_full_today" ? "paid" : "partially_paid";
+
+  const remainingBalanceCents =
+    paymentOption === "pay_full_today"
+      ? 0
+      : Math.max(0, totalCents - paidTodayCents);
 
   const subscriptionId =
     typeof session.subscription === "string" ? session.subscription : null;
 
   const customerId =
     typeof session.customer === "string" ? session.customer : null;
+
+  const planKey = getPlanKey(paymentOption);
+  const planName = getPlanLabel(paymentOption);
+  const paymentModel = getPaymentModel(paymentOption);
+
+  const purchase = await getTrustSafetyPurchaseBySessionId(session.id);
+  const purchaseId = purchase?.id || null;
+  const managementApprovalStatus = getManagementApprovalStatusForPayment(
+    paymentOption,
+    purchase?.management_approval_status,
+  );
+
+  if (purchaseId) {
+    const purchaseUpdate: Record<string, unknown> = {
+      amount_paid_cents: Math.max(
+        safeCents(purchase?.amount_paid_cents),
+        paidTodayCents,
+      ),
+      remaining_balance_cents: remainingBalanceCents,
+      payment_status: paymentStatus,
+      repayment_status:
+        paymentOption === "pay_full_today" ? "complete" : "active",
+      stripe_payment_intent_id: paymentIntentId || null,
+      stripe_customer_id: customerId,
+      stripe_subscription_id: subscriptionId,
+      paid_at: now,
+      updated_at: now,
+    };
+
+    if (isFinancedTrustSafetyPlan(paymentOption)) {
+      purchaseUpdate.management_approval_status = managementApprovalStatus;
+    }
+
+    if (paymentOption === "pay_15_three_monthly") {
+      purchaseUpdate.installment_count = 3;
+      purchaseUpdate.installment_amount_cents = PAWSTEP_MONTHLY_CENTS;
+      purchaseUpdate.installments_paid_count = 0;
+      purchaseUpdate.booking_deduction_remaining_cents = 0;
+    }
+
+    if (paymentOption === "pay_15_booking_deductions") {
+      purchaseUpdate.booking_deduction_required = true;
+      purchaseUpdate.booking_deduction_agreement_accepted = true;
+      purchaseUpdate.booking_deduction_remaining_cents =
+        remainingAfterTodayCents;
+    }
+
+    const { error: purchaseUpdateError } = await supabaseAdmin
+      .from("guru_trust_safety_plan_purchases")
+      .update(purchaseUpdate)
+      .eq("id", purchaseId);
+
+    if (purchaseUpdateError) {
+      console.error(
+        "Could not update Trust & Safety purchase after Stripe payment:",
+        purchaseUpdateError,
+      );
+    }
+  } else {
+    console.warn(
+      "Trust & Safety purchase record not found for completed checkout session:",
+      session.id,
+    );
+  }
+
+  await writeTrustSafetyFinancialEvent({
+    purchaseId,
+    guruId,
+    userId: guruBeforeUpdate?.user_id || asTrimmedString(session.metadata?.user_id) || null,
+    eventType:
+      paymentOption === "pay_full_today"
+        ? "payment_collected"
+        : "down_payment_collected",
+    planKey,
+    planName,
+    grossAmountCents: paidTodayCents,
+    feeAmountCents: 0,
+    netAmountCents: paidTodayCents,
+    stripeCheckoutSessionId: session.id,
+    stripePaymentIntentId: paymentIntentId || null,
+    stripeChargeId: stripeChargeId || null,
+    description:
+      paymentOption === "pay_full_today"
+        ? "Paw in Full Trust & Safety payment collected."
+        : `${planName} down payment collected.`,
+    metadata: {
+      payment_option: paymentOption,
+      payment_model: paymentModel,
+      payment_intent_status: paymentIntentStatus,
+      paid_today_cents: paidTodayCents,
+      total_cents: totalCents,
+      remaining_balance_cents: remainingBalanceCents,
+      management_approval_status: managementApprovalStatus,
+      checkr_invite_allowed_after_trigger:
+        paymentOption === "pay_full_today" ? true : false,
+    },
+    occurredAt: now,
+  });
 
   const updatePayload: Record<string, unknown> = {
     background_check_fee_amount: centsToDollars(totalCents),
@@ -694,9 +997,12 @@ async function updateTrustSafetyScreeningPaidFromCheckoutSession(
   }
 
   if (paymentOption === "pay_15_three_monthly") {
-    updatePayload.background_check_payment_plan_status = "monthly_plan_active";
+    updatePayload.background_check_payment_plan_status =
+      managementApprovalStatus === "approved"
+        ? "monthly_plan_active"
+        : "management_approval_pending";
     updatePayload.background_check_reimbursement_balance = centsToDollars(
-      FLEXIBLE_REMAINING_CENTS,
+      remainingAfterTodayCents,
     );
     updatePayload.background_check_reimbursement_status =
       "stripe_monthly_plan";
@@ -704,9 +1010,12 @@ async function updateTrustSafetyScreeningPaidFromCheckoutSession(
   }
 
   if (paymentOption === "pay_15_booking_deductions") {
-    updatePayload.background_check_payment_plan_status = "not_started";
+    updatePayload.background_check_payment_plan_status =
+      managementApprovalStatus === "approved"
+        ? "booking_deductions_active"
+        : "management_approval_pending";
     updatePayload.background_check_reimbursement_balance = centsToDollars(
-      FLEXIBLE_REMAINING_CENTS,
+      remainingAfterTodayCents,
     );
     updatePayload.background_check_reimbursement_status =
       "covered_by_sitguru";
@@ -768,9 +1077,9 @@ async function updateTrustSafetyScreeningPaidFromCheckoutSession(
       email: guruEmail,
     }),
     paymentOption,
-    planLabel: getPlanLabel(paymentOption),
+    planLabel: planName,
     paidTodayCents,
-    remainingCents,
+    remainingCents: remainingAfterTodayCents,
     paymentStatus,
     stripeSessionId: session.id,
     badgeLabel: getBadgeLabel(paymentOption),
@@ -790,12 +1099,56 @@ async function updateTrustSafetyScreeningExpiredFromCheckoutSession(
     return;
   }
 
+  const now = new Date().toISOString();
+  const purchase = await getTrustSafetyPurchaseBySessionId(session.id);
+
+  if (purchase?.id) {
+    const { error: purchaseError } = await supabaseAdmin
+      .from("guru_trust_safety_plan_purchases")
+      .update({
+        payment_status: "canceled",
+        repayment_status: "canceled",
+        canceled_at: now,
+        updated_at: now,
+      })
+      .eq("id", purchase.id);
+
+    if (purchaseError) {
+      console.error(
+        "Error canceling Trust & Safety purchase after checkout expiration:",
+        purchaseError,
+      );
+    }
+
+    await writeTrustSafetyFinancialEvent({
+      purchaseId: purchase.id,
+      guruId,
+      userId: purchase.user_id,
+      eventType: "ledger_adjustment",
+      status: "voided",
+      planKey: purchase.plan_key,
+      planName: purchase.plan_name,
+      grossAmountCents: 0,
+      stripeCheckoutSessionId: session.id,
+      stripePaymentIntentId:
+        typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : null,
+      description: "Trust & Safety checkout expired before payment.",
+      metadata: {
+        session_id: session.id,
+        payment_status: session.payment_status,
+      },
+      occurredAt: now,
+    });
+  }
+
   const { error } = await supabaseAdmin
     .from("gurus")
     .update({
       background_check_fee_status: "unpaid",
       background_check_payment_plan_status: "not_started",
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq("id", guruId)
     .eq("background_check_fee_checkout_session_id", session.id);
@@ -817,6 +1170,8 @@ async function updateTrustSafetyScreeningRefundedFromCharge(
     return false;
   }
 
+  const purchase = await getTrustSafetyPurchaseByPaymentIntent(paymentIntentId);
+
   const { data: guruData, error: lookupError } = await supabaseAdmin
     .from("gurus")
     .select("id")
@@ -832,9 +1187,62 @@ async function updateTrustSafetyScreeningRefundedFromCharge(
   }
 
   const guru = guruData as unknown as RefundGuruRow | null;
+  const guruId = guru?.id || purchase?.guru_id || "";
 
-  if (!guru || !guru.id) {
+  if (!guruId) {
     return false;
+  }
+
+  const now = new Date().toISOString();
+  const refundAmountCents =
+    typeof charge.amount_refunded === "number"
+      ? charge.amount_refunded
+      : typeof charge.amount === "number"
+        ? charge.amount
+        : 0;
+
+  if (purchase?.id) {
+    const { error: purchaseError } = await supabaseAdmin
+      .from("guru_trust_safety_plan_purchases")
+      .update({
+        payment_status: "refunded",
+        repayment_status: "canceled",
+        refunded_at: now,
+        checkr_invite_allowed: false,
+        checkr_invite_blocked_reason:
+          "Trust & Safety payment was refunded before Checkr could continue.",
+        updated_at: now,
+      })
+      .eq("id", purchase.id);
+
+    if (purchaseError) {
+      console.error(
+        "Error refunding Trust & Safety purchase record:",
+        purchaseError,
+      );
+    }
+
+    await writeTrustSafetyFinancialEvent({
+      purchaseId: purchase.id,
+      guruId,
+      userId: purchase.user_id,
+      eventType: "refund",
+      status: "refunded",
+      planKey: purchase.plan_key,
+      planName: purchase.plan_name,
+      grossAmountCents: refundAmountCents * -1,
+      netAmountCents: refundAmountCents * -1,
+      stripeCheckoutSessionId: purchase.stripe_checkout_session_id,
+      stripePaymentIntentId: paymentIntentId,
+      stripeChargeId: charge.id,
+      description: "Trust & Safety payment refunded.",
+      metadata: {
+        charge_id: charge.id,
+        amount_refunded_cents: refundAmountCents,
+        refund_status: charge.refunded,
+      },
+      occurredAt: now,
+    });
   }
 
   const { error } = await supabaseAdmin
@@ -844,17 +1252,14 @@ async function updateTrustSafetyScreeningRefundedFromCharge(
       background_check_payment_plan_status: "refunded",
       background_check_reimbursement_balance: 0,
       background_check_reimbursement_status: "not_started",
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
-    .eq("id", guru.id);
+    .eq("id", guruId);
 
   if (error) {
     console.error("Error refunding Trust & Safety Screening payment:", error);
   } else {
-    console.log(
-      "↩️ Trust & Safety Screening payment refunded for Guru:",
-      guru.id,
-    );
+    console.log("↩️ Trust & Safety Screening payment refunded for Guru:", guruId);
   }
 
   return true;
@@ -867,6 +1272,7 @@ async function updatePawstepInvoicePaid(invoice: Stripe.Invoice) {
     billing_reason?: string | null;
     amount_paid?: number | null;
     customer?: string | Stripe.Customer | Stripe.DeletedCustomer | null;
+    payment_intent?: string | Stripe.PaymentIntent | null;
   };
 
   const subscriptionId =
@@ -887,6 +1293,13 @@ async function updatePawstepInvoicePaid(invoice: Stripe.Invoice) {
       ? invoiceAny.amount_paid
       : PAWSTEP_MONTHLY_CENTS;
 
+  const paymentIntentId =
+    typeof invoiceAny.payment_intent === "string"
+      ? invoiceAny.payment_intent
+      : invoiceAny.payment_intent?.id || "";
+
+  const purchase = await getTrustSafetyPurchaseBySubscriptionId(subscriptionId);
+
   const { data: guruData, error: lookupError } = await supabaseAdmin
     .from("gurus")
     .select(
@@ -905,17 +1318,21 @@ async function updatePawstepInvoicePaid(invoice: Stripe.Invoice) {
   }
 
   const guru = guruData as unknown as PawstepGuruInvoiceRow | null;
+  const guruId = guru?.id || purchase?.guru_id || "";
 
-  if (!guru || !guru.id) {
+  if (!guruId) {
     return;
   }
 
   const currentBalance = Number(
-    guru.background_check_reimbursement_balance ?? 0,
+    guru?.background_check_reimbursement_balance ??
+      centsToDollars(purchase?.remaining_balance_cents || 0),
   );
 
   const currentCompleted = Number(
-    guru.background_check_monthly_payments_completed ?? 0,
+    guru?.background_check_monthly_payments_completed ??
+      purchase?.installments_paid_count ??
+      0,
   );
 
   const nextBalance = Math.max(
@@ -927,10 +1344,67 @@ async function updatePawstepInvoicePaid(invoice: Stripe.Invoice) {
     ? currentCompleted + 1
     : 1;
 
+  const now = new Date().toISOString();
+
+  if (purchase?.id) {
+    const currentPurchasePaid = safeCents(purchase.amount_paid_cents);
+    const nextPurchasePaid = currentPurchasePaid + amountPaidCents;
+    const nextRemainingBalanceCents = Math.max(
+      0,
+      safeCents(purchase.remaining_balance_cents) - amountPaidCents,
+    );
+
+    const purchaseUpdate: Record<string, unknown> = {
+      amount_paid_cents: nextPurchasePaid,
+      remaining_balance_cents: nextRemainingBalanceCents,
+      installments_paid_count: nextCompleted,
+      repayment_status:
+        nextRemainingBalanceCents <= 0 || nextCompleted >= 3
+          ? "complete"
+          : "active",
+      payment_status:
+        nextRemainingBalanceCents <= 0 || nextCompleted >= 3
+          ? "paid"
+          : "partially_paid",
+      updated_at: now,
+    };
+
+    const { error: purchaseError } = await supabaseAdmin
+      .from("guru_trust_safety_plan_purchases")
+      .update(purchaseUpdate)
+      .eq("id", purchase.id);
+
+    if (purchaseError) {
+      console.error("Could not update Pawstep purchase payment:", purchaseError);
+    }
+
+    await writeTrustSafetyFinancialEvent({
+      purchaseId: purchase.id,
+      guruId,
+      userId: purchase.user_id,
+      eventType: "installment_collected",
+      planKey: purchase.plan_key,
+      planName: purchase.plan_name,
+      grossAmountCents: amountPaidCents,
+      netAmountCents: amountPaidCents,
+      stripeCheckoutSessionId: purchase.stripe_checkout_session_id,
+      stripePaymentIntentId: paymentIntentId || null,
+      description: "Pawstep Plan monthly installment collected.",
+      metadata: {
+        stripe_invoice_id: invoiceAny.id,
+        stripe_subscription_id: subscriptionId,
+        amount_paid_cents: amountPaidCents,
+        installments_paid_count: nextCompleted,
+        remaining_balance_cents: nextRemainingBalanceCents,
+      },
+      occurredAt: now,
+    });
+  }
+
   const updatePayload: Record<string, unknown> = {
     background_check_reimbursement_balance: nextBalance,
     background_check_monthly_payments_completed: nextCompleted,
-    updated_at: new Date().toISOString(),
+    updated_at: now,
   };
 
   if (nextBalance <= 0 || nextCompleted >= 3) {
@@ -943,13 +1417,13 @@ async function updatePawstepInvoicePaid(invoice: Stripe.Invoice) {
   const { error } = await supabaseAdmin
     .from("gurus")
     .update(updatePayload)
-    .eq("id", guru.id);
+    .eq("id", guruId);
 
   if (error) {
     console.error("Could not update Pawstep invoice payment:", error);
   } else {
     console.log(
-      `✅ Pawstep monthly payment applied for Guru ${guru.id}. Amount: ${formatMoneyFromCents(
+      `✅ Pawstep monthly payment applied for Guru ${guruId}. Amount: ${formatMoneyFromCents(
         amountPaidCents,
       )}`,
     );
@@ -957,11 +1431,34 @@ async function updatePawstepInvoicePaid(invoice: Stripe.Invoice) {
 }
 
 async function updatePawstepSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const now = new Date().toISOString();
+  const purchase = await getTrustSafetyPurchaseBySubscriptionId(subscription.id);
+
+  if (purchase?.id) {
+    const { error: purchaseError } = await supabaseAdmin
+      .from("guru_trust_safety_plan_purchases")
+      .update({
+        repayment_status:
+          purchase.remaining_balance_cents && purchase.remaining_balance_cents > 0
+            ? "canceled"
+            : "complete",
+        updated_at: now,
+      })
+      .eq("id", purchase.id);
+
+    if (purchaseError) {
+      console.error(
+        "Could not update deleted Pawstep purchase subscription:",
+        purchaseError,
+      );
+    }
+  }
+
   const { error } = await supabaseAdmin
     .from("gurus")
     .update({
       background_check_payment_plan_status: "subscription_ended",
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq("background_check_stripe_subscription_id", subscription.id);
 
@@ -1129,7 +1626,8 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case "invoice.paid": {
+      case "invoice.paid":
+      case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
         await updatePawstepInvoicePaid(invoice);
         break;

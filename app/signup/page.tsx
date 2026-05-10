@@ -2,6 +2,7 @@
 
 import { Open_Sans } from "next/font/google";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import WelcomeConfetti from "@/components/WelcomeConfetti";
 import { supabase } from "@/lib/supabase";
@@ -118,6 +119,19 @@ function getSignupSourceFromUrl() {
   return source.trim() || "direct";
 }
 
+function getPostSignupPath(accountType: AccountType) {
+  return accountType === "guru"
+    ? "/guru/dashboard/profile"
+    : "/customer/dashboard/profile";
+}
+
+function buildLoginHref(accountType: AccountType) {
+  const nextPath = getPostSignupPath(accountType);
+  const loginPath = accountType === "guru" ? "/guru/login" : "/login";
+
+  return `${loginPath}?next=${encodeURIComponent(nextPath)}`;
+}
+
 function getAccountTypeFromUrl(): AccountType | null {
   if (typeof window === "undefined") return null;
 
@@ -149,6 +163,8 @@ function getAccountTypeFromUrl(): AccountType | null {
 }
 
 export default function SignupPage() {
+  const router = useRouter();
+
   const [form, setForm] = useState<SignupFormState>(initialSignupFormState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupError, setSignupError] = useState("");
@@ -163,11 +179,13 @@ export default function SignupPage() {
   const passwordIsLongEnough = form.password.length >= 8;
   const passwordHasValue = form.password.length > 0;
 
-  const loginHref = form.accountType === "guru" ? "/guru/login" : "/login";
+  const loginHref = buildLoginHref(form.accountType);
   const loginLabel =
     form.accountType === "guru" ? "Guru Login" : "Pet Parent Login";
 
-  const alternateLoginHref = form.accountType === "guru" ? "/login" : "/guru/login";
+  const alternateAccountType: AccountType =
+    form.accountType === "guru" ? "customer" : "guru";
+  const alternateLoginHref = buildLoginHref(alternateAccountType);
   const alternateLoginLabel =
     form.accountType === "guru" ? "Pet Parent Login" : "Guru Login";
 
@@ -223,12 +241,17 @@ export default function SignupPage() {
 
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const selectedAccountType = form.accountType;
+      const postSignupPath = getPostSignupPath(selectedAccountType);
+      const callbackPath = `/auth/callback?next=${encodeURIComponent(
+        postSignupPath,
+      )}`;
 
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: form.email.trim(),
         password: form.password,
         options: {
-          emailRedirectTo: origin ? `${origin}/auth/callback` : undefined,
+          emailRedirectTo: origin ? `${origin}${callbackPath}` : undefined,
           data: {
             first_name: form.firstName.trim(),
             last_name: form.lastName.trim(),
@@ -246,9 +269,9 @@ export default function SignupPage() {
       }
 
       setSignupSuccess(
-        form.accountType === "guru"
-          ? "Your free Guru account has been created. Check your email to confirm your account, then log in through the Guru portal to continue setup."
-          : "Your free Pet Parent account has been created. Check your email to confirm your account, then start finding trusted pet care.",
+        selectedAccountType === "guru"
+          ? "Your free Guru account has been created. Continue to your Guru profile setup to finish becoming bookable."
+          : "Your free Pet Parent account has been created. Continue to your My Profile setup to complete your care profile.",
       );
 
       setShouldCelebrateSignup(true);
@@ -258,6 +281,12 @@ export default function SignupPage() {
         accountType: prev.accountType,
         referralCode: prev.referralCode,
       }));
+
+      if (data.session) {
+        window.setTimeout(() => {
+          router.replace(postSignupPath);
+        }, 900);
+      }
     } catch (error) {
       const message =
         error instanceof Error
@@ -545,7 +574,15 @@ export default function SignupPage() {
 
               {signupSuccess ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                  {signupSuccess}
+                  <p>{signupSuccess}</p>
+                  <Link
+                    href={getPostSignupPath(form.accountType)}
+                    className="mt-3 inline-flex min-h-[42px] items-center justify-center rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white transition hover:bg-emerald-700"
+                  >
+                    {form.accountType === "guru"
+                      ? "Continue to Guru Profile"
+                      : "Continue to My Profile"}
+                  </Link>
                 </div>
               ) : null}
 

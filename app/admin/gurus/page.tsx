@@ -7,7 +7,6 @@ import {
   ClipboardCheck,
   Download,
   FileSearch,
-  Globe2,
   ShieldCheck,
   Sparkles,
   Star,
@@ -22,10 +21,14 @@ export const dynamic = "force-dynamic";
 
 type GuruRow = Record<string, unknown>;
 type ProfileRow = Record<string, unknown>;
+type BackgroundCheckRow = Record<string, unknown>;
 
 type SearchParams = {
   status?: string;
   filter?: string;
+  queue?: string;
+  setupStep?: string;
+  stuckBeforeStep?: string;
   guru?: string;
   q?: string;
 };
@@ -66,6 +69,10 @@ type GuruDisplayRow = {
   backgroundStatus: string;
   safetyStatus: string;
   bookable: boolean;
+  approvedThisWeek: boolean;
+  flaggedForReview: boolean;
+  setupStep: number;
+  setupStepLabel: string;
   joined: string;
   href: string;
   publicHref: string;
@@ -75,6 +82,20 @@ type ChartItem = {
   label: string;
   value: number;
   helper?: string;
+};
+
+type QueueConfig = {
+  key: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+};
+
+type SetupStepConfig = {
+  step: number;
+  eyebrow: string;
+  title: string;
+  description: string;
 };
 
 const adminRoutes = {
@@ -98,6 +119,113 @@ const chartColors = [
   "#8b5cf6",
   "#f59e0b",
 ];
+
+const queueConfigs: Record<string, QueueConfig> = {
+  "pending-reviews": {
+    key: "pending-reviews",
+    eyebrow: "Guru Approval Queue",
+    title: "Pending Reviews",
+    description:
+      "Focused Admin queue showing Gurus who are not bookable yet and still need review, verification, profile follow-up, approval, or a final bookable decision.",
+  },
+  "approved-this-week": {
+    key: "approved-this-week",
+    eyebrow: "Guru Approval Queue",
+    title: "Approved This Week",
+    description:
+      "Focused Admin queue showing Gurus who were approved, activated, or made bookable within the last 7 days so Admin can review recent launch decisions and follow-up actions.",
+  },
+  "profile-updates": {
+    key: "profile-updates",
+    eyebrow: "Guru Approval Queue",
+    title: "Need Profile Updates",
+    description:
+      "Focused Admin queue showing Gurus missing important public profile details such as name, bio, location, or services so Admin can request updates before approval.",
+  },
+  "flagged-review": {
+    key: "flagged-review",
+    eyebrow: "Guru Approval Queue",
+    title: "Flagged for Review",
+    description:
+      "Focused Admin queue showing Gurus with flagged, suspended, rejected, failed, risk, or needs-review signals so Admin can investigate trust, safety, or quality concerns.",
+  },
+};
+
+const setupStepConfigs: Record<string, SetupStepConfig> = {
+  "1": {
+    step: 1,
+    eyebrow: "Guru Setup Funnel",
+    title: "Step 1: Account / Profile Started",
+    description:
+      "Focused setup queue showing Gurus who have reached Step 1 or beyond. These Gurus have an account, profile link, email, or Guru record started.",
+  },
+  "2": {
+    step: 2,
+    eyebrow: "Guru Setup Funnel",
+    title: "Step 2: Services / Area Added",
+    description:
+      "Focused setup queue showing Gurus who have reached Step 2 or beyond. These Gurus have service, location, radius, or pricing data started.",
+  },
+  "3": {
+    step: 3,
+    eyebrow: "Guru Setup Funnel",
+    title: "Step 3: Profile Ready",
+    description:
+      "Focused setup queue showing Gurus who have reached Step 3 or beyond. These Gurus have stronger public profile readiness signals such as bio, experience, photo, and service information.",
+  },
+  "4": {
+    step: 4,
+    eyebrow: "Guru Setup Funnel",
+    title: "Step 4: Checkr / Trust Started",
+    description:
+      "Focused setup queue showing Gurus who have reached Step 4 or beyond. These Gurus have Checkr package, invitation, candidate, report, or background status activity.",
+  },
+  "5": {
+    step: 5,
+    eyebrow: "Guru Setup Funnel",
+    title: "Step 5: Approved / Bookable",
+    description:
+      "Focused setup queue showing Gurus who have reached Step 5. These Gurus are approved, active, or bookable.",
+  },
+};
+
+const stuckBeforeStepConfigs: Record<string, SetupStepConfig> = {
+  "1": {
+    step: 1,
+    eyebrow: "Guru Missing-Step Queue",
+    title: "Missing Step 1: Account / Profile Started",
+    description:
+      "Focused Admin queue showing Gurus who have not reached Step 1 yet. This should usually be zero because every Guru row should have a basic account or profile record.",
+  },
+  "2": {
+    step: 2,
+    eyebrow: "Guru Missing-Step Queue",
+    title: "Missing Step 2: Services / Area Added",
+    description:
+      "Focused Admin queue showing Gurus who have not added enough service, location, radius, or pricing data. These Gurus need help completing their service setup.",
+  },
+  "3": {
+    step: 3,
+    eyebrow: "Guru Missing-Step Queue",
+    title: "Missing Step 3: Profile Ready",
+    description:
+      "Focused Admin queue showing Gurus whose public profile is not ready yet. These Gurus need stronger bio, experience, photo, services, or profile details.",
+  },
+  "4": {
+    step: 4,
+    eyebrow: "Guru Missing-Step Queue",
+    title: "Missing Step 4: Checkr / Trust Started",
+    description:
+      "Focused Admin queue showing Gurus who have not started the Checkr or Trust & Safety workflow. These Gurus need background check payment, package, invite, or status follow-up.",
+  },
+  "5": {
+    step: 5,
+    eyebrow: "Guru Missing-Step Queue",
+    title: "Missing Step 5: Approved / Bookable",
+    description:
+      "Focused Admin queue showing Gurus who are not approved, active, or bookable yet. These Gurus need final Admin review before becoming customer-visible.",
+  },
+};
 
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -144,6 +272,21 @@ function formatDateShort(value?: string | null) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function isWithinLastDays(value: unknown, days: number) {
+  const dateValue = asTrimmedString(value);
+
+  if (!dateValue) return false;
+
+  const parsed = new Date(dateValue);
+
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  return parsed >= cutoff;
 }
 
 async function safeRows<T>(
@@ -309,6 +452,9 @@ function getCredentialStatus(value: unknown) {
   if (normalized === "approved") return "Approved";
   if (normalized === "rejected") return "Rejected";
   if (normalized === "failed") return "Failed";
+  if (normalized === "consider") return "Needs Review";
+  if (normalized === "suspended") return "Suspended";
+  if (normalized === "canceled") return "Canceled";
 
   return normalized
     .split("_")
@@ -337,6 +483,19 @@ function isPendingTrustStatus(value: string) {
   );
 }
 
+function isRiskTrustStatus(value: string) {
+  const normalized = value.toLowerCase();
+
+  return (
+    normalized === "needs review" ||
+    normalized === "consider" ||
+    normalized === "failed" ||
+    normalized === "rejected" ||
+    normalized === "suspended" ||
+    normalized === "canceled"
+  );
+}
+
 function isGuruFlagged(guru: GuruRow) {
   const status = (
     asTrimmedString(guru.status) ||
@@ -348,7 +507,11 @@ function isGuruFlagged(guru: GuruRow) {
   return (
     Boolean(guru.flagged || guru.is_flagged || guru.needs_review) ||
     status.includes("flag") ||
-    status.includes("suspend")
+    status.includes("suspend") ||
+    status.includes("reject") ||
+    status.includes("failed") ||
+    status.includes("risk") ||
+    status.includes("consider")
   );
 }
 
@@ -380,6 +543,16 @@ function isGuruApproved(guru: GuruRow) {
   );
 }
 
+function isGuruApprovedThisWeek(guru: GuruRow) {
+  return (
+    isGuruApproved(guru) &&
+    (isWithinLastDays(guru.approved_at, 7) ||
+      isWithinLastDays(guru.bookable_at, 7) ||
+      isWithinLastDays(guru.updated_at, 7) ||
+      isWithinLastDays(guru.created_at, 7))
+  );
+}
+
 function needsProfileUpdate(guru: GuruRow) {
   const hasName = Boolean(
     asTrimmedString(guru.display_name) ||
@@ -402,6 +575,126 @@ function needsProfileUpdate(guru: GuruRow) {
         );
 
   return !hasName || !hasBio || !hasLocation || !hasServices;
+}
+
+function hasGuruProfileStarted(guru: GuruRow, profile?: ProfileRow) {
+  return Boolean(
+    getGuruId(guru) ||
+      getGuruEmail(guru, profile) !== "—" ||
+      asTrimmedString(guru.created_at) ||
+      asTrimmedString(guru.user_id) ||
+      asTrimmedString(guru.profile_id),
+  );
+}
+
+function hasGuruServiceData(guru: GuruRow) {
+  const services = guru.services;
+
+  const hasServices =
+    Array.isArray(services) && services.length > 0
+      ? true
+      : Boolean(
+          asTrimmedString(guru.service) ||
+            asTrimmedString(guru.service_name) ||
+            asTrimmedString(guru.specialty) ||
+            asTrimmedString(guru.title),
+        );
+
+  const hasLocation = Boolean(
+    asTrimmedString(guru.city) ||
+      asTrimmedString(guru.state) ||
+      asTrimmedString(guru.service_city) ||
+      asTrimmedString(guru.service_state),
+  );
+
+  const hasRadius = Boolean(
+    toNumber(guru.service_radius_miles) ||
+      toNumber(guru.radius_miles) ||
+      toNumber(guru.travel_radius) ||
+      toNumber(guru.max_travel_miles),
+  );
+
+  const hasRates = Boolean(
+    toNumber(guru.hourly_rate) ||
+      toNumber(guru.rate) ||
+      toNumber(guru.price) ||
+      toNumber(guru.base_rate),
+  );
+
+  return hasServices && hasLocation && (hasRadius || hasRates);
+}
+
+function hasGuruProfileReady(guru: GuruRow, profile?: ProfileRow) {
+  const hasName = Boolean(getGuruName(guru, profile));
+  const hasBio = Boolean(
+    asTrimmedString(guru.bio) || asTrimmedString(profile?.bio),
+  );
+  const hasExperience = getGuruExperience(guru) !== "Not listed";
+  const hasPhoto = Boolean(
+    asTrimmedString(guru.avatar_url) ||
+      asTrimmedString(guru.profile_photo_url) ||
+      asTrimmedString(guru.photo_url) ||
+      asTrimmedString(guru.image_url) ||
+      asTrimmedString(profile?.avatar_url) ||
+      asTrimmedString(profile?.profile_photo_url),
+  );
+
+  return hasName && hasBio && hasExperience && hasPhoto && hasGuruServiceData(guru);
+}
+
+function hasGuruCheckrStarted(guru: GuruRow, check?: BackgroundCheckRow) {
+  const status = asTrimmedString(
+    guru.background_check_status || check?.status,
+  ).toLowerCase();
+
+  return Boolean(
+    (status && status !== "not_started") ||
+      asTrimmedString(guru.checkr_package_slug) ||
+      asTrimmedString(check?.package_slug) ||
+      asTrimmedString(guru.checkr_candidate_id) ||
+      asTrimmedString(check?.checkr_candidate_id) ||
+      asTrimmedString(guru.checkr_invitation_id) ||
+      asTrimmedString(check?.checkr_invitation_id) ||
+      asTrimmedString(guru.checkr_report_id) ||
+      asTrimmedString(check?.checkr_report_id) ||
+      asTrimmedString(guru.checkr_invitation_url) ||
+      asTrimmedString(check?.invitation_url),
+  );
+}
+
+function getSetupStepLabel(step: number) {
+  switch (step) {
+    case 5:
+      return "Step 5: Approved / Bookable";
+    case 4:
+      return "Step 4: Checkr / Trust Started";
+    case 3:
+      return "Step 3: Profile Ready";
+    case 2:
+      return "Step 2: Services / Area Added";
+    case 1:
+      return "Step 1: Account / Profile Started";
+    default:
+      return "Not Started";
+  }
+}
+
+function getGuruSetupStep({
+  guru,
+  profile,
+  check,
+}: {
+  guru: GuruRow;
+  profile?: ProfileRow;
+  check?: BackgroundCheckRow;
+}) {
+  if (isGuruBookable(guru) || isGuruApproved(guru)) return 5;
+  if (hasGuruCheckrStarted(guru, check)) return 4;
+  if (hasGuruProfileReady(guru, profile)) return 3;
+  if (hasGuruServiceData(guru)) return 2;
+  if (hasGuruProfileStarted(guru, profile)) return 1;
+
+  return 0;
 }
 
 function getProfileQuality(guru: GuruRow) {
@@ -494,16 +787,50 @@ function normalizeQuery(value?: string) {
   return String(value || "").trim().toLowerCase();
 }
 
+function getActiveQueue(searchParams: SearchParams) {
+  const queue = normalizeQuery(searchParams.queue);
+
+  return queueConfigs[queue] || null;
+}
+
+function getActiveSetupStep(searchParams: SearchParams) {
+  const setupStep = normalizeQuery(searchParams.setupStep);
+
+  return setupStepConfigs[setupStep] || null;
+}
+
+function getActiveStuckBeforeStep(searchParams: SearchParams) {
+  const stuckBeforeStep = normalizeQuery(searchParams.stuckBeforeStep);
+
+  return stuckBeforeStepConfigs[stuckBeforeStep] || null;
+}
+
+function isPendingReviewRow(row: GuruDisplayRow) {
+  return !["bookable", "rejected", "suspended"].includes(
+    row.applicationStatus,
+  );
+}
+
+function isProfileUpdateRow(row: GuruDisplayRow) {
+  return row.profileQuality.toLowerCase() === "needs update";
+}
+
+function isFlaggedReviewRow(row: GuruDisplayRow) {
+  return row.flaggedForReview;
+}
+
 function filterGuruRows(rows: GuruDisplayRow[], searchParams: SearchParams) {
   const status = normalizeQuery(searchParams.status);
   const filter = normalizeQuery(searchParams.filter);
+  const queue = normalizeQuery(searchParams.queue);
+  const setupStep = normalizeQuery(searchParams.setupStep);
+  const stuckBeforeStep = normalizeQuery(searchParams.stuckBeforeStep);
   const guru = normalizeQuery(searchParams.guru);
   const query = normalizeQuery(searchParams.q);
 
   return rows.filter((row) => {
     const rowStatus = row.applicationStatus;
     const rowStatusLabel = row.statusLabel.toLowerCase();
-    const rowQuality = row.profileQuality.toLowerCase();
     const rowId = row.id.toLowerCase();
     const rowName = row.name.toLowerCase();
 
@@ -519,6 +846,7 @@ function filterGuruRows(rows: GuruDisplayRow[], searchParams: SearchParams) {
       row.identityStatus,
       row.backgroundStatus,
       row.safetyStatus,
+      row.setupStepLabel,
     ]
       .join(" ")
       .toLowerCase();
@@ -531,9 +859,47 @@ function filterGuruRows(rows: GuruDisplayRow[], searchParams: SearchParams) {
       return false;
     }
 
+    if (stuckBeforeStep) {
+      const stepNumber = Number(stuckBeforeStep);
+
+      if (Number.isFinite(stepNumber) && stepNumber >= 1 && stepNumber <= 5) {
+        return row.setupStep < stepNumber;
+      }
+    }
+
+    if (setupStep) {
+      const stepNumber = Number(setupStep);
+
+      if (Number.isFinite(stepNumber) && stepNumber >= 1 && stepNumber <= 5) {
+        return row.setupStep >= stepNumber;
+      }
+
+      if (stepNumber === 0) {
+        return row.setupStep === 0;
+      }
+    }
+
+    if (queue) {
+      if (queue === "pending-reviews") {
+        return isPendingReviewRow(row);
+      }
+
+      if (queue === "approved-this-week") {
+        return row.approvedThisWeek;
+      }
+
+      if (queue === "profile-updates") {
+        return isProfileUpdateRow(row);
+      }
+
+      if (queue === "flagged-review") {
+        return isFlaggedReviewRow(row);
+      }
+    }
+
     if (status) {
       if (status === "pending") {
-        return !["bookable", "rejected", "suspended"].includes(rowStatus);
+        return isPendingReviewRow(row);
       }
 
       if (status === "new") return rowStatus === "new";
@@ -563,11 +929,15 @@ function filterGuruRows(rows: GuruDisplayRow[], searchParams: SearchParams) {
 
     if (filter) {
       if (filter === "profile-quality" || filter === "profile-updates") {
-        return rowQuality === "needs update";
+        return isProfileUpdateRow(row);
       }
 
       if (filter === "quality-review") {
-        return rowQuality === "needs update" || rowStatus === "reviewing";
+        return isProfileUpdateRow(row) || rowStatus === "reviewing";
+      }
+
+      if (filter === "flagged-review") {
+        return isFlaggedReviewRow(row);
       }
 
       if (filter === "not-bookable") {
@@ -644,7 +1014,7 @@ function buildTrustChartRows(rows: GuruDisplayRow[]) {
 }
 
 async function getGuruManagementData(searchParams: SearchParams) {
-  const [gurus, profiles] = await Promise.all([
+  const [gurus, profiles, backgroundChecks] = await Promise.all([
     safeRows<GuruRow>(
       supabaseAdmin
         .from("gurus")
@@ -661,6 +1031,14 @@ async function getGuruManagementData(searchParams: SearchParams) {
         .limit(1000),
       "profiles",
     ),
+    safeRows<BackgroundCheckRow>(
+      supabaseAdmin
+        .from("guru_background_checks")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "guru_background_checks",
+    ),
   ]);
 
   const profileMap = new Map<string, ProfileRow>();
@@ -673,12 +1051,36 @@ async function getGuruManagementData(searchParams: SearchParams) {
     if (email) profileMap.set(email, profile);
   }
 
+  const backgroundCheckMap = new Map<string, BackgroundCheckRow>();
+
+  for (const check of backgroundChecks) {
+    const guruId = asTrimmedString(check.guru_id);
+
+    if (guruId) {
+      backgroundCheckMap.set(guruId, check);
+    }
+  }
+
   const rows: GuruDisplayRow[] = gurus.map((guru) => {
     const profile = profileMap.get(getGuruProfileKey(guru));
     const id = getGuruId(guru);
+    const check = backgroundCheckMap.get(id);
     const slug = getGuruSlug(guru);
     const applicationStatus = normalizeApplicationStatus(guru);
+    const backgroundStatus = getCredentialStatus(guru.background_check_status);
+    const identityStatus = getCredentialStatus(
+      guru.stripe_identity_status || guru.identity_status,
+    );
+    const safetyStatus = getCredentialStatus(guru.safety_cert_status);
+    const setupStep = getGuruSetupStep({ guru, profile, check });
     const publicHref = slug ? `/guru/${slug}` : "/search";
+    const flaggedForReview =
+      applicationStatus === "suspended" ||
+      applicationStatus === "rejected" ||
+      isRiskTrustStatus(backgroundStatus) ||
+      isRiskTrustStatus(identityStatus) ||
+      isRiskTrustStatus(safetyStatus) ||
+      isGuruFlagged(guru);
 
     return {
       id,
@@ -692,12 +1094,14 @@ async function getGuruManagementData(searchParams: SearchParams) {
       applicationStatus,
       statusLabel: getApplicationStatusLabel(applicationStatus),
       profileQuality: getProfileQuality(guru),
-      identityStatus: getCredentialStatus(
-        guru.stripe_identity_status || guru.identity_status,
-      ),
-      backgroundStatus: getCredentialStatus(guru.background_check_status),
-      safetyStatus: getCredentialStatus(guru.safety_cert_status),
+      identityStatus,
+      backgroundStatus,
+      safetyStatus,
       bookable: isGuruBookable(guru),
+      approvedThisWeek: isGuruApprovedThisWeek(guru),
+      flaggedForReview,
+      setupStep,
+      setupStepLabel: getSetupStepLabel(setupStep),
       joined: formatDateShort(asTrimmedString(guru.created_at)),
       href: id ? `/admin/gurus/${encodeURIComponent(id)}` : "/admin/gurus",
       publicHref,
@@ -714,6 +1118,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
   );
   const serviceChart = countByLabel(rows, (row) => row.services.split(" • ")[0]);
   const trustChart = buildTrustChartRows(rows);
+  const setupChart = countByLabel(rows, (row) => row.setupStepLabel);
 
   return {
     rows: filteredRows,
@@ -725,6 +1130,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       experienceChart,
       serviceChart,
       trustChart,
+      setupChart,
       visibilityChart: [
         {
           label: "Bookable",
@@ -741,10 +1147,20 @@ async function getGuruManagementData(searchParams: SearchParams) {
     totals: {
       all: rows.length,
       shown: filteredRows.length,
-      pending: rows.filter(
-        (row) =>
-          !["bookable", "rejected", "suspended"].includes(row.applicationStatus),
-      ).length,
+      pending: rows.filter((row) => isPendingReviewRow(row)).length,
+      approvedThisWeek: rows.filter((row) => row.approvedThisWeek).length,
+      profileUpdates: rows.filter((row) => isProfileUpdateRow(row)).length,
+      flaggedReview: rows.filter((row) => isFlaggedReviewRow(row)).length,
+      setupStep1: rows.filter((row) => row.setupStep >= 1).length,
+      setupStep2: rows.filter((row) => row.setupStep >= 2).length,
+      setupStep3: rows.filter((row) => row.setupStep >= 3).length,
+      setupStep4: rows.filter((row) => row.setupStep >= 4).length,
+      setupStep5: rows.filter((row) => row.setupStep >= 5).length,
+      missingStep1: rows.filter((row) => row.setupStep < 1).length,
+      missingStep2: rows.filter((row) => row.setupStep < 2).length,
+      missingStep3: rows.filter((row) => row.setupStep < 3).length,
+      missingStep4: rows.filter((row) => row.setupStep < 4).length,
+      missingStep5: rows.filter((row) => row.setupStep < 5).length,
       new: rows.filter((row) => row.applicationStatus === "new").length,
       reviewing: rows.filter((row) => row.applicationStatus === "reviewing")
         .length,
@@ -757,8 +1173,6 @@ async function getGuruManagementData(searchParams: SearchParams) {
       ).length,
       approved: rows.filter((row) => row.applicationStatus === "approved").length,
       bookable: rows.filter((row) => row.applicationStatus === "bookable").length,
-      profileUpdates: rows.filter((row) => row.profileQuality === "Needs Update")
-        .length,
       paused: rows.filter(
         (row) =>
           row.applicationStatus === "suspended" ||
@@ -773,6 +1187,155 @@ function DashboardCard({ children }: { children: ReactNode }) {
     <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
       {children}
     </div>
+  );
+}
+
+function QueueBanner({
+  queue,
+  shown,
+}: {
+  queue: QueueConfig;
+  shown: number;
+}) {
+  return (
+    <section className="rounded-[30px] border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+            {queue.eyebrow}
+          </p>
+          <h2 className="mt-2 text-2xl font-black tracking-tight text-emerald-950">
+            {queue.title}
+          </h2>
+          <p className="mt-2 max-w-5xl text-sm font-semibold leading-7 text-emerald-800">
+            {queue.description}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-emerald-200 bg-white px-5 py-4 text-center">
+          <p className="text-3xl font-black text-emerald-950">
+            {number(shown)}
+          </p>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+            Gurus in queue
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Link
+          href="/admin/guru-approvals"
+          className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100"
+        >
+          ← Back to Approvals Hub
+        </Link>
+
+        <Link
+          href="/admin/gurus"
+          className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
+        >
+          Clear queue filter
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function SetupStepBanner({
+  step,
+  shown,
+}: {
+  step: SetupStepConfig;
+  shown: number;
+}) {
+  return (
+    <section className="rounded-[30px] border border-sky-200 bg-sky-50 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
+            {step.eyebrow}
+          </p>
+          <h2 className="mt-2 text-2xl font-black tracking-tight text-sky-950">
+            {step.title}
+          </h2>
+          <p className="mt-2 max-w-5xl text-sm font-semibold leading-7 text-sky-800">
+            {step.description}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-sky-200 bg-white px-5 py-4 text-center">
+          <p className="text-3xl font-black text-sky-950">{number(shown)}</p>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-sky-700">
+            Gurus shown
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Link
+          href="/admin/guru-approvals"
+          className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-black text-sky-800 shadow-sm transition hover:bg-sky-100"
+        >
+          ← Back to Guru Approvals
+        </Link>
+
+        <Link
+          href="/admin/gurus"
+          className="inline-flex items-center justify-center rounded-2xl bg-sky-700 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-sky-800"
+        >
+          Clear step filter
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function MissingStepBanner({
+  step,
+  shown,
+}: {
+  step: SetupStepConfig;
+  shown: number;
+}) {
+  return (
+    <section className="rounded-[30px] border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+            {step.eyebrow}
+          </p>
+          <h2 className="mt-2 text-2xl font-black tracking-tight text-amber-950">
+            {step.title}
+          </h2>
+          <p className="mt-2 max-w-5xl text-sm font-semibold leading-7 text-amber-800">
+            {step.description}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-amber-200 bg-white px-5 py-4 text-center">
+          <p className="text-3xl font-black text-amber-950">{number(shown)}</p>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">
+            Gurus missing
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Link
+          href="/admin/guru-approvals"
+          className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-white px-4 py-2.5 text-sm font-black text-amber-800 shadow-sm transition hover:bg-amber-100"
+        >
+          ← Back to Guru Approvals
+        </Link>
+
+        <Link
+          href="/admin/gurus"
+          className="inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-amber-700"
+        >
+          Clear missing-step filter
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -1030,6 +1593,12 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
   }
 
   const guruData = await getGuruManagementData(resolvedSearchParams);
+  const activeQueue = getActiveQueue(resolvedSearchParams);
+  const activeSetupStep = getActiveSetupStep(resolvedSearchParams);
+  const activeStuckBeforeStep = getActiveStuckBeforeStep(resolvedSearchParams);
+  const hasFocusedQueue = Boolean(
+    activeQueue || activeSetupStep || activeStuckBeforeStep,
+  );
 
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
@@ -1037,11 +1606,11 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
         <div className="flex flex-col justify-between gap-4 rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm lg:flex-row lg:items-end">
           <div>
             <Link
-              href={adminRoutes.dashboard}
+              href={hasFocusedQueue ? adminRoutes.approvals : adminRoutes.dashboard}
               className="mb-4 inline-flex items-center gap-2 text-sm font-black text-green-800 transition hover:text-green-950"
             >
               <ArrowLeft size={17} />
-              Back to Admin Dashboard
+              {hasFocusedQueue ? "Back to Guru Approvals" : "Back to Admin Dashboard"}
             </Link>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -1051,15 +1620,31 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
 
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
-                  Admin / Guru Management
+                  {activeQueue
+                    ? activeQueue.eyebrow
+                    : activeSetupStep
+                      ? activeSetupStep.eyebrow
+                      : activeStuckBeforeStep
+                        ? activeStuckBeforeStep.eyebrow
+                        : "Admin / Guru Management"}
                 </p>
                 <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                  Guru Management
+                  {activeQueue
+                    ? activeQueue.title
+                    : activeSetupStep
+                      ? activeSetupStep.title
+                      : activeStuckBeforeStep
+                        ? activeStuckBeforeStep.title
+                        : "Guru Management"}
                 </h1>
                 <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
-                  Review Guru applications, profile readiness, verification
-                  progress, trust checks, bookable visibility, and exportable
-                  Guru reporting.
+                  {activeQueue
+                    ? activeQueue.description
+                    : activeSetupStep
+                      ? activeSetupStep.description
+                      : activeStuckBeforeStep
+                        ? activeStuckBeforeStep.description
+                        : "Review Guru applications, profile readiness, verification progress, trust checks, bookable visibility, and exportable Guru reporting."}
                 </p>
               </div>
             </div>
@@ -1092,7 +1677,25 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {activeQueue ? (
+          <QueueBanner queue={activeQueue} shown={guruData.totals.shown} />
+        ) : null}
+
+        {activeSetupStep ? (
+          <SetupStepBanner
+            step={activeSetupStep}
+            shown={guruData.totals.shown}
+          />
+        ) : null}
+
+        {activeStuckBeforeStep ? (
+          <MissingStepBanner
+            step={activeStuckBeforeStep}
+            shown={guruData.totals.shown}
+          />
+        ) : null}
+
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <StatCard
             icon={<Users size={22} />}
             label="Total Gurus"
@@ -1103,34 +1706,42 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
 
           <StatCard
             icon={<FileSearch size={22} />}
-            label="Pending Reviews"
-            value={number(guruData.totals.pending)}
-            detail="Not bookable and awaiting admin action"
-            href="/admin/gurus?status=pending"
+            label="Step 1 Started"
+            value={number(guruData.totals.setupStep1)}
+            detail={`${number(guruData.totals.missingStep1)} missing this step`}
+            href="/admin/gurus?setupStep=1"
           />
 
           <StatCard
             icon={<Sparkles size={22} />}
-            label="Profile Updates"
-            value={number(guruData.totals.profileUpdates)}
-            detail="Missing public profile information"
-            href="/admin/gurus?filter=profile-updates"
+            label="Step 2 Services"
+            value={number(guruData.totals.setupStep2)}
+            detail={`${number(guruData.totals.missingStep2)} missing this step`}
+            href="/admin/gurus?setupStep=2"
+          />
+
+          <StatCard
+            icon={<ClipboardCheck size={22} />}
+            label="Step 3 Profile"
+            value={number(guruData.totals.setupStep3)}
+            detail={`${number(guruData.totals.missingStep3)} missing this step`}
+            href="/admin/gurus?setupStep=3"
           />
 
           <StatCard
             icon={<ShieldCheck size={22} />}
-            label="Verification"
-            value={number(guruData.totals.verification)}
-            detail="Identity or background steps pending"
-            href="/admin/gurus?status=verification"
+            label="Step 4 Checkr"
+            value={number(guruData.totals.setupStep4)}
+            detail={`${number(guruData.totals.missingStep4)} missing this step`}
+            href="/admin/gurus?setupStep=4"
           />
 
           <StatCard
             icon={<BadgeCheck size={22} />}
-            label="Bookable Gurus"
-            value={number(guruData.totals.bookable)}
-            detail="Visible to customers when search is live"
-            href="/admin/gurus?status=bookable"
+            label="Step 5 Bookable"
+            value={number(guruData.totals.setupStep5)}
+            detail={`${number(guruData.totals.missingStep5)} missing this step`}
+            href="/admin/gurus?setupStep=5"
           />
         </section>
 
@@ -1139,29 +1750,29 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
             <DashboardCard>
               <div className="mb-5">
                 <h2 className="text-xl font-black text-slate-950">
-                  Guru Status Chart
+                  Guru Setup Chart
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Application and readiness distribution from live Guru rows.
+                  Setup step distribution from live Guru rows.
                 </p>
               </div>
 
               <DonutChart
                 title="Gurus"
                 total={guruData.totals.all}
-                items={guruData.chartData.statusChart}
+                items={guruData.chartData.setupChart}
               />
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                 <MiniMetric
                   icon={<BadgeCheck size={18} />}
-                  label="Bookable"
-                  value={number(guruData.totals.bookable)}
+                  label="Profile Updates"
+                  value={number(guruData.totals.profileUpdates)}
                 />
                 <MiniMetric
                   icon={<Sparkles size={18} />}
-                  label="Profile Updates"
-                  value={number(guruData.totals.profileUpdates)}
+                  label="Flagged Review"
+                  value={number(guruData.totals.flaggedReview)}
                 />
               </div>
             </DashboardCard>
@@ -1383,11 +1994,11 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
           <span className="font-black text-green-900">
             Supabase coordination:
           </span>{" "}
-          this page reads `gurus` and `profiles`. Guru avatars, application
-          status, profile quality, identity status, background status, safety
-          status, bookable visibility, services, location, experience, joined
-          dates, charts, filters, sorting, and CSV export are calculated from
-          live rows.
+          this page reads `gurus`, `profiles`, and `guru_background_checks`.
+          Guru avatars, setup step, missing-step queues, application status,
+          profile quality, identity status, background status, safety status,
+          bookable visibility, services, location, experience, joined dates,
+          charts, filters, sorting, and CSV export are calculated from live rows.
         </div>
       </div>
     </main>

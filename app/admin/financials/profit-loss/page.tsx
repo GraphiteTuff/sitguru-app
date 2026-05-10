@@ -12,6 +12,8 @@ type PayoutRow = Record<string, unknown>;
 type DisputeRow = Record<string, unknown>;
 type FinancialLedgerRow = Record<string, unknown>;
 type FinancialLineRow = Record<string, unknown>;
+type TrustSafetyPurchaseRow = Record<string, unknown>;
+type TrustSafetyFinancialEventRow = Record<string, unknown>;
 type AdminIdentity = {
   id: string;
   email: string;
@@ -93,6 +95,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   maintenance: "Repairs / Maintenance",
   payment_processing: "Stripe / Payment Processing",
   customer_credits: "Customer Credits",
+  trust_safety_checkr_cost: "Trust & Safety / Checkr Vendor Cost",
+  trust_safety_stripe_fees: "Trust & Safety Stripe Fees",
+  trust_safety_refunds: "Trust & Safety Refunds",
   other: "Other Expenses",
 };
 
@@ -134,6 +139,30 @@ const CATEGORY_PRESETS = [
     categoryMatch: "affiliate_revenue",
   },
   {
+    section: "revenue",
+    label: "Trust & Safety Plan Revenue",
+    sourceType: "trust_safety",
+    categoryMatch: "trust_safety_revenue",
+  },
+  {
+    section: "revenue",
+    label: "Paw in Full Revenue",
+    sourceType: "trust_safety",
+    categoryMatch: "paw_in_full_revenue",
+  },
+  {
+    section: "revenue",
+    label: "Pawstep Plan Revenue",
+    sourceType: "trust_safety",
+    categoryMatch: "pawstep_plan_revenue",
+  },
+  {
+    section: "revenue",
+    label: "Book & Bark Plan Revenue",
+    sourceType: "trust_safety",
+    categoryMatch: "book_and_bark_plan_revenue",
+  },
+  {
     section: "cost_of_revenue",
     label: "Guru Payouts",
     sourceType: "bookings",
@@ -144,6 +173,24 @@ const CATEGORY_PRESETS = [
     label: "Stripe / Payment Processing",
     sourceType: "expense_ledger",
     categoryMatch: "payment_processing",
+  },
+  {
+    section: "cost_of_revenue",
+    label: "Checkr Vendor Costs",
+    sourceType: "trust_safety",
+    categoryMatch: "trust_safety_checkr_vendor_cost",
+  },
+  {
+    section: "cost_of_revenue",
+    label: "Trust & Safety Stripe Fees",
+    sourceType: "trust_safety",
+    categoryMatch: "trust_safety_stripe_fees",
+  },
+  {
+    section: "cost_of_revenue",
+    label: "Trust & Safety Refunds",
+    sourceType: "trust_safety",
+    categoryMatch: "trust_safety_refunds",
   },
   {
     section: "cost_of_revenue",
@@ -259,11 +306,32 @@ const DEFAULT_STATEMENT_LINES: FinancialLineConfig[] = [
     display_order: 20,
   },
   {
+    section: "revenue",
+    label: "Trust & Safety Plan Revenue",
+    source_type: "trust_safety",
+    category_match: "trust_safety_revenue",
+    display_order: 30,
+  },
+  {
     section: "cost_of_revenue",
     label: "Guru Payouts",
     source_type: "bookings",
     category_match: "guru_payouts",
     display_order: 10,
+  },
+  {
+    section: "cost_of_revenue",
+    label: "Checkr Vendor Costs",
+    source_type: "trust_safety",
+    category_match: "trust_safety_checkr_vendor_cost",
+    display_order: 15,
+  },
+  {
+    section: "cost_of_revenue",
+    label: "Trust & Safety Stripe Fees",
+    source_type: "trust_safety",
+    category_match: "trust_safety_stripe_fees",
+    display_order: 18,
   },
   {
     section: "cost_of_revenue",
@@ -1121,6 +1189,54 @@ function dedupeStatementLineConfigs(lines: FinancialLineConfig[]) {
   );
 }
 
+
+function centsToStatementDollars(value: unknown) {
+  return toNumber(value) / 100;
+}
+
+function getTrustSafetyPurchasePaidAmount(purchase: TrustSafetyPurchaseRow) {
+  return centsToStatementDollars(purchase.amount_paid_cents);
+}
+
+function getTrustSafetyPurchaseRevenue(
+  purchases: TrustSafetyPurchaseRow[],
+  planKey?: string,
+) {
+  return purchases
+    .filter((purchase) => {
+      if (!planKey) return true;
+      return asTrimmedString(purchase.plan_key) === planKey;
+    })
+    .filter((purchase) => {
+      const status = asTrimmedString(purchase.payment_status).toLowerCase();
+      return status === "paid" || status === "partially_paid";
+    })
+    .reduce((sum, purchase) => sum + getTrustSafetyPurchasePaidAmount(purchase), 0);
+}
+
+function getTrustSafetyEventAmount(event: TrustSafetyFinancialEventRow) {
+  const gross = centsToStatementDollars(event.gross_amount_cents);
+  const net = centsToStatementDollars(event.net_amount_cents);
+  const fee = centsToStatementDollars(event.fee_amount_cents);
+
+  return Math.max(Math.abs(gross), Math.abs(net), Math.abs(fee), 0);
+}
+
+function getTrustSafetyFinancialEventTotal(
+  events: TrustSafetyFinancialEventRow[],
+  eventTypes: string[],
+) {
+  const allowed = new Set(eventTypes);
+
+  return events
+    .filter((event) => {
+      const status = asTrimmedString(event.status).toLowerCase();
+      return status !== "voided" && status !== "failed";
+    })
+    .filter((event) => allowed.has(asTrimmedString(event.event_type)))
+    .reduce((sum, event) => sum + getTrustSafetyEventAmount(event), 0);
+}
+
 function getStatementLineAmount({
   line,
   bookings,
@@ -1128,6 +1244,8 @@ function getStatementLineAmount({
   payouts,
   disputes,
   financialLedger,
+  trustSafetyPurchases,
+  trustSafetyFinancialEvents,
 }: {
   line: FinancialLineConfig;
   bookings: BookingRow[];
@@ -1135,6 +1253,8 @@ function getStatementLineAmount({
   payouts: PayoutRow[];
   disputes: DisputeRow[];
   financialLedger: FinancialLedgerRow[];
+  trustSafetyPurchases: TrustSafetyPurchaseRow[];
+  trustSafetyFinancialEvents: TrustSafetyFinancialEventRow[];
 }) {
   const normalizedLine = normalizeStatementLineConfig(line);
   const sourceType = normalizedLine.source_type.toLowerCase();
@@ -1221,6 +1341,47 @@ function getStatementLineAmount({
       .reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   }
 
+
+  if (sourceType === "trust_safety") {
+    if (categoryMatch === "trust_safety_revenue") {
+      return getTrustSafetyPurchaseRevenue(trustSafetyPurchases);
+    }
+
+    if (categoryMatch === "paw_in_full_revenue") {
+      return getTrustSafetyPurchaseRevenue(trustSafetyPurchases, "paw_in_full");
+    }
+
+    if (categoryMatch === "pawstep_plan_revenue") {
+      return getTrustSafetyPurchaseRevenue(trustSafetyPurchases, "pawstep_plan");
+    }
+
+    if (categoryMatch === "book_and_bark_plan_revenue") {
+      return getTrustSafetyPurchaseRevenue(
+        trustSafetyPurchases,
+        "book_and_bark_plan",
+      );
+    }
+
+    if (categoryMatch === "trust_safety_checkr_vendor_cost") {
+      return getTrustSafetyFinancialEventTotal(trustSafetyFinancialEvents, [
+        "checkr_vendor_cost",
+        "sitguru_fronted_cost",
+      ]);
+    }
+
+    if (categoryMatch === "trust_safety_stripe_fees") {
+      return getTrustSafetyFinancialEventTotal(trustSafetyFinancialEvents, [
+        "stripe_fee",
+      ]);
+    }
+
+    if (categoryMatch === "trust_safety_refunds") {
+      return getTrustSafetyFinancialEventTotal(trustSafetyFinancialEvents, [
+        "refund",
+      ]);
+    }
+  }
+
   return 0;
 }
 
@@ -1245,12 +1406,16 @@ function getAccountingReadinessItems({
   payouts,
   disputes,
   financialLedger,
+  trustSafetyPurchases,
+  trustSafetyFinancialEvents,
 }: {
   bookings: BookingRow[];
   expenses: ExpenseRow[];
   payouts: PayoutRow[];
   disputes: DisputeRow[];
   financialLedger: FinancialLedgerRow[];
+  trustSafetyPurchases: TrustSafetyPurchaseRow[];
+  trustSafetyFinancialEvents: TrustSafetyFinancialEventRow[];
 }): AccountingReadinessItem[] {
   const stripeEntries = financialLedger.filter((entry) =>
     getLedgerText(entry).includes("stripe"),
@@ -1298,6 +1463,13 @@ function getAccountingReadinessItems({
       label: "Payout and dispute support",
       status: payouts.length || disputes.length ? "ready" : "needs_review",
       detail: `${payouts.length.toLocaleString()} payout rows and ${disputes.length.toLocaleString()} dispute rows available for support schedules.`,
+    },
+    {
+      label: "Trust & Safety financial activity",
+      status: trustSafetyPurchases.length || trustSafetyFinancialEvents.length ? "ready" : "needs_review",
+      detail: trustSafetyPurchases.length || trustSafetyFinancialEvents.length
+        ? `${trustSafetyPurchases.length.toLocaleString()} Trust & Safety purchase rows and ${trustSafetyFinancialEvents.length.toLocaleString()} financial event rows are available for P&L revenue, Checkr costs, Stripe fees, and refunds.`
+        : "Trust & Safety plan purchases and financial events should be connected before screening revenue and Checkr costs are complete.",
     },
     {
       label: "Manual expense ledger",
@@ -1381,10 +1553,10 @@ function AccountingReadinessPanel({
 function IntegrationFlowPanel() {
   const steps = [
     "Customer booking creates revenue and payout records.",
-    "Stripe balance transactions identify gross payments, fees, refunds, disputes, and payouts.",
+    "Stripe balance transactions identify gross payments, Trust & Safety plan payments, fees, refunds, disputes, and payouts.",
     "Navy Federal checking/savings activity confirms cash deposits, transfers, and expenses.",
     "Reconciliation matches Stripe payouts to bank deposits so revenue is not double-counted.",
-    "Financial Overview, P&L, Balance Sheet, Cash Flow, exports, and CPA handoff use the same ledger foundation.",
+    "Financial Overview, P&L, Balance Sheet, Cash Flow, exports, Trust & Safety records, and CPA handoff use the same ledger foundation.",
   ];
 
   return (
@@ -1569,6 +1741,8 @@ async function getProfitLossData() {
     rawPayouts,
     rawDisputes,
     rawFinancialLedger,
+    rawTrustSafetyPurchases,
+    rawTrustSafetyFinancialEvents,
     savedRows,
   ] = await Promise.all([
     safeRows<BookingRow>(
@@ -1611,6 +1785,22 @@ async function getProfitLossData() {
         .limit(1500),
       "financial_ledger_entries",
     ),
+    safeRows<TrustSafetyPurchaseRow>(
+      supabaseAdmin
+        .from("guru_trust_safety_plan_purchases")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1500),
+      "guru_trust_safety_plan_purchases",
+    ),
+    safeRows<TrustSafetyFinancialEventRow>(
+      supabaseAdmin
+        .from("trust_safety_financial_events")
+        .select("*")
+        .order("occurred_at", { ascending: false })
+        .limit(1500),
+      "trust_safety_financial_events",
+    ),
     safeRows<FinancialLineRow>(
       supabaseAdmin
         .from("financial_statement_lines")
@@ -1628,6 +1818,12 @@ async function getProfitLossData() {
   const payouts = rawPayouts.filter((row) => !isArchivedRow(row));
   const disputes = rawDisputes.filter((row) => !isArchivedRow(row));
   const financialLedger = rawFinancialLedger.filter(
+    (row) => !isArchivedRow(row),
+  );
+  const trustSafetyPurchases = rawTrustSafetyPurchases.filter(
+    (row) => !isArchivedRow(row),
+  );
+  const trustSafetyFinancialEvents = rawTrustSafetyFinancialEvents.filter(
     (row) => !isArchivedRow(row),
   );
 
@@ -1672,6 +1868,8 @@ async function getProfitLossData() {
           payouts,
           disputes,
           financialLedger,
+          trustSafetyPurchases,
+          trustSafetyFinancialEvents,
         }),
       };
     })
@@ -1695,6 +1893,20 @@ async function getProfitLossData() {
   const taxCollected = bookings.reduce(
     (sum, booking) => sum + getBookingTaxAmount(booking),
     0,
+  );
+
+  const trustSafetyRevenue = getTrustSafetyPurchaseRevenue(trustSafetyPurchases);
+  const trustSafetyCheckrCosts = getTrustSafetyFinancialEventTotal(
+    trustSafetyFinancialEvents,
+    ["checkr_vendor_cost", "sitguru_fronted_cost"],
+  );
+  const trustSafetyStripeFees = getTrustSafetyFinancialEventTotal(
+    trustSafetyFinancialEvents,
+    ["stripe_fee"],
+  );
+  const trustSafetyRefunds = getTrustSafetyFinancialEventTotal(
+    trustSafetyFinancialEvents,
+    ["refund"],
   );
 
   const revenueLines = statementLines.filter(
@@ -1792,6 +2004,10 @@ async function getProfitLossData() {
       grossBookingVolume,
       paidBookingVolume,
       taxCollected,
+      trustSafetyRevenue,
+      trustSafetyCheckrCosts,
+      trustSafetyStripeFees,
+      trustSafetyRefunds,
       totalRevenue,
       totalCostOfRevenue,
       grossProfit,
@@ -1820,6 +2036,8 @@ async function getProfitLossData() {
       payouts,
       disputes,
       financialLedger,
+      trustSafetyPurchases,
+      trustSafetyFinancialEvents,
     }),
     savedLineCount: customSavedLineCount,
     expenseCount: expenses.length,
@@ -1878,6 +2096,7 @@ export default async function AdminProfitLossPage() {
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 Live Profit & Loss view using SitGuru bookings, Guru payouts,
+                Trust & Safety plan revenue, Checkr costs, Stripe fees,
                 expense ledger rows, refunds, dispute records, and custom
                 financial statement categories.
               </p>
@@ -1886,12 +2105,18 @@ export default async function AdminProfitLossPage() {
             <ProfitLossExportActions />
           </div>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <StatCard
               label="Total Revenue"
               value={money(pnl.totals.totalRevenue)}
               detail={`${pnl.totals.paidBookings.toLocaleString()} paid booking rows detected.`}
               tone="emerald"
+            />
+            <StatCard
+              label="Trust & Safety Revenue"
+              value={money(pnl.totals.trustSafetyRevenue)}
+              detail={`${money(pnl.totals.trustSafetyCheckrCosts + pnl.totals.trustSafetyStripeFees + pnl.totals.trustSafetyRefunds)} related Checkr, Stripe, and refund costs.`}
+              tone="sky"
             />
             <StatCard
               label="Gross Profit"

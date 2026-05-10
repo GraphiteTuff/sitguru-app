@@ -8,8 +8,10 @@ type LifecycleRole = "all" | "customer" | "guru" | "admin";
 type AccountRecord = {
   id: string;
   email: string;
+  display_name?: string | null;
   role: string | null;
   account_status: string | null;
+  approval_status?: string | null;
   guru_status: string | null;
   deactivated_at: string | null;
   suspended_at: string | null;
@@ -21,8 +23,27 @@ type AccountRecord = {
   guru_cancelled_at: string | null;
   guru_cancellation_reason: string | null;
   created_at: string | null;
+  updated_at?: string | null;
+  auth_created_at?: string | null;
   last_sign_in_at: string | null;
+  email_confirmed_at?: string | null;
   auth_user_exists: boolean;
+
+  phone?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  service_zip?: string | null;
+  recovery_email?: string | null;
+  recovery_email_verified?: boolean | null;
+
+  pet_count?: number | null;
+  booking_count?: number | null;
+  message_count?: number | null;
+  setup_completed_steps?: number | null;
+  setup_total_steps?: number | null;
+  setup_completion_percent?: number | null;
+  setup_status?: string | null;
+
   latest_event?: {
     event_type: string;
     reason: string | null;
@@ -57,10 +78,14 @@ const roleOptions = [
 function formatDate(value?: string | null) {
   if (!value) return "—";
 
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) return "—";
+
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(parsed);
 }
 
 function statusBadgeClass(status?: string | null) {
@@ -83,6 +108,40 @@ function statusBadgeClass(status?: string | null) {
   return "bg-slate-50 text-slate-600 border-slate-200";
 }
 
+function setupBadgeClass(percent: number) {
+  if (percent >= 100) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (percent >= 50) {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
+  return "border-rose-200 bg-rose-50 text-rose-700";
+}
+
+function numberValue(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function getLocation(account: AccountRecord) {
+  const city = account.service_city?.trim();
+  const state = account.service_state?.trim();
+  const zip = account.service_zip?.trim();
+
+  const cityState = [city, state].filter(Boolean).join(", ");
+
+  return [cityState, zip].filter(Boolean).join(" ") || "—";
+}
+
+function getAccountName(account: AccountRecord) {
+  return (
+    account.display_name?.trim() ||
+    account.email?.split("@")[0] ||
+    "Deleted auth user"
+  );
+}
+
 export default function AccountLifecycleTable({
   title = "Account lifecycle",
   description = "Track active, deactivated, suspended, deleted, paused, and cancelled accounts across SitGuru.",
@@ -101,6 +160,10 @@ export default function AccountLifecycleTable({
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState("");
 
+  const effectiveRole = lockedRole || role;
+  const isCustomerMode = effectiveRole === "customer";
+  const isGuruMode = effectiveRole === "guru";
+
   const filteredSummary = useMemo(() => {
     const total = accounts.length;
     const active = accounts.filter(
@@ -118,6 +181,15 @@ export default function AccountLifecycleTable({
     const cancelledGurus = accounts.filter(
       (account) => account.guru_status === "cancelled",
     ).length;
+    const setupComplete = accounts.filter(
+      (account) => numberValue(account.setup_completion_percent) >= 100,
+    ).length;
+    const setupIncomplete = accounts.filter(
+      (account) => numberValue(account.setup_completion_percent) < 100,
+    ).length;
+    const recoveryEmails = accounts.filter((account) =>
+      Boolean(account.recovery_email),
+    ).length;
 
     return {
       total,
@@ -126,6 +198,9 @@ export default function AccountLifecycleTable({
       suspended,
       deactivated,
       cancelledGurus,
+      setupComplete,
+      setupIncomplete,
+      recoveryEmails,
     };
   }, [accounts]);
 
@@ -210,6 +285,7 @@ export default function AccountLifecycleTable({
 
       setMessage("Account status updated.");
       setAdminReason("");
+      setSelectedAccount(null);
       await loadAccounts();
     } catch (error) {
       setMessage(
@@ -229,7 +305,8 @@ export default function AccountLifecycleTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, role, lockedRole]);
 
-  const showGuruCancelledCard = (lockedRole || role) !== "customer";
+  const customerColSpan = 8;
+  const defaultColSpan = 6;
 
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -243,7 +320,7 @@ export default function AccountLifecycleTable({
             {title}
           </h1>
 
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             {description}
           </p>
         </div>
@@ -268,7 +345,7 @@ export default function AccountLifecycleTable({
         </div>
 
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-400">
+          <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-500">
             Active
           </p>
           <p className="mt-2 text-2xl font-black text-emerald-700">
@@ -276,42 +353,75 @@ export default function AccountLifecycleTable({
           </p>
         </div>
 
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.15em] text-rose-400">
-            Deleted
-          </p>
-          <p className="mt-2 text-2xl font-black text-rose-700">
-            {filteredSummary.deleted}
-          </p>
-        </div>
+        {isCustomerMode ? (
+          <>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-500">
+                Setup Complete
+              </p>
+              <p className="mt-2 text-2xl font-black text-emerald-700">
+                {filteredSummary.setupComplete}
+              </p>
+            </div>
 
-        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.15em] text-orange-400">
-            Suspended
-          </p>
-          <p className="mt-2 text-2xl font-black text-orange-700">
-            {filteredSummary.suspended}
-          </p>
-        </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.15em] text-amber-500">
+                Needs Setup
+              </p>
+              <p className="mt-2 text-2xl font-black text-amber-700">
+                {filteredSummary.setupIncomplete}
+              </p>
+            </div>
 
-        {showGuruCancelledCard ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.15em] text-slate-400">
-              Guru cancelled
-            </p>
-            <p className="mt-2 text-2xl font-black text-slate-950">
-              {filteredSummary.cancelledGurus}
-            </p>
-          </div>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.15em] text-sky-500">
+                Recovery Emails
+              </p>
+              <p className="mt-2 text-2xl font-black text-sky-700">
+                {filteredSummary.recoveryEmails}
+              </p>
+            </div>
+          </>
         ) : (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.15em] text-amber-400">
-              Deactivated
-            </p>
-            <p className="mt-2 text-2xl font-black text-amber-700">
-              {filteredSummary.deactivated}
-            </p>
-          </div>
+          <>
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.15em] text-rose-400">
+                Deleted
+              </p>
+              <p className="mt-2 text-2xl font-black text-rose-700">
+                {filteredSummary.deleted}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.15em] text-orange-400">
+                Suspended
+              </p>
+              <p className="mt-2 text-2xl font-black text-orange-700">
+                {filteredSummary.suspended}
+              </p>
+            </div>
+
+            {isGuruMode || effectiveRole === "all" ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-slate-400">
+                  Guru Cancelled
+                </p>
+                <p className="mt-2 text-2xl font-black text-slate-950">
+                  {filteredSummary.cancelledGurus}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-amber-400">
+                  Deactivated
+                </p>
+                <p className="mt-2 text-2xl font-black text-amber-700">
+                  {filteredSummary.deactivated}
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -320,7 +430,11 @@ export default function AccountLifecycleTable({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="input w-full"
-          placeholder="Search by email, user ID, or reason"
+          placeholder={
+            isCustomerMode
+              ? "Search by email, name, phone, city, ZIP, or user ID"
+              : "Search by email, user ID, or reason"
+          }
         />
 
         <select
@@ -367,33 +481,62 @@ export default function AccountLifecycleTable({
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-left font-black text-slate-700">
-                  Account
-                </th>
-                <th className="px-4 py-3 text-left font-black text-slate-700">
-                  Role
-                </th>
-                <th className="px-4 py-3 text-left font-black text-slate-700">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left font-black text-slate-700">
-                  Guru status
-                </th>
-                <th className="px-4 py-3 text-left font-black text-slate-700">
-                  Latest activity
-                </th>
-                <th className="px-4 py-3 text-left font-black text-slate-700">
-                  Actions
-                </th>
-              </tr>
+              {isCustomerMode ? (
+                <tr>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Pet Parent
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Setup
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Pets
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Bookings
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Messages
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Location
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Last Sign-In
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Actions
+                  </th>
+                </tr>
+              ) : (
+                <tr>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Account
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Role
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Guru Status
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Latest Activity
+                  </th>
+                  <th className="px-4 py-3 text-left font-black text-slate-700">
+                    Actions
+                  </th>
+                </tr>
+              )}
             </thead>
 
             <tbody className="divide-y divide-slate-200 bg-white">
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={isCustomerMode ? customerColSpan : defaultColSpan}
                     className="px-4 py-8 text-center font-semibold text-slate-500"
                   >
                     Loading accounts...
@@ -402,12 +545,122 @@ export default function AccountLifecycleTable({
               ) : accounts.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={isCustomerMode ? customerColSpan : defaultColSpan}
                     className="px-4 py-8 text-center font-semibold text-slate-500"
                   >
                     No accounts found.
                   </td>
                 </tr>
+              ) : isCustomerMode ? (
+                accounts.map((account) => {
+                  const setupPercent = numberValue(
+                    account.setup_completion_percent,
+                  );
+                  const setupCompleted = numberValue(
+                    account.setup_completed_steps,
+                  );
+                  const setupTotal = numberValue(account.setup_total_steps) || 6;
+
+                  return (
+                    <tr key={account.id}>
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-black text-slate-950">
+                          {getAccountName(account)}
+                        </p>
+                        <p className="mt-1 break-all text-xs font-semibold text-slate-600">
+                          {account.email || "Deleted auth user"}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {account.id}
+                        </p>
+                        {!account.auth_user_exists ? (
+                          <p className="mt-1 text-xs font-bold text-rose-600">
+                            Auth user removed
+                          </p>
+                        ) : null}
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${setupBadgeClass(
+                            setupPercent,
+                          )}`}
+                        >
+                          {setupPercent}% complete
+                        </span>
+                        <p className="mt-2 text-xs font-semibold text-slate-600">
+                          {setupCompleted}/{setupTotal} setup steps
+                        </p>
+                        <div className="mt-2 h-2 w-28 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full bg-emerald-500"
+                            style={{
+                              width: `${Math.max(
+                                0,
+                                Math.min(100, setupPercent),
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <p className="text-lg font-black text-slate-950">
+                          {numberValue(account.pet_count)}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <p className="text-lg font-black text-slate-950">
+                          {numberValue(account.booking_count)}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <p className="text-lg font-black text-slate-950">
+                          {numberValue(account.message_count)}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <p className="text-sm font-bold text-slate-700">
+                          {getLocation(account)}
+                        </p>
+                        {account.recovery_email ? (
+                          <p className="mt-2 max-w-[220px] break-all text-xs font-semibold text-slate-500">
+                            Recovery: {account.recovery_email}
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-xs font-semibold text-amber-700">
+                            No recovery email
+                          </p>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <p className="text-xs font-semibold text-slate-600">
+                          {formatDate(account.last_sign_in_at)}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          Joined:{" "}
+                          {formatDate(
+                            account.auth_created_at || account.created_at,
+                          )}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-4 align-top">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAccount(account)}
+                          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50"
+                        >
+                          Manage
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 accounts.map((account) => (
                   <tr key={account.id}>
@@ -501,7 +754,7 @@ export default function AccountLifecycleTable({
 
       {selectedAccount ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
-          <div className="w-full max-w-xl rounded-[2rem] bg-white p-6 shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
@@ -519,6 +772,88 @@ export default function AccountLifecycleTable({
               >
                 Close
               </button>
+            </div>
+
+            <div className="mt-5 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                  Role
+                </p>
+                <p className="mt-1 text-sm font-black text-slate-950">
+                  {selectedAccount.role || "—"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                  Status
+                </p>
+                <p className="mt-1 text-sm font-black text-slate-950">
+                  {selectedAccount.account_status || "unknown"}
+                </p>
+              </div>
+
+              {selectedAccount.role === "customer" ? (
+                <>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Customer Setup
+                    </p>
+                    <p className="mt-1 text-sm font-black text-slate-950">
+                      {numberValue(selectedAccount.setup_completion_percent)}%
+                      complete
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Pet Passports
+                    </p>
+                    <p className="mt-1 text-sm font-black text-slate-950">
+                      {numberValue(selectedAccount.pet_count)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Location
+                    </p>
+                    <p className="mt-1 text-sm font-black text-slate-950">
+                      {getLocation(selectedAccount)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                      Recovery Email
+                    </p>
+                    <p className="mt-1 break-all text-sm font-black text-slate-950">
+                      {selectedAccount.recovery_email || "Not added"}
+                    </p>
+                  </div>
+                </>
+              ) : null}
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                  Last Sign-In
+                </p>
+                <p className="mt-1 text-sm font-black text-slate-950">
+                  {formatDate(selectedAccount.last_sign_in_at)}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                  Joined
+                </p>
+                <p className="mt-1 text-sm font-black text-slate-950">
+                  {formatDate(
+                    selectedAccount.auth_created_at ||
+                      selectedAccount.created_at,
+                  )}
+                </p>
+              </div>
             </div>
 
             <div className="mt-5">

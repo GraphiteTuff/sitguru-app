@@ -5,7 +5,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+type AnyRow = Record<string, unknown>;
 type ProFormaRow = Record<string, unknown>;
+type TrustSafetyPurchaseRow = Record<string, unknown>;
+type TrustSafetyFinancialEventRow = Record<string, unknown>;
 
 type SafeQueryResponse = {
   data: unknown;
@@ -41,14 +44,35 @@ type Assumptions = {
   forecastMonths: number;
 };
 
+type TrustSafetyActuals = {
+  purchaseCount: number;
+  pawInFullCount: number;
+  pawstepCount: number;
+  bookAndBarkCount: number;
+  cashCollected: number;
+  outstandingBalance: number;
+  vendorCosts: number;
+  stripeFees: number;
+  refunds: number;
+  monthlyPlanStarts: number;
+};
+
 type ForecastMonth = {
   monthNumber: number;
   label: string;
   projectedBookings: number;
+  projectedTrustSafetyGurus: number;
   grossBookingVolume: number;
   platformRevenue: number;
   guruPayouts: number;
   refunds: number;
+  trustSafetyContractedRevenue: number;
+  trustSafetyCashCollected: number;
+  trustSafetyInstallmentRecovery: number;
+  trustSafetyBookingDeductionRecovery: number;
+  trustSafetyVendorCosts: number;
+  trustSafetyStripeFees: number;
+  trustSafetyNetCash: number;
   grossProfit: number;
   operatingExpenses: number;
   netIncome: number;
@@ -85,12 +109,31 @@ const DEFAULT_ASSUMPTIONS: Assumptions = {
   forecastMonths: 12,
 };
 
+const TRUST_SAFETY_PLAN_CENTS = {
+  pawInFullTotal: 3799,
+  flexibleTotal: 3999,
+  flexibleDownPayment: 1500,
+  flexibleRemaining: 2499,
+  projectedCheckrVendorCost: 2500,
+};
+
+const TRUST_SAFETY_PLAN_MIX = {
+  pawInFull: 0.4,
+  pawstep: 0.35,
+  bookAndBark: 0.25,
+};
+
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
 function toNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[$,]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -105,6 +148,10 @@ function getOptionalBoolean(value: unknown) {
   }
 
   return false;
+}
+
+function centsToDollars(cents: number) {
+  return cents / 100;
 }
 
 function money(value: number) {
@@ -128,6 +175,12 @@ function moneyExact(value: number) {
 
 function percent(value: number) {
   return `${value.toFixed(1)}%`;
+}
+
+function number(value: number) {
+  return new Intl.NumberFormat("en-US").format(
+    Number.isFinite(value) ? Math.round(value) : 0,
+  );
 }
 
 function getBarWidth(value: number, max: number) {
@@ -297,11 +350,16 @@ function rowToAssumptions(row?: ProFormaRow): Assumptions {
   return {
     id: asTrimmedString(row.id),
     scenarioName: asTrimmedString(row.scenario_name) || "Base Case",
-    monthlyBookings: toNumber(row.monthly_bookings),
-    averageBookingValue: toNumber(row.average_booking_value),
-    platformFeeRate: toNumber(row.platform_fee_rate),
-    guruPayoutRate: toNumber(row.guru_payout_rate),
-    refundRate: toNumber(row.refund_rate),
+    monthlyBookings:
+      toNumber(row.monthly_bookings) || DEFAULT_ASSUMPTIONS.monthlyBookings,
+    averageBookingValue:
+      toNumber(row.average_booking_value) ||
+      DEFAULT_ASSUMPTIONS.averageBookingValue,
+    platformFeeRate:
+      toNumber(row.platform_fee_rate) || DEFAULT_ASSUMPTIONS.platformFeeRate,
+    guruPayoutRate:
+      toNumber(row.guru_payout_rate) || DEFAULT_ASSUMPTIONS.guruPayoutRate,
+    refundRate: toNumber(row.refund_rate) || DEFAULT_ASSUMPTIONS.refundRate,
     monthlyMarketingSpend: toNumber(row.monthly_marketing_spend),
     monthlySoftwareSpend: toNumber(row.monthly_software_spend),
     monthlyAdminSpend: toNumber(row.monthly_admin_spend),
@@ -312,7 +370,8 @@ function rowToAssumptions(row?: ProFormaRow): Assumptions {
     ownerContribution: toNumber(row.owner_contribution),
     loanProceeds: toNumber(row.loan_proceeds),
     loanRepayments: toNumber(row.loan_repayments),
-    monthlyGrowthRate: toNumber(row.monthly_growth_rate),
+    monthlyGrowthRate:
+      toNumber(row.monthly_growth_rate) || DEFAULT_ASSUMPTIONS.monthlyGrowthRate,
     forecastMonths: Math.max(
       1,
       Math.min(36, Math.round(toNumber(row.forecast_months) || 12)),
@@ -391,7 +450,69 @@ async function saveProFormaAssumptions(formData: FormData) {
   revalidatePath("/admin/financials/pro-forma");
 }
 
-function buildForecast(assumptions: Assumptions): ForecastMonth[] {
+function getTrustSafetyEventAmountCents(row: TrustSafetyFinancialEventRow) {
+  return (
+    toNumber(row.net_amount_cents) ||
+    toNumber(row.gross_amount_cents) ||
+    toNumber(row.amount_cents)
+  );
+}
+
+function getTrustSafetyActuals({
+  purchases,
+  events,
+}: {
+  purchases: TrustSafetyPurchaseRow[];
+  events: TrustSafetyFinancialEventRow[];
+}): TrustSafetyActuals {
+  const purchaseCount = purchases.length;
+  const pawInFullCount = purchases.filter(
+    (row) => asTrimmedString(row.plan_key) === "paw_in_full",
+  ).length;
+  const pawstepCount = purchases.filter(
+    (row) => asTrimmedString(row.plan_key) === "pawstep_plan",
+  ).length;
+  const bookAndBarkCount = purchases.filter(
+    (row) => asTrimmedString(row.plan_key) === "book_and_bark_plan",
+  ).length;
+
+  const cashCollected = purchases.reduce(
+    (sum, row) => sum + centsToDollars(toNumber(row.amount_paid_cents)),
+    0,
+  );
+  const outstandingBalance = purchases.reduce(
+    (sum, row) => sum + centsToDollars(toNumber(row.remaining_balance_cents)),
+    0,
+  );
+
+  const vendorCosts = events
+    .filter((row) => asTrimmedString(row.event_type) === "checkr_vendor_cost")
+    .reduce((sum, row) => sum + centsToDollars(Math.abs(getTrustSafetyEventAmountCents(row))), 0);
+  const stripeFees = events
+    .filter((row) => asTrimmedString(row.event_type) === "stripe_fee")
+    .reduce((sum, row) => sum + centsToDollars(Math.abs(getTrustSafetyEventAmountCents(row))), 0);
+  const refunds = events
+    .filter((row) => asTrimmedString(row.event_type) === "refund")
+    .reduce((sum, row) => sum + centsToDollars(Math.abs(getTrustSafetyEventAmountCents(row))), 0);
+
+  return {
+    purchaseCount,
+    pawInFullCount,
+    pawstepCount,
+    bookAndBarkCount,
+    cashCollected,
+    outstandingBalance,
+    vendorCosts,
+    stripeFees,
+    refunds,
+    monthlyPlanStarts: Math.max(1, Math.round(purchaseCount / 3)),
+  };
+}
+
+function buildForecast(
+  assumptions: Assumptions,
+  trustSafetyActuals: TrustSafetyActuals,
+): ForecastMonth[] {
   const forecastMonths = Math.max(
     1,
     Math.min(36, assumptions.forecastMonths || 12),
@@ -416,7 +537,56 @@ function buildForecast(assumptions: Assumptions): ForecastMonth[] {
       grossBookingVolume * (assumptions.guruPayoutRate / 100);
     const refunds = grossBookingVolume * (assumptions.refundRate / 100);
 
-    const grossProfit = platformRevenue - refunds;
+    const projectedTrustSafetyGurus = Math.max(
+      1,
+      trustSafetyActuals.purchaseCount
+        ? trustSafetyActuals.monthlyPlanStarts * growthMultiplier
+        : projectedBookings * 0.2,
+    );
+
+    const pawInFullCount = projectedTrustSafetyGurus * TRUST_SAFETY_PLAN_MIX.pawInFull;
+    const pawstepCount = projectedTrustSafetyGurus * TRUST_SAFETY_PLAN_MIX.pawstep;
+    const bookAndBarkCount =
+      projectedTrustSafetyGurus * TRUST_SAFETY_PLAN_MIX.bookAndBark;
+
+    const pawInFullRevenue =
+      pawInFullCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.pawInFullTotal);
+    const pawstepContractedRevenue =
+      pawstepCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleTotal);
+    const bookAndBarkContractedRevenue =
+      bookAndBarkCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleTotal);
+
+    const trustSafetyContractedRevenue =
+      pawInFullRevenue + pawstepContractedRevenue + bookAndBarkContractedRevenue;
+
+    const trustSafetyCashToday =
+      pawInFullRevenue +
+      pawstepCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleDownPayment) +
+      bookAndBarkCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleDownPayment);
+
+    const recoveryRamp = Math.min(monthNumber, 3) / 3;
+    const trustSafetyInstallmentRecovery =
+      pawstepCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleRemaining) * recoveryRamp;
+    const trustSafetyBookingDeductionRecovery =
+      bookAndBarkCount * centsToDollars(TRUST_SAFETY_PLAN_CENTS.flexibleRemaining) * recoveryRamp;
+
+    const trustSafetyCashCollected =
+      trustSafetyCashToday +
+      trustSafetyInstallmentRecovery +
+      trustSafetyBookingDeductionRecovery;
+
+    const trustSafetyVendorCosts =
+      projectedTrustSafetyGurus *
+      centsToDollars(TRUST_SAFETY_PLAN_CENTS.projectedCheckrVendorCost);
+
+    const trustSafetyStripeFees =
+      trustSafetyCashCollected * 0.029 + projectedTrustSafetyGurus * 0.3;
+
+    const trustSafetyNetCash =
+      trustSafetyCashCollected - trustSafetyVendorCosts - trustSafetyStripeFees;
+
+    const grossProfit =
+      platformRevenue + trustSafetyCashCollected - refunds - trustSafetyVendorCosts - trustSafetyStripeFees;
 
     const operatingExpenses =
       assumptions.monthlyMarketingSpend +
@@ -442,10 +612,18 @@ function buildForecast(assumptions: Assumptions): ForecastMonth[] {
       monthNumber,
       label: `Month ${monthNumber}`,
       projectedBookings,
+      projectedTrustSafetyGurus,
       grossBookingVolume,
       platformRevenue,
       guruPayouts,
       refunds,
+      trustSafetyContractedRevenue,
+      trustSafetyCashCollected,
+      trustSafetyInstallmentRecovery,
+      trustSafetyBookingDeductionRecovery,
+      trustSafetyVendorCosts,
+      trustSafetyStripeFees,
+      trustSafetyNetCash,
       grossProfit,
       operatingExpenses,
       netIncome,
@@ -575,7 +753,8 @@ function ForecastReadinessPanel({
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
             These checks confirm whether the forecast has enough assumptions to
             support revenue planning, cash runway, expense forecasting, funding
-            scenarios, and comparison against actual financial statements.
+            scenarios, Trust & Safety screening projections, and comparison
+            against actual financial statements.
           </p>
         </div>
 
@@ -608,10 +787,10 @@ function ForecastReadinessPanel({
 
 function IntegrationFlowPanel() {
   const steps = [
-    "Actual P&L, Balance Sheet, and Cash Flow provide the baseline operating model.",
-    "Pro forma assumptions project bookings, platform fees, refunds, payouts, expenses, and growth.",
-    "Cash planning layers in beginning cash, owner contributions, loan proceeds, and repayments.",
-    "Runway and break-even outputs guide pricing, marketing spend, hiring, and reserve decisions.",
+    "Actual P&L, Balance Sheet, Cash Flow, General Ledger, and Trust & Safety records provide the baseline operating model.",
+    "Pro forma assumptions project bookings, platform fees, refunds, payouts, expenses, Trust & Safety plans, and growth.",
+    "Trust & Safety projections split Paw in Full, Pawstep, and Book & Bark into cash collected, receivables, vendor costs, Stripe fees, and recoveries.",
+    "Cash planning layers in beginning cash, owner contributions, loan proceeds, repayments, and projected screening cash flow.",
     "Exports give CPA/bookkeeper/investor-ready planning schedules alongside actual statements.",
   ];
 
@@ -646,10 +825,12 @@ function getForecastReadinessItems({
   assumptions,
   forecast,
   savedScenarioCount,
+  trustSafetyActuals,
 }: {
   assumptions: Assumptions;
   forecast: ForecastMonth[];
   savedScenarioCount: number;
+  trustSafetyActuals: TrustSafetyActuals;
 }): ForecastReadinessItem[] {
   const totalOperatingExpenses =
     assumptions.monthlyMarketingSpend +
@@ -665,6 +846,10 @@ function getForecastReadinessItems({
     assumptions.loanProceeds > 0;
 
   const endingCash = forecast[forecast.length - 1]?.endingCash || 0;
+  const trustSafetyCash = forecast.reduce(
+    (sum, row) => sum + row.trustSafetyCashCollected,
+    0,
+  );
 
   return [
     {
@@ -690,6 +875,13 @@ function getForecastReadinessItems({
       )} platform fee.`,
     },
     {
+      label: "Trust & Safety assumptions",
+      status: trustSafetyCash > 0 ? "ready" : "needs_review",
+      detail: trustSafetyActuals.purchaseCount
+        ? `${trustSafetyActuals.purchaseCount.toLocaleString()} actual Trust & Safety purchases are available to anchor the forecast.`
+        : "No historical Trust & Safety purchases found yet, so projections use the default plan mix model.",
+    },
+    {
       label: "Expense assumptions",
       status: totalOperatingExpenses > 0 ? "ready" : "needs_review",
       detail: `${moneyExact(
@@ -706,34 +898,51 @@ function getForecastReadinessItems({
         : "Add beginning cash, owner contribution, or loan proceeds for more useful runway planning.",
     },
     {
-      label: "Forecast horizon",
-      status: assumptions.forecastMonths >= 12 ? "ready" : "needs_review",
-      detail: `${assumptions.forecastMonths} month forecast horizon. 12+ months is better for annual planning.`,
-    },
-    {
       label: "Ending cash signal",
       status: endingCash >= 0 ? "ready" : "missing",
       detail:
         endingCash >= 0
           ? `Projected ending cash is ${moneyExact(endingCash)}.`
-          : `Projected ending cash is negative at ${moneyExact(endingCash)}; review pricing, spend, or funding.`,
+          : `Projected ending cash is negative at ${moneyExact(endingCash)}; review pricing, spend, screening costs, or funding.`,
     },
   ];
 }
 
 async function getProFormaData() {
-  const rows = await safeRows<ProFormaRow>(
-    supabaseAdmin
-      .from("proforma_assumptions")
-      .select("*")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(1),
-    "proforma_assumptions",
-  );
+  const [rows, trustSafetyPurchases, trustSafetyEvents] = await Promise.all([
+    safeRows<ProFormaRow>(
+      supabaseAdmin
+        .from("proforma_assumptions")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1),
+      "proforma_assumptions",
+    ),
+    safeRows<TrustSafetyPurchaseRow>(
+      supabaseAdmin
+        .from("guru_trust_safety_plan_purchases")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1500),
+      "guru_trust_safety_plan_purchases",
+    ),
+    safeRows<TrustSafetyFinancialEventRow>(
+      supabaseAdmin
+        .from("trust_safety_financial_events")
+        .select("*")
+        .order("occurred_at", { ascending: false })
+        .limit(1500),
+      "trust_safety_financial_events",
+    ),
+  ]);
 
   const assumptions = rowToAssumptions(rows[0]);
-  const forecast = buildForecast(assumptions);
+  const trustSafetyActuals = getTrustSafetyActuals({
+    purchases: trustSafetyPurchases,
+    events: trustSafetyEvents,
+  });
+  const forecast = buildForecast(assumptions, trustSafetyActuals);
 
   const totalGrossBookingVolume = forecast.reduce(
     (sum, row) => sum + row.grossBookingVolume,
@@ -752,6 +961,35 @@ async function getProFormaData() {
 
   const totalRefunds = forecast.reduce((sum, row) => sum + row.refunds, 0);
 
+  const totalTrustSafetyContractedRevenue = forecast.reduce(
+    (sum, row) => sum + row.trustSafetyContractedRevenue,
+    0,
+  );
+  const totalTrustSafetyCashCollected = forecast.reduce(
+    (sum, row) => sum + row.trustSafetyCashCollected,
+    0,
+  );
+  const totalTrustSafetyInstallments = forecast.reduce(
+    (sum, row) => sum + row.trustSafetyInstallmentRecovery,
+    0,
+  );
+  const totalTrustSafetyBookingDeductions = forecast.reduce(
+    (sum, row) => sum + row.trustSafetyBookingDeductionRecovery,
+    0,
+  );
+  const totalTrustSafetyVendorCosts = forecast.reduce(
+    (sum, row) => sum + row.trustSafetyVendorCosts,
+    0,
+  );
+  const totalTrustSafetyStripeFees = forecast.reduce(
+    (sum, row) => sum + row.trustSafetyStripeFees,
+    0,
+  );
+  const totalTrustSafetyNetCash = forecast.reduce(
+    (sum, row) => sum + row.trustSafetyNetCash,
+    0,
+  );
+
   const totalOperatingExpenses = forecast.reduce(
     (sum, row) => sum + row.operatingExpenses,
     0,
@@ -765,26 +1003,36 @@ async function getProFormaData() {
     forecast.find((row) => row.netIncome >= 0)?.monthNumber || null;
 
   const maxVisualValue = Math.max(
-    totalPlatformRevenue,
+    totalPlatformRevenue + totalTrustSafetyCashCollected,
     totalOperatingExpenses,
     Math.abs(totalNetIncome),
     Math.abs(endingCash),
+    totalTrustSafetyCashCollected,
     1,
   );
 
   return {
     assumptions,
+    trustSafetyActuals,
     forecast,
     readinessItems: getForecastReadinessItems({
       assumptions,
       forecast,
       savedScenarioCount: rows.length,
+      trustSafetyActuals,
     }),
     totals: {
       totalGrossBookingVolume,
       totalPlatformRevenue,
       totalGuruPayouts,
       totalRefunds,
+      totalTrustSafetyContractedRevenue,
+      totalTrustSafetyCashCollected,
+      totalTrustSafetyInstallments,
+      totalTrustSafetyBookingDeductions,
+      totalTrustSafetyVendorCosts,
+      totalTrustSafetyStripeFees,
+      totalTrustSafetyNetCash,
       totalOperatingExpenses,
       totalNetIncome,
       endingCash,
@@ -811,6 +1059,11 @@ export default async function AdminProFormaPage() {
       tone: "bg-emerald-500",
     },
     {
+      label: "Projected Trust & Safety Cash",
+      value: proForma.totals.totalTrustSafetyCashCollected,
+      tone: "bg-sky-400",
+    },
+    {
       label: "Projected Operating Expenses",
       value: proForma.totals.totalOperatingExpenses,
       tone: "bg-amber-400",
@@ -823,11 +1076,6 @@ export default async function AdminProFormaPage() {
       value: Math.abs(proForma.totals.totalNetIncome),
       tone:
         proForma.totals.totalNetIncome >= 0 ? "bg-violet-400" : "bg-rose-400",
-    },
-    {
-      label: "Projected Ending Cash",
-      value: Math.abs(proForma.totals.endingCash),
-      tone: proForma.totals.endingCash >= 0 ? "bg-sky-400" : "bg-rose-400",
     },
   ];
 
@@ -846,9 +1094,10 @@ export default async function AdminProFormaPage() {
               </h1>
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                Forecast future revenue, Guru payouts, refunds, operating
-                expenses, net income, cash flow, break-even timing, and ending
-                cash based on planning assumptions.
+                Forecast future booking revenue, Guru payouts, refunds,
+                operating expenses, Trust & Safety screening plans, Checkr cost
+                exposure, cash flow, break-even timing, and ending cash based on
+                planning assumptions.
               </p>
             </div>
 
@@ -859,6 +1108,10 @@ export default async function AdminProFormaPage() {
               <ActionLink
                 href="/admin/financials/balance-sheet"
                 label="Balance Sheet"
+              />
+              <ActionLink
+                href="/admin/background-checks"
+                label="Trust & Safety"
               />
               <ActionLink
                 href="/api/admin/financials/pro-forma/export?format=csv"
@@ -879,9 +1132,18 @@ export default async function AdminProFormaPage() {
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Projected Revenue"
-              value={money(proForma.totals.totalPlatformRevenue)}
-              detail={`${assumptions.forecastMonths} month projected SitGuru platform fee revenue.`}
+              value={money(
+                proForma.totals.totalPlatformRevenue +
+                  proForma.totals.totalTrustSafetyCashCollected,
+              )}
+              detail={`${assumptions.forecastMonths} month projected platform + Trust & Safety cash revenue.`}
               tone="emerald"
+            />
+            <StatCard
+              label="Projected Trust & Safety"
+              value={money(proForma.totals.totalTrustSafetyCashCollected)}
+              detail={`${money(proForma.totals.totalTrustSafetyNetCash)} projected net Trust & Safety cash after Checkr and Stripe costs.`}
+              tone="sky"
             />
             <StatCard
               label="Projected Net Income / Loss"
@@ -897,20 +1159,7 @@ export default async function AdminProFormaPage() {
               label="Projected Ending Cash"
               value={money(proForma.totals.endingCash)}
               detail="Beginning cash plus projected net cash movement."
-              tone={proForma.totals.endingCash >= 0 ? "sky" : "rose"}
-            />
-            <StatCard
-              label="Projected Bookings"
-              value={Math.round(
-                proForma.forecast.reduce(
-                  (sum, row) => sum + row.projectedBookings,
-                  0,
-                ),
-              ).toLocaleString()}
-              detail={`${percent(
-                assumptions.monthlyGrowthRate,
-              )} monthly growth assumption.`}
-              tone="amber"
+              tone={proForma.totals.endingCash >= 0 ? "amber" : "rose"}
             />
           </div>
         </section>
@@ -928,10 +1177,9 @@ export default async function AdminProFormaPage() {
               Update SitGuru forecast inputs.
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Change these assumptions and the forecast will update after
-              saving. These assumptions are planning estimates and should be
-              reviewed against actual P&L, Balance Sheet, Cash Flow, Stripe, and
-              Navy Federal banking activity.
+              These assumptions save to the existing pro forma table. Trust &
+              Safety projections are layered on top from the locked plan model
+              and current Trust & Safety purchase history.
             </p>
 
             <form action={saveProFormaAssumptions} className="mt-6 grid gap-5">
@@ -1083,12 +1331,77 @@ export default async function AdminProFormaPage() {
           </div>
 
           <div className="space-y-8">
+            <div className="rounded-[2rem] border border-sky-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+                Trust & Safety Forecast
+              </p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                Project screening revenue, cost, and recovery.
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Uses the actual plan prices: Paw in Full at $37.99 and Pawstep / Book & Bark at $39.99 with $15 today and $24.99 recovered later.
+              </p>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <StatCard
+                  label="Contracted Plan Value"
+                  value={money(proForma.totals.totalTrustSafetyContractedRevenue)}
+                  detail="Projected gross value of selected screening plans."
+                  tone="sky"
+                />
+                <StatCard
+                  label="Cash Collected"
+                  value={money(proForma.totals.totalTrustSafetyCashCollected)}
+                  detail="Upfront payments plus projected recoveries."
+                  tone="emerald"
+                />
+                <StatCard
+                  label="Book & Bark Recovery"
+                  value={money(proForma.totals.totalTrustSafetyBookingDeductions)}
+                  detail="Projected booking deduction recoveries."
+                  tone="amber"
+                />
+                <StatCard
+                  label="Checkr + Stripe Costs"
+                  value={money(
+                    proForma.totals.totalTrustSafetyVendorCosts +
+                      proForma.totals.totalTrustSafetyStripeFees,
+                  )}
+                  detail="Projected screening vendor cost and processing fees."
+                  tone="rose"
+                />
+              </div>
+
+              <div className="mt-6 rounded-[1.5rem] border border-slate-100 bg-[#fbfefd] p-5">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                  Default Plan Mix
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-100 bg-white p-4">
+                    <p className="text-sm font-black text-slate-950">Paw in Full</p>
+                    <p className="mt-1 text-2xl font-black text-emerald-700">40%</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">$37.99 today</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 bg-white p-4">
+                    <p className="text-sm font-black text-slate-950">Pawstep Plan</p>
+                    <p className="mt-1 text-2xl font-black text-sky-700">35%</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">$15 today + installments</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 bg-white p-4">
+                    <p className="text-sm font-black text-slate-950">Book & Bark</p>
+                    <p className="mt-1 text-2xl font-black text-amber-700">25%</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">$15 today + booking deductions</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                 Forecast Visuals
               </p>
               <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-                Revenue, expenses, net income, and cash.
+                Revenue, expenses, and net result.
               </h2>
 
               <div className="mt-6 space-y-5">
@@ -1102,7 +1415,6 @@ export default async function AdminProFormaPage() {
                         {money(row.value)}
                       </p>
                     </div>
-
                     <div className="h-3 rounded-full bg-slate-100">
                       <div
                         className={`h-3 rounded-full ${row.tone}`}
@@ -1118,155 +1430,79 @@ export default async function AdminProFormaPage() {
                 ))}
               </div>
             </div>
-
-            <div className="rounded-[2rem] border border-blue-100 bg-blue-50 p-5 shadow-sm sm:p-6 lg:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">
-                Scenario Summary
-              </p>
-              <h3 className="mt-3 text-3xl font-black text-slate-950">
-                {assumptions.scenarioName}
-              </h3>
-              <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
-                This scenario assumes{" "}
-                {assumptions.monthlyBookings.toLocaleString()} starting monthly
-                bookings at {moneyExact(assumptions.averageBookingValue)} average
-                booking value, with {percent(assumptions.monthlyGrowthRate)}{" "}
-                monthly growth and {percent(assumptions.platformFeeRate)}{" "}
-                SitGuru platform fee revenue.
-              </p>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-blue-100 bg-white p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Break-even Month
-                  </p>
-                  <p className="mt-2 text-2xl font-black text-slate-950">
-                    {proForma.totals.breakEvenMonth
-                      ? `Month ${proForma.totals.breakEvenMonth}`
-                      : "Not reached"}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-blue-100 bg-white p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Ending Cash
-                  </p>
-                  <p
-                    className={`mt-2 text-2xl font-black ${
-                      proForma.totals.endingCash >= 0
-                        ? "text-emerald-700"
-                        : "text-rose-700"
-                    }`}
-                  >
-                    {money(proForma.totals.endingCash)}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
-                Planning Links
-              </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <ActionLink href="/admin/financials/profit-loss" label="Compare P&L" />
-                <ActionLink href="/admin/financials/cash-flow" label="Compare Cash Flow" />
-                <ActionLink href="/admin/financials/balance-sheet" label="Compare Balance Sheet" />
-                <ActionLink href="/admin/financials/exports" label="Open Export Center" />
-              </div>
-            </div>
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
-                Forecast Table
-              </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-                Monthly pro forma projection.
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Projected performance based on the current saved assumptions.
-              </p>
-            </div>
-
-            <ActionLink href="/admin/financials/cash-flow" label="Compare Cash Flow" />
+        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-sm">
+          <div className="border-b border-slate-100 p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+              Monthly Forecast
+            </p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+              Booking + Trust & Safety projection by month
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Trust & Safety cash includes Paw in Full payments, Pawstep installment recoveries, Book & Bark booking deductions, estimated Checkr vendor cost, and Stripe fees.
+            </p>
           </div>
 
-          <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-100">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                      Month
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                      Bookings
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                      Gross Volume
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                      Revenue
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                      Refunds
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                      Expenses
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                      Net Income
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                      Ending Cash
-                    </th>
+          <div className="overflow-x-auto">
+            <table className="min-w-[1180px] w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Month</th>
+                  <th className="px-4 py-3 text-right">Bookings</th>
+                  <th className="px-4 py-3 text-right">Platform Rev.</th>
+                  <th className="px-4 py-3 text-right">T&S Gurus</th>
+                  <th className="px-4 py-3 text-right">T&S Cash</th>
+                  <th className="px-4 py-3 text-right">Book & Bark</th>
+                  <th className="px-4 py-3 text-right">Checkr/Stripe</th>
+                  <th className="px-4 py-3 text-right">Net Income</th>
+                  <th className="px-4 py-3 text-right">Ending Cash</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {proForma.forecast.map((row) => (
+                  <tr key={row.monthNumber} className="transition hover:bg-slate-50">
+                    <td className="px-4 py-4 font-black text-slate-950">
+                      {row.label}
+                    </td>
+                    <td className="px-4 py-4 text-right font-semibold text-slate-600">
+                      {number(row.projectedBookings)}
+                    </td>
+                    <td className="px-4 py-4 text-right font-semibold text-slate-600">
+                      {money(row.platformRevenue)}
+                    </td>
+                    <td className="px-4 py-4 text-right font-semibold text-slate-600">
+                      {number(row.projectedTrustSafetyGurus)}
+                    </td>
+                    <td className="px-4 py-4 text-right font-semibold text-emerald-700">
+                      {money(row.trustSafetyCashCollected)}
+                    </td>
+                    <td className="px-4 py-4 text-right font-semibold text-amber-700">
+                      {money(row.trustSafetyBookingDeductionRecovery)}
+                    </td>
+                    <td className="px-4 py-4 text-right font-semibold text-rose-700">
+                      {money(row.trustSafetyVendorCosts + row.trustSafetyStripeFees)}
+                    </td>
+                    <td
+                      className={`px-4 py-4 text-right font-black ${
+                        row.netIncome >= 0 ? "text-slate-950" : "text-rose-700"
+                      }`}
+                    >
+                      {money(row.netIncome)}
+                    </td>
+                    <td
+                      className={`px-4 py-4 text-right font-black ${
+                        row.endingCash >= 0 ? "text-slate-950" : "text-rose-700"
+                      }`}
+                    >
+                      {money(row.endingCash)}
+                    </td>
                   </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {proForma.forecast.map((row) => (
-                    <tr key={row.monthNumber} className="transition hover:bg-slate-50">
-                      <td className="px-4 py-4 font-semibold text-slate-950">
-                        {row.label}
-                      </td>
-                      <td className="px-4 py-4 text-slate-600">
-                        {Math.round(row.projectedBookings).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-4 font-semibold text-slate-950">
-                        {money(row.grossBookingVolume)}
-                      </td>
-                      <td className="px-4 py-4 font-semibold text-emerald-700">
-                        {money(row.platformRevenue)}
-                      </td>
-                      <td className="px-4 py-4 font-semibold text-rose-700">
-                        {money(row.refunds)}
-                      </td>
-                      <td className="px-4 py-4 font-semibold text-amber-700">
-                        {money(row.operatingExpenses)}
-                      </td>
-                      <td
-                        className={`px-4 py-4 font-semibold ${
-                          row.netIncome >= 0 ? "text-emerald-700" : "text-rose-700"
-                        }`}
-                      >
-                        {money(row.netIncome)}
-                      </td>
-                      <td
-                        className={`px-4 py-4 font-semibold ${
-                          row.endingCash >= 0 ? "text-slate-950" : "text-rose-700"
-                        }`}
-                      >
-                        {money(row.endingCash)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -1279,24 +1515,24 @@ export default async function AdminProFormaPage() {
               {money(proForma.totals.totalGrossBookingVolume)}
             </p>
             <p className="mt-3 text-sm text-slate-600">
-              Total projected customer booking volume.
+              Projected booking volume before platform fees, Guru payouts, and refunds.
             </p>
           </div>
 
-          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
-              Guru Payouts
+          <div className="rounded-[2rem] border border-sky-100 bg-white p-5 shadow-sm sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+              Guru Payout Projection
             </p>
             <p className="mt-3 text-4xl font-black text-slate-950">
               {money(proForma.totals.totalGuruPayouts)}
             </p>
             <p className="mt-3 text-sm text-slate-600">
-              Projected amount paid to Gurus.
+              Projected Guru payout activity based on payout percentage.
             </p>
           </div>
 
-          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+          <div className="rounded-[2rem] border border-rose-100 bg-white p-5 shadow-sm sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-700">
               Refund Exposure
             </p>
             <p className="mt-3 text-4xl font-black text-slate-950">
