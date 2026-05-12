@@ -14,6 +14,7 @@ import {
   Gauge,
   HandCoins,
   Home,
+  Landmark,
   LineChart,
   MessageCircle,
   PawPrint,
@@ -37,6 +38,7 @@ const adminRoutes = {
   settings: "/admin/settings",
   trustSafety: "/admin/background-checks",
   financials: "/admin/financials",
+  banking: "/admin/financials/plaid",
   profitLoss: "/admin/financials/profit-loss",
   balanceSheet: "/admin/financials/balance-sheet",
   cashFlow: "/admin/financials/cash-flow",
@@ -71,6 +73,7 @@ const navSections = [
     title: "Financials",
     items: [
       { label: "Financial Overview", href: adminRoutes.financials, icon: LineChart },
+      { label: "Banking", href: adminRoutes.banking, icon: Landmark },
       { label: "Profit & Loss", href: adminRoutes.profitLoss, icon: FileBarChart },
       { label: "Balance Sheet", href: adminRoutes.balanceSheet, icon: FileSpreadsheet },
       { label: "Cash Flow", href: adminRoutes.cashFlow, icon: CreditCard },
@@ -238,6 +241,7 @@ function AdminFooter() {
       title: "Financials",
       links: [
         { label: "Financial Overview", href: adminRoutes.financials },
+        { label: "Banking", href: adminRoutes.banking },
         { label: "Profit & Loss", href: adminRoutes.profitLoss },
         { label: "Balance Sheet", href: adminRoutes.balanceSheet },
         { label: "Cash Flow", href: adminRoutes.cashFlow },

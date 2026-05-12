@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: "6mb",
+      allowedOrigins: ["twentieth-turban-silver.ngrok-free.dev"],
     },
   },
 

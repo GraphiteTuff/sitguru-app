@@ -1,12 +1,5 @@
-"use client";
-
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import {
-  PlaidLinkOnExit,
-  PlaidLinkOnSuccess,
-  usePlaidLink,
-} from "react-plaid-link";
+import { createClient } from "@/lib/supabase/server";
 
 type PlaidAccount = {
   id: string;
@@ -24,10 +17,22 @@ type PlaidAccount = {
   created_at?: string | null;
 };
 
-type ApiErrorPayload = {
-  error?: string;
-  details?: string;
+type AdminPlaidFinancialsPageProps = {
+  searchParams?: Promise<{
+    error?: string;
+    status?: string;
+  }>;
 };
+
+function getMessageText(value?: string) {
+  if (!value) return "";
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
 function money(value?: number | null, currency = "USD") {
   return new Intl.NumberFormat("en-US", {
@@ -50,192 +55,40 @@ function formatDate(value?: string | null) {
   });
 }
 
-function normalizeApiError(payload: ApiErrorPayload | null, fallback: string) {
-  if (!payload) return fallback;
+async function getConnectedAccounts() {
+  const supabase = await createClient();
 
-  if (payload.details) {
-    return `${payload.error || fallback}: ${payload.details}`;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return [];
   }
 
-  return payload.error || fallback;
+  const { data, error } = await supabase
+    .from("admin_plaid_accounts")
+    .select(
+      "id, account_id, institution_name, name, official_name, mask, type, subtype, verification_status, current_balance, available_balance, iso_currency_code, created_at",
+    )
+    .eq("admin_user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Plaid accounts load error:", error);
+    return [];
+  }
+
+  return (data || []) as PlaidAccount[];
 }
 
-export default function AdminPlaidFinancialsPage() {
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [accounts, setAccounts] = useState<PlaidAccount[]>([]);
-  const [loadingToken, setLoadingToken] = useState(true);
-  const [loadingAccounts, setLoadingAccounts] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [tokenStatus, setTokenStatus] = useState<
-    "idle" | "loading" | "ready" | "error"
-  >("idle");
-
-  async function loadAccounts() {
-    setLoadingAccounts(true);
-
-    try {
-      const response = await fetch("/api/plaid/accounts", {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      const payload = (await response.json().catch(() => null)) as
-        | ApiErrorPayload
-        | { accounts?: PlaidAccount[] }
-        | null;
-
-      if (!response.ok) {
-        setError(
-          normalizeApiError(
-            payload as ApiErrorPayload | null,
-            "Unable to load connected accounts.",
-          ),
-        );
-        setLoadingAccounts(false);
-        return;
-      }
-
-      setAccounts(
-        Array.isArray((payload as { accounts?: PlaidAccount[] })?.accounts)
-          ? ((payload as { accounts?: PlaidAccount[] }).accounts as PlaidAccount[])
-          : [],
-      );
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Unable to load connected accounts.",
-      );
-    } finally {
-      setLoadingAccounts(false);
-    }
-  }
-
-  async function createLinkToken() {
-    setLoadingToken(true);
-    setTokenStatus("loading");
-    setError("");
-    setMessage("");
-
-    try {
-      const response = await fetch("/api/plaid/create-link-token", {
-        method: "POST",
-        cache: "no-store",
-      });
-
-      const payload = (await response.json().catch(() => null)) as
-        | ApiErrorPayload
-        | { link_token?: string }
-        | null;
-
-      if (!response.ok) {
-        setLinkToken(null);
-        setTokenStatus("error");
-        setError(
-          normalizeApiError(
-            payload as ApiErrorPayload | null,
-            "Unable to create Plaid Link token.",
-          ),
-        );
-        setLoadingToken(false);
-        return;
-      }
-
-      const token = (payload as { link_token?: string } | null)?.link_token;
-
-      if (!token) {
-        setLinkToken(null);
-        setTokenStatus("error");
-        setError("Plaid Link token response did not include a link_token.");
-        setLoadingToken(false);
-        return;
-      }
-
-      setLinkToken(token);
-      setTokenStatus("ready");
-    } catch (tokenError) {
-      setLinkToken(null);
-      setTokenStatus("error");
-      setError(
-        tokenError instanceof Error
-          ? tokenError.message
-          : "Unable to create Plaid Link token.",
-      );
-    } finally {
-      setLoadingToken(false);
-    }
-  }
-
-  useEffect(() => {
-    void createLinkToken();
-    void loadAccounts();
-  }, []);
-
-  const onSuccess = useCallback<PlaidLinkOnSuccess>(
-    async (publicToken, metadata) => {
-      setBusy(true);
-      setError("");
-      setMessage("");
-
-      try {
-        const response = await fetch("/api/plaid/exchange-public-token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            public_token: publicToken,
-            metadata,
-          }),
-        });
-
-        const payload = (await response.json().catch(() => null)) as
-          | ApiErrorPayload
-          | null;
-
-        if (!response.ok) {
-          setError(
-            normalizeApiError(payload, "Unable to connect bank account."),
-          );
-          setBusy(false);
-          return;
-        }
-
-        setMessage("Bank account connected successfully.");
-        await loadAccounts();
-        await createLinkToken();
-      } catch (exchangeError) {
-        setError(
-          exchangeError instanceof Error
-            ? exchangeError.message
-            : "Unable to connect bank account.",
-        );
-      } finally {
-        setBusy(false);
-      }
-    },
-    [],
-  );
-
-  const onExit = useCallback<PlaidLinkOnExit>((exitError) => {
-    if (exitError) {
-      setError(
-        exitError.display_message ||
-          exitError.error_message ||
-          "Plaid Link was closed.",
-      );
-    }
-  }, []);
-
-  const { open, ready } = usePlaidLink({
-    token: linkToken,
-    onSuccess,
-    onExit,
-  });
-
-  const canOpenPlaid = Boolean(ready && linkToken && !loadingToken && !busy);
+export default async function AdminPlaidFinancialsPage({
+  searchParams,
+}: AdminPlaidFinancialsPageProps) {
+  const params = await searchParams;
+  const errorMessage = getMessageText(params?.error);
+  const statusMessage = getMessageText(params?.status);
+  const accounts = await getConnectedAccounts();
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -254,34 +107,73 @@ export default function AdminPlaidFinancialsPage() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-              Connect and manage admin financial accounts through Plaid Link.
-              Use Sandbox for testing before switching to production.
+              Connect and manage SitGuru admin financial accounts through Plaid
+              Link. Development mode is being used to connect and verify real
+              bank accounts before switching fully to Production.
             </p>
           </div>
 
-          <button
-            type="button"
-            disabled={!canOpenPlaid}
-            onClick={() => open()}
-            className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+          <Link
+            href="/api/plaid/start"
+            className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
           >
-            {loadingToken
-              ? "Preparing Plaid..."
-              : busy
-                ? "Connecting..."
-                : "Connect Bank Account"}
-          </button>
+            Open Plaid Secure Link
+          </Link>
         </div>
 
-        {error ? (
+        <section className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+            Plaid Server Launch Active
+          </p>
+
+          <p className="mt-2 text-sm font-bold leading-6 text-amber-950">
+            This page now uses a normal server link to start Plaid. It does not
+            depend on the stuck React button handler.
+          </p>
+
+          <div className="mt-4 grid gap-3 text-xs font-bold text-slate-700 md:grid-cols-3">
+            <div className="rounded-2xl border border-amber-200 bg-white p-3">
+              <p className="text-slate-500">Plaid Mode</p>
+              <p className="mt-1 text-slate-950">Development</p>
+            </div>
+
+            <div className="rounded-2xl border border-amber-200 bg-white p-3">
+              <p className="text-slate-500">Current Product</p>
+              <p className="mt-1 text-slate-950">Transactions</p>
+            </div>
+
+            <div className="rounded-2xl border border-amber-200 bg-white p-3">
+              <p className="text-slate-500">Auth Status</p>
+              <p className="mt-1 text-slate-950">Requested / Pending</p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/api/plaid/create-link-token"
+              className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-black text-amber-800 transition hover:bg-amber-100"
+            >
+              Test Link Token JSON
+            </Link>
+
+            <Link
+              href="/admin/financials/plaid"
+              className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-black text-amber-800 transition hover:bg-amber-100"
+            >
+              Refresh Page
+            </Link>
+          </div>
+        </section>
+
+        {errorMessage ? (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-700">
-            {error}
+            {errorMessage}
           </div>
         ) : null}
 
-        {message ? (
+        {statusMessage ? (
           <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700">
-            {message}
+            {statusMessage}
           </div>
         ) : null}
 
@@ -299,79 +191,27 @@ export default function AdminPlaidFinancialsPage() {
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
               Plaid Mode
             </p>
-            <p className="mt-2 text-4xl font-black text-slate-950">Sandbox</p>
+            <p className="mt-2 text-4xl font-black text-slate-950">
+              Development
+            </p>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
               Product
             </p>
-            <p className="mt-2 text-4xl font-black text-slate-950">Auth</p>
+            <p className="mt-2 text-4xl font-black text-slate-950">
+              Transactions
+            </p>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Link Token
+              Auth
             </p>
-            <p
-              className={`mt-2 text-4xl font-black ${
-                tokenStatus === "ready"
-                  ? "text-emerald-700"
-                  : tokenStatus === "error"
-                    ? "text-red-600"
-                    : "text-slate-950"
-              }`}
-            >
-              {tokenStatus === "ready"
-                ? "Ready"
-                : tokenStatus === "error"
-                  ? "Error"
-                  : "Loading"}
-            </p>
+            <p className="mt-2 text-4xl font-black text-amber-700">Pending</p>
           </div>
         </section>
-
-        {tokenStatus === "error" ? (
-          <section className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 p-6">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-              Plaid Setup Check
-            </p>
-
-            <h2 className="mt-2 text-2xl font-black text-slate-950">
-              The page is wired, but Plaid cannot create a Link token yet.
-            </h2>
-
-            <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
-              Confirm your root <code>.env.local</code> has the Sandbox Plaid
-              credentials, then restart the dev server.
-            </p>
-
-            <pre className="mt-4 overflow-x-auto rounded-2xl border border-amber-200 bg-white p-4 text-xs font-bold text-slate-800">
-{`PLAID_CLIENT_ID=your_client_id
-PLAID_SECRET=your_sandbox_secret
-PLAID_ENV=sandbox
-PLAID_PRODUCTS=auth
-PLAID_COUNTRY_CODES=US`}
-            </pre>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={createLinkToken}
-                className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
-              >
-                Retry Link Token
-              </button>
-
-              <Link
-                href="/admin/financials"
-                className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-black text-amber-800 transition hover:bg-amber-100"
-              >
-                Back to Financials
-              </Link>
-            </div>
-          </section>
-        ) : null}
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -385,21 +225,15 @@ PLAID_COUNTRY_CODES=US`}
               </h2>
             </div>
 
-            <button
-              type="button"
-              onClick={loadAccounts}
-              disabled={loadingAccounts}
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            <Link
+              href="/admin/financials/plaid"
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
             >
-              {loadingAccounts ? "Refreshing..." : "Refresh"}
-            </button>
+              Refresh
+            </Link>
           </div>
 
-          {loadingAccounts ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm font-bold text-slate-500">
-              Loading connected accounts...
-            </div>
-          ) : accounts.length ? (
+          {accounts.length ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead>
@@ -474,21 +308,25 @@ PLAID_COUNTRY_CODES=US`}
               </p>
 
               <p className="mx-auto mt-2 max-w-lg text-sm font-semibold leading-6 text-slate-600">
-                Click “Connect Bank Account” to open Plaid Link and connect a
-                sandbox bank account for testing.
+                Click “Open Plaid Secure Link” to create a Plaid Link token and
+                connect a real bank account in Plaid Development.
               </p>
 
-              <div className="mx-auto mt-5 max-w-md rounded-2xl border border-slate-200 bg-white p-4 text-left">
+              <div className="mx-auto mt-5 max-w-xl rounded-2xl border border-slate-200 bg-white p-4 text-left">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                  Sandbox Credentials
+                  Development Testing Reminder
                 </p>
 
-                <p className="mt-2 text-sm font-bold text-slate-700">
-                  Username: <span className="font-black">user_good</span>
+                <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                  Use the ngrok URL when testing:{" "}
+                  <span className="font-black text-slate-950">
+                    https://twentieth-turban-silver.ngrok-free.dev
+                  </span>
                 </p>
 
-                <p className="mt-1 text-sm font-bold text-slate-700">
-                  Password: <span className="font-black">pass_good</span>
+                <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                  Plaid connects and verifies the bank. Stripe handles actual
+                  payments and payouts.
                 </p>
               </div>
             </div>

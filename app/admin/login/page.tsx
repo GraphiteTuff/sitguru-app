@@ -1,117 +1,30 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Eye,
-  EyeOff,
-  Lock,
-  Mail,
-  MessageCircle,
-  PawPrint,
-  ShieldCheck,
-  Sparkles,
-  Users,
-} from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { ArrowLeft, Lock, Mail, MessageCircle, PawPrint, ShieldCheck, Users } from "lucide-react";
 
-function normalizeError(error: unknown) {
-  if (!error) return "Something went wrong.";
+type AdminLoginPageProps = {
+  searchParams?: Promise<{
+    error?: string;
+    status?: string;
+  }>;
+};
 
-  if (typeof error === "string") return error;
+function getMessageText(value?: string) {
+  if (!value) return "";
 
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
-  ) {
-    return error.message;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
   }
-
-  return "Something went wrong.";
 }
 
-export default function AdminLoginPage() {
-  const router = useRouter();
-
-  const [email, setEmail] = useState("admin@sitguru.com");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    setSubmitting(true);
-    setErrorMessage("");
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-      if (error) {
-        setErrorMessage(error.message || "Unable to sign in.");
-        return;
-      }
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        setErrorMessage("Unable to verify your admin account.");
-        await supabase.auth.signOut();
-        return;
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-      if (profileError || profile?.role !== "admin") {
-        setErrorMessage("This account is not authorized for admin access.");
-        await supabase.auth.signOut();
-        return;
-      }
-
-      const { data: aalData, error: aalError } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-      if (aalError) {
-        setErrorMessage(normalizeError(aalError));
-        return;
-      }
-
-      if (aalData?.currentLevel === "aal2") {
-        router.push("/admin");
-        router.refresh();
-        return;
-      }
-
-      if (aalData?.nextLevel === "aal2") {
-        router.push("/admin/security/mfa/challenge");
-        router.refresh();
-        return;
-      }
-
-      router.push("/admin/security/mfa");
-      router.refresh();
-    } catch {
-      setErrorMessage("Something went wrong while signing in.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+export default async function AdminLoginPage({
+  searchParams,
+}: AdminLoginPageProps) {
+  const params = await searchParams;
+  const errorMessage = getMessageText(params?.error);
+  const statusMessage = getMessageText(params?.status);
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#f7f8f4] text-slate-950">
@@ -197,7 +110,17 @@ export default function AdminLoginPage() {
                 Use your SitGuru Admin credentials to continue.
               </p>
 
-              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900">
+                SERVER FORM LOGIN ACTIVE — this page does not need browser
+                JavaScript to submit.
+              </div>
+
+              <form
+                noValidate
+                action="/api/admin/login"
+                method="post"
+                className="mt-8 space-y-5"
+              >
                 <div>
                   <label
                     htmlFor="admin-email"
@@ -211,13 +134,12 @@ export default function AdminLoginPage() {
 
                     <input
                       id="admin-email"
-                      type="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      autoComplete="email"
+                      name="email"
+                      type="text"
+                      defaultValue="admin@sitguru.com"
+                      autoComplete="username"
                       className="ml-3 w-full bg-transparent text-base font-semibold text-slate-950 outline-none placeholder:text-slate-400"
                       placeholder="admin@sitguru.com"
-                      required
                     />
                   </div>
                 </div>
@@ -235,31 +157,20 @@ export default function AdminLoginPage() {
 
                     <input
                       id="admin-password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
+                      name="password"
+                      type="password"
                       autoComplete="current-password"
                       className="ml-3 w-full bg-transparent text-base font-semibold text-slate-950 outline-none placeholder:text-slate-400"
                       placeholder="Enter password"
-                      required
                     />
-
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((value) => !value)}
-                      className="ml-3 rounded-full p-1 text-slate-500 transition hover:bg-white hover:text-green-800"
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
-                    </button>
                   </div>
                 </div>
+
+                {statusMessage ? (
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+                    {statusMessage}
+                  </div>
+                ) : null}
 
                 {errorMessage ? (
                   <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
@@ -269,17 +180,9 @@ export default function AdminLoginPage() {
 
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-4 text-base font-black text-white shadow-[0_12px_30px_rgba(22,101,52,0.22)] transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="flex w-full items-center justify-center rounded-2xl bg-green-800 px-5 py-4 text-base font-black text-white shadow-[0_12px_30px_rgba(22,101,52,0.22)] transition hover:bg-green-900"
                 >
-                  {submitting ? (
-                    <>
-                      <Sparkles className="h-5 w-5 animate-pulse" />
-                      Checking security...
-                    </>
-                  ) : (
-                    "Sign In"
-                  )}
+                  Sign In
                 </button>
               </form>
 
