@@ -13,14 +13,6 @@ type PlaidItemRow = {
   transactions_cursor?: string | null;
 };
 
-type PlaidAccountRow = {
-  account_id: string;
-  item_id: string;
-  name?: string | null;
-  official_name?: string | null;
-  subtype?: string | null;
-};
-
 function getErrorMessage(error: unknown) {
   if (
     typeof error === "object" &&
@@ -43,16 +35,6 @@ function getErrorMessage(error: unknown) {
 function asDateString(value?: string | null) {
   if (!value) return null;
   return value;
-}
-
-function isBusinessCheckingOrSavings(account: PlaidAccountRow) {
-  const name = `${account.name || ""} ${account.official_name || ""}`.toLowerCase();
-  const subtype = String(account.subtype || "").toLowerCase();
-
-  const isCheckingOrSavings = subtype === "checking" || subtype === "savings";
-  const looksBusiness = name.includes("business");
-
-  return isCheckingOrSavings && looksBusiness;
 }
 
 async function requireAdminUser() {
@@ -153,45 +135,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const itemIds = items.map((item) => item.item_id);
-
-    const { data: accountRows, error: accountError } = await supabaseAdmin
-      .from("admin_plaid_accounts")
-      .select("account_id, item_id, name, official_name, subtype")
-      .eq("user_id", adminCheck.user.id)
-      .in("item_id", itemIds);
-
-    if (accountError) {
-      console.error("Plaid business account lookup error:", accountError);
-
-      return NextResponse.json(
-        { error: "Unable to load business checking/savings accounts." },
-        { status: 500 },
-      );
-    }
-
-    const businessAccounts = ((accountRows || []) as PlaidAccountRow[]).filter(
-      isBusinessCheckingOrSavings,
-    );
-
-    const allowedAccountIds = new Set(
-      businessAccounts.map((account) => account.account_id),
-    );
-
-    if (!allowedAccountIds.size) {
-      return NextResponse.json(
-        {
-          error:
-            "No Business Checking or Business Savings accounts are saved for this Plaid environment. Clean up and reconnect NFCU if needed.",
-        },
-        { status: 404 },
-      );
-    }
-
     let totalAdded = 0;
     let totalModified = 0;
     let totalRemoved = 0;
-    let skippedTransactions = 0;
     const syncedItems: string[] = [];
 
     for (const item of items) {
@@ -213,11 +159,6 @@ export async function POST(request: NextRequest) {
         const removed = syncResponse.data.removed || [];
 
         for (const transaction of added) {
-          if (!allowedAccountIds.has(transaction.account_id)) {
-            skippedTransactions += 1;
-            continue;
-          }
-
           const { error: insertError } = await supabaseAdmin
             .from("admin_plaid_transactions")
             .upsert(
@@ -255,11 +196,6 @@ export async function POST(request: NextRequest) {
         }
 
         for (const transaction of modified) {
-          if (!allowedAccountIds.has(transaction.account_id)) {
-            skippedTransactions += 1;
-            continue;
-          }
-
           const { error: updateError } = await supabaseAdmin
             .from("admin_plaid_transactions")
             .upsert(
@@ -310,14 +246,8 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        totalAdded += added.filter((transaction) =>
-          allowedAccountIds.has(transaction.account_id),
-        ).length;
-
-        totalModified += modified.filter((transaction) =>
-          allowedAccountIds.has(transaction.account_id),
-        ).length;
-
+        totalAdded += added.length;
+        totalModified += modified.length;
         totalRemoved += removed.length;
 
         cursor = syncResponse.data.next_cursor;
@@ -348,15 +278,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      message: "Business checking/savings transactions synced successfully.",
+      message: "Plaid transactions synced successfully.",
       plaid_environment: currentPlaidEnvironment,
       items_synced: syncedItems.length,
-      business_accounts_synced: allowedAccountIds.size,
       item_ids: syncedItems,
       added: totalAdded,
       modified: totalModified,
       removed: totalRemoved,
-      skipped_non_business_transactions: skippedTransactions,
     });
   } catch (error) {
     const message = getErrorMessage(error);
