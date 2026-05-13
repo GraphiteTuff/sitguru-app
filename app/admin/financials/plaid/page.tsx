@@ -1,20 +1,52 @@
 import Link from "next/link";
+import PlaidTransactionCategoryControls from "@/components/admin/PlaidTransactionCategoryControls";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type PlaidAccount = {
   id: string;
   account_id: string;
-  institution_name?: string | null;
+  item_id: string;
   name?: string | null;
   official_name?: string | null;
   mask?: string | null;
   type?: string | null;
   subtype?: string | null;
-  verification_status?: string | null;
   current_balance?: number | null;
   available_balance?: number | null;
   iso_currency_code?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type PlaidItem = {
+  item_id: string;
+  institution_name?: string | null;
+  plaid_environment?: string | null;
+  transactions_last_synced_at?: string | null;
+  created_at?: string | null;
+};
+
+type PlaidTransaction = {
+  id: string;
+  transaction_id: string;
+  item_id: string;
+  account_id: string;
+  name?: string | null;
+  merchant_name?: string | null;
+  amount?: number | null;
+  iso_currency_code?: string | null;
+  date?: string | null;
+  pending?: boolean | null;
+  payment_channel?: string | null;
+  created_at?: string | null;
+  sitguru_category?: string | null;
+  sitguru_category_type?: string | null;
+  sitguru_report_section?: string | null;
+  sitguru_notes?: string | null;
+  review_status?: string | null;
+  is_excluded_from_reports?: boolean | null;
+  manually_categorized?: boolean | null;
 };
 
 type AdminPlaidFinancialsPageProps = {
@@ -22,6 +54,14 @@ type AdminPlaidFinancialsPageProps = {
     error?: string;
     status?: string;
   }>;
+};
+
+type BankingData = {
+  accounts: PlaidAccount[];
+  items: PlaidItem[];
+  transactions: PlaidTransaction[];
+  totalTransactions: number;
+  lastSyncedAt: string | null;
 };
 
 function getMessageText(value?: string) {
@@ -55,31 +95,160 @@ function formatDate(value?: string | null) {
   });
 }
 
-async function getConnectedAccounts() {
+function formatDateTime(value?: string | null) {
+  if (!value) return "Not synced yet";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not synced yet";
+
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function isBusinessCheckingOrSavings(account: PlaidAccount) {
+  const name = `${account.name || ""} ${account.official_name || ""}`.toLowerCase();
+  const subtype = String(account.subtype || "").toLowerCase();
+
+  const isCheckingOrSavings = subtype === "checking" || subtype === "savings";
+  const looksBusiness = name.includes("business");
+
+  return isCheckingOrSavings && looksBusiness;
+}
+
+async function getCurrentAdminUserId() {
   const supabase = await createClient();
 
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return [];
+  if (userError || !user) {
+    return null;
   }
 
-  const { data, error } = await supabase
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || profile?.role !== "admin") {
+    return null;
+  }
+
+  return user.id;
+}
+
+async function getBankingData(): Promise<BankingData> {
+  const userId = await getCurrentAdminUserId();
+
+  if (!userId) {
+    return {
+      accounts: [],
+      items: [],
+      transactions: [],
+      totalTransactions: 0,
+      lastSyncedAt: null,
+    };
+  }
+
+  const { data: accountRows, error: accountError } = await supabaseAdmin
     .from("admin_plaid_accounts")
     .select(
-      "id, account_id, institution_name, name, official_name, mask, type, subtype, verification_status, current_balance, available_balance, iso_currency_code, created_at",
+      "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, created_at, updated_at",
     )
-    .eq("admin_user_id", user.id)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("Plaid accounts load error:", error);
-    return [];
+  if (accountError) {
+    console.error("Plaid accounts load error:", accountError);
   }
 
-  return (data || []) as PlaidAccount[];
+  const accounts = ((accountRows || []) as PlaidAccount[]).filter(
+    isBusinessCheckingOrSavings,
+  );
+
+  const itemIds = Array.from(
+    new Set(accounts.map((account) => account.item_id).filter(Boolean)),
+  );
+
+  let items: PlaidItem[] = [];
+
+  if (itemIds.length) {
+    const { data: itemRows, error: itemError } = await supabaseAdmin
+      .from("admin_plaid_items")
+      .select(
+        "item_id, institution_name, plaid_environment, transactions_last_synced_at, created_at",
+      )
+      .eq("user_id", userId)
+      .in("item_id", itemIds)
+      .order("created_at", { ascending: false });
+
+    if (itemError) {
+      console.error("Plaid items load error:", itemError);
+    }
+
+    items = (itemRows || []) as PlaidItem[];
+  }
+
+  const accountIds = accounts.map((account) => account.account_id);
+
+  let totalTransactions = 0;
+  let transactions: PlaidTransaction[] = [];
+
+  if (accountIds.length) {
+    const { count, error: countError } = await supabaseAdmin
+      .from("admin_plaid_transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .in("account_id", accountIds)
+      .is("removed_at", null);
+
+    if (countError) {
+      console.error("Plaid transaction count error:", countError);
+    }
+
+    totalTransactions = count || 0;
+
+    const { data: transactionRows, error: transactionError } =
+      await supabaseAdmin
+        .from("admin_plaid_transactions")
+        .select(
+          "id, transaction_id, item_id, account_id, name, merchant_name, amount, iso_currency_code, date, pending, payment_channel, created_at, sitguru_category, sitguru_category_type, sitguru_report_section, sitguru_notes, review_status, is_excluded_from_reports, manually_categorized",
+        )
+        .eq("user_id", userId)
+        .in("account_id", accountIds)
+        .is("removed_at", null)
+        .order("date", { ascending: false })
+        .limit(12);
+
+    if (transactionError) {
+      console.error("Plaid transactions load error:", transactionError);
+    }
+
+    transactions = (transactionRows || []) as PlaidTransaction[];
+  }
+
+  const lastSyncedAt =
+    items
+      .map((item) => item.transactions_last_synced_at)
+      .filter(Boolean)
+      .sort()
+      .reverse()[0] || null;
+
+  return {
+    accounts,
+    items,
+    transactions,
+    totalTransactions,
+    lastSyncedAt,
+  };
 }
 
 export default async function AdminPlaidFinancialsPage({
@@ -88,12 +257,31 @@ export default async function AdminPlaidFinancialsPage({
   const params = await searchParams;
   const errorMessage = getMessageText(params?.error);
   const statusMessage = getMessageText(params?.status);
-  const accounts = await getConnectedAccounts();
+
+  const { accounts, items, transactions, totalTransactions, lastSyncedAt } =
+    await getBankingData();
+
+  const checkingAccount = accounts.find(
+    (account) => account.subtype === "checking",
+  );
+  const savingsAccount = accounts.find(
+    (account) => account.subtype === "savings",
+  );
+
+  const totalCurrentBalance = accounts.reduce(
+    (total, account) => total + Number(account.current_balance || 0),
+    0,
+  );
+
+  const totalAvailableBalance = accounts.reduce(
+    (total, account) => total + Number(account.available_balance || 0),
+    0,
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <Link
               href="/admin/financials"
@@ -102,63 +290,80 @@ export default async function AdminPlaidFinancialsPage({
               ← Back to Financials
             </Link>
 
-            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 xl:text-5xl">
               Plaid Bank Connections
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-              Connect and manage SitGuru admin financial accounts through Plaid
-              Link. Development mode is being used to connect and verify real
-              bank accounts before switching fully to Production.
+              Connect, sync, categorize, and review NFCU Business Checking and
+              Business Savings activity. Category choices feed SitGuru financial
+              reports.
             </p>
           </div>
 
-          <Link
-            href="/api/plaid/start"
-            className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
-          >
-            Open Plaid Secure Link
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/api/plaid/sync-transactions"
+              className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
+            >
+              Sync Transactions
+            </Link>
+
+            <Link
+              href="/api/plaid/start"
+              className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+            >
+              Open Plaid Secure Link
+            </Link>
+          </div>
         </div>
 
-        <section className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-            Plaid Server Launch Active
+        <section className="mb-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+            NFCU Business Banking Active
           </p>
 
-          <p className="mt-2 text-sm font-bold leading-6 text-amber-950">
-            This page now uses a normal server link to start Plaid. It does not
-            depend on the stuck React button handler.
+          <p className="mt-2 text-sm font-bold leading-6 text-emerald-950">
+            SitGuru is connected to NFCU Business Checking and Business Savings.
+            Personal and test accounts have been removed from the active banking
+            view.
           </p>
 
-          <div className="mt-4 grid gap-3 text-xs font-bold text-slate-700 md:grid-cols-3">
-            <div className="rounded-2xl border border-amber-200 bg-white p-3">
+          <div className="mt-4 grid gap-3 text-xs font-bold text-slate-700 md:grid-cols-4">
+            <div className="rounded-2xl border border-emerald-200 bg-white p-3">
               <p className="text-slate-500">Plaid Mode</p>
               <p className="mt-1 text-slate-950">Development</p>
             </div>
 
-            <div className="rounded-2xl border border-amber-200 bg-white p-3">
-              <p className="text-slate-500">Current Product</p>
-              <p className="mt-1 text-slate-950">Transactions</p>
+            <div className="rounded-2xl border border-emerald-200 bg-white p-3">
+              <p className="text-slate-500">Products</p>
+              <p className="mt-1 text-slate-950">Auth + Transactions</p>
             </div>
 
-            <div className="rounded-2xl border border-amber-200 bg-white p-3">
-              <p className="text-slate-500">Auth Status</p>
-              <p className="mt-1 text-slate-950">Requested / Pending</p>
+            <div className="rounded-2xl border border-emerald-200 bg-white p-3">
+              <p className="text-slate-500">Linked Items</p>
+              <p className="mt-1 text-slate-950">{items.length}</p>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-200 bg-white p-3">
+              <p className="text-slate-500">Last Sync</p>
+              <p className="mt-1 text-slate-950">
+                {formatDateTime(lastSyncedAt)}
+              </p>
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/api/plaid/create-link-token"
-              className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-black text-amber-800 transition hover:bg-amber-100"
+              className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
             >
               Test Link Token JSON
             </Link>
 
             <Link
               href="/admin/financials/plaid"
-              className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-black text-amber-800 transition hover:bg-amber-100"
+              className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
             >
               Refresh Page
             </Link>
@@ -189,27 +394,129 @@ export default async function AdminPlaidFinancialsPage({
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Plaid Mode
+              Total Transactions
             </p>
             <p className="mt-2 text-4xl font-black text-slate-950">
-              Development
+              {totalTransactions}
             </p>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Product
+              Current Balance
             </p>
             <p className="mt-2 text-4xl font-black text-slate-950">
-              Transactions
+              {money(totalCurrentBalance)}
             </p>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Auth
+              Available Balance
             </p>
-            <p className="mt-2 text-4xl font-black text-amber-700">Pending</p>
+            <p className="mt-2 text-4xl font-black text-slate-950">
+              {money(totalAvailableBalance)}
+            </p>
+          </div>
+        </section>
+
+        <section className="mb-6 grid gap-4 md:grid-cols-2">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              Business Checking
+            </p>
+
+            {checkingAccount ? (
+              <>
+                <h2 className="mt-2 text-3xl font-black text-slate-950">
+                  {checkingAccount.name || "Business Checking"}
+                </h2>
+
+                <p className="mt-1 text-sm font-bold text-slate-500">
+                  Mask:{" "}
+                  {checkingAccount.mask ? `•••• ${checkingAccount.mask}` : "—"}
+                </p>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      Current
+                    </p>
+                    <p className="mt-1 text-2xl font-black text-slate-950">
+                      {money(
+                        checkingAccount.current_balance,
+                        checkingAccount.iso_currency_code || "USD",
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      Available
+                    </p>
+                    <p className="mt-1 text-2xl font-black text-slate-950">
+                      {money(
+                        checkingAccount.available_balance,
+                        checkingAccount.iso_currency_code || "USD",
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="mt-3 text-sm font-bold text-slate-500">
+                No Business Checking account is currently saved.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              Business Savings
+            </p>
+
+            {savingsAccount ? (
+              <>
+                <h2 className="mt-2 text-3xl font-black text-slate-950">
+                  {savingsAccount.name || "Business Savings"}
+                </h2>
+
+                <p className="mt-1 text-sm font-bold text-slate-500">
+                  Mask:{" "}
+                  {savingsAccount.mask ? `•••• ${savingsAccount.mask}` : "—"}
+                </p>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      Current
+                    </p>
+                    <p className="mt-1 text-2xl font-black text-slate-950">
+                      {money(
+                        savingsAccount.current_balance,
+                        savingsAccount.iso_currency_code || "USD",
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      Available
+                    </p>
+                    <p className="mt-1 text-2xl font-black text-slate-950">
+                      {money(
+                        savingsAccount.available_balance,
+                        savingsAccount.iso_currency_code || "USD",
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="mt-3 text-sm font-bold text-slate-500">
+                No Business Savings account is currently saved.
+              </p>
+            )}
           </div>
         </section>
 
@@ -217,84 +524,110 @@ export default async function AdminPlaidFinancialsPage({
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-black uppercase tracking-wide text-slate-500">
-                Accounts
+                Recent Activity
               </p>
 
               <h2 className="mt-2 text-2xl font-black text-slate-950">
-                Connected bank accounts
+                Categorized business transactions
               </h2>
+
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+                Auto-categories feed SitGuru financial reports. Manual category
+                changes are saved and will not be overwritten by future Plaid
+                syncs. Bank Status shows whether NFCU/Plaid says the transaction
+                is pending or posted.
+              </p>
             </div>
 
             <Link
-              href="/admin/financials/plaid"
+              href="/api/plaid/sync-transactions"
               className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
             >
-              Refresh
+              Sync Now
             </Link>
           </div>
 
-          {accounts.length ? (
+          {transactions.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-sm">
+              <table className="w-full min-w-[1180px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-xs font-black uppercase tracking-wide text-slate-500">
-                    <th className="pb-3">Account</th>
-                    <th className="pb-3">Mask</th>
-                    <th className="pb-3">Type</th>
-                    <th className="pb-3">Available</th>
-                    <th className="pb-3">Current</th>
-                    <th className="pb-3">Connected</th>
+                    <th className="pb-3">Date</th>
+                    <th className="pb-3">Description</th>
+                    <th className="pb-3">Category</th>
+                    <th className="pb-3">Merchant</th>
+                    <th className="pb-3">Channel</th>
+                    <th className="pb-3">Bank Status</th>
+                    <th className="pb-3 text-right">Amount</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {accounts.map((account) => (
+                  {transactions.map((transaction) => (
                     <tr
-                      key={account.account_id}
-                      className="border-b border-slate-100 last:border-0"
+                      key={transaction.transaction_id}
+                      className="border-b border-slate-100 align-top last:border-0"
                     >
-                      <td className="py-4 pr-4">
+                      <td className="py-4 pr-4 font-bold text-slate-600">
+                        {formatDate(transaction.date)}
+                      </td>
+
+                      <td className="max-w-[280px] py-4 pr-4">
                         <p className="font-black text-slate-950">
-                          {account.name || "Bank Account"}
+                          {transaction.name || "Transaction"}
                         </p>
 
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          {account.official_name || "Plaid-linked account"}
-                        </p>
-
-                        {account.institution_name ? (
-                          <p className="mt-1 text-xs font-semibold text-emerald-700">
-                            {account.institution_name}
+                        {transaction.sitguru_category ? (
+                          <p className="mt-2 text-xs font-black text-emerald-700">
+                            Current: {transaction.sitguru_category}
                           </p>
                         ) : null}
                       </td>
 
-                      <td className="py-4 pr-4 font-bold text-slate-600">
-                        {account.mask ? `•••• ${account.mask}` : "—"}
+                      <td className="py-4 pr-4">
+                        <PlaidTransactionCategoryControls
+                          transactionId={transaction.transaction_id}
+                          currentCategory={transaction.sitguru_category}
+                          currentCategoryType={transaction.sitguru_category_type}
+                          currentReportSection={
+                            transaction.sitguru_report_section
+                          }
+                          currentNotes={transaction.sitguru_notes}
+                          isExcludedFromReports={
+                            transaction.is_excluded_from_reports
+                          }
+                          reviewStatus={transaction.review_status}
+                          manuallyCategorized={
+                            transaction.manually_categorized
+                          }
+                        />
                       </td>
 
                       <td className="py-4 pr-4 font-bold text-slate-600">
-                        {[account.type, account.subtype]
-                          .filter(Boolean)
-                          .join(" / ") || "—"}
+                        {transaction.merchant_name || "—"}
                       </td>
 
-                      <td className="py-4 pr-4 font-bold text-slate-600">
+                      <td className="py-4 pr-4 font-bold capitalize text-slate-600">
+                        {transaction.payment_channel || "—"}
+                      </td>
+
+                      <td className="py-4 pr-4">
+                        <span
+                          className={
+                            transaction.pending
+                              ? "inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800"
+                              : "inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800"
+                          }
+                        >
+                          {transaction.pending ? "Pending" : "Posted"}
+                        </span>
+                      </td>
+
+                      <td className="py-4 text-right font-black text-slate-950">
                         {money(
-                          account.available_balance,
-                          account.iso_currency_code || "USD",
+                          transaction.amount,
+                          transaction.iso_currency_code || "USD",
                         )}
-                      </td>
-
-                      <td className="py-4 pr-4 font-bold text-slate-600">
-                        {money(
-                          account.current_balance,
-                          account.iso_currency_code || "USD",
-                        )}
-                      </td>
-
-                      <td className="py-4 font-bold text-slate-600">
-                        {formatDate(account.created_at)}
                       </td>
                     </tr>
                   ))}
@@ -304,31 +637,13 @@ export default async function AdminPlaidFinancialsPage({
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center">
               <p className="text-lg font-black text-slate-950">
-                No Plaid accounts connected yet.
+                No transactions displayed yet.
               </p>
 
               <p className="mx-auto mt-2 max-w-lg text-sm font-semibold leading-6 text-slate-600">
-                Click “Open Plaid Secure Link” to create a Plaid Link token and
-                connect a real bank account in Plaid Development.
+                Click “Sync Transactions” to pull the latest NFCU Business
+                Checking and Business Savings transactions into SitGuru.
               </p>
-
-              <div className="mx-auto mt-5 max-w-xl rounded-2xl border border-slate-200 bg-white p-4 text-left">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-                  Development Testing Reminder
-                </p>
-
-                <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
-                  Use the ngrok URL when testing:{" "}
-                  <span className="font-black text-slate-950">
-                    https://twentieth-turban-silver.ngrok-free.dev
-                  </span>
-                </p>
-
-                <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
-                  Plaid connects and verifies the bank. Stripe handles actual
-                  payments and payouts.
-                </p>
-              </div>
             </div>
           )}
         </section>

@@ -13,6 +13,21 @@ type PlaidItemRow = {
   transactions_cursor?: string | null;
 };
 
+type PlaidAccountRow = {
+  account_id: string;
+  item_id: string;
+  name?: string | null;
+  official_name?: string | null;
+  subtype?: string | null;
+};
+
+type AutoCategory = {
+  sitguru_category: string;
+  sitguru_category_type: string;
+  sitguru_report_section: string;
+  is_excluded_from_reports: boolean;
+};
+
 function getErrorMessage(error: unknown) {
   if (
     typeof error === "object" &&
@@ -35,6 +50,164 @@ function getErrorMessage(error: unknown) {
 function asDateString(value?: string | null) {
   if (!value) return null;
   return value;
+}
+
+function isBusinessCheckingOrSavings(account: PlaidAccountRow) {
+  const name = `${account.name || ""} ${account.official_name || ""}`.toLowerCase();
+  const subtype = String(account.subtype || "").toLowerCase();
+
+  return (subtype === "checking" || subtype === "savings") && name.includes("business");
+}
+
+function autoCategorizeTransaction(transaction: {
+  name?: string | null;
+  merchant_name?: string | null;
+  amount?: number | null;
+}): AutoCategory {
+  const text = `${transaction.name || ""} ${transaction.merchant_name || ""}`.toLowerCase();
+  const amount = Number(transaction.amount || 0);
+
+  if (text.includes("transfer from savings") || text.includes("transfer to checking")) {
+    return {
+      sitguru_category: "Transfer Between Accounts",
+      sitguru_category_type: "transfer",
+      sitguru_report_section: "Transfers",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  if (text.includes("stripe")) {
+    return {
+      sitguru_category: "Stripe Deposit",
+      sitguru_category_type: "income",
+      sitguru_report_section: "Revenue",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  if (text.includes("apple")) {
+    return {
+      sitguru_category: "Software / SaaS",
+      sitguru_category_type: "expense",
+      sitguru_report_section: "Operating Expenses",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  if (
+    text.includes("grok") ||
+    text.includes("xai") ||
+    text.includes("ngrok") ||
+    text.includes("supabase") ||
+    text.includes("vercel") ||
+    text.includes("twilio") ||
+    text.includes("google")
+  ) {
+    return {
+      sitguru_category: "Software / SaaS",
+      sitguru_category_type: "expense",
+      sitguru_report_section: "Operating Expenses",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  if (
+    text.includes("meta") ||
+    text.includes("facebook") ||
+    text.includes("penny") ||
+    text.includes("pennypower")
+  ) {
+    return {
+      sitguru_category: "Marketing / Advertising",
+      sitguru_category_type: "expense",
+      sitguru_report_section: "Operating Expenses",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  if (text.includes("checkr")) {
+    return {
+      sitguru_category: "Legal / Professional",
+      sitguru_category_type: "expense",
+      sitguru_report_section: "Operating Expenses",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  if (text.includes("dfas")) {
+    return {
+      sitguru_category: "Owner Contribution",
+      sitguru_category_type: "owner_equity",
+      sitguru_report_section: "Owner Equity",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  if (text.includes("refund")) {
+    return {
+      sitguru_category: "Refunds",
+      sitguru_category_type: "expense",
+      sitguru_report_section: "Refunds",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  if (amount < 0) {
+    return {
+      sitguru_category: "Other Income",
+      sitguru_category_type: "income",
+      sitguru_report_section: "Revenue",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  if (amount > 0) {
+    return {
+      sitguru_category: "Uncategorized",
+      sitguru_category_type: "expense",
+      sitguru_report_section: "Needs Review",
+      is_excluded_from_reports: false,
+    };
+  }
+
+  return {
+    sitguru_category: "Uncategorized",
+    sitguru_category_type: "uncategorized",
+    sitguru_report_section: "Needs Review",
+    is_excluded_from_reports: false,
+  };
+}
+
+async function applyAutoCategory({
+  userId,
+  transactionId,
+  category,
+}: {
+  userId: string;
+  transactionId: string;
+  category: AutoCategory;
+}) {
+  const { error } = await supabaseAdmin
+    .from("admin_plaid_transactions")
+    .update({
+      sitguru_category: category.sitguru_category,
+      sitguru_category_type: category.sitguru_category_type,
+      sitguru_report_section: category.sitguru_report_section,
+      is_excluded_from_reports: category.is_excluded_from_reports,
+      review_status:
+        category.sitguru_category === "Uncategorized"
+          ? "needs_review"
+          : "auto_categorized",
+      categorized_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .eq("transaction_id", transactionId)
+    .eq("manually_categorized", false);
+
+  if (error) {
+    console.error("Plaid auto-category update error:", error);
+  }
 }
 
 async function requireAdminUser() {
@@ -135,9 +308,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const itemIds = items.map((item) => item.item_id);
+
+    const { data: accountRows, error: accountError } = await supabaseAdmin
+      .from("admin_plaid_accounts")
+      .select("account_id, item_id, name, official_name, subtype")
+      .eq("user_id", adminCheck.user.id)
+      .in("item_id", itemIds);
+
+    if (accountError) {
+      console.error("Plaid business account lookup error:", accountError);
+
+      return NextResponse.json(
+        { error: "Unable to load business checking/savings accounts." },
+        { status: 500 },
+      );
+    }
+
+    const businessAccounts = ((accountRows || []) as PlaidAccountRow[]).filter(
+      isBusinessCheckingOrSavings,
+    );
+
+    const allowedAccountIds = new Set(
+      businessAccounts.map((account) => account.account_id),
+    );
+
+    if (!allowedAccountIds.size) {
+      return NextResponse.json(
+        {
+          error:
+            "No Business Checking or Business Savings accounts are saved for this Plaid environment.",
+        },
+        { status: 404 },
+      );
+    }
+
     let totalAdded = 0;
     let totalModified = 0;
     let totalRemoved = 0;
+    let skippedTransactions = 0;
+    let autoCategorized = 0;
     const syncedItems: string[] = [];
 
     for (const item of items) {
@@ -159,6 +369,11 @@ export async function POST(request: NextRequest) {
         const removed = syncResponse.data.removed || [];
 
         for (const transaction of added) {
+          if (!allowedAccountIds.has(transaction.account_id)) {
+            skippedTransactions += 1;
+            continue;
+          }
+
           const { error: insertError } = await supabaseAdmin
             .from("admin_plaid_transactions")
             .upsert(
@@ -192,10 +407,24 @@ export async function POST(request: NextRequest) {
 
           if (insertError) {
             console.error("Plaid transaction insert error:", insertError);
+          } else {
+            const category = autoCategorizeTransaction(transaction);
+            await applyAutoCategory({
+              userId: item.user_id,
+              transactionId: transaction.transaction_id,
+              category,
+            });
+            autoCategorized += 1;
+            totalAdded += 1;
           }
         }
 
         for (const transaction of modified) {
+          if (!allowedAccountIds.has(transaction.account_id)) {
+            skippedTransactions += 1;
+            continue;
+          }
+
           const { error: updateError } = await supabaseAdmin
             .from("admin_plaid_transactions")
             .upsert(
@@ -229,6 +458,15 @@ export async function POST(request: NextRequest) {
 
           if (updateError) {
             console.error("Plaid transaction update error:", updateError);
+          } else {
+            const category = autoCategorizeTransaction(transaction);
+            await applyAutoCategory({
+              userId: item.user_id,
+              transactionId: transaction.transaction_id,
+              category,
+            });
+            autoCategorized += 1;
+            totalModified += 1;
           }
         }
 
@@ -243,12 +481,10 @@ export async function POST(request: NextRequest) {
 
           if (removeError) {
             console.error("Plaid transaction remove error:", removeError);
+          } else {
+            totalRemoved += 1;
           }
         }
-
-        totalAdded += added.length;
-        totalModified += modified.length;
-        totalRemoved += removed.length;
 
         cursor = syncResponse.data.next_cursor;
         hasMore = Boolean(syncResponse.data.has_more);
@@ -278,13 +514,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      message: "Plaid transactions synced successfully.",
+      message:
+        "Business checking/savings transactions synced and auto-categorized successfully.",
       plaid_environment: currentPlaidEnvironment,
       items_synced: syncedItems.length,
+      business_accounts_synced: allowedAccountIds.size,
       item_ids: syncedItems,
       added: totalAdded,
       modified: totalModified,
       removed: totalRemoved,
+      auto_categorized: autoCategorized,
+      skipped_non_business_transactions: skippedTransactions,
     });
   } catch (error) {
     const message = getErrorMessage(error);

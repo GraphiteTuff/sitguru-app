@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["twentieth-turban-silver.ngrok-free.dev"],
+
   experimental: {
     serverActions: {
       bodySizeLimit: "6mb",
-      allowedOrigins: ["twentieth-turban-silver.ngrok-free.dev"],
     },
   },
 
