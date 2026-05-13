@@ -11,6 +11,21 @@ type SafeQueryResponse = {
   error: unknown;
 };
 
+type PeriodKey =
+  | "today"
+  | "weekly"
+  | "monthly"
+  | "quarterly"
+  | "yearly"
+  | "annual"
+  | "all";
+
+type AdminGeneralLedgerPageProps = {
+  searchParams?: Promise<{
+    period?: string;
+  }>;
+};
+
 type LedgerSource =
   | "financial_ledger_entries"
   | "trust_safety_financial_events"
@@ -20,6 +35,9 @@ type LedgerSource =
   | "stripe_transactions"
   | "stripe_balance_transactions"
   | "bank_transactions"
+  | "admin_plaid_transactions"
+  | "cash_flow_lines"
+  | "financial_statement_lines"
   | "payments"
   | "payouts"
   | "commissions"
@@ -38,9 +56,14 @@ type LedgerEntry = {
   debit: number;
   credit: number;
   amount: number;
+  cashImpact: number;
+  pnlImpact: number;
   status: string;
+  bankStatus: string;
+  reviewStatus: string;
   reconciliationStatus: string;
   taxTreatment: string;
+  categoryType: string;
 };
 
 type AdminIdentity = {
@@ -48,6 +71,63 @@ type AdminIdentity = {
   email: string;
   role: string;
   canAccessFinancials: boolean;
+};
+
+type PeriodWindow = {
+  key: PeriodKey;
+  label: string;
+  comparisonLabel: string;
+  start: Date | null;
+  end: Date | null;
+  previousStart: Date | null;
+  previousEnd: Date | null;
+};
+
+type LedgerTotals = {
+  totalDebits: number;
+  totalCredits: number;
+  difference: number;
+  isBalanced: boolean;
+  needsReview: number;
+  rowCount: number;
+  cashIn: number;
+  cashOut: number;
+  netCashImpact: number;
+  pnlIncome: number;
+  pnlExpenses: number;
+  pnlNet: number;
+  pendingRows: number;
+  postedRows: number;
+  manualRows: number;
+  plaidRows: number;
+  trustSafetyRows: number;
+  trustSafetyDebits: number;
+  trustSafetyCredits: number;
+  trustSafetyNet: number;
+};
+
+type SourceCount = {
+  source: LedgerSource;
+  label: string;
+  count: number;
+};
+
+type AccountSummary = {
+  account: string;
+  debit: number;
+  credit: number;
+  net: number;
+  count: number;
+};
+
+type GeneralLedgerData = {
+  entries: LedgerEntry[];
+  sourceCounts: SourceCount[];
+  accountSummary: AccountSummary[];
+  trustSafetyEntries: LedgerEntry[];
+  period: PeriodWindow;
+  previousTotals: LedgerTotals;
+  totals: LedgerTotals;
 };
 
 const FINANCE_ROLES = [
@@ -60,6 +140,16 @@ const FINANCE_ROLES = [
   "bookkeeper",
 ];
 
+const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "weekly", label: "This Week" },
+  { key: "monthly", label: "This Month" },
+  { key: "quarterly", label: "This Quarter" },
+  { key: "yearly", label: "This Year" },
+  { key: "annual", label: "Annual" },
+  { key: "all", label: "All Time" },
+];
+
 const SOURCE_TABLES: LedgerSource[] = [
   "financial_ledger_entries",
   "trust_safety_financial_events",
@@ -69,6 +159,9 @@ const SOURCE_TABLES: LedgerSource[] = [
   "stripe_transactions",
   "stripe_balance_transactions",
   "bank_transactions",
+  "admin_plaid_transactions",
+  "cash_flow_lines",
+  "financial_statement_lines",
   "payments",
   "payouts",
   "commissions",
@@ -113,6 +206,7 @@ function getOptionalBoolean(value: unknown) {
 
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
+
     if (["true", "yes", "1"].includes(normalized)) return true;
     if (["false", "no", "0"].includes(normalized)) return false;
   }
@@ -129,6 +223,17 @@ function money(value: number) {
   return value < 0 ? `(${formatted})` : formatted;
 }
 
+function formatSignedMoney(value: number) {
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${money(value)}`;
+}
+
+function formatSignedPercent(value: number) {
+  if (!Number.isFinite(value)) return "0.0%";
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toFixed(1)}%`;
+}
+
 function dateLabel(value: string) {
   if (!value) return "No date";
 
@@ -143,8 +248,196 @@ function dateLabel(value: string) {
   }).format(parsed);
 }
 
+function startOfDay(value: Date) {
+  const next = new Date(value);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function endOfDay(value: Date) {
+  const next = new Date(value);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function addDays(value: Date, days: number) {
+  const next = new Date(value);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function addMonths(value: Date, months: number) {
+  const next = new Date(value);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+function addYears(value: Date, years: number) {
+  const next = new Date(value);
+  next.setFullYear(next.getFullYear() + years);
+  return next;
+}
+
+function getPeriodKey(value?: string): PeriodKey {
+  const normalized = String(value || "monthly").toLowerCase();
+
+  if (
+    normalized === "today" ||
+    normalized === "weekly" ||
+    normalized === "monthly" ||
+    normalized === "quarterly" ||
+    normalized === "yearly" ||
+    normalized === "annual" ||
+    normalized === "all"
+  ) {
+    return normalized;
+  }
+
+  return "monthly";
+}
+
+function getPeriodWindow(period: PeriodKey): PeriodWindow {
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const todayEnd = endOfDay(now);
+
+  if (period === "today") {
+    const previousStart = addDays(todayStart, -1);
+    const previousEnd = endOfDay(previousStart);
+
+    return {
+      key: period,
+      label: "Today",
+      comparisonLabel: "vs yesterday",
+      start: todayStart,
+      end: todayEnd,
+      previousStart,
+      previousEnd,
+    };
+  }
+
+  if (period === "weekly") {
+    const day = todayStart.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const start = addDays(todayStart, mondayOffset);
+    const end = todayEnd;
+    const previousStart = addDays(start, -7);
+    const previousEnd = endOfDay(addDays(start, -1));
+
+    return {
+      key: period,
+      label: "This Week",
+      comparisonLabel: "vs previous week",
+      start,
+      end,
+      previousStart,
+      previousEnd,
+    };
+  }
+
+  if (period === "monthly") {
+    const start = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+    const end = todayEnd;
+    const previousStart = addMonths(start, -1);
+    const previousEnd = endOfDay(addDays(start, -1));
+
+    return {
+      key: period,
+      label: "This Month",
+      comparisonLabel: "vs previous month",
+      start,
+      end,
+      previousStart,
+      previousEnd,
+    };
+  }
+
+  if (period === "quarterly") {
+    const quarterStartMonth = Math.floor(todayStart.getMonth() / 3) * 3;
+    const start = new Date(todayStart.getFullYear(), quarterStartMonth, 1);
+    const end = todayEnd;
+    const previousStart = addMonths(start, -3);
+    const previousEnd = endOfDay(addDays(start, -1));
+
+    return {
+      key: period,
+      label: "This Quarter",
+      comparisonLabel: "vs previous quarter",
+      start,
+      end,
+      previousStart,
+      previousEnd,
+    };
+  }
+
+  if (period === "yearly" || period === "annual") {
+    const start = new Date(todayStart.getFullYear(), 0, 1);
+    const end = todayEnd;
+    const previousStart = addYears(start, -1);
+    const previousEnd = endOfDay(addDays(start, -1));
+
+    return {
+      key: period,
+      label: period === "annual" ? "Annual" : "This Year",
+      comparisonLabel: "vs previous year",
+      start,
+      end,
+      previousStart,
+      previousEnd,
+    };
+  }
+
+  return {
+    key: "all",
+    label: "All Time",
+    comparisonLabel: "all available records",
+    start: null,
+    end: null,
+    previousStart: null,
+    previousEnd: null,
+  };
+}
+
+function isWithinWindow(dateValue: string | null | undefined, window: PeriodWindow) {
+  if (!window.start || !window.end) return true;
+  if (!dateValue) return false;
+
+  const parsed = new Date(dateValue);
+
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  return parsed >= window.start && parsed <= window.end;
+}
+
+function isWithinPreviousWindow(
+  dateValue: string | null | undefined,
+  window: PeriodWindow,
+) {
+  if (!window.previousStart || !window.previousEnd) return false;
+  if (!dateValue) return false;
+
+  const parsed = new Date(dateValue);
+
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  return parsed >= window.previousStart && parsed <= window.previousEnd;
+}
+
+function getChangePercent(current: number, previous: number) {
+  if (previous === 0 && current === 0) return 0;
+  if (previous === 0) return 100;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function getMetricChange(current: number, previous: number) {
+  const diff = current - previous;
+  const pct = getChangePercent(current, previous);
+  return `${formatSignedMoney(diff)} / ${formatSignedPercent(pct)}`;
+}
+
 function getDateValue(row: AnyRow) {
   return (
+    asTrimmedString(row.date) ||
     asTrimmedString(row.occurred_at) ||
     asTrimmedString(row.transaction_date) ||
     asTrimmedString(row.posted_at) ||
@@ -162,6 +455,7 @@ function getId(row: AnyRow, source: LedgerSource, index: number) {
   return (
     asTrimmedString(row.id) ||
     asTrimmedString(row.transaction_id) ||
+    asTrimmedString(row.plaid_transaction_id) ||
     asTrimmedString(row.payment_intent_id) ||
     asTrimmedString(row.stripe_id) ||
     asTrimmedString(row.stripe_payment_intent_id) ||
@@ -180,7 +474,7 @@ function getText(row: AnyRow, keys: string[]) {
 }
 
 function getMetadataText(row: AnyRow) {
-  const metadata = row.metadata;
+  const metadata = row.metadata || row.raw;
 
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return "";
@@ -192,13 +486,19 @@ function getMetadataText(row: AnyRow) {
     asTrimmedString(meta.description) ||
     asTrimmedString(meta.memo) ||
     asTrimmedString(meta.note) ||
+    asTrimmedString(meta.name) ||
+    asTrimmedString(meta.merchant_name) ||
     asTrimmedString(meta.payment_option) ||
     asTrimmedString(meta.action) ||
     ""
   );
 }
 
-function getStatus(row: AnyRow) {
+function getStatus(row: AnyRow, source: LedgerSource) {
+  if (source === "admin_plaid_transactions") {
+    return getOptionalBoolean(row.pending) ? "pending" : "posted";
+  }
+
   return (
     getText(row, [
       "status",
@@ -210,7 +510,35 @@ function getStatus(row: AnyRow) {
       "deduction_status",
       "management_approval_status",
       "state",
+      "review_status",
     ]) || "recorded"
+  );
+}
+
+function getBankStatus(row: AnyRow, source: LedgerSource) {
+  if (source === "admin_plaid_transactions") {
+    return getOptionalBoolean(row.pending) ? "Pending" : "Posted";
+  }
+
+  if (source === "expense_ledger" || source === "cash_flow_lines") {
+    return "Manual";
+  }
+
+  return getText(row, ["bank_status", "posting_status", "status"]) || "Recorded";
+}
+
+function getReviewStatus(row: AnyRow, source: LedgerSource) {
+  if (source === "admin_plaid_transactions") {
+    return asTrimmedString(row.review_status) || "needs_review";
+  }
+
+  if (source === "expense_ledger" || source === "cash_flow_lines") {
+    return "reviewed";
+  }
+
+  return (
+    getText(row, ["review_status", "approval_status", "management_approval_status"]) ||
+    "recorded"
   );
 }
 
@@ -224,6 +552,9 @@ function sourceLabel(source: LedgerSource) {
     stripe_transactions: "Stripe Transactions",
     stripe_balance_transactions: "Stripe Balance",
     bank_transactions: "Bank Transactions",
+    admin_plaid_transactions: "Plaid/NFCU Transactions",
+    cash_flow_lines: "Cash Flow Lines",
+    financial_statement_lines: "P&L Statement Lines",
     payments: "Payments",
     payouts: "Payouts",
     commissions: "Commissions",
@@ -243,7 +574,9 @@ function statusClasses(status: string) {
     normalized.includes("reconciled") ||
     normalized.includes("ready") ||
     normalized.includes("approved") ||
-    normalized.includes("collected")
+    normalized.includes("collected") ||
+    normalized.includes("reviewed") ||
+    normalized.includes("auto_categorized")
   ) {
     return "border-emerald-100 bg-emerald-50 text-emerald-800";
   }
@@ -347,7 +680,11 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
     ),
   ]);
 
-  const profile = profileChecks.flat().find(Boolean) || {};
+  const profile = (profileChecks.flat().find(Boolean) || {}) as Record<
+    string,
+    unknown
+  >;
+
   const role = asTrimmedString(profile.role) || "admin";
   const active =
     profile.is_active === undefined
@@ -386,15 +723,18 @@ function deriveTrustSafetyAccount(row: AnyRow, source: LedgerSource) {
       return {
         account: "Trust & Safety Receivable - Pawstep",
         quickBooksAccount: "Accounts Receivable: Trust & Safety Pawstep",
-        taxTreatment: "Installment receivable for financed Trust & Safety plan; CPA review.",
+        taxTreatment:
+          "Installment receivable for financed Trust & Safety plan; CPA review.",
       };
     }
 
     if (planKey === "book_and_bark_plan") {
       return {
         account: "Trust & Safety Receivable - Book & Bark",
-        quickBooksAccount: "Accounts Receivable: Trust & Safety Booking Deductions",
-        taxTreatment: "Booking-deduction receivable for financed Trust & Safety plan; CPA review.",
+        quickBooksAccount:
+          "Accounts Receivable: Trust & Safety Booking Deductions",
+        taxTreatment:
+          "Booking-deduction receivable for financed Trust & Safety plan; CPA review.",
       };
     }
 
@@ -408,8 +748,10 @@ function deriveTrustSafetyAccount(row: AnyRow, source: LedgerSource) {
   if (source === "booking_trust_safety_deductions") {
     return {
       account: "Trust & Safety Booking Deduction Recovery",
-      quickBooksAccount: "Accounts Receivable: Trust & Safety Booking Deductions",
-      taxTreatment: "Recovery of Book & Bark balance from completed booking payouts; CPA review.",
+      quickBooksAccount:
+        "Accounts Receivable: Trust & Safety Booking Deductions",
+      taxTreatment:
+        "Recovery of Book & Bark balance from completed booking payouts; CPA review.",
     };
   }
 
@@ -417,7 +759,8 @@ function deriveTrustSafetyAccount(row: AnyRow, source: LedgerSource) {
     return {
       account: "Checkr Vendor Costs",
       quickBooksAccount: "Cost of Services: Background Checks",
-      taxTreatment: "Vendor cost of revenue for Trust & Safety screening; CPA review.",
+      taxTreatment:
+        "Vendor cost of revenue for Trust & Safety screening; CPA review.",
     };
   }
 
@@ -457,6 +800,98 @@ function deriveTrustSafetyAccount(row: AnyRow, source: LedgerSource) {
   };
 }
 
+function derivePlaidAccount(row: AnyRow) {
+  const category = asTrimmedString(row.sitguru_category) || "Uncategorized";
+  const type = asTrimmedString(row.sitguru_category_type).toLowerCase();
+  const section = asTrimmedString(row.sitguru_report_section);
+  const text = `${category} ${type} ${section}`.toLowerCase();
+
+  if (type === "income") {
+    return {
+      account: category || "Operating Revenue",
+      quickBooksAccount: "Income: Operating Revenue",
+      taxTreatment: "Operating income; CPA review.",
+    };
+  }
+
+  if (type === "expense") {
+    return {
+      account: category || "Operating Expenses",
+      quickBooksAccount: section || "Expenses: Operating Expenses",
+      taxTreatment: "Business expense; CPA should confirm deductibility.",
+    };
+  }
+
+  if (type === "transfer") {
+    return {
+      account: "Bank Transfers",
+      quickBooksAccount: "Transfer: Business Bank Accounts",
+      taxTreatment:
+        "Balance sheet transfer between accounts; excluded from P&L.",
+    };
+  }
+
+  if (type === "owner_equity") {
+    return {
+      account: "Owner Contributions",
+      quickBooksAccount: "Equity: Owner Contributions",
+      taxTreatment: "Owner equity movement; excluded from P&L.",
+    };
+  }
+
+  if (type === "owner_draw") {
+    return {
+      account: "Owner Draws",
+      quickBooksAccount: "Equity: Owner Draws",
+      taxTreatment: "Owner draw; excluded from P&L.",
+    };
+  }
+
+  if (type === "liability") {
+    return {
+      account: category || "Liabilities",
+      quickBooksAccount: "Liabilities",
+      taxTreatment: "Liability cash movement; CPA review.",
+    };
+  }
+
+  if (type === "ignore" || text.includes("personal")) {
+    return {
+      account: "Ignored / Personal",
+      quickBooksAccount: "Excluded from Business Reports",
+      taxTreatment: "Excluded from business financial statements.",
+    };
+  }
+
+  return {
+    account: "Uncategorized Bank Activity",
+    quickBooksAccount: "Ask My Accountant",
+    taxTreatment: "Needs accounting classification.",
+  };
+}
+
+function deriveCashFlowLineAccount(row: AnyRow) {
+  const section = asTrimmedString(row.section).replaceAll("_", " ");
+  const label = asTrimmedString(row.label) || "Cash Flow Line";
+
+  return {
+    account: label,
+    quickBooksAccount: `Cash Flow: ${section || "Manual"}`,
+    taxTreatment: "Manual cash-flow line; CPA review.",
+  };
+}
+
+function deriveStatementLineAccount(row: AnyRow) {
+  const section = asTrimmedString(row.section).replaceAll("_", " ");
+  const label = asTrimmedString(row.label) || "Statement Line";
+
+  return {
+    account: label,
+    quickBooksAccount: `P&L: ${section || "Manual"}`,
+    taxTreatment: "P&L statement category mapping; CPA review.",
+  };
+}
+
 function deriveAccountFromText(text: string, source: LedgerSource, row?: AnyRow) {
   if (
     source === "trust_safety_financial_events" ||
@@ -464,6 +899,18 @@ function deriveAccountFromText(text: string, source: LedgerSource, row?: AnyRow)
     source === "booking_trust_safety_deductions"
   ) {
     return deriveTrustSafetyAccount(row || {}, source);
+  }
+
+  if (source === "admin_plaid_transactions") {
+    return derivePlaidAccount(row || {});
+  }
+
+  if (source === "cash_flow_lines") {
+    return deriveCashFlowLineAccount(row || {});
+  }
+
+  if (source === "financial_statement_lines") {
+    return deriveStatementLineAccount(row || {});
   }
 
   const normalized = text.toLowerCase();
@@ -511,7 +958,8 @@ function deriveAccountFromText(text: string, source: LedgerSource, row?: AnyRow)
   if (
     normalized.includes("partner") ||
     normalized.includes("commission") ||
-    normalized.includes("affiliate")
+    normalized.includes("affiliate") ||
+    source === "commissions"
   ) {
     return {
       account: "Partner Commissions",
@@ -524,7 +972,8 @@ function deriveAccountFromText(text: string, source: LedgerSource, row?: AnyRow)
     normalized.includes("bank") ||
     normalized.includes("checking") ||
     normalized.includes("savings") ||
-    normalized.includes("navy")
+    normalized.includes("navy") ||
+    normalized.includes("nfcu")
   ) {
     return {
       account: "Cash and Cash Equivalents",
@@ -568,7 +1017,12 @@ function amountFromTrustSafetyRow(row: AnyRow, source: LedgerSource) {
     const fee = centsToDollars(row.fee_amount_cents);
     const eventType = asTrimmedString(row.event_type).toLowerCase();
 
-    if (eventType === "stripe_fee" || eventType === "checkr_vendor_cost" || eventType === "sitguru_fronted_cost" || eventType === "refund") {
+    if (
+      eventType === "stripe_fee" ||
+      eventType === "checkr_vendor_cost" ||
+      eventType === "sitguru_fronted_cost" ||
+      eventType === "refund"
+    ) {
       return -Math.abs(net || gross || fee);
     }
 
@@ -608,6 +1062,10 @@ function amountFromRow(row: AnyRow, source: LedgerSource) {
     );
   }
 
+  if (source === "financial_statement_lines") {
+    return 0;
+  }
+
   return (
     toNumber(row.amount) ||
     toNumber(row.total_amount) ||
@@ -639,8 +1097,120 @@ function getTrustSafetyDescription(row: AnyRow, source: LedgerSource) {
 
   return (
     asTrimmedString(row.description) ||
-    `${asTrimmedString(row.plan_name) || "Trust & Safety"} ${asTrimmedString(row.event_type) || "event"}`.trim()
+    `${asTrimmedString(row.plan_name) || "Trust & Safety"} ${
+      asTrimmedString(row.event_type) || "event"
+    }`.trim()
   );
+}
+
+function getDescription(row: AnyRow, source: LedgerSource) {
+  const isTrustSafetySource =
+    source === "trust_safety_financial_events" ||
+    source === "guru_trust_safety_plan_purchases" ||
+    source === "booking_trust_safety_deductions";
+
+  if (isTrustSafetySource) {
+    return getTrustSafetyDescription(row, source);
+  }
+
+  if (source === "admin_plaid_transactions") {
+    return (
+      asTrimmedString(row.merchant_name) ||
+      asTrimmedString(row.name) ||
+      "Plaid/NFCU bank transaction"
+    );
+  }
+
+  if (source === "cash_flow_lines") {
+    return asTrimmedString(row.label) || "Cash flow line";
+  }
+
+  if (source === "financial_statement_lines") {
+    return asTrimmedString(row.label) || "P&L statement line";
+  }
+
+  return (
+    getText(row, [
+      "description",
+      "memo",
+      "name",
+      "title",
+      "vendor_name",
+      "customer_name",
+      "statement_descriptor",
+      "type",
+      "transaction_type",
+      "category",
+    ]) ||
+    getMetadataText(row) ||
+    sourceLabel(source)
+  );
+}
+
+function getCategoryType(row: AnyRow, source: LedgerSource) {
+  if (source === "admin_plaid_transactions") {
+    return asTrimmedString(row.sitguru_category_type) || "uncategorized";
+  }
+
+  if (source === "expense_ledger") return "expense";
+  if (source === "cash_flow_lines") return "manual_cash_flow_line";
+  if (source === "financial_statement_lines") return "statement_line";
+
+  return asTrimmedString(row.category_type) || asTrimmedString(row.type) || source;
+}
+
+function getCashImpact(amount: number, row: AnyRow, source: LedgerSource) {
+  if (source === "financial_statement_lines") return 0;
+
+  if (source === "admin_plaid_transactions") {
+    const type = getCategoryType(row, source).toLowerCase();
+    const absoluteAmount = Math.abs(amount);
+
+    if (type === "income" || type === "owner_equity") return absoluteAmount;
+
+    if (type === "expense" || type === "owner_draw" || type === "liability") {
+      return -absoluteAmount;
+    }
+
+    if (type === "transfer") {
+      const name = `${row.name || ""} ${row.merchant_name || ""}`.toLowerCase();
+
+      if (
+        name.includes("from savings") ||
+        name.includes("to checking") ||
+        name.includes("deposit")
+      ) {
+        return absoluteAmount;
+      }
+
+      return -absoluteAmount;
+    }
+
+    return -amount;
+  }
+
+  if (source === "expense_ledger" || source === "payouts" || source === "commissions") {
+    return -Math.abs(amount);
+  }
+
+  return amount;
+}
+
+function getPnlImpact(amount: number, row: AnyRow, source: LedgerSource) {
+  if (source === "admin_plaid_transactions") {
+    const type = getCategoryType(row, source).toLowerCase();
+    const absoluteAmount = Math.abs(amount);
+
+    if (type === "income") return absoluteAmount;
+    if (type === "expense") return -absoluteAmount;
+
+    return 0;
+  }
+
+  if (source === "expense_ledger") return -Math.abs(amount);
+  if (source === "financial_statement_lines" || source === "cash_flow_lines") return 0;
+
+  return amount;
 }
 
 function normalizeLedgerEntry(
@@ -652,42 +1222,23 @@ function normalizeLedgerEntry(
   const explicitDebit = toNumber(row.debit) || toNumber(row.debit_amount);
   const explicitCredit = toNumber(row.credit) || toNumber(row.credit_amount);
   const amount = amountFromRow(row, source);
-  const isTrustSafetySource =
-    source === "trust_safety_financial_events" ||
-    source === "guru_trust_safety_plan_purchases" ||
-    source === "booking_trust_safety_deductions";
-
-  const description = isTrustSafetySource
-    ? getTrustSafetyDescription(row, source)
-    : getText(row, [
-        "description",
-        "memo",
-        "name",
-        "title",
-        "vendor_name",
-        "customer_name",
-        "statement_descriptor",
-        "type",
-        "transaction_type",
-        "category",
-      ]) ||
-      getMetadataText(row) ||
-      sourceLabel(source);
-
-  const accountInfo = isTrustSafetySource
-    ? deriveTrustSafetyAccount(row, source)
-    : asTrimmedString(row.account_name) ||
-        asTrimmedString(row.account) ||
-        asTrimmedString(row.category)
+  const description = getDescription(row, source);
+  const accountInfo =
+    asTrimmedString(row.account_name) ||
+    asTrimmedString(row.account) ||
+    asTrimmedString(row.quickbooks_account) ||
+    asTrimmedString(row.qb_account)
       ? {
           account:
             asTrimmedString(row.account_name) ||
             asTrimmedString(row.account) ||
-            asTrimmedString(row.category),
+            asTrimmedString(row.category) ||
+            "Ledger Account",
           quickBooksAccount:
             asTrimmedString(row.quickbooks_account) ||
             asTrimmedString(row.qb_account) ||
             asTrimmedString(row.account_name) ||
+            asTrimmedString(row.account) ||
             "Ask My Accountant",
           taxTreatment:
             asTrimmedString(row.tax_treatment) ||
@@ -703,6 +1254,7 @@ function normalizeLedgerEntry(
         : amount >= 0
           ? amount
           : 0;
+
   const credit =
     explicitCredit > 0
       ? explicitCredit
@@ -711,6 +1263,13 @@ function normalizeLedgerEntry(
         : amount < 0
           ? Math.abs(amount)
           : 0;
+
+  const cashImpact = getCashImpact(amount, row, source);
+  const pnlImpact = getPnlImpact(amount, row, source);
+  const status = getStatus(row, source);
+  const bankStatus = getBankStatus(row, source);
+  const reviewStatus = getReviewStatus(row, source);
+  const categoryType = getCategoryType(row, source);
 
   return {
     id: `${source}-${sourceId}-${index}`,
@@ -722,21 +1281,34 @@ function normalizeLedgerEntry(
     quickBooksAccount: accountInfo.quickBooksAccount,
     description,
     memo:
-      getText(row, ["notes", "note", "memo", "metadata_summary"]) ||
+      getText(row, [
+        "notes",
+        "note",
+        "memo",
+        "metadata_summary",
+        "sitguru_notes",
+        "official_name",
+      ]) ||
       getMetadataText(row) ||
       "Imported from SitGuru financial data source.",
     debit,
     credit,
     amount: debit - credit,
-    status: getStatus(row),
+    cashImpact,
+    pnlImpact,
+    status,
+    bankStatus,
+    reviewStatus,
     reconciliationStatus:
       getText(row, ["reconciliation_status", "reconciled_status"]) ||
       (source === "bank_transactions" ||
+      source === "admin_plaid_transactions" ||
       source === "stripe_balance_transactions" ||
       source === "trust_safety_financial_events"
         ? "Needs reconciliation review"
         : "Not reconciled"),
     taxTreatment: accountInfo.taxTreatment,
+    categoryType,
   };
 }
 
@@ -746,36 +1318,20 @@ async function getSourceRows(source: LedgerSource) {
       .from(source)
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(750),
+      .limit(1000),
     source,
   );
 }
 
-async function getGeneralLedgerData() {
-  const sourceResults = await Promise.all(
-    SOURCE_TABLES.map(async (source) => ({
-      source,
-      rows: await getSourceRows(source),
-    })),
-  );
-
-  const entries = sourceResults
-    .flatMap(({ source, rows }) =>
-      rows.map((row, index) => normalizeLedgerEntry(row, source, index)),
-    )
-    .sort((a, b) => {
-      const aTime = new Date(a.date || "").getTime() || 0;
-      const bTime = new Date(b.date || "").getTime() || 0;
-      return bTime - aTime;
-    });
-
+function calculateTotals(entries: LedgerEntry[]): LedgerTotals {
   const totalDebits = entries.reduce((sum, entry) => sum + entry.debit, 0);
   const totalCredits = entries.reduce((sum, entry) => sum + entry.credit, 0);
   const difference = totalDebits - totalCredits;
-  const trustSafetyEntries = entries.filter((entry) =>
-    entry.source.includes("trust_safety") ||
-    entry.account.toLowerCase().includes("trust & safety") ||
-    entry.account.toLowerCase().includes("checkr"),
+  const trustSafetyEntries = entries.filter(
+    (entry) =>
+      entry.source.includes("trust_safety") ||
+      entry.account.toLowerCase().includes("trust & safety") ||
+      entry.account.toLowerCase().includes("checkr"),
   );
   const trustSafetyDebits = trustSafetyEntries.reduce(
     (sum, entry) => sum + entry.debit,
@@ -786,19 +1342,78 @@ async function getGeneralLedgerData() {
     0,
   );
 
-  const sourceCounts = sourceResults.map(({ source, rows }) => ({
-    source,
-    label: sourceLabel(source),
-    count: rows.length,
-  }));
+  const cashIn = entries
+    .filter((entry) => entry.cashImpact > 0)
+    .reduce((sum, entry) => sum + entry.cashImpact, 0);
+
+  const cashOut = entries
+    .filter((entry) => entry.cashImpact < 0)
+    .reduce((sum, entry) => sum + Math.abs(entry.cashImpact), 0);
+
+  const pnlIncome = entries
+    .filter((entry) => entry.pnlImpact > 0)
+    .reduce((sum, entry) => sum + entry.pnlImpact, 0);
+
+  const pnlExpenses = entries
+    .filter((entry) => entry.pnlImpact < 0)
+    .reduce((sum, entry) => sum + Math.abs(entry.pnlImpact), 0);
+
+  const pendingRows = entries.filter((entry) =>
+    `${entry.status} ${entry.bankStatus} ${entry.reviewStatus}`
+      .toLowerCase()
+      .includes("pending"),
+  ).length;
+
+  const postedRows = entries.filter((entry) =>
+    `${entry.status} ${entry.bankStatus}`.toLowerCase().includes("posted"),
+  ).length;
+
+  const manualRows = entries.filter(
+    (entry) =>
+      entry.source === "manual" ||
+      entry.source === "expense_ledger" ||
+      entry.source === "cash_flow_lines",
+  ).length;
+
+  const plaidRows = entries.filter(
+    (entry) => entry.source === "admin_plaid_transactions",
+  ).length;
+
   const needsReview = entries.filter(
     (entry) =>
       entry.account === "Uncategorized Ledger Activity" ||
+      entry.account === "Uncategorized Bank Activity" ||
       entry.quickBooksAccount === "Ask My Accountant" ||
-      entry.reconciliationStatus.toLowerCase().includes("needs"),
+      entry.reconciliationStatus.toLowerCase().includes("needs") ||
+      entry.reviewStatus.toLowerCase().includes("needs_review"),
   ).length;
 
-  const accountSummary = Array.from(
+  return {
+    totalDebits,
+    totalCredits,
+    difference,
+    isBalanced: Math.abs(difference) < 0.01,
+    needsReview,
+    rowCount: entries.length,
+    cashIn,
+    cashOut,
+    netCashImpact: cashIn - cashOut,
+    pnlIncome,
+    pnlExpenses,
+    pnlNet: pnlIncome - pnlExpenses,
+    pendingRows,
+    postedRows,
+    manualRows,
+    plaidRows,
+    trustSafetyRows: trustSafetyEntries.length,
+    trustSafetyDebits,
+    trustSafetyCredits,
+    trustSafetyNet: trustSafetyDebits - trustSafetyCredits,
+  };
+}
+
+function buildAccountSummary(entries: LedgerEntry[]) {
+  return Array.from(
     entries.reduce<Map<string, { debit: number; credit: number; count: number }>>(
       (map, entry) => {
         const current = map.get(entry.account) || {
@@ -823,25 +1438,82 @@ async function getGeneralLedgerData() {
       net: values.debit - values.credit,
     }))
     .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+}
+
+async function getGeneralLedgerData(periodKey: PeriodKey): Promise<GeneralLedgerData> {
+  const period = getPeriodWindow(periodKey);
+
+  const sourceResults = await Promise.all(
+    SOURCE_TABLES.map(async (source) => ({
+      source,
+      rows: await getSourceRows(source),
+    })),
+  );
+
+  const allEntries = sourceResults
+    .flatMap(({ source, rows }) =>
+      rows.map((row, index) => normalizeLedgerEntry(row, source, index)),
+    )
+    .filter((entry) => Boolean(entry.id))
+    .sort((a, b) => {
+      const aTime = new Date(a.date || "").getTime() || 0;
+      const bTime = new Date(b.date || "").getTime() || 0;
+      return bTime - aTime;
+    });
+
+  const entries = allEntries.filter((entry) => isWithinWindow(entry.date, period));
+
+  const previousEntries = allEntries.filter((entry) =>
+    isWithinPreviousWindow(entry.date, period),
+  );
+
+  const totals = calculateTotals(entries);
+  const previousTotals = calculateTotals(previousEntries);
+
+  const sourceCounts = sourceResults.map(({ source, rows }) => ({
+    source,
+    label: sourceLabel(source),
+    count: rows.length,
+  }));
+
+  const accountSummary = buildAccountSummary(entries);
+
+  const trustSafetyEntries = entries.filter(
+    (entry) =>
+      entry.source.includes("trust_safety") ||
+      entry.account.toLowerCase().includes("trust & safety") ||
+      entry.account.toLowerCase().includes("checkr"),
+  );
 
   return {
     entries,
     sourceCounts,
     accountSummary,
     trustSafetyEntries,
-    totals: {
-      totalDebits,
-      totalCredits,
-      difference,
-      isBalanced: Math.abs(difference) < 0.01,
-      needsReview,
-      rowCount: entries.length,
-      trustSafetyRows: trustSafetyEntries.length,
-      trustSafetyDebits,
-      trustSafetyCredits,
-      trustSafetyNet: trustSafetyDebits - trustSafetyCredits,
-    },
+    period,
+    previousTotals,
+    totals,
   };
+}
+
+function PeriodSelector({ currentPeriod }: { currentPeriod: PeriodKey }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {PERIOD_OPTIONS.map((period) => (
+        <Link
+          key={period.key}
+          href={`/admin/financials/general-ledger?period=${period.key}`}
+          className={
+            currentPeriod === period.key
+              ? "rounded-full bg-emerald-700 px-4 py-2 text-xs font-black uppercase tracking-wide text-white shadow-sm"
+              : "rounded-full border border-emerald-100 bg-white px-4 py-2 text-xs font-black uppercase tracking-wide text-emerald-800 transition hover:bg-emerald-50"
+          }
+        >
+          {period.label}
+        </Link>
+      ))}
+    </div>
+  );
 }
 
 function SectionHeader({
@@ -874,12 +1546,16 @@ function StatCard({
   label,
   value,
   detail,
+  change,
+  comparisonLabel,
   tone = "emerald",
 }: {
   label: string;
   value: string;
   detail: string;
-  tone?: "emerald" | "blue" | "amber" | "rose" | "slate";
+  change?: string;
+  comparisonLabel?: string;
+  tone?: "emerald" | "blue" | "amber" | "rose" | "slate" | "violet";
 }) {
   const tones = {
     emerald: "border-emerald-100 bg-emerald-50",
@@ -887,6 +1563,7 @@ function StatCard({
     amber: "border-amber-100 bg-amber-50",
     rose: "border-rose-100 bg-rose-50",
     slate: "border-slate-100 bg-slate-50",
+    violet: "border-violet-100 bg-violet-50",
   };
 
   return (
@@ -897,6 +1574,14 @@ function StatCard({
       <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
         {value}
       </p>
+      {change ? (
+        <p className="mt-2 text-sm font-black text-slate-950">{change}</p>
+      ) : null}
+      {comparisonLabel ? (
+        <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+          {comparisonLabel}
+        </p>
+      ) : null}
       <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
         {detail}
       </p>
@@ -908,12 +1593,12 @@ function EmptyLedgerState() {
   return (
     <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
       <p className="text-lg font-black text-slate-950">
-        No ledger entries loaded yet.
+        No ledger entries loaded for this period yet.
       </p>
       <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-        Connect Stripe, Navy Federal bank activity, Trust & Safety records,
-        payment records, payout records, commissions, expenses, or financial
-        ledger entries to populate the General Ledger.
+        Connect Stripe, NFCU/Plaid bank activity, Trust & Safety records,
+        payment records, payout records, commissions, expenses, or manual ledger
+        rows to populate the General Ledger.
       </p>
     </div>
   );
@@ -923,98 +1608,386 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
   if (!entries.length) return <EmptyLedgerState />;
 
   return (
-    <div className="overflow-x-auto rounded-[1.5rem] border border-slate-100">
-      <table className="min-w-[1200px] divide-y divide-slate-100">
-        <thead className="bg-slate-50">
-          <tr>
-            {[
-              "Date",
-              "Account",
-              "Description",
-              "Source",
-              "Status",
-              "Debit",
-              "Credit",
-              "QuickBooks",
-              "Reconciliation",
-            ].map((heading) => (
-              <th
-                key={heading}
-                className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-[0.16em] text-slate-500"
-              >
-                {heading}
-              </th>
-            ))}
-          </tr>
-        </thead>
-
-        <tbody className="divide-y divide-slate-100 bg-white">
-          {entries.slice(0, 175).map((entry) => (
-            <tr key={entry.id} className="align-top">
-              <td className="whitespace-nowrap px-4 py-4 text-sm font-bold text-slate-700">
-                {dateLabel(entry.date)}
-              </td>
-              <td className="px-4 py-4">
-                <p className="text-sm font-black text-slate-950">
-                  {entry.account}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                  {entry.taxTreatment}
-                </p>
-              </td>
-              <td className="max-w-[280px] px-4 py-4">
-                <p className="text-sm font-bold leading-6 text-slate-700">
-                  {entry.description}
-                </p>
-                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                  {entry.memo}
-                </p>
-              </td>
-              <td className="px-4 py-4">
-                <p className="text-sm font-black text-slate-950">
-                  {entry.sourceLabel}
-                </p>
-                <p className="mt-1 max-w-[180px] truncate text-xs font-semibold text-slate-500">
-                  {entry.sourceId}
-                </p>
-              </td>
-              <td className="px-4 py-4">
-                <span
-                  className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClasses(
-                    entry.status,
-                  )}`}
+    <div className="w-full max-w-full overflow-hidden rounded-[1.5rem] border border-slate-100">
+      <div className="w-full overflow-x-auto">
+        <table className="min-w-[1500px] divide-y divide-slate-100">
+          <thead className="bg-slate-50">
+            <tr>
+              {[
+                "Date",
+                "Account",
+                "Description",
+                "Source",
+                "Status",
+                "Bank Status",
+                "Debit",
+                "Credit",
+                "Cash Impact",
+                "P&L Impact",
+                "QuickBooks",
+                "Reconciliation",
+              ].map((heading) => (
+                <th
+                  key={heading}
+                  className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-[0.16em] text-slate-500"
                 >
-                  {entry.status}
-                </span>
-              </td>
-              <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-black text-emerald-800">
-                {entry.debit > 0 ? money(entry.debit) : "—"}
-              </td>
-              <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-black text-rose-800">
-                {entry.credit > 0 ? money(entry.credit) : "—"}
-              </td>
-              <td className="px-4 py-4 text-sm font-bold text-slate-700">
-                {entry.quickBooksAccount}
-              </td>
-              <td className="max-w-[240px] px-4 py-4 text-sm font-semibold leading-6 text-slate-600">
-                {entry.reconciliationStatus}
-              </td>
+                  {heading}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {entries.slice(0, 225).map((entry) => (
+              <tr key={entry.id} className="align-top transition hover:bg-slate-50">
+                <td className="whitespace-nowrap px-4 py-4 text-sm font-bold text-slate-700">
+                  {dateLabel(entry.date)}
+                </td>
+                <td className="px-4 py-4">
+                  <p className="text-sm font-black text-slate-950">
+                    {entry.account}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    {entry.taxTreatment}
+                  </p>
+                </td>
+                <td className="max-w-[300px] px-4 py-4">
+                  <p className="text-sm font-bold leading-6 text-slate-700">
+                    {entry.description}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                    {entry.memo}
+                  </p>
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                    {entry.categoryType.replaceAll("_", " ")}
+                  </p>
+                </td>
+                <td className="px-4 py-4">
+                  <p className="text-sm font-black text-slate-950">
+                    {entry.sourceLabel}
+                  </p>
+                  <p className="mt-1 max-w-[180px] truncate text-xs font-semibold text-slate-500">
+                    {entry.sourceId}
+                  </p>
+                </td>
+                <td className="px-4 py-4">
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClasses(
+                      entry.status,
+                    )}`}
+                  >
+                    {entry.status}
+                  </span>
+                  <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                    {entry.reviewStatus}
+                  </p>
+                </td>
+                <td className="px-4 py-4">
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClasses(
+                      entry.bankStatus,
+                    )}`}
+                  >
+                    {entry.bankStatus}
+                  </span>
+                </td>
+                <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-black text-emerald-800">
+                  {entry.debit > 0 ? money(entry.debit) : "—"}
+                </td>
+                <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-black text-rose-800">
+                  {entry.credit > 0 ? money(entry.credit) : "—"}
+                </td>
+                <td
+                  className={`whitespace-nowrap px-4 py-4 text-right text-sm font-black ${
+                    entry.cashImpact < 0 ? "text-rose-700" : "text-slate-950"
+                  }`}
+                >
+                  {entry.cashImpact !== 0 ? money(entry.cashImpact) : "—"}
+                </td>
+                <td
+                  className={`whitespace-nowrap px-4 py-4 text-right text-sm font-black ${
+                    entry.pnlImpact < 0 ? "text-rose-700" : "text-slate-950"
+                  }`}
+                >
+                  {entry.pnlImpact !== 0 ? money(entry.pnlImpact) : "—"}
+                </td>
+                <td className="px-4 py-4 text-sm font-bold text-slate-700">
+                  {entry.quickBooksAccount}
+                </td>
+                <td className="max-w-[240px] px-4 py-4 text-sm font-semibold leading-6 text-slate-600">
+                  {entry.reconciliationStatus}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-export default async function AdminGeneralLedgerPage() {
+function SourceCountPanel({ sources }: { sources: SourceCount[] }) {
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <SectionHeader
+        eyebrow="Source Coverage"
+        title="Financial data feeding the ledger"
+        description="Each source is queried safely. Missing tables are skipped instead of breaking the page."
+      />
+
+      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {sources.map((source) => (
+          <div
+            key={source.source}
+            className="rounded-2xl border border-slate-100 bg-[#fbfefd] p-4"
+          >
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+              {source.label}
+            </p>
+            <p className="mt-2 text-3xl font-black text-slate-950">
+              {source.count.toLocaleString()}
+            </p>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              {source.source}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AccountSummaryPanel({ rows }: { rows: AccountSummary[] }) {
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <SectionHeader
+        eyebrow="Account Summary"
+        title="Ledger accounts by net activity"
+        description="This groups all ledger rows by derived account name for CPA and QuickBooks review."
+      />
+
+      <div className="mt-6 w-full max-w-full overflow-hidden rounded-[1.5rem] border border-slate-100">
+        <div className="w-full overflow-x-auto">
+          <table className="min-w-[900px] text-left text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.18em]">
+                  Account
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-[0.18em]">
+                  Debits
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-[0.18em]">
+                  Credits
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-[0.18em]">
+                  Net
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-[0.18em]">
+                  Rows
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {rows.slice(0, 30).map((row) => (
+                <tr key={row.account}>
+                  <td className="px-4 py-4 font-black text-slate-950">
+                    {row.account}
+                  </td>
+                  <td className="px-4 py-4 text-right font-bold text-emerald-800">
+                    {money(row.debit)}
+                  </td>
+                  <td className="px-4 py-4 text-right font-bold text-rose-800">
+                    {money(row.credit)}
+                  </td>
+                  <td
+                    className={`px-4 py-4 text-right font-black ${
+                      row.net < 0 ? "text-rose-700" : "text-slate-950"
+                    }`}
+                  >
+                    {money(row.net)}
+                  </td>
+                  <td className="px-4 py-4 text-right font-bold text-slate-600">
+                    {row.count.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+
+              {!rows.length ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-600">
+                    No account activity is available for this period.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ReviewQueuePanel({ ledger }: { ledger: GeneralLedgerData }) {
+  const reviewRows = ledger.entries.filter(
+    (entry) =>
+      entry.quickBooksAccount === "Ask My Accountant" ||
+      entry.reconciliationStatus.toLowerCase().includes("needs") ||
+      entry.reviewStatus.toLowerCase().includes("needs_review"),
+  );
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <SectionHeader
+        eyebrow="Review Queue"
+        title="Rows needing attention"
+        description="These rows are not fully classified, reconciled, or mapped to CPA-ready accounts."
+      />
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {reviewRows.slice(0, 12).map((entry) => (
+          <div
+            key={entry.id}
+            className="rounded-2xl border border-amber-100 bg-amber-50 p-4"
+          >
+            <p className="text-sm font-black text-slate-950">
+              {entry.description}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-slate-600">
+              {entry.sourceLabel} · {entry.account}
+            </p>
+            <p className="mt-2 text-xs font-black uppercase tracking-[0.14em] text-amber-800">
+              {entry.reconciliationStatus}
+            </p>
+          </div>
+        ))}
+
+        {!reviewRows.length ? (
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+            <p className="text-sm font-black text-emerald-900">
+              No review rows found for this period.
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function ReadinessPanel({ ledger }: { ledger: GeneralLedgerData }) {
+  const items = [
+    {
+      label: "Plaid/NFCU Rows",
+      ready: ledger.totals.plaidRows > 0,
+      detail: `${ledger.totals.plaidRows.toLocaleString()} Plaid/NFCU rows are included in the selected period.`,
+    },
+    {
+      label: "Manual Rows",
+      ready: ledger.totals.manualRows > 0,
+      detail: `${ledger.totals.manualRows.toLocaleString()} manual or ledger-controlled rows are included.`,
+    },
+    {
+      label: "Pending / Posted",
+      ready: ledger.totals.postedRows > 0 || ledger.totals.pendingRows > 0,
+      detail: `${ledger.totals.postedRows.toLocaleString()} posted and ${ledger.totals.pendingRows.toLocaleString()} pending rows are visible.`,
+    },
+    {
+      label: "Needs Review",
+      ready: ledger.totals.needsReview === 0,
+      detail: ledger.totals.needsReview
+        ? `${ledger.totals.needsReview.toLocaleString()} rows still need classification or reconciliation review.`
+        : "No ledger rows need classification review for this period.",
+    },
+    {
+      label: "Cash Impact",
+      ready: ledger.totals.cashIn > 0 || ledger.totals.cashOut > 0,
+      detail: `${money(ledger.totals.cashIn)} cash in and ${money(ledger.totals.cashOut)} cash out.`,
+    },
+    {
+      label: "P&L Impact",
+      ready: ledger.totals.pnlIncome > 0 || ledger.totals.pnlExpenses > 0,
+      detail: `${money(ledger.totals.pnlIncome)} income and ${money(ledger.totals.pnlExpenses)} expenses.`,
+    },
+  ];
+
+  const readyCount = items.filter((item) => item.ready).length;
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+            Ledger Readiness
+          </p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+            Master accounting record checks
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
+            These checks confirm whether the ledger has bank rows, manual rows,
+            P&L impact, cash impact, and review visibility for the selected
+            period.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800">
+          {readyCount}/{items.length} ready
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-xl border p-4 ${
+              item.ready
+                ? "border-emerald-100 bg-emerald-50 text-emerald-800"
+                : "border-amber-100 bg-amber-50 text-amber-800"
+            }`}
+          >
+            <p className="text-xs font-black uppercase tracking-[0.16em] opacity-80">
+              {item.ready ? "Ready" : "Needs Review"}
+            </p>
+            <h3 className="mt-2 text-base font-black text-slate-950">
+              {item.label}
+            </h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              {item.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export default async function AdminGeneralLedgerPage({
+  searchParams,
+}: AdminGeneralLedgerPageProps) {
+  const params = await searchParams;
+  const selectedPeriod = getPeriodKey(params?.period);
   const actor = await requireFinancialAdmin();
 
   if (!actor) {
-    return null;
+    return (
+      <main className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Financial access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with a finance-enabled admin account to view SitGuru General
+            Ledger reports.
+          </p>
+        </div>
+      </main>
+    );
   }
 
-  const ledger = await getGeneralLedgerData();
+  const ledger = await getGeneralLedgerData(selectedPeriod);
 
   return (
     <main className="min-h-screen bg-[#f7fbf8] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
@@ -1023,29 +1996,41 @@ export default async function AdminGeneralLedgerPage() {
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-5xl">
               <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
-                Financials / General Ledger
+                Admin / Financials / General Ledger
               </p>
 
               <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                General Ledger.
+                SitGuru General Ledger by period.
               </h1>
 
               <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
-                CPA-ready ledger view for SitGuru financial activity. This page
-                combines financial ledger entries, Trust & Safety events,
-                Trust & Safety plan purchases, Book & Bark deductions, Stripe
-                activity, Navy Federal bank activity, payments, payouts,
-                commissions, and expenses into account-mapped debit and credit
-                rows for QuickBooks handoff.
+                CPA-ready master ledger view for SitGuru financial activity. This
+                combines P&L activity, Cash Flow activity, NFCU/Plaid bank rows,
+                manual expenses, Trust & Safety activity, Stripe activity,
+                payouts, commissions, and statement mappings into debit, credit,
+                cash-impact, and P&L-impact rows.
               </p>
+
+              <div className="mt-5">
+                <PeriodSelector currentPeriod={ledger.period.key} />
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-sm font-black text-emerald-950">
+                  Viewing: {ledger.period.label}
+                </p>
+                <p className="mt-1 text-xs font-bold uppercase tracking-wide text-emerald-700">
+                  {ledger.period.comparisonLabel}
+                </p>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/admin/financials/exports"
+                href="/admin/financials/profit-loss"
                 className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
               >
-                Reports & Exports
+                Profit & Loss
               </Link>
               <Link
                 href="/admin/financials/cash-flow"
@@ -1054,10 +2039,10 @@ export default async function AdminGeneralLedgerPage() {
                 Cash Flow
               </Link>
               <Link
-                href="/admin/background-checks"
+                href="/admin/financials/plaid"
                 className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-800 shadow-sm transition hover:bg-emerald-100"
               >
-                Trust & Safety
+                Banking
               </Link>
               <Link
                 href="/admin/financials"
@@ -1072,18 +2057,28 @@ export default async function AdminGeneralLedgerPage() {
             <StatCard
               label="Ledger Rows"
               value={ledger.totals.rowCount.toLocaleString()}
-              detail="Combined rows from ledger, Trust & Safety, Stripe, bank, payments, payouts, commissions, and expenses."
+              detail="Rows from bank, manual, Trust & Safety, Stripe, statements, payouts, payments, and commissions."
               tone="emerald"
             />
             <StatCard
               label="Total Debits"
               value={money(ledger.totals.totalDebits)}
+              change={getMetricChange(
+                ledger.totals.totalDebits,
+                ledger.previousTotals.totalDebits,
+              )}
+              comparisonLabel={ledger.period.comparisonLabel}
               detail="Debit-side activity available for accounting review."
               tone="blue"
             />
             <StatCard
               label="Total Credits"
               value={money(ledger.totals.totalCredits)}
+              change={getMetricChange(
+                ledger.totals.totalCredits,
+                ledger.previousTotals.totalCredits,
+              )}
+              comparisonLabel={ledger.period.comparisonLabel}
               detail="Credit-side activity available for accounting review."
               tone="amber"
             />
@@ -1094,13 +2089,52 @@ export default async function AdminGeneralLedgerPage() {
               tone={ledger.totals.isBalanced ? "emerald" : "rose"}
             />
           </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Cash Impact"
+              value={money(ledger.totals.netCashImpact)}
+              change={getMetricChange(
+                ledger.totals.netCashImpact,
+                ledger.previousTotals.netCashImpact,
+              )}
+              comparisonLabel={ledger.period.comparisonLabel}
+              detail={`${money(ledger.totals.cashIn)} cash in and ${money(ledger.totals.cashOut)} cash out.`}
+              tone={ledger.totals.netCashImpact >= 0 ? "emerald" : "rose"}
+            />
+            <StatCard
+              label="P&L Impact"
+              value={money(ledger.totals.pnlNet)}
+              change={getMetricChange(
+                ledger.totals.pnlNet,
+                ledger.previousTotals.pnlNet,
+              )}
+              comparisonLabel={ledger.period.comparisonLabel}
+              detail={`${money(ledger.totals.pnlIncome)} income and ${money(ledger.totals.pnlExpenses)} expenses.`}
+              tone={ledger.totals.pnlNet >= 0 ? "violet" : "rose"}
+            />
+            <StatCard
+              label="Plaid/NFCU Rows"
+              value={ledger.totals.plaidRows.toLocaleString()}
+              detail="Bank-fed rows from connected NFCU Business Checking/Savings."
+              tone="slate"
+            />
+            <StatCard
+              label="Manual Rows"
+              value={ledger.totals.manualRows.toLocaleString()}
+              detail="Expense ledger and manual cash-flow line rows."
+              tone="slate"
+            />
+          </div>
         </section>
+
+        <ReadinessPanel ledger={ledger} />
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Trust & Safety Rows"
             value={ledger.totals.trustSafetyRows.toLocaleString()}
-            detail="Plan purchases, financial events, and Book & Bark deductions in the ledger."
+            detail="Plan purchases, financial events, and Book & Bark deductions."
             tone="emerald"
           />
           <StatCard
@@ -1123,135 +2157,30 @@ export default async function AdminGeneralLedgerPage() {
           />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1fr_0.45fr]">
-          <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-            <SectionHeader
-              eyebrow="Ledger Entries"
-              title="Debit / Credit Activity"
-              description="Review the newest imported ledger rows. Uncategorized and unreconciled rows are surfaced so your CPA or bookkeeper can classify them before month-end close."
-            />
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <SectionHeader
+            eyebrow="Master Ledger"
+            title={`${ledger.period.label} ledger entries`}
+            description="Shows all available ledger rows for the selected period. Rows include accounting account, source, status, debit, credit, cash impact, P&L impact, QuickBooks mapping, and reconciliation status."
+          />
 
-            <div className="mt-6">
-              <LedgerTable entries={ledger.entries} />
-            </div>
-          </section>
+          <div className="mt-6">
+            <LedgerTable entries={ledger.entries} />
+          </div>
 
-          <aside className="space-y-6">
-            <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-              <SectionHeader
-                eyebrow="Sources"
-                title="Connected Tables"
-                description="Rows are safely loaded only from tables that exist and are accessible."
-              />
-
-              <div className="mt-5 space-y-3">
-                {ledger.sourceCounts.map((source) => (
-                  <div
-                    key={source.source}
-                    className="flex items-center justify-between gap-4 rounded-[1.25rem] border border-slate-100 bg-slate-50 p-4"
-                  >
-                    <div>
-                      <p className="text-sm font-black text-slate-950">
-                        {source.label}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        {source.source}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700 shadow-sm">
-                      {source.count.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[2rem] border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
-              <SectionHeader
-                eyebrow="Account Summary"
-                title="Top Accounts"
-                description="Largest ledger balances by account."
-              />
-
-              <div className="mt-5 space-y-3">
-                {ledger.accountSummary.slice(0, 10).map((account) => (
-                  <div
-                    key={account.account}
-                    className="rounded-[1.25rem] border border-slate-100 bg-[#fbfefd] p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-black text-slate-950">
-                          {account.account}
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          {account.count.toLocaleString()} rows
-                        </p>
-                      </div>
-                      <p className="text-right text-sm font-black text-slate-950">
-                        {money(account.net)}
-                      </p>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-bold text-slate-500">
-                      <p>Debit: {money(account.debit)}</p>
-                      <p>Credit: {money(account.credit)}</p>
-                    </div>
-                  </div>
-                ))}
-
-                {ledger.accountSummary.length === 0 ? (
-                  <p className="rounded-[1.25rem] border border-slate-100 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-600">
-                    No account summary available yet.
-                  </p>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="rounded-[2rem] border border-amber-100 bg-amber-50 p-5 shadow-sm sm:p-6">
-              <p className="text-xs font-black uppercase tracking-[0.28em] text-amber-800">
-                CPA Close Notes
-              </p>
-              <h2 className="mt-2 text-2xl font-black text-slate-950">
-                Month-End Review
-              </h2>
-              <div className="mt-5 space-y-3">
-                {[
-                  "Confirm Trust & Safety Stripe payments match Stripe payout and Navy Federal deposits.",
-                  "Confirm Pawstep and Book & Bark balances agree to receivables on the Balance Sheet.",
-                  "Classify Checkr vendor costs and Trust & Safety Stripe fees consistently as cost of revenue.",
-                  "Classify uncategorized ledger activity before exporting to QuickBooks.",
-                  "Export statements and attach this ledger support to the CPA package.",
-                ].map((item, index) => (
-                  <div
-                    key={item}
-                    className="flex gap-3 rounded-[1.25rem] border border-amber-100 bg-white/70 p-4"
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white">
-                      {index + 1}
-                    </span>
-                    <p className="text-sm font-bold leading-6 text-slate-700">
-                      {item}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </aside>
+          {ledger.entries.length > 225 ? (
+            <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-800">
+              Showing the latest 225 rows. Use exports later for the full
+              period ledger.
+            </p>
+          ) : null}
         </section>
 
-        {ledger.trustSafetyEntries.length > 0 ? (
-          <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-            <SectionHeader
-              eyebrow="Trust & Safety Ledger Support"
-              title="Trust & Safety event detail"
-              description="These are the Trust & Safety plan purchases, finance events, and Book & Bark deductions feeding revenue, costs, receivables, cash flow, and reconciliation."
-            />
+        <AccountSummaryPanel rows={ledger.accountSummary} />
 
-            <div className="mt-6">
-              <LedgerTable entries={ledger.trustSafetyEntries} />
-            </div>
-          </section>
-        ) : null}
+        <ReviewQueuePanel ledger={ledger} />
+
+        <SourceCountPanel sources={ledger.sourceCounts} />
       </div>
     </main>
   );
