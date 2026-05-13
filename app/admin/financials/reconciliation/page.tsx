@@ -9,6 +9,8 @@ type SafeQueryResponse = {
   error: unknown;
 };
 
+type GenericRow = Record<string, unknown>;
+
 type AdminIdentity = {
   id: string;
   email: string;
@@ -16,17 +18,54 @@ type AdminIdentity = {
   canAccessFinancials: boolean;
 };
 
-type GenericRow = Record<string, unknown>;
-
 type ReconciliationItem = {
   id: string;
   source: string;
   label: string;
   amount: number;
   status: string;
+  bankStatus: string;
+  reviewStatus: string;
   date: string;
   reference: string;
   category: string;
+  issueType: string;
+  recommendation: string;
+};
+
+type ReconciliationData = {
+  bankItems: ReconciliationItem[];
+  manualItems: ReconciliationItem[];
+  needsReviewItems: ReconciliationItem[];
+  pendingItems: ReconciliationItem[];
+  excludedItems: ReconciliationItem[];
+  duplicateItems: ReconciliationItem[];
+  uncategorizedItems: ReconciliationItem[];
+  trustSafetyItems: ReconciliationItem[];
+  stripeItems: ReconciliationItem[];
+  reportChecks: {
+    label: string;
+    status: "ready" | "needs_review" | "missing";
+    detail: string;
+  }[];
+  totals: {
+    bankRows: number;
+    postedRows: number;
+    pendingRows: number;
+    needsReviewRows: number;
+    excludedRows: number;
+    manualRows: number;
+    duplicateRows: number;
+    uncategorizedRows: number;
+    stripeRows: number;
+    trustSafetyRows: number;
+    totalCashIn: number;
+    totalCashOut: number;
+    netCashMovement: number;
+    manualExpenseTotal: number;
+    reviewQueueTotal: number;
+    reconciliationScore: number;
+  };
 };
 
 async function safeRows<T>(
@@ -56,19 +95,36 @@ function toNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
 
   if (typeof value === "string") {
-    const parsed = Number(value.replace(/[$,]/g, ""));
-    return Number.isFinite(parsed) ? parsed : 0;
+    const cleaned = value.replace(/[$,%\s,()]/g, "");
+    const parsed = Number(cleaned);
+
+    if (Number.isFinite(parsed)) {
+      return value.includes("(") && value.includes(")") ? -parsed : parsed;
+    }
   }
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function centsToDollars(value: unknown) {
+  return toNumber(value) / 100;
+}
+
 function money(value: number) {
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-  }).format(Math.abs(value));
+  }).format(Math.abs(value || 0));
+
+  return value < 0 ? `(${formatted})` : formatted;
+}
+
+function moneyExact(value: number) {
+  const formatted = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(Math.abs(value || 0));
 
   return value < 0 ? `(${formatted})` : formatted;
 }
@@ -92,6 +148,7 @@ function getOptionalBoolean(value: unknown) {
 
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
+
     if (["true", "yes", "1"].includes(normalized)) return true;
     if (["false", "no", "0"].includes(normalized)) return false;
   }
@@ -163,7 +220,7 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
     ),
   ]);
 
-  const profile = profileChecks.flat().find(Boolean) || {};
+  const profile = (profileChecks.flat().find(Boolean) || {}) as GenericRow;
   const role = asTrimmedString(profile.role) || "admin";
   const active =
     profile.is_active === undefined
@@ -184,115 +241,391 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
   };
 }
 
-function getBankAmount(row: GenericRow) {
+function getRowDate(row: GenericRow) {
   return (
+    asTrimmedString(row.date) ||
+    asTrimmedString(row.transaction_date) ||
+    asTrimmedString(row.posted_at) ||
+    asTrimmedString(row.paid_at) ||
+    asTrimmedString(row.created_at) ||
+    asTrimmedString(row.updated_at) ||
+    ""
+  );
+}
+
+function getRowLabel(row: GenericRow) {
+  return (
+    asTrimmedString(row.merchant_name) ||
+    asTrimmedString(row.name) ||
+    asTrimmedString(row.description) ||
+    asTrimmedString(row.label) ||
+    asTrimmedString(row.title) ||
+    "Financial activity"
+  );
+}
+
+function getRowReference(row: GenericRow, fallback: string) {
+  return (
+    asTrimmedString(row.transaction_id) ||
+    asTrimmedString(row.id) ||
+    asTrimmedString(row.payment_intent_id) ||
+    asTrimmedString(row.stripe_id) ||
+    asTrimmedString(row.account_id) ||
+    fallback
+  );
+}
+
+function getBankCategoryType(row: GenericRow) {
+  return (
+    asTrimmedString(row.sitguru_category_type).toLowerCase() || "uncategorized"
+  );
+}
+
+function getBankCategory(row: GenericRow) {
+  return asTrimmedString(row.sitguru_category) || "Uncategorized";
+}
+
+function getReviewStatus(row: GenericRow) {
+  return asTrimmedString(row.review_status) || "needs_review";
+}
+
+function getBankStatus(row: GenericRow) {
+  return getOptionalBoolean(row.pending) ? "Pending" : "Posted";
+}
+
+function getBankAmount(row: GenericRow) {
+  return Math.abs(toNumber(row.amount));
+}
+
+function getSignedBankCashAmount(row: GenericRow) {
+  const type = getBankCategoryType(row);
+  const amount = getBankAmount(row);
+
+  if (type === "income" || type === "owner_equity") return amount;
+
+  if (type === "expense" || type === "owner_draw" || type === "liability") {
+    return -amount;
+  }
+
+  if (type === "transfer") {
+    const label = `${getRowLabel(row)} ${asTrimmedString(row.sitguru_notes)}`.toLowerCase();
+
+    if (
+      label.includes("from savings") ||
+      label.includes("to checking") ||
+      label.includes("deposit")
+    ) {
+      return amount;
+    }
+
+    return -amount;
+  }
+
+  return toNumber(row.amount);
+}
+
+function getManualExpenseAmount(row: GenericRow) {
+  return Math.abs(
     toNumber(row.amount) ||
-    toNumber(row.transaction_amount) ||
-    toNumber(row.net_amount) ||
-    toNumber(row.value) ||
-    toNumber(row.credit) - toNumber(row.debit)
+      toNumber(row.total_amount) ||
+      toNumber(row.expense_amount) ||
+      toNumber(row.cost),
   );
 }
 
 function getStripeAmount(row: GenericRow) {
-  return (
+  const amount =
     toNumber(row.net) ||
     toNumber(row.net_amount) ||
     toNumber(row.amount) ||
     toNumber(row.gross_amount) ||
-    toNumber(row.balance_amount)
-  );
+    toNumber(row.balance_amount) ||
+    centsToDollars(row.amount_cents) ||
+    centsToDollars(row.net_amount_cents);
+
+  return Math.abs(amount) > 10000 && Number.isInteger(amount) ? amount / 100 : amount;
 }
 
 function getTrustSafetyAmount(row: GenericRow) {
   return (
-    toNumber(row.net_amount_cents) / 100 ||
-    toNumber(row.gross_amount_cents) / 100 ||
+    centsToDollars(row.net_amount_cents) ||
+    centsToDollars(row.gross_amount_cents) ||
+    centsToDollars(row.remaining_balance_cents) ||
+    centsToDollars(row.deduction_amount_cents) ||
     0
   );
 }
 
-function getBankLabel(row: GenericRow) {
-  return (
-    asTrimmedString(row.name) ||
-    asTrimmedString(row.description) ||
-    asTrimmedString(row.merchant_name) ||
-    asTrimmedString(row.memo) ||
-    "Bank Transaction"
-  );
-}
-
-function getStripeLabel(row: GenericRow) {
-  return (
-    asTrimmedString(row.description) ||
-    asTrimmedString(row.reporting_category) ||
-    asTrimmedString(row.type) ||
-    "Stripe Balance Transaction"
-  );
-}
-
-function getTrustSafetyLabel(row: GenericRow) {
-  return (
-    asTrimmedString(row.description) ||
-    asTrimmedString(row.plan_name) ||
-    asTrimmedString(row.event_type) ||
-    "Trust & Safety Event"
-  );
-}
-
-function getStatus(row: GenericRow) {
-  return (
-    asTrimmedString(row.reconciliation_status) ||
-    asTrimmedString(row.status) ||
-    (row.reconciled_at ? "reconciled" : "unmatched")
-  );
-}
-
-function isReconciled(row: GenericRow) {
+function isArchivedRow(row: GenericRow) {
   return Boolean(
-    row.reconciled_at ||
-      row.reconciliation_id ||
-      row.matched_transaction_id ||
-      asTrimmedString(row.reconciliation_status).toLowerCase() === "reconciled" ||
-      asTrimmedString(row.status).toLowerCase() === "reconciled",
+    row.deleted_at ||
+      row.voided_at ||
+      row.archived_at ||
+      row.is_deleted === true ||
+      row.is_void === true ||
+      row.is_active === false,
   );
 }
 
-function statusClass(status: string) {
-  const normalized = status.toLowerCase();
+function bankRowToItem(row: GenericRow, index: number): ReconciliationItem {
+  const reviewStatus = getReviewStatus(row);
+  const bankStatus = getBankStatus(row);
+  const categoryType = getBankCategoryType(row);
+  const amount = getSignedBankCashAmount(row);
 
-  if (normalized.includes("reconciled") || normalized.includes("matched")) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (normalized.includes("pending") || normalized.includes("review")) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-700";
+  return {
+    id: `bank-${getRowReference(row, String(index))}`,
+    source: "Plaid/NFCU",
+    label: getRowLabel(row),
+    amount,
+    status: reviewStatus === "needs_review" ? "Needs Review" : "Ready",
+    bankStatus,
+    reviewStatus,
+    date: formatDate(getRowDate(row)),
+    reference: getRowReference(row, String(index)),
+    category: getBankCategory(row),
+    issueType:
+      reviewStatus === "needs_review"
+        ? "Needs category review"
+        : categoryType === "uncategorized"
+          ? "Uncategorized"
+          : getOptionalBoolean(row.is_excluded_from_reports)
+            ? "Excluded from reports"
+            : "Reconciled candidate",
+    recommendation:
+      reviewStatus === "needs_review"
+        ? "Open Banking and assign a SitGuru report category."
+        : categoryType === "uncategorized"
+          ? "Assign income, expense, transfer, owner equity, owner draw, liability, or ignore."
+          : getOptionalBoolean(row.is_excluded_from_reports)
+            ? "Confirm this was intentionally excluded from reports."
+            : "Ready to support P&L, Cash Flow, General Ledger, or Balance Sheet.",
+  };
 }
 
-async function getReconciliationData() {
+function manualExpenseToItem(row: GenericRow, index: number): ReconciliationItem {
+  const amount = getManualExpenseAmount(row);
+
+  return {
+    id: `manual-expense-${getRowReference(row, String(index))}`,
+    source: "Manual Expense",
+    label: getRowLabel(row),
+    amount: -amount,
+    status: "Manual",
+    bankStatus: "Manual",
+    reviewStatus: "reviewed",
+    date: formatDate(getRowDate(row)),
+    reference: getRowReference(row, String(index)),
+    category: asTrimmedString(row.category) || "Manual Expense",
+    issueType: "Manual entry",
+    recommendation:
+      "Confirm this manual expense is either not in the bank feed or should remain as a CPA adjustment.",
+  };
+}
+
+function stripeToItem(row: GenericRow, index: number, source: string): ReconciliationItem {
+  const amount = getStripeAmount(row);
+  const status =
+    asTrimmedString(row.status) ||
+    asTrimmedString(row.payment_status) ||
+    "Recorded";
+
+  return {
+    id: `${source}-${getRowReference(row, String(index))}`,
+    source,
+    label: getRowLabel(row),
+    amount,
+    status,
+    bankStatus: "Stripe",
+    reviewStatus: "recorded",
+    date: formatDate(getRowDate(row)),
+    reference: getRowReference(row, String(index)),
+    category: asTrimmedString(row.type) || "Stripe Activity",
+    issueType: "Stripe matching check",
+    recommendation:
+      "Match this Stripe activity to a bank deposit, payout, fee, refund, or payment record.",
+  };
+}
+
+function trustSafetyToItem(
+  row: GenericRow,
+  index: number,
+  source: string,
+): ReconciliationItem {
+  const amount = getTrustSafetyAmount(row);
+  const status =
+    asTrimmedString(row.payment_status) ||
+    asTrimmedString(row.repayment_status) ||
+    asTrimmedString(row.status) ||
+    "Recorded";
+
+  return {
+    id: `${source}-${getRowReference(row, String(index))}`,
+    source,
+    label:
+      asTrimmedString(row.plan_name) ||
+      asTrimmedString(row.event_type) ||
+      getRowLabel(row),
+    amount,
+    status,
+    bankStatus: "Trust & Safety",
+    reviewStatus: "recorded",
+    date: formatDate(getRowDate(row)),
+    reference: getRowReference(row, String(index)),
+    category:
+      asTrimmedString(row.plan_key) ||
+      asTrimmedString(row.event_type) ||
+      "Trust & Safety",
+    issueType: "Trust & Safety receivable check",
+    recommendation:
+      "Confirm Trust & Safety receivable, collection, fee, refund, or booking deduction is represented in General Ledger and Balance Sheet.",
+  };
+}
+
+function findDuplicateBankItems(items: ReconciliationItem[]) {
+  const groups = new Map<string, ReconciliationItem[]>();
+
+  for (const item of items) {
+    const key = [
+      item.date,
+      Math.abs(item.amount).toFixed(2),
+      item.label.toLowerCase().slice(0, 28),
+    ].join("|");
+
+    const existing = groups.get(key) || [];
+    existing.push(item);
+    groups.set(key, existing);
+  }
+
+  return Array.from(groups.values())
+    .filter((group) => group.length > 1)
+    .flat()
+    .map((item, index) => ({
+      ...item,
+      id: `${item.id}-duplicate-${index}`,
+      issueType: "Possible duplicate",
+      recommendation:
+        "Review same-date, same-amount activity and confirm whether both rows are legitimate.",
+    }));
+}
+
+function getUniqueReconciliationRows(rows: ReconciliationItem[]) {
+  const seen = new Set<string>();
+
+  return rows.filter((row) => {
+    const key = [
+      row.id,
+      row.source,
+      row.reference,
+      row.issueType,
+      row.amount.toFixed(2),
+    ].join("|");
+
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function getScore({
+  needsReviewRows,
+  pendingRows,
+  duplicateRows,
+  uncategorizedRows,
+  excludedRows,
+  bankRows,
+}: {
+  needsReviewRows: number;
+  pendingRows: number;
+  duplicateRows: number;
+  uncategorizedRows: number;
+  excludedRows: number;
+  bankRows: number;
+}) {
+  if (bankRows === 0) return 0;
+
+  const issueCount =
+    needsReviewRows + duplicateRows + uncategorizedRows + Math.round(pendingRows / 2);
+
+  const score = Math.max(0, Math.min(100, 100 - (issueCount / bankRows) * 100));
+
+  if (excludedRows > bankRows * 0.5) return Math.min(score, 75);
+
+  return Math.round(score);
+}
+
+async function getReconciliationData(): Promise<ReconciliationData> {
   const [
-    bankTransactions,
-    stripeTransactions,
+    bankRows,
+    manualExpenseRows,
+    cashFlowLines,
+    balanceSheetLines,
+    statementLines,
+    stripeRows,
+    stripeBalanceRows,
     trustSafetyEvents,
-    financialLedgerEntries,
+    trustSafetyPurchases,
+    bookingDeductions,
   ] = await Promise.all([
     safeRows<GenericRow>(
       supabaseAdmin
-        .from("bank_transactions")
+        .from("admin_plaid_transactions")
+        .select("*")
+        .is("removed_at", null)
+        .order("date", { ascending: false })
+        .limit(5000),
+      "admin_plaid_transactions",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("expense_ledger")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(3000),
-      "bank_transactions",
+        .limit(2500),
+      "expense_ledger",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("cash_flow_lines")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(500),
+      "cash_flow_lines",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("balance_sheet_lines")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(500),
+      "balance_sheet_lines",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("financial_statement_lines")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(500),
+      "financial_statement_lines",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("stripe_transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "stripe_transactions",
     ),
     safeRows<GenericRow>(
       supabaseAdmin
         .from("stripe_balance_transactions")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(3000),
+        .limit(1000),
       "stripe_balance_transactions",
     ),
     safeRows<GenericRow>(
@@ -300,132 +633,269 @@ async function getReconciliationData() {
         .from("trust_safety_financial_events")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(3000),
+        .limit(2000),
       "trust_safety_financial_events",
     ),
     safeRows<GenericRow>(
       supabaseAdmin
-        .from("financial_ledger_entries")
+        .from("guru_trust_safety_plan_purchases")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(3000),
-      "financial_ledger_entries",
+        .limit(2000),
+      "guru_trust_safety_plan_purchases",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("booking_trust_safety_deductions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2000),
+      "booking_trust_safety_deductions",
     ),
   ]);
 
-  const bankItems: ReconciliationItem[] = bankTransactions.map((row, index) => ({
-    id:
-      asTrimmedString(row.id) ||
-      asTrimmedString(row.transaction_id) ||
-      `bank-${index}`,
-    source: "NFCU / Bank",
-    label: getBankLabel(row),
-    amount: getBankAmount(row),
-    status: getStatus(row),
-    date: formatDate(
-      asTrimmedString(row.date) ||
-        asTrimmedString(row.transaction_date) ||
-        asTrimmedString(row.posted_at) ||
-        asTrimmedString(row.created_at),
+  const activeBankRows = bankRows.filter((row) => !isArchivedRow(row));
+  const activeManualExpenseRows = manualExpenseRows.filter((row) => !isArchivedRow(row));
+  const activeCashFlowLines = cashFlowLines.filter((row) => !isArchivedRow(row));
+  const activeBalanceSheetLines = balanceSheetLines.filter((row) => !isArchivedRow(row));
+  const activeStatementLines = statementLines.filter((row) => !isArchivedRow(row));
+
+  const bankItems = activeBankRows.map(bankRowToItem);
+
+  const manualItems = [
+    ...activeManualExpenseRows.map(manualExpenseToItem),
+    ...activeCashFlowLines.map((row, index) => ({
+      id: `cash-flow-line-${getRowReference(row, String(index))}`,
+      source: "Manual Cash Flow Line",
+      label: getRowLabel(row),
+      amount: toNumber(row.amount),
+      status: "Manual",
+      bankStatus: "Manual",
+      reviewStatus: "reviewed",
+      date: formatDate(getRowDate(row)),
+      reference: getRowReference(row, String(index)),
+      category: asTrimmedString(row.section) || "Cash Flow",
+      issueType: "Manual cash flow line",
+      recommendation:
+        "Confirm this line should remain separate from bank-fed activity.",
+    })),
+    ...activeBalanceSheetLines.map((row, index) => ({
+      id: `balance-sheet-line-${getRowReference(row, String(index))}`,
+      source: "Manual Balance Sheet Line",
+      label: getRowLabel(row),
+      amount: toNumber(row.amount),
+      status: "Manual",
+      bankStatus: "Manual",
+      reviewStatus: "reviewed",
+      date: formatDate(getRowDate(row)),
+      reference: getRowReference(row, String(index)),
+      category: asTrimmedString(row.section) || "Balance Sheet",
+      issueType: "Manual balance sheet line",
+      recommendation:
+        "Confirm this balance sheet adjustment is supported by CPA or opening balance documentation.",
+    })),
+  ];
+
+  const stripeItems = [
+    ...stripeRows.map((row, index) => stripeToItem(row, index, "Stripe Transaction")),
+    ...stripeBalanceRows.map((row, index) =>
+      stripeToItem(row, index, "Stripe Balance Transaction"),
     ),
-    reference:
-      asTrimmedString(row.transaction_id) ||
-      asTrimmedString(row.bank_transaction_id) ||
-      asTrimmedString(row.plaid_transaction_id) ||
-      "—",
-    category: "Bank",
-  }));
+  ];
 
-  const stripeItems: ReconciliationItem[] = stripeTransactions.map(
-    (row, index) => ({
-      id:
-        asTrimmedString(row.id) ||
-        asTrimmedString(row.balance_transaction_id) ||
-        `stripe-${index}`,
-      source: "Stripe",
-      label: getStripeLabel(row),
-      amount: getStripeAmount(row),
-      status: getStatus(row),
-      date: formatDate(
-        asTrimmedString(row.available_on) ||
-          asTrimmedString(row.created_at) ||
-          asTrimmedString(row.date),
-      ),
-      reference:
-        asTrimmedString(row.balance_transaction_id) ||
-        asTrimmedString(row.stripe_balance_transaction_id) ||
-        asTrimmedString(row.source) ||
-        "—",
-      category: "Stripe",
-    }),
+  const trustSafetyItems = [
+    ...trustSafetyEvents.map((row, index) =>
+      trustSafetyToItem(row, index, "Trust & Safety Event"),
+    ),
+    ...trustSafetyPurchases.map((row, index) =>
+      trustSafetyToItem(row, index, "Trust & Safety Plan"),
+    ),
+    ...bookingDeductions.map((row, index) =>
+      trustSafetyToItem(row, index, "Book & Bark Deduction"),
+    ),
+  ];
+
+  const needsReviewItems = bankItems.filter(
+    (item) => item.reviewStatus === "needs_review",
   );
 
-  const trustSafetyItems: ReconciliationItem[] = trustSafetyEvents.map(
-    (row, index) => ({
-      id: asTrimmedString(row.id) || `trust-safety-${index}`,
-      source: "Trust & Safety",
-      label: getTrustSafetyLabel(row),
-      amount: getTrustSafetyAmount(row),
-      status: getStatus(row),
-      date: formatDate(asTrimmedString(row.occurred_at) || asTrimmedString(row.created_at)),
-      reference:
-        asTrimmedString(row.stripe_payment_intent_id) ||
-        asTrimmedString(row.stripe_charge_id) ||
-        asTrimmedString(row.stripe_checkout_session_id) ||
-        asTrimmedString(row.bank_transaction_id) ||
-        "—",
-      category: asTrimmedString(row.event_type) || "Trust & Safety",
-    }),
+  const pendingItems = bankItems.filter((item) => item.bankStatus === "Pending");
+
+  const excludedItems = bankItems.filter((item) =>
+    item.issueType.toLowerCase().includes("excluded"),
   );
 
-  const items = [...trustSafetyItems, ...stripeItems, ...bankItems].sort(
-    (a, b) => Math.abs(b.amount) - Math.abs(a.amount),
-  );
-
-  const reconciledCount =
-    bankTransactions.filter(isReconciled).length +
-    stripeTransactions.filter(isReconciled).length +
-    trustSafetyEvents.filter(isReconciled).length +
-    financialLedgerEntries.filter(isReconciled).length;
-
-  const totalRows =
-    bankTransactions.length +
-    stripeTransactions.length +
-    trustSafetyEvents.length +
-    financialLedgerEntries.length;
-
-  const unmatchedItems = items.filter(
+  const uncategorizedItems = bankItems.filter(
     (item) =>
-      !item.status.toLowerCase().includes("reconciled") &&
-      !item.status.toLowerCase().includes("matched"),
+      item.category === "Uncategorized" ||
+      item.issueType.toLowerCase().includes("uncategorized"),
   );
 
-  const trustSafetyCash = trustSafetyItems.reduce(
-    (sum, item) => sum + item.amount,
+  const duplicateItems = findDuplicateBankItems(bankItems);
+
+  const postedRows = bankItems.filter((item) => item.bankStatus === "Posted").length;
+
+  const totalCashIn = bankItems
+    .filter((item) => item.amount > 0)
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  const totalCashOut = bankItems
+    .filter((item) => item.amount < 0)
+    .reduce((sum, item) => sum + Math.abs(item.amount), 0);
+
+  const manualExpenseTotal = activeManualExpenseRows.reduce(
+    (sum, row) => sum + getManualExpenseAmount(row),
     0,
   );
 
-  const stripeCash = stripeItems.reduce((sum, item) => sum + item.amount, 0);
-  const bankCash = bankItems.reduce((sum, item) => sum + item.amount, 0);
+  const reviewQueueTotal = getUniqueReconciliationRows([
+    ...needsReviewItems,
+    ...uncategorizedItems,
+    ...duplicateItems,
+    ...pendingItems,
+  ]).length;
+
+  const reconciliationScore = getScore({
+    needsReviewRows: needsReviewItems.length,
+    pendingRows: pendingItems.length,
+    duplicateRows: duplicateItems.length,
+    uncategorizedRows: uncategorizedItems.length,
+    excludedRows: excludedItems.length,
+    bankRows: bankItems.length,
+  });
+
+  const reportChecks = [
+    {
+      label: "Plaid/NFCU Bank Feed",
+      status: bankItems.length > 0 ? "ready" : "missing",
+      detail: `${bankItems.length.toLocaleString()} bank-fed rows are available for reconciliation.`,
+    },
+    {
+      label: "Posted vs Pending",
+      status: pendingItems.length === 0 ? "ready" : "needs_review",
+      detail: `${postedRows.toLocaleString()} posted and ${pendingItems.length.toLocaleString()} pending transactions are visible.`,
+    },
+    {
+      label: "Category Review",
+      status: needsReviewItems.length === 0 ? "ready" : "needs_review",
+      detail: needsReviewItems.length
+        ? `${needsReviewItems.length.toLocaleString()} transactions still need review before reports are final.`
+        : "No bank transactions are waiting for category review.",
+    },
+    {
+      label: "Manual Entries",
+      status: manualItems.length > 0 ? "ready" : "needs_review",
+      detail: `${manualItems.length.toLocaleString()} manual expenses, cash flow lines, or balance sheet lines are available for review.`,
+    },
+    {
+      label: "Duplicate Check",
+      status: duplicateItems.length === 0 ? "ready" : "needs_review",
+      detail: duplicateItems.length
+        ? `${duplicateItems.length.toLocaleString()} possible duplicate rows should be reviewed.`
+        : "No likely duplicate bank rows were detected by same date, amount, and label.",
+    },
+    {
+      label: "Statement Lines",
+      status:
+        activeCashFlowLines.length ||
+        activeBalanceSheetLines.length ||
+        activeStatementLines.length
+          ? "ready"
+          : "needs_review",
+      detail: `${(
+        activeCashFlowLines.length +
+        activeBalanceSheetLines.length +
+        activeStatementLines.length
+      ).toLocaleString()} saved statement or reporting lines are active.`,
+    },
+    {
+      label: "Stripe / Payment Activity",
+      status: stripeItems.length > 0 ? "ready" : "needs_review",
+      detail: `${stripeItems.length.toLocaleString()} Stripe rows are available to match against deposits, refunds, and fees.`,
+    },
+    {
+      label: "Trust & Safety Activity",
+      status: trustSafetyItems.length > 0 ? "ready" : "needs_review",
+      detail: `${trustSafetyItems.length.toLocaleString()} Trust & Safety rows are available for receivable, collection, fee, and deduction checks.`,
+    },
+  ] satisfies ReconciliationData["reportChecks"];
 
   return {
-    items: items.slice(0, 250),
-    unmatchedItems: unmatchedItems.slice(0, 25),
+    bankItems,
+    manualItems,
+    needsReviewItems,
+    pendingItems,
+    excludedItems,
+    duplicateItems,
+    uncategorizedItems,
+    trustSafetyItems,
+    stripeItems,
+    reportChecks,
     totals: {
-      totalRows,
-      reconciledCount,
-      unmatchedCount: Math.max(0, totalRows - reconciledCount),
-      bankRows: bankTransactions.length,
-      stripeRows: stripeTransactions.length,
-      trustSafetyRows: trustSafetyEvents.length,
-      ledgerRows: financialLedgerEntries.length,
-      trustSafetyCash,
-      stripeCash,
-      bankCash,
-      reconciliationRate:
-        totalRows > 0 ? Math.round((reconciledCount / totalRows) * 100) : 0,
+      bankRows: bankItems.length,
+      postedRows,
+      pendingRows: pendingItems.length,
+      needsReviewRows: needsReviewItems.length,
+      excludedRows: excludedItems.length,
+      manualRows: manualItems.length,
+      duplicateRows: duplicateItems.length,
+      uncategorizedRows: uncategorizedItems.length,
+      stripeRows: stripeItems.length,
+      trustSafetyRows: trustSafetyItems.length,
+      totalCashIn,
+      totalCashOut,
+      netCashMovement: totalCashIn - totalCashOut,
+      manualExpenseTotal,
+      reviewQueueTotal,
+      reconciliationScore,
     },
   };
+}
+
+function statusClasses(status: string) {
+  const normalized = status.toLowerCase();
+
+  if (
+    normalized.includes("ready") ||
+    normalized.includes("posted") ||
+    normalized.includes("reviewed") ||
+    normalized.includes("reconciled") ||
+    normalized.includes("recorded") ||
+    normalized.includes("paid") ||
+    normalized.includes("succeeded")
+  ) {
+    return "border-emerald-100 bg-emerald-50 text-emerald-800";
+  }
+
+  if (
+    normalized.includes("pending") ||
+    normalized.includes("review") ||
+    normalized.includes("manual")
+  ) {
+    return "border-amber-100 bg-amber-50 text-amber-800";
+  }
+
+  if (
+    normalized.includes("failed") ||
+    normalized.includes("void") ||
+    normalized.includes("dispute") ||
+    normalized.includes("chargeback") ||
+    normalized.includes("excluded")
+  ) {
+    return "border-rose-100 bg-rose-50 text-rose-800";
+  }
+
+  return "border-slate-100 bg-slate-50 text-slate-700";
+}
+
+function readinessClasses(status: "ready" | "needs_review" | "missing") {
+  const classes = {
+    ready: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    needs_review: "border-amber-100 bg-amber-50 text-amber-800",
+    missing: "border-rose-100 bg-rose-50 text-rose-800",
+  };
+
+  return classes[status];
 }
 
 function StatCard({
@@ -437,7 +907,7 @@ function StatCard({
   label: string;
   value: string;
   detail: string;
-  tone?: "emerald" | "sky" | "violet" | "amber" | "rose";
+  tone?: "emerald" | "sky" | "violet" | "amber" | "rose" | "slate";
 }) {
   const toneClass = {
     emerald: "border-emerald-100 bg-emerald-50",
@@ -445,6 +915,7 @@ function StatCard({
     violet: "border-violet-100 bg-violet-50",
     amber: "border-amber-100 bg-amber-50",
     rose: "border-rose-100 bg-rose-50",
+    slate: "border-slate-100 bg-slate-50",
   }[tone];
 
   return (
@@ -469,112 +940,261 @@ function ActionLink({
   label: string;
   primary?: boolean;
 }) {
-  if (primary) {
-    return (
-      <Link
-        href={href}
-        className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
-      >
-        {label}
-      </Link>
-    );
-  }
-
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:border-emerald-200 hover:bg-emerald-50"
+      className={
+        primary
+          ? "inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
+          : "inline-flex items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:border-emerald-200 hover:bg-emerald-50"
+      }
     >
       {label}
     </Link>
   );
 }
 
-function ReconciliationTable({ items }: { items: ReconciliationItem[] }) {
-  return (
-    <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white">
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-600">
-            <tr>
-              <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.18em]">
-                Source
-              </th>
-              <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.18em]">
-                Activity
-              </th>
-              <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.18em]">
-                Amount
-              </th>
-              <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.18em]">
-                Status
-              </th>
-              <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.18em]">
-                Date
-              </th>
-              <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.18em]">
-                Reference
-              </th>
-            </tr>
-          </thead>
+function ReconciliationChecks({ data }: { data: ReconciliationData }) {
+  const readyCount = data.reportChecks.filter((item) => item.status === "ready").length;
 
-          <tbody className="divide-y divide-slate-100">
-            {items.length ? (
-              items.map((item) => (
-                <tr key={`${item.source}-${item.id}`} className="transition hover:bg-slate-50">
-                  <td className="px-4 py-4">
-                    <p className="font-black text-slate-950">{item.source}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      {item.category}
-                    </p>
-                  </td>
-                  <td className="px-4 py-4 font-semibold text-slate-700">
-                    {item.label}
-                  </td>
-                  <td
-                    className={`px-4 py-4 font-black ${
-                      item.amount < 0 ? "text-rose-700" : "text-slate-950"
-                    }`}
-                  >
-                    {money(item.amount)}
-                  </td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${statusClass(
-                        item.status,
-                      )}`}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-slate-600">{item.date}</td>
-                  <td className="max-w-[220px] truncate px-4 py-4 text-xs font-semibold text-slate-500">
-                    {item.reference}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
-                  No reconciliation rows found yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+            Reconciliation Health
+          </p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+            Matching and reporting checks
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            These checks compare bank activity, manual entries, Stripe activity,
+            Trust & Safety rows, and reporting lines so SitGuru’s financial
+            statements can be reviewed cleanly.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800">
+          {readyCount}/{data.reportChecks.length} ready
+        </div>
       </div>
-    </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {data.reportChecks.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-xl border p-4 ${readinessClasses(item.status)}`}
+          >
+            <p className="text-xs font-black uppercase tracking-[0.16em] opacity-80">
+              {item.status.replace("_", " ")}
+            </p>
+            <h3 className="mt-2 text-base font-black text-slate-950">
+              {item.label}
+            </h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              {item.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
-export default async function AdminFinancialReconciliationPage() {
+function ItemsTable({
+  eyebrow,
+  title,
+  description,
+  rows,
+  emptyMessage,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  rows: ReconciliationItem[];
+  emptyMessage: string;
+}) {
+  const displayRows = getUniqueReconciliationRows(rows);
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+          {eyebrow}
+        </p>
+        <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+          {title}
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      </div>
+
+      <div className="mt-6 w-full max-w-full overflow-hidden rounded-[1.5rem] border border-slate-100">
+        <div className="w-full overflow-x-auto">
+          <table className="min-w-[1180px] text-left text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                  Date
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                  Activity
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                  Source
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                  Category
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
+                  Issue
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em]">
+                  Amount
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {displayRows.length ? (
+                displayRows.slice(0, 80).map((row, index) => (
+                  <tr
+                    key={`${row.id}-${row.source}-${row.issueType}-${index}`}
+                    className="align-top transition hover:bg-slate-50"
+                  >
+                    <td className="whitespace-nowrap px-4 py-4 font-semibold text-slate-600">
+                      {row.date}
+                    </td>
+                    <td className="max-w-[320px] px-4 py-4">
+                      <p className="font-black text-slate-950">{row.label}</p>
+                      <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                        Ref: {row.reference}
+                      </p>
+                      <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
+                        {row.recommendation}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4 font-semibold text-slate-600">
+                      {row.source}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                        {row.category}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-2">
+                        <span
+                          className={`inline-flex w-fit rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClasses(
+                            row.status,
+                          )}`}
+                        >
+                          {row.status}
+                        </span>
+                        <span
+                          className={`inline-flex w-fit rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClasses(
+                            row.bankStatus,
+                          )}`}
+                        >
+                          {row.bankStatus}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-sm font-semibold text-slate-600">
+                      {row.issueType}
+                    </td>
+                    <td
+                      className={`whitespace-nowrap px-4 py-4 text-right font-black ${
+                        row.amount < 0 ? "text-rose-700" : "text-slate-950"
+                      }`}
+                    >
+                      {moneyExact(row.amount)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-600">
+                    {emptyMessage}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {displayRows.length > 80 ? (
+        <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-800">
+          Showing the latest 80 rows in this section.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function ReconciliationFlowPanel() {
+  const steps = [
+    "Plaid/NFCU bank rows are checked for pending, posted, needs review, excluded, and uncategorized states.",
+    "Manual expenses and manual statement lines are checked so they do not accidentally duplicate bank activity.",
+    "Stripe activity is reviewed against expected deposits, refunds, fees, and payment records.",
+    "Trust & Safety activity is checked against receivables, collections, booking deductions, and vendor costs.",
+    "Exception queues show what needs cleanup before P&L, Cash Flow, General Ledger, and Balance Sheet are final.",
+  ];
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+        Reconciliation Flow
+      </p>
+      <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+        How SitGuru verifies financial activity
+      </h2>
+
+      <div className="mt-6 grid gap-3 lg:grid-cols-5">
+        {steps.map((step, index) => (
+          <div
+            key={step}
+            className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
+              {index + 1}
+            </span>
+            <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
+              {step}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export default async function AdminReconciliationPage() {
   const actor = await getAdminIdentity();
 
   if (!actor?.canAccessFinancials) {
-    return null;
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Financial access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with a finance-enabled admin account to view SitGuru
+            reconciliation reports.
+          </p>
+        </div>
+      </div>
+    );
   }
 
-  const reconciliation = await getReconciliationData();
+  const data = await getReconciliationData();
 
   return (
     <div className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
@@ -587,137 +1207,184 @@ export default async function AdminFinancialReconciliationPage() {
               </p>
 
               <h1 className="mt-3 max-w-4xl text-4xl font-black leading-[0.95] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-                SitGuru Financial Reconciliation.
+                SitGuru Reconciliation Center.
               </h1>
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                Match Stripe activity, NFCU/Plaid bank activity, financial
-                ledger rows, and Trust & Safety events so SitGuru can verify
-                deposits, payouts, Stripe fees, Checkr costs, refunds, and
-                booking deduction recoveries without double counting.
+                Review whether NFCU/Plaid bank activity, manual entries, Stripe
+                records, Trust & Safety activity, P&L, Cash Flow, General Ledger,
+                and Balance Sheet support are aligned before financial reports
+                are finalized.
               </p>
             </div>
 
             <div className="rounded-[1.5rem] border border-emerald-100 bg-[#fbfefd] p-4 shadow-sm">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                Reconciliation Actions
+                Financial Navigation
               </p>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <ActionLink href="/admin/financials" label="Financials" />
+                <ActionLink href="/admin/financials" label="Overview" />
+                <ActionLink href="/admin/financials/plaid" label="Banking" />
                 <ActionLink href="/admin/financials/profit-loss" label="P&L" />
+                <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
+                <ActionLink href="/admin/financials/general-ledger" label="Ledger" />
                 <ActionLink
                   href="/admin/financials/balance-sheet"
                   label="Balance Sheet"
-                />
-                <ActionLink
-                  href="/admin/financials/cash-flow"
-                  label="Cash Flow"
                   primary
                 />
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+                  Reconciliation Score
+                </p>
+                <p className="mt-2 text-5xl font-black text-emerald-700">
+                  {data.totals.reconciliationScore}%
+                </p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Based on needs review, pending, duplicate, uncategorized, and
+                  excluded bank activity.
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <StatCard
-              label="Reconciliation Rate"
-              value={`${reconciliation.totals.reconciliationRate}%`}
-              detail={`${reconciliation.totals.reconciledCount.toLocaleString()} reconciled rows out of ${reconciliation.totals.totalRows.toLocaleString()} total rows.`}
-              tone={
-                reconciliation.totals.reconciliationRate >= 80
-                  ? "emerald"
-                  : "amber"
-              }
+              label="Bank Rows"
+              value={data.totals.bankRows.toLocaleString()}
+              detail={`${data.totals.postedRows.toLocaleString()} posted and ${data.totals.pendingRows.toLocaleString()} pending.`}
+              tone="emerald"
             />
+
             <StatCard
-              label="Unmatched Rows"
-              value={reconciliation.totals.unmatchedCount.toLocaleString()}
-              detail="Rows still needing a Stripe, NFCU/Plaid, ledger, or Trust & Safety match."
-              tone={
-                reconciliation.totals.unmatchedCount === 0 ? "emerald" : "rose"
-              }
+              label="Needs Review"
+              value={data.totals.needsReviewRows.toLocaleString()}
+              detail="Bank transactions that must be categorized before reports are final."
+              tone={data.totals.needsReviewRows ? "amber" : "emerald"}
             />
+
             <StatCard
-              label="Trust & Safety Rows"
-              value={reconciliation.totals.trustSafetyRows.toLocaleString()}
-              detail={`${money(reconciliation.totals.trustSafetyCash)} net Trust & Safety activity included.`}
-              tone="violet"
+              label="Possible Duplicates"
+              value={data.totals.duplicateRows.toLocaleString()}
+              detail="Same-date, same-amount, similar-label bank rows."
+              tone={data.totals.duplicateRows ? "rose" : "emerald"}
             />
+
             <StatCard
-              label="Bank + Stripe Rows"
-              value={(
-                reconciliation.totals.bankRows + reconciliation.totals.stripeRows
-              ).toLocaleString()}
-              detail={`${reconciliation.totals.bankRows.toLocaleString()} bank rows and ${reconciliation.totals.stripeRows.toLocaleString()} Stripe rows found.`}
+              label="Manual Entries"
+              value={data.totals.manualRows.toLocaleString()}
+              detail={`${money(data.totals.manualExpenseTotal)} in manual expenses plus reporting lines.`}
               tone="sky"
             />
+
+            <StatCard
+              label="Net Cash Movement"
+              value={money(data.totals.netCashMovement)}
+              detail={`${money(data.totals.totalCashIn)} cash in and ${money(data.totals.totalCashOut)} cash out.`}
+              tone={data.totals.netCashMovement >= 0 ? "violet" : "rose"}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Uncategorized"
+              value={data.totals.uncategorizedRows.toLocaleString()}
+              detail="Rows that need a report category or category type."
+              tone={data.totals.uncategorizedRows ? "amber" : "emerald"}
+            />
+
+            <StatCard
+              label="Excluded Rows"
+              value={data.totals.excludedRows.toLocaleString()}
+              detail="Rows marked excluded or personal should be confirmed."
+              tone="slate"
+            />
+
+            <StatCard
+              label="Stripe Rows"
+              value={data.totals.stripeRows.toLocaleString()}
+              detail="Stripe transactions and balance rows available for matching."
+              tone="sky"
+            />
+
+            <StatCard
+              label="Trust & Safety Rows"
+              value={data.totals.trustSafetyRows.toLocaleString()}
+              detail="Plan, receivable, deduction, fee, refund, and collection support."
+              tone="violet"
+            />
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
-                Unmatched / Review Queue
-              </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-                Items that need reconciliation review.
-              </h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-                This queue highlights the highest-priority unmatched activity
-                across Trust & Safety, Stripe, and NFCU/Plaid bank rows.
-              </p>
-            </div>
+        <ReconciliationChecks data={data} />
 
-            <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800">
-              {reconciliation.unmatchedItems.length.toLocaleString()} shown
-            </div>
-          </div>
+        <ReconciliationFlowPanel />
 
-          <div className="mt-6">
-            <ReconciliationTable items={reconciliation.unmatchedItems} />
-          </div>
+        <ItemsTable
+          eyebrow="Exception Queue"
+          title="Transactions needing review"
+          description="These rows should be cleaned up first because they can affect P&L, Cash Flow, General Ledger, and Balance Sheet accuracy."
+          rows={[
+            ...data.needsReviewItems,
+            ...data.uncategorizedItems,
+            ...data.duplicateItems,
+            ...data.pendingItems,
+          ]}
+          emptyMessage="No exception rows found. Reconciliation looks clean for this pass."
+        />
+
+        <ItemsTable
+          eyebrow="Possible Duplicates"
+          title="Duplicate review"
+          description="These rows share the same date, amount, and similar label. Confirm they are not accidental duplicates."
+          rows={data.duplicateItems}
+          emptyMessage="No likely duplicate bank rows detected."
+        />
+
+        <ItemsTable
+          eyebrow="Pending Bank Activity"
+          title="Pending transactions"
+          description="Pending transactions are visible but may change after the bank posts them."
+          rows={data.pendingItems}
+          emptyMessage="No pending bank transactions found."
+        />
+
+        <ItemsTable
+          eyebrow="Manual Entry Review"
+          title="Manual entries and statement lines"
+          description="Manual entries should be checked against bank activity so expenses or adjustments are not counted twice."
+          rows={data.manualItems}
+          emptyMessage="No manual expense, cash flow, or balance sheet lines found."
+        />
+
+        <section className="grid gap-8 xl:grid-cols-2">
+          <ItemsTable
+            eyebrow="Stripe Matching"
+            title="Stripe activity"
+            description="Stripe rows should eventually be matched to bank deposits, processing fees, refunds, chargebacks, and payments."
+            rows={data.stripeItems}
+            emptyMessage="No Stripe rows found yet."
+          />
+
+          <ItemsTable
+            eyebrow="Trust & Safety Matching"
+            title="Trust & Safety activity"
+            description="Trust & Safety rows should align with receivables, collections, Book & Bark deductions, Checkr costs, and Stripe fees."
+            rows={data.trustSafetyItems}
+            emptyMessage="No Trust & Safety rows found yet."
+          />
         </section>
 
-        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
-                All Reconciliation Support
-              </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-                Trust & Safety, Stripe, and bank activity.
-              </h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-                Use this table to compare Trust & Safety payments and deductions
-                against Stripe charges, Stripe payouts, NFCU/Plaid bank deposits,
-                refunds, fees, and reconciliation references.
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-100 bg-[#fbfefd] px-4 py-3 text-sm font-black text-slate-700">
-              {reconciliation.items.length.toLocaleString()} rows shown
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <ReconciliationTable items={reconciliation.items} />
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] border border-sky-100 bg-sky-50 p-5 shadow-sm sm:p-6 lg:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
-            Reconciliation Notes
-          </p>
-          <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
-            Trust & Safety events should reconcile to Stripe checkout sessions,
-            payment intents, charges, refunds, and Stripe payouts. Stripe payouts
-            should then reconcile to NFCU/Plaid bank deposits. Book & Bark
-            booking deduction recoveries should reconcile to completed booking
-            payout adjustments and the remaining deduction balance.
-          </p>
-        </section>
+        <ItemsTable
+          eyebrow="Excluded / Personal"
+          title="Excluded transactions"
+          description="These transactions are outside reports. Confirm they were intentionally excluded."
+          rows={data.excludedItems}
+          emptyMessage="No excluded rows found."
+        />
       </div>
     </div>
   );
