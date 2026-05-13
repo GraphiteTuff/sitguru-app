@@ -1,10 +1,20 @@
-"use client";
-
 import { createBrowserClient } from "@supabase/ssr";
 
-export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+function getRequiredEnv(name: string): string {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing ${name} environment variable.`);
+  }
+
+  return value;
 }
+
+export function createClient() {
+  const supabaseUrl = getRequiredEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const supabaseAnonKey = getRequiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+}
+
+export const supabase = createClient();
