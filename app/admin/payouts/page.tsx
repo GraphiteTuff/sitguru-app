@@ -715,7 +715,7 @@ export default async function AdminPayoutLandingPage({
                   Main payout buttons should point here:
                 </p>
                 <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-600">
-                  /admin/payout
+                  /admin/payouts
                 </p>
               </div>
             </div>
@@ -770,7 +770,7 @@ export default async function AdminPayoutLandingPage({
 
       <section className="grid gap-5 xl:grid-cols-12">
         <div className="rounded-[1.75rem] border border-[#e6eee2] bg-white p-5 shadow-sm sm:p-6 xl:col-span-8">
-          <form action="/admin/payout" className="space-y-4">
+          <form action="/admin/payouts" className="space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-[#118a43]">
@@ -796,7 +796,7 @@ export default async function AdminPayoutLandingPage({
                 </button>
 
                 <Link
-                  href="/admin/payout"
+                  href="/admin/payouts"
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#dbe8d5] bg-white px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#f7fbf5]"
                 >
                   Reset

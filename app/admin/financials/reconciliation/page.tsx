@@ -356,6 +356,82 @@ function getTrustSafetyAmount(row: GenericRow) {
   );
 }
 
+
+function getBookingStripeAmount(row: GenericRow) {
+  const amount =
+    toNumber(row.total_customer_paid) ||
+    toNumber(row.amount_total) ||
+    toNumber(row.subtotal_amount) ||
+    toNumber(row.total_amount) ||
+    toNumber(row.booking_total) ||
+    centsToDollars(row.amount_total_cents) ||
+    centsToDollars(row.subtotal_amount_cents);
+
+  return Math.abs(amount) > 10000 && Number.isInteger(amount) ? amount / 100 : amount;
+}
+
+function getBookingStripeFee(row: GenericRow) {
+  const fee =
+    toNumber(row.sitguru_fee_amount) ||
+    toNumber(row.platform_fee) ||
+    toNumber(row.marketplace_fee_amount) ||
+    toNumber(row.stripe_fee) ||
+    toNumber(row.processing_fee) ||
+    centsToDollars(row.sitguru_fee_amount_cents) ||
+    centsToDollars(row.platform_fee_cents) ||
+    centsToDollars(row.marketplace_fee_amount_cents) ||
+    centsToDollars(row.stripe_fee_cents);
+
+  return Math.abs(fee) > 10000 && Number.isInteger(fee) ? fee / 100 : fee;
+}
+
+function getPayoutAmount(row: GenericRow) {
+  const amount =
+    toNumber(row.net_amount) ||
+    toNumber(row.amount) ||
+    toNumber(row.payout_amount) ||
+    toNumber(row.transfer_amount) ||
+    centsToDollars(row.net_amount_cents) ||
+    centsToDollars(row.amount_cents) ||
+    centsToDollars(row.payout_amount_cents) ||
+    centsToDollars(row.transfer_amount_cents);
+
+  return Math.abs(amount) > 10000 && Number.isInteger(amount) ? amount / 100 : amount;
+}
+
+function isStripeRelatedBooking(row: GenericRow) {
+  return Boolean(
+    asTrimmedString(row.stripe_session_id) ||
+      asTrimmedString(row.stripe_checkout_session_id) ||
+      asTrimmedString(row.payment_intent_id) ||
+      asTrimmedString(row.stripe_payment_intent_id) ||
+      asTrimmedString(row.charge_id) ||
+      asTrimmedString(row.stripe_charge_id) ||
+      asTrimmedString(row.checkout_session_id) ||
+      asTrimmedString(row.payment_status),
+  );
+}
+
+function bankLooksLikeStripeDeposit(row: GenericRow) {
+  const text = [
+    getRowLabel(row),
+    asTrimmedString(row.merchant_name),
+    asTrimmedString(row.description),
+    asTrimmedString(row.name),
+    asTrimmedString(row.sitguru_notes),
+    asTrimmedString(row.category),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    text.includes("stripe") ||
+    text.includes("strp") ||
+    text.includes("payout") ||
+    text.includes("payment processing")
+  );
+}
+
 function isArchivedRow(row: GenericRow) {
   return Boolean(
     row.deleted_at ||
@@ -555,15 +631,100 @@ function getScore({
   return Math.round(score);
 }
 
+
+function getUniqueSourceRows(rows: GenericRow[]) {
+  const seen = new Set<string>();
+
+  return rows.filter((row, index) => {
+    const key =
+      getRowReference(row, String(index)) ||
+      [getRowDate(row), getRowLabel(row), String(toNumber(row.amount))].join("|");
+
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function bookingToStripeItem(row: GenericRow, index: number): ReconciliationItem {
+  const amount = getBookingStripeAmount(row);
+  const fee = getBookingStripeFee(row);
+  const paymentStatus =
+    asTrimmedString(row.payment_status) ||
+    asTrimmedString(row.status) ||
+    "Recorded";
+  const reference =
+    asTrimmedString(row.stripe_checkout_session_id) ||
+    asTrimmedString(row.stripe_session_id) ||
+    asTrimmedString(row.payment_intent_id) ||
+    asTrimmedString(row.stripe_payment_intent_id) ||
+    getRowReference(row, String(index));
+
+  return {
+    id: `booking-stripe-${reference}`,
+    source: "Booking Stripe Payment",
+    label:
+      asTrimmedString(row.customer_name) ||
+      asTrimmedString(row.pet_parent_name) ||
+      asTrimmedString(row.service_name) ||
+      getRowLabel(row),
+    amount,
+    status: paymentStatus,
+    bankStatus: "Stripe",
+    reviewStatus: "recorded",
+    date: formatDate(getRowDate(row)),
+    reference,
+    category: fee ? `Stripe payment · Fee ${moneyExact(fee)}` : "Stripe payment",
+    issueType: "Stripe booking payment check",
+    recommendation:
+      "Confirm this booking payment is represented in Stripe activity, payout batches, Plaid/NFCU deposits, P&L, Cash Flow, and General Ledger.",
+  };
+}
+
+function stripePayoutToItem(row: GenericRow, index: number): ReconciliationItem {
+  const amount = getPayoutAmount(row);
+  const plaidReference =
+    asTrimmedString(row.plaid_transaction_id) ||
+    asTrimmedString(row.bank_transaction_id) ||
+    asTrimmedString(row.matched_bank_transaction_id);
+  const reference =
+    asTrimmedString(row.stripe_payout_id) ||
+    asTrimmedString(row.payout_id) ||
+    asTrimmedString(row.transfer_id) ||
+    getRowReference(row, String(index));
+
+  return {
+    id: `stripe-payout-${reference}`,
+    source: "Stripe Payout",
+    label: asTrimmedString(row.description) || asTrimmedString(row.bank_description) || "Stripe payout batch",
+    amount,
+    status: asTrimmedString(row.status) || asTrimmedString(row.payout_status) || "Recorded",
+    bankStatus: plaidReference ? "Bank Matched" : "Needs Bank Match",
+    reviewStatus: plaidReference ? "matched" : "needs_review",
+    date: formatDate(getRowDate(row)),
+    reference,
+    category: plaidReference ? "Matched payout deposit" : "Unmatched payout deposit",
+    issueType: plaidReference ? "Matched Stripe payout" : "Stripe payout needs Plaid/NFCU match",
+    recommendation: plaidReference
+      ? "Confirm the matched Plaid/NFCU deposit agrees to the Stripe payout batch."
+      : "Match this Stripe payout to the corresponding Plaid/NFCU business bank deposit before month-end close.",
+  };
+}
+
 async function getReconciliationData(): Promise<ReconciliationData> {
   const [
-    bankRows,
+    adminPlaidRows,
+    plaidTransactionRows,
+    bankTransactionRows,
     manualExpenseRows,
     cashFlowLines,
     balanceSheetLines,
     statementLines,
     stripeRows,
     stripeBalanceRows,
+    stripePayoutRows,
+    bookingRows,
     trustSafetyEvents,
     trustSafetyPurchases,
     bookingDeductions,
@@ -576,6 +737,22 @@ async function getReconciliationData(): Promise<ReconciliationData> {
         .order("date", { ascending: false })
         .limit(5000),
       "admin_plaid_transactions",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("plaid_transactions")
+        .select("*")
+        .order("date", { ascending: false })
+        .limit(5000),
+      "plaid_transactions",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("bank_transactions")
+        .select("*")
+        .order("date", { ascending: false })
+        .limit(5000),
+      "bank_transactions",
     ),
     safeRows<GenericRow>(
       supabaseAdmin
@@ -630,6 +807,22 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     ),
     safeRows<GenericRow>(
       supabaseAdmin
+        .from("stripe_payouts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2000),
+      "stripe_payouts",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("bookings")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3000),
+      "bookings_stripe_reconciliation",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
         .from("trust_safety_financial_events")
         .select("*")
         .order("created_at", { ascending: false })
@@ -654,6 +847,11 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     ),
   ]);
 
+  const bankRows = getUniqueSourceRows([
+    ...adminPlaidRows,
+    ...plaidTransactionRows,
+    ...bankTransactionRows,
+  ]);
   const activeBankRows = bankRows.filter((row) => !isArchivedRow(row));
   const activeManualExpenseRows = manualExpenseRows.filter((row) => !isArchivedRow(row));
   const activeCashFlowLines = cashFlowLines.filter((row) => !isArchivedRow(row));
@@ -696,11 +894,35 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     })),
   ];
 
+  const stripeBookingRows = bookingRows
+    .filter((row) => !isArchivedRow(row))
+    .filter(isStripeRelatedBooking);
+  const stripePayoutItems = stripePayoutRows
+    .filter((row) => !isArchivedRow(row))
+    .map(stripePayoutToItem);
+  const stripeBankDepositItems = activeBankRows
+    .filter(bankLooksLikeStripeDeposit)
+    .map((row, index) => {
+      const item = bankRowToItem(row, index);
+
+      return {
+        ...item,
+        id: `${item.id}-stripe-bank-deposit-${index}`,
+        source: "Plaid/NFCU Stripe Deposit",
+        issueType: "Stripe deposit bank match candidate",
+        recommendation:
+          "Confirm this Plaid/NFCU bank row matches a Stripe payout batch and should clear the unmatched deposit queue.",
+      };
+    });
+
   const stripeItems = [
     ...stripeRows.map((row, index) => stripeToItem(row, index, "Stripe Transaction")),
     ...stripeBalanceRows.map((row, index) =>
       stripeToItem(row, index, "Stripe Balance Transaction"),
     ),
+    ...stripeBookingRows.map(bookingToStripeItem),
+    ...stripePayoutItems,
+    ...stripeBankDepositItems,
   ];
 
   const trustSafetyItems = [
@@ -811,7 +1033,7 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     {
       label: "Stripe / Payment Activity",
       status: stripeItems.length > 0 ? "ready" : "needs_review",
-      detail: `${stripeItems.length.toLocaleString()} Stripe rows are available to match against deposits, refunds, and fees.`,
+      detail: `${stripeItems.length.toLocaleString()} Stripe rows are available from bookings, Stripe payouts, Stripe tables, and Plaid/NFCU deposit candidates.`,
     },
     {
       label: "Trust & Safety Activity",
@@ -1226,6 +1448,7 @@ export default async function AdminReconciliationPage() {
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <ActionLink href="/admin/financials" label="Overview" />
                 <ActionLink href="/admin/financials/plaid" label="Banking" />
+                <ActionLink href="/admin/financials/stripe" label="Stripe" />
                 <ActionLink href="/admin/financials/profit-loss" label="P&L" />
                 <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
                 <ActionLink href="/admin/financials/general-ledger" label="Ledger" />

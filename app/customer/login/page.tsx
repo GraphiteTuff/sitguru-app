@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { redirect } from "next/navigation";
 import { login } from "@/app/auth/actions";
 import { createClient } from "@/lib/supabase/server";
+import PhoneCodeLogin from "@/components/auth/PhoneCodeLogin";
 
 type CustomerLoginPageProps = {
   searchParams?: Promise<{
@@ -77,8 +78,8 @@ export default async function CustomerLoginPage({
               </h1>
 
               <p className="mt-4 max-w-md text-sm leading-6 text-slate-700">
-                Log in to manage bookings, pet details, messages, and your
-                dashboard in one easy place.
+                Log in with your phone number to manage bookings, pet details,
+                messages, and your dashboard in one easy place.
               </p>
             </div>
 
@@ -122,7 +123,7 @@ export default async function CustomerLoginPage({
               </h2>
 
               <p className="mt-2 text-sm text-slate-600">
-                Sign in to your customer account.
+                Use your phone number for a quick, secure 6-digit login code.
               </p>
             </div>
 
@@ -138,70 +139,102 @@ export default async function CustomerLoginPage({
               </div>
             ) : null}
 
-            <form action={login} className="mt-8 space-y-5">
-              <input type="hidden" name="next" value={nextPath} />
+            <PhoneCodeLogin
+              nextPath={nextPath}
+              role="customer"
+              heading="Log in with phone"
+              description="We’ll text you a secure 6-digit SitGuru code."
+              submitLabel="Send 6-digit code"
+              verifyLabel="Verify & enter Customer Portal"
+            />
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-slate-700"
-                >
-                  Email
-                </label>
+            <div className="my-8 flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                or use email
+              </span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
 
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="customer@sitguru.com"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500"
-                />
+            <details className="group rounded-2xl border border-slate-200 bg-slate-50">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-bold text-slate-800">
+                <span className="inline-flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-emerald-600" />
+                  Log in with email and password
+                </span>
+
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-500 shadow-sm">
+                  Backup option
+                </span>
+              </summary>
+
+              <div className="border-t border-slate-200 bg-white px-5 py-5">
+                <form action={login} className="space-y-5">
+                  <input type="hidden" name="next" value={nextPath} />
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="email"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Email
+                    </label>
+
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      placeholder="customer@sitguru.com"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="password"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Password
+                    </label>
+
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      required
+                      autoComplete="current-password"
+                      placeholder="Enter your password"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                    <Link
+                      href="/forgot-password"
+                      className="text-emerald-700 hover:text-emerald-600"
+                    >
+                      Forgot password?
+                    </Link>
+
+                    <Link
+                      href={`/signup?next=${encodeURIComponent(nextPath)}`}
+                      className="text-emerald-700 hover:text-emerald-600"
+                    >
+                      Need an account?
+                    </Link>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    Log in with email
+                  </button>
+                </form>
               </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-slate-700"
-                >
-                  Password
-                </label>
-
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-                <Link
-                  href="/forgot-password"
-                  className="text-emerald-700 hover:text-emerald-600"
-                >
-                  Forgot password?
-                </Link>
-
-                <Link
-                  href={`/phone-login?next=${encodeURIComponent(nextPath)}`}
-                  className="text-emerald-700 hover:text-emerald-600"
-                >
-                  Log in with phone code
-                </Link>
-              </div>
-
-              <button
-                type="submit"
-                className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
-              >
-                Log in to Customer Portal
-              </button>
-            </form>
+            </details>
 
             <div className="mt-8 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 p-5">
               <p className="text-sm font-semibold text-slate-900">

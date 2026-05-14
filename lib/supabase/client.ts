@@ -10,11 +10,29 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
+function getSessionStorage() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  return window.sessionStorage;
+}
+
 export function createClient() {
   const supabaseUrl = getRequiredEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const supabaseAnonKey = getRequiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    getRequiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      persistSession: true,
+      storage: getSessionStorage(),
+      storageKey: "sitguru-session",
+    },
+  });
 }
 
 export const supabase = createClient();

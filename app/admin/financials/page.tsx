@@ -93,6 +93,21 @@ type SourceHealth = {
   message: string;
 };
 
+type PlaidBankingSummary = {
+  connectedBusinessAccounts: number;
+  businessCheckingAccounts: number;
+  businessSavingsAccounts: number;
+  currentCashBalance: number;
+  availableCashBalance: number;
+  postedTransactions: number;
+  pendingTransactions: number;
+  needsReviewTransactions: number;
+  manualCategorizedTransactions: number;
+  uncategorizedTransactions: number;
+  businessOnlyFeed: boolean;
+  lastSyncedAt: string | null;
+};
+
 type FinancialOverviewResponse = {
   ok: boolean;
   isLive: boolean;
@@ -104,6 +119,7 @@ type FinancialOverviewResponse = {
     segment: string;
   };
   sourceHealth: SourceHealth[];
+  plaidBanking?: PlaidBankingSummary;
   kpis: KpiCard[];
   breakEven: {
     percent: number;
@@ -246,6 +262,20 @@ const fallbackOverview: FinancialOverviewResponse = {
       message: "Preview fallback loaded while live financial overview data loads.",
     },
   ],
+  plaidBanking: {
+    connectedBusinessAccounts: 0,
+    businessCheckingAccounts: 0,
+    businessSavingsAccounts: 0,
+    currentCashBalance: 0,
+    availableCashBalance: 0,
+    postedTransactions: 0,
+    pendingTransactions: 0,
+    needsReviewTransactions: 0,
+    manualCategorizedTransactions: 0,
+    uncategorizedTransactions: 0,
+    businessOnlyFeed: true,
+    lastSyncedAt: null,
+  },
   kpis: [
     {
       label: "Gross Bookings",
@@ -567,7 +597,7 @@ const supportingRecords: ReportCard[] = [
     eyebrow: "Monthly Close",
     title: "Bank & Card Reconciliation",
     description:
-      "Reconcile Stripe settlements, Navy Federal business banking, credit card transactions, deposits, and fees.",
+      "Reconcile Stripe settlements, NFCU/Plaid business banking, credit card transactions, deposits, and fees.",
     href: "/admin/financials/reconciliation",
     tone: "green",
   },
@@ -608,9 +638,9 @@ const operatingFinance: ReportCard[] = [
   },
   {
     eyebrow: "Banking",
-    title: "Plaid Bank Connections",
+    title: "NFCU / Plaid Business Banking",
     description:
-      "Connect bank accounts through Plaid Link, view linked accounts, masks, balances, account types, and sync status.",
+      "Review connected NFCU Business Checking/Savings accounts, masks, balances, posted/pending transactions, review status, and sync health.",
     href: "/admin/financials/plaid",
     tone: "green",
   },
@@ -634,7 +664,7 @@ const operatingFinance: ReportCard[] = [
 
 const cpaChecklist = [
   "Review Stripe payments, refunds, fees, disputes, and transfers.",
-  "Reconcile Stripe payouts to Navy Federal business banking deposits.",
+  "Reconcile Stripe payouts to NFCU/Plaid business banking deposits.",
   "Confirm guru payouts, partner commissions, and payout exceptions.",
   "Categorize vendor expenses by operating, administrative, payroll, contractor, and technology costs.",
   "Review A/R aging, A/P aging, balance sheet accounts, and general ledger detail.",
@@ -654,7 +684,7 @@ const statementExportLinks = [
   },
   {
     title: "Cash Flow Export",
-    description: "Operating cash movement, Stripe payout deposits, Navy Federal activity, and transfers.",
+    description: "Operating cash movement, Stripe payout deposits, NFCU/Plaid business activity, and transfers.",
     href: "/api/admin/financials/cash-flow/export?format=excel",
   },
   {
@@ -750,6 +780,12 @@ function formatDateTime(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
+}
+
+function safeNumber(value: unknown, fallback = 0) {
+  const numberValue = Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : fallback;
 }
 
 function getRangeDates(range: string) {
@@ -1286,16 +1322,267 @@ function CashFlowByCategoryChart({ data }: { data: CashFlowCategory[] }) {
   );
 }
 
+function getPlaidBankingSummary(overview: FinancialOverviewResponse): PlaidBankingSummary {
+  const kpis = Array.isArray(overview.kpis) ? overview.kpis : [];
+  const cashBalance = safeNumber(
+    kpis.find((kpi) => kpi.label === "Cash Balance")?.rawValue,
+  );
+  const availableCash = safeNumber(
+    kpis.find((kpi) => kpi.label === "Available Cash")?.rawValue,
+    cashBalance,
+  );
+  const banking = overview.plaidBanking ?? {
+    connectedBusinessAccounts: 0,
+    businessCheckingAccounts: 0,
+    businessSavingsAccounts: 0,
+    currentCashBalance: cashBalance,
+    availableCashBalance: availableCash,
+    postedTransactions: 0,
+    pendingTransactions: 0,
+    needsReviewTransactions: 0,
+    manualCategorizedTransactions: 0,
+    uncategorizedTransactions: 0,
+    businessOnlyFeed: true,
+    lastSyncedAt: null,
+  };
+
+  return {
+    connectedBusinessAccounts: safeNumber(banking.connectedBusinessAccounts),
+    businessCheckingAccounts: safeNumber(banking.businessCheckingAccounts),
+    businessSavingsAccounts: safeNumber(banking.businessSavingsAccounts),
+    currentCashBalance: safeNumber(banking.currentCashBalance, cashBalance),
+    availableCashBalance: safeNumber(
+      banking.availableCashBalance,
+      availableCash || cashBalance,
+    ),
+    postedTransactions: safeNumber(banking.postedTransactions),
+    pendingTransactions: safeNumber(banking.pendingTransactions),
+    needsReviewTransactions: safeNumber(banking.needsReviewTransactions),
+    manualCategorizedTransactions: safeNumber(
+      banking.manualCategorizedTransactions,
+    ),
+    uncategorizedTransactions: safeNumber(banking.uncategorizedTransactions),
+    businessOnlyFeed:
+      typeof banking.businessOnlyFeed === "boolean"
+        ? banking.businessOnlyFeed
+        : true,
+    lastSyncedAt: banking.lastSyncedAt || null,
+  };
+}
+
+function PlaidBankingSummaryPanel({
+  overview,
+}: {
+  overview: FinancialOverviewResponse;
+}) {
+  const banking = getPlaidBankingSummary(overview);
+  const hasBusinessAccounts = banking.connectedBusinessAccounts > 0;
+  const reviewTotal =
+    banking.needsReviewTransactions + banking.uncategorizedTransactions;
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+            Plaid / NFCU Business Banking
+          </p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+            Business Checking, Savings & Transaction Feed
+          </h2>
+          <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
+            This dashboard is wired to the same Plaid/NFCU banking foundation used
+            by Banking, P&amp;L, Cash Flow, General Ledger, Balance Sheet,
+            Reconciliation, and Pro Forma. It only summarizes business checking
+            and business savings activity from the financial overview API.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
+              hasBusinessAccounts
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-amber-200 bg-amber-50 text-amber-800"
+            }`}
+          >
+            {hasBusinessAccounts ? "Business Feed Connected" : "Needs Banking Review"}
+          </span>
+
+          <span
+            className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
+              banking.businessOnlyFeed
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-rose-200 bg-rose-50 text-rose-800"
+            }`}
+          >
+            {banking.businessOnlyFeed ? "Business Only" : "Review Account Scope"}
+          </span>
+
+          <Link
+            href="/admin/financials/plaid"
+            className="rounded-full bg-emerald-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
+          >
+            Open Banking
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <div className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+            Business Accounts
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {banking.connectedBusinessAccounts.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            {banking.businessCheckingAccounts} checking · {banking.businessSavingsAccounts} savings
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-blue-100 bg-blue-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+            Current Cash
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {formatCurrency(banking.currentCashBalance)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            NFCU business balances
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-sky-100 bg-sky-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
+            Available Cash
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {formatCurrency(banking.availableCashBalance)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            Available for operations
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+            Posted Rows
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {banking.postedTransactions.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            Bank-posted transactions
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-amber-100 bg-amber-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
+            Pending Rows
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {banking.pendingTransactions.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            May change when posted
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-rose-100 bg-rose-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-700">
+            Needs Review
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {reviewTotal.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            Category cleanup queue
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-[1.25rem] border border-slate-100 bg-[#fbfefd] p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+            Manual Categorized
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {banking.manualCategorizedTransactions.toLocaleString()}
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+            Rows manually assigned to financial report categories and ready to
+            feed P&amp;L, Cash Flow, General Ledger, Balance Sheet, and Reconciliation.
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-slate-100 bg-[#fbfefd] p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+            Uncategorized
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {banking.uncategorizedTransactions.toLocaleString()}
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+            Rows still needing income, expense, transfer, owner equity, owner draw,
+            liability, or ignore classification.
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-slate-100 bg-[#fbfefd] p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+            Last Sync
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {banking.lastSyncedAt ? formatDateTime(banking.lastSyncedAt) : "Not synced"}
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+            This should update when the Plaid sync route pulls business banking
+            activity into SitGuru.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function TrustSafetyFinancialsPanel({
   financials,
 }: {
   financials: TrustSafetyFinancialsResponse;
 }) {
   const safeFinancials = financials ?? fallbackTrustSafetyFinancials;
-  const totals = safeFinancials.totals ?? fallbackTrustSafetyFinancials.totals;
-  const plans = Array.isArray(safeFinancials.plans)
-    ? safeFinancials.plans
-    : fallbackTrustSafetyFinancials.plans;
+  const rawTotals = safeFinancials.totals ?? fallbackTrustSafetyFinancials.totals;
+  const totals = {
+    purchases: safeNumber(rawTotals.purchases),
+    revenueCents: safeNumber(rawTotals.revenueCents),
+    outstandingCents: safeNumber(rawTotals.outstandingCents),
+    bookingDeductionRemainingCents: safeNumber(
+      rawTotals.bookingDeductionRemainingCents,
+    ),
+    approvalPending: safeNumber(rawTotals.approvalPending),
+    checkrReady: safeNumber(rawTotals.checkrReady),
+    clearCount: safeNumber(rawTotals.clearCount),
+    bookableCount: safeNumber(rawTotals.bookableCount),
+  };
+  const plans = (
+    Array.isArray(safeFinancials.plans)
+      ? safeFinancials.plans
+      : fallbackTrustSafetyFinancials.plans
+  ).map((plan) => ({
+    planKey: plan.planKey || "unknown-plan",
+    planName: plan.planName || "Screening Plan",
+    purchases: safeNumber(plan.purchases),
+    revenueCents: safeNumber(plan.revenueCents),
+    outstandingCents: safeNumber(plan.outstandingCents),
+    bookingDeductionRemainingCents: safeNumber(
+      plan.bookingDeductionRemainingCents,
+    ),
+    approvalPending: safeNumber(plan.approvalPending),
+    checkrReady: safeNumber(plan.checkrReady),
+    clearCount: safeNumber(plan.clearCount),
+    bookableCount: safeNumber(plan.bookableCount),
+  }));
 
   return (
     <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
@@ -1919,8 +2206,8 @@ export default function AdminFinancialsPage() {
 
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                 Real-time financial performance across all SitGuru operations,
-                including bookings, customers, gurus, partners, Stripe, payouts,
-                banking, expenses, reporting, and CPA export readiness.
+                including Plaid/NFCU business banking, bookings, customers, gurus,
+                partners, Stripe, payouts, expenses, reporting, and CPA export readiness.
               </p>
 
               <div
@@ -1949,7 +2236,7 @@ export default function AdminFinancialsPage() {
                   href="/admin/financials/plaid"
                   className="rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
                 >
-                  Plaid Bank Connections →
+                  NFCU / Plaid Business Banking →
                 </Link>
 
                 <Link
@@ -2234,6 +2521,10 @@ export default function AdminFinancialsPage() {
             ) : null}
           </div>
         </section>
+
+        {sectionVisible(segment, ["banking", "payouts", "trust-safety"]) ? (
+          <PlaidBankingSummaryPanel overview={overview} />
+        ) : null}
 
         {showTrustSafetyFinancials ? (
           <TrustSafetyFinancialsPanel financials={trustSafetyFinancials} />

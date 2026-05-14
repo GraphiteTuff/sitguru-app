@@ -80,8 +80,6 @@ const routes = {
   login: "/login",
 };
 
-const fallbackAvatar = "/images/customer-profile-photo.jpg";
-
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -90,12 +88,34 @@ function readBoolean(value: unknown) {
   return typeof value === "boolean" ? value : false;
 }
 
+function isOAuthProviderAvatarUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+
+    return (
+      hostname.includes("googleusercontent.com") ||
+      hostname.includes("ggpht.com") ||
+      hostname.includes("google.com") ||
+      hostname.includes("googleapis.com") ||
+      hostname.includes("facebook.com") ||
+      hostname.includes("fbcdn.net") ||
+      hostname.includes("apple.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function normalizePhotoUrl(value: string | null) {
   if (!value) return null;
 
   const cleanValue = value.trim();
 
   if (!cleanValue) return null;
+
+  if (isOAuthProviderAvatarUrl(cleanValue)) return null;
+
   if (cleanValue.startsWith("http://")) return cleanValue;
   if (cleanValue.startsWith("https://")) return cleanValue;
   if (cleanValue.startsWith("/")) return cleanValue;
@@ -158,26 +178,15 @@ function buildCustomerProfile(
     fullName?.split(" ")[0] ||
     null;
 
-  const avatarUrl =
-    normalizePhotoUrl(
-      readFirstString(row, [
-        "avatar_url",
-        "profile_photo_url",
-        "photo_url",
-        "image_url",
-        "picture",
-      ]),
-    ) ||
-    normalizePhotoUrl(
-      readMetadataString(metadata, [
-        "avatar_url",
-        "profile_photo_url",
-        "photo_url",
-        "image_url",
-        "picture",
-        "avatar",
-      ]),
-    );
+  const avatarUrl = normalizePhotoUrl(
+    readFirstString(row, [
+      "profile_photo_url",
+      "photo_url",
+      "image_url",
+      "avatar_url",
+      "picture",
+    ]),
+  );
 
   return {
     id: user.id,
@@ -307,7 +316,9 @@ async function fetchBookingStats(userId: string) {
   const { data, error } = await supabase
     .from("bookings")
     .select("id,status")
-    .or(`customer_id.eq.${userId},pet_owner_id.eq.${userId},user_id.eq.${userId}`)
+    .or(
+      `customer_id.eq.${userId},pet_owner_id.eq.${userId},user_id.eq.${userId}`,
+    )
     .limit(100);
 
   if (error) {
@@ -496,6 +507,7 @@ export default function CustomerProfileSetupPage() {
     completed: 0,
   });
   const [errorMessage, setErrorMessage] = useState("");
+  const [avatarImageFailed, setAvatarImageFailed] = useState(false);
 
   const loadPage = useCallback(async () => {
     setLoading(true);
@@ -551,27 +563,27 @@ export default function CustomerProfileSetupPage() {
   const setupBooleans = useMemo(() => {
     const basicInfoComplete = Boolean(
       (profile?.full_name || profile?.first_name) &&
-        profile?.email &&
-        profile?.phone,
+      profile?.email &&
+      profile?.phone,
     );
 
     const serviceLocationComplete = Boolean(
       profile?.service_address &&
-        profile?.service_city &&
-        profile?.service_state &&
-        profile?.service_zip,
+      profile?.service_city &&
+      profile?.service_state &&
+      profile?.service_zip,
     );
 
     const petPassportsComplete = petCount > 0;
     const careNotesComplete = Boolean(profile?.care_preferences);
     const emergencyContactComplete = Boolean(
       profile?.emergency_contact ||
-        (profile?.emergency_contact_name && profile?.emergency_contact_phone),
+      (profile?.emergency_contact_name && profile?.emergency_contact_phone),
     );
     const notificationsComplete = Boolean(
       profile?.email_notifications ||
-        profile?.push_notifications ||
-        profile?.text_notifications,
+      profile?.push_notifications ||
+      profile?.text_notifications,
     );
 
     return {
@@ -697,8 +709,14 @@ export default function CustomerProfileSetupPage() {
     setupBooleans.serviceLocationComplete &&
     setupBooleans.petPassportsComplete;
 
-  const avatarSrc = profile?.avatar_url || fallbackAvatar;
+  const avatarSrc = profile?.avatar_url || "";
   const displayName = getCustomerDisplayName(profile);
+  const avatarInitials = getCustomerInitials(profile);
+  const showAvatarImage = Boolean(avatarSrc) && !avatarImageFailed;
+
+  useEffect(() => {
+    setAvatarImageFailed(false);
+  }, [avatarSrc]);
 
   if (loading) {
     return (
@@ -737,18 +755,18 @@ export default function CustomerProfileSetupPage() {
               <div className="grid gap-6 lg:grid-cols-[1.05fr_1.35fr] lg:items-center">
                 <div className="flex items-center gap-5">
                   <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-emerald-100 bg-emerald-50 text-3xl font-black text-emerald-700">
-                    {avatarSrc ? (
+                    {showAvatarImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={avatarSrc}
                         alt={`${displayName} profile`}
                         className="h-full w-full object-cover"
-                        onError={(event) => {
-                          event.currentTarget.style.display = "none";
-                        }}
+                        onError={() => setAvatarImageFailed(true)}
                       />
                     ) : (
-                      getCustomerInitials(profile)
+                      <span aria-label={`${displayName} initials`}>
+                        {avatarInitials}
+                      </span>
                     )}
                   </div>
 
@@ -830,8 +848,8 @@ export default function CustomerProfileSetupPage() {
 
                   <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-emerald-50">
                     Each step captures information SitGuru uses throughout the
-                    platform: matching, bookings, maps, Guru preparation, safety,
-                    messaging, reminders, and rebooking.
+                    platform: matching, bookings, maps, Guru preparation,
+                    safety, messaging, reminders, and rebooking.
                   </p>
                 </div>
 
@@ -839,9 +857,7 @@ export default function CustomerProfileSetupPage() {
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-50">
                     Setup Progress
                   </p>
-                  <p className="mt-2 text-5xl font-black">
-                    {completedSteps}/6
-                  </p>
+                  <p className="mt-2 text-5xl font-black">{completedSteps}/6</p>
                   <p className="mt-1 text-sm font-black text-emerald-50">
                     {completionPercent}% complete
                   </p>

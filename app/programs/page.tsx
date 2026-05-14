@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -296,48 +297,72 @@ const ambassadorTypes = [
     phrase: "Guide the Pack",
     description:
       "Vet Techs talk with Pet Parents every day about routines, wellness, follow-up care, and daily pet support. Their trusted voice can help connect families with SitGuru.",
+    image: "/images/ambassadors/vet-tech-ambassador3.jpg",
+    imageAlt: "Vet Tech Ambassador supporting a dog in a veterinary clinic",
+    imagePosition: "center 35%",
   },
   {
     title: "Veterinarian Ambassadors",
     phrase: "Strengthen the Pack",
     description:
       "Veterinarians are trusted voices for Pet Parents. Their recommendations can help families discover reliable local pet care support beyond the clinic.",
+    image: "/images/ambassadors/veterinarian-ambassador2.jpg",
+    imageAlt: "Veterinarian Ambassador caring for a golden retriever in a clinic",
+    imagePosition: "center 35%",
   },
   {
     title: "Trainer Ambassadors",
     phrase: "Shape the Pack",
     description:
       "Trainers help pets and Pet Parents build trust, structure, and better routines while introducing families to dependable SitGuru support.",
+    image: "/images/ambassadors/trainer-ambassador2.jpg",
+    imageAlt: "Trainer Ambassador working with dogs outdoors",
+    imagePosition: "center 42%",
   },
   {
     title: "Groomer Ambassadors",
     phrase: "Connect the Pack",
     description:
       "Groomers and pet care professionals regularly see Pet Parents and can help families find trusted pet care when life gets busy.",
+    image: "/images/ambassadors/groomer-ambassador2.jpg",
+    imageAlt: "Groomer Ambassador grooming a small dog",
+    imagePosition: "center 38%",
   },
   {
     title: "Student Ambassadors",
     phrase: "Grow the Pack",
     description:
       "Students can share SitGuru on campus, in apartments, with friends, clubs, teammates, and local Pet Parents.",
+    image: "/images/ambassadors/student-ambassador2.jpg",
+    imageAlt: "Student Ambassador spending time with pets",
+    imagePosition: "center 35%",
   },
   {
     title: "Veteran & Military Ambassadors",
     phrase: "Serve the Pack",
     description:
       "Veterans, spouses, and military-connected families can help grow SitGuru through strong service networks and trusted local relationships.",
+    image: "/images/ambassadors/veteran-military-ambassador.jpg",
+    imageAlt: "Veteran and Military Ambassador working from a laptop",
+    imagePosition: "center 35%",
   },
   {
     title: "Rescue & Shelter Ambassadors",
     phrase: "Protect the Pack",
     description:
       "Rescue and shelter advocates can help adopters, volunteers, and animal lovers discover trusted pet care support through SitGuru.",
+    image: "/images/ambassadors/rescue-shelter-ambassador2.jpg",
+    imageAlt: "Rescue and Shelter Ambassador holding a kitten",
+    imagePosition: "center 35%",
   },
   {
     title: "Guru Ambassadors",
     phrase: "Build the Pack",
     description:
       "Existing Gurus can refer great pet lovers, Pet Parents, and local partners while helping SitGuru grow in their service area.",
+    image: "/images/ambassadors/guru-ambassador2.jpg",
+    imageAlt: "Guru Ambassador walking a happy dog outside",
+    imagePosition: "center 42%",
   },
 ];
 
@@ -973,10 +998,11 @@ export default function ProgramsPage() {
               </h2>
 
               <p className="mt-3 max-w-5xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
-                The Ambassador Program should not be cookie-cutter. Each
-                Ambassador type has a specific role in helping foster,
-                encourage, and promote SitGuru while talking with Pet Parents,
-                Gurus, students, clients, patients, families, and local networks.
+                Every Ambassador brings a different voice, background, and
+                connection to the Pack. Each Ambassador type has a specific role
+                in helping foster, encourage, and promote SitGuru while talking
+                with Pet Parents, Gurus, students, clients, patients, families,
+                and local networks.
               </p>
             </div>
 
@@ -993,19 +1019,32 @@ export default function ProgramsPage() {
             {ambassadorTypes.map((item) => (
               <div
                 key={item.title}
-                className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-4"
+                className="overflow-hidden rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] shadow-sm"
               >
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">
-                  {item.phrase}
-                </p>
+                <div className="relative aspect-[16/9] w-full overflow-hidden bg-green-50 lg:aspect-[16/10]">
+                  <Image
+                    src={item.image}
+                    alt={item.imageAlt}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                    className="object-cover"
+                    style={{ objectPosition: item.imagePosition || "center center" }}
+                  />
+                </div>
 
-                <h3 className="mt-1 text-lg font-black text-green-950">
-                  {item.title}
-                </h3>
+                <div className="p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">
+                    {item.phrase}
+                  </p>
 
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  {item.description}
-                </p>
+                  <h3 className="mt-1 text-lg font-black leading-tight text-green-950">
+                    {item.title}
+                  </h3>
+
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    {item.description}
+                  </p>
+                </div>
               </div>
             ))}
           </div>

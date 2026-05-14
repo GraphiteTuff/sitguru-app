@@ -40,7 +40,7 @@ const ambassadorCards: AmbassadorCardItem[] = [
     tagline: "Trusted pet care guidance from the clinic side.",
     description:
       "Vet Techs are trusted by Pet Parents during some of the most important pet care conversations. As a SitGuru Ambassador, you can help families find dependable care beyond the clinic while helping responsible animal lovers discover a path to become Gurus.",
-    image: "/images/ambassadors/vet-tech-ambassador.jpg",
+    image: "/images/ambassadors/vet-tech-ambassador3.jpg",
     imageAlt: "Vet professional with a dog in a clinic",
     imagePosition: "center 35%",
     icon: Stethoscope,
@@ -66,7 +66,7 @@ const ambassadorCards: AmbassadorCardItem[] = [
     tagline: "A trusted local voice for Pet Parents.",
     description:
       "Veterinarians understand how much trust matters in pet care. SitGuru gives you a community-centered way to help Pet Parents find reliable support for walks, visits, routines, travel, and peace of mind.",
-    image: "/images/ambassadors/veterinarian-ambassador.jpg",
+    image: "/images/ambassadors/veterinarian-ambassador2.jpg",
     imageAlt: "Veterinarian with pet owner and dog",
     imagePosition: "center 35%",
     icon: ShieldCheck,
@@ -92,7 +92,7 @@ const ambassadorCards: AmbassadorCardItem[] = [
     tagline: "Build trust, routine, and support through training.",
     description:
       "Trainers help pets and Pet Parents build structure, confidence, and better routines. SitGuru Ambassadors can help families keep that progress going with dependable local care between training sessions.",
-    image: "/images/ambassadors/trainer-ambassador.jpg",
+    image: "/images/ambassadors/trainer-ambassador2.jpg",
     imageAlt: "Dog trainer with dog and owner",
     imagePosition: "center 32%",
     icon: PawPrint,
@@ -118,7 +118,7 @@ const ambassadorCards: AmbassadorCardItem[] = [
     tagline: "Trusted regular touchpoints with Pet Parents.",
     description:
       "Groomers see Pet Parents regularly and often hear when families need extra help. SitGuru gives groomers a way to connect families with trusted care while helping grow a stronger pet community.",
-    image: "/images/ambassadors/groomer-ambassador.jpg",
+    image: "/images/ambassadors/groomer-ambassador2.jpg",
     imageAlt: "Groomer with happy dog",
     imagePosition: "center 35%",
     icon: Scissors,
@@ -144,7 +144,7 @@ const ambassadorCards: AmbassadorCardItem[] = [
     tagline: "Campus and community energy that spreads trust.",
     description:
       "Students are connected through campuses, apartments, clubs, teams, classmates, and social circles. Student Ambassadors can help SitGuru grow while helping friends and local Pet Parents discover flexible pet care opportunities.",
-    image: "/images/ambassadors/student-ambassador.jpg",
+    image: "/images/ambassadors/student-ambassador2.jpg",
     imageAlt: "Student with dog outdoors",
     imagePosition: "center 32%",
     icon: GraduationCap,
@@ -170,7 +170,7 @@ const ambassadorCards: AmbassadorCardItem[] = [
     tagline: "Military-connected trust and community connection.",
     description:
       "Veterans, military spouses, Guard, Reserve, and military-connected families understand service, trust, and responsibility. SitGuru gives military-connected Ambassadors a meaningful way to support Pet Parents and grow trusted local care.",
-    image: "/images/ambassadors/veteran-ambassador.jpg",
+    image: "/images/ambassadors/veteran-military-ambassador.jpg",
     imageAlt: "Military-connected person with dog",
     imagePosition: "center 32%",
     icon: Medal,
@@ -197,7 +197,7 @@ const ambassadorCards: AmbassadorCardItem[] = [
     tagline: "Support adopters, fosters, and local pet care networks.",
     description:
       "Rescue and shelter advocates already care deeply about animal wellbeing. SitGuru Ambassadors can help adopters, volunteers, fosters, and Pet Parents find trusted support after adoption and throughout pet ownership.",
-    image: "/images/ambassadors/rescue-ambassador.jpg",
+    image: "/images/ambassadors/rescue-shelter-ambassador2.jpg",
     imageAlt: "Rescue volunteer with dog and cat",
     imagePosition: "center 35%",
     icon: HandHeart,
@@ -223,7 +223,7 @@ const ambassadorCards: AmbassadorCardItem[] = [
     tagline: "Experienced caregivers helping grow trusted care.",
     description:
       "Existing Gurus can become some of SitGuru’s strongest Ambassadors. You understand what Pet Parents need, what makes a great Guru, and how trusted local care can make a real difference.",
-    image: "/images/ambassadors/guru-ambassador.jpg",
+    image: "/images/ambassadors/guru-ambassador2.jpg",
     imageAlt: "Guru walking with dog",
     imagePosition: "center 35%",
     icon: UsersRound,

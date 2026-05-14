@@ -12,18 +12,25 @@ import {
   ChevronUp,
   LogOut,
   Menu,
+  Repeat2,
   UserRound,
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
 
+type HeaderMode = "public" | "customer" | "guru" | "admin";
+
 type HeaderUser = {
   id?: string | null;
   name?: string | null;
   email?: string | null;
   avatarUrl?: string | null;
-  role?: "customer" | "guru" | "admin" | string | null;
+  role?: "customer" | "guru" | "admin" | "both" | string | null;
+  hasCustomerAccess?: boolean;
+  hasGuruAccess?: boolean;
+  hasAdminAccess?: boolean;
+  guruStatus?: string | null;
 };
 
 type HeaderProps = {
@@ -44,6 +51,24 @@ type ProfileRow = {
   profile_photo_url?: string | null;
   photo_url?: string | null;
   image_url?: string | null;
+  is_pet_parent?: boolean | null;
+  is_customer?: boolean | null;
+  is_guru?: boolean | null;
+  is_guru_interested?: boolean | null;
+};
+
+type GuruRow = {
+  id?: string | null;
+  user_id?: string | null;
+  status?: string | null;
+  approval_status?: string | null;
+  onboarding_status?: string | null;
+  is_active?: boolean | null;
+  is_public?: boolean | null;
+};
+
+type UserRoleRow = {
+  role?: string | null;
 };
 
 type NavLink = {
@@ -71,6 +96,7 @@ const customerNavLinks: NavLink[] = [
 const guruNavLinks: NavLink[] = [
   { label: "Dashboard", href: "/guru/dashboard" },
   { label: "Bookings", href: "/guru/dashboard/bookings" },
+  { label: "Referrals", href: "/guru/dashboard/referrals" },
   { label: "Messages", href: "/guru/dashboard/messages" },
   { label: "My Profile", href: "/guru/dashboard/profile" },
   { label: "Availability", href: "/guru/dashboard/availability" },
@@ -85,52 +111,104 @@ const adminNavLinks: NavLink[] = [
   { label: "Referrals", href: "/admin/referrals" },
 ];
 
-function normalizeStoredRole(value?: string | null) {
-  const role = String(value || "").trim().toLowerCase();
+function normalizeRole(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
 
-  if (role.includes("admin")) return "admin";
+function isAdminRole(value?: string | null) {
+  const role = normalizeRole(value);
 
-  if (
+  return (
+    role.includes("admin") ||
+    role.includes("super") ||
+    role.includes("owner") ||
+    role.includes("founder") ||
+    role.includes("ceo")
+  );
+}
+
+function isGuruRole(value?: string | null) {
+  const role = normalizeRole(value);
+
+  return (
     role.includes("guru") ||
     role.includes("sitter") ||
     role.includes("provider") ||
     role.includes("walker") ||
-    role.includes("caretaker")
-  ) {
-    return "guru";
-  }
+    role.includes("caretaker") ||
+    role.includes("pet_care") ||
+    role.includes("pet-care")
+  );
+}
+
+function isCustomerRole(value?: string | null) {
+  const role = normalizeRole(value);
+
+  return (
+    role.includes("customer") ||
+    role.includes("pet_parent") ||
+    role.includes("pet-parent") ||
+    role.includes("pet parent") ||
+    role.includes("parent")
+  );
+}
+
+function isBothRole(value?: string | null) {
+  const role = normalizeRole(value);
+
+  return (
+    role === "both" ||
+    role.includes("both") ||
+    role.includes("customer_guru") ||
+    role.includes("customer-guru") ||
+    role.includes("pet_parent_and_guru") ||
+    role.includes("pet-parent-and-guru")
+  );
+}
+
+function normalizeStoredRole(value?: string | null) {
+  const role = normalizeRole(value);
+
+  if (isAdminRole(role)) return "admin";
+  if (isBothRole(role)) return "both";
+  if (isGuruRole(role)) return "guru";
+  if (isCustomerRole(role)) return "customer";
 
   return "customer";
 }
 
-function getHeaderMode(
-  pathname: string | null,
-  isLoggedIn: boolean,
-  storedRole: string,
-) {
+function getHeaderMode({
+  pathname,
+  isLoggedIn,
+  storedRole,
+}: {
+  pathname: string | null;
+  isLoggedIn: boolean;
+  storedRole: string;
+}): HeaderMode {
   const path = pathname || "";
 
   if (!isLoggedIn) return "public";
 
-  if (path.startsWith("/admin")) {
-    return "admin";
-  }
+  if (path.startsWith("/admin")) return "admin";
 
-  if (path.startsWith("/guru/dashboard") || path.startsWith("/guru/success-center")) {
+  if (
+    path.startsWith("/guru") ||
+    path.startsWith("/guru-dashboard") ||
+    path.startsWith("/guru-success-center")
+  ) {
     return "guru";
   }
 
   if (
     path.startsWith("/customer") ||
-    path.startsWith("/search") ||
-    path.startsWith("/find-care") ||
-    path.startsWith("/book/") ||
-    path.startsWith("/bookings") ||
     path.startsWith("/pets") ||
+    path.startsWith("/bookings") ||
     path.startsWith("/messages") ||
+    path.startsWith("/profile") ||
+    path.startsWith("/rewards") ||
     path.startsWith("/referrals") ||
-    path.startsWith("/pawperks") ||
-    path.startsWith("/guru/")
+    path.startsWith("/pawperks")
   ) {
     return "customer";
   }
@@ -156,12 +234,42 @@ function getProfileName(profile: ProfileRow | null, email?: string | null) {
   );
 }
 
+function isOAuthProviderAvatarUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+
+    return (
+      hostname.includes("googleusercontent.com") ||
+      hostname.includes("ggpht.com") ||
+      hostname.includes("google.com") ||
+      hostname.includes("googleapis.com") ||
+      hostname.includes("facebook.com") ||
+      hostname.includes("fbcdn.net") ||
+      hostname.includes("apple.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizeAvatarUrl(value?: string | null) {
+  if (!value) return "";
+
+  const cleanValue = value.trim();
+
+  if (!cleanValue) return "";
+  if (isOAuthProviderAvatarUrl(cleanValue)) return "";
+
+  return cleanValue;
+}
+
 function getProfileAvatar(profile: ProfileRow | null) {
   return (
-    profile?.profile_photo_url ||
-    profile?.photo_url ||
-    profile?.avatar_url ||
-    profile?.image_url ||
+    normalizeAvatarUrl(profile?.profile_photo_url) ||
+    normalizeAvatarUrl(profile?.photo_url) ||
+    normalizeAvatarUrl(profile?.image_url) ||
+    normalizeAvatarUrl(profile?.avatar_url) ||
     ""
   );
 }
@@ -228,11 +336,96 @@ function getActiveAliases(href: string) {
     return ["/guru/dashboard"];
   }
 
+  if (href === "/guru/dashboard/referrals") {
+    return ["/guru/dashboard/referrals", "/guru/referrals"];
+  }
+
+  if (href === "/guru/dashboard/messages") {
+    return ["/guru/dashboard/messages", "/guru/messages"];
+  }
+
+  if (href === "/guru/dashboard/bookings") {
+    return ["/guru/dashboard/bookings", "/guru/bookings"];
+  }
+
+  if (href === "/guru/dashboard/profile") {
+    return ["/guru/dashboard/profile", "/guru/profile"];
+  }
+
+  if (href === "/guru/dashboard/availability") {
+    return ["/guru/dashboard/availability", "/guru/availability"];
+  }
+
+  if (href === "/guru/dashboard/earnings") {
+    return ["/guru/dashboard/earnings", "/guru/earnings"];
+  }
+
+  if (href === "/guru/success-center") {
+    return ["/guru/success-center", "/guru/dashboard/resources"];
+  }
+
   if (href === "/admin") {
     return ["/admin"];
   }
 
   return [href];
+}
+
+function clearSitGuruAuthStorage() {
+  if (typeof window === "undefined") return;
+
+  const keysToRemove = [
+    "sitguru_pending_role",
+    "sitguru_selected_role",
+    "sitguru_signup_role",
+    "sitguru_onboarding_role",
+    "sitguru_auth_redirect",
+    "sitguru_pending_phone",
+    "sitguru_phone_login_started",
+  ];
+
+  keysToRemove.forEach((key) => {
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
+  });
+}
+
+function getGuruStatus(guru: GuruRow | null) {
+  return (
+    guru?.approval_status ||
+    guru?.onboarding_status ||
+    guru?.status ||
+    (guru?.is_active ? "approved" : null)
+  );
+}
+
+function getSwitchHref(headerMode: HeaderMode) {
+  if (headerMode === "guru") return "/customer/dashboard/profile";
+  if (headerMode === "customer") return "/guru/dashboard/profile";
+  return "";
+}
+
+function getSwitchLabel(headerMode: HeaderMode, guruStatus?: string | null) {
+  if (headerMode === "guru") {
+    return "Switch to Pet Parent";
+  }
+
+  if (headerMode === "customer") {
+    const status = normalizeRole(guruStatus);
+
+    if (
+      status.includes("pending") ||
+      status.includes("review") ||
+      status.includes("started") ||
+      status.includes("setup")
+    ) {
+      return "Switch to Guru Setup";
+    }
+
+    return "Switch to Guru";
+  }
+
+  return "";
 }
 
 export default function Header({ user = null }: HeaderProps) {
@@ -255,32 +448,110 @@ export default function Header({ user = null }: HeaderProps) {
 
         const {
           data: { user: activeUser },
+          error: userError,
         } = await supabase.auth.getUser();
 
         if (!mounted) return;
 
-        if (!activeUser) {
+        if (userError || !activeUser) {
           setLoadedUser(null);
           return;
         }
 
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", activeUser.id)
           .maybeSingle();
 
+        const { data: roleRows, error: roleError } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", activeUser.id);
+
+        const { data: guruData, error: guruError } = await supabase
+          .from("gurus")
+          .select(
+            "id,user_id,status,approval_status,onboarding_status,is_active,is_public",
+          )
+          .eq("user_id", activeUser.id)
+          .maybeSingle();
+
         if (!mounted) return;
 
-        const profile = (profileData || null) as ProfileRow | null;
-        const rawRole = profile?.role || profile?.account_type || "customer";
+        const profile = !profileError
+          ? ((profileData || null) as ProfileRow | null)
+          : null;
+
+        const roles = !roleError
+          ? (((roleRows || []) as UserRoleRow[])
+              .map((row) => row.role)
+              .filter(Boolean) as string[])
+          : [];
+
+        const guru = !guruError ? ((guruData || null) as GuruRow | null) : null;
+
+        const metadataRole =
+          typeof activeUser.user_metadata?.role === "string"
+            ? activeUser.user_metadata.role
+            : typeof activeUser.app_metadata?.role === "string"
+              ? activeUser.app_metadata.role
+              : null;
+
+        const metadataAccountType =
+          typeof activeUser.user_metadata?.account_type === "string"
+            ? activeUser.user_metadata.account_type
+            : typeof activeUser.app_metadata?.account_type === "string"
+              ? activeUser.app_metadata.account_type
+              : null;
+
+        const allRoleSignals = [
+          profile?.role,
+          profile?.account_type,
+          metadataRole,
+          metadataAccountType,
+          ...roles,
+        ].filter(Boolean) as string[];
+
+        const hasAdminAccess = allRoleSignals.some(isAdminRole);
+
+        const hasGuruAccess =
+          Boolean(guru?.id) ||
+          Boolean(profile?.is_guru) ||
+          Boolean(profile?.is_guru_interested) ||
+          allRoleSignals.some(isGuruRole) ||
+          allRoleSignals.some(isBothRole);
+
+        /**
+         * Every signed-in SitGuru user can use the Pet Parent side.
+         * Guru-only users can still book care as Pet Parents without creating a second account.
+         */
+        const hasCustomerAccess =
+          !hasAdminAccess ||
+          Boolean(profile?.is_pet_parent) ||
+          Boolean(profile?.is_customer) ||
+          allRoleSignals.some(isCustomerRole) ||
+          allRoleSignals.some(isBothRole);
+
+        const rawRole =
+          hasAdminAccess
+            ? "admin"
+            : hasGuruAccess && hasCustomerAccess
+              ? "both"
+              : hasGuruAccess
+                ? "guru"
+                : "customer";
 
         setLoadedUser({
           id: activeUser.id,
-          email: activeUser.email || profile?.email || "",
-          name: getProfileName(profile, activeUser.email),
+          email: activeUser.email || profile?.email || activeUser.phone || "",
+          name: getProfileName(profile, activeUser.email || activeUser.phone),
           avatarUrl: getProfileAvatar(profile),
-          role: normalizeStoredRole(rawRole),
+          role: rawRole,
+          hasCustomerAccess,
+          hasGuruAccess,
+          hasAdminAccess,
+          guruStatus: getGuruStatus(guru),
         });
       } catch (error) {
         console.error("Header user load failed:", error);
@@ -306,14 +577,16 @@ export default function Header({ user = null }: HeaderProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      loadActiveUser();
+      window.setTimeout(() => {
+        loadActiveUser();
+      }, 0);
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [user]);
+  }, [user, pathname]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -349,34 +622,37 @@ export default function Header({ user = null }: HeaderProps) {
   const activeUser = loadedUser;
   const isLoggedIn = Boolean(activeUser);
   const storedRole = normalizeStoredRole(activeUser?.role);
-  const headerMode = getHeaderMode(pathname, isLoggedIn, storedRole);
+  const headerMode = getHeaderMode({ pathname, isLoggedIn, storedRole });
 
   const isCustomer = headerMode === "customer";
   const isGuru = headerMode === "guru";
   const isAdmin = headerMode === "admin";
 
+  const hasCustomerAccess = Boolean(activeUser?.hasCustomerAccess);
+  const hasGuruAccess = Boolean(activeUser?.hasGuruAccess);
+  const hasAdminAccess = Boolean(activeUser?.hasAdminAccess);
+
+  const showPortalSwitch =
+    isLoggedIn &&
+    !isAdmin &&
+    !hasAdminAccess &&
+    ((isGuru && hasCustomerAccess) || (isCustomer && hasGuruAccess));
+
+  const switchHref = showPortalSwitch ? getSwitchHref(headerMode) : "";
+  const switchLabel = showPortalSwitch
+    ? getSwitchLabel(headerMode, activeUser?.guruStatus)
+    : "";
+
   const navLinks = useMemo(() => {
-    if (isCustomer) return customerNavLinks;
-    if (isGuru) return guruNavLinks;
     if (isAdmin) return adminNavLinks;
+    if (isGuru) return guruNavLinks;
+    if (isCustomer) return customerNavLinks;
     return publicNavLinks;
   }, [isAdmin, isCustomer, isGuru]);
-
-  const dashboardHref = isGuru
-    ? "/guru/dashboard"
-    : isAdmin
-      ? "/admin"
-      : "/customer/dashboard";
 
   const bookingsHref = isGuru
     ? "/guru/dashboard/bookings"
     : "/customer/dashboard/bookings";
-
-  const messagesHref = isGuru
-    ? "/guru/dashboard/messages"
-    : isAdmin
-      ? "/admin/messages"
-      : "/messages";
 
   const resourcesHref = isGuru
     ? "/guru/success-center"
@@ -390,16 +666,17 @@ export default function Header({ user = null }: HeaderProps) {
 
   const logoHref = "/";
 
-  const userName = isAdmin ? "Admin HQ" : activeUser?.name || "My Account";
-  const userEmail = isAdmin ? "admin@sitguru.com" : activeUser?.email || "";
-  const userAvatarUrl = activeUser?.avatarUrl || "";
+  const userName = activeUser?.name || (isAdmin ? "Admin HQ" : "My Account");
+  const userEmail = activeUser?.email || "";
+  const userAvatarUrl = normalizeAvatarUrl(activeUser?.avatarUrl);
   const userInitials = getInitials(userName, userEmail);
 
   const accountMenuLinks: NavLink[] = isGuru
     ? [
         { label: "Dashboard", href: "/guru/dashboard" },
-        { label: "Update Profile", href: "/guru/dashboard/profile" },
+        { label: "Update Guru Profile", href: "/guru/dashboard/profile" },
         { label: "Bookings", href: "/guru/dashboard/bookings" },
+        { label: "Referrals", href: "/guru/dashboard/referrals" },
         { label: "Messages", href: "/guru/dashboard/messages" },
         { label: "Availability", href: "/guru/dashboard/availability" },
         { label: "Earnings", href: "/guru/dashboard/earnings" },
@@ -416,7 +693,10 @@ export default function Header({ user = null }: HeaderProps) {
         ]
       : [
           { label: "Dashboard", href: "/customer/dashboard" },
-          { label: "Update Profile", href: "/customer/dashboard/profile" },
+          {
+            label: "Update Pet Parent Profile",
+            href: "/customer/dashboard/profile",
+          },
           { label: "My Care", href: "/customer/dashboard/bookings" },
           { label: "My Pets", href: "/customer/pets" },
           { label: "Messages", href: "/messages" },
@@ -448,22 +728,30 @@ export default function Header({ user = null }: HeaderProps) {
   };
 
   async function handleLogout() {
+    setLoadedUser(null);
     setAvatarOpen(false);
     setMobileOpen(false);
+    clearSitGuruAuthStorage();
 
     try {
-      await supabase.auth.signOut();
-    } catch {
-      try {
-        await fetch("/auth/signout", {
-          method: "POST",
-        });
-      } catch {
-        // Keep logout moving even if that endpoint is not present.
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("Supabase logout failed:", error.message);
       }
+    } catch (error) {
+      console.error("Logout failed:", error);
     }
 
-    router.push("/");
+    try {
+      await fetch("/auth/signout", {
+        method: "POST",
+      });
+    } catch {
+      // Optional endpoint. Continue even if it does not exist.
+    }
+
+    router.replace("/");
     router.refresh();
   }
 
@@ -552,6 +840,16 @@ export default function Header({ user = null }: HeaderProps) {
             <div className="h-11 w-48 animate-pulse rounded-full bg-slate-100" />
           ) : isLoggedIn ? (
             <>
+              {showPortalSwitch ? (
+                <Link
+                  href={switchHref}
+                  className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100 xl:inline-flex"
+                >
+                  <Repeat2 className="h-4 w-4" />
+                  {switchLabel}
+                </Link>
+              ) : null}
+
               {isGuru ? (
                 <Link
                   href={resourcesHref}
@@ -624,6 +922,18 @@ export default function Header({ user = null }: HeaderProps) {
                     </div>
 
                     <div className="grid gap-1 p-3">
+                      {showPortalSwitch ? (
+                        <Link
+                          href={switchHref}
+                          role="menuitem"
+                          onClick={() => setAvatarOpen(false)}
+                          className="mb-1 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-100"
+                        >
+                          <Repeat2 className="h-4 w-4" />
+                          {switchLabel}
+                        </Link>
+                      ) : null}
+
                       {accountMenuLinks.map((item) => (
                         <Link
                           key={item.href}
@@ -712,6 +1022,17 @@ export default function Header({ user = null }: HeaderProps) {
                   <NotificationBell />
                 </div>
               </div>
+            ) : null}
+
+            {showPortalSwitch ? (
+              <Link
+                href={switchHref}
+                onClick={() => setMobileOpen(false)}
+                className="mb-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-100"
+              >
+                <Repeat2 className="h-4 w-4" />
+                {switchLabel}
+              </Link>
             ) : null}
 
             {navLinks.map((item) => (

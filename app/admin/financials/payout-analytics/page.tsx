@@ -88,6 +88,9 @@ type SearchParamsShape = {
 
 type SearchParamsInput = Promise<SearchParamsShape> | SearchParamsShape;
 
+const ANALYTICS_ROUTE = "/admin/financials/payout-analytics";
+const MAIN_PAYOUT_ROUTE = "/admin/payouts";
+
 const demoPayoutRows: PayoutRow[] = [
   {
     id: "demo-guru-001",
@@ -309,6 +312,7 @@ function normalizeSource(value: unknown): PayoutSource {
 
   return "Guru";
 }
+
 function normalizeTypeLabel(value: unknown, fallback = "Unclassified") {
   const raw = String(value || "").trim();
 
@@ -377,9 +381,13 @@ function getAmbassadorType(row: any) {
     .toLowerCase();
 
   if (sourceText.includes("vet tech")) return "Vet Tech";
-  if (sourceText.includes("veterinarian") || sourceText.includes("vet")) return "Veterinarian";
+  if (sourceText.includes("veterinarian") || sourceText.includes("vet")) {
+    return "Veterinarian";
+  }
   if (sourceText.includes("trainer")) return "Trainer";
-  if (sourceText.includes("student") || sourceText.includes("campus")) return "Student / Campus";
+  if (sourceText.includes("student") || sourceText.includes("campus")) {
+    return "Student / Campus";
+  }
   if (sourceText.includes("veteran") || sourceText.includes("skillbridge")) {
     return "Veteran / SkillBridge";
   }
@@ -406,11 +414,10 @@ function getProgramType(row: any) {
   );
 }
 
-
 function getStatusLabel(status: PayoutStatus) {
   if (status === "paid") return "Paid";
   if (status === "pending") return "Pending";
-  if (status === "review") return "Review";
+  if (status === "review") return "Needs Review";
   if (status === "failed") return "Failed";
   return "Scheduled";
 }
@@ -999,7 +1006,6 @@ function SourceBar({ item }: { item: SourceSummary }) {
   );
 }
 
-
 function TypeBreakdownCard({
   title,
   description,
@@ -1015,13 +1021,13 @@ function TypeBreakdownCard({
     <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[#111b33]">{title}</h2>
-          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+          <h2 className="text-xl font-black leading-tight text-[#111b33]">{title}</h2>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
             {description}
           </p>
         </div>
 
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#118a43]">
+        <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#118a43]">
           {items.length} types
         </span>
       </div>
@@ -1235,7 +1241,7 @@ export default async function PayoutsAnalyticsPage({
       }
     });
 
-    return `/admin/financials/payouts?${search.toString()}`;
+    return `${ANALYTICS_ROUTE}?${search.toString()}`;
   };
 
   return (
@@ -1273,7 +1279,7 @@ export default async function PayoutsAnalyticsPage({
 
           <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
             <Link
-              href="/admin/payout"
+              href={MAIN_PAYOUT_ROUTE}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#118a43] px-5 py-3 text-sm font-black text-white transition hover:bg-[#0b6d33]"
             >
               Main Payout Landing
@@ -1294,7 +1300,7 @@ export default async function PayoutsAnalyticsPage({
       </section>
 
       <section className="rounded-[1.75rem] border border-[#e6eee2] bg-white p-5 shadow-sm sm:p-6">
-        <form action="/admin/financials/payouts" className="space-y-4">
+        <form action={ANALYTICS_ROUTE} className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-[#118a43]">
@@ -1320,7 +1326,7 @@ export default async function PayoutsAnalyticsPage({
               </button>
 
               <Link
-                href="/admin/financials/payouts"
+                href={ANALYTICS_ROUTE}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#dbe8d5] bg-white px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#f7fbf5]"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -1510,17 +1516,17 @@ export default async function PayoutsAnalyticsPage({
           </div>
         </div>
 
-        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-4">
-          <div className="mb-5 flex items-center justify-between">
+        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-5">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-black text-[#111b33]">
               Payout Volume Over Time
             </h2>
-            <div className="flex items-center gap-4 text-xs font-bold text-slate-500">
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
               <span className="flex items-center gap-2">
                 <span className="h-1.5 w-6 rounded-full bg-[#118a43]" />
                 Apr 25 – May 2, 2026
               </span>
-              <span className="hidden items-center gap-2 sm:flex">
+              <span className="flex items-center gap-2">
                 <span className="h-1.5 w-6 rounded-full bg-slate-300" />
                 Apr 18 – Apr 24, 2026
               </span>
@@ -1591,7 +1597,7 @@ export default async function PayoutsAnalyticsPage({
           </div>
         </div>
 
-        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-2">
+        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-3">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-black text-[#111b33]">Payouts by Source</h2>
             <Link
@@ -1609,7 +1615,7 @@ export default async function PayoutsAnalyticsPage({
           </div>
         </div>
 
-        <div className="grid gap-5 xl:col-span-4 xl:grid-cols-3">
+        <div className="grid gap-5 xl:col-span-9 xl:grid-cols-3">
           <TypeBreakdownCard
             title="Payouts by Ambassador Type"
             description="Tracks Ambassador payouts across Vet Techs, Veterinarians, Trainers, students, Veterans, SkillBridge, Friends & Family, and community Ambassador groups."
@@ -1630,7 +1636,7 @@ export default async function PayoutsAnalyticsPage({
           />
         </div>
 
-        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-2">
+        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-3">
           <h2 className="text-lg font-black text-[#111b33]">Quick Actions & Alerts</h2>
 
           <div className="mt-5 space-y-3">
@@ -1656,7 +1662,7 @@ export default async function PayoutsAnalyticsPage({
             </div>
 
             <Link
-              href="/admin/payout"
+              href={MAIN_PAYOUT_ROUTE}
               className="flex items-center justify-center rounded-2xl bg-[#118a43] px-4 py-3 text-sm font-black text-white transition hover:bg-[#0b6d33]"
             >
               Back to Main Payout Landing →
@@ -1683,7 +1689,7 @@ export default async function PayoutsAnalyticsPage({
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            <form action="/admin/financials/payouts" className="flex flex-col gap-2 sm:flex-row">
+            <form action={ANALYTICS_ROUTE} className="flex flex-col gap-2 sm:flex-row">
               <PreservedFilterInputs params={params} omit={["q", "page", "focus"]} />
               <input
                 type="text"
@@ -1701,7 +1707,7 @@ export default async function PayoutsAnalyticsPage({
               </button>
             </form>
 
-            <form action="/admin/financials/payouts" className="flex items-center gap-2">
+            <form action={ANALYTICS_ROUTE} className="flex items-center gap-2">
               <PreservedFilterInputs params={params} omit={["sort", "page", "focus"]} />
               <select
                 name="sort"
@@ -1725,7 +1731,7 @@ export default async function PayoutsAnalyticsPage({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1420px] w-full">
+          <table className="w-full min-w-[1420px]">
             <thead className="bg-[#fbfdfb]">
               <tr className="border-b border-[#edf2e7] text-left">
                 {[
@@ -1877,7 +1883,7 @@ export default async function PayoutsAnalyticsPage({
                     </p>
                     <div className="mt-5">
                       <Link
-                        href="/admin/financials/payouts"
+                        href={ANALYTICS_ROUTE}
                         className="inline-flex items-center justify-center rounded-2xl bg-[#118a43] px-4 py-3 text-sm font-black text-white transition hover:bg-[#0b6d33]"
                       >
                         Reset Filters

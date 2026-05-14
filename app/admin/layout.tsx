@@ -39,6 +39,7 @@ const adminRoutes = {
   trustSafety: "/admin/background-checks",
   financials: "/admin/financials",
   banking: "/admin/financials/plaid",
+  stripe: "/admin/financials/stripe",
   profitLoss: "/admin/financials/profit-loss",
   balanceSheet: "/admin/financials/balance-sheet",
   cashFlow: "/admin/financials/cash-flow",
@@ -74,6 +75,7 @@ const navSections = [
     items: [
       { label: "Financial Overview", href: adminRoutes.financials, icon: LineChart },
       { label: "Banking", href: adminRoutes.banking, icon: Landmark },
+      { label: "Stripe Transactions", href: adminRoutes.stripe, icon: CreditCard },
       { label: "Profit & Loss", href: adminRoutes.profitLoss, icon: FileBarChart },
       { label: "Balance Sheet", href: adminRoutes.balanceSheet, icon: FileSpreadsheet },
       { label: "Cash Flow", href: adminRoutes.cashFlow, icon: CreditCard },
@@ -242,6 +244,7 @@ function AdminFooter() {
       links: [
         { label: "Financial Overview", href: adminRoutes.financials },
         { label: "Banking", href: adminRoutes.banking },
+        { label: "Stripe Transactions", href: adminRoutes.stripe },
         { label: "Profit & Loss", href: adminRoutes.profitLoss },
         { label: "Balance Sheet", href: adminRoutes.balanceSheet },
         { label: "Cash Flow", href: adminRoutes.cashFlow },

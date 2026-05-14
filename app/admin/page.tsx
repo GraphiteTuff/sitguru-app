@@ -6,6 +6,7 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   CircleDollarSign,
+  CreditCard,
   Download,
   FileBarChart,
   Gift,
@@ -54,6 +55,7 @@ const adminRoutes = {
   settings: "/admin/settings",
   financials: "/admin/financials",
   profitLoss: "/admin/financials/profit-loss",
+  stripeTransactions: "/admin/financials/stripe",
   commissions: "/admin/commissions",
   exports: "/admin/exports",
   reports: "/admin/exports",
@@ -1761,6 +1763,11 @@ export default async function AdminDashboardPage() {
               href={adminRoutes.guruPerformance}
               icon={<BarChart3 />}
               label="Guru Financials"
+            />
+            <QuickAction
+              href={adminRoutes.stripeTransactions}
+              icon={<CreditCard />}
+              label="Stripe"
             />
             <QuickAction
               href={adminRoutes.reports}

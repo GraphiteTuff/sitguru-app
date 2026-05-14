@@ -80,6 +80,33 @@ type ManagementAlert = {
   href: string;
 };
 
+type PlaidBankingSummary = {
+  businessAccountCount: number;
+  checkingCount: number;
+  savingsCount: number;
+  currentCash: number;
+  availableCash: number;
+  postedRows: number;
+  pendingRows: number;
+  needsReviewRows: number;
+  manualCategorizedRows: number;
+  autoCategorizedRows: number;
+  uncategorizedRows: number;
+  excludedRows: number;
+  transactionRows: number;
+  revenue: number;
+  expenses: number;
+  ownerContributions: number;
+  ownerDraws: number;
+  transfers: number;
+  cashIn: number;
+  cashOut: number;
+  netCashFlow: number;
+  lastSyncedAt: string | null;
+  status: "ready" | "needs_review" | "not_connected";
+  message: string;
+};
+
 type FinancialOverviewResponse = {
   ok: boolean;
   isLive: boolean;
@@ -91,6 +118,7 @@ type FinancialOverviewResponse = {
     segment: string;
   };
   sourceHealth: SourceStatus[];
+  plaidBanking: PlaidBankingSummary;
   kpis: DashboardKpi[];
   breakEven: {
     percent: number;
@@ -119,15 +147,6 @@ type AdminIdentity = {
   canAccessFinancials: boolean;
 };
 
-const FALLBACK_GROSS_BOOKINGS = 1287540;
-const FALLBACK_PLATFORM_REVENUE = 192845;
-const FALLBACK_GURU_PAYOUTS = 732619;
-const FALLBACK_PARTNER_COMMISSIONS = 78214;
-const FALLBACK_STRIPE_FEES = 23761;
-const FALLBACK_REFUNDS = 5914;
-const FALLBACK_OPERATING_EXPENSES = 158020;
-const FALLBACK_CASH_BALANCE = 1183459;
-const FALLBACK_MONTHLY_BURN = 158020;
 const BREAK_EVEN_TARGET = 1450000;
 
 const FINANCE_ROLES = [
@@ -140,7 +159,10 @@ const FINANCE_ROLES = [
   "bookkeeper",
 ];
 
-const tableNames = [
+const TABLE_NAMES = [
+  "admin_plaid_accounts",
+  "admin_plaid_transactions",
+  "admin_plaid_items",
   "bookings",
   "customer_bookings",
   "payments",
@@ -149,6 +171,9 @@ const tableNames = [
   "financial_ledger_entries",
   "bank_transactions",
   "expense_ledger",
+  "cash_flow_lines",
+  "balance_sheet_lines",
+  "financial_statement_lines",
   "guru_payouts",
   "payouts",
   "commissions",
@@ -159,19 +184,6 @@ const tableNames = [
   "guru_trust_safety_plan_purchases",
   "trust_safety_financial_events",
   "booking_trust_safety_deductions",
-];
-
-const dateColumnCandidates = [
-  "created_at",
-  "updated_at",
-  "booking_date",
-  "service_date",
-  "paid_at",
-  "posted_at",
-  "transaction_date",
-  "payout_date",
-  "available_on",
-  "date",
 ];
 
 function asTrimmedString(value: unknown) {
@@ -204,11 +216,16 @@ function toCentsAwareAmount(value: unknown) {
   return raw;
 }
 
+function centsToDollars(value: unknown) {
+  return toNumber(value) / 100;
+}
+
 function getOptionalBoolean(value: unknown) {
   if (typeof value === "boolean") return value;
 
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
+
     if (["true", "yes", "1"].includes(normalized)) return true;
     if (["false", "no", "0"].includes(normalized)) return false;
   }
@@ -261,165 +278,321 @@ function getStatus(row: AnyRow) {
     "payment_status",
     "payout_status",
     "commission_status",
-    "export_status",
+    "repayment_status",
     "state",
   ]).toLowerCase();
 }
 
-function getTypeText(row: AnyRow) {
-  return [
-    row.type,
-    row.transaction_type,
-    row.payment_type,
-    row.payout_type,
-    row.commission_type,
-    row.fee_type,
-    row.expense_type,
-    row.entry_type,
-    row.category,
-    row.description,
-    row.memo,
-    row.account_name,
-    row.reporting_category,
-    row.source,
-    row.source_type,
-  ]
-    .map(asTrimmedString)
-    .join(" ")
-    .toLowerCase();
-}
-
-function rowIncludes(row: AnyRow, terms: string[]) {
-  const status = getStatus(row);
-  const typeText = getTypeText(row);
-
-  return terms.some((term) => status.includes(term) || typeText.includes(term));
-}
-
-function isRefundLike(row: AnyRow) {
-  return rowIncludes(row, ["refund", "chargeback", "dispute", "customer credit"]);
-}
-
-function isFeeLike(row: AnyRow) {
-  return rowIncludes(row, ["stripe", "fee", "processing", "merchant"]);
-}
-
-function isPartnerCommissionLike(row: AnyRow) {
-  return rowIncludes(row, ["partner", "affiliate", "ambassador", "commission"]);
-}
-
-function isGuruPayoutLike(row: AnyRow) {
-  return rowIncludes(row, ["guru", "payout", "sitter", "provider"]);
-}
-
-function isOperatingExpenseLike(row: AnyRow) {
-  return rowIncludes(row, [
-    "expense",
-    "vendor",
-    "software",
-    "admin",
-    "marketing",
-    "supplies",
-    "insurance",
-    "background",
-    "legal",
-    "office",
-    "hosting",
-  ]);
-}
-
 function getRowDate(row: AnyRow) {
-  for (const key of dateColumnCandidates) {
-    const value = asTrimmedString(row[key]);
-    if (value) return value;
-  }
-
-  return "";
+  return (
+    getString(row, [
+      "date",
+      "transaction_date",
+      "posted_at",
+      "paid_at",
+      "payout_date",
+      "available_on",
+      "service_date",
+      "booking_date",
+      "created_at",
+      "updated_at",
+    ]) || ""
+  );
 }
 
-function isWithinDateRange(row: AnyRow, startDate: string | null, endDate: string | null) {
+function parseDate(value: string | null | undefined) {
+  if (!value) return null;
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return parsed;
+}
+
+function isInsideDateWindow(
+  row: AnyRow,
+  startDate: string | null,
+  endDate: string | null,
+) {
   if (!startDate && !endDate) return true;
 
-  const rawDate = getRowDate(row);
-  if (!rawDate) return true;
+  const rowDate = parseDate(getRowDate(row));
 
-  const parsed = new Date(rawDate);
-  if (Number.isNaN(parsed.getTime())) return true;
+  if (!rowDate) return false;
 
   if (startDate) {
     const start = new Date(`${startDate}T00:00:00.000Z`);
-    if (parsed < start) return false;
+    if (rowDate < start) return false;
   }
 
   if (endDate) {
     const end = new Date(`${endDate}T23:59:59.999Z`);
-    if (parsed > end) return false;
+    if (rowDate > end) return false;
   }
 
   return true;
 }
 
-function getAmount(row: AnyRow) {
-  const candidates = [
-    row.amount,
-    row.gross_amount,
-    row.total_amount,
-    row.booking_total,
-    row.price,
-    row.subtotal,
-    row.subtotal_amount,
-    row.platform_revenue,
-    row.net_amount,
-    row.fee_amount,
-    row.payout_amount,
-    row.commission_amount,
-    row.expense_amount,
-    row.balance,
-    row.cost,
-  ];
-
-  for (const value of candidates) {
-    const parsed = toNumber(value);
-    if (parsed) return parsed;
+function getRangeWindow(range: string, explicitStart: string | null, explicitEnd: string | null) {
+  if (explicitStart || explicitEnd) {
+    return {
+      startDate: explicitStart,
+      endDate: explicitEnd,
+    };
   }
 
-  return 0;
+  const now = new Date();
+  const endDate = now.toISOString().slice(0, 10);
+
+  if (range === "all") {
+    return {
+      startDate: null,
+      endDate: null,
+    };
+  }
+
+  if (range === "ytd") {
+    return {
+      startDate: `${now.getFullYear()}-01-01`,
+      endDate,
+    };
+  }
+
+  const days =
+    range === "7d"
+      ? 7
+      : range === "30d"
+        ? 30
+        : range === "90d"
+          ? 90
+          : range === "12m"
+            ? 365
+            : 30;
+
+  const start = new Date(now);
+  start.setDate(start.getDate() - days);
+
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate,
+  };
 }
 
-function sumRows(rows: AnyRow[], amountKeys?: string[]) {
-  return rows.reduce((total, row) => {
-    if (amountKeys) {
-      for (const key of amountKeys) {
-        const parsed = toNumber(row[key]);
-        if (parsed) return total + Math.abs(parsed);
-      }
-      return total;
+function monthsBack(count: number) {
+  const now = new Date();
+  const rows: { key: string; label: string; start: Date; end: Date }[] = [];
+
+  for (let index = count - 1; index >= 0; index -= 1) {
+    const month = new Date(now.getFullYear(), now.getMonth() - index, 1);
+    const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    rows.push({
+      key: `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`,
+      label: month.toLocaleDateString("en-US", {
+        month: "short",
+        year: "2-digit",
+      }),
+      start: month,
+      end,
+    });
+  }
+
+  return rows;
+}
+
+function isBusinessCheckingOrSavings(row: AnyRow) {
+  const name = `${asTrimmedString(row.name)} ${asTrimmedString(
+    row.official_name,
+  )}`.toLowerCase();
+  const subtype = asTrimmedString(row.subtype).toLowerCase();
+
+  return (
+    (subtype === "checking" || subtype === "savings") &&
+    name.includes("business")
+  );
+}
+
+function isBusinessChecking(row: AnyRow) {
+  const name = `${asTrimmedString(row.name)} ${asTrimmedString(
+    row.official_name,
+  )}`.toLowerCase();
+  const subtype = asTrimmedString(row.subtype).toLowerCase();
+
+  return subtype === "checking" && name.includes("business");
+}
+
+function isBusinessSavings(row: AnyRow) {
+  const name = `${asTrimmedString(row.name)} ${asTrimmedString(
+    row.official_name,
+  )}`.toLowerCase();
+  const subtype = asTrimmedString(row.subtype).toLowerCase();
+
+  return subtype === "savings" && name.includes("business");
+}
+
+function getTransactionType(row: AnyRow) {
+  return (
+    asTrimmedString(row.sitguru_category_type).toLowerCase() || "uncategorized"
+  );
+}
+
+function getReviewStatus(row: AnyRow) {
+  return asTrimmedString(row.review_status).toLowerCase() || "needs_review";
+}
+
+function isReviewedTransaction(row: AnyRow) {
+  const status = getReviewStatus(row);
+  return status === "reviewed" || status === "auto_categorized";
+}
+
+function isExcluded(row: AnyRow) {
+  return Boolean(
+    row.removed_at ||
+      getOptionalBoolean(row.is_excluded_from_reports) ||
+      getTransactionType(row) === "ignore",
+  );
+}
+
+function isReportableTransaction(row: AnyRow) {
+  return !isExcluded(row) && isReviewedTransaction(row);
+}
+
+function getAbsoluteTransactionAmount(row: AnyRow) {
+  return Math.abs(toNumber(row.amount));
+}
+
+function getSignedCashAmount(row: AnyRow) {
+  const type = getTransactionType(row);
+  const amount = getAbsoluteTransactionAmount(row);
+
+  if (type === "income" || type === "owner_equity") return amount;
+
+  if (type === "expense" || type === "owner_draw" || type === "liability") {
+    return -amount;
+  }
+
+  if (type === "transfer") {
+    const label = `${asTrimmedString(row.name)} ${asTrimmedString(
+      row.merchant_name,
+    )} ${asTrimmedString(row.sitguru_notes)}`.toLowerCase();
+
+    if (
+      label.includes("from savings") ||
+      label.includes("to checking") ||
+      label.includes("deposit")
+    ) {
+      return amount;
     }
 
-    return total + Math.abs(getAmount(row));
-  }, 0);
+    return -amount;
+  }
+
+  return -amount;
 }
 
-function safePercent(numerator: number, denominator: number) {
-  if (!denominator) return 0;
-  return (numerator / denominator) * 100;
+function getManualExpenseAmount(row: AnyRow) {
+  return Math.abs(
+    toNumber(row.amount) ||
+      toNumber(row.total_amount) ||
+      toNumber(row.expense_amount) ||
+      toNumber(row.cost),
+  );
 }
 
-function buildWidthClass(value: number, maxValue: number) {
-  const percent = safePercent(value, maxValue);
-
-  if (percent >= 92) return "w-full";
-  if (percent >= 78) return "w-5/6";
-  if (percent >= 62) return "w-4/6";
-  if (percent >= 42) return "w-3/6";
-  if (percent >= 24) return "w-2/6";
-
-  return "w-1/6";
+function getGrossAmount(row: AnyRow) {
+  return (
+    toCentsAwareAmount(row.gross_amount) ||
+    toCentsAwareAmount(row.amount) ||
+    toCentsAwareAmount(row.total_amount) ||
+    toCentsAwareAmount(row.booking_total) ||
+    toCentsAwareAmount(row.price) ||
+    toCentsAwareAmount(row.subtotal) ||
+    0
+  );
 }
 
-function normalizeErrorMessage(message: string) {
-  if (!message) return "Table unavailable.";
-  return message.length > 150 ? `${message.slice(0, 150)}...` : message;
+function getNetAmount(row: AnyRow) {
+  return (
+    toCentsAwareAmount(row.net_amount) ||
+    toCentsAwareAmount(row.net) ||
+    toCentsAwareAmount(row.platform_revenue) ||
+    toCentsAwareAmount(row.platform_fee) ||
+    toCentsAwareAmount(row.sitguru_fee) ||
+    0
+  );
+}
+
+function getPayoutAmount(row: AnyRow) {
+  return (
+    toCentsAwareAmount(row.payout_amount) ||
+    toCentsAwareAmount(row.amount) ||
+    toCentsAwareAmount(row.total_amount) ||
+    0
+  );
+}
+
+function getCommissionAmount(row: AnyRow) {
+  return (
+    toCentsAwareAmount(row.commission_amount) ||
+    toCentsAwareAmount(row.amount) ||
+    toCentsAwareAmount(row.total_amount) ||
+    0
+  );
+}
+
+function isArchivedRow(row: AnyRow) {
+  return Boolean(
+    row.deleted_at ||
+      row.voided_at ||
+      row.archived_at ||
+      row.is_deleted === true ||
+      row.is_void === true ||
+      row.is_active === false,
+  );
+}
+
+function getTrustSafetyRemainingBalance(row: AnyRow) {
+  const paymentStatus = getStatus(row);
+  const repaymentStatus = asTrimmedString(row.repayment_status).toLowerCase();
+
+  if (
+    ["canceled", "cancelled", "refunded", "voided", "failed"].includes(paymentStatus) ||
+    repaymentStatus === "canceled"
+  ) {
+    return 0;
+  }
+
+  return Math.max(0, centsToDollars(row.remaining_balance_cents));
+}
+
+function getMonthLabel(value: string) {
+  const date = parseDate(value);
+
+  if (!date) return "";
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    year: "2-digit",
+  });
+}
+
+function widthClassFor(value: number, max: number) {
+  if (max <= 0) return "w-[5%]";
+
+  const percent = Math.max(5, Math.min(100, Math.round((value / max) * 100)));
+
+  if (percent >= 95) return "w-full";
+  if (percent >= 85) return "w-11/12";
+  if (percent >= 75) return "w-10/12";
+  if (percent >= 65) return "w-9/12";
+  if (percent >= 55) return "w-8/12";
+  if (percent >= 45) return "w-7/12";
+  if (percent >= 35) return "w-6/12";
+  if (percent >= 25) return "w-5/12";
+  if (percent >= 15) return "w-4/12";
+
+  return "w-3/12";
 }
 
 function getEnvAdminEmails() {
@@ -438,7 +611,10 @@ function hasFinancialRole(role: string) {
   return FINANCE_ROLES.includes(role.trim().toLowerCase());
 }
 
-async function safeRows<T>(query: PromiseLike<{ data: unknown; error: unknown }>, label: string): Promise<T[]> {
+async function safeRows<T>(
+  query: PromiseLike<{ data: unknown; error: unknown }>,
+  label: string,
+): Promise<T[]> {
   try {
     const result = await query;
 
@@ -451,6 +627,40 @@ async function safeRows<T>(query: PromiseLike<{ data: unknown; error: unknown }>
   } catch (error) {
     console.warn(`Financial overview query skipped for ${label}:`, error);
     return [];
+  }
+}
+
+async function checkSource(table: string): Promise<SourceStatus> {
+  try {
+    const { count, error } = await supabaseAdmin
+      .from(table)
+      .select("*", { count: "exact", head: true });
+
+    if (error) {
+      return {
+        id: table,
+        table,
+        ok: false,
+        rowCount: 0,
+        message: "Table unavailable or not yet configured.",
+      };
+    }
+
+    return {
+      id: table,
+      table,
+      ok: true,
+      rowCount: count || 0,
+      message: count ? "Live source connected." : "Table exists but has no rows yet.",
+    };
+  } catch {
+    return {
+      id: table,
+      table,
+      ok: false,
+      rowCount: 0,
+      message: "Table unavailable or not yet configured.",
+    };
   }
 }
 
@@ -474,7 +684,7 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
         .select("role,email,is_active,can_access_financials")
         .eq("user_id", user.id)
         .limit(1),
-      "admin_users_finance_access",
+      "admin_users_financial_overview_access",
     ),
     safeRows<AnyRow>(
       supabaseAdmin
@@ -482,7 +692,7 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
         .select("role,email,is_active,can_access_financials")
         .eq("id", user.id)
         .limit(1),
-      "profiles_finance_access",
+      "profiles_financial_overview_access",
     ),
     safeRows<AnyRow>(
       supabaseAdmin
@@ -490,11 +700,11 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
         .select("role,email,is_active,can_access_financials")
         .eq("id", user.id)
         .limit(1),
-      "users_finance_access",
+      "users_financial_overview_access",
     ),
   ]);
 
-  const profile = profileChecks.flat().find(Boolean) || {};
+  const profile = (profileChecks.flat().find(Boolean) || {}) as AnyRow;
   const role = asTrimmedString(profile.role) || "admin";
   const active =
     profile.is_active === undefined
@@ -514,704 +724,397 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
   };
 }
 
-async function readTableRows({
-  table,
+function buildPlaidBankingSummary({
+  accounts,
+  transactions,
+  items,
   startDate,
   endDate,
-  limit = 3000,
 }: {
-  table: string;
+  accounts: AnyRow[];
+  transactions: AnyRow[];
+  items: AnyRow[];
   startDate: string | null;
   endDate: string | null;
-  limit?: number;
-}) {
-  const { data, error } = await supabaseAdmin
-    .from(table)
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error || !data) {
-    return {
-      rows: [] as AnyRow[],
-      status: {
-        id: `${table}:unavailable`,
-        table,
-        ok: false,
-        rowCount: 0,
-        message: normalizeErrorMessage(error?.message || "Table unavailable."),
-      } satisfies SourceStatus,
-    };
-  }
-
-  const rows = (data as AnyRow[]).filter((row) =>
-    isWithinDateRange(row, startDate, endDate),
+}): PlaidBankingSummary {
+  const businessAccounts = accounts.filter(isBusinessCheckingOrSavings);
+  const allowedAccountIds = new Set(
+    businessAccounts
+      .map((account) => asTrimmedString(account.account_id))
+      .filter(Boolean),
   );
 
+  const businessTransactions = transactions
+    .filter((transaction) =>
+      allowedAccountIds.has(asTrimmedString(transaction.account_id)),
+    )
+    .filter((transaction) => !transaction.removed_at)
+    .filter((transaction) => isInsideDateWindow(transaction, startDate, endDate));
+
+  const reportableTransactions = businessTransactions.filter(isReportableTransaction);
+  const postedRows = businessTransactions.filter(
+    (transaction) => !getOptionalBoolean(transaction.pending),
+  ).length;
+  const pendingRows = businessTransactions.filter((transaction) =>
+    getOptionalBoolean(transaction.pending),
+  ).length;
+
+  const needsReviewRows = businessTransactions.filter(
+    (transaction) =>
+      !isExcluded(transaction) && getReviewStatus(transaction) === "needs_review",
+  ).length;
+
+  const manualCategorizedRows = businessTransactions.filter((transaction) =>
+    getOptionalBoolean(transaction.manually_categorized),
+  ).length;
+
+  const autoCategorizedRows = businessTransactions.filter(
+    (transaction) => getReviewStatus(transaction) === "auto_categorized",
+  ).length;
+
+  const uncategorizedRows = businessTransactions.filter(
+    (transaction) =>
+      !isExcluded(transaction) &&
+      (getTransactionType(transaction) === "uncategorized" ||
+        getString(transaction, ["sitguru_category"]) === "Uncategorized"),
+  ).length;
+
+  const excludedRows = businessTransactions.filter(isExcluded).length;
+
+  const currentCash = businessAccounts.reduce(
+    (sum, account) => sum + toNumber(account.current_balance),
+    0,
+  );
+
+  const availableCash = businessAccounts.reduce(
+    (sum, account) => sum + toNumber(account.available_balance),
+    0,
+  );
+
+  const revenue = reportableTransactions
+    .filter((transaction) => getTransactionType(transaction) === "income")
+    .reduce((sum, transaction) => sum + getAbsoluteTransactionAmount(transaction), 0);
+
+  const expenses = reportableTransactions
+    .filter((transaction) => getTransactionType(transaction) === "expense")
+    .reduce((sum, transaction) => sum + getAbsoluteTransactionAmount(transaction), 0);
+
+  const ownerContributions = reportableTransactions
+    .filter((transaction) => getTransactionType(transaction) === "owner_equity")
+    .reduce((sum, transaction) => sum + getAbsoluteTransactionAmount(transaction), 0);
+
+  const ownerDraws = reportableTransactions
+    .filter((transaction) => getTransactionType(transaction) === "owner_draw")
+    .reduce((sum, transaction) => sum + getAbsoluteTransactionAmount(transaction), 0);
+
+  const transfers = reportableTransactions
+    .filter((transaction) => getTransactionType(transaction) === "transfer")
+    .reduce((sum, transaction) => sum + getAbsoluteTransactionAmount(transaction), 0);
+
+  const cashImpacts = reportableTransactions.map(getSignedCashAmount);
+  const cashIn = cashImpacts
+    .filter((amount) => amount > 0)
+    .reduce((sum, amount) => sum + amount, 0);
+  const cashOut = cashImpacts
+    .filter((amount) => amount < 0)
+    .reduce((sum, amount) => sum + Math.abs(amount), 0);
+
+  const itemSyncedDates = items
+    .map((item) => asTrimmedString(item.transactions_last_synced_at))
+    .filter(Boolean)
+    .sort();
+
+  const transactionUpdatedDates = businessTransactions
+    .map((transaction) => asTrimmedString(transaction.updated_at))
+    .filter(Boolean)
+    .sort();
+
+  const lastSyncedAt =
+    itemSyncedDates.at(-1) || transactionUpdatedDates.at(-1) || null;
+
+  const checkingCount = businessAccounts.filter(isBusinessChecking).length;
+  const savingsCount = businessAccounts.filter(isBusinessSavings).length;
+
+  const status =
+    businessAccounts.length === 0
+      ? "not_connected"
+      : needsReviewRows || uncategorizedRows
+        ? "needs_review"
+        : "ready";
+
+  const message =
+    status === "not_connected"
+      ? "No NFCU business checking or savings accounts are currently connected."
+      : status === "needs_review"
+        ? "NFCU business banking is connected, but some rows still need category review."
+        : "NFCU Business Checking and Business Savings are connected and reporting.";
+
   return {
-    rows: rows.map((row) => ({ ...row, __sourceTable: table })),
-    status: {
-      id: `${table}:loaded`,
-      table,
-      ok: true,
-      rowCount: rows.length,
-      message: `Loaded ${rows.length.toLocaleString()} rows for overview calculations.`,
-    } satisfies SourceStatus,
+    businessAccountCount: businessAccounts.length,
+    checkingCount,
+    savingsCount,
+    currentCash,
+    availableCash,
+    postedRows,
+    pendingRows,
+    needsReviewRows,
+    manualCategorizedRows,
+    autoCategorizedRows,
+    uncategorizedRows,
+    excludedRows,
+    transactionRows: businessTransactions.length,
+    revenue,
+    expenses,
+    ownerContributions,
+    ownerDraws,
+    transfers,
+    cashIn,
+    cashOut,
+    netCashFlow: cashIn - cashOut,
+    lastSyncedAt,
+    status,
+    message,
   };
 }
 
-function dedupeSourceHealth(sources: SourceStatus[]) {
-  const byId = new Map<string, SourceStatus>();
-
-  sources.forEach((source, index) => {
-    const baseId = source.id || `${source.table}:${source.message}`;
-    const id = byId.has(baseId) ? `${baseId}:${index}` : baseId;
-
-    byId.set(id, {
-      ...source,
-      id,
-    });
-  });
-
-  return Array.from(byId.values());
-}
-
-function getBookingGrossAmount(row: AnyRow) {
-  return (
-    toNumber(row.subtotal_amount) ||
-    toNumber(row.booking_total) ||
-    toNumber(row.gross_amount) ||
-    toNumber(row.total_amount) ||
-    toNumber(row.amount) ||
-    toNumber(row.price) ||
-    toNumber(row.hourly_rate)
-  );
-}
-
-function getPlatformFee(row: AnyRow) {
-  const storedFee =
-    toNumber(row.sitguru_fee_amount) ||
-    toNumber(row.platform_fee) ||
-    toNumber(row.platform_fee_amount) ||
-    toNumber(row.marketplace_fee);
-
-  if (storedFee > 0) return storedFee;
-
-  return getBookingGrossAmount(row) * 0.08;
-}
-
-function getGuruPayoutAmount(row: AnyRow) {
-  const storedNet =
-    toNumber(row.guru_net_amount) ||
-    toNumber(row.guru_payout_amount) ||
-    toNumber(row.payout_amount);
-
-  if (storedNet > 0) return storedNet;
-
-  return Math.max(0, getBookingGrossAmount(row) - getPlatformFee(row));
-}
-
-function getRefundAmount(row: AnyRow) {
-  const explicitRefund =
-    toNumber(row.refund_amount) ||
-    toNumber(row.chargeback_amount) ||
-    toNumber(row.dispute_amount);
-
-  if (explicitRefund > 0) return explicitRefund;
-
-  if (isRefundLike(row)) return Math.abs(getAmount(row));
-
-  return 0;
-}
-
-function getStripeFee(row: AnyRow) {
-  const explicit =
-    toCentsAwareAmount(row.fee) ||
-    toCentsAwareAmount(row.fee_amount) ||
-    toCentsAwareAmount(row.stripe_fee) ||
-    toCentsAwareAmount(row.processing_fee);
-
-  if (explicit > 0) return Math.abs(explicit);
-
-  if (isFeeLike(row)) return Math.abs(getAmount(row));
-
-  return 0;
-}
-
-function centsToDollars(value: unknown) {
-  return toNumber(value) / 100;
-}
-
-function getTrustSafetyEventAmount(row: AnyRow) {
-  const gross = centsToDollars(row.gross_amount_cents);
-  const net = centsToDollars(row.net_amount_cents);
-  const fee = centsToDollars(row.fee_amount_cents);
-
-  if (gross) return Math.abs(gross);
-  if (net) return Math.abs(net);
-  if (fee) return Math.abs(fee);
-
-  return 0;
-}
-
-function getTrustSafetyEventType(row: AnyRow) {
-  return asTrimmedString(row.event_type).toLowerCase();
-}
-
-function getTrustSafetyRevenueFromPurchases(rows: AnyRow[]) {
-  return rows.reduce((sum, row) => sum + centsToDollars(row.amount_paid_cents), 0);
-}
-
-function getTrustSafetyOutstandingBalance(rows: AnyRow[]) {
-  return rows.reduce(
-    (sum, row) => sum + centsToDollars(row.remaining_balance_cents),
-    0,
-  );
-}
-
-function getTrustSafetyInstallmentReceivable(rows: AnyRow[]) {
-  return rows
-    .filter((row) => asTrimmedString(row.plan_key) === "pawstep_plan")
-    .reduce((sum, row) => sum + centsToDollars(row.remaining_balance_cents), 0);
-}
-
-function getTrustSafetyBookingDeductionReceivable(rows: AnyRow[]) {
-  return rows
-    .filter((row) => asTrimmedString(row.plan_key) === "book_and_bark_plan")
-    .reduce(
-      (sum, row) =>
-        sum +
-        (centsToDollars(row.booking_deduction_remaining_cents) ||
-          centsToDollars(row.remaining_balance_cents)),
-      0,
-    );
-}
-
-function getBankAmount(row: AnyRow) {
-  return (
-    toNumber(row.amount) ||
-    toNumber(row.transaction_amount) ||
-    toNumber(row.value) ||
-    toNumber(row.balance)
-  );
-}
-
-function getCashBalance(bankRows: AnyRow[], ledgerRows: AnyRow[]) {
-  const bankBalanceRows = bankRows.filter((row) =>
-    Boolean(row.current_balance || row.available_balance || row.balance),
-  );
-
-  if (bankBalanceRows.length) {
-    return bankBalanceRows.reduce(
-      (sum, row) =>
-        sum +
-        (toNumber(row.current_balance) ||
-          toNumber(row.available_balance) ||
-          toNumber(row.balance)),
-      0,
-    );
-  }
-
-  const netBankTransactions = bankRows.reduce(
-    (sum, row) => sum + getBankAmount(row),
-    0,
-  );
-
-  const ledgerCash = ledgerRows.reduce((sum, row) => {
-    const text = getTypeText(row);
-
-    if (
-      text.includes("cash") ||
-      text.includes("checking") ||
-      text.includes("savings") ||
-      text.includes("navy")
-    ) {
-      return sum + toNumber(row.debit) - toNumber(row.credit);
-    }
-
-    return sum;
-  }, 0);
-
-  return netBankTransactions + ledgerCash;
-}
-
 function buildRevenueTrend({
-  bookings,
-  platformRevenue,
-  grossBookings,
+  businessTransactions,
+  bookingRows,
+  paymentRows,
 }: {
-  bookings: AnyRow[];
-  platformRevenue: number;
-  grossBookings: number;
-}) {
-  const now = new Date();
-  const months = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(now);
-    date.setMonth(now.getMonth() - (5 - index));
+  businessTransactions: AnyRow[];
+  bookingRows: AnyRow[];
+  paymentRows: AnyRow[];
+}): TrendPoint[] {
+  const months = monthsBack(6);
 
-    return {
-      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
-      label: date.toLocaleString("en-US", { month: "short" }),
-    };
-  });
-
-  const grouped = months.map((month) => {
-    const rows = bookings.filter((row) => {
-      const rawDate = getRowDate(row);
-      if (!rawDate) return false;
-      const date = new Date(rawDate);
-      if (Number.isNaN(date.getTime())) return false;
-
-      return (
-        `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}` ===
-        month.key
-      );
+  return months.map((month) => {
+    const transactionRows = businessTransactions.filter((row) => {
+      const rowDate = parseDate(getRowDate(row));
+      return Boolean(rowDate && rowDate >= month.start && rowDate <= month.end);
     });
 
-    const monthGross = rows.reduce((sum, row) => sum + getBookingGrossAmount(row), 0);
-    const monthPlatform = rows.reduce((sum, row) => sum + getPlatformFee(row), 0);
+    const bookingMonthRows = bookingRows.filter((row) => {
+      const rowDate = parseDate(getRowDate(row));
+      return Boolean(rowDate && rowDate >= month.start && rowDate <= month.end);
+    });
+
+    const paymentMonthRows = paymentRows.filter((row) => {
+      const rowDate = parseDate(getRowDate(row));
+      return Boolean(rowDate && rowDate >= month.start && rowDate <= month.end);
+    });
+
+    const plaidRevenue = transactionRows
+      .filter(isReportableTransaction)
+      .filter((row) => getTransactionType(row) === "income")
+      .reduce((sum, row) => sum + getAbsoluteTransactionAmount(row), 0);
+
+    const bookingGross = bookingMonthRows.reduce(
+      (sum, row) => sum + getGrossAmount(row),
+      0,
+    );
+
+    const paymentGross = paymentMonthRows.reduce(
+      (sum, row) => sum + getGrossAmount(row),
+      0,
+    );
 
     return {
       label: month.label,
-      platformRevenue: Math.round(monthPlatform),
-      grossBookings: Math.round(monthGross),
+      platformRevenue:
+        plaidRevenue ||
+        paymentMonthRows.reduce((sum, row) => sum + getNetAmount(row), 0),
+      grossBookings: bookingGross || paymentGross || plaidRevenue,
     };
   });
-
-  if (grouped.some((row) => row.platformRevenue || row.grossBookings)) {
-    return grouped;
-  }
-
-  const platformMultipliers = [0.42, 0.5, 0.58, 0.68, 0.78, 1];
-  const bookingMultipliers = [0.38, 0.48, 0.58, 0.7, 0.82, 1];
-
-  return months.map((month, index) => ({
-    label: month.label,
-    platformRevenue: Math.round(platformRevenue * platformMultipliers[index]),
-    grossBookings: Math.round(grossBookings * bookingMultipliers[index]),
-  }));
 }
 
 function buildExpenseTrend({
-  guruPayouts,
-  partnerCommissions,
-  stripeFees,
-  operatingExpenses,
+  businessTransactions,
+  manualExpenses,
+  payoutRows,
+  commissionRows,
+  stripeRows,
 }: {
-  guruPayouts: number;
-  partnerCommissions: number;
-  stripeFees: number;
-  operatingExpenses: number;
-}) {
-  const now = new Date();
-  const months = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(now);
-    date.setMonth(now.getMonth() - (5 - index));
-    return date.toLocaleString("en-US", { month: "short" });
-  });
-  const multipliers = [0.42, 0.5, 0.6, 0.72, 0.84, 1];
+  businessTransactions: AnyRow[];
+  manualExpenses: AnyRow[];
+  payoutRows: AnyRow[];
+  commissionRows: AnyRow[];
+  stripeRows: AnyRow[];
+}): ExpenseTrendPoint[] {
+  const months = monthsBack(6);
 
-  return months.map((month, index) => ({
-    month,
-    payouts: Math.round((guruPayouts / 6) * multipliers[index]),
-    commissions: Math.round((partnerCommissions / 6) * multipliers[index]),
-    fees: Math.round((stripeFees / 6) * multipliers[index]),
-    other: Math.round((operatingExpenses / 6) * multipliers[index]),
-  }));
+  return months.map((month) => {
+    const inMonth = (row: AnyRow) => {
+      const rowDate = parseDate(getRowDate(row));
+      return Boolean(rowDate && rowDate >= month.start && rowDate <= month.end);
+    };
+
+    const bankExpenses = businessTransactions
+      .filter(inMonth)
+      .filter(isReportableTransaction)
+      .filter((row) => getTransactionType(row) === "expense")
+      .reduce((sum, row) => sum + getAbsoluteTransactionAmount(row), 0);
+
+    const manual = manualExpenses
+      .filter(inMonth)
+      .reduce((sum, row) => sum + getManualExpenseAmount(row), 0);
+
+    return {
+      month: month.label,
+      payouts: payoutRows.filter(inMonth).reduce((sum, row) => sum + getPayoutAmount(row), 0),
+      commissions: commissionRows
+        .filter(inMonth)
+        .reduce((sum, row) => sum + getCommissionAmount(row), 0),
+      fees: stripeRows
+        .filter(inMonth)
+        .reduce((sum, row) => sum + Math.abs(toCentsAwareAmount(row.fee)), 0),
+      other: bankExpenses + manual,
+    };
+  });
 }
 
-function buildCashRunway(cashBalance: number, monthlyBurn: number) {
-  const months = monthlyBurn > 0 ? cashBalance / monthlyBurn : 0;
-  const runwayDate = new Date();
+function buildPayoutStatus(rows: AnyRow[]): PayoutStatus {
+  const paid = rows.filter((row) => {
+    const status = getStatus(row);
+    return status.includes("paid") || status.includes("complete") || status.includes("succeeded");
+  }).length;
 
-  runwayDate.setMonth(runwayDate.getMonth() + Math.floor(months));
+  const processing = rows.filter((row) => getStatus(row).includes("processing")).length;
+  const pending = rows.filter((row) => {
+    const status = getStatus(row);
+    return status.includes("pending") || status.includes("queued") || status.includes("ready");
+  }).length;
 
   return {
-    months: Number(months.toFixed(1)),
-    cashBalance,
-    monthlyBurn,
-    runwayEndLabel:
-      monthlyBurn > 0
-        ? new Intl.DateTimeFormat("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          }).format(runwayDate)
-        : "Not calculated",
+    paid,
+    processing,
+    pending,
+    total: rows.length,
+  };
+}
+
+function buildCommissionStatus(rows: AnyRow[]): CommissionStatus {
+  const paid = rows.filter((row) => {
+    const status = getStatus(row);
+    return status.includes("paid") || status.includes("complete") || status.includes("succeeded");
+  }).length;
+
+  const processing = rows.filter((row) => getStatus(row).includes("processing")).length;
+  const pending = rows.filter((row) => {
+    const status = getStatus(row);
+    return status.includes("pending") || status.includes("queued") || status.includes("ready");
+  }).length;
+
+  return {
+    paid,
+    pending,
+    processing,
+    total: rows.length,
   };
 }
 
 function buildManagementAlerts({
-  exports,
-  payoutRows,
-  paymentRows,
-  sourceHealth,
-  netCashFlow,
-  cashBalance,
-  trustSafetyApprovalNeeded,
+  plaidBanking,
+  manualRows,
+  proformaRows,
+  reconciliationScore,
+  netIncome,
+  cashRunwayMonths,
 }: {
-  exports: AnyRow[];
-  payoutRows: AnyRow[];
-  paymentRows: AnyRow[];
-  sourceHealth: SourceStatus[];
-  netCashFlow: number;
-  cashBalance: number;
-  trustSafetyApprovalNeeded: number;
-}) {
+  plaidBanking: PlaidBankingSummary;
+  manualRows: number;
+  proformaRows: number;
+  reconciliationScore: number;
+  netIncome: number;
+  cashRunwayMonths: number;
+}): ManagementAlert[] {
   const alerts: ManagementAlert[] = [];
 
-  const exportsNeedingReview = exports.filter((row) =>
-    ["needs_review", "processing", "failed"].includes(getStatus(row)),
-  );
-
-  const failedPayments = paymentRows.filter((row) =>
-    rowIncludes(row, ["failed", "dispute", "chargeback"]),
-  );
-
-  const failedPayouts = payoutRows.filter((row) =>
-    rowIncludes(row, ["failed", "returned", "exception"]),
-  );
-
-  const missingImportantSources = sourceHealth.filter(
-    (source) =>
-      !source.ok &&
-      ["stripe_balance_transactions", "bank_transactions", "financial_ledger_entries"].includes(
-        source.table,
-      ),
-  );
-
-  if (exportsNeedingReview.length > 0) {
+  if (plaidBanking.businessAccountCount === 0) {
     alerts.push({
-      id: "exports-need-review",
-      title: `${exportsNeedingReview.length} export package${
-        exportsNeedingReview.length === 1 ? "" : "s"
-      } need review`,
+      id: "plaid-not-connected",
+      title: "Connect NFCU business banking",
       description:
-        "Review CPA, tax, PDF, Excel, CSV, or ZIP exports before handoff.",
-      severity: "warning",
-      href: "/admin/financials/exports",
-    });
-  }
-
-  if (failedPayments.length > 0) {
-    alerts.push({
-      id: "failed-payments",
-      title: `${failedPayments.length} payment issue${
-        failedPayments.length === 1 ? "" : "s"
-      } need attention`,
-      description:
-        "Review failed payments, disputes, refunds, or chargebacks before monthly close.",
+        "The financial dashboard does not see connected NFCU Business Checking or Savings accounts yet.",
       severity: "critical",
-      href: "/admin/financials/stripe",
+      href: "/admin/financials/plaid",
     });
-  }
-
-  if (failedPayouts.length > 0) {
+  } else if (plaidBanking.needsReviewRows || plaidBanking.uncategorizedRows) {
     alerts.push({
-      id: "failed-payouts",
-      title: `${failedPayouts.length} payout issue${
-        failedPayouts.length === 1 ? "" : "s"
-      } need attention`,
-      description:
-        "Review failed, returned, or exception payout activity for gurus and partners.",
-      severity: "critical",
-      href: "/admin/financials/payouts",
-    });
-  }
-
-  if (trustSafetyApprovalNeeded > 0) {
-    alerts.push({
-      id: "trust-safety-approval-needed",
-      title: `${trustSafetyApprovalNeeded} Trust & Safety plan${
-        trustSafetyApprovalNeeded === 1 ? "" : "s"
-      } need approval`,
-      description:
-        "Review Pawstep or Book & Bark financing approvals before Checkr can start.",
+      id: "plaid-needs-review",
+      title: "Banking categories need review",
+      description: `${plaidBanking.needsReviewRows.toLocaleString()} needs-review rows and ${plaidBanking.uncategorizedRows.toLocaleString()} uncategorized rows should be cleaned up.`,
       severity: "warning",
-      href: "/admin/background-checks?approval=pending",
+      href: "/admin/financials/plaid",
+    });
+  } else {
+    alerts.push({
+      id: "plaid-ready",
+      title: "Plaid/NFCU business banking is active",
+      description:
+        "Business Checking and Savings data is available for the connected financial pages.",
+      severity: "success",
+      href: "/admin/financials/plaid",
     });
   }
 
-  if (missingImportantSources.length > 0) {
+  if (reconciliationScore < 80) {
     alerts.push({
-      id: "financial-source-gaps",
-      title: "Financial source wiring needs review",
+      id: "reconciliation-low",
+      title: "Reconciliation score needs improvement",
       description:
-        "Stripe, Navy Federal bank, or financial ledger tables are not fully connected yet.",
+        "Review pending, uncategorized, and needs-review bank rows before relying on final reports.",
       severity: "warning",
       href: "/admin/financials/reconciliation",
     });
   }
 
-  if (netCashFlow < 0 || cashBalance < 0) {
+  if (manualRows === 0) {
     alerts.push({
-      id: "cash-position-review",
-      title: "Cash position needs review",
+      id: "manual-rows-missing",
+      title: "Manual financial rows are not loaded",
       description:
-        "Net cash flow or cash balance is negative from available records. Review cash flow and banking reconciliation.",
-      severity: "critical",
+        "Add manual expense, cash flow, or balance sheet lines for CPA adjustments and operating expenses that are not bank-fed.",
+      severity: "info",
+      href: "/admin/financials/reconciliation",
+    });
+  }
+
+  if (proformaRows === 0) {
+    alerts.push({
+      id: "proforma-missing",
+      title: "Forecast assumptions need setup",
+      description:
+        "Add or confirm Pro Forma assumptions so the dashboard can show reliable forward-looking financials.",
+      severity: "info",
+      href: "/admin/financials/pro-forma",
+    });
+  }
+
+  if (netIncome < 0) {
+    alerts.push({
+      id: "net-income-negative",
+      title: "Net income is currently negative",
+      description:
+        "Review revenue, bank expenses, manual expenses, and forecast assumptions for the current period.",
+      severity: "warning",
+      href: "/admin/financials/profit-loss",
+    });
+  }
+
+  if (cashRunwayMonths > 0 && cashRunwayMonths < 6) {
+    alerts.push({
+      id: "runway-low",
+      title: "Cash runway is under six months",
+      description:
+        "Monitor current cash, burn rate, and near-term expenses before increasing spend.",
+      severity: "warning",
       href: "/admin/financials/cash-flow",
     });
   }
 
-  if (alerts.length === 0) {
-    alerts.push({
-      id: "all-clear",
-      title: "No critical finance alerts",
-      description:
-        "No failed payouts, failed payments, source blockers, or export review blockers were detected in the current data window.",
-      severity: "success",
-      href: "/admin/financials",
-    });
-  }
-
-  return alerts.slice(0, 4);
-}
-
-function buildFallbackResponse({
-  generatedAt,
-  range,
-  startDate,
-  endDate,
-  segment,
-  sourceHealth = [],
-}: {
-  generatedAt: string;
-  range: string;
-  startDate: string | null;
-  endDate: string | null;
-  segment: string;
-  sourceHealth?: SourceStatus[];
-}): FinancialOverviewResponse {
-  const netCashFlow =
-    FALLBACK_PLATFORM_REVENUE -
-    FALLBACK_GURU_PAYOUTS -
-    FALLBACK_PARTNER_COMMISSIONS -
-    FALLBACK_STRIPE_FEES -
-    FALLBACK_REFUNDS -
-    FALLBACK_OPERATING_EXPENSES;
-
-  return {
-    ok: true,
-    isLive: false,
-    generatedAt,
-    filters: {
-      range,
-      startDate,
-      endDate,
-      segment,
-    },
-    sourceHealth:
-      sourceHealth.length > 0
-        ? dedupeSourceHealth(sourceHealth)
-        : [
-            {
-              id: "fallback:overview-api",
-              table: "overview-api",
-              ok: false,
-              rowCount: 0,
-              message:
-                "Live financial overview data unavailable. Safe fallback loaded.",
-            },
-          ],
-    kpis: [
-      {
-        label: "Gross Bookings",
-        value: formatCurrency(FALLBACK_GROSS_BOOKINGS),
-        rawValue: FALLBACK_GROSS_BOOKINGS,
-        change: "Preview",
-        helper: "safe fallback",
-        tone: "green",
-      },
-      {
-        label: "Platform Revenue",
-        value: formatCurrency(FALLBACK_PLATFORM_REVENUE),
-        rawValue: FALLBACK_PLATFORM_REVENUE,
-        change: "Preview",
-        helper: "safe fallback",
-        tone: "green",
-      },
-      {
-        label: "Guru Payouts",
-        value: formatCurrency(FALLBACK_GURU_PAYOUTS),
-        rawValue: FALLBACK_GURU_PAYOUTS,
-        change: "Preview",
-        helper: "safe fallback",
-        tone: "green",
-      },
-      {
-        label: "Partner Commissions",
-        value: formatCurrency(FALLBACK_PARTNER_COMMISSIONS),
-        rawValue: FALLBACK_PARTNER_COMMISSIONS,
-        change: "Preview",
-        helper: "safe fallback",
-        tone: "blue",
-      },
-      {
-        label: "Stripe Fees",
-        value: formatCurrency(FALLBACK_STRIPE_FEES),
-        rawValue: FALLBACK_STRIPE_FEES,
-        change: "Preview",
-        helper: "safe fallback",
-        tone: "blue",
-      },
-      {
-        label: "Refunds / Chargebacks",
-        value: formatCurrency(FALLBACK_REFUNDS),
-        rawValue: FALLBACK_REFUNDS,
-        change: "Preview",
-        helper: "safe fallback",
-        tone: "red",
-      },
-      {
-        label: "Net Margin",
-        value: formatPercent(safePercent(FALLBACK_PLATFORM_REVENUE, FALLBACK_GROSS_BOOKINGS)),
-        rawValue: safePercent(FALLBACK_PLATFORM_REVENUE, FALLBACK_GROSS_BOOKINGS),
-        change: "Preview",
-        helper: "safe fallback",
-        tone: "green",
-      },
-      {
-        label: "Cash Balance",
-        value: formatCurrency(FALLBACK_CASH_BALANCE),
-        rawValue: FALLBACK_CASH_BALANCE,
-        change: "Preview",
-        helper: "safe fallback",
-        tone: "green",
-      },
-    ],
-    breakEven: {
-      percent: 78,
-      target: BREAK_EVEN_TARGET,
-      currentContribution: 1134200,
-      remaining: 313300,
-      runwayMonths: 7.4,
-    },
-    bookingsToCashFunnel: [
-      {
-        label: "Gross Bookings",
-        value: formatCurrency(FALLBACK_GROSS_BOOKINGS),
-        rawValue: FALLBACK_GROSS_BOOKINGS,
-        widthClass: "w-full",
-      },
-      {
-        label: "Less Cancellations",
-        value: formatCurrency(FALLBACK_REFUNDS),
-        rawValue: FALLBACK_REFUNDS,
-        widthClass: "w-1/6",
-      },
-      {
-        label: "Net Bookings",
-        value: formatCurrency(FALLBACK_GROSS_BOOKINGS - FALLBACK_REFUNDS),
-        rawValue: FALLBACK_GROSS_BOOKINGS - FALLBACK_REFUNDS,
-        widthClass: "w-5/6",
-      },
-      {
-        label: "Collected Cash",
-        value: formatCurrency(925464),
-        rawValue: 925464,
-        widthClass: "w-4/6",
-      },
-      {
-        label: "Payouts & Fees",
-        value: formatCurrency(
-          FALLBACK_GURU_PAYOUTS +
-            FALLBACK_PARTNER_COMMISSIONS +
-            FALLBACK_STRIPE_FEES,
-        ),
-        rawValue:
-          FALLBACK_GURU_PAYOUTS +
-          FALLBACK_PARTNER_COMMISSIONS +
-          FALLBACK_STRIPE_FEES,
-        widthClass: "w-3/6",
-      },
-      {
-        label: "Net Cash Retained",
-        value: formatCurrency(netCashFlow),
-        rawValue: netCashFlow,
-        widthClass: "w-2/6",
-      },
-    ],
-    guruPayoutStatus: {
-      paid: FALLBACK_GURU_PAYOUTS,
-      processing: 157310,
-      pending: 66410,
-      total: FALLBACK_GURU_PAYOUTS,
-    },
-    partnerCommissionStatus: {
-      paid: 48214,
-      pending: 19842,
-      processing: 9970,
-      total: FALLBACK_PARTNER_COMMISSIONS,
-    },
-    cashRunway: buildCashRunway(FALLBACK_CASH_BALANCE, FALLBACK_MONTHLY_BURN),
-    revenueTrend: buildRevenueTrend({
-      bookings: [],
-      platformRevenue: FALLBACK_PLATFORM_REVENUE,
-      grossBookings: FALLBACK_GROSS_BOOKINGS,
-    }),
-    expenseTrend: buildExpenseTrend({
-      guruPayouts: FALLBACK_GURU_PAYOUTS,
-      partnerCommissions: FALLBACK_PARTNER_COMMISSIONS,
-      stripeFees: FALLBACK_STRIPE_FEES,
-      operatingExpenses: FALLBACK_OPERATING_EXPENSES,
-    }),
-    cashFlowByCategory: [
-      {
-        label: "Platform Revenue",
-        value: FALLBACK_PLATFORM_REVENUE,
-        displayValue: formatCurrency(FALLBACK_PLATFORM_REVENUE),
-        type: "inflow",
-      },
-      {
-        label: "Payouts",
-        value: -FALLBACK_GURU_PAYOUTS,
-        displayValue: `-${formatCurrency(FALLBACK_GURU_PAYOUTS)}`,
-        type: "outflow",
-      },
-      {
-        label: "Partner Commissions",
-        value: -FALLBACK_PARTNER_COMMISSIONS,
-        displayValue: `-${formatCurrency(FALLBACK_PARTNER_COMMISSIONS)}`,
-        type: "outflow",
-      },
-      {
-        label: "Stripe Fees",
-        value: -FALLBACK_STRIPE_FEES,
-        displayValue: `-${formatCurrency(FALLBACK_STRIPE_FEES)}`,
-        type: "outflow",
-      },
-      {
-        label: "Refunds / Chargebacks",
-        value: -FALLBACK_REFUNDS,
-        displayValue: `-${formatCurrency(FALLBACK_REFUNDS)}`,
-        type: "outflow",
-      },
-      {
-        label: "Operating Expenses",
-        value: -FALLBACK_OPERATING_EXPENSES,
-        displayValue: `-${formatCurrency(FALLBACK_OPERATING_EXPENSES)}`,
-        type: "outflow",
-      },
-      {
-        label: "Net Cash Flow",
-        value: netCashFlow,
-        displayValue: formatCurrency(netCashFlow),
-        type: "net",
-      },
-    ],
-    managementAlerts: [
-      {
-        id: "safe-fallback",
-        title: "Financial Overview loaded with safe fallback data",
-        description:
-          "Live table data was not available, so the dashboard loaded preview values instead of breaking.",
-        severity: "info",
-        href: "/admin/financials",
-      },
-    ],
-    fallbackUsed: true,
-  };
+  return alerts.slice(0, 8);
 }
 
 export async function GET(request: Request) {
@@ -1219,520 +1122,510 @@ export async function GET(request: Request) {
 
   if (!actor?.canAccessFinancials) {
     return NextResponse.json(
-      { ok: false, message: "Not authorized to view financial overview." },
+      {
+        ok: false,
+        error: "Financial access required.",
+      },
       { status: 403 },
     );
   }
 
-  const generatedAt = new Date().toISOString();
-  const range = getSearchParam(request.url, "range", "month");
+  const range = getSearchParam(request.url, "range", "30d");
   const segment = getSearchParam(request.url, "segment", "all");
-  const startDate = getDateOrNull(getSearchParam(request.url, "startDate"));
-  const endDate = getDateOrNull(getSearchParam(request.url, "endDate"));
+  const explicitStart = getDateOrNull(getSearchParam(request.url, "startDate"));
+  const explicitEnd = getDateOrNull(getSearchParam(request.url, "endDate"));
+  const { startDate, endDate } = getRangeWindow(range, explicitStart, explicitEnd);
 
-  try {
-    const results = await Promise.all(
-      tableNames.map((table) => readTableRows({ table, startDate, endDate })),
-    );
+  const [
+    sourceHealth,
+    plaidAccounts,
+    plaidTransactions,
+    plaidItems,
+    bookingRowsA,
+    bookingRowsB,
+    paymentRows,
+    stripeRows,
+    stripeBalanceRows,
+    expenseRows,
+    cashFlowLines,
+    balanceSheetLines,
+    statementLines,
+    payoutRowsA,
+    payoutRowsB,
+    commissionRowsA,
+    commissionRowsB,
+    proformaRows,
+    trustSafetyPurchases,
+    trustSafetyEvents,
+    bookingDeductions,
+  ] = await Promise.all([
+    Promise.all(TABLE_NAMES.map(checkSource)),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_plaid_accounts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "admin_plaid_accounts",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_plaid_transactions")
+        .select("*")
+        .is("removed_at", null)
+        .order("date", { ascending: false })
+        .limit(10000),
+      "admin_plaid_transactions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_plaid_items")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "admin_plaid_items",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("bookings")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "bookings",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("customer_bookings")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "customer_bookings",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "payments",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("stripe_transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "stripe_transactions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("stripe_balance_transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "stripe_balance_transactions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("expense_ledger")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "expense_ledger",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("cash_flow_lines")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "cash_flow_lines",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("balance_sheet_lines")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "balance_sheet_lines",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("financial_statement_lines")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "financial_statement_lines",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("guru_payouts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "guru_payouts",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("payouts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "payouts",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("commissions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "commissions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("partner_commissions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "partner_commissions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("proforma_assumptions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "proforma_assumptions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("guru_trust_safety_plan_purchases")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "guru_trust_safety_plan_purchases",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("trust_safety_financial_events")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "trust_safety_financial_events",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("booking_trust_safety_deductions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "booking_trust_safety_deductions",
+    ),
+  ]);
 
-    const rowsByTable = new Map<string, AnyRow[]>();
-    const sourceHealth = dedupeSourceHealth(results.map((result) => result.status));
+  const bookingRows = [...bookingRowsA, ...bookingRowsB]
+    .filter((row) => !isArchivedRow(row))
+    .filter((row) => isInsideDateWindow(row, startDate, endDate));
 
-    for (let index = 0; index < tableNames.length; index += 1) {
-      rowsByTable.set(tableNames[index], results[index].rows);
-    }
+  const activePaymentRows = paymentRows
+    .filter((row) => !isArchivedRow(row))
+    .filter((row) => isInsideDateWindow(row, startDate, endDate));
 
-    const allRows = Array.from(rowsByTable.values()).flat();
-    const hasLiveRows = sourceHealth.some((source) => source.ok && source.rowCount > 0);
+  const activeExpenseRows = expenseRows
+    .filter((row) => !isArchivedRow(row))
+    .filter((row) => isInsideDateWindow(row, startDate, endDate));
 
-    if (!hasLiveRows) {
-      return NextResponse.json(
-        buildFallbackResponse({
-          generatedAt,
-          range,
-          startDate,
-          endDate,
-          segment,
-          sourceHealth,
-        }),
-      );
-    }
+  const activeCashFlowLines = cashFlowLines.filter((row) => !isArchivedRow(row));
+  const activeBalanceSheetLines = balanceSheetLines.filter((row) => !isArchivedRow(row));
+  const activeStatementLines = statementLines.filter((row) => !isArchivedRow(row));
+  const activeProformaRows = proformaRows.filter((row) => !isArchivedRow(row));
+  const activeTrustSafetyPurchases = trustSafetyPurchases.filter(
+    (row) => !isArchivedRow(row),
+  );
 
-    const bookings = [
-      ...(rowsByTable.get("bookings") || []),
-      ...(rowsByTable.get("customer_bookings") || []),
-    ];
-    const paymentRows = [
-      ...(rowsByTable.get("payments") || []),
-      ...(rowsByTable.get("stripe_transactions") || []),
-      ...(rowsByTable.get("stripe_balance_transactions") || []),
-      ...(rowsByTable.get("financial_ledger_entries") || []).filter((row) =>
-        rowIncludes(row, ["stripe", "payment", "refund", "fee", "dispute"]),
-      ),
-    ];
-    const payoutRows = [
-      ...(rowsByTable.get("payouts") || []),
-      ...(rowsByTable.get("guru_payouts") || []),
-      ...(rowsByTable.get("commissions") || []),
-      ...(rowsByTable.get("partner_commissions") || []),
-    ];
-    const expenseRows = [
-      ...(rowsByTable.get("expense_ledger") || []),
-      ...(rowsByTable.get("financial_ledger_entries") || []).filter(isOperatingExpenseLike),
-    ];
-    const bankRows = rowsByTable.get("bank_transactions") || [];
-    const ledgerRows = rowsByTable.get("financial_ledger_entries") || [];
-    const trustSafetyPurchases = rowsByTable.get("guru_trust_safety_plan_purchases") || [];
-    const trustSafetyEvents = rowsByTable.get("trust_safety_financial_events") || [];
-    const trustSafetyBookingDeductions = rowsByTable.get("booking_trust_safety_deductions") || [];
-    const exportRows = [
-      ...(rowsByTable.get("financial_export_history") || []),
-      ...(rowsByTable.get("financial_audit_logs") || []).filter((row) =>
-        rowIncludes(row, ["export", "email"]),
-      ),
-    ];
+  const plaidBanking = buildPlaidBankingSummary({
+    accounts: plaidAccounts,
+    transactions: plaidTransactions,
+    items: plaidItems,
+    startDate,
+    endDate,
+  });
 
-    const grossBookings =
-      bookings.reduce((sum, row) => sum + getBookingGrossAmount(row), 0) ||
-      sumRows(paymentRows.filter((row) => !isRefundLike(row) && !isFeeLike(row))) ||
-      FALLBACK_GROSS_BOOKINGS;
+  const businessAccounts = plaidAccounts.filter(isBusinessCheckingOrSavings);
+  const allowedAccountIds = new Set(
+    businessAccounts
+      .map((account) => asTrimmedString(account.account_id))
+      .filter(Boolean),
+  );
 
-    const bookingPlatformFees = bookings.reduce((sum, row) => sum + getPlatformFee(row), 0);
-    const guruPayoutRows = [
-      ...payoutRows.filter(isGuruPayoutLike),
-      ...bookings,
-    ];
-    const partnerCommissionRows = payoutRows.filter(isPartnerCommissionLike);
-    const feeRows = paymentRows.filter(isFeeLike);
-    const refundRows = [
-      ...paymentRows.filter(isRefundLike),
-      ...bookings.filter((row) => getRefundAmount(row) > 0),
-    ];
+  const businessTransactions = plaidTransactions
+    .filter((transaction) =>
+      allowedAccountIds.has(asTrimmedString(transaction.account_id)),
+    )
+    .filter((transaction) => !transaction.removed_at)
+    .filter((transaction) => isInsideDateWindow(transaction, startDate, endDate));
 
-    const trustSafetyPaymentEvents = trustSafetyEvents.filter((row) =>
-      [
-        "payment_collected",
-        "down_payment_collected",
-        "installment_collected",
-        "booking_deduction_collected",
-      ].includes(getTrustSafetyEventType(row)),
-    );
-    const trustSafetyStripeFeeEvents = trustSafetyEvents.filter(
-      (row) => getTrustSafetyEventType(row) === "stripe_fee",
-    );
-    const trustSafetyRefundEvents = trustSafetyEvents.filter(
-      (row) => getTrustSafetyEventType(row) === "refund",
-    );
-    const trustSafetyCheckrCostEvents = trustSafetyEvents.filter((row) =>
-      ["checkr_vendor_cost", "sitguru_fronted_cost"].includes(
-        getTrustSafetyEventType(row),
-      ),
-    );
+  const reportableBusinessTransactions = businessTransactions.filter(
+    isReportableTransaction,
+  );
 
-    const trustSafetyRevenue =
-      trustSafetyPaymentEvents.reduce(
-        (sum, row) => sum + getTrustSafetyEventAmount(row),
-        0,
-      ) || getTrustSafetyRevenueFromPurchases(trustSafetyPurchases);
-    const trustSafetyStripeFees = trustSafetyStripeFeeEvents.reduce(
-      (sum, row) => sum + getTrustSafetyEventAmount(row),
-      0,
-    );
-    const trustSafetyRefunds = trustSafetyRefundEvents.reduce(
-      (sum, row) => sum + getTrustSafetyEventAmount(row),
-      0,
-    );
-    const trustSafetyCheckrCosts = trustSafetyCheckrCostEvents.reduce(
-      (sum, row) => sum + getTrustSafetyEventAmount(row),
-      0,
-    );
-    const trustSafetyOutstandingReceivables = getTrustSafetyOutstandingBalance(
-      trustSafetyPurchases,
-    );
-    const trustSafetyInstallmentReceivable = getTrustSafetyInstallmentReceivable(
-      trustSafetyPurchases,
-    );
-    const trustSafetyBookingDeductionReceivable =
-      getTrustSafetyBookingDeductionReceivable(trustSafetyPurchases);
-    const trustSafetyBookingDeductionsCollected = trustSafetyBookingDeductions
-      .filter((row) => getStatus(row) === "collected")
-      .reduce((sum, row) => sum + centsToDollars(row.deduction_amount_cents), 0);
-    const trustSafetyApprovalNeeded = trustSafetyPurchases.filter(
-      (row) =>
-        getOptionalBoolean(row.management_approval_required) &&
-        asTrimmedString(row.management_approval_status).toLowerCase() ===
-          "pending",
-    ).length;
+  const manualExpenseTotal = activeExpenseRows.reduce(
+    (sum, row) => sum + getManualExpenseAmount(row),
+    0,
+  );
 
-    const stripeFees =
-      feeRows.reduce((sum, row) => sum + getStripeFee(row), 0) +
-        trustSafetyStripeFees ||
-      FALLBACK_STRIPE_FEES;
+  const grossBookings =
+    bookingRows.reduce((sum, row) => sum + getGrossAmount(row), 0) ||
+    activePaymentRows.reduce((sum, row) => sum + getGrossAmount(row), 0) ||
+    plaidBanking.revenue;
 
-    const refunds =
-      refundRows.reduce((sum, row) => sum + getRefundAmount(row), 0) +
-        trustSafetyRefunds ||
-      FALLBACK_REFUNDS;
+  const platformRevenue =
+    activePaymentRows.reduce((sum, row) => sum + getNetAmount(row), 0) ||
+    plaidBanking.revenue;
 
-    const guruPayouts =
-      (payoutRows.filter(isGuruPayoutLike).length
-        ? sumRows(payoutRows.filter(isGuruPayoutLike), [
-            "payout_amount",
-            "guru_payout",
-            "amount",
-            "net_amount",
-          ])
-        : bookings.reduce((sum, row) => sum + getGuruPayoutAmount(row), 0)) ||
-      FALLBACK_GURU_PAYOUTS;
+  const bankExpenseTotal = plaidBanking.expenses;
+  const totalExpenses = bankExpenseTotal + manualExpenseTotal;
 
-    const partnerCommissions =
-      sumRows(partnerCommissionRows, [
-        "commission_amount",
-        "partner_commission",
-        "amount",
-        "net_amount",
-      ]) || FALLBACK_PARTNER_COMMISSIONS;
+  const payoutRows = [...payoutRowsA, ...payoutRowsB]
+    .filter((row) => !isArchivedRow(row))
+    .filter((row) => isInsideDateWindow(row, startDate, endDate));
 
-    const operatingExpenses =
-      sumRows(expenseRows, ["expense_amount", "amount", "total_amount", "net_amount", "cost"]) +
-        trustSafetyCheckrCosts ||
-      FALLBACK_OPERATING_EXPENSES;
+  const commissionRows = [...commissionRowsA, ...commissionRowsB]
+    .filter((row) => !isArchivedRow(row))
+    .filter((row) => isInsideDateWindow(row, startDate, endDate));
 
-    const marketplacePlatformRevenue =
-      bookingPlatformFees ||
-      Math.max(
-        0,
-        grossBookings - guruPayouts - partnerCommissions - stripeFees - refunds,
-      ) ||
-      FALLBACK_PLATFORM_REVENUE;
+  const payoutTotal = payoutRows.reduce((sum, row) => sum + getPayoutAmount(row), 0);
+  const commissionTotal = commissionRows.reduce(
+    (sum, row) => sum + getCommissionAmount(row),
+    0,
+  );
 
-    const platformRevenue = marketplacePlatformRevenue + trustSafetyRevenue;
+  const stripeFees =
+    stripeBalanceRows
+      .filter((row) => isInsideDateWindow(row, startDate, endDate))
+      .reduce((sum, row) => sum + Math.abs(toCentsAwareAmount(row.fee)), 0) ||
+    stripeRows
+      .filter((row) => isInsideDateWindow(row, startDate, endDate))
+      .reduce((sum, row) => sum + Math.abs(toCentsAwareAmount(row.fee)), 0);
 
-    const netCashFlow =
-      platformRevenue -
-      guruPayouts -
-      partnerCommissions -
-      stripeFees -
-      refunds -
-      operatingExpenses;
+  const refunds = stripeRows
+    .filter((row) => isInsideDateWindow(row, startDate, endDate))
+    .filter((row) => getStatus(row).includes("refund"))
+    .reduce((sum, row) => sum + Math.abs(toCentsAwareAmount(row.amount)), 0);
 
-    const netMargin = safePercent(platformRevenue - operatingExpenses, platformRevenue || grossBookings);
-    const cashBalance = getCashBalance(bankRows, ledgerRows) || FALLBACK_CASH_BALANCE;
-    const cashRunway = buildCashRunway(
-      cashBalance,
-      Math.max(1, operatingExpenses || FALLBACK_MONTHLY_BURN),
-    );
+  const netIncome =
+    platformRevenue - totalExpenses - payoutTotal - commissionTotal - stripeFees - refunds;
 
-    const paidGuruPayouts =
-      sumRows(
-        payoutRows.filter((row) => isGuruPayoutLike(row) && getStatus(row).includes("paid")),
-      ) || guruPayouts;
+  const trustSafetyReceivables = activeTrustSafetyPurchases.reduce(
+    (sum, row) => sum + getTrustSafetyRemainingBalance(row),
+    0,
+  );
 
-    const processingGuruPayouts =
-      sumRows(
-        payoutRows.filter((row) => isGuruPayoutLike(row) && getStatus(row).includes("processing")),
-      ) || Math.round(guruPayouts * 0.2);
+  const manualRows =
+    activeExpenseRows.length +
+    activeCashFlowLines.length +
+    activeBalanceSheetLines.length +
+    activeStatementLines.length;
 
-    const pendingGuruPayouts =
-      sumRows(
-        payoutRows.filter((row) => isGuruPayoutLike(row) && getStatus(row).includes("pending")),
-      ) || Math.round(guruPayouts * 0.09);
+  const reconciliationIssues =
+    plaidBanking.needsReviewRows +
+    plaidBanking.uncategorizedRows +
+    Math.round(plaidBanking.pendingRows / 2);
 
-    const paidPartnerCommissions =
-      sumRows(
-        partnerCommissionRows.filter((row) => getStatus(row).includes("paid")),
-      ) || Math.round(partnerCommissions * 0.62);
+  const reconciliationScore =
+    plaidBanking.transactionRows === 0
+      ? 0
+      : Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(100 - (reconciliationIssues / plaidBanking.transactionRows) * 100),
+          ),
+        );
 
-    const pendingPartnerCommissions =
-      sumRows(
-        partnerCommissionRows.filter((row) => getStatus(row).includes("pending")),
-      ) || Math.round(partnerCommissions * 0.25);
+  const monthlyBurn = Math.max(totalExpenses + payoutTotal + commissionTotal + stripeFees, 0);
+  const cashRunwayMonths =
+    monthlyBurn > 0 ? Math.floor(plaidBanking.currentCash / monthlyBurn) : 0;
 
-    const processingPartnerCommissions =
-      sumRows(
-        partnerCommissionRows.filter((row) => getStatus(row).includes("processing")),
-      ) || Math.round(partnerCommissions * 0.13);
+  const runwayDate = new Date();
+  runwayDate.setMonth(runwayDate.getMonth() + Math.max(cashRunwayMonths, 0));
 
-    const currentContribution = Math.max(
-      0,
-      platformRevenue + Math.max(0, netCashFlow),
-    );
-    const breakEvenPercent = Math.min(
-      100,
-      Math.round(safePercent(currentContribution, BREAK_EVEN_TARGET)),
-    );
-    const payoutsAndFees = guruPayouts + partnerCommissions + stripeFees;
-    const netBookings = grossBookings - refunds;
-    const collectedCash =
-      bankRows.reduce((sum, row) => sum + Math.max(0, getBankAmount(row)), 0) ||
-      Math.max(0, platformRevenue + payoutsAndFees);
+  const breakEvenContribution =
+    platformRevenue - totalExpenses - payoutTotal - commissionTotal - stripeFees;
 
-    const response: FinancialOverviewResponse = {
-      ok: true,
-      isLive: true,
-      generatedAt,
-      filters: {
-        range,
-        startDate,
-        endDate,
-        segment,
-      },
-      sourceHealth,
-      kpis: [
-        {
-          label: "Gross Bookings",
-          value: formatCurrency(grossBookings),
-          rawValue: grossBookings,
-          change: "Live",
-          helper: `${bookings.length.toLocaleString()} booking rows`,
-          tone: "green",
-        },
-        {
-          label: "Platform Revenue",
-          value: formatCurrency(platformRevenue),
-          rawValue: platformRevenue,
-          change: "Live",
-          helper: trustSafetyRevenue > 0 ? "marketplace + Trust & Safety" : "P&L source",
-          tone: "green",
-        },
-        {
-          label: "Trust & Safety Revenue",
-          value: formatCurrency(trustSafetyRevenue),
-          rawValue: trustSafetyRevenue,
-          change: "Live",
-          helper: "screening plans",
-          tone: "green",
-        },
-        {
-          label: "Trust & Safety Receivable",
-          value: formatCurrency(trustSafetyOutstandingReceivables),
-          rawValue: trustSafetyOutstandingReceivables,
-          change: "Live",
-          helper: "Pawstep + Book & Bark",
-          tone: trustSafetyOutstandingReceivables > 0 ? "blue" : "green",
-        },
-        {
-          label: "Guru Payouts",
-          value: formatCurrency(guruPayouts),
-          rawValue: guruPayouts,
-          change: "Live",
-          helper: "contractor cost",
-          tone: "green",
-        },
-        {
-          label: "Partner Commissions",
-          value: formatCurrency(partnerCommissions),
-          rawValue: partnerCommissions,
-          change: "Live",
-          helper: "partner payouts",
-          tone: "blue",
-        },
-        {
-          label: "Stripe Fees",
-          value: formatCurrency(stripeFees),
-          rawValue: stripeFees,
-          change: "Live",
-          helper: "merchant fees",
-          tone: "blue",
-        },
-        {
-          label: "Refunds / Chargebacks",
-          value: formatCurrency(refunds),
-          rawValue: refunds,
-          change: "Live",
-          helper: "contra revenue",
-          tone: refunds > 0 ? "red" : "green",
-        },
-        {
-          label: "Net Margin",
-          value: formatPercent(netMargin),
-          rawValue: netMargin,
-          change: "Live",
-          helper: "available records",
-          tone: netMargin >= 0 ? "green" : "red",
-        },
-        {
-          label: "Cash Balance",
-          value: formatCurrency(cashBalance),
-          rawValue: cashBalance,
-          change: "Live",
-          helper: "bank / ledger",
-          tone: cashBalance >= 0 ? "green" : "red",
-        },
-      ],
-      breakEven: {
-        percent: breakEvenPercent,
-        target: BREAK_EVEN_TARGET,
-        currentContribution,
-        remaining: Math.max(0, BREAK_EVEN_TARGET - currentContribution),
-        runwayMonths: cashRunway.months,
-      },
-      bookingsToCashFunnel: [
-        {
-          label: "Gross Bookings",
-          value: formatCurrency(grossBookings),
-          rawValue: grossBookings,
-          widthClass: "w-full",
-        },
-        {
-          label: "Less Cancellations",
-          value: formatCurrency(refunds),
-          rawValue: refunds,
-          widthClass: buildWidthClass(refunds, grossBookings),
-        },
-        {
-          label: "Net Bookings",
-          value: formatCurrency(netBookings),
-          rawValue: netBookings,
-          widthClass: buildWidthClass(netBookings, grossBookings),
-        },
-        {
-          label: "Collected Cash",
-          value: formatCurrency(collectedCash),
-          rawValue: collectedCash,
-          widthClass: buildWidthClass(collectedCash, grossBookings),
-        },
-        {
-          label: "Trust & Safety Cash",
-          value: formatCurrency(trustSafetyRevenue),
-          rawValue: trustSafetyRevenue,
-          widthClass: buildWidthClass(trustSafetyRevenue, grossBookings),
-        },
-        {
-          label: "Payouts & Fees",
-          value: formatCurrency(payoutsAndFees),
-          rawValue: payoutsAndFees,
-          widthClass: buildWidthClass(payoutsAndFees, grossBookings),
-        },
-        {
-          label: "Net Cash Retained",
-          value: formatCurrency(netCashFlow),
-          rawValue: netCashFlow,
-          widthClass: buildWidthClass(Math.abs(netCashFlow), grossBookings),
-        },
-      ],
-      guruPayoutStatus: {
-        paid: paidGuruPayouts,
-        processing: processingGuruPayouts,
-        pending: pendingGuruPayouts,
-        total: guruPayouts,
-      },
-      partnerCommissionStatus: {
-        paid: paidPartnerCommissions,
-        pending: pendingPartnerCommissions,
-        processing: processingPartnerCommissions,
-        total: partnerCommissions,
-      },
-      cashRunway,
-      revenueTrend: buildRevenueTrend({
-        bookings,
-        platformRevenue,
-        grossBookings,
-      }),
-      expenseTrend: buildExpenseTrend({
-        guruPayouts,
-        partnerCommissions,
-        stripeFees,
-        operatingExpenses,
-      }),
-      cashFlowByCategory: [
-        {
-          label: "Platform Revenue",
-          value: platformRevenue,
-          displayValue: formatCurrency(platformRevenue),
-          type: "inflow",
-        },
-        {
-          label: "Trust & Safety Revenue",
-          value: trustSafetyRevenue,
-          displayValue: formatCurrency(trustSafetyRevenue),
-          type: "inflow",
-        },
-        {
-          label: "Pawstep Receivable",
-          value: trustSafetyInstallmentReceivable,
-          displayValue: formatCurrency(trustSafetyInstallmentReceivable),
-          type: "inflow",
-        },
-        {
-          label: "Book & Bark Receivable",
-          value: trustSafetyBookingDeductionReceivable,
-          displayValue: formatCurrency(trustSafetyBookingDeductionReceivable),
-          type: "inflow",
-        },
-        {
-          label: "Book & Bark Deductions Collected",
-          value: trustSafetyBookingDeductionsCollected,
-          displayValue: formatCurrency(trustSafetyBookingDeductionsCollected),
-          type: "inflow",
-        },
-        {
-          label: "Checkr Vendor Costs",
-          value: -trustSafetyCheckrCosts,
-          displayValue: `-${formatCurrency(trustSafetyCheckrCosts)}`,
-          type: "outflow",
-        },
-        {
-          label: "Payouts",
-          value: -guruPayouts,
-          displayValue: `-${formatCurrency(guruPayouts)}`,
-          type: "outflow",
-        },
-        {
-          label: "Partner Commissions",
-          value: -partnerCommissions,
-          displayValue: `-${formatCurrency(partnerCommissions)}`,
-          type: "outflow",
-        },
-        {
-          label: "Stripe Fees",
-          value: -stripeFees,
-          displayValue: `-${formatCurrency(stripeFees)}`,
-          type: "outflow",
-        },
-        {
-          label: "Refunds / Chargebacks",
-          value: -refunds,
-          displayValue: `-${formatCurrency(refunds)}`,
-          type: "outflow",
-        },
-        {
-          label: "Operating Expenses",
-          value: -operatingExpenses,
-          displayValue: `-${formatCurrency(operatingExpenses)}`,
-          type: "outflow",
-        },
-        {
-          label: "Net Cash Flow",
-          value: netCashFlow,
-          displayValue: formatCurrency(netCashFlow),
-          type: "net",
-        },
-      ],
-      managementAlerts: buildManagementAlerts({
-        exports: exportRows,
-        payoutRows,
-        paymentRows,
-        sourceHealth,
-        netCashFlow,
-        cashBalance,
-        trustSafetyApprovalNeeded,
-      }),
-      fallbackUsed: sourceHealth.some((source) => !source.ok),
-    };
+  const breakEvenPercent =
+    BREAK_EVEN_TARGET > 0
+      ? Math.max(0, Math.min(100, (breakEvenContribution / BREAK_EVEN_TARGET) * 100))
+      : 0;
 
-    return NextResponse.json(response);
-  } catch (error) {
-    console.warn("Financial overview API fallback used:", error);
+  const revenueTrend = buildRevenueTrend({
+    businessTransactions,
+    bookingRows,
+    paymentRows: activePaymentRows,
+  });
 
-    return NextResponse.json(
-      buildFallbackResponse({
-        generatedAt,
-        range,
-        startDate,
-        endDate,
-        segment,
-      }),
-    );
-  }
+  const expenseTrend = buildExpenseTrend({
+    businessTransactions,
+    manualExpenses: activeExpenseRows,
+    payoutRows,
+    commissionRows,
+    stripeRows: [...stripeRows, ...stripeBalanceRows],
+  });
+
+  const funnelValues = [
+    {
+      label: "Gross Bookings",
+      rawValue: grossBookings,
+    },
+    {
+      label: "Platform Revenue",
+      rawValue: platformRevenue,
+    },
+    {
+      label: "Bank Cash In",
+      rawValue: plaidBanking.cashIn,
+    },
+    {
+      label: "Net Cash Flow",
+      rawValue: plaidBanking.netCashFlow,
+    },
+  ];
+
+  const maxFunnelValue = Math.max(...funnelValues.map((row) => Math.abs(row.rawValue)), 1);
+
+  const cashFlowByCategory: CashFlowCategory[] = [
+    {
+      label: "Bank Cash In",
+      value: plaidBanking.cashIn,
+      displayValue: formatCurrency(plaidBanking.cashIn),
+      type: "inflow",
+    },
+    {
+      label: "Bank Cash Out",
+      value: plaidBanking.cashOut,
+      displayValue: formatCurrency(plaidBanking.cashOut),
+      type: "outflow",
+    },
+    {
+      label: "Manual Expenses",
+      value: manualExpenseTotal,
+      displayValue: formatCurrency(manualExpenseTotal),
+      type: "outflow",
+    },
+    {
+      label: "Net Cash Flow",
+      value: plaidBanking.netCashFlow - manualExpenseTotal,
+      displayValue: formatCurrency(plaidBanking.netCashFlow - manualExpenseTotal),
+      type: "net",
+    },
+  ];
+
+  const kpis: DashboardKpi[] = [
+    {
+      label: "Current Cash",
+      value: formatCurrency(plaidBanking.currentCash),
+      rawValue: plaidBanking.currentCash,
+      change: plaidBanking.lastSyncedAt ? "Live Plaid/NFCU" : "Not synced",
+      helper: "Current balance from NFCU Business Checking and Business Savings.",
+      tone: plaidBanking.currentCash >= 0 ? "green" : "red",
+    },
+    {
+      label: "Available Cash",
+      value: formatCurrency(plaidBanking.availableCash),
+      rawValue: plaidBanking.availableCash,
+      change: `${plaidBanking.businessAccountCount} business accounts`,
+      helper: "Available cash across connected business banking accounts.",
+      tone: plaidBanking.availableCash >= 0 ? "green" : "red",
+    },
+    {
+      label: "Platform Revenue",
+      value: formatCurrency(platformRevenue),
+      rawValue: platformRevenue,
+      change: `${plaidBanking.postedRows.toLocaleString()} posted bank rows`,
+      helper: "Reviewed income activity from Plaid/NFCU and payment records.",
+      tone: "green",
+    },
+    {
+      label: "Total Expenses",
+      value: formatCurrency(totalExpenses),
+      rawValue: totalExpenses,
+      change: `${activeExpenseRows.length.toLocaleString()} manual expense rows`,
+      helper: "Bank expenses plus manual expense ledger rows.",
+      tone: totalExpenses > 0 ? "red" : "green",
+    },
+    {
+      label: "Net Income",
+      value: formatCurrency(netIncome),
+      rawValue: netIncome,
+      change: netIncome >= 0 ? "Positive" : "Loss",
+      helper: "Estimated from revenue minus bank, manual, payout, commission, fee, and refund costs.",
+      tone: netIncome >= 0 ? "green" : "red",
+    },
+    {
+      label: "Needs Review",
+      value: plaidBanking.needsReviewRows.toLocaleString(),
+      rawValue: plaidBanking.needsReviewRows,
+      change: `${plaidBanking.uncategorizedRows.toLocaleString()} uncategorized`,
+      helper: "Bank transactions still needing category or report review.",
+      tone: plaidBanking.needsReviewRows ? "red" : "green",
+    },
+  ];
+
+  const managementAlerts = buildManagementAlerts({
+    plaidBanking,
+    manualRows,
+    proformaRows: activeProformaRows.length,
+    reconciliationScore,
+    netIncome,
+    cashRunwayMonths,
+  });
+
+  const response: FinancialOverviewResponse = {
+    ok: true,
+    isLive: true,
+    generatedAt: new Date().toISOString(),
+    filters: {
+      range,
+      startDate,
+      endDate,
+      segment,
+    },
+    sourceHealth,
+    plaidBanking,
+    kpis,
+    breakEven: {
+      percent: Number(formatPercent(breakEvenPercent).replace("%", "")),
+      target: BREAK_EVEN_TARGET,
+      currentContribution: breakEvenContribution,
+      remaining: Math.max(0, BREAK_EVEN_TARGET - breakEvenContribution),
+      runwayMonths: cashRunwayMonths,
+    },
+    bookingsToCashFunnel: funnelValues.map((row) => ({
+      label: row.label,
+      value: formatCurrency(row.rawValue),
+      rawValue: row.rawValue,
+      widthClass: widthClassFor(Math.abs(row.rawValue), maxFunnelValue),
+    })),
+    guruPayoutStatus: buildPayoutStatus(payoutRows),
+    partnerCommissionStatus: buildCommissionStatus(commissionRows),
+    cashRunway: {
+      months: cashRunwayMonths,
+      cashBalance: plaidBanking.currentCash,
+      monthlyBurn,
+      runwayEndLabel:
+        cashRunwayMonths > 0
+          ? runwayDate.toLocaleDateString("en-US", {
+              month: "short",
+              year: "numeric",
+            })
+          : "Not available",
+    },
+    revenueTrend,
+    expenseTrend,
+    cashFlowByCategory,
+    managementAlerts,
+    fallbackUsed: false,
+  };
+
+  return NextResponse.json(response);
 }

@@ -1,12 +1,34 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
+const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
+
+function normalizeValue(value: string | null | undefined) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeEmail(value: string | null | undefined) {
+  return normalizeValue(value);
+}
+
+function isSuperUserEmail(email: string | null | undefined) {
+  return SUPER_USER_EMAILS.has(normalizeEmail(email));
+}
+
 function isAdminLoginPath(pathname: string) {
   return pathname === "/admin/login";
 }
 
+function isGuruLoginPath(pathname: string) {
+  return pathname === "/guru/login" || pathname === "/guru/signup";
+}
+
 function isProtectedAdminPath(pathname: string) {
   return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
+function isProtectedGuruDashboardPath(pathname: string) {
+  return pathname === "/guru/dashboard" || pathname.startsWith("/guru/dashboard/");
 }
 
 const ALLOWED_EXACT_PATHS = new Set([
@@ -20,6 +42,8 @@ const ALLOWED_EXACT_PATHS = new Set([
   "/admin/login",
   "/guru/login",
   "/guru/signup",
+  "/guru/application",
+  "/become-a-guru",
   "/favicon.ico",
   "/robots.txt",
   "/sitemap.xml",
@@ -33,16 +57,11 @@ const ALLOWED_PREFIXES = [
   "/privacy/",
   "/terms/",
   "/help/",
+  "/auth",
 
-  // Internal testing/app routes allowed during pre-launch.
-  "/admin",
+  // Public/prelaunch app routes.
   "/customer",
   "/dashboard",
-  "/guru/dashboard",
-  "/guru/bookings",
-  "/guru/availability",
-  "/guru/resources",
-  "/guru/pet-families",
   "/messages",
   "/bookings",
   "/pets",
@@ -50,6 +69,18 @@ const ALLOWED_PREFIXES = [
   "/rewards",
   "/referrals",
   "/search",
+  "/guru/application",
+  "/guru/success-center",
+  "/become-a-guru",
+
+  // Protected routes are allowed through prelaunch,
+  // then protected by auth/role logic below.
+  "/admin",
+  "/guru/dashboard",
+  "/guru/bookings",
+  "/guru/availability",
+  "/guru/resources",
+  "/guru/pet-families",
 ];
 
 const ALLOWED_PUBLIC_FILES = new Set([
@@ -59,7 +90,7 @@ const ALLOWED_PUBLIC_FILES = new Set([
 
 function isStaticAsset(pathname: string) {
   return /\.(png|jpg|jpeg|gif|webp|svg|ico|css|js|map|txt|xml|woff|woff2|ttf|eot)$/i.test(
-    pathname
+    pathname,
   );
 }
 
@@ -79,6 +110,114 @@ function isAllowedPrelaunchPath(pathname: string) {
 
 function getSiteMode() {
   return process.env.SITE_MODE === "live" ? "live" : "prelaunch";
+}
+
+function makeSessionCookieOptions(options: CookieOptions): CookieOptions {
+  const sessionOptions = {
+    ...options,
+    path: options.path || "/",
+    sameSite: options.sameSite || "lax",
+  } as CookieOptions & {
+    expires?: Date;
+    maxAge?: number;
+  };
+
+  /**
+   * Keep sign-out/removal cookies working.
+   */
+  if (typeof sessionOptions.maxAge === "number" && sessionOptions.maxAge <= 0) {
+    return sessionOptions;
+  }
+
+  /**
+   * Remove long-term persistence.
+   * This makes Supabase auth cookies browser-session cookies.
+   */
+  delete sessionOptions.maxAge;
+  delete sessionOptions.expires;
+
+  return sessionOptions;
+}
+
+function isAdminRole(role: string | null | undefined) {
+  const normalized = normalizeValue(role);
+
+  return [
+    "admin",
+    "owner",
+    "super_admin",
+    "super user",
+    "superuser",
+    "founder",
+    "ceo",
+    "founder/ceo",
+    "co-founder",
+    "cofounder",
+  ].includes(normalized);
+}
+
+function isGuruRole(role: string | null | undefined) {
+  const normalized = normalizeValue(role);
+
+  return [
+    "guru",
+    "pet_guru",
+    "pet-care-guru",
+    "pet_care_guru",
+    "provider",
+    "sitter",
+    "walker",
+    "caregiver",
+  ].includes(normalized);
+}
+
+function isCustomerRole(role: string | null | undefined) {
+  const normalized = normalizeValue(role);
+
+  return [
+    "customer",
+    "pet_parent",
+    "pet-parent",
+    "pet parent",
+    "pet_owner",
+    "pet-owner",
+    "pet owner",
+    "parent",
+  ].includes(normalized);
+}
+
+function isBothRole(role: string | null | undefined) {
+  const normalized = normalizeValue(role);
+
+  return [
+    "both",
+    "customer_guru",
+    "customer-guru",
+    "pet_parent_and_guru",
+    "pet-parent-and-guru",
+    "pet_owner_and_guru",
+    "pet-owner-and-guru",
+  ].includes(normalized);
+}
+
+function makeRedirectUrl({
+  request,
+  pathname,
+  nextPath,
+}: {
+  request: NextRequest;
+  pathname: string;
+  nextPath?: string;
+}) {
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = pathname;
+  redirectUrl.search = "";
+
+  if (nextPath) {
+    redirectUrl.searchParams.set("next", nextPath);
+  }
+
+  return redirectUrl;
 }
 
 export async function middleware(request: NextRequest) {
@@ -103,8 +242,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(launchUrl);
   }
 
-  // Admin protection still runs in pre-launch mode.
-  if (!isProtectedAdminPath(pathname) || isAdminLoginPath(pathname)) {
+  const requiresAdminAccess = isProtectedAdminPath(pathname) && !isAdminLoginPath(pathname);
+  const requiresGuruAccess =
+    isProtectedGuruDashboardPath(pathname) && !isGuruLoginPath(pathname);
+
+  if (!requiresAdminAccess && !requiresGuruAccess) {
     return NextResponse.next();
   }
 
@@ -116,17 +258,20 @@ export async function middleware(request: NextRequest) {
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {
           return request.cookies.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
+          const sessionOptions = makeSessionCookieOptions(options);
+
           request.cookies.set({
             name,
             value,
-            ...options,
+            ...sessionOptions,
           });
 
           response = NextResponse.next({
@@ -138,14 +283,20 @@ export async function middleware(request: NextRequest) {
           response.cookies.set({
             name,
             value,
-            ...options,
+            ...sessionOptions,
           });
         },
         remove(name: string, options: CookieOptions) {
+          const removalOptions = {
+            ...options,
+            path: options.path || "/",
+            maxAge: 0,
+          } as CookieOptions;
+
           request.cookies.set({
             name,
             value: "",
-            ...options,
+            ...removalOptions,
           });
 
           response = NextResponse.next({
@@ -157,11 +308,11 @@ export async function middleware(request: NextRequest) {
           response.cookies.set({
             name,
             value: "",
-            ...options,
+            ...removalOptions,
           });
         },
       },
-    }
+    },
   );
 
   const {
@@ -170,51 +321,100 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    return NextResponse.redirect(new URL("/admin/login", request.url));
+    if (requiresAdminAccess) {
+      return NextResponse.redirect(
+        makeRedirectUrl({
+          request,
+          pathname: "/admin/login",
+          nextPath: pathname,
+        }),
+      );
+    }
+
+    return NextResponse.redirect(
+      makeRedirectUrl({
+        request,
+        pathname: "/guru/login",
+        nextPath: pathname,
+      }),
+    );
   }
 
-  let isAdmin = false;
+  const userEmail = normalizeEmail(user.email);
+  const isSuperUser = isSuperUserEmail(userEmail);
+
+  /**
+   * Only jason@sitguru.com and nette@sitguru.com are Super Users.
+   * Super Users can access Admin, Guru, and Customer portals.
+   */
+  if (isSuperUser) {
+    return response;
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, account_type")
+    .select("id, email, role")
     .eq("id", user.id)
     .maybeSingle();
 
   const profileRole = String(profile?.role || "").toLowerCase();
-  const profileAccountType = String(profile?.account_type || "").toLowerCase();
 
-  if (
-    profileRole === "admin" ||
-    profileRole === "owner" ||
-    profileRole === "super_admin" ||
-    profileAccountType === "admin" ||
-    profileAccountType === "owner" ||
-    profileAccountType === "super_admin"
-  ) {
-    isAdmin = true;
+  const { data: roleRows } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id);
+
+  const roles = (roleRows || [])
+    .map((row) => String(row.role || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  const hasAdminRole =
+    isAdminRole(profileRole) || roles.some((role) => isAdminRole(role));
+
+  const hasGuruRole =
+    isGuruRole(profileRole) ||
+    isBothRole(profileRole) ||
+    roles.some((role) => isGuruRole(role) || isBothRole(role));
+
+  const hasCustomerRole =
+    isCustomerRole(profileRole) ||
+    isBothRole(profileRole) ||
+    roles.some((role) => isCustomerRole(role) || isBothRole(role));
+
+  let hasGuruRow = false;
+
+  if (requiresGuruAccess && !hasGuruRole) {
+    const { data: guruRow } = await supabase
+      .from("gurus")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    hasGuruRow = Boolean(guruRow?.id);
   }
 
-  if (!isAdmin) {
-    const { data: roleRows } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-
-    if (
-      (roleRows || []).some((row) => {
-        const role = String(row.role || "").toLowerCase();
-        return role === "admin" || role === "owner" || role === "super_admin";
-      })
-    ) {
-      isAdmin = true;
-    }
-  }
-
-  if (!isAdmin) {
+  if (requiresAdminAccess && !hasAdminRole) {
     return NextResponse.redirect(
-      new URL(siteMode === "prelaunch" ? "/launch" : "/", request.url)
+      makeRedirectUrl({
+        request,
+        pathname: siteMode === "prelaunch" ? "/launch" : "/",
+      }),
     );
+  }
+
+  if (requiresGuruAccess && !hasGuruRole && !hasGuruRow) {
+    const applicationUrl = makeRedirectUrl({
+      request,
+      pathname: "/guru/application",
+    });
+
+    applicationUrl.searchParams.set("from", "guru-dashboard");
+    applicationUrl.searchParams.set(
+      "reason",
+      hasCustomerRole ? "customer-only" : "guru-access-required",
+    );
+
+    return NextResponse.redirect(applicationUrl);
   }
 
   return response;

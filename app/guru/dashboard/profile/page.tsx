@@ -230,6 +230,52 @@ function stringifyError(error: unknown) {
   }
 }
 
+function isOAuthProviderAvatarUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+
+    return (
+      hostname.includes("googleusercontent.com") ||
+      hostname.includes("ggpht.com") ||
+      hostname.includes("google.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizeSitGuruPhotoUrl(value: string | null | undefined) {
+  if (!value) return "";
+
+  const cleanValue = value.trim();
+
+  if (!cleanValue) return "";
+
+  /**
+   * Do not use Google/Gmail OAuth photos as SitGuru Guru avatars.
+   * Gurus should show an uploaded SitGuru profile photo or the branded initials fallback.
+   */
+  if (isOAuthProviderAvatarUrl(cleanValue)) return "";
+
+  if (cleanValue.startsWith("http://")) return cleanValue;
+  if (cleanValue.startsWith("https://")) return cleanValue;
+  if (cleanValue.startsWith("/")) return cleanValue;
+  if (cleanValue.startsWith("data:image")) return cleanValue;
+
+  return `/${cleanValue}`;
+}
+
+function firstSitGuruPhotoUrl(values: Array<string | null | undefined>) {
+  for (const value of values) {
+    const normalized = normalizeSitGuruPhotoUrl(value);
+
+    if (normalized) return normalized;
+  }
+
+  return "";
+}
+
 function normalizeServices(value: GuruProfile["services"]): string[] {
   if (!value) return [];
   if (Array.isArray(value)) {
@@ -803,11 +849,12 @@ function GuruDashboardProfilePageContent() {
               : "",
         );
         setProfilePhotoUrl(
-          profile.profile_photo_url ||
-            profile.image_url ||
-            profile.avatar_url ||
-            profile.photo_url ||
-            "",
+          firstSitGuruPhotoUrl([
+            profile.profile_photo_url,
+            profile.image_url,
+            profile.photo_url,
+            profile.avatar_url,
+          ]),
         );
         const normalizedProfileServices = normalizeServices(profile.services);
         setServices(normalizedProfileServices);
@@ -1243,11 +1290,12 @@ function GuruDashboardProfilePageContent() {
               : "",
         );
         setProfilePhotoUrl(
-          refreshed.profile_photo_url ||
-            refreshed.image_url ||
-            refreshed.avatar_url ||
-            refreshed.photo_url ||
-            "",
+          firstSitGuruPhotoUrl([
+            refreshed.profile_photo_url,
+            refreshed.image_url,
+            refreshed.photo_url,
+            refreshed.avatar_url,
+          ]),
         );
         const refreshedServices = normalizeServices(refreshed.services);
         setServices(refreshedServices);

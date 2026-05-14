@@ -4,7 +4,11 @@ import { Open_Sans } from "next/font/google";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import ReferralRewardsSection from "@/components/ReferralRewardsSection";
+import PhoneCodeLogin from "@/components/auth/PhoneCodeLogin";
+import PawPerksRewardCard from "@/components/customer/PawPerksRewardCard";
+import PawPerksRewardStates, {
+  type PawPerksAudience,
+} from "@/components/customer/PawPerksRewardStates";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
@@ -13,6 +17,8 @@ const openSans = Open_Sans({
   weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
 });
+
+const heroImagePath = "/images/hero/sitguru-pet-care-signup-bandanas.jpg";
 
 const heroServiceOptions = [
   "Dog Walking",
@@ -232,11 +238,32 @@ const guruTypes = [
   "Trusted local helpers",
 ];
 
-const launchHighlights = [
-  "Something new is coming to pet care",
-  "Early access for Pet Parents and future Gurus",
-  "Warm, premium, pet-friendly brand feel",
-  "Capture leads from Instagram, Facebook, TikTok, and more",
+const bottomHeroServices = [
+  {
+    title: "Walks & Drop-ins",
+    description: "Daily walks and quick visits",
+    icon: "🐕",
+  },
+  {
+    title: "Boarding & Sitting",
+    description: "Overnight stays in loving homes",
+    icon: "🏡",
+  },
+  {
+    title: "Day Care",
+    description: "Play, socialization and fun",
+    icon: "☘️",
+  },
+  {
+    title: "Training Support",
+    description: "Positive training and guidance",
+    icon: "🎾",
+  },
+  {
+    title: "Trusted Reviews",
+    description: "Real reviews from real Pet Parents",
+    icon: "⭐",
+  },
 ];
 
 const homepagePrograms = [
@@ -387,19 +414,19 @@ const audienceOptions: {
   {
     value: "customer",
     label: "Pet Parent",
-    description: "I want trusted pet care when SitGuru launches.",
-    emoji: "🐾",
+    description: "I need care for my pet.",
+    emoji: "🐶",
   },
   {
     value: "guru",
-    label: "Become a Guru",
-    description: "I want to offer services and grow with SitGuru.",
-    emoji: "⭐",
+    label: "Pet Care Guru",
+    description: "I offer pet care services.",
+    emoji: "🧘",
   },
   {
     value: "both",
     label: "Both",
-    description: "I’m interested in care and offering services.",
+    description: "I need care and may offer services.",
     emoji: "✨",
   },
 ];
@@ -458,6 +485,28 @@ function detectSourceFromUrl() {
 
 function normalizeZipCode(value: string) {
   return value.replace(/\D/g, "").slice(0, 5);
+}
+
+function formatPhoneWithDashes(value: string) {
+  const digitsOnly = value.replace(/\D/g, "").slice(0, 11);
+
+  const normalizedDigits =
+    digitsOnly.length === 11 && digitsOnly.startsWith("1")
+      ? digitsOnly.slice(1)
+      : digitsOnly.slice(0, 10);
+
+  if (normalizedDigits.length <= 3) {
+    return normalizedDigits;
+  }
+
+  if (normalizedDigits.length <= 6) {
+    return `${normalizedDigits.slice(0, 3)}-${normalizedDigits.slice(3)}`;
+  }
+
+  return `${normalizedDigits.slice(0, 3)}-${normalizedDigits.slice(
+    3,
+    6,
+  )}-${normalizedDigits.slice(6)}`;
 }
 
 async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
@@ -757,6 +806,8 @@ export default function HomePage() {
   const [zipLookupStatus, setZipLookupStatus] =
     useState<ZipLookupStatus>("idle");
   const [zipLookupMessage, setZipLookupMessage] = useState("");
+  const [selectedPawPerksAudience, setSelectedPawPerksAudience] =
+    useState<PawPerksAudience>("pet-parent");
 
   const [launchForm, setLaunchForm] = useState<LaunchFormState>(
     initialLaunchFormState,
@@ -764,6 +815,10 @@ export default function HomePage() {
   const [isSubmittingLaunch, setIsSubmittingLaunch] = useState(false);
   const [launchError, setLaunchError] = useState("");
   const [launchSuccess, setLaunchSuccess] = useState("");
+
+  const phoneLoginRole = launchForm.interestType === "guru" ? "guru" : "customer";
+  const phoneLoginNextPath =
+    launchForm.interestType === "guru" ? "/guru/dashboard" : "/customer/dashboard";
 
   const isCustomerSelected = useMemo(
     () =>
@@ -943,7 +998,10 @@ export default function HomePage() {
   ) {
     setLaunchForm((prev) => ({
       ...prev,
-      [key]: value,
+      [key]:
+        key === "phone"
+          ? (formatPhoneWithDashes(String(value)) as LaunchFormState[K])
+          : value,
     }));
   }
 
@@ -984,10 +1042,25 @@ export default function HomePage() {
       },
     });
 
-    const section = document.getElementById("launch-list");
+    const section = document.getElementById("free-signup");
     if (section) {
-      section.scrollIntoView({ behavior: "smooth", block: "start" });
+      section.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+  }
+
+  function handlePawPerksAudienceChange(audience: PawPerksAudience) {
+    setSelectedPawPerksAudience(audience);
+
+    trackEvent({
+      eventName: "homepage_petperks_audience_selected",
+      eventType: "referral",
+      source: launchForm.source || detectSourceFromUrl(),
+      role: audience,
+      metadata: {
+        selected_audience: audience,
+        location: "homepage_petperks_section",
+      },
+    });
   }
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
@@ -999,12 +1072,59 @@ export default function HomePage() {
       source: launchForm.source || detectSourceFromUrl(),
       role: "customer",
       metadata: {
-        location: "homepage_quick_search",
+        location: "homepage_top_search",
         service: String(formData.get("service") || ""),
         city: String(formData.get("city") || ""),
         state: String(formData.get("state") || ""),
         zip_code: String(formData.get("zipCode") || formData.get("zip") || ""),
       },
+    });
+  }
+
+  async function handleOAuthSignup(provider: "google" | "apple") {
+    const selectedNextPath =
+      launchForm.interestType === "guru"
+        ? "/guru/dashboard/profile"
+        : "/customer/dashboard/profile";
+
+    const callbackUrl =
+      typeof window !== "undefined"
+        ? new URL("/auth/callback", window.location.origin)
+        : null;
+
+    if (callbackUrl) {
+      callbackUrl.searchParams.set("next", selectedNextPath);
+      callbackUrl.searchParams.set("type", launchForm.interestType);
+    }
+
+    trackEvent({
+      eventName: "homepage_social_signup_clicked",
+      eventType: "auth",
+      source: launchForm.source || detectSourceFromUrl(),
+      role: launchForm.interestType,
+      metadata: {
+        provider,
+        location: "homepage_free_signup_card",
+        selected_next_path: selectedNextPath,
+        force_google_account_picker: provider === "google",
+      },
+    });
+
+    const oauthOptions =
+      provider === "google"
+        ? {
+            redirectTo: callbackUrl?.toString(),
+            queryParams: {
+              prompt: "select_account",
+            },
+          }
+        : {
+            redirectTo: callbackUrl?.toString(),
+          };
+
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: oauthOptions,
     });
   }
 
@@ -1020,6 +1140,7 @@ export default function HomePage() {
       source: launchForm.source || detectSourceFromUrl(),
       role: launchForm.interestType,
       metadata: {
+        location: "homepage_free_signup_card",
         has_phone: Boolean(launchForm.phone.trim()),
         has_zip_code: Boolean(launchForm.zipCode.trim()),
         has_pet_types: Boolean(launchForm.petTypes.trim()),
@@ -1041,7 +1162,7 @@ export default function HomePage() {
 
       if (!response.ok) {
         throw new Error(
-          payload?.error || "Unable to join the launch list right now.",
+          payload?.error || "Unable to create your free SitGuru signup right now.",
         );
       }
 
@@ -1052,6 +1173,7 @@ export default function HomePage() {
         role: launchForm.interestType,
         metadata: {
           interest_type: launchForm.interestType,
+          location: "homepage_free_signup_card",
           has_phone: Boolean(launchForm.phone.trim()),
           has_zip_code: Boolean(launchForm.zipCode.trim()),
           has_pet_types: Boolean(launchForm.petTypes.trim()),
@@ -1061,7 +1183,7 @@ export default function HomePage() {
       });
 
       setLaunchSuccess(
-        "You’re officially on the SitGuru launch list. We’ll share early access and launch updates soon.",
+        "You’re signed up. Welcome to the SitGuru pack — we’ll share launch updates and next steps soon.",
       );
 
       setLaunchForm((prev) => ({
@@ -1081,6 +1203,7 @@ export default function HomePage() {
         role: launchForm.interestType,
         metadata: {
           error: message,
+          location: "homepage_free_signup_card",
         },
       });
 
@@ -1095,7 +1218,6 @@ export default function HomePage() {
       className={`${openSans.className} page-shell bg-white text-slate-950 font-light`}
       style={{ fontWeight: 300 }}
     >
-      {/* Quick Search */}
       <section className="border-b border-slate-200 bg-white py-8 sm:py-10">
         <div className="page-container">
           <div className="mx-auto max-w-3xl text-center">
@@ -1209,148 +1331,220 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/35 blur-3xl" />
-          <div className="absolute right-0 top-8 h-72 w-72 rounded-full bg-slate-300/30 blur-3xl" />
-          <div className="absolute bottom-0 left-1/3 h-52 w-52 rounded-full bg-amber-200/25 blur-3xl" />
-        </div>
-
-        <div className="page-container relative py-14 sm:py-18 lg:py-24">
-          <div className="grid items-start gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:gap-12">
-            <div>
-              <div className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-4 py-1.5 text-sm font-semibold text-emerald-800 shadow-sm">
-                Something New Is Coming to Pet Care
-              </div>
-
-              <h1 className="mt-5 max-w-4xl text-slate-950">
-                Find the right Guru for your pet with more confidence.
-              </h1>
-
-              <div className="mt-5 space-y-4">
-                <p className="max-w-3xl text-lg font-medium leading-8 text-slate-800 sm:text-xl">
-                  SitGuru helps Pet Parents discover trusted local caregivers
-                  for{" "}
-                  <span className="font-semibold text-emerald-700">
-                    walking, sitting, boarding, day care, training support,
-                  </span>{" "}
-                  and more.
-                </p>
-
-                <p className="max-w-3xl text-base leading-7 text-slate-700 sm:text-lg sm:leading-8">
-                  A Guru is a trusted pet care pro — someone pets love, parents
-                  trust, and communities rely on. More than a sitter, a Guru is
-                  a trusted guide in your pet’s care.
-                </p>
-              </div>
-
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <Link
-                  href="/search"
-                  className="btn-primary w-full sm:w-auto"
-                  onClick={() =>
-                    trackHomepageClick("Find a Guru", "hero", "/search")
-                  }
-                >
-                  Find a Guru
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => scrollToLaunchForm("guru")}
-                  className="btn-secondary w-full sm:w-auto"
-                >
-                  Become a Guru
-                </button>
-
-                <Link
-                  href="/guru/login"
-                  className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 sm:w-auto"
-                  onClick={() =>
-                    trackHomepageClick("Guru Login", "hero", "/guru/login")
-                  }
-                >
-                  Guru Login
-                </Link>
-              </div>
-
-              <p className="mt-5 text-sm text-slate-700">
-                Already have an account?{" "}
-                <Link
-                  href="/login"
-                  className="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
-                  onClick={() =>
-                    trackHomepageClick(
-                      "Customer Login",
-                      "hero_login_prompt",
-                      "/login",
-                    )
-                  }
-                >
-                  Customer Login
-                </Link>
-              </p>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-                  Browse local care
-                </span>
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-                  Compare services faster
-                </span>
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-                  Built for mobile booking
-                </span>
-              </div>
-
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                {launchHighlights.map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-8 overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
-                <img
-                  src="/images/homepage/sitguru-dog-walking-hero.jpg"
-                  alt="SitGuru caregiver walking two happy dogs"
-                  className="h-auto w-full object-cover"
-                />
-              </div>
+      <section className="relative overflow-hidden bg-white px-3 py-5 sm:px-5 sm:py-8 lg:px-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[28px] border border-slate-100 bg-gradient-to-br from-white via-white to-emerald-50 shadow-[0_28px_90px_rgba(15,23,42,0.10)] sm:rounded-[36px]">
+          <div className="relative overflow-hidden px-5 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-14">
+            <div className="pointer-events-none absolute inset-0">
+              <div className="absolute inset-y-0 right-0 hidden w-[46%] bg-gradient-to-l from-emerald-100/60 via-emerald-50/20 to-transparent lg:block" />
+              <div className="absolute -left-20 top-24 h-72 w-72 rounded-full bg-emerald-100/70 blur-3xl" />
+              <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-amber-100/40 blur-3xl" />
             </div>
 
-            <div
-              id="launch-list"
-              className="rounded-[30px] border border-slate-200 bg-white/95 p-5 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur-sm sm:p-6 lg:p-7"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-amber-800">
-                    Early access
-                  </div>
-                  <h2 className="mt-4 text-lg font-semibold text-slate-950">
-                    Join the SitGuru launch list
-                  </h2>
-                  <p className="mt-2 text-sm text-slate-600">
-                    Be first to hear what’s coming. Join as a Pet Parent, future
-                    Guru, or both.
+            <div className="relative grid gap-8 lg:grid-cols-[1.08fr_0.92fr] lg:items-start lg:gap-10">
+              <div className="relative z-10">
+                <div className="inline-flex items-center gap-3 rounded-full bg-emerald-50 px-2 py-2 shadow-sm ring-1 ring-emerald-100">
+                  <span className="rounded-full border border-emerald-300 bg-white px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-700">
+                    New
+                  </span>
+                  <span className="pr-3 text-sm font-semibold text-slate-600">
+                    A Smarter Way to Pet Care
+                  </span>
+                </div>
+
+                <h1 className="mt-8 max-w-3xl text-[3.15rem] font-black leading-[0.98] tracking-[-0.06em] text-slate-950 sm:text-[4.25rem] lg:text-[5.15rem]">
+                  Pet care
+                  <br />
+                  just got better.
+                  <br />
+                  <span className="text-emerald-600">
+                    Something new
+                    <br />
+                    is here.
+                  </span>
+                </h1>
+
+                <div className="mt-7 max-w-2xl space-y-4 text-lg leading-8 text-slate-600">
+                  <p>
+                    SitGuru connects Pet Parents with trusted local Gurus for{" "}
+                    <span className="font-bold text-emerald-700">
+                      walking, sitting, boarding, training
+                    </span>{" "}
+                    and more.
+                  </p>
+
+                  <p>
+                    It’s modern pet care, built around trust, convenience, and
+                    happy pets.
                   </p>
                 </div>
 
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  Live capture
-                </span>
+                <div className="mt-8 grid gap-4 text-sm font-bold text-slate-700 sm:grid-cols-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                      ♡
+                    </span>
+                    Trusted local Gurus
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                      ✤
+                    </span>
+                    All-in-one pet care
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                      ✓
+                    </span>
+                    Verified & reviewed
+                  </div>
+                </div>
+
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <Link
+                    href="/search"
+                    className="btn-primary w-full sm:w-auto"
+                    onClick={() =>
+                      trackHomepageClick("Find a Guru", "new_hero", "/search")
+                    }
+                  >
+                    Find care near me
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => scrollToLaunchForm("guru")}
+                    className="btn-secondary w-full sm:w-auto"
+                  >
+                    Become a Guru
+                  </button>
+                </div>
+
+                <div className="mt-8 overflow-hidden rounded-[30px] border border-white/70 bg-white shadow-[0_26px_70px_rgba(15,23,42,0.14)] ring-1 ring-slate-100">
+                  <img
+                    src={heroImagePath}
+                    alt="SitGuru caregiver with happy dogs wearing SitGuru avatar bandanas"
+                    className="h-[260px] w-full object-cover object-center sm:h-[340px] lg:h-[360px]"
+                    loading="eager"
+                  />
+                </div>
               </div>
 
-              <form onSubmit={handleLaunchSubmit} className="mt-6 space-y-5">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div
+                id="free-signup"
+                className="relative z-20 rounded-[30px] border border-slate-200 bg-white/95 p-5 shadow-[0_30px_80px_rgba(15,23,42,0.16)] backdrop-blur-sm sm:p-7 lg:mt-6"
+              >
+                <div>
+                  <h2 className="text-3xl font-black tracking-[-0.04em] text-slate-950">
+                    Get started for free
+                  </h2>
+                  <p className="mt-2 text-sm font-medium text-slate-500">
+                    Create your free account in less than a minute.
+                  </p>
+                </div>
+
+                <div className="mt-7 grid gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleOAuthSignup("google")}
+                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40"
+                  >
+                    <span className="text-lg">G</span>
+                    Continue with Google
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOAuthSignup("apple")}
+                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40"
+                  >
+                    <span className="text-lg"></span>
+                    Continue with Apple
+                  </button>
+                </div>
+
+                <div className="mt-6">
+                  <label className="mb-3 block text-sm font-bold text-slate-800">
+                    I’m joining as a...
+                  </label>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {audienceOptions.slice(0, 2).map((option) => {
+                      const selected = launchForm.interestType === option.value;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            updateLaunchField("interestType", option.value);
+
+                            trackEvent({
+                              eventName: "launch_interest_selected",
+                              eventType: "lead",
+                              source: launchForm.source || detectSourceFromUrl(),
+                              role: option.value,
+                              metadata: {
+                                selected_interest: option.value,
+                                location: "homepage_free_signup_card",
+                              },
+                            });
+                          }}
+                          className={`min-h-[104px] rounded-2xl border p-4 text-center transition ${
+                            selected
+                              ? "border-emerald-500 bg-emerald-50 shadow-sm ring-4 ring-emerald-100"
+                              : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
+                          }`}
+                        >
+                          <div className="text-xl">{option.emoji}</div>
+                          <div className="mt-1 text-sm font-black text-slate-900">
+                            {option.label}
+                          </div>
+                          <p className="mt-2 text-xs leading-5 text-slate-500">
+                            {option.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => updateLaunchField("interestType", "both")}
+                    className={`mt-3 w-full rounded-2xl border px-4 py-3 text-sm font-bold transition ${
+                      launchForm.interestType === "both"
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-800 ring-4 ring-emerald-100"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/40"
+                    }`}
+                  >
+                    ✨ I’m interested in both
+                  </button>
+                </div>
+
+                <PhoneCodeLogin
+                  nextPath={phoneLoginNextPath}
+                  role={phoneLoginRole}
+                  heading="Continue with phone"
+                  description="Enter your mobile number and we’ll text you a secure 6-digit SitGuru code."
+                  submitLabel="Text me a code"
+                  verifyLabel={
+                    phoneLoginRole === "guru"
+                      ? "Verify & enter Guru Dashboard"
+                      : "Verify & enter Customer Dashboard"
+                  }
+                  compact
+                />
+
+                <div className="my-6 flex items-center gap-4">
+                  <div className="h-px flex-1 bg-slate-200" />
+                  <span className="text-sm font-semibold text-slate-400">
+                    or finish the quick form
+                  </span>
+                  <div className="h-px flex-1 bg-slate-200" />
+                </div>
+
+                <form onSubmit={handleLaunchSubmit} className="space-y-5">
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-800">
+                    <label className="mb-2 block text-sm font-bold text-slate-800">
                       Full name
                     </label>
                     <input
@@ -1366,7 +1560,7 @@ export default function HomePage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-800">
+                    <label className="mb-2 block text-sm font-bold text-slate-800">
                       Email
                     </label>
                     <input
@@ -1380,224 +1574,218 @@ export default function HomePage() {
                       required
                     />
                   </div>
-                </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-800">
+                        ZIP code
+                      </label>
+                      <input
+                        type="text"
+                        value={launchForm.zipCode}
+                        onChange={(e) =>
+                          updateLaunchField(
+                            "zipCode",
+                            normalizeZipCode(e.target.value),
+                          )
+                        }
+                        placeholder="Optional"
+                        className="input w-full"
+                        inputMode="numeric"
+                        maxLength={5}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-800">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={launchForm.phone}
+                        onChange={(e) =>
+                          updateLaunchField("phone", e.target.value)
+                        }
+                        placeholder="856-555-1234"
+                        className="input w-full"
+                        inputMode="tel"
+                        maxLength={12}
+                      />
+                    </div>
+                  </div>
+
+                  {isCustomerSelected ? (
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-800">
+                        Pet type(s)
+                      </label>
+                      <input
+                        type="text"
+                        value={launchForm.petTypes}
+                        onChange={(e) =>
+                          updateLaunchField("petTypes", e.target.value)
+                        }
+                        placeholder="Dogs, cats, puppies, senior pets..."
+                        className="input w-full"
+                      />
+                    </div>
+                  ) : null}
+
+                  {isGuruSelected ? (
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-800">
+                        Services offered
+                      </label>
+                      <input
+                        type="text"
+                        value={launchForm.servicesOffered}
+                        onChange={(e) =>
+                          updateLaunchField("servicesOffered", e.target.value)
+                        }
+                        placeholder="Pet sitting, walks, boarding, training..."
+                        className="input w-full"
+                      />
+                    </div>
+                  ) : null}
+
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-800">
-                      Phone
+                    <label className="mb-2 block text-sm font-bold text-slate-800">
+                      Notes
                     </label>
-                    <input
-                      type="tel"
-                      value={launchForm.phone}
-                      onChange={(e) =>
-                        updateLaunchField("phone", e.target.value)
-                      }
-                      placeholder="Optional"
-                      className="input w-full"
+                    <textarea
+                      value={launchForm.notes}
+                      onChange={(e) => updateLaunchField("notes", e.target.value)}
+                      rows={3}
+                      placeholder="Tell us what you’d love to see."
+                      className="input min-h-[96px] w-full resize-y"
                     />
                   </div>
 
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-800">
-                      ZIP code
-                    </label>
-                    <input
-                      type="text"
-                      value={launchForm.zipCode}
-                      onChange={(e) =>
-                        updateLaunchField("zipCode", e.target.value)
-                      }
-                      placeholder="Optional"
-                      className="input w-full"
-                    />
-                  </div>
-                </div>
+                  {launchError ? (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                      {launchError}
+                    </div>
+                  ) : null}
 
-                <div>
-                  <label className="mb-3 block text-sm font-semibold text-slate-800">
-                    I’m interested as a...
-                  </label>
+                  {launchSuccess ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                      {launchSuccess}
+                    </div>
+                  ) : null}
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {audienceOptions.map((option) => {
-                      const selected = launchForm.interestType === option.value;
-
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => {
-                            updateLaunchField("interestType", option.value);
-
-                            trackEvent({
-                              eventName: "launch_interest_selected",
-                              eventType: "lead",
-                              source:
-                                launchForm.source || detectSourceFromUrl(),
-                              role: option.value,
-                              metadata: {
-                                selected_interest: option.value,
-                                location: "homepage_launch_form",
-                              },
-                            });
-                          }}
-                          className={`rounded-3xl border p-4 text-left transition ${
-                            selected
-                              ? "border-emerald-500 bg-emerald-50 shadow-sm ring-4 ring-emerald-100"
-                              : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{option.emoji}</span>
-                            <span className="text-sm font-black text-slate-900">
-                              {option.label}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-xs leading-6 text-slate-600">
-                            {option.description}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {isCustomerSelected ? (
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-800">
-                      Pet type(s)
-                    </label>
-                    <input
-                      type="text"
-                      value={launchForm.petTypes}
-                      onChange={(e) =>
-                        updateLaunchField("petTypes", e.target.value)
-                      }
-                      placeholder="Dogs, cats, puppies, senior pets, etc."
-                      className="input w-full"
-                    />
-                  </div>
-                ) : null}
-
-                {isGuruSelected ? (
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-800">
-                      Services offered
-                    </label>
-                    <input
-                      type="text"
-                      value={launchForm.servicesOffered}
-                      onChange={(e) =>
-                        updateLaunchField("servicesOffered", e.target.value)
-                      }
-                      placeholder="Pet sitting, walks, boarding, training support..."
-                      className="input w-full"
-                    />
-                  </div>
-                ) : null}
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-800">
-                    What would make SitGuru exciting for you?
-                  </label>
-                  <textarea
-                    value={launchForm.notes}
-                    onChange={(e) => updateLaunchField("notes", e.target.value)}
-                    rows={4}
-                    placeholder="Tell us what you’d love to see."
-                    className="input min-h-[120px] w-full resize-y"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Social source
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">
-                    {launchForm.source || "direct"}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Use links like{" "}
-                    <span className="font-semibold">?source=instagram</span>,{" "}
-                    <span className="font-semibold">?source=facebook</span>, or{" "}
-                    <span className="font-semibold">?source=tiktok</span> in
-                    your bios.
-                  </p>
-                </div>
-
-                {launchError ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                    {launchError}
-                  </div>
-                ) : null}
-
-                {launchSuccess ? (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                    {launchSuccess}
-                  </div>
-                ) : null}
-
-                <button
-                  type="submit"
-                  disabled={isSubmittingLaunch}
-                  className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSubmittingLaunch
-                    ? "Joining Launch List..."
-                    : "Unlock Early Access"}
-                </button>
-              </form>
-
-              <div className="mt-6 grid grid-cols-1 gap-3 border-t border-slate-200 pt-5 sm:grid-cols-2">
-                {pillars.slice(0, 4).map((pillar) => (
-                  <div
-                    key={pillar.number}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  <button
+                    type="submit"
+                    disabled={isSubmittingLaunch}
+                    className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
-                      {pillar.number}
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">
-                      {pillar.title}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {pillar.description}
+                    {isSubmittingLaunch ? "Signing up..." : "Sign up for free"}
+                  </button>
+
+                  <p className="text-center text-sm text-slate-500">
+                    Already have an account?{" "}
+                    <Link
+                      href="/login"
+                      className="font-black text-emerald-700 hover:text-emerald-800 hover:underline"
+                      onClick={() =>
+                        trackHomepageClick(
+                          "Login",
+                          "homepage_free_signup_card",
+                          "/login",
+                        )
+                      }
+                    >
+                      Log in
+                    </Link>
+                  </p>
+                </form>
+              </div>
+            </div>
+
+            <div className="relative z-30 mt-8 rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-md">
+              <h2 className="text-center text-2xl font-black tracking-[-0.04em] text-slate-950">
+                Everything you need. All in one place.
+              </h2>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                {bottomHeroServices.map((service) => (
+                  <div key={service.title} className="text-center">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-lg text-emerald-700 ring-1 ring-emerald-100">
+                      {service.icon}
+                    </div>
+                    <h3 className="mt-3 text-sm font-black text-slate-800">
+                      {service.title}
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      {service.description}
                     </p>
                   </div>
                 ))}
               </div>
-
-              <div className="mt-6 flex flex-wrap gap-2">
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  Trust-first
-                </span>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  Pet-centered
-                </span>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  Social-ready
-                </span>
-              </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          <ReferralRewardsSection
-            source={launchForm.source || detectSourceFromUrl()}
-            onShare={(platform, referralType) => {
-              trackEvent({
-                eventName: "homepage_referral_share_clicked",
-                eventType: "referral",
-                source: launchForm.source || detectSourceFromUrl(),
-                role: referralType,
-                metadata: {
-                  platform,
-                  referral_type: referralType,
-                  location: "homepage_rewards_section",
-                },
-              });
-            }}
-          />
+      <CaregiverCarousel items={carouselItems} />
+
+      <section className="bg-gradient-to-br from-white via-slate-50 to-emerald-50 py-10 sm:py-14">
+        <div className="page-container">
+          <section className="rounded-[34px] border border-emerald-100 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
+            <div className="grid gap-8 xl:grid-cols-[0.82fr_1.18fr] xl:items-start">
+              <div>
+                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-emerald-800">
+                  PetPerks Referral Program
+                </div>
+
+                <h2 className="mt-4 !text-3xl !font-bold !leading-tight text-slate-950 sm:!text-4xl">
+                  Share SitGuru. Earn PetPerks.
+                </h2>
+
+                <p className="mt-4 text-base leading-7 text-slate-700">
+                  Invite Pet Parents or future Gurus and earn rewards when they
+                  join the pack and complete eligible activity.
+                </p>
+
+                <div className="mt-6">
+                  <PawPerksRewardStates
+                    selectedAudience={selectedPawPerksAudience}
+                    onAudienceChange={handlePawPerksAudienceChange}
+                  />
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+                    Simple launch-friendly rewards
+                  </p>
+
+                  <div className="mt-4 grid gap-3">
+                    <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+                      <p className="text-sm font-bold text-emerald-700">
+                        Pet Parents
+                      </p>
+                      <p className="mt-1 text-lg font-black text-slate-950">
+                        Give $10. Get $10.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-sky-100 bg-white p-4">
+                      <p className="text-sm font-bold text-sky-700">
+                        Future Gurus
+                      </p>
+                      <p className="mt-1 text-lg font-black text-slate-950">
+                        Refer a Guru. Earn $20.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <PawPerksRewardCard
+                selectedAudience={selectedPawPerksAudience}
+                referralCode="COMMUNITY"
+              />
+            </div>
+          </section>
 
           <section className="mt-10 rounded-[34px] border border-emerald-100 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
             <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
@@ -1615,14 +1803,6 @@ export default function HomePage() {
                   applicants, pet-care professionals, and community supporters a
                   public pathway to earn, refer, support local Pet Parents, and
                   grow with the SitGuru Pet Community.
-                </p>
-
-                <p className="mt-4 text-base leading-7 text-slate-700">
-                  Student Hire stays highlighted for flexible earning. Veterans
-                  Hire brings together military-connected applicants and
-                  SkillBridge interest. The Ambassador Program gives Vet Techs,
-                  Veterinarians, Trainers, and trusted community voices a way to
-                  support referrals and community growth.
                 </p>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -1771,7 +1951,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 5 Pillars */}
       <section className="section-space bg-slate-50">
         <div className="page-container">
           <div className="mx-auto max-w-3xl text-center">
@@ -1806,7 +1985,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Services */}
       <section className="section-space bg-white">
         <div className="page-container">
           <div className="mx-auto max-w-3xl text-center">
@@ -1815,9 +1993,10 @@ export default function HomePage() {
               A marketplace that feels familiar but more elevated
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              SitGuru should feel intuitive to customers coming from platforms
-              like Rover, while offering a broader, more premium path for pet
-              care.
+              SitGuru gives Pet Parents a cleaner, warmer, and more trusted way
+              to find local pet care — with flexible services, clearer profiles,
+              and a more elevated experience built around pets, people, and
+              community.
             </p>
           </div>
 
@@ -1877,7 +2056,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pet matching */}
       <section className="section-space bg-slate-50">
         <div className="page-container">
           <div className="grid gap-6 lg:grid-cols-2">
@@ -1933,7 +2111,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Guru types */}
       <section className="section-space bg-white">
         <div className="page-container">
           <div className="mx-auto max-w-3xl text-center">
@@ -1961,7 +2138,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Audience split */}
       <section className="section-space bg-white">
         <div className="page-container">
           <div className="grid gap-6 lg:grid-cols-2">
@@ -2029,9 +2205,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <CaregiverCarousel items={carouselItems} />
-
-      {/* Features */}
       <section className="section-space bg-slate-50">
         <div className="page-container">
           <div className="mx-auto max-w-3xl text-center">
@@ -2067,7 +2240,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Trust */}
       <section className="section-space bg-white">
         <div className="page-container">
           <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
@@ -2099,7 +2271,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Support */}
       <section className="section-space bg-slate-50">
         <div className="page-container">
           <div className="grid gap-6 lg:grid-cols-2">
@@ -2143,7 +2314,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials */}
       <section className="section-space bg-white">
         <div className="page-container">
           <div className="mx-auto max-w-3xl text-center">
@@ -2176,7 +2346,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Final CTA */}
       <section className="section-space bg-slate-950 text-white">
         <div className="page-container">
           <div className="rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,#0f172a,#111827_45%,#0b1220)] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.25)] sm:p-10">
@@ -2191,8 +2360,8 @@ export default function HomePage() {
 
               <p className="mx-auto mt-4 max-w-2xl !text-base !leading-7 !text-slate-200 sm:!text-lg">
                 Browse local Gurus, compare profiles, and start finding care
-                that feels right for your pet. Or join the early-access list and
-                be part of what launches next.
+                that feels right for your pet. Or sign up for free and be part
+                of what launches next.
               </p>
 
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
@@ -2211,7 +2380,7 @@ export default function HomePage() {
                   onClick={() => scrollToLaunchForm("both")}
                   className="inline-flex w-full items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold !text-white transition hover:bg-white/15 sm:w-auto"
                 >
-                  Join Launch List
+                  Sign up for free
                 </button>
               </div>
             </div>

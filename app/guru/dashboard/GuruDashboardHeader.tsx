@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   LogOut,
   MessageCircle,
+  Repeat2,
   UserCircle,
   UserPlus,
   Wallet,
@@ -170,6 +171,34 @@ function getPhotoFromProfile(profile?: GuruProfileForHeader | null) {
   );
 }
 
+function isOAuthProviderAvatarUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+
+    return (
+      hostname.includes("googleusercontent.com") ||
+      hostname.includes("ggpht.com") ||
+      hostname.includes("google.com") ||
+      hostname.includes("googleapis.com") ||
+      hostname.includes("facebook.com") ||
+      hostname.includes("fbcdn.net") ||
+      hostname.includes("apple.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizePhotoUrl(value?: string | null) {
+  const cleanValue = asText(value);
+
+  if (!cleanValue) return "";
+  if (isOAuthProviderAvatarUrl(cleanValue)) return "";
+
+  return cleanValue;
+}
+
 function isPathActive(pathname: string, href: string) {
   if (href === "/guru/dashboard") {
     return pathname === "/guru/dashboard";
@@ -208,7 +237,9 @@ export default function GuruDashboardHeader({
   const [loadedProfile, setLoadedProfile] = useState<LoadedHeaderProfile>({
     name: firstText(displayName, getNameFromProfile(guruProfile), "Guru"),
     email: asText(guruProfile?.email),
-    photoUrl: firstText(imageUrl, getPhotoFromProfile(guruProfile)),
+    photoUrl: normalizePhotoUrl(
+      firstText(imageUrl, getPhotoFromProfile(guruProfile)),
+    ),
   });
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
@@ -221,7 +252,7 @@ export default function GuruDashboardHeader({
         "Guru",
       email: asText(guruProfile?.email) || current.email,
       photoUrl:
-        firstText(imageUrl, getPhotoFromProfile(guruProfile)) ||
+        normalizePhotoUrl(firstText(imageUrl, getPhotoFromProfile(guruProfile))) ||
         current.photoUrl,
     }));
   }, [displayName, imageUrl, guruProfile]);
@@ -238,7 +269,7 @@ export default function GuruDashboardHeader({
 
       let profileName = firstText(displayName);
       let profileEmail = user.email || "";
-      let profilePhoto = firstText(imageUrl);
+      let profilePhoto = normalizePhotoUrl(imageUrl);
 
       const { data: guruData } = await supabase
         .from("gurus")
@@ -261,12 +292,14 @@ export default function GuruDashboardHeader({
 
         profileEmail = firstText(guru.email, profileEmail);
 
-        profilePhoto = firstText(
-          profilePhoto,
-          guru.profile_photo_url,
-          guru.photo_url,
-          guru.avatar_url,
-          guru.image_url,
+        profilePhoto = normalizePhotoUrl(
+          firstText(
+            profilePhoto,
+            guru.profile_photo_url,
+            guru.photo_url,
+            guru.avatar_url,
+            guru.image_url,
+          ),
         );
       }
 
@@ -291,12 +324,14 @@ export default function GuruDashboardHeader({
 
         profileEmail = firstText(profileEmail, profile.email);
 
-        profilePhoto = firstText(
-          profilePhoto,
-          profile.profile_photo_url,
-          profile.photo_url,
-          profile.avatar_url,
-          profile.image_url,
+        profilePhoto = normalizePhotoUrl(
+          firstText(
+            profilePhoto,
+            profile.profile_photo_url,
+            profile.photo_url,
+            profile.avatar_url,
+            profile.image_url,
+          ),
         );
       }
 
@@ -446,6 +481,23 @@ export default function GuruDashboardHeader({
 
         <div className="hidden items-center gap-3 lg:flex">
           <Link
+            href="/customer/dashboard/profile"
+            className="sg-guru-switch-link inline-flex h-11 min-w-[190px] items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100"
+            style={{ color: "#065f46" }}
+          >
+            <Repeat2
+              className="h-4 w-4 shrink-0"
+              style={{ color: "#047857" }}
+            />
+            <span
+              className="whitespace-nowrap text-sm font-semibold leading-none"
+              style={{ color: "#065f46" }}
+            >
+              Switch to Pet Parent
+            </span>
+          </Link>
+
+          <Link
             href="/guru/success-center"
             className="sg-guru-success-link inline-flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
             style={{ color: "#0f172a" }}
@@ -536,6 +588,17 @@ export default function GuruDashboardHeader({
                 </div>
 
                 <div className="grid gap-1 bg-white p-3">
+                  <Link
+                    href="/customer/dashboard/profile"
+                    role="menuitem"
+                    onClick={() => setAccountMenuOpen(false)}
+                    className="mb-1 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] transition hover:bg-emerald-100"
+                    style={{ color: "#065f46" }}
+                  >
+                    <Repeat2 className="h-4 w-4" />
+                    Switch to Pet Parent
+                  </Link>
+
                   {guruAccountMenuLinks.map((item) => (
                     <Link
                       key={item.href}
@@ -588,6 +651,15 @@ export default function GuruDashboardHeader({
 
       <div className="border-t border-slate-100 bg-white lg:hidden">
         <div className="mx-auto flex max-w-[1500px] gap-2 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
+          <Link
+            href="/customer/dashboard/profile"
+            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold tracking-[-0.01em] hover:bg-emerald-100"
+            style={{ color: "#065f46" }}
+          >
+            <Repeat2 className="h-4 w-4" />
+            Switch to Pet Parent
+          </Link>
+
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -669,6 +741,16 @@ export default function GuruDashboardHeader({
               </div>
             </div>
 
+            <Link
+              href="/customer/dashboard/profile"
+              onClick={() => setAccountMenuOpen(false)}
+              className="mb-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold tracking-[-0.01em] transition hover:bg-emerald-100"
+              style={{ color: "#065f46" }}
+            >
+              <Repeat2 className="h-4 w-4" />
+              Switch to Pet Parent
+            </Link>
+
             {guruAccountMenuLinks.map((item) => (
               <Link
                 key={`mobile-${item.href}`}
@@ -731,7 +813,8 @@ export default function GuruDashboardHeader({
           color: #047857 !important;
         }
 
-        .sg-guru-success-link:hover span {
+        .sg-guru-success-link:hover span,
+        .sg-guru-switch-link:hover span {
           color: #047857 !important;
         }
       `}</style>
