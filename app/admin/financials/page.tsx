@@ -188,6 +188,64 @@ type TrustSafetyFinancialsResponse = {
   plans: TrustSafetyPlanRollup[];
 };
 
+type GrowthFinancialSummaryRow = {
+  financial_category: string;
+  financial_statement_section: string;
+  row_count: number;
+  total_amount: number;
+  first_activity_date: string | null;
+  last_activity_date: string | null;
+  source: string;
+};
+
+type GrowthCampaignRoiRow = {
+  campaign_id: string | null;
+  campaign_name: string;
+  campaign_slug: string | null;
+  channel: string;
+  campaign_type: string;
+  source: string | null;
+  clicks: number;
+  leads: number;
+  signups: number;
+  bookings: number;
+  attributed_revenue: number;
+  total_cost: number;
+  net_growth_return: number;
+  roi_percent: number | null;
+  signup_conversion_percent: number | null;
+  booking_conversion_percent: number | null;
+  cost_per_signup: number | null;
+  cost_per_booking: number | null;
+  growth_signal: string;
+  admin_recommendation: string;
+  last_event_at: string | null;
+  last_cost_date: string | null;
+};
+
+type GrowthReferralFinancialsResponse = {
+  ok: boolean;
+  isLive: boolean;
+  generatedAt: string;
+  message?: string;
+  totals: {
+    marketingExpense: number;
+    pendingRewardLiability: number;
+    issuedReferralRewards: number;
+    totalAttributedRevenue: number;
+    totalGrowthCost: number;
+    netGrowthReturn: number;
+    overallRoiPercent: number | null;
+    campaignsTracked: number;
+    clicks: number;
+    leads: number;
+    signups: number;
+    bookings: number;
+  };
+  summaryRows: GrowthFinancialSummaryRow[];
+  roiRows: GrowthCampaignRoiRow[];
+};
+
 const fallbackTrustSafetyFinancials: TrustSafetyFinancialsResponse = {
   ok: true,
   isLive: false,
@@ -241,6 +299,29 @@ const fallbackTrustSafetyFinancials: TrustSafetyFinancialsResponse = {
       bookableCount: 0,
     },
   ],
+};
+
+const fallbackGrowthReferralFinancials: GrowthReferralFinancialsResponse = {
+  ok: true,
+  isLive: false,
+  generatedAt: new Date().toISOString(),
+  message: "Growth, referral, and marketing ROI financial data is loading.",
+  totals: {
+    marketingExpense: 0,
+    pendingRewardLiability: 0,
+    issuedReferralRewards: 0,
+    totalAttributedRevenue: 0,
+    totalGrowthCost: 0,
+    netGrowthReturn: 0,
+    overallRoiPercent: null,
+    campaignsTracked: 0,
+    clicks: 0,
+    leads: 0,
+    signups: 0,
+    bookings: 0,
+  },
+  summaryRows: [],
+  roiRows: [],
 };
 
 const fallbackOverview: FinancialOverviewResponse = {
@@ -711,6 +792,7 @@ const segmentFilters = [
   { label: "Partners", value: "partners" },
   { label: "Payouts", value: "payouts" },
   { label: "Banking", value: "banking" },
+  { label: "Growth", value: "growth" },
   { label: "Trust & Safety", value: "trust-safety" },
 ];
 
@@ -834,6 +916,7 @@ function getVisibleKpis(kpis: KpiCard[], segment: string) {
     partners: ["Partner Commissions", "Net Margin"],
     payouts: ["Guru Payouts", "Partner Commissions", "Stripe Fees", "Refunds / Chargebacks"],
     banking: ["Cash Balance", "Platform Revenue", "Stripe Fees", "Refunds / Chargebacks", "Net Margin"],
+    growth: ["Platform Revenue", "Partner Commissions", "Stripe Fees", "Refunds / Chargebacks", "Net Margin", "Cash Balance"],
     "trust-safety": ["Platform Revenue", "Stripe Fees", "Net Margin", "Cash Balance"],
   };
 
@@ -1703,6 +1786,294 @@ function TrustSafetyFinancialsPanel({
   );
 }
 
+function GrowthReferralFinancialsPanel({
+  financials,
+}: {
+  financials: GrowthReferralFinancialsResponse;
+}) {
+  const safeFinancials = financials ?? fallbackGrowthReferralFinancials;
+  const totals = safeFinancials.totals ?? fallbackGrowthReferralFinancials.totals;
+  const summaryRows = Array.isArray(safeFinancials.summaryRows)
+    ? safeFinancials.summaryRows
+    : [];
+  const roiRows = Array.isArray(safeFinancials.roiRows)
+    ? safeFinancials.roiRows
+    : [];
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+            Growth, Referrals &amp; Marketing ROI
+          </p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+            Growth Costs, Reward Liability &amp; Campaign Return
+          </h2>
+          <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
+            Financials now includes the same Growth &amp; Referrals foundation:
+            campaign costs, referral reward liability, issued reward expense,
+            attributed revenue, cost per signup, cost per booking, and campaign
+            ROI.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
+              safeFinancials.isLive
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-amber-200 bg-amber-50 text-amber-800"
+            }`}
+          >
+            {safeFinancials.isLive ? "Live Supabase Views" : "Preview / Offline"}
+          </span>
+
+          <Link
+            href="/admin/referrals"
+            className="rounded-full bg-emerald-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
+          >
+            Open Growth &amp; Referrals
+          </Link>
+        </div>
+      </div>
+
+      {safeFinancials.message ? (
+        <div
+          className={`mb-5 rounded-[1.25rem] border p-4 ${
+            safeFinancials.isLive
+              ? "border-emerald-100 bg-emerald-50"
+              : "border-amber-100 bg-amber-50"
+          }`}
+        >
+          <p
+            className={`text-xs font-black uppercase tracking-[0.18em] ${
+              safeFinancials.isLive ? "text-emerald-700" : "text-amber-700"
+            }`}
+          >
+            Growth Financial Feed
+          </p>
+          <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
+            {safeFinancials.message}
+          </p>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <div className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+            Marketing Expense
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {formatCurrency(totals.marketingExpense)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            Campaign costs in financial views
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-amber-100 bg-amber-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
+            Reward Liability
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {formatCurrency(totals.pendingRewardLiability)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            Pending referral reward exposure
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-blue-100 bg-blue-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+            Issued Rewards
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {formatCurrency(totals.issuedReferralRewards)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            Referral rewards already expensed
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+            Attributed Revenue
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {formatCurrency(totals.totalAttributedRevenue)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            Revenue tied to campaign events
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-sky-100 bg-sky-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
+            Growth ROI
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {totals.overallRoiPercent === null
+              ? "Need cost data"
+              : `${Math.round(totals.overallRoiPercent)}%`}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            Revenue vs growth costs
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-purple-100 bg-purple-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-purple-700">
+            Campaigns
+          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">
+            {totals.campaignsTracked.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
+            ROI rows available
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-[1.5rem] border border-slate-100 bg-[#fbfefd] p-5">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+            Funnel tracked in financials
+          </p>
+          <h3 className="mt-2 text-xl font-black text-slate-950">
+            Clicks → Leads → Signups → Bookings
+          </h3>
+
+          <div className="mt-5 grid gap-3 text-sm font-bold text-slate-600">
+            <p className="flex justify-between gap-4">
+              <span>Clicks / QR scans</span>
+              <span className="text-slate-950">{totals.clicks.toLocaleString()}</span>
+            </p>
+            <p className="flex justify-between gap-4">
+              <span>Leads / applications</span>
+              <span className="text-slate-950">{totals.leads.toLocaleString()}</span>
+            </p>
+            <p className="flex justify-between gap-4">
+              <span>Signups</span>
+              <span className="text-slate-950">{totals.signups.toLocaleString()}</span>
+            </p>
+            <p className="flex justify-between gap-4">
+              <span>Bookings</span>
+              <span className="text-slate-950">{totals.bookings.toLocaleString()}</span>
+            </p>
+            <p className="flex justify-between gap-4 border-t border-slate-200 pt-3">
+              <span>Net growth return</span>
+              <span className="text-slate-950">{formatCurrency(totals.netGrowthReturn)}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white">
+          <div className="border-b border-slate-100 bg-slate-50 px-5 py-4">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+              Top campaign ROI rows
+            </p>
+          </div>
+
+          <div className="max-h-[360px] overflow-auto">
+            {roiRows.length > 0 ? (
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                      Campaign
+                    </th>
+                    <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                      Bookings
+                    </th>
+                    <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                      Revenue
+                    </th>
+                    <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                      Cost
+                    </th>
+                    <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                      ROI
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roiRows.slice(0, 8).map((row) => (
+                    <tr
+                      key={`${row.campaign_slug || row.campaign_name}-${row.channel}`}
+                      className="border-b border-slate-100 last:border-0"
+                    >
+                      <td className="px-5 py-4">
+                        <p className="font-black text-slate-950">
+                          {row.campaign_name}
+                        </p>
+                        <p className="text-xs font-bold text-slate-500">
+                          {row.channel || "unknown"} · {row.growth_signal}
+                        </p>
+                      </td>
+                      <td className="px-5 py-4 font-bold text-slate-700">
+                        {safeNumber(row.bookings).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-4 font-bold text-slate-700">
+                        {formatCurrency(safeNumber(row.attributed_revenue))}
+                      </td>
+                      <td className="px-5 py-4 font-bold text-slate-700">
+                        {formatCurrency(safeNumber(row.total_cost))}
+                      </td>
+                      <td className="px-5 py-4 font-black text-emerald-700">
+                        {row.roi_percent === null
+                          ? "Need cost"
+                          : `${Math.round(safeNumber(row.roi_percent))}%`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-5">
+                <p className="text-sm font-bold leading-6 text-slate-600">
+                  No campaign ROI rows yet. Add campaign events and costs for
+                  QR codes, flyers, paid ads, partner links, Ambassador links,
+                  and referral campaigns to populate this table.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {summaryRows.length > 0 ? (
+        <div className="mt-5 rounded-[1.5rem] border border-slate-100 bg-[#fbfefd] p-5">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+            Financial category rollup
+          </p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {summaryRows.slice(0, 8).map((row) => (
+              <div
+                key={`${row.financial_category}-${row.financial_statement_section}-${row.source}`}
+                className="rounded-[1.25rem] border border-slate-100 bg-white p-4"
+              >
+                <p className="text-sm font-black text-slate-950">
+                  {row.financial_category}
+                </p>
+                <p className="mt-1 text-xs font-bold text-slate-500">
+                  {row.financial_statement_section}
+                </p>
+                <p className="mt-3 text-xl font-black text-emerald-800">
+                  {formatCurrency(safeNumber(row.total_amount))}
+                </p>
+                <p className="mt-1 text-xs font-bold text-slate-500">
+                  {safeNumber(row.row_count).toLocaleString()} row(s)
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function ManagementAlerts({ alerts }: { alerts: ManagementAlert[] }) {
   return (
     <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
@@ -2047,6 +2418,8 @@ export default function AdminFinancialsPage() {
     useState<FinancialOverviewResponse>(fallbackOverview);
   const [trustSafetyFinancials, setTrustSafetyFinancials] =
     useState<TrustSafetyFinancialsResponse>(fallbackTrustSafetyFinancials);
+  const [growthReferralFinancials, setGrowthReferralFinancials] =
+    useState<GrowthReferralFinancialsResponse>(fallbackGrowthReferralFinancials);
   const [range, setRange] = useState("month");
   const [segment, setSegment] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -2086,6 +2459,12 @@ export default function AdminFinancialsPage() {
     "payouts",
     "banking",
   ]);
+  const showGrowthReferralFinancials = sectionVisible(segment, [
+    "growth",
+    "partners",
+    "payouts",
+    "banking",
+  ]);
   const showOperatingFinance = sectionVisible(segment, [
     "bookings",
     "customers",
@@ -2093,6 +2472,7 @@ export default function AdminFinancialsPage() {
     "partners",
     "payouts",
     "banking",
+    "growth",
     "trust-safety",
   ]);
 
@@ -2120,6 +2500,36 @@ export default function AdminFinancialsPage() {
           error instanceof Error
             ? error.message
             : "Unable to load Trust & Safety financials.",
+      });
+    }
+  }
+
+  async function loadGrowthReferralFinancials() {
+    try {
+      const response = await fetch("/api/admin/financials/growth-referrals", {
+        cache: "no-store",
+      });
+
+      const json = (await response.json()) as GrowthReferralFinancialsResponse;
+
+      if (!response.ok || !json.ok) {
+        setGrowthReferralFinancials({
+          ...fallbackGrowthReferralFinancials,
+          message:
+            json.message ||
+            "Unable to load Growth & Referrals financial summary.",
+        });
+        return;
+      }
+
+      setGrowthReferralFinancials(json);
+    } catch (error) {
+      setGrowthReferralFinancials({
+        ...fallbackGrowthReferralFinancials,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to load Growth & Referrals financial summary.",
       });
     }
   }
@@ -2172,6 +2582,7 @@ export default function AdminFinancialsPage() {
   useEffect(() => {
     void loadOverview();
     void loadTrustSafetyFinancials();
+    void loadGrowthReferralFinancials();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range, segment]);
 
@@ -2528,6 +2939,10 @@ export default function AdminFinancialsPage() {
 
         {showTrustSafetyFinancials ? (
           <TrustSafetyFinancialsPanel financials={trustSafetyFinancials} />
+        ) : null}
+
+        {showGrowthReferralFinancials ? (
+          <GrowthReferralFinancialsPanel financials={growthReferralFinancials} />
         ) : null}
 
         <ManagementAlerts alerts={overview.managementAlerts} />

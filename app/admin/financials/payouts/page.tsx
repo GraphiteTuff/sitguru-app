@@ -21,7 +21,13 @@ import {
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-type PayoutSource = "Guru" | "Partner" | "Platform" | "Adjustment" | "Refund";
+type PayoutSource =
+  | "Guru"
+  | "Partner"
+  | "Referral"
+  | "Platform"
+  | "Adjustment"
+  | "Refund";
 type PayoutStatus = "paid" | "pending" | "review" | "failed" | "scheduled";
 
 type PayoutRow = {
@@ -296,6 +302,15 @@ function normalizeSource(value: unknown): PayoutSource {
   const source = String(value || "").toLowerCase();
 
   if (
+    source.includes("pawperks") ||
+    source.includes("petperks") ||
+    source.includes("reward") ||
+    source.includes("referral")
+  ) {
+    return "Referral";
+  }
+
+  if (
     source.includes("partner") ||
     source.includes("affiliate") ||
     source.includes("ambassador")
@@ -426,6 +441,7 @@ function getStatusBadgeStyles(status: PayoutStatus) {
 function getSourceBadgeStyles(source: PayoutSource) {
   if (source === "Guru") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (source === "Partner") return "border-violet-200 bg-violet-50 text-violet-800";
+  if (source === "Referral") return "border-blue-200 bg-blue-50 text-blue-800";
   if (source === "Platform") return "border-slate-200 bg-slate-100 text-slate-700";
   if (source === "Adjustment") return "border-indigo-200 bg-indigo-50 text-indigo-800";
   return "border-rose-200 bg-rose-50 text-rose-800";
@@ -663,6 +679,117 @@ function buildGenericPayoutRows(rows: any[]): PayoutRow[] {
   }));
 }
 
+
+function normalizeRewardPayoutStatus(row: any): PayoutStatus {
+  const treatment = String(row?.financial_treatment || "").toLowerCase();
+  const status = String(
+    row?.normalized_status || row?.reward_status || row?.payout_status || row?.status || "pending",
+  ).toLowerCase();
+
+  if (treatment.includes("issued") || status.includes("paid") || status.includes("credited")) {
+    return "paid";
+  }
+
+  if (
+    treatment.includes("not_qualified") ||
+    status.includes("reject") ||
+    status.includes("cancel") ||
+    status.includes("invalid")
+  ) {
+    return "review";
+  }
+
+  if (status.includes("fail") || status.includes("error")) return "failed";
+  if (status.includes("approved") || status.includes("qualified") || status.includes("review")) {
+    return "review";
+  }
+
+  return "pending";
+}
+
+function getRewardProgramType(row: any) {
+  const category = String(row?.financial_category || row?.reward_type || row?.type || "").toLowerCase();
+
+  if (category.includes("pawperks") || category.includes("petperks")) return "PawPerks";
+  if (category.includes("ambassador")) return "Ambassador Referral";
+  if (category.includes("partner")) return "Partner Referral";
+  if (category.includes("guru")) return "Guru Referral";
+
+  return getProgramType(row);
+}
+
+function buildReferralRewardRows(rows: any[]): PayoutRow[] {
+  return rows
+    .map((row, index) => {
+      const amount = normalizeAmount(
+        row.normalized_amount ||
+          row.reward_amount ||
+          row.credit_amount ||
+          row.payout_amount ||
+          row.commission_amount ||
+          row.amount,
+      );
+
+      if (amount <= 0) return null;
+
+      const programType = getRewardProgramType(row);
+      const recipientName =
+        row.recipient_name ||
+        row.customer_name ||
+        row.pet_parent_name ||
+        row.guru_name ||
+        row.ambassador_name ||
+        row.partner_name ||
+        row.referrer_name ||
+        row.name ||
+        `${programType} reward`;
+
+      return {
+        id: String(row.id || row.referral_reward_id || row.referral_code_id || `referral-reward-${index}`),
+        source: "Referral" as PayoutSource,
+        name: recipientName,
+        email:
+          row.recipient_email ||
+          row.customer_email ||
+          row.guru_email ||
+          row.ambassador_email ||
+          row.partner_email ||
+          row.referrer_email ||
+          row.email ||
+          "No email on file",
+        city: row.city || row.recipient_city || row.customer_city || "Remote",
+        state: row.state || row.recipient_state || row.customer_state || "US",
+        zip: row.zip || row.zip_code || row.recipient_zip || "",
+        amount,
+        status: normalizeRewardPayoutStatus(row),
+        payoutDate:
+          row.paid_at ||
+          row.credited_at ||
+          row.payout_date ||
+          row.scheduled_for ||
+          row.created_at ||
+          row.updated_at ||
+          null,
+        reference:
+          row.reference ||
+          row.referral_code ||
+          row.referral_code_id ||
+          row.referral_reward_id ||
+          row.id ||
+          "Referral reward liability",
+        batch: row.batch_name || row.batch || row.payout_batch || "Referral Rewards / PawPerks",
+        notes:
+          row.notes ||
+          row.memo ||
+          `${row.financial_category || "Referral reward"} · ${row.financial_treatment || "pending payout review"}`,
+        partnerType: row.financial_category || getPartnerType(row),
+        ambassadorType: getAmbassadorType(row),
+        programType,
+      };
+    })
+    .filter(Boolean) as PayoutRow[];
+}
+
 function dedupeRows(rows: PayoutRow[]) {
   const map = new Map<string, PayoutRow>();
 
@@ -685,6 +812,9 @@ async function getPayoutRows() {
     await safeSelect<any>("financial_payouts"),
   );
   const adminPayoutRows = buildGenericPayoutRows(await safeSelect<any>("admin_payouts"));
+  const referralRewardRows = buildReferralRewardRows(
+    await safeSelect<any>("admin_referral_reward_liability"),
+  );
 
   const merged = dedupeRows([
     ...bookingRows,
@@ -695,6 +825,7 @@ async function getPayoutRows() {
     ...payoutsRows,
     ...financialPayoutRows,
     ...adminPayoutRows,
+    ...referralRewardRows,
   ]);
 
   return merged.length ? merged : demoPayoutRows;
@@ -760,6 +891,7 @@ function buildSourceSummaries(rows: PayoutRow[]): SourceSummary[] {
   const sourceOrder: PayoutSource[] = [
     "Guru",
     "Partner",
+    "Referral",
     "Platform",
     "Adjustment",
     "Refund",
@@ -785,7 +917,7 @@ function buildTypeSummaries(
   fallback: string,
 ): PayoutTypeSummary[] {
   const grouped = new Map<string, { total: number; count: number }>();
-  const partnerRows = rows.filter((row) => row.source === "Partner");
+  const partnerRows = rows.filter((row) => row.source === "Partner" || row.source === "Referral");
   const grandTotal = partnerRows.reduce((sum, row) => sum + row.amount, 0);
 
   for (const row of partnerRows) {
@@ -883,6 +1015,7 @@ function getInitials(name: string) {
 function getRecipientTone(source: PayoutSource) {
   if (source === "Guru") return "bg-emerald-50 text-emerald-700";
   if (source === "Partner") return "bg-violet-50 text-violet-700";
+  if (source === "Referral") return "bg-blue-50 text-blue-700";
   if (source === "Platform") return "bg-slate-100 text-slate-700";
   if (source === "Adjustment") return "bg-indigo-50 text-indigo-700";
   return "bg-rose-50 text-rose-700";
@@ -937,6 +1070,8 @@ function SourceBar({ item }: { item: SourceSummary }) {
       ? "bg-[#118a43]"
       : item.source === "Partner"
         ? "bg-violet-500"
+        : item.source === "Referral"
+          ? "bg-blue-500"
         : item.source === "Platform"
           ? "bg-slate-400"
           : item.source === "Adjustment"
@@ -948,6 +1083,8 @@ function SourceBar({ item }: { item: SourceSummary }) {
       ? "bg-emerald-50 text-emerald-700"
       : item.source === "Partner"
         ? "bg-violet-50 text-violet-700"
+        : item.source === "Referral"
+          ? "bg-blue-50 text-blue-700"
         : item.source === "Platform"
           ? "bg-slate-100 text-slate-700"
           : item.source === "Adjustment"
@@ -963,6 +1100,7 @@ function SourceBar({ item }: { item: SourceSummary }) {
           >
             {item.source === "Guru" && <Users className="h-4 w-4" />}
             {item.source === "Partner" && <Wallet className="h-4 w-4" />}
+            {item.source === "Referral" && <TrendingUp className="h-4 w-4" />}
             {item.source === "Platform" && <CalendarDays className="h-4 w-4" />}
             {item.source === "Adjustment" && <RefreshCw className="h-4 w-4" />}
             {item.source === "Refund" && <AlertTriangle className="h-4 w-4" />}
@@ -974,6 +1112,8 @@ function SourceBar({ item }: { item: SourceSummary }) {
                 ? "Guru Payouts"
                 : item.source === "Partner"
                   ? "Partner Commissions"
+                  : item.source === "Referral"
+                    ? "Referral Rewards"
                   : item.source === "Platform"
                     ? "Platform Payouts"
                     : item.source === "Adjustment"
@@ -1211,6 +1351,13 @@ export default async function PayoutsAnalyticsPage({
     ? (((summary.paidCount + summary.scheduledCount) / summary.totalCount) * 100).toFixed(1)
     : "0.0";
 
+  const referralRewardRows = visibleRows.filter((row) => row.source === "Referral");
+  const pendingReferralRewards = referralRewardRows.filter((row) => row.status === "pending");
+  const issuedReferralRewards = referralRewardRows.filter((row) => row.status === "paid");
+  const reviewReferralRewards = referralRewardRows.filter((row) => row.status === "review");
+  const pendingReferralRewardTotal = pendingReferralRewards.reduce((sum, row) => sum + row.amount, 0);
+  const issuedReferralRewardTotal = issuedReferralRewards.reduce((sum, row) => sum + row.amount, 0);
+  const reviewReferralRewardTotal = reviewReferralRewards.reduce((sum, row) => sum + row.amount, 0);
   const totalPartnersPaid = visibleRows.filter((row) => row.source === "Partner").length;
 
   const buildHref = (overrides: Partial<SearchParamsShape> = {}) => {
@@ -1370,6 +1517,7 @@ export default async function PayoutsAnalyticsPage({
               <option value="all">Source: All</option>
               <option value="guru">Guru</option>
               <option value="partner">Partner</option>
+              <option value="referral">Referral Rewards</option>
               <option value="platform">Platform</option>
               <option value="adjustment">Adjustment</option>
               <option value="refund">Refund</option>
@@ -1458,6 +1606,46 @@ export default async function PayoutsAnalyticsPage({
           icon={<TrendingUp className="h-6 w-6" />}
           iconWrapClassName="bg-emerald-50 text-[#118a43]"
         />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-[1.35rem] border border-blue-100 bg-blue-50 p-5 shadow-sm">
+          <p className="text-sm font-semibold text-blue-700">Referral Reward Records</p>
+          <p className="mt-2 text-3xl font-black text-[#111b33]">{referralRewardRows.length}</p>
+          <p className="mt-1 text-xs font-bold text-blue-700">
+            PawPerks, Guru, Ambassador, and Partner reward rows
+          </p>
+        </div>
+
+        <div className="rounded-[1.35rem] border border-amber-100 bg-amber-50 p-5 shadow-sm">
+          <p className="text-sm font-semibold text-amber-700">Pending Reward Liability</p>
+          <p className="mt-2 text-3xl font-black text-[#111b33]">
+            {formatCurrency(pendingReferralRewardTotal)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-amber-700">
+            {pendingReferralRewards.length} rewards awaiting approval, credit, or payout
+          </p>
+        </div>
+
+        <div className="rounded-[1.35rem] border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+          <p className="text-sm font-semibold text-emerald-700">Issued Referral Rewards</p>
+          <p className="mt-2 text-3xl font-black text-[#111b33]">
+            {formatCurrency(issuedReferralRewardTotal)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-emerald-700">
+            Paid, credited, or completed reward expense
+          </p>
+        </div>
+
+        <div className="rounded-[1.35rem] border border-violet-100 bg-violet-50 p-5 shadow-sm">
+          <p className="text-sm font-semibold text-violet-700">Reward Review Queue</p>
+          <p className="mt-2 text-3xl font-black text-[#111b33]">
+            {formatCurrency(reviewReferralRewardTotal)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-violet-700">
+            {reviewReferralRewards.length} reward rows need payout review
+          </p>
+        </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-12">

@@ -50,6 +50,31 @@ const heroPetImages = [
 
 const pawPerksRulesPath = "/customer/dashboard/pawperks/rules";
 
+function getPublicSiteUrl() {
+  const configuredSiteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_VERCEL_URL;
+
+  if (configuredSiteUrl) {
+    const normalizedUrl = configuredSiteUrl.startsWith("http")
+      ? configuredSiteUrl
+      : `https://${configuredSiteUrl}`;
+
+    return normalizedUrl.replace(/\/$/, "");
+  }
+
+  if (typeof window !== "undefined") {
+    const currentOrigin = window.location.origin;
+
+    if (!currentOrigin.includes("localhost")) {
+      return currentOrigin.replace(/\/$/, "");
+    }
+  }
+
+  return "https://sitguru.com";
+}
+
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -105,10 +130,7 @@ async function fetchReferralStats(
   profile: CustomerProfile | null,
 ) {
   const fallbackCode = makeReferralCode(userId, profile);
-  const origin =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://sitguru.com";
+  const origin = getPublicSiteUrl();
 
   const fallbackStats: ReferralStats = {
     referral_code: fallbackCode,
@@ -859,10 +881,10 @@ export default function CustomerPawPerksPage() {
 
                   <div>
                     <h2 className="text-2xl font-black tracking-tight text-slate-950">
-                      Share your Friends & Family link
+                      Share your PawPerks link
                     </h2>
                     <p className="mt-1 text-sm font-semibold text-slate-500">
-                      Invite friends and family. Earn PawPerks Rewards.
+                      Invite friends and family. Earn future SitGuru care credits after eligible first paid bookings qualify.
                     </p>
                   </div>
                 </div>
@@ -910,7 +932,7 @@ export default function CustomerPawPerksPage() {
                   className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50"
                 >
                   <ShareIcon />
-                  Share with Friends & Family
+                  Share PawPerks Link
                 </button>
 
                 <a
@@ -1013,7 +1035,7 @@ export default function CustomerPawPerksPage() {
           <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
             <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] lg:p-7">
               <h2 className="text-2xl font-black tracking-tight text-slate-950">
-                How Friends & Family Rewards work
+                How PawPerks Rewards work
               </h2>
 
               <div className="mt-7 grid gap-6 md:grid-cols-3">
@@ -1027,13 +1049,13 @@ export default function CustomerPawPerksPage() {
                   step="2"
                   icon="🐶"
                   title="They join SitGuru"
-                  text="Your friend or family member signs up and completes a booking with SitGuru."
+                  text="Your friend or family member signs up and completes their first eligible paid booking with SitGuru."
                 />
                 <HowItWorksStep
                   step="3"
                   icon="🎁"
                   title="Earn rewards"
-                  text="When their booking is completed, you earn future credits for your next stay."
+                  text="When their eligible first paid booking is completed and verified, you earn future SitGuru care credits."
                 />
               </div>
             </div>
@@ -1104,9 +1126,9 @@ export default function CustomerPawPerksPage() {
                   Review the full PawPerks program details.
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                  Learn how Friends & Family Rewards qualify, when credits are
-                  issued, how rewards can be used, and what activity may not
-                  qualify.
+                  Learn how PawPerks Rewards qualify, when credits are
+                  issued, how future SitGuru care credits can be used, and what
+                  activity may not qualify.
                 </p>
               </div>
 

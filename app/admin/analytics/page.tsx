@@ -11,6 +11,9 @@ type ProfileRow = Record<string, unknown>;
 type LaunchSignupRow = Record<string, unknown>;
 type MessageRow = Record<string, unknown>;
 type AnalyticsEventRow = Record<string, unknown>;
+type GrowthCampaignRoiRow = Record<string, unknown>;
+type GrowthCampaignEventRow = Record<string, unknown>;
+type GrowthCampaignRow = Record<string, unknown>;
 
 type Tone = "emerald" | "sky" | "violet" | "amber" | "rose";
 
@@ -207,6 +210,53 @@ function getEventRole(event: AnalyticsEventRow) {
 
 function getEventCreatedAt(event: AnalyticsEventRow) {
   return asTrimmedString(event.created_at);
+}
+
+
+function getGrowthLabel(row: GrowthCampaignRoiRow) {
+  return (
+    asTrimmedString(row.campaign_name) ||
+    asTrimmedString(row.campaign_slug) ||
+    asTrimmedString(row.utm_campaign) ||
+    "Unassigned Campaign"
+  );
+}
+
+function getGrowthChannel(row: GrowthCampaignRoiRow) {
+  return (
+    asTrimmedString(row.channel) ||
+    asTrimmedString(row.source) ||
+    asTrimmedString(row.utm_source) ||
+    "unknown"
+  );
+}
+
+function getGrowthSignal(row: GrowthCampaignRoiRow) {
+  return asTrimmedString(row.growth_signal) || "needs_more_data";
+}
+
+function getGrowthRecommendation(row: GrowthCampaignRoiRow) {
+  return (
+    asTrimmedString(row.admin_recommendation) ||
+    "Keep tracking. More campaign events are needed before making a strong decision."
+  );
+}
+
+function getGrowthNumber(row: GrowthCampaignRoiRow, key: string) {
+  return toNumber(row[key]);
+}
+
+function getGrowthStatusLabel(signal: string) {
+  const normalized = signal.toLowerCase().replaceAll("_", " ");
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function getGrowthSignalTone(signal: string): Tone {
+  if (signal === "profitable" || signal === "high_value_low_cost") return "emerald";
+  if (signal === "needs_booking_conversion") return "amber";
+  if (signal === "needs_signup_conversion") return "sky";
+  if (signal === "review_spend") return "rose";
+  return "violet";
 }
 
 function isEvent(event: AnalyticsEventRow, eventName: string) {
@@ -505,6 +555,9 @@ async function getAnalyticsData() {
     launchSignups,
     messages,
     analyticsEvents,
+    growthCampaignRoi,
+    growthCampaignEvents,
+    growthCampaigns,
   ] = await Promise.all([
     safeRows<BookingRow>(
       supabaseAdmin.from("bookings").select("*").limit(1000),
@@ -541,6 +594,28 @@ async function getAnalyticsData() {
         .order("created_at", { ascending: false })
         .limit(2500),
       "analytics_events"
+    ),
+    safeRows<GrowthCampaignRoiRow>(
+      supabaseAdmin
+        .from("admin_growth_campaign_roi")
+        .select("*")
+        .limit(500),
+      "admin_growth_campaign_roi"
+    ),
+    safeRows<GrowthCampaignEventRow>(
+      supabaseAdmin
+        .from("growth_campaign_events")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2500),
+      "growth_campaign_events"
+    ),
+    safeRows<GrowthCampaignRow>(
+      supabaseAdmin
+        .from("growth_campaigns")
+        .select("*")
+        .limit(500),
+      "growth_campaigns"
     ),
   ]);
 
@@ -702,6 +777,118 @@ async function getAnalyticsData() {
     });
   }).slice(0, 6);
 
+
+  const growthRows = growthCampaignRoi.map((row) => {
+    const clicks = getGrowthNumber(row, "clicks");
+    const leads = getGrowthNumber(row, "leads");
+    const signups = getGrowthNumber(row, "signups");
+    const bookingsCount = getGrowthNumber(row, "bookings");
+    const attributedRevenue = getGrowthNumber(row, "attributed_revenue");
+    const totalCost = getGrowthNumber(row, "total_cost");
+    const roiPercent = getGrowthNumber(row, "roi_percent");
+    const costPerSignup = getGrowthNumber(row, "cost_per_signup");
+    const costPerBooking = getGrowthNumber(row, "cost_per_booking");
+    const signal = getGrowthSignal(row);
+
+    return {
+      campaignName: getGrowthLabel(row),
+      channel: getGrowthChannel(row),
+      clicks,
+      leads,
+      signups,
+      bookings: bookingsCount,
+      attributedRevenue,
+      totalCost,
+      roiPercent,
+      costPerSignup,
+      costPerBooking,
+      signal,
+      signalLabel: getGrowthStatusLabel(signal),
+      recommendation: getGrowthRecommendation(row),
+    };
+  });
+
+  const growthTotals = growthRows.reduce(
+    (totals, row) => {
+      totals.clicks += row.clicks;
+      totals.leads += row.leads;
+      totals.signups += row.signups;
+      totals.bookings += row.bookings;
+      totals.attributedRevenue += row.attributedRevenue;
+      totals.totalCost += row.totalCost;
+      return totals;
+    },
+    {
+      clicks: 0,
+      leads: 0,
+      signups: 0,
+      bookings: 0,
+      attributedRevenue: 0,
+      totalCost: 0,
+    }
+  );
+
+  const growthNetReturn = growthTotals.attributedRevenue - growthTotals.totalCost;
+  const growthRoiPercent = growthTotals.totalCost
+    ? (growthNetReturn / growthTotals.totalCost) * 100
+    : 0;
+  const growthCostPerSignup = growthTotals.signups
+    ? growthTotals.totalCost / growthTotals.signups
+    : 0;
+  const growthCostPerBooking = growthTotals.bookings
+    ? growthTotals.totalCost / growthTotals.bookings
+    : 0;
+
+  const topGrowthCampaigns = growthRows
+    .slice()
+    .sort((a, b) => {
+      if (b.bookings !== a.bookings) return b.bookings - a.bookings;
+      if (b.attributedRevenue !== a.attributedRevenue) {
+        return b.attributedRevenue - a.attributedRevenue;
+      }
+      return b.signups - a.signups;
+    })
+    .slice(0, 8);
+
+  const channelMap = new Map<
+    string,
+    { clicks: number; leads: number; signups: number; bookings: number; revenue: number; cost: number }
+  >();
+
+  for (const row of growthRows) {
+    const current = channelMap.get(row.channel) || {
+      clicks: 0,
+      leads: 0,
+      signups: 0,
+      bookings: 0,
+      revenue: 0,
+      cost: 0,
+    };
+
+    current.clicks += row.clicks;
+    current.leads += row.leads;
+    current.signups += row.signups;
+    current.bookings += row.bookings;
+    current.revenue += row.attributedRevenue;
+    current.cost += row.totalCost;
+    channelMap.set(row.channel, current);
+  }
+
+  const growthChannelMix = Array.from(channelMap.entries())
+    .map(([label, value]) => ({
+      label,
+      ...value,
+      roi: value.cost ? ((value.revenue - value.cost) / value.cost) * 100 : 0,
+    }))
+    .sort((a, b) => b.bookings - a.bookings || b.revenue - a.revenue)
+    .slice(0, 8);
+
+  const maxGrowthCampaignClicks = Math.max(...growthRows.map((row) => row.clicks), 1);
+  const maxGrowthChannelBookings = Math.max(
+    ...growthChannelMix.map((row) => row.bookings),
+    1
+  );
+
   const recentBookings = bookings
     .slice()
     .sort((a, b) => {
@@ -814,6 +1001,19 @@ async function getAnalyticsData() {
       checkoutStarts: checkoutStarts.length,
       bookingRequestsCreated: bookingRequestsCreated.length,
       bookingFailures: bookingFailures.length,
+      growthCampaigns: growthCampaigns.length || growthRows.length,
+      growthCampaignRows: growthRows.length,
+      growthCampaignEvents: growthCampaignEvents.length,
+      growthClicks: growthTotals.clicks,
+      growthLeads: growthTotals.leads,
+      growthSignups: growthTotals.signups,
+      growthBookings: growthTotals.bookings,
+      growthAttributedRevenue: growthTotals.attributedRevenue,
+      growthCost: growthTotals.totalCost,
+      growthNetReturn,
+      growthRoiPercent,
+      growthCostPerSignup,
+      growthCostPerBooking,
       profileViewRate,
       searchEngagementRate,
       bookingStartRate,
@@ -833,6 +1033,8 @@ async function getAnalyticsData() {
     recentBookings,
     launchRecent,
     recentEvents,
+    topGrowthCampaigns,
+    growthChannelMix,
     maxSourceCount,
     maxRoleCount,
     maxEventSourceCount,
@@ -843,6 +1045,8 @@ async function getAnalyticsData() {
     maxMonthlyCount,
     maxServiceRevenue,
     maxMarketRevenue,
+    maxGrowthCampaignClicks,
+    maxGrowthChannelBookings,
   };
 }
 
@@ -943,6 +1147,30 @@ export default async function AdminAnalyticsPage() {
             detail={`${percent(
               analytics.totals.bookingConversion
             )} booking completion rate from booking records.`}
+          />
+        </div>
+
+
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Growth Campaigns"
+            value={analytics.totals.growthCampaigns.toLocaleString()}
+            detail={`${analytics.totals.growthCampaignEvents.toLocaleString()} campaign events captured from Growth & Referral tracking.`}
+          />
+          <StatCard
+            label="Growth ROI"
+            value={percent(analytics.totals.growthRoiPercent)}
+            detail={`${money(analytics.totals.growthAttributedRevenue)} attributed revenue against ${money(analytics.totals.growthCost)} tracked spend.`}
+          />
+          <StatCard
+            label="Cost per Signup"
+            value={money(analytics.totals.growthCostPerSignup)}
+            detail={`${analytics.totals.growthSignups.toLocaleString()} tracked signups from growth campaigns.`}
+          />
+          <StatCard
+            label="Cost per Booking"
+            value={money(analytics.totals.growthCostPerBooking)}
+            detail={`${analytics.totals.growthBookings.toLocaleString()} attributed bookings from campaign activity.`}
           />
         </div>
 
@@ -1165,6 +1393,149 @@ export default async function AdminAnalyticsPage() {
             </div>
           </SectionCard>
         </div>
+
+
+        <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+          <SectionCard
+            eyebrow="Growth ROI"
+            title="Campaign performance and marketing return"
+            description="This reads from the Growth Campaign ROI view and shows which campaigns are producing clicks, leads, signups, bookings, attributed revenue, and ROI."
+            actions={
+              <>
+                <ActionLink href="/admin/referrals" label="Growth & Referrals" />
+                <ActionLink href="/admin/financials" label="Financials" primary />
+              </>
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Clicks
+                </p>
+                <p className="mt-2 text-2xl font-black text-slate-950">
+                  {analytics.totals.growthClicks.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
+                  Leads
+                </p>
+                <p className="mt-2 text-2xl font-black text-slate-950">
+                  {analytics.totals.growthLeads.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">
+                  Signups
+                </p>
+                <p className="mt-2 text-2xl font-black text-slate-950">
+                  {analytics.totals.growthSignups.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+                  Bookings
+                </p>
+                <p className="mt-2 text-2xl font-black text-slate-950">
+                  {analytics.totals.growthBookings.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              {analytics.topGrowthCampaigns.length ? (
+                analytics.topGrowthCampaigns.slice(0, 6).map((campaign, index) => (
+                  <BarRow
+                    key={`${campaign.campaignName}-${campaign.channel}`}
+                    label={campaign.campaignName}
+                    value={campaign.clicks}
+                    max={analytics.maxGrowthCampaignClicks}
+                    detail={`${campaign.channel} · ${campaign.signups.toLocaleString()} signups · ${campaign.bookings.toLocaleString()} bookings · ${percent(campaign.roiPercent)} ROI`}
+                    tone={getGrowthSignalTone(campaign.signal) || toneForIndex(index)}
+                  />
+                ))
+              ) : (
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+                  No campaign ROI rows yet. As tracked campaign events and costs are added, this section will show what is working and what needs refinement.
+                </p>
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            eyebrow="Growth Strategy"
+            title="What is working and what needs attention"
+            description="Use the signal and recommendation columns to decide whether to scale, refine, pause, or improve conversion for each campaign."
+            actions={
+              <>
+                <ActionLink href="/admin/financials/payouts" label="Payout Analytics" />
+                <ActionLink href="/admin/financials/pro-forma" label="Forecasting" />
+              </>
+            }
+          >
+            <div className="space-y-5">
+              {analytics.growthChannelMix.length ? (
+                analytics.growthChannelMix.map((channel, index) => (
+                  <BarRow
+                    key={channel.label}
+                    label={channel.label}
+                    value={channel.bookings}
+                    max={analytics.maxGrowthChannelBookings}
+                    detail={`${channel.signups.toLocaleString()} signups · ${money(channel.revenue)} revenue · ${money(channel.cost)} cost · ${percent(channel.roi)} ROI`}
+                    tone={toneForIndex(index)}
+                  />
+                ))
+              ) : (
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+                  No channel mix available yet. Campaign events with source/channel values will populate this view.
+                </p>
+              )}
+            </div>
+          </SectionCard>
+        </div>
+
+        <SectionCard
+          eyebrow="Campaign ROI Detail"
+          title="Top growth campaigns"
+          description="Detailed campaign table for admin decision-making: scale profitable channels, improve weak conversion points, and pause spend that is not producing signups or bookings."
+          actions={
+            <>
+              <ActionLink href="/admin/referrals" label="Growth Command Center" primary />
+              <ActionLink href="/admin/exports" label="Export" />
+            </>
+          }
+        >
+          <TableCard
+            headers={[
+              "Campaign",
+              "Channel",
+              "Clicks",
+              "Signups",
+              "Bookings",
+              "Revenue",
+              "Cost",
+              "ROI",
+              "Signal",
+              "Recommendation",
+            ]}
+            rows={
+              analytics.topGrowthCampaigns.length
+                ? analytics.topGrowthCampaigns.map((campaign) => [
+                    campaign.campaignName,
+                    campaign.channel,
+                    campaign.clicks.toLocaleString(),
+                    campaign.signups.toLocaleString(),
+                    campaign.bookings.toLocaleString(),
+                    money(campaign.attributedRevenue),
+                    money(campaign.totalCost),
+                    percent(campaign.roiPercent),
+                    campaign.signalLabel,
+                    campaign.recommendation,
+                  ])
+                : [["No campaigns yet", "—", "—", "—", "—", "—", "—", "—", "—", "—"]]
+            }
+          />
+        </SectionCard>
 
         <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
           <SectionCard

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   CheckCircle2,
+  Gift,
   GraduationCap,
   PawPrint,
   ShieldCheck,
@@ -17,6 +18,7 @@ const PETPERKS_IMAGES = {
 const petParentRules = [
   "The referred friend or family member must sign up using a valid PetPerks referral link.",
   "The referred friend or family member must complete their first eligible paid booking with a SitGuru Guru.",
+  "Pet Parent rewards are issued as future SitGuru care credits after the referral qualifies.",
   "Rewards may not apply to cancelled, refunded, duplicate, fraudulent, self-referred, incomplete, or ineligible activity.",
   "SitGuru may review referral activity before issuing any PetPerks reward.",
 ];
@@ -31,6 +33,7 @@ const guruRules = [
 const generalTerms = [
   "PetPerks rewards are earned after qualified sign-up, approval when required, and eligible first paid booking activity is completed.",
   "Rewards are not guaranteed until all eligibility requirements and first eligible paid booking activity are completed.",
+  "Pet Parents can track their personal reward activity inside the PawPerks Rewards area after signing in.",
   "SitGuru may delay, deny, reverse, or adjust rewards for suspected abuse, fraud, cancelled activity, refunded activity, duplicate accounts, self-referrals, or policy violations.",
   "PetPerks are intended to support genuine community growth through real Pet Parents, future Gurus, Ambassadors, and trusted referrals.",
   "Additional terms may apply depending on the referral source, campaign, program, location, or launch phase.",
@@ -65,9 +68,10 @@ export default function PetPerksPage() {
               </h1>
 
               <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-700 sm:text-xl">
-                PetPerks rewards Pet Parents, future Gurus, Ambassadors, and
-                the SitGuru community for helping the pack grow through
-                qualified referrals and eligible first paid booking activity.
+                PetPerks is SitGuru’s public rewards program for Pet Parents,
+                future Gurus, Ambassadors, and community members who help the
+                SitGuru pack grow through qualified referrals and eligible first
+                paid booking activity.
               </p>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -80,7 +84,7 @@ export default function PetPerksPage() {
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
                     Your friend or family member gets $10 toward care. You earn
-                    $10 after their first eligible paid booking.
+                    $10 after their first eligible paid booking is completed.
                   </p>
                 </div>
 
@@ -96,6 +100,22 @@ export default function PetPerksPage() {
                     completes their first eligible paid booking.
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+                >
+                  Sign Up Free
+                </Link>
+
+                <Link
+                  href="/customer/dashboard/pawperks"
+                  className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+                >
+                  Open PawPerks Rewards
+                </Link>
               </div>
             </div>
 
@@ -126,7 +146,51 @@ export default function PetPerksPage() {
             </div>
           </div>
 
-          <div className="mt-14 grid gap-6 lg:grid-cols-2">
+          <section className="mt-14 rounded-[2rem] border border-emerald-200 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:p-8">
+            <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-800">
+                  <Gift className="h-4 w-4" aria-hidden="true" />
+                  Public program + private rewards center
+                </div>
+
+                <h2 className="mt-5 text-3xl font-black leading-tight text-slate-950 sm:text-4xl">
+                  PetPerks is the program. PawPerks Rewards is where Pet Parents
+                  track it.
+                </h2>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+                    Public page
+                  </p>
+                  <p className="mt-2 text-2xl font-black text-slate-950">
+                    PetPerks
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Explains the SitGuru rewards program to Pet Parents, future
+                    Gurus, Ambassadors, and the broader community.
+                  </p>
+                </div>
+
+                <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+                    Pet Parent dashboard
+                  </p>
+                  <p className="mt-2 text-2xl font-black text-slate-950">
+                    PawPerks Rewards
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Logged-in Pet Parents can copy their PawPerks link, track
+                    qualified referrals, and view available rewards.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
             <article className="overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
               <div className="relative overflow-hidden bg-emerald-50">
                 <img
@@ -163,9 +227,7 @@ export default function PetPerksPage() {
                         className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"
                         aria-hidden="true"
                       />
-                      <p className="text-sm leading-6 text-slate-700">
-                        {rule}
-                      </p>
+                      <p className="text-sm leading-6 text-slate-700">{rule}</p>
                     </div>
                   ))}
                 </div>
@@ -195,8 +257,8 @@ export default function PetPerksPage() {
                 </h2>
 
                 <p className="mt-4 text-base leading-7 text-slate-700">
-                  Invite sitters, walkers, trainers, pet-care professionals,
-                  and trusted community helpers. Rewards are earned after the
+                  Invite sitters, walkers, trainers, pet-care professionals, and
+                  trusted community helpers. Rewards are earned after the
                   referred Guru is approved and completes their first eligible
                   paid booking.
                 </p>
@@ -208,9 +270,7 @@ export default function PetPerksPage() {
                         className="mt-0.5 h-5 w-5 shrink-0 text-sky-600"
                         aria-hidden="true"
                       />
-                      <p className="text-sm leading-6 text-slate-700">
-                        {rule}
-                      </p>
+                      <p className="text-sm leading-6 text-slate-700">{rule}</p>
                     </div>
                   ))}
                 </div>
@@ -249,9 +309,7 @@ export default function PetPerksPage() {
                         className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"
                         aria-hidden="true"
                       />
-                      <p className="text-sm leading-6 text-slate-700">
-                        {term}
-                      </p>
+                      <p className="text-sm leading-6 text-slate-700">{term}</p>
                     </div>
                   </div>
                 ))}
@@ -286,10 +344,10 @@ export default function PetPerksPage() {
 
                 <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                   <Link
-                    href="/"
+                    href="/customer/dashboard/pawperks"
                     className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-6 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
                   >
-                    Start Sharing
+                    Open PawPerks Rewards
                   </Link>
 
                   <Link

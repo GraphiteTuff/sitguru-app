@@ -74,6 +74,8 @@ type PlaidTransactionRow = {
 
 type ExpenseLedgerRow = Record<string, unknown>;
 type CashFlowLineRow = Record<string, unknown>;
+type GrowthMarketingExpenseRow = Record<string, unknown>;
+type ReferralRewardLiabilityRow = Record<string, unknown>;
 
 type PeriodWindow = {
   key: PeriodKey;
@@ -113,7 +115,7 @@ type CashActivityRow = {
   type: string;
   section: string;
   bankStatus: string;
-  source: "Plaid/NFCU" | "Manual";
+  source: "Plaid/NFCU" | "Manual" | "Growth/Referrals";
   amount: number;
 };
 
@@ -131,6 +133,9 @@ type CashFlowMetrics = {
   ownerContributions: number;
   ownerDraws: number;
   manualExpenses: number;
+  growthMarketingCashOut: number;
+  issuedReferralRewardCashOut: number;
+  growthReferralCashOut: number;
   netChangeInCash: number;
   beginningCash: number;
   endingCash: number;
@@ -141,6 +146,8 @@ type CashFlowData = {
   accounts: PlaidAccountRow[];
   plaidTransactions: PlaidTransactionRow[];
   manualExpenses: ExpenseLedgerRow[];
+  growthMarketingExpenses: GrowthMarketingExpenseRow[];
+  issuedReferralRewards: ReferralRewardLiabilityRow[];
   customLines: CashFlowLine[];
   operatingLines: CashFlowLine[];
   investingLines: CashFlowLine[];
@@ -149,6 +156,7 @@ type CashFlowData = {
   cashPositionLines: CashFlowLine[];
   recentActivity: CashActivityRow[];
   needsReviewActivity: CashActivityRow[];
+  recentGrowthReferralActivity: CashActivityRow[];
   period: PeriodWindow;
   previousMetrics: CashFlowMetrics;
   totals: CashFlowMetrics & {
@@ -245,6 +253,29 @@ const DEFAULT_CASH_FLOW_LINES: CashFlowLine[] = [
     source: "expense_ledger",
   },
   {
+    id: "core-growth-marketing-expenses",
+    dbId: "",
+    isSaved: false,
+    section: "operating",
+    label: "Growth Marketing Cash Out",
+    amount: 0,
+    notes: "Campaign costs from Growth & Referrals marketing expense views.",
+    displayOrder: 40,
+    source: "admin_growth_marketing_expenses",
+  },
+  {
+    id: "core-issued-referral-rewards",
+    dbId: "",
+    isSaved: false,
+    section: "operating",
+    label: "Issued Referral Rewards Cash Out",
+    amount: 0,
+    notes:
+      "Issued PawPerks, Ambassador, Guru, Partner, or referral rewards paid or credited.",
+    displayOrder: 50,
+    source: "admin_referral_reward_liability",
+  },
+  {
     id: "core-owner-contributions",
     dbId: "",
     isSaved: false,
@@ -273,7 +304,8 @@ const DEFAULT_CASH_FLOW_LINES: CashFlowLine[] = [
     section: "transfers",
     label: "Transfer In",
     amount: 0,
-    notes: "Transfers into the active business accounts. Shown separately from P&L.",
+    notes:
+      "Transfers into the active business accounts. Shown separately from P&L.",
     displayOrder: 10,
     source: "admin_plaid_transactions",
   },
@@ -284,7 +316,8 @@ const DEFAULT_CASH_FLOW_LINES: CashFlowLine[] = [
     section: "transfers",
     label: "Transfer Out",
     amount: 0,
-    notes: "Transfers out of the active business accounts. Shown separately from P&L.",
+    notes:
+      "Transfers out of the active business accounts. Shown separately from P&L.",
     displayOrder: 20,
     source: "admin_plaid_transactions",
   },
@@ -295,7 +328,8 @@ const DEFAULT_CASH_FLOW_LINES: CashFlowLine[] = [
     section: "cash_position",
     label: "Current Cash Balance",
     amount: 0,
-    notes: "Current balance across NFCU Business Checking and Business Savings.",
+    notes:
+      "Current balance across NFCU Business Checking and Business Savings.",
     displayOrder: 10,
     source: "admin_plaid_accounts",
   },
@@ -530,7 +564,10 @@ function getPeriodWindow(period: PeriodKey): PeriodWindow {
   };
 }
 
-function isWithinWindow(dateValue: string | null | undefined, window: PeriodWindow) {
+function isWithinWindow(
+  dateValue: string | null | undefined,
+  window: PeriodWindow,
+) {
   if (!window.start || !window.end) return true;
   if (!dateValue) return false;
 
@@ -812,25 +849,26 @@ async function deleteCashFlowLine(formData: FormData) {
 function isArchivedExpense(row: ExpenseLedgerRow) {
   return Boolean(
     row.deleted_at ||
-      row.voided_at ||
-      row.archived_at ||
-      row.is_deleted === true ||
-      row.is_void === true ||
-      row.is_active === false,
+    row.voided_at ||
+    row.archived_at ||
+    row.is_deleted === true ||
+    row.is_void === true ||
+    row.is_active === false,
   );
 }
 
 function isArchivedCashFlowLine(row: CashFlowLineRow) {
   return Boolean(
     row.deleted_at ||
-      row.archived_at ||
-      row.is_deleted === true ||
-      row.is_active === false,
+    row.archived_at ||
+    row.is_deleted === true ||
+    row.is_active === false,
   );
 }
 
 function isBusinessCheckingOrSavings(account: PlaidAccountRow) {
-  const name = `${account.name || ""} ${account.official_name || ""}`.toLowerCase();
+  const name =
+    `${account.name || ""} ${account.official_name || ""}`.toLowerCase();
   const subtype = String(account.subtype || "").toLowerCase();
 
   return (
@@ -885,7 +923,8 @@ function getSignedCashAmount(transaction: PlaidTransactionRow) {
   }
 
   if (type === "transfer") {
-    const name = `${transaction.name || ""} ${transaction.merchant_name || ""}`.toLowerCase();
+    const name =
+      `${transaction.name || ""} ${transaction.merchant_name || ""}`.toLowerCase();
 
     if (
       name.includes("from savings") ||
@@ -908,9 +947,14 @@ function shouldIncludeCashTransaction(transaction: PlaidTransactionRow) {
     !transaction.removed_at &&
     !transaction.is_excluded_from_reports &&
     isReviewed(transaction) &&
-    ["income", "expense", "transfer", "owner_equity", "owner_draw", "liability"].includes(
-      type,
-    )
+    [
+      "income",
+      "expense",
+      "transfer",
+      "owner_equity",
+      "owner_draw",
+      "liability",
+    ].includes(type)
   );
 }
 
@@ -959,6 +1003,97 @@ function getManualExpenseId(row: ExpenseLedgerRow, index: number) {
   );
 }
 
+function getGrowthExpenseName(row: GrowthMarketingExpenseRow) {
+  return (
+    asTrimmedString(row.campaign_name) ||
+    asTrimmedString(row.cost_type) ||
+    "Growth marketing expense"
+  );
+}
+
+function getGrowthExpenseCategory(row: GrowthMarketingExpenseRow) {
+  return (
+    asTrimmedString(row.financial_category) ||
+    asTrimmedString(row.cost_type) ||
+    "Growth Marketing Expense"
+  );
+}
+
+function getGrowthExpenseAmount(row: GrowthMarketingExpenseRow) {
+  return Math.abs(
+    toNumber(row.amount) ||
+      toNumber(row.spend) ||
+      toNumber(row.ad_spend) ||
+      toNumber(row.marketing_spend),
+  );
+}
+
+function getGrowthExpenseDate(row: GrowthMarketingExpenseRow) {
+  return (
+    asTrimmedString(row.cost_date) ||
+    asTrimmedString(row.created_at) ||
+    asTrimmedString(row.updated_at)
+  );
+}
+
+function getGrowthExpenseId(row: GrowthMarketingExpenseRow, index: number) {
+  return (
+    asTrimmedString(row.id) ||
+    asTrimmedString(row.campaign_id) ||
+    `${getGrowthExpenseName(row)}-${index}`
+  );
+}
+
+function isIssuedReferralReward(row: ReferralRewardLiabilityRow) {
+  const treatment = asTrimmedString(row.financial_treatment).toLowerCase();
+  const status = asTrimmedString(row.normalized_status).toLowerCase();
+
+  return (
+    treatment === "issued_reward_expense" ||
+    ["paid", "credited", "issued", "complete", "completed"].includes(status)
+  );
+}
+
+function getReferralRewardName(row: ReferralRewardLiabilityRow) {
+  return (
+    asTrimmedString(row.financial_category) ||
+    asTrimmedString(row.reward_type) ||
+    asTrimmedString(row.type) ||
+    "Issued referral reward"
+  );
+}
+
+function getReferralRewardAmount(row: ReferralRewardLiabilityRow) {
+  return Math.abs(
+    toNumber(row.normalized_amount) ||
+      toNumber(row.reward_amount) ||
+      toNumber(row.credit_amount) ||
+      toNumber(row.payout_amount) ||
+      toNumber(row.commission_amount) ||
+      toNumber(row.amount),
+  );
+}
+
+function getReferralRewardDate(row: ReferralRewardLiabilityRow) {
+  return (
+    asTrimmedString(row.paid_at) ||
+    asTrimmedString(row.issued_at) ||
+    asTrimmedString(row.credited_at) ||
+    asTrimmedString(row.completed_at) ||
+    asTrimmedString(row.updated_at) ||
+    asTrimmedString(row.created_at)
+  );
+}
+
+function getReferralRewardId(row: ReferralRewardLiabilityRow, index: number) {
+  return (
+    asTrimmedString(row.id) ||
+    asTrimmedString(row.referral_code_id) ||
+    asTrimmedString(row.reward_id) ||
+    `${getReferralRewardName(row)}-${index}`
+  );
+}
+
 function getCashFlowSection(value: unknown): CashFlowSectionKey {
   const section = asTrimmedString(value) as CashFlowSectionKey;
 
@@ -975,7 +1110,10 @@ function getCashFlowSection(value: unknown): CashFlowSectionKey {
   return "operating";
 }
 
-function normalizeCashFlowLine(row: CashFlowLineRow, index: number): CashFlowLine {
+function normalizeCashFlowLine(
+  row: CashFlowLineRow,
+  index: number,
+): CashFlowLine {
   const section = getCashFlowSection(row.section);
   const dbId = asTrimmedString(row.id);
 
@@ -1007,7 +1145,10 @@ function toCashActivity(transaction: PlaidTransactionRow): CashActivityRow {
   };
 }
 
-function toManualCashActivity(row: ExpenseLedgerRow, index: number): CashActivityRow {
+function toManualCashActivity(
+  row: ExpenseLedgerRow,
+  index: number,
+): CashActivityRow {
   return {
     id: getManualExpenseId(row, index),
     date: formatDateShort(getManualExpenseDate(row)),
@@ -1022,13 +1163,56 @@ function toManualCashActivity(row: ExpenseLedgerRow, index: number): CashActivit
   };
 }
 
+function toGrowthMarketingCashActivity(
+  row: GrowthMarketingExpenseRow,
+  index: number,
+): CashActivityRow {
+  return {
+    id: getGrowthExpenseId(row, index),
+    date: formatDateShort(getGrowthExpenseDate(row)),
+    description: getGrowthExpenseName(row),
+    merchant:
+      asTrimmedString(row.vendor) ||
+      asTrimmedString(row.source) ||
+      "Growth campaign",
+    category: getGrowthExpenseCategory(row),
+    type: "expense",
+    section: "Operating Activities",
+    bankStatus: "Financial View",
+    source: "Growth/Referrals",
+    amount: -Math.abs(getGrowthExpenseAmount(row)),
+  };
+}
+
+function toReferralRewardCashActivity(
+  row: ReferralRewardLiabilityRow,
+  index: number,
+): CashActivityRow {
+  return {
+    id: getReferralRewardId(row, index),
+    date: formatDateShort(getReferralRewardDate(row)),
+    description: getReferralRewardName(row),
+    merchant: asTrimmedString(row.source_table) || "Referral rewards",
+    category: asTrimmedString(row.financial_category) || "Referral Rewards",
+    type: "expense",
+    section: "Operating Activities",
+    bankStatus: "Issued",
+    source: "Growth/Referrals",
+    amount: -Math.abs(getReferralRewardAmount(row)),
+  };
+}
+
 function calculateCashFlowMetrics({
   transactions,
   manualExpenses,
+  growthMarketingExpenses,
+  issuedReferralRewards,
   currentBalance,
 }: {
   transactions: PlaidTransactionRow[];
   manualExpenses: ExpenseLedgerRow[];
+  growthMarketingExpenses: GrowthMarketingExpenseRow[];
+  issuedReferralRewards: ReferralRewardLiabilityRow[];
   currentBalance: number;
 }): CashFlowMetrics {
   const cashTransactions = transactions.filter(shouldIncludeCashTransaction);
@@ -1072,6 +1256,19 @@ function calculateCashFlowMetrics({
     0,
   );
 
+  const growthMarketingCashOut = growthMarketingExpenses.reduce(
+    (sum, row) => sum + Math.abs(getGrowthExpenseAmount(row)),
+    0,
+  );
+
+  const issuedReferralRewardCashOut = issuedReferralRewards.reduce(
+    (sum, row) => sum + Math.abs(getReferralRewardAmount(row)),
+    0,
+  );
+
+  const growthReferralCashOut =
+    growthMarketingCashOut + issuedReferralRewardCashOut;
+
   const transferIn = transferTransactions
     .map(getSignedCashAmount)
     .filter((amount) => amount > 0)
@@ -1097,18 +1294,26 @@ function calculateCashFlowMetrics({
     0,
   );
 
-  const netOperatingCash = operatingCashIn - operatingCashOut - manualExpenseTotal;
+  const netOperatingCash =
+    operatingCashIn -
+    operatingCashOut -
+    manualExpenseTotal -
+    growthReferralCashOut;
   const netInvestingCash = 0;
-  const netFinancingCash = ownerContributions - ownerDraws + liabilityCashImpact;
+  const netFinancingCash =
+    ownerContributions - ownerDraws + liabilityCashImpact;
   const netTransferCash = transferIn - transferOut;
-  const cashIn = operatingCashIn + ownerContributions + Math.max(0, liabilityCashImpact);
+  const cashIn =
+    operatingCashIn + ownerContributions + Math.max(0, liabilityCashImpact);
   const cashOut =
     operatingCashOut +
     manualExpenseTotal +
+    growthReferralCashOut +
     ownerDraws +
     Math.abs(Math.min(0, liabilityCashImpact));
 
-  const netChangeInCash = netOperatingCash + netInvestingCash + netFinancingCash;
+  const netChangeInCash =
+    netOperatingCash + netInvestingCash + netFinancingCash;
   const beginningCash = currentBalance - netChangeInCash;
   const endingCash = beginningCash + netChangeInCash;
 
@@ -1126,10 +1331,17 @@ function calculateCashFlowMetrics({
     ownerContributions,
     ownerDraws,
     manualExpenses: manualExpenseTotal,
+    growthMarketingCashOut,
+    issuedReferralRewardCashOut,
+    growthReferralCashOut,
     netChangeInCash,
     beginningCash,
     endingCash,
-    reportableTransactions: cashTransactions.length + manualExpenses.length,
+    reportableTransactions:
+      cashTransactions.length +
+      manualExpenses.length +
+      growthMarketingExpenses.length +
+      issuedReferralRewards.length,
   };
 }
 
@@ -1153,6 +1365,17 @@ function buildCoreLines({
 
     if (line.id === "core-manual-expenses") {
       return { ...line, amount: -Math.abs(metrics.manualExpenses) };
+    }
+
+    if (line.id === "core-growth-marketing-expenses") {
+      return { ...line, amount: -Math.abs(metrics.growthMarketingCashOut) };
+    }
+
+    if (line.id === "core-issued-referral-rewards") {
+      return {
+        ...line,
+        amount: -Math.abs(metrics.issuedReferralRewardCashOut),
+      };
     }
 
     if (line.id === "core-owner-contributions") {
@@ -1186,7 +1409,14 @@ function buildCoreLines({
 async function getCashFlowData(periodKey: PeriodKey): Promise<CashFlowData> {
   const period = getPeriodWindow(periodKey);
 
-  const [accounts, transactions, manualExpenses, customLineRows] = await Promise.all([
+  const [
+    accounts,
+    transactions,
+    manualExpenses,
+    customLineRows,
+    growthMarketingExpenseRows,
+    referralRewardRows,
+  ] = await Promise.all([
     safeRows<PlaidAccountRow>(
       supabaseAdmin
         .from("admin_plaid_accounts")
@@ -1225,6 +1455,22 @@ async function getCashFlowData(periodKey: PeriodKey): Promise<CashFlowData> {
         .limit(500),
       "cash_flow_lines",
     ),
+    safeRows<GrowthMarketingExpenseRow>(
+      supabaseAdmin
+        .from("admin_growth_marketing_expenses")
+        .select("*")
+        .order("cost_date", { ascending: false })
+        .limit(2500),
+      "admin_growth_marketing_expenses",
+    ),
+    safeRows<ReferralRewardLiabilityRow>(
+      supabaseAdmin
+        .from("admin_referral_reward_liability")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2500),
+      "admin_referral_reward_liability",
+    ),
   ]);
 
   const businessAccounts = accounts.filter(isBusinessCheckingOrSavings);
@@ -1256,6 +1502,26 @@ async function getCashFlowData(periodKey: PeriodKey): Promise<CashFlowData> {
     isWithinPreviousWindow(getManualExpenseDate(row), period),
   );
 
+  const periodGrowthMarketingExpenses = growthMarketingExpenseRows.filter(
+    (row) => isWithinWindow(getGrowthExpenseDate(row), period),
+  );
+
+  const previousGrowthMarketingExpenses = growthMarketingExpenseRows.filter(
+    (row) => isWithinPreviousWindow(getGrowthExpenseDate(row), period),
+  );
+
+  const activeIssuedReferralRewards = referralRewardRows.filter(
+    isIssuedReferralReward,
+  );
+
+  const periodIssuedReferralRewards = activeIssuedReferralRewards.filter(
+    (row) => isWithinWindow(getReferralRewardDate(row), period),
+  );
+
+  const previousIssuedReferralRewards = activeIssuedReferralRewards.filter(
+    (row) => isWithinPreviousWindow(getReferralRewardDate(row), period),
+  );
+
   const currentBalance = businessAccounts.reduce(
     (sum, account) => sum + toNumber(account.current_balance),
     0,
@@ -1269,12 +1535,16 @@ async function getCashFlowData(periodKey: PeriodKey): Promise<CashFlowData> {
   const metrics = calculateCashFlowMetrics({
     transactions: periodTransactions,
     manualExpenses: periodManualExpenses,
+    growthMarketingExpenses: periodGrowthMarketingExpenses,
+    issuedReferralRewards: periodIssuedReferralRewards,
     currentBalance,
   });
 
   const previousMetrics = calculateCashFlowMetrics({
     transactions: previousTransactions,
     manualExpenses: previousManualExpenses,
+    growthMarketingExpenses: previousGrowthMarketingExpenses,
+    issuedReferralRewards: previousIssuedReferralRewards,
     currentBalance,
   });
 
@@ -1292,17 +1562,31 @@ async function getCashFlowData(periodKey: PeriodKey): Promise<CashFlowData> {
     (a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label),
   );
 
-  const operatingLines = allLines.filter((line) => line.section === "operating");
-  const investingLines = allLines.filter((line) => line.section === "investing");
-  const financingLines = allLines.filter((line) => line.section === "financing");
+  const operatingLines = allLines.filter(
+    (line) => line.section === "operating",
+  );
+  const investingLines = allLines.filter(
+    (line) => line.section === "investing",
+  );
+  const financingLines = allLines.filter(
+    (line) => line.section === "financing",
+  );
   const transferLines = allLines.filter((line) => line.section === "transfers");
   const cashPositionLines = allLines.filter(
     (line) => line.section === "cash_position",
   );
 
+  const recentGrowthReferralActivity = [
+    ...periodGrowthMarketingExpenses.map(toGrowthMarketingCashActivity),
+    ...periodIssuedReferralRewards.map(toReferralRewardCashActivity),
+  ];
+
   const recentActivity = [
-    ...periodTransactions.filter(shouldIncludeCashTransaction).map(toCashActivity),
+    ...periodTransactions
+      .filter(shouldIncludeCashTransaction)
+      .map(toCashActivity),
     ...periodManualExpenses.map(toManualCashActivity),
+    ...recentGrowthReferralActivity,
   ]
     .sort((a, b) => {
       const left = new Date(a.date).getTime();
@@ -1341,6 +1625,8 @@ async function getCashFlowData(periodKey: PeriodKey): Promise<CashFlowData> {
     accounts: businessAccounts,
     plaidTransactions: periodTransactions,
     manualExpenses: periodManualExpenses,
+    growthMarketingExpenses: periodGrowthMarketingExpenses,
+    issuedReferralRewards: periodIssuedReferralRewards,
     customLines: savedLines,
     operatingLines,
     investingLines,
@@ -1349,6 +1635,7 @@ async function getCashFlowData(periodKey: PeriodKey): Promise<CashFlowData> {
     cashPositionLines,
     recentActivity,
     needsReviewActivity,
+    recentGrowthReferralActivity: recentGrowthReferralActivity.slice(0, 12),
     period,
     previousMetrics,
     totals: {
@@ -1711,7 +1998,10 @@ function CashActivityTable({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-600">
+                  <td
+                    colSpan={6}
+                    className="px-4 py-8 text-center text-slate-600"
+                  >
                     {emptyMessage}
                   </td>
                 </tr>
@@ -1752,13 +2042,20 @@ function ReadinessPanel({ cashFlow }: { cashFlow: CashFlowData }) {
       detail: `${cashFlow.totals.manualExpenseCount} manual expense rows are included in this period.`,
     },
     {
+      label: "Growth / Referral Cash Out",
+      ready: cashFlow.totals.growthReferralCashOut > 0,
+      detail: `${money(cashFlow.totals.growthMarketingCashOut)} campaign cash out and ${money(cashFlow.totals.issuedReferralRewardCashOut)} issued referral rewards are included.`,
+    },
+    {
       label: "Transfer Visibility",
       ready: cashFlow.totals.transferIn > 0 || cashFlow.totals.transferOut > 0,
       detail: `${money(cashFlow.totals.transferIn)} transfer in and ${money(cashFlow.totals.transferOut)} transfer out.`,
     },
     {
       label: "Cash Position",
-      ready: cashFlow.totals.currentBalance !== 0 || cashFlow.totals.availableBalance !== 0,
+      ready:
+        cashFlow.totals.currentBalance !== 0 ||
+        cashFlow.totals.availableBalance !== 0,
       detail: `${moneyExact(cashFlow.totals.currentBalance)} current cash and ${moneyExact(cashFlow.totals.availableBalance)} available cash.`,
     },
   ];
@@ -1776,8 +2073,9 @@ function ReadinessPanel({ cashFlow }: { cashFlow: CashFlowData }) {
             Bank feed and reporting checks
           </h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            This checks whether NFCU business accounts, categorized cash activity,
-            manual expenses, transfers, and cash balances are ready for the selected period.
+            This checks whether NFCU business accounts, categorized cash
+            activity, manual expenses, transfers, and cash balances are ready
+            for the selected period.
           </p>
         </div>
 
@@ -1821,7 +2119,8 @@ function AddCashFlowLinePanel({ cashFlow }: { cashFlow: CashFlowData }) {
             Manual Cash Flow Controls
           </p>
           <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-            Add operating, investing, financing, transfer, or cash-position lines.
+            Add operating, investing, financing, transfer, or cash-position
+            lines.
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Use this for one-off cash adjustments, loans, owner contributions,
@@ -1870,7 +2169,8 @@ function AddCashFlowLinePanel({ cashFlow }: { cashFlow: CashFlowData }) {
             <option value="">Optional preset...</option>
             {LINE_PRESETS.map((item) => (
               <option key={`${item.section}-${item.label}`} value={item.label}>
-                {SECTION_LABELS[item.section as CashFlowSectionKey]} — {item.label}
+                {SECTION_LABELS[item.section as CashFlowSectionKey]} —{" "}
+                {item.label}
               </option>
             ))}
           </select>
@@ -1942,7 +2242,8 @@ export default async function AdminCashFlowPage({
             Financial access required.
           </h1>
           <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-            Sign in with a finance-enabled admin account to view SitGuru Cash Flow reports.
+            Sign in with a finance-enabled admin account to view SitGuru Cash
+            Flow reports.
           </p>
         </div>
       </div>
@@ -1955,13 +2256,15 @@ export default async function AdminCashFlowPage({
     {
       label: "Cash In",
       value: cashFlow.totals.cashIn,
-      detail: "Income, owner contributions, and positive financing cash movement.",
+      detail:
+        "Income, owner contributions, and positive financing cash movement.",
       tone: "bg-emerald-400",
     },
     {
       label: "Cash Out",
       value: -Math.abs(cashFlow.totals.cashOut),
-      detail: "Expenses, manual expenses, owner draws, and negative financing movement.",
+      detail:
+        "Expenses, manual expenses, growth marketing, issued rewards, owner draws, and negative financing movement.",
       tone: "bg-rose-400",
     },
     {
@@ -1976,11 +2279,10 @@ export default async function AdminCashFlowPage({
     {
       label: "Net Change in Cash",
       value: cashFlow.totals.netChangeInCash,
-      detail: "Operating + investing + financing movement. Transfers are shown separately.",
+      detail:
+        "Operating + investing + financing movement. Transfers are shown separately.",
       tone:
-        cashFlow.totals.netChangeInCash >= 0
-          ? "bg-violet-400"
-          : "bg-amber-400",
+        cashFlow.totals.netChangeInCash >= 0 ? "bg-violet-400" : "bg-amber-400",
     },
   ];
 
@@ -1999,9 +2301,11 @@ export default async function AdminCashFlowPage({
               </h1>
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                Tracks real cash movement from NFCU Business Checking and Business Savings,
-                including income, expenses, owner contributions, owner draws, transfers,
-                manual expenses, pending activity, and current cash position.
+                Tracks real cash movement from NFCU Business Checking and
+                Business Savings, including income, expenses, owner
+                contributions, owner draws, transfers, manual expenses, growth
+                marketing cash out, issued referral rewards, pending activity,
+                and current cash position.
               </p>
 
               <div className="mt-5">
@@ -2097,7 +2401,7 @@ export default async function AdminCashFlowPage({
                 cashFlow.previousMetrics.cashOut,
               )}
               comparisonLabel={cashFlow.period.comparisonLabel}
-              detail="Expenses, manual expenses, owner draws, and cash outflows."
+              detail="Expenses, manual expenses, growth marketing, issued referral rewards, owner draws, and cash outflows."
               tone="rose"
             />
 
@@ -2189,7 +2493,10 @@ export default async function AdminCashFlowPage({
                   Owner Equity Movement
                 </p>
                 <p className="mt-2 text-xl font-black text-slate-950">
-                  {money(cashFlow.totals.ownerContributions - cashFlow.totals.ownerDraws)}
+                  {money(
+                    cashFlow.totals.ownerContributions -
+                      cashFlow.totals.ownerDraws,
+                  )}
                 </p>
               </div>
             </div>
@@ -2206,9 +2513,9 @@ export default async function AdminCashFlowPage({
                 {cashFlow.period.label} Statement of Cash Flows
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Current SitGuru cash flow statement from NFCU business bank activity,
-                reviewed categories, transfer activity, owner equity movement, manual
-                expenses, and custom cash flow lines.
+                Current SitGuru cash flow statement from NFCU business bank
+                activity, reviewed categories, transfer activity, owner equity
+                movement, manual expenses, and custom cash flow lines.
               </p>
             </div>
 
@@ -2333,10 +2640,10 @@ export default async function AdminCashFlowPage({
 
                 <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Manual Expenses
+                    Growth / Referral Cash Out
                   </p>
                   <p className="mt-2 text-2xl font-black text-slate-950">
-                    {cashFlow.totals.manualExpenseCount.toLocaleString()}
+                    {money(cashFlow.totals.growthReferralCashOut)}
                   </p>
                 </div>
               </div>
@@ -2346,9 +2653,10 @@ export default async function AdminCashFlowPage({
                   Cash Flow Note
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Transfers between NFCU Business Checking and Business Savings are shown
-                  separately so the bank movement is visible without incorrectly treating
-                  transfers as revenue or operating expense.
+                  Transfers between NFCU Business Checking and Business Savings
+                  are shown separately so the bank movement is visible without
+                  incorrectly treating transfers as revenue or operating
+                  expense.
                 </p>
               </div>
             </div>
@@ -2358,10 +2666,11 @@ export default async function AdminCashFlowPage({
                 SitGuru Cash Flow Notes
               </p>
               <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
-                P&L shows profit. Cash Flow shows actual money movement. This page
-                includes income, expenses, manual operating expenses, owner equity,
-                owner draws, transfers, pending activity, posted bank activity, and
-                available cash from NFCU business banking.
+                P&L shows profit. Cash Flow shows actual money movement. This
+                page includes income, expenses, manual operating expenses, owner
+                equity, owner draws, transfers, growth marketing cash out,
+                issued referral reward cash out, pending activity, posted bank
+                activity, and available cash from NFCU business banking.
               </p>
             </div>
           </div>
@@ -2373,6 +2682,14 @@ export default async function AdminCashFlowPage({
           description="Reviewed cash-impacting Plaid/NFCU transactions and manual operating expenses for the selected period."
           rows={cashFlow.recentActivity}
           emptyMessage="No reviewed cash-flow activity is available for this period yet."
+        />
+
+        <CashActivityTable
+          eyebrow="Growth & Referral Cash Out"
+          title="Growth costs included in cash flow"
+          description="Campaign costs and issued referral rewards from the live Growth & Referrals financial views included as operating cash outflows."
+          rows={cashFlow.recentGrowthReferralActivity}
+          emptyMessage="No growth marketing expenses or issued referral rewards are included in this period yet."
         />
 
         <CashActivityTable

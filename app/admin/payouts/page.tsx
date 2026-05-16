@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type PayoutSource = "Guru" | "Partner" | "Platform" | "Adjustment" | "Refund";
 type PayoutStatus = "paid" | "pending" | "review" | "failed" | "scheduled";
@@ -243,6 +244,165 @@ async function safeSelect<T>(
   }
 }
 
+async function safeAdminSelect<T>(table: string, query = "*") {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from(table)
+      .select(query)
+      .limit(500);
+
+    if (error || !data) return [] as T[];
+
+    return data as T[];
+  } catch {
+    return [] as T[];
+  }
+}
+
+function rewardAmount(row: any) {
+  return normalizeAmount(
+    row.normalized_amount ||
+      row.reward_amount ||
+      row.credit_amount ||
+      row.payout_amount ||
+      row.commission_amount ||
+      row.amount,
+  );
+}
+
+function rewardStatus(row: any): PayoutStatus {
+  const treatment = String(row.financial_treatment || "").toLowerCase();
+  const status = String(
+    row.normalized_status || row.reward_status || row.payout_status || row.status || "",
+  ).toLowerCase();
+
+  if (
+    treatment.includes("issued") ||
+    status.includes("paid") ||
+    status.includes("credited") ||
+    status.includes("issued") ||
+    status.includes("complete")
+  ) {
+    return "paid";
+  }
+
+  if (
+    status.includes("approved") ||
+    status.includes("qualified") ||
+    status.includes("scheduled")
+  ) {
+    return "scheduled";
+  }
+
+  if (
+    status.includes("review") ||
+    status.includes("hold") ||
+    status.includes("manual")
+  ) {
+    return "review";
+  }
+
+  if (
+    status.includes("failed") ||
+    status.includes("rejected") ||
+    status.includes("invalid") ||
+    status.includes("cancel")
+  ) {
+    return "failed";
+  }
+
+  return "pending";
+}
+
+function rewardRecipientName(row: any) {
+  return (
+    row.recipient_name ||
+    row.customer_name ||
+    row.pet_parent_name ||
+    row.referrer_name ||
+    row.referred_name ||
+    row.ambassador_name ||
+    row.partner_name ||
+    row.guru_name ||
+    row.full_name ||
+    row.name ||
+    row.financial_category ||
+    "Referral reward recipient"
+  );
+}
+
+function rewardRecipientEmail(row: any) {
+  return (
+    row.recipient_email ||
+    row.customer_email ||
+    row.pet_parent_email ||
+    row.referrer_email ||
+    row.referred_email ||
+    row.ambassador_email ||
+    row.partner_email ||
+    row.guru_email ||
+    row.email ||
+    "No email on file"
+  );
+}
+
+function rewardProgramLabel(row: any) {
+  const category = String(row.financial_category || row.reward_type || row.source || row.type || "")
+    .replace(/[-_]+/g, " ")
+    .trim();
+
+  if (!category) return "Referral Rewards";
+
+  return category
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function buildReferralRewardPayoutRows(rows: any[]): PayoutRow[] {
+  return rows
+    .map((row, index) => {
+      const amount = rewardAmount(row);
+
+      if (amount <= 0) return null;
+
+      const programLabel = rewardProgramLabel(row);
+      const treatment = String(row.financial_treatment || "pending_reward_liability");
+
+      return {
+        id: String(row.id || row.referral_code_id || row.reward_id || `referral-reward-${index}`),
+        source: "Partner" as PayoutSource,
+        name: rewardRecipientName(row),
+        email: rewardRecipientEmail(row),
+        city: row.city || row.recipient_city || row.customer_city || row.partner_city || "Remote",
+        state: row.state || row.recipient_state || row.customer_state || row.partner_state || "US",
+        zip: row.zip || row.zip_code || row.recipient_zip || row.customer_zip || "",
+        amount,
+        status: rewardStatus(row),
+        payoutDate:
+          row.paid_at ||
+          row.credited_at ||
+          row.payout_date ||
+          row.scheduled_for ||
+          row.qualified_at ||
+          row.created_at ||
+          row.updated_at ||
+          null,
+        reference:
+          row.reference ||
+          row.reward_reference ||
+          row.referral_code ||
+          row.referral_code_id ||
+          row.id ||
+          "Referral reward",
+        batch: `${programLabel} / Reward Queue`,
+        notes: `Referral reward · ${programLabel} · ${treatment.replaceAll("_", " ")}`,
+      };
+    })
+    .filter(Boolean) as PayoutRow[];
+}
+
+
 function buildGuruPayoutRows(rows: any[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `guru-${index}`),
@@ -369,6 +529,9 @@ async function getPayoutRows() {
   const adminPayoutRows = buildGenericPayoutRows(
     await safeSelect<any>(supabase, "admin_payouts"),
   );
+  const referralRewardRows = buildReferralRewardPayoutRows(
+    await safeAdminSelect<any>("admin_referral_reward_liability"),
+  );
 
   const merged = dedupeRows([
     ...guruRows,
@@ -376,6 +539,7 @@ async function getPayoutRows() {
     ...payoutsRows,
     ...financialPayoutRows,
     ...adminPayoutRows,
+    ...referralRewardRows,
   ]);
 
   return merged.length ? merged : demoPayoutRows;
@@ -606,6 +770,15 @@ export default async function AdminPayoutLandingPage({
   const failedCount = countByStatus(rows, "failed");
   const pendingCount = countByStatus(rows, "pending");
   const paidCount = countByStatus(rows, "paid");
+  const rewardRows = rows.filter((row) =>
+    `${row.notes} ${row.batch} ${row.reference}`.toLowerCase().includes("referral reward"),
+  );
+  const pendingRewardRows = rewardRows.filter((row) =>
+    row.status === "pending" || row.status === "review" || row.status === "scheduled",
+  );
+  const issuedRewardRows = rewardRows.filter((row) => row.status === "paid");
+  const pendingRewardTotal = pendingRewardRows.reduce((sum, row) => sum + row.amount, 0);
+  const issuedRewardTotal = issuedRewardRows.reduce((sum, row) => sum + row.amount, 0);
 
   return (
     <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-10 sm:px-6 xl:px-8 2xl:px-0">
@@ -632,7 +805,8 @@ export default async function AdminPayoutLandingPage({
               </div>
 
               <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-500 sm:text-base">
-                Manage guru payouts, partner commissions, payout batches, failed transfers,
+                Manage Guru payouts, partner commissions, PawPerks rewards, Guru referral rewards,
+                Ambassador rewards, partner reward liabilities, payout batches, failed transfers,
                 manual reviews, references, and accounting-ready payout activity from one
                 focused SitGuru HQ workspace.
               </p>
@@ -766,6 +940,93 @@ export default async function AdminPayoutLandingPage({
           icon={<TrendingUp className="h-5 w-5" />}
           tone="bg-emerald-50 text-[#118a43]"
         />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <DashboardCard
+          title="Referral Reward Queue"
+          value={formatCurrency(pendingRewardTotal)}
+          subtext={`${pendingRewardRows.length} pending / review / scheduled rewards`}
+          icon={<Sparkles className="h-5 w-5" />}
+          tone="bg-violet-50 text-violet-600"
+        />
+        <DashboardCard
+          title="Issued Rewards"
+          value={formatCurrency(issuedRewardTotal)}
+          subtext={`${issuedRewardRows.length} paid / credited rewards`}
+          icon={<CheckCircle2 className="h-5 w-5" />}
+          tone="bg-emerald-50 text-[#118a43]"
+        />
+        <DashboardCard
+          title="Reward Records"
+          value={rewardRows.length.toLocaleString()}
+          subtext="PawPerks, Guru, Ambassador, and Partner reward rows"
+          icon={<Users className="h-5 w-5" />}
+          tone="bg-blue-50 text-blue-600"
+        />
+      </section>
+
+      <section className="rounded-[1.75rem] border border-violet-100 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">
+              Growth & Referral Payouts
+            </p>
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-[#111b33]">
+              PawPerks and program rewards are now in the payout queue.
+            </h2>
+            <p className="mt-2 max-w-4xl text-sm font-medium leading-6 text-slate-500">
+              This page now reads referral reward liabilities from Supabase and places pending
+              rewards into the payout review workflow while keeping issued rewards visible for
+              accounting and reconciliation review.
+            </p>
+          </div>
+
+          <Link
+            href="/admin/referrals"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-black text-violet-700 transition hover:bg-violet-100"
+          >
+            Open Growth & Referrals
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {pendingRewardRows.slice(0, 4).map((row) => (
+            <div
+              key={`reward-${row.id}`}
+              className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-black text-[#111b33]">{row.name}</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">{row.batch}</p>
+                </div>
+                <span
+                  className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${getStatusBadgeStyles(
+                    row.status,
+                  )}`}
+                >
+                  {getStatusLabel(row.status)}
+                </span>
+              </div>
+              <p className="mt-3 text-xl font-black text-[#111b33]">
+                {formatCurrency(row.amount)}
+              </p>
+              <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                {row.notes}
+              </p>
+            </div>
+          ))}
+
+          {!pendingRewardRows.length ? (
+            <div className="rounded-2xl border border-dashed border-violet-100 bg-violet-50/40 p-5 text-center md:col-span-2 xl:col-span-4">
+              <p className="text-sm font-bold text-slate-500">
+                No pending referral rewards found yet.
+              </p>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-12">

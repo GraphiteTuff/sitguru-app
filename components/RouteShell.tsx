@@ -80,10 +80,9 @@ export default function RouteShell({ children }: { children: ReactNode }) {
   }
 
   /*
-   * Private Guru pages already render their own Guru dashboard header.
-   * Private Customer pages will render their own Customer dashboard header.
-   * Do not render the public marketing header here, or the dashboards show
-   * double/triple headers.
+   * Private Guru and Pet Parent pages render their own dashboard headers.
+   * Do not render the public marketing header here, or private portal pages
+   * can show duplicate headers.
    */
   if (isGuruPrivatePage || isCustomerPrivatePage) {
     return (

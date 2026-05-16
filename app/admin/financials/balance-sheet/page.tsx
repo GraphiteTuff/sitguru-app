@@ -66,6 +66,17 @@ type PlaidTransactionRow = {
   updated_at?: string | null;
 };
 
+type ReferralRewardLiabilityRow = {
+  id?: string | null;
+  created_at?: string | null;
+  normalized_status?: string | null;
+  normalized_amount?: number | string | null;
+  financial_treatment?: string | null;
+  financial_category?: string | null;
+  source_table?: string | null;
+  [key: string]: unknown;
+};
+
 type BalanceLine = {
   id: string;
   dbId: string;
@@ -132,6 +143,7 @@ type BalanceSheetData = {
     needsReviewCount: number;
     manualExpenseCount: number;
     trustSafetyReceivableTotal: number;
+    pendingReferralRewardLiability: number;
     pawstepReceivable: number;
     bookAndBarkReceivable: number;
     maxVisualValue: number;
@@ -171,6 +183,7 @@ const LINE_PRESETS = [
   { section: "current_liabilities", label: "Guru Payouts Payable" },
   { section: "current_liabilities", label: "Sales Tax Payable" },
   { section: "current_liabilities", label: "Refunds Payable" },
+  { section: "current_liabilities", label: "Pending Referral Reward Liability" },
   { section: "current_liabilities", label: "Disputes / Chargebacks Payable" },
   { section: "long_term_liabilities", label: "Bank Loan" },
   { section: "long_term_liabilities", label: "Long-Term Debt" },
@@ -257,6 +270,17 @@ const CORE_BALANCE_LINES: BalanceLine[] = [
     amount: 0,
     notes: "Estimated payable placeholder for unreleased Guru payouts.",
     displayOrder: 10,
+    source: "calculated",
+  },
+  {
+    id: "core-pending-referral-reward-liability",
+    dbId: "",
+    isSaved: false,
+    section: "current_liabilities",
+    label: "Pending Referral Reward Liability",
+    amount: 0,
+    notes: "Pending PawPerks, Guru referral, Ambassador, and Partner rewards not yet paid or issued. This stays on the Balance Sheet until earned rewards are paid/credited.",
+    displayOrder: 20,
     source: "calculated",
   },
   {
@@ -775,6 +799,25 @@ function getTrustSafetyBookingDeductionReceivable(purchases: AnyRow[]) {
     );
 }
 
+function isPendingReferralRewardLiability(row: ReferralRewardLiabilityRow) {
+  return (
+    asTrimmedString(row.financial_treatment).toLowerCase() ===
+    "pending_reward_liability"
+  );
+}
+
+function getReferralRewardLiabilityAmount(row: ReferralRewardLiabilityRow) {
+  return Math.max(0, toNumber(row.normalized_amount));
+}
+
+function getPendingReferralRewardLiabilityTotal(
+  rows: ReferralRewardLiabilityRow[],
+) {
+  return rows
+    .filter(isPendingReferralRewardLiability)
+    .reduce((sum, row) => sum + getReferralRewardLiabilityAmount(row), 0);
+}
+
 function getManualLineSection(line: AnyRow): BalanceSectionKey {
   const section = asTrimmedString(line.section) as BalanceSectionKey;
 
@@ -815,6 +858,7 @@ function buildCoreLines({
   trustSafetyReceivableTotal,
   pawstepReceivable,
   bookAndBarkReceivable,
+  pendingReferralRewardLiability,
   ownerContributions,
   ownerDraws,
   currentNetIncome,
@@ -825,6 +869,7 @@ function buildCoreLines({
   trustSafetyReceivableTotal: number;
   pawstepReceivable: number;
   bookAndBarkReceivable: number;
+  pendingReferralRewardLiability: number;
   ownerContributions: number;
   ownerDraws: number;
   currentNetIncome: number;
@@ -854,6 +899,10 @@ function buildCoreLines({
       return { ...line, amount: bookAndBarkReceivable };
     }
 
+    if (line.id === "core-pending-referral-reward-liability") {
+      return { ...line, amount: pendingReferralRewardLiability };
+    }
+
     if (line.id === "core-owner-contributions") {
       return { ...line, amount: ownerContributions };
     }
@@ -880,6 +929,7 @@ function getReadinessItems({
   totalEquity,
   isBalanced,
   trustSafetyReceivableTotal,
+  pendingReferralRewardLiability,
 }: {
   businessAccountCount: number;
   bankTransactionCount: number;
@@ -890,6 +940,7 @@ function getReadinessItems({
   totalEquity: number;
   isBalanced: boolean;
   trustSafetyReceivableTotal: number;
+  pendingReferralRewardLiability: number;
 }): BalanceReadinessItem[] {
   return [
     {
@@ -927,6 +978,13 @@ function getReadinessItems({
         : "No outstanding Trust & Safety receivables are currently reflected from financed plans.",
     },
     {
+      label: "Referral Reward Liability",
+      status: pendingReferralRewardLiability > 0 ? "ready" : "needs_review",
+      detail: pendingReferralRewardLiability
+        ? `${money(pendingReferralRewardLiability)} in pending referral rewards is reflected as a current liability.`
+        : "No pending PawPerks, Guru referral, Ambassador, or Partner reward liability is currently reflected.",
+    },
+    {
       label: "Assets Captured",
       status: totalAssets > 0 ? "ready" : "missing",
       detail: `${money(totalAssets)} in assets is reflected on the balance sheet.`,
@@ -953,6 +1011,7 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
     transactions,
     expenses,
     trustSafetyPurchases,
+    referralRewardLiabilities,
   ] = await Promise.all([
     safeRows<AnyRow>(
       supabaseAdmin
@@ -1000,6 +1059,13 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
         .order("created_at", { ascending: false })
         .limit(3000),
       "guru_trust_safety_plan_purchases",
+    ),
+    safeRows<ReferralRewardLiabilityRow>(
+      supabaseAdmin
+        .from("admin_referral_reward_liability")
+        .select("*")
+        .limit(5000),
+      "admin_referral_reward_liability",
     ),
   ]);
 
@@ -1078,6 +1144,9 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
     activeTrustSafetyPurchases,
   );
 
+  const pendingReferralRewardLiability =
+    getPendingReferralRewardLiabilityTotal(referralRewardLiabilities);
+
   const coreLines = buildCoreLines({
     checkingBalance,
     savingsBalance,
@@ -1085,6 +1154,7 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
     trustSafetyReceivableTotal,
     pawstepReceivable,
     bookAndBarkReceivable,
+    pendingReferralRewardLiability,
     ownerContributions,
     ownerDraws,
     currentNetIncome,
@@ -1181,6 +1251,7 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
     totalEquity,
     isBalanced,
     trustSafetyReceivableTotal,
+    pendingReferralRewardLiability,
   });
 
   return {
@@ -1217,6 +1288,7 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
       needsReviewCount: needsReviewTransactions.length,
       manualExpenseCount: activeExpenses.length,
       trustSafetyReceivableTotal,
+      pendingReferralRewardLiability,
       pawstepReceivable,
       bookAndBarkReceivable,
       maxVisualValue,
@@ -1924,7 +1996,7 @@ export default async function AdminBalanceSheetPage() {
                 Snapshot of SitGuru assets, liabilities, and equity. This page
                 is now wired to NFCU/Plaid business accounts, categorized bank
                 transactions, manual expense rows, Trust & Safety receivables,
-                and manual balance sheet lines.
+                pending referral reward liabilities, and manual balance sheet lines.
               </p>
             </div>
 
@@ -1944,6 +2016,13 @@ export default async function AdminBalanceSheetPage() {
               value={money(balance.totals.totalLiabilities)}
               detail={`${money(balance.totals.totalCurrentLiabilities)} current liabilities + ${money(balance.totals.totalLongTermLiabilities)} long-term liabilities.`}
               tone="sky"
+            />
+
+            <StatCard
+              label="Referral Reward Liability"
+              value={money(balance.totals.pendingReferralRewardLiability)}
+              detail="Pending PawPerks, Guru referral, Ambassador, and Partner rewards remain a current liability until paid or credited."
+              tone="amber"
             />
 
             <StatCard
@@ -2138,7 +2217,7 @@ export default async function AdminBalanceSheetPage() {
             </p>
             <p className="mt-3 text-sm leading-7 text-slate-700">
               Auto-estimated lines include NFCU Business Checking, NFCU Business
-              Savings, available cash, Trust & Safety receivables, owner
+              Savings, available cash, Trust & Safety receivables, pending referral reward liabilities, owner
               contributions, owner draws, and current net income when source data
               is available. Owner capital, retained earnings, long-term debt,
               equipment, prepaid assets, and opening balances should usually be
@@ -2161,6 +2240,15 @@ export default async function AdminBalanceSheetPage() {
                 </p>
                 <p className="mt-2 text-xl font-black text-slate-950">
                   {balance.totals.needsReviewCount.toLocaleString()}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-sky-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Referral Liability
+                </p>
+                <p className="mt-2 text-xl font-black text-slate-950">
+                  {money(balance.totals.pendingReferralRewardLiability)}
                 </p>
               </div>
 

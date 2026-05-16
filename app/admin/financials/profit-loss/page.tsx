@@ -70,6 +70,8 @@ type PlaidAccountRow = {
 
 type ExpenseLedgerRow = Record<string, unknown>;
 type FinancialLineRow = Record<string, unknown>;
+type GrowthMarketingExpenseRow = Record<string, unknown>;
+type ReferralRewardLiabilityRow = Record<string, unknown>;
 
 type CategorySummary = {
   category: string;
@@ -91,7 +93,7 @@ type ReportTransaction = {
   bankStatus: string;
   reviewStatus: string;
   manuallyCategorized: boolean;
-  source: "Plaid/NFCU" | "Manual";
+  source: "Plaid/NFCU" | "Manual" | "Growth/Referral";
 };
 
 type StatementLine = {
@@ -132,6 +134,8 @@ type ProfitLossData = {
   excludedTransactions: PlaidTransactionRow[];
   nonProfitLossTransactions: PlaidTransactionRow[];
   manualExpenses: ExpenseLedgerRow[];
+  growthMarketingExpenses: GrowthMarketingExpenseRow[];
+  issuedReferralRewards: ReferralRewardLiabilityRow[];
   statementLines: StatementLine[];
   revenueByCategory: CategorySummary[];
   expenseByCategory: CategorySummary[];
@@ -139,6 +143,7 @@ type ProfitLossData = {
   recentReportTransactions: ReportTransaction[];
   recentNeedsReview: ReportTransaction[];
   recentManualExpenses: ReportTransaction[];
+  recentGrowthExpenses: ReportTransaction[];
   period: PeriodWindow;
   previousMetrics: PeriodMetrics;
   totals: PeriodMetrics & {
@@ -148,6 +153,11 @@ type ProfitLossData = {
     excludedCount: number;
     nonProfitLossCount: number;
     manualExpenseCount: number;
+    growthMarketingExpenseCount: number;
+    issuedReferralRewardCount: number;
+    growthMarketingExpenseTotal: number;
+    issuedReferralRewardExpenseTotal: number;
+    growthAndReferralExpenseTotal: number;
     customStatementLineCount: number;
     currentBalance: number;
     availableBalance: number;
@@ -277,6 +287,26 @@ const MANUAL_EXPENSE_CATEGORIES = [
     value: "Marketing / Advertising",
     label: "Marketing / Advertising",
     section: "Operating Expenses",
+  },
+  {
+    value: "Marketing - Print",
+    label: "Marketing - Print",
+    section: "Operating Expenses",
+  },
+  {
+    value: "Marketing - General",
+    label: "Marketing - General",
+    section: "Operating Expenses",
+  },
+  {
+    value: "Referral Rewards",
+    label: "Referral Rewards",
+    section: "Sales & Marketing",
+  },
+  {
+    value: "Referral Commissions",
+    label: "Referral Commissions",
+    section: "Sales & Marketing",
   },
   {
     value: "Payment Processing Fees",
@@ -941,6 +971,121 @@ function getManualExpenseDate(row: ExpenseLedgerRow) {
   );
 }
 
+function isArchivedGrowthExpense(row: GrowthMarketingExpenseRow) {
+  return Boolean(
+    row.deleted_at ||
+      row.removed_at ||
+      row.voided_at ||
+      row.archived_at ||
+      row.is_deleted === true ||
+      row.is_void === true ||
+      row.is_active === false,
+  );
+}
+
+function getGrowthExpenseId(row: GrowthMarketingExpenseRow, index: number) {
+  return (
+    asTrimmedString(row.id) ||
+    asTrimmedString(row.campaign_id) ||
+    `${getGrowthExpenseName(row)}-${index}`
+  );
+}
+
+function getGrowthExpenseName(row: GrowthMarketingExpenseRow) {
+  return (
+    asTrimmedString(row.campaign_name) ||
+    asTrimmedString(row.financial_category) ||
+    "Growth campaign expense"
+  );
+}
+
+function getGrowthExpenseCategory(row: GrowthMarketingExpenseRow) {
+  const category = asTrimmedString(row.financial_category);
+
+  if (category === "Marketing - Advertising") return "Marketing / Advertising";
+  if (category) return category;
+
+  return "Marketing - General";
+}
+
+function getGrowthExpenseSection(row: GrowthMarketingExpenseRow) {
+  return asTrimmedString(row.financial_statement_section) || "Operating Expenses";
+}
+
+function getGrowthExpenseAmount(row: GrowthMarketingExpenseRow) {
+  return (
+    toNumber(row.amount) ||
+    toNumber(row.total_amount) ||
+    toNumber(row.marketing_spend) ||
+    toNumber(row.ad_spend) ||
+    toNumber(row.spend)
+  );
+}
+
+function getGrowthExpenseDate(row: GrowthMarketingExpenseRow) {
+  return (
+    asTrimmedString(row.cost_date) ||
+    asTrimmedString(row.created_at) ||
+    asTrimmedString(row.updated_at)
+  );
+}
+
+function isIssuedReferralReward(row: ReferralRewardLiabilityRow) {
+  const treatment = asTrimmedString(row.financial_treatment).toLowerCase();
+  const status = asTrimmedString(row.normalized_status).toLowerCase();
+
+  return (
+    treatment === "issued_reward_expense" ||
+    ["paid", "credited", "issued", "complete", "completed"].includes(status)
+  );
+}
+
+function getReferralRewardId(row: ReferralRewardLiabilityRow, index: number) {
+  return (
+    asTrimmedString(row.id) ||
+    asTrimmedString(row.referral_code_id) ||
+    asTrimmedString(row.reward_id) ||
+    `${getReferralRewardName(row)}-${index}`
+  );
+}
+
+function getReferralRewardName(row: ReferralRewardLiabilityRow) {
+  return (
+    asTrimmedString(row.financial_category) ||
+    asTrimmedString(row.source) ||
+    asTrimmedString(row.referral_source) ||
+    "Issued referral reward"
+  );
+}
+
+function getReferralRewardCategory(row: ReferralRewardLiabilityRow) {
+  return asTrimmedString(row.financial_category) || "Referral Rewards";
+}
+
+function getReferralRewardSection(row: ReferralRewardLiabilityRow) {
+  return "Sales & Marketing";
+}
+
+function getReferralRewardAmount(row: ReferralRewardLiabilityRow) {
+  return (
+    toNumber(row.normalized_amount) ||
+    toNumber(row.reward_amount) ||
+    toNumber(row.credit_amount) ||
+    toNumber(row.payout_amount) ||
+    toNumber(row.commission_amount) ||
+    toNumber(row.amount)
+  );
+}
+
+function getReferralRewardDate(row: ReferralRewardLiabilityRow) {
+  return (
+    asTrimmedString(row.created_at) ||
+    asTrimmedString(row.updated_at) ||
+    asTrimmedString(row.paid_at) ||
+    asTrimmedString(row.issued_at)
+  );
+}
+
 function groupTransactionsByCategory(transactions: PlaidTransactionRow[]) {
   const map = new Map<string, CategorySummary>();
 
@@ -976,6 +1121,57 @@ function groupManualExpensesByCategory(expenses: ExpenseLedgerRow[]) {
     const section = getManualExpenseSection(expense);
     const key = `expense:${section}:${category}`;
     const amount = getManualExpenseAmount(expense);
+    const current = map.get(key);
+
+    if (current) {
+      current.amount += amount;
+      current.count += 1;
+    } else {
+      map.set(key, {
+        category,
+        type: "expense",
+        section,
+        amount,
+        count: 1,
+      });
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function groupGrowthExpensesByCategory(
+  marketingExpenses: GrowthMarketingExpenseRow[],
+  issuedRewards: ReferralRewardLiabilityRow[],
+) {
+  const map = new Map<string, CategorySummary>();
+
+  for (const expense of marketingExpenses) {
+    const category = getGrowthExpenseCategory(expense);
+    const section = getGrowthExpenseSection(expense);
+    const key = `expense:${section}:${category}`;
+    const amount = getGrowthExpenseAmount(expense);
+    const current = map.get(key);
+
+    if (current) {
+      current.amount += amount;
+      current.count += 1;
+    } else {
+      map.set(key, {
+        category,
+        type: "expense",
+        section,
+        amount,
+        count: 1,
+      });
+    }
+  }
+
+  for (const reward of issuedRewards) {
+    const category = getReferralRewardCategory(reward);
+    const section = getReferralRewardSection(reward);
+    const key = `expense:${section}:${category}`;
+    const amount = getReferralRewardAmount(reward);
     const current = map.get(key);
 
     if (current) {
@@ -1074,6 +1270,46 @@ function toManualExpenseTransaction(
   };
 }
 
+function toGrowthMarketingExpenseTransaction(
+  expense: GrowthMarketingExpenseRow,
+  index: number,
+): ReportTransaction {
+  return {
+    id: getGrowthExpenseId(expense, index),
+    date: formatDateShort(getGrowthExpenseDate(expense)),
+    name: getGrowthExpenseName(expense),
+    merchant: asTrimmedString(expense.vendor) || "Growth campaign",
+    category: getGrowthExpenseCategory(expense),
+    type: "expense",
+    section: getGrowthExpenseSection(expense),
+    amount: -Math.abs(getGrowthExpenseAmount(expense)),
+    bankStatus: "Supabase View",
+    reviewStatus: "reviewed",
+    manuallyCategorized: true,
+    source: "Growth/Referral",
+  };
+}
+
+function toIssuedReferralRewardTransaction(
+  reward: ReferralRewardLiabilityRow,
+  index: number,
+): ReportTransaction {
+  return {
+    id: getReferralRewardId(reward, index),
+    date: formatDateShort(getReferralRewardDate(reward)),
+    name: getReferralRewardName(reward),
+    merchant: "Issued referral reward",
+    category: getReferralRewardCategory(reward),
+    type: "expense",
+    section: getReferralRewardSection(reward),
+    amount: -Math.abs(getReferralRewardAmount(reward)),
+    bankStatus: "Supabase View",
+    reviewStatus: "reviewed",
+    manuallyCategorized: true,
+    source: "Growth/Referral",
+  };
+}
+
 function getBarWidth(value: number, max: number) {
   if (max <= 0) return 0;
   return Math.max(4, Math.min(100, (Math.abs(value) / max) * 100));
@@ -1092,9 +1328,13 @@ function normalizeStatementLine(row: FinancialLineRow): StatementLine {
 function calculatePeriodMetrics({
   reportTransactions,
   manualExpenses,
+  growthMarketingExpenses = [],
+  issuedReferralRewards = [],
 }: {
   reportTransactions: PlaidTransactionRow[];
   manualExpenses: ExpenseLedgerRow[];
+  growthMarketingExpenses?: GrowthMarketingExpenseRow[];
+  issuedReferralRewards?: ReferralRewardLiabilityRow[];
 }): PeriodMetrics {
   const incomeTransactions = reportTransactions.filter(
     (transaction) => getTransactionType(transaction) === "income",
@@ -1119,7 +1359,21 @@ function calculatePeriodMetrics({
     0,
   );
 
-  const totalExpenses = plaidExpenses + manualExpenseTotal;
+  const growthMarketingExpenseTotal = growthMarketingExpenses.reduce(
+    (sum, expense) => sum + getGrowthExpenseAmount(expense),
+    0,
+  );
+
+  const issuedReferralRewardExpenseTotal = issuedReferralRewards.reduce(
+    (sum, reward) => sum + getReferralRewardAmount(reward),
+    0,
+  );
+
+  const totalExpenses =
+    plaidExpenses +
+    manualExpenseTotal +
+    growthMarketingExpenseTotal +
+    issuedReferralRewardExpenseTotal;
   const netIncome = totalRevenue - totalExpenses;
 
   return {
@@ -1139,8 +1393,14 @@ function calculatePeriodMetrics({
 async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> {
   const period = getPeriodWindow(periodKey);
 
-  const [accountsResult, transactionsResult, expensesResult, statementLinesResult] =
-    await Promise.all([
+  const [
+    accountsResult,
+    transactionsResult,
+    expensesResult,
+    statementLinesResult,
+    growthMarketingExpensesResult,
+    referralRewardLiabilityResult,
+  ] = await Promise.all([
       supabaseAdmin
         .from("admin_plaid_accounts")
         .select(
@@ -1167,6 +1427,16 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: true })
         .limit(500),
+      supabaseAdmin
+        .from("admin_growth_marketing_expenses")
+        .select("*")
+        .order("cost_date", { ascending: false })
+        .limit(2500),
+      supabaseAdmin
+        .from("admin_referral_reward_liability")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2500),
     ]);
 
   if (accountsResult.error) {
@@ -1191,6 +1461,20 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     );
   }
 
+  if (growthMarketingExpensesResult.error) {
+    console.warn(
+      "Profit & Loss growth marketing expense query skipped:",
+      growthMarketingExpensesResult.error,
+    );
+  }
+
+  if (referralRewardLiabilityResult.error) {
+    console.warn(
+      "Profit & Loss referral reward liability query skipped:",
+      referralRewardLiabilityResult.error,
+    );
+  }
+
   const accounts = ((accountsResult.data || []) as PlaidAccountRow[]).filter(
     isBusinessCheckingOrSavings,
   );
@@ -1205,6 +1489,14 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     (row) => !isArchivedExpense(row),
   );
 
+  const allGrowthMarketingExpenses = (
+    (growthMarketingExpensesResult.data || []) as GrowthMarketingExpenseRow[]
+  ).filter((row) => !isArchivedGrowthExpense(row));
+
+  const allIssuedReferralRewards = (
+    (referralRewardLiabilityResult.data || []) as ReferralRewardLiabilityRow[]
+  ).filter(isIssuedReferralReward);
+
   const statementLines = ((statementLinesResult.data || []) as FinancialLineRow[])
     .map(normalizeStatementLine)
     .filter((line) => line.id);
@@ -1217,12 +1509,28 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     isWithinWindow(getManualExpenseDate(expense), period),
   );
 
+  const filteredGrowthMarketingExpenses = allGrowthMarketingExpenses.filter((expense) =>
+    isWithinWindow(getGrowthExpenseDate(expense), period),
+  );
+
+  const filteredIssuedReferralRewards = allIssuedReferralRewards.filter((reward) =>
+    isWithinWindow(getReferralRewardDate(reward), period),
+  );
+
   const previousTransactions = allTransactions.filter((transaction) =>
     isWithinPreviousWindow(transaction.date, period),
   );
 
   const previousManualExpenses = allManualExpenses.filter((expense) =>
     isWithinPreviousWindow(getManualExpenseDate(expense), period),
+  );
+
+  const previousGrowthMarketingExpenses = allGrowthMarketingExpenses.filter((expense) =>
+    isWithinPreviousWindow(getGrowthExpenseDate(expense), period),
+  );
+
+  const previousIssuedReferralRewards = allIssuedReferralRewards.filter((reward) =>
+    isWithinPreviousWindow(getReferralRewardDate(reward), period),
   );
 
   const reportTransactions = filteredTransactions.filter(isProfitLossTransaction);
@@ -1256,20 +1564,29 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
   const revenueByCategory = groupTransactionsByCategory(incomeTransactions);
   const plaidExpenseByCategory = groupTransactionsByCategory(expenseTransactions);
   const manualExpenseByCategory = groupManualExpensesByCategory(filteredManualExpenses);
+  const growthExpenseByCategory = groupGrowthExpensesByCategory(
+    filteredGrowthMarketingExpenses,
+    filteredIssuedReferralRewards,
+  );
   const expenseByCategory = mergeCategorySummaries([
     ...plaidExpenseByCategory,
     ...manualExpenseByCategory,
+    ...growthExpenseByCategory,
   ]);
   const expenseBySection = groupExpensesBySection(expenseByCategory);
 
   const periodMetrics = calculatePeriodMetrics({
     reportTransactions,
     manualExpenses: filteredManualExpenses,
+    growthMarketingExpenses: filteredGrowthMarketingExpenses,
+    issuedReferralRewards: filteredIssuedReferralRewards,
   });
 
   const previousMetrics = calculatePeriodMetrics({
     reportTransactions: previousReportTransactions,
     manualExpenses: previousManualExpenses,
+    growthMarketingExpenses: previousGrowthMarketingExpenses,
+    issuedReferralRewards: previousIssuedReferralRewards,
   });
 
   const currentBalance = accounts.reduce(
@@ -1304,9 +1621,23 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     .slice(0, 10)
     .map(toManualExpenseTransaction);
 
+  const recentGrowthMarketingExpenses = filteredGrowthMarketingExpenses
+    .slice(0, 10)
+    .map(toGrowthMarketingExpenseTransaction);
+
+  const recentIssuedReferralRewards = filteredIssuedReferralRewards
+    .slice(0, 10)
+    .map(toIssuedReferralRewardTransaction);
+
+  const recentGrowthExpenses = [
+    ...recentGrowthMarketingExpenses,
+    ...recentIssuedReferralRewards,
+  ].slice(0, 16);
+
   const recentReportTransactions = [
     ...recentPlaidReportTransactions,
     ...recentManualExpenses,
+    ...recentGrowthExpenses,
   ].slice(0, 16);
 
   return {
@@ -1316,6 +1647,8 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     excludedTransactions,
     nonProfitLossTransactions,
     manualExpenses: filteredManualExpenses,
+    growthMarketingExpenses: filteredGrowthMarketingExpenses,
+    issuedReferralRewards: filteredIssuedReferralRewards,
     statementLines,
     revenueByCategory,
     expenseByCategory,
@@ -1325,6 +1658,7 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
       .slice(0, 8)
       .map(toReportTransaction),
     recentManualExpenses,
+    recentGrowthExpenses,
     period,
     previousMetrics,
     totals: {
@@ -1335,6 +1669,25 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
       excludedCount: excludedTransactions.length,
       nonProfitLossCount: nonProfitLossTransactions.length,
       manualExpenseCount: filteredManualExpenses.length,
+      growthMarketingExpenseCount: filteredGrowthMarketingExpenses.length,
+      issuedReferralRewardCount: filteredIssuedReferralRewards.length,
+      growthMarketingExpenseTotal: filteredGrowthMarketingExpenses.reduce(
+        (sum, expense) => sum + getGrowthExpenseAmount(expense),
+        0,
+      ),
+      issuedReferralRewardExpenseTotal: filteredIssuedReferralRewards.reduce(
+        (sum, reward) => sum + getReferralRewardAmount(reward),
+        0,
+      ),
+      growthAndReferralExpenseTotal:
+        filteredGrowthMarketingExpenses.reduce(
+          (sum, expense) => sum + getGrowthExpenseAmount(expense),
+          0,
+        ) +
+        filteredIssuedReferralRewards.reduce(
+          (sum, reward) => sum + getReferralRewardAmount(reward),
+          0,
+        ),
       customStatementLineCount: statementLines.length,
       totalRevenue: periodMetrics.totalRevenue,
       plaidExpenses: periodMetrics.plaidExpenses,
@@ -1733,6 +2086,15 @@ function AccountingReadinessPanel({ pnl }: { pnl: ProfitLossData }) {
       detail: `${pnl.totals.manualExpenseCount} manual operating expense rows are included in this period.`,
     },
     {
+      label: "Growth & Referral Expenses",
+      status:
+        pnl.totals.growthMarketingExpenseCount ||
+        pnl.totals.issuedReferralRewardCount
+          ? "ready"
+          : "needs_review",
+      detail: `${pnl.totals.growthMarketingExpenseCount} campaign cost rows and ${pnl.totals.issuedReferralRewardCount} issued referral reward rows are included from Supabase financial views.`,
+    },
+    {
       label: "Needs Review Queue",
       status: pnl.totals.needsReviewCount ? "needs_review" : "ready",
       detail: pnl.totals.needsReviewCount
@@ -1807,6 +2169,7 @@ function IntegrationFlowPanel() {
     "Plaid sync pulls NFCU Business Checking and Savings transactions.",
     "SitGuru auto-categorizes common bank transactions into report categories.",
     "Admin reviews and manually categorizes anything in Needs Review.",
+    "Growth campaign costs and issued referral rewards flow from Supabase financial views into operating expenses.",
     "Manual P&L categories and real operating expenses can be added as backup.",
     "Period filters show daily, weekly, monthly, quarterly, yearly, annual, or all-time performance.",
   ];
@@ -1893,6 +2256,117 @@ function StatementSection({
         </div>
       </div>
     </div>
+  );
+}
+
+function GrowthReferralFinancialsPanel({ pnl }: { pnl: ProfitLossData }) {
+  const rows = [
+    {
+      label: "Campaign Costs",
+      value: pnl.totals.growthMarketingExpenseTotal,
+      detail: `${pnl.totals.growthMarketingExpenseCount} marketing / advertising / print rows`,
+      tone: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    },
+    {
+      label: "Issued Referral Rewards",
+      value: pnl.totals.issuedReferralRewardExpenseTotal,
+      detail: `${pnl.totals.issuedReferralRewardCount} issued, credited, paid, or completed reward rows`,
+      tone: "border-blue-100 bg-blue-50 text-blue-800",
+    },
+    {
+      label: "P&L Growth Expense",
+      value: pnl.totals.growthAndReferralExpenseTotal,
+      detail: "Included in Total Expenses and Net Income / Loss",
+      tone: "border-amber-100 bg-amber-50 text-amber-800",
+    },
+  ];
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+            Growth / Referrals / P&amp;L
+          </p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+            Marketing costs and issued rewards now feed Profit &amp; Loss.
+          </h2>
+          <p className="mt-2 max-w-5xl text-sm leading-6 text-slate-600">
+            Campaign costs from <span className="font-black">admin_growth_marketing_expenses</span> and issued referral reward expenses from <span className="font-black">admin_referral_reward_liability</span> are included as operating expenses for the selected period. Pending reward liability stays off the P&amp;L until issued, credited, or paid.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <ActionLink href="/admin/referrals" label="Open Growth & Referrals" primary />
+          <ActionLink href="/admin/financials" label="Financial Overview" />
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        {rows.map((row) => (
+          <div key={row.label} className={`rounded-[1.5rem] border p-5 ${row.tone}`}>
+            <p className="text-xs font-black uppercase tracking-[0.18em] opacity-80">
+              {row.label}
+            </p>
+            <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+              {money(row.value)}
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              {row.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-100">
+        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">
+            Recent growth/referral rows included in P&amp;L
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-white text-slate-600">
+              <tr>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Date</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Item</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Category</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Section</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em]">Amount</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {pnl.recentGrowthExpenses.length ? (
+                pnl.recentGrowthExpenses.map((transaction) => (
+                  <tr key={transaction.id} className="transition hover:bg-slate-50">
+                    <td className="px-4 py-4 font-semibold text-slate-600">{transaction.date}</td>
+                    <td className="px-4 py-4">
+                      <p className="font-black text-slate-950">{transaction.name}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">{transaction.merchant}</p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
+                        {transaction.category}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 font-semibold text-slate-600">{transaction.section}</td>
+                    <td className="px-4 py-4 text-right font-black text-rose-700">{moneyExact(transaction.amount)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-600">
+                    No campaign costs or issued referral rewards are included in this selected P&amp;L period yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -2253,7 +2727,7 @@ export default async function AdminProfitLossPage({
                 "money",
               )}
               comparisonLabel={pnl.period.comparisonLabel}
-              detail={`${money(pnl.totals.plaidExpenses)} bank-fed + ${money(pnl.totals.manualExpenses)} manual expenses.`}
+              detail={`${money(pnl.totals.plaidExpenses)} bank-fed + ${money(pnl.totals.manualExpenses)} manual + ${money(pnl.totals.growthAndReferralExpenseTotal)} growth/referral expenses.`}
               tone="amber"
             />
 
@@ -2279,7 +2753,10 @@ export default async function AdminProfitLossPage({
                 "number",
               )}
               comparisonLabel={pnl.period.comparisonLabel}
-              detail={`${pnl.totals.manualCategorizedCount.toLocaleString()} manual bank categories and ${pnl.totals.manualExpenseCount.toLocaleString()} manual expenses.`}
+              detail={`${pnl.totals.manualCategorizedCount.toLocaleString()} manual bank categories, ${pnl.totals.manualExpenseCount.toLocaleString()} manual expenses, and ${(
+                pnl.totals.growthMarketingExpenseCount +
+                pnl.totals.issuedReferralRewardCount
+              ).toLocaleString()} growth/referral rows.`}
               tone="sky"
             />
 
@@ -2305,6 +2782,8 @@ export default async function AdminProfitLossPage({
         <AccountingReadinessPanel pnl={pnl} />
 
         <IntegrationFlowPanel />
+
+        <GrowthReferralFinancialsPanel pnl={pnl} />
 
         <ManualControlsPanel pnl={pnl} />
 
@@ -2464,6 +2943,14 @@ export default async function AdminProfitLossPage({
           rows={pnl.recentManualExpenses}
           emptyMessage="No manual operating expenses have been added for this period yet."
           showVoidAction
+        />
+
+        <TransactionsTable
+          eyebrow="Growth & Referral Expenses"
+          title="Campaign costs and issued rewards included in P&L"
+          description="These campaign costs and issued referral rewards come from the Growth & Referrals financial Supabase views and are included in expenses for this period."
+          rows={pnl.recentGrowthExpenses}
+          emptyMessage="No campaign costs or issued referral rewards are included in this period yet."
         />
 
         <TransactionsTable

@@ -57,9 +57,9 @@ export default function PawPerksRulesPage() {
               </h1>
 
               <p className="mt-5 max-w-3xl text-base font-semibold leading-8 text-slate-700 md:text-lg">
-                Review how Friends & Family Rewards qualify, when credits are
-                issued, and how PawPerks Rewards can be used on eligible
-                SitGuru bookings.
+                Review how Friends & Family Rewards qualify, when future SitGuru
+                care credits are issued, and how PawPerks Rewards can be used
+                on eligible SitGuru bookings.
               </p>
             </div>
 
@@ -77,9 +77,9 @@ export default function PawPerksRulesPage() {
             <p>
               PawPerks is SitGuru’s Friends & Family Rewards program. Pet
               Parents can share their personal PawPerks link or referral code
-              with friends and family. When a referred person signs up, books
-              eligible Pet Care, and completes the qualifying action, the
-              referring Pet Parent may earn future SitGuru booking credits.
+              with friends and family. When a referred person signs up and completes their first eligible
+              paid booking, the referring Pet Parent may earn future SitGuru
+              care credits.
             </p>
           </RuleSection>
 
@@ -104,8 +104,8 @@ export default function PawPerksRulesPage() {
           <RuleSection title="What counts as a qualified referral">
             <p>
               A referral generally qualifies when a new customer uses your
-              PawPerks link or referral code, creates a SitGuru account, books
-              eligible Pet Care, and completes the required booking activity.
+              PawPerks link or referral code, creates a SitGuru account, and
+              completes their first eligible paid booking.
             </p>
 
             <ul className="space-y-3">
@@ -116,8 +116,8 @@ export default function PawPerksRulesPage() {
                 The referral must be connected to your PawPerks code or link.
               </RuleItem>
               <RuleItem>
-                The booking must be completed and not canceled, refunded, or
-                marked as invalid.
+                The first eligible paid booking must be completed and not canceled,
+                refunded, disputed, or marked as invalid.
               </RuleItem>
               <RuleItem>
                 Duplicate accounts, self-referrals, fake referrals, or
@@ -128,8 +128,8 @@ export default function PawPerksRulesPage() {
 
           <RuleSection title="Reward tiers">
             <p>
-              PawPerks Rewards are currently planned as future booking credits
-              based on qualified referrals:
+              PawPerks Rewards are currently planned as future SitGuru care
+              credits based on qualified referrals:
             </p>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -170,8 +170,8 @@ export default function PawPerksRulesPage() {
           <RuleSection title="When rewards become available">
             <ul className="space-y-3">
               <RuleItem>
-                Rewards are generally issued after the referred customer’s
-                qualifying booking is completed.
+                Rewards are generally issued after the referred customer completes
+                their first eligible paid booking.
               </RuleItem>
               <RuleItem>
                 Rewards may remain pending while SitGuru verifies the referral,
@@ -188,11 +188,12 @@ export default function PawPerksRulesPage() {
           <RuleSection title="How PawPerks Rewards can be used">
             <ul className="space-y-3">
               <RuleItem>
-                PawPerks Rewards are intended to be used as future SitGuru
-                booking credits.
+                PawPerks Rewards are intended to be used as future SitGuru care
+                credits on eligible bookings.
               </RuleItem>
               <RuleItem>
-                Credits may apply only to eligible SitGuru bookings.
+                Credits may apply only to eligible SitGuru bookings and may be
+                subject to booking, account, and program verification.
               </RuleItem>
               <RuleItem>
                 Credits are not cash, are not cash equivalents, and may not be
@@ -236,8 +237,8 @@ export default function PawPerksRulesPage() {
           <RuleSection title="Questions or support">
             <p>
               If you have questions about your PawPerks Rewards, referral
-              status, or available credits, contact SitGuru support through your
-              customer account.
+              status, or available future care credits, contact SitGuru support
+              through your customer account.
             </p>
 
             <a

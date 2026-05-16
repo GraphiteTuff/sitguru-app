@@ -61,6 +61,7 @@ const adminRoutes = {
   reports: "/admin/exports",
   activity: "/admin/activity",
   launchSignups: "/admin/launch-signups",
+  referrals: "/admin/referrals",
   programs: "/admin/programs",
   partners: "/admin/partners",
   partnerApplications: "/admin/partners/applications",
@@ -1633,6 +1634,30 @@ export default async function AdminDashboardPage() {
               href={adminRoutes.partners}
             />
 
+            <Link
+              href={adminRoutes.referrals}
+              className="mb-4 flex items-start justify-between gap-4 rounded-2xl border border-green-200 bg-green-50 p-4 transition hover:-translate-y-0.5 hover:border-green-300 hover:bg-green-100"
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
+                  <Gift size={18} />
+                </div>
+
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-green-950">
+                    Growth & Referrals
+                  </p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-green-900/70">
+                    Open the PawPerks, Guru referral, Ambassador, Partner, reward, and payout command center.
+                  </p>
+                </div>
+              </div>
+
+              <span className="shrink-0 text-sm font-black text-green-800">
+                Open →
+              </span>
+            </Link>
+
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
               <NetworkKpiTile
                 href={adminRoutes.programs}
@@ -1778,6 +1803,11 @@ export default async function AdminDashboardPage() {
               href={adminRoutes.exports}
               icon={<Download />}
               label="Export Data"
+            />
+            <QuickAction
+              href={adminRoutes.referrals}
+              icon={<Gift />}
+              label="Growth Referrals"
             />
             <QuickAction
               href={adminRoutes.partners}

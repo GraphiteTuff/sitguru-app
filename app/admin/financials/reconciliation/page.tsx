@@ -18,6 +18,8 @@ type AdminIdentity = {
   canAccessFinancials: boolean;
 };
 
+type ReadinessStatus = "ready" | "needs_review" | "missing";
+
 type ReconciliationItem = {
   id: string;
   source: string;
@@ -33,6 +35,12 @@ type ReconciliationItem = {
   recommendation: string;
 };
 
+type ReconciliationCheck = {
+  label: string;
+  status: ReadinessStatus;
+  detail: string;
+};
+
 type ReconciliationData = {
   bankItems: ReconciliationItem[];
   manualItems: ReconciliationItem[];
@@ -43,11 +51,11 @@ type ReconciliationData = {
   uncategorizedItems: ReconciliationItem[];
   trustSafetyItems: ReconciliationItem[];
   stripeItems: ReconciliationItem[];
-  reportChecks: {
-    label: string;
-    status: "ready" | "needs_review" | "missing";
-    detail: string;
-  }[];
+  growthMarketingItems: ReconciliationItem[];
+  referralRewardItems: ReconciliationItem[];
+  growthItems: ReconciliationItem[];
+  reportChecks: ReconciliationCheck[];
+  sourceCounts: { label: string; count: number; source: string }[];
   totals: {
     bankRows: number;
     postedRows: number;
@@ -59,10 +67,17 @@ type ReconciliationData = {
     uncategorizedRows: number;
     stripeRows: number;
     trustSafetyRows: number;
+    growthMarketingRows: number;
+    referralRewardRows: number;
+    growthRows: number;
+    growthNeedsMatchingRows: number;
     totalCashIn: number;
     totalCashOut: number;
     netCashMovement: number;
     manualExpenseTotal: number;
+    growthMarketingTotal: number;
+    issuedReferralRewardTotal: number;
+    pendingReferralRewardLiabilityTotal: number;
     reviewQueueTotal: number;
     reconciliationScore: number;
   };
@@ -245,8 +260,10 @@ function getRowDate(row: GenericRow) {
   return (
     asTrimmedString(row.date) ||
     asTrimmedString(row.transaction_date) ||
+    asTrimmedString(row.cost_date) ||
     asTrimmedString(row.posted_at) ||
     asTrimmedString(row.paid_at) ||
+    asTrimmedString(row.earned_at) ||
     asTrimmedString(row.created_at) ||
     asTrimmedString(row.updated_at) ||
     ""
@@ -256,10 +273,12 @@ function getRowDate(row: GenericRow) {
 function getRowLabel(row: GenericRow) {
   return (
     asTrimmedString(row.merchant_name) ||
+    asTrimmedString(row.campaign_name) ||
     asTrimmedString(row.name) ||
     asTrimmedString(row.description) ||
     asTrimmedString(row.label) ||
     asTrimmedString(row.title) ||
+    asTrimmedString(row.financial_category) ||
     "Financial activity"
   );
 }
@@ -267,7 +286,11 @@ function getRowLabel(row: GenericRow) {
 function getRowReference(row: GenericRow, fallback: string) {
   return (
     asTrimmedString(row.transaction_id) ||
+    asTrimmedString(row.plaid_transaction_id) ||
     asTrimmedString(row.id) ||
+    asTrimmedString(row.reward_id) ||
+    asTrimmedString(row.referral_code_id) ||
+    asTrimmedString(row.campaign_id) ||
     asTrimmedString(row.payment_intent_id) ||
     asTrimmedString(row.stripe_id) ||
     asTrimmedString(row.account_id) ||
@@ -333,17 +356,26 @@ function getManualExpenseAmount(row: GenericRow) {
   );
 }
 
-function getStripeAmount(row: GenericRow) {
-  const amount =
-    toNumber(row.net) ||
-    toNumber(row.net_amount) ||
-    toNumber(row.amount) ||
-    toNumber(row.gross_amount) ||
-    toNumber(row.balance_amount) ||
-    centsToDollars(row.amount_cents) ||
-    centsToDollars(row.net_amount_cents);
+function centsAwareAmount(value: unknown) {
+  const amount = toNumber(value);
 
-  return Math.abs(amount) > 10000 && Number.isInteger(amount) ? amount / 100 : amount;
+  if (Math.abs(amount) > 10000 && Number.isInteger(amount)) {
+    return amount / 100;
+  }
+
+  return amount;
+}
+
+function getStripeAmount(row: GenericRow) {
+  return (
+    centsAwareAmount(row.net) ||
+    centsAwareAmount(row.net_amount) ||
+    centsAwareAmount(row.amount) ||
+    centsAwareAmount(row.gross_amount) ||
+    centsAwareAmount(row.balance_amount) ||
+    centsToDollars(row.amount_cents) ||
+    centsToDollars(row.net_amount_cents)
+  );
 }
 
 function getTrustSafetyAmount(row: GenericRow) {
@@ -352,51 +384,69 @@ function getTrustSafetyAmount(row: GenericRow) {
     centsToDollars(row.gross_amount_cents) ||
     centsToDollars(row.remaining_balance_cents) ||
     centsToDollars(row.deduction_amount_cents) ||
+    toNumber(row.amount) ||
     0
   );
 }
 
-
 function getBookingStripeAmount(row: GenericRow) {
-  const amount =
-    toNumber(row.total_customer_paid) ||
-    toNumber(row.amount_total) ||
-    toNumber(row.subtotal_amount) ||
-    toNumber(row.total_amount) ||
-    toNumber(row.booking_total) ||
+  return (
+    centsAwareAmount(row.total_customer_paid) ||
+    centsAwareAmount(row.amount_total) ||
+    centsAwareAmount(row.subtotal_amount) ||
+    centsAwareAmount(row.total_amount) ||
+    centsAwareAmount(row.booking_total) ||
     centsToDollars(row.amount_total_cents) ||
-    centsToDollars(row.subtotal_amount_cents);
-
-  return Math.abs(amount) > 10000 && Number.isInteger(amount) ? amount / 100 : amount;
+    centsToDollars(row.subtotal_amount_cents)
+  );
 }
 
 function getBookingStripeFee(row: GenericRow) {
-  const fee =
-    toNumber(row.sitguru_fee_amount) ||
-    toNumber(row.platform_fee) ||
-    toNumber(row.marketplace_fee_amount) ||
-    toNumber(row.stripe_fee) ||
-    toNumber(row.processing_fee) ||
+  return (
+    centsAwareAmount(row.sitguru_fee_amount) ||
+    centsAwareAmount(row.platform_fee) ||
+    centsAwareAmount(row.marketplace_fee_amount) ||
+    centsAwareAmount(row.stripe_fee) ||
+    centsAwareAmount(row.processing_fee) ||
     centsToDollars(row.sitguru_fee_amount_cents) ||
     centsToDollars(row.platform_fee_cents) ||
     centsToDollars(row.marketplace_fee_amount_cents) ||
-    centsToDollars(row.stripe_fee_cents);
-
-  return Math.abs(fee) > 10000 && Number.isInteger(fee) ? fee / 100 : fee;
+    centsToDollars(row.stripe_fee_cents)
+  );
 }
 
 function getPayoutAmount(row: GenericRow) {
-  const amount =
-    toNumber(row.net_amount) ||
-    toNumber(row.amount) ||
-    toNumber(row.payout_amount) ||
-    toNumber(row.transfer_amount) ||
+  return (
+    centsAwareAmount(row.net_amount) ||
+    centsAwareAmount(row.amount) ||
+    centsAwareAmount(row.payout_amount) ||
+    centsAwareAmount(row.transfer_amount) ||
     centsToDollars(row.net_amount_cents) ||
     centsToDollars(row.amount_cents) ||
     centsToDollars(row.payout_amount_cents) ||
-    centsToDollars(row.transfer_amount_cents);
+    centsToDollars(row.transfer_amount_cents)
+  );
+}
 
-  return Math.abs(amount) > 10000 && Number.isInteger(amount) ? amount / 100 : amount;
+function getGrowthMarketingAmount(row: GenericRow) {
+  return (
+    toNumber(row.amount) ||
+    toNumber(row.total_amount) ||
+    toNumber(row.cost_amount) ||
+    toNumber(row.spend_amount) ||
+    toNumber(row.expense_amount)
+  );
+}
+
+function getReferralRewardAmount(row: GenericRow) {
+  return (
+    toNumber(row.normalized_amount) ||
+    toNumber(row.reward_amount) ||
+    toNumber(row.credit_amount) ||
+    toNumber(row.payout_amount) ||
+    toNumber(row.commission_amount) ||
+    toNumber(row.amount)
+  );
 }
 
 function isStripeRelatedBooking(row: GenericRow) {
@@ -437,6 +487,7 @@ function isArchivedRow(row: GenericRow) {
     row.deleted_at ||
       row.voided_at ||
       row.archived_at ||
+      row.removed_at ||
       row.is_deleted === true ||
       row.is_void === true ||
       row.is_active === false,
@@ -558,6 +609,86 @@ function trustSafetyToItem(
   };
 }
 
+function growthMarketingToItem(
+  row: GenericRow,
+  index: number,
+): ReconciliationItem {
+  const amount = getGrowthMarketingAmount(row);
+  const category =
+    asTrimmedString(row.financial_category) ||
+    asTrimmedString(row.category) ||
+    asTrimmedString(row.campaign_type) ||
+    "Growth Marketing Expense";
+  const campaignName =
+    asTrimmedString(row.campaign_name) ||
+    asTrimmedString(row.name) ||
+    asTrimmedString(row.campaign_slug) ||
+    category;
+
+  return {
+    id: `growth-marketing-${getRowReference(row, String(index))}`,
+    source: "Growth Marketing Expense",
+    label: campaignName,
+    amount: -Math.abs(amount),
+    status: asTrimmedString(row.status) || "Recorded",
+    bankStatus: "Needs Bank Match",
+    reviewStatus: "needs_review",
+    date: formatDate(getRowDate(row)),
+    reference: getRowReference(row, String(index)),
+    category,
+    issueType: "Growth campaign cost reconciliation",
+    recommendation:
+      "Match this campaign cost to Plaid/NFCU, Stripe, card activity, or an approved manual expense before month-end close.",
+  };
+}
+
+function referralRewardToItem(
+  row: GenericRow,
+  index: number,
+): ReconciliationItem {
+  const amount = getReferralRewardAmount(row);
+  const treatment =
+    asTrimmedString(row.financial_treatment) ||
+    asTrimmedString(row.normalized_status) ||
+    asTrimmedString(row.status) ||
+    "pending_reward_liability";
+  const category =
+    asTrimmedString(row.financial_category) ||
+    asTrimmedString(row.reward_type) ||
+    asTrimmedString(row.type) ||
+    "Referral Rewards";
+  const normalizedStatus =
+    asTrimmedString(row.normalized_status) ||
+    asTrimmedString(row.reward_status) ||
+    asTrimmedString(row.payout_status) ||
+    asTrimmedString(row.status) ||
+    "pending";
+  const isIssued =
+    treatment.toLowerCase().includes("issued") ||
+    ["paid", "credited", "issued", "complete", "completed"].includes(
+      normalizedStatus.toLowerCase(),
+    );
+
+  return {
+    id: `referral-reward-${getRowReference(row, String(index))}`,
+    source: "Referral Reward Liability",
+    label: category,
+    amount: isIssued ? -Math.abs(amount) : Math.abs(amount),
+    status: normalizedStatus,
+    bankStatus: isIssued ? "Needs Payout Match" : "Not Paid Yet",
+    reviewStatus: isIssued ? "needs_review" : "recorded",
+    date: formatDate(getRowDate(row)),
+    reference: getRowReference(row, String(index)),
+    category,
+    issueType: isIssued
+      ? "Issued referral reward payout match"
+      : "Pending referral reward liability",
+    recommendation: isIssued
+      ? "Match this issued reward to payout, Stripe, Plaid/NFCU, or customer credit records."
+      : "Keep this as a current liability until it is credited, paid, rejected, expired, or cleared.",
+  };
+}
+
 function findDuplicateBankItems(items: ReconciliationItem[]) {
   const groups = new Map<string, ReconciliationItem[]>();
 
@@ -611,6 +742,7 @@ function getScore({
   uncategorizedRows,
   excludedRows,
   bankRows,
+  growthNeedsMatchingRows,
 }: {
   needsReviewRows: number;
   pendingRows: number;
@@ -618,11 +750,16 @@ function getScore({
   uncategorizedRows: number;
   excludedRows: number;
   bankRows: number;
+  growthNeedsMatchingRows: number;
 }) {
   if (bankRows === 0) return 0;
 
   const issueCount =
-    needsReviewRows + duplicateRows + uncategorizedRows + Math.round(pendingRows / 2);
+    needsReviewRows +
+    duplicateRows +
+    uncategorizedRows +
+    Math.round(pendingRows / 2) +
+    Math.round(growthNeedsMatchingRows / 2);
 
   const score = Math.max(0, Math.min(100, 100 - (issueCount / bankRows) * 100));
 
@@ -630,7 +767,6 @@ function getScore({
 
   return Math.round(score);
 }
-
 
 function getUniqueSourceRows(rows: GenericRow[]) {
   const seen = new Set<string>();
@@ -697,15 +833,23 @@ function stripePayoutToItem(row: GenericRow, index: number): ReconciliationItem 
   return {
     id: `stripe-payout-${reference}`,
     source: "Stripe Payout",
-    label: asTrimmedString(row.description) || asTrimmedString(row.bank_description) || "Stripe payout batch",
+    label:
+      asTrimmedString(row.description) ||
+      asTrimmedString(row.bank_description) ||
+      "Stripe payout batch",
     amount,
-    status: asTrimmedString(row.status) || asTrimmedString(row.payout_status) || "Recorded",
+    status:
+      asTrimmedString(row.status) ||
+      asTrimmedString(row.payout_status) ||
+      "Recorded",
     bankStatus: plaidReference ? "Bank Matched" : "Needs Bank Match",
     reviewStatus: plaidReference ? "matched" : "needs_review",
     date: formatDate(getRowDate(row)),
     reference,
     category: plaidReference ? "Matched payout deposit" : "Unmatched payout deposit",
-    issueType: plaidReference ? "Matched Stripe payout" : "Stripe payout needs Plaid/NFCU match",
+    issueType: plaidReference
+      ? "Matched Stripe payout"
+      : "Stripe payout needs Plaid/NFCU match",
     recommendation: plaidReference
       ? "Confirm the matched Plaid/NFCU deposit agrees to the Stripe payout batch."
       : "Match this Stripe payout to the corresponding Plaid/NFCU business bank deposit before month-end close.",
@@ -728,6 +872,8 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     trustSafetyEvents,
     trustSafetyPurchases,
     bookingDeductions,
+    growthMarketingRows,
+    referralRewardRows,
   ] = await Promise.all([
     safeRows<GenericRow>(
       supabaseAdmin
@@ -845,6 +991,22 @@ async function getReconciliationData(): Promise<ReconciliationData> {
         .limit(2000),
       "booking_trust_safety_deductions",
     ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("admin_growth_marketing_expenses")
+        .select("*")
+        .order("cost_date", { ascending: false })
+        .limit(2000),
+      "admin_growth_marketing_expenses",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("admin_referral_reward_liability")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2000),
+      "admin_referral_reward_liability",
+    ),
   ]);
 
   const bankRows = getUniqueSourceRows([
@@ -937,6 +1099,29 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     ),
   ];
 
+  const growthMarketingItems = growthMarketingRows
+    .filter((row) => !isArchivedRow(row))
+    .map(growthMarketingToItem);
+
+  const referralRewardItems = referralRewardRows
+    .filter((row) => !isArchivedRow(row))
+    .map(referralRewardToItem);
+
+  const growthItems = [...growthMarketingItems, ...referralRewardItems];
+
+  const issuedReferralRewardTotal = referralRewardItems
+    .filter((item) => item.issueType.toLowerCase().includes("issued"))
+    .reduce((sum, item) => sum + Math.abs(item.amount), 0);
+
+  const pendingReferralRewardLiabilityTotal = referralRewardItems
+    .filter((item) => item.issueType.toLowerCase().includes("pending"))
+    .reduce((sum, item) => sum + Math.abs(item.amount), 0);
+
+  const growthMarketingTotal = growthMarketingItems.reduce(
+    (sum, item) => sum + Math.abs(item.amount),
+    0,
+  );
+
   const needsReviewItems = bankItems.filter(
     (item) => item.reviewStatus === "needs_review",
   );
@@ -970,11 +1155,16 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     0,
   );
 
+  const growthNeedsMatchingRows = growthItems.filter(
+    (item) => item.reviewStatus === "needs_review",
+  ).length;
+
   const reviewQueueTotal = getUniqueReconciliationRows([
     ...needsReviewItems,
     ...uncategorizedItems,
     ...duplicateItems,
     ...pendingItems,
+    ...growthItems.filter((item) => item.reviewStatus === "needs_review"),
   ]).length;
 
   const reconciliationScore = getScore({
@@ -984,9 +1174,10 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     uncategorizedRows: uncategorizedItems.length,
     excludedRows: excludedItems.length,
     bankRows: bankItems.length,
+    growthNeedsMatchingRows,
   });
 
-  const reportChecks = [
+  const reportChecks: ReconciliationCheck[] = [
     {
       label: "Plaid/NFCU Bank Feed",
       status: bankItems.length > 0 ? "ready" : "missing",
@@ -1040,7 +1231,17 @@ async function getReconciliationData(): Promise<ReconciliationData> {
       status: trustSafetyItems.length > 0 ? "ready" : "needs_review",
       detail: `${trustSafetyItems.length.toLocaleString()} Trust & Safety rows are available for receivable, collection, fee, and deduction checks.`,
     },
-  ] satisfies ReconciliationData["reportChecks"];
+    {
+      label: "Growth Marketing Costs",
+      status: growthMarketingItems.length > 0 ? "ready" : "needs_review",
+      detail: `${growthMarketingItems.length.toLocaleString()} campaign cost rows totaling ${money(growthMarketingTotal)} are available for bank, card, Stripe, or manual expense matching.`,
+    },
+    {
+      label: "Referral Reward Liability",
+      status: referralRewardItems.length > 0 ? "ready" : "needs_review",
+      detail: `${referralRewardItems.length.toLocaleString()} reward rows are available, including ${money(pendingReferralRewardLiabilityTotal)} pending liability and ${money(issuedReferralRewardTotal)} issued reward expense.`,
+    },
+  ];
 
   return {
     bankItems,
@@ -1052,7 +1253,28 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     uncategorizedItems,
     trustSafetyItems,
     stripeItems,
+    growthMarketingItems,
+    referralRewardItems,
+    growthItems,
     reportChecks,
+    sourceCounts: [
+      { label: "Admin Plaid", count: adminPlaidRows.length, source: "admin_plaid_transactions" },
+      { label: "Plaid", count: plaidTransactionRows.length, source: "plaid_transactions" },
+      { label: "Bank", count: bankTransactionRows.length, source: "bank_transactions" },
+      { label: "Manual Expenses", count: manualExpenseRows.length, source: "expense_ledger" },
+      { label: "Cash Flow Lines", count: cashFlowLines.length, source: "cash_flow_lines" },
+      { label: "Balance Sheet Lines", count: balanceSheetLines.length, source: "balance_sheet_lines" },
+      { label: "Statement Lines", count: statementLines.length, source: "financial_statement_lines" },
+      { label: "Stripe", count: stripeRows.length, source: "stripe_transactions" },
+      { label: "Stripe Balance", count: stripeBalanceRows.length, source: "stripe_balance_transactions" },
+      { label: "Stripe Payouts", count: stripePayoutRows.length, source: "stripe_payouts" },
+      { label: "Bookings", count: bookingRows.length, source: "bookings" },
+      { label: "Trust & Safety Events", count: trustSafetyEvents.length, source: "trust_safety_financial_events" },
+      { label: "Trust & Safety Plans", count: trustSafetyPurchases.length, source: "guru_trust_safety_plan_purchases" },
+      { label: "Book & Bark Deductions", count: bookingDeductions.length, source: "booking_trust_safety_deductions" },
+      { label: "Growth Marketing", count: growthMarketingRows.length, source: "admin_growth_marketing_expenses" },
+      { label: "Referral Rewards", count: referralRewardRows.length, source: "admin_referral_reward_liability" },
+    ],
     totals: {
       bankRows: bankItems.length,
       postedRows,
@@ -1064,10 +1286,17 @@ async function getReconciliationData(): Promise<ReconciliationData> {
       uncategorizedRows: uncategorizedItems.length,
       stripeRows: stripeItems.length,
       trustSafetyRows: trustSafetyItems.length,
+      growthMarketingRows: growthMarketingItems.length,
+      referralRewardRows: referralRewardItems.length,
+      growthRows: growthItems.length,
+      growthNeedsMatchingRows,
       totalCashIn,
       totalCashOut,
       netCashMovement: totalCashIn - totalCashOut,
       manualExpenseTotal,
+      growthMarketingTotal,
+      issuedReferralRewardTotal,
+      pendingReferralRewardLiabilityTotal,
       reviewQueueTotal,
       reconciliationScore,
     },
@@ -1084,7 +1313,8 @@ function statusClasses(status: string) {
     normalized.includes("reconciled") ||
     normalized.includes("recorded") ||
     normalized.includes("paid") ||
-    normalized.includes("succeeded")
+    normalized.includes("succeeded") ||
+    normalized.includes("matched")
   ) {
     return "border-emerald-100 bg-emerald-50 text-emerald-800";
   }
@@ -1092,7 +1322,8 @@ function statusClasses(status: string) {
   if (
     normalized.includes("pending") ||
     normalized.includes("review") ||
-    normalized.includes("manual")
+    normalized.includes("manual") ||
+    normalized.includes("needs")
   ) {
     return "border-amber-100 bg-amber-50 text-amber-800";
   }
@@ -1110,7 +1341,7 @@ function statusClasses(status: string) {
   return "border-slate-100 bg-slate-50 text-slate-700";
 }
 
-function readinessClasses(status: "ready" | "needs_review" | "missing") {
+function readinessClasses(status: ReadinessStatus) {
   const classes = {
     ready: "border-emerald-100 bg-emerald-50 text-emerald-800",
     needs_review: "border-amber-100 bg-amber-50 text-amber-800",
@@ -1191,8 +1422,9 @@ function ReconciliationChecks({ data }: { data: ReconciliationData }) {
           </h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
             These checks compare bank activity, manual entries, Stripe activity,
-            Trust & Safety rows, and reporting lines so SitGuru’s financial
-            statements can be reviewed cleanly.
+            Trust & Safety rows, Growth & Referrals, reward liabilities, and
+            reporting lines so SitGuru’s financial statements can be reviewed
+            cleanly.
           </p>
         </div>
 
@@ -1201,7 +1433,7 @@ function ReconciliationChecks({ data }: { data: ReconciliationData }) {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {data.reportChecks.map((item) => (
           <div
             key={item.label}
@@ -1362,8 +1594,8 @@ function ReconciliationFlowPanel() {
     "Plaid/NFCU bank rows are checked for pending, posted, needs review, excluded, and uncategorized states.",
     "Manual expenses and manual statement lines are checked so they do not accidentally duplicate bank activity.",
     "Stripe activity is reviewed against expected deposits, refunds, fees, and payment records.",
-    "Trust & Safety activity is checked against receivables, collections, booking deductions, and vendor costs.",
-    "Exception queues show what needs cleanup before P&L, Cash Flow, General Ledger, and Balance Sheet are final.",
+    "Trust & Safety and Growth & Referrals are checked against receivables, liabilities, reward payouts, campaign costs, and vendor costs.",
+    "Exception queues show what needs cleanup before P&L, Cash Flow, General Ledger, Balance Sheet, and payout review are final.",
   ];
 
   return (
@@ -1386,6 +1618,43 @@ function ReconciliationFlowPanel() {
             </span>
             <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
               {step}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SourceCoveragePanel({ data }: { data: ReconciliationData }) {
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+        Source Coverage
+      </p>
+      <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+        Data sources feeding reconciliation
+      </h2>
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        Missing sources are skipped safely. Row counts help confirm whether bank,
+        Stripe, manual, Trust & Safety, Growth Marketing, and Referral Reward
+        views are feeding this reconciliation pass.
+      </p>
+
+      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {data.sourceCounts.map((source) => (
+          <div
+            key={source.source}
+            className="rounded-2xl border border-slate-100 bg-[#fbfefd] p-4"
+          >
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+              {source.label}
+            </p>
+            <p className="mt-2 text-3xl font-black text-slate-950">
+              {source.count.toLocaleString()}
+            </p>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              {source.source}
             </p>
           </div>
         ))}
@@ -1434,9 +1703,9 @@ export default async function AdminReconciliationPage() {
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 Review whether NFCU/Plaid bank activity, manual entries, Stripe
-                records, Trust & Safety activity, P&L, Cash Flow, General Ledger,
-                and Balance Sheet support are aligned before financial reports
-                are finalized.
+                records, Trust & Safety activity, Growth & Referrals, P&L, Cash
+                Flow, General Ledger, and Balance Sheet support are aligned
+                before financial reports are finalized.
               </p>
             </div>
 
@@ -1452,9 +1721,10 @@ export default async function AdminReconciliationPage() {
                 <ActionLink href="/admin/financials/profit-loss" label="P&L" />
                 <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
                 <ActionLink href="/admin/financials/general-ledger" label="Ledger" />
+                <ActionLink href="/admin/financials/balance-sheet" label="Balance Sheet" />
                 <ActionLink
-                  href="/admin/financials/balance-sheet"
-                  label="Balance Sheet"
+                  href="/admin/financials/commissions"
+                  label="Rewards / Payouts"
                   primary
                 />
               </div>
@@ -1467,8 +1737,8 @@ export default async function AdminReconciliationPage() {
                   {data.totals.reconciliationScore}%
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Based on needs review, pending, duplicate, uncategorized, and
-                  excluded bank activity.
+                  Based on needs review, pending, duplicate, uncategorized,
+                  excluded bank activity, and growth/reward matching gaps.
                 </p>
               </div>
             </div>
@@ -1540,6 +1810,36 @@ export default async function AdminReconciliationPage() {
               tone="violet"
             />
           </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Growth Rows"
+              value={data.totals.growthRows.toLocaleString()}
+              detail="Campaign costs plus PawPerks, Guru, Ambassador, and Partner reward rows."
+              tone="emerald"
+            />
+
+            <StatCard
+              label="Growth Marketing"
+              value={money(data.totals.growthMarketingTotal)}
+              detail={`${data.totals.growthMarketingRows.toLocaleString()} campaign cost rows needing bank, Stripe, card, or manual expense support.`}
+              tone="sky"
+            />
+
+            <StatCard
+              label="Issued Rewards"
+              value={money(data.totals.issuedReferralRewardTotal)}
+              detail="Paid, credited, issued, or completed rewards that should match payout records."
+              tone="violet"
+            />
+
+            <StatCard
+              label="Pending Reward Liability"
+              value={money(data.totals.pendingReferralRewardLiabilityTotal)}
+              detail="Rewards still owed and carried as current liabilities until cleared."
+              tone={data.totals.pendingReferralRewardLiabilityTotal ? "amber" : "emerald"}
+            />
+          </div>
         </section>
 
         <ReconciliationChecks data={data} />
@@ -1549,12 +1849,13 @@ export default async function AdminReconciliationPage() {
         <ItemsTable
           eyebrow="Exception Queue"
           title="Transactions needing review"
-          description="These rows should be cleaned up first because they can affect P&L, Cash Flow, General Ledger, and Balance Sheet accuracy."
+          description="These rows should be cleaned up first because they can affect P&L, Cash Flow, General Ledger, Balance Sheet, and Growth & Referrals accuracy."
           rows={[
             ...data.needsReviewItems,
             ...data.uncategorizedItems,
             ...data.duplicateItems,
             ...data.pendingItems,
+            ...data.growthItems.filter((item) => item.reviewStatus === "needs_review"),
           ]}
           emptyMessage="No exception rows found. Reconciliation looks clean for this pass."
         />
@@ -1601,6 +1902,24 @@ export default async function AdminReconciliationPage() {
           />
         </section>
 
+        <section className="grid gap-8 xl:grid-cols-2">
+          <ItemsTable
+            eyebrow="Growth Marketing Matching"
+            title="Campaign costs and marketing spend"
+            description="These rows should be matched against Plaid/NFCU, Stripe, card charges, or approved manual expenses so marketing spend is not missed or double-counted."
+            rows={data.growthMarketingItems}
+            emptyMessage="No growth marketing expense rows found yet."
+          />
+
+          <ItemsTable
+            eyebrow="Referral Reward Matching"
+            title="PawPerks, Guru, Ambassador, and Partner rewards"
+            description="Pending rewards stay as liabilities. Issued, credited, or paid rewards should match payout, Stripe, Plaid/NFCU, or customer credit records."
+            rows={data.referralRewardItems}
+            emptyMessage="No referral reward rows found yet."
+          />
+        </section>
+
         <ItemsTable
           eyebrow="Excluded / Personal"
           title="Excluded transactions"
@@ -1608,6 +1927,8 @@ export default async function AdminReconciliationPage() {
           rows={data.excludedItems}
           emptyMessage="No excluded rows found."
         />
+
+        <SourceCoveragePanel data={data} />
       </div>
     </div>
   );

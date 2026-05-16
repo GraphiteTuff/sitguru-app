@@ -41,6 +41,8 @@ type LedgerSource =
   | "payments"
   | "payouts"
   | "commissions"
+  | "admin_growth_marketing_expenses"
+  | "admin_referral_reward_liability"
   | "manual";
 
 type LedgerEntry = {
@@ -104,6 +106,12 @@ type LedgerTotals = {
   trustSafetyDebits: number;
   trustSafetyCredits: number;
   trustSafetyNet: number;
+  growthRows: number;
+  growthMarketingDebits: number;
+  referralRewardDebits: number;
+  referralRewardCredits: number;
+  pendingReferralLiability: number;
+  issuedReferralExpense: number;
 };
 
 type SourceCount = {
@@ -125,6 +133,7 @@ type GeneralLedgerData = {
   sourceCounts: SourceCount[];
   accountSummary: AccountSummary[];
   trustSafetyEntries: LedgerEntry[];
+  growthEntries: LedgerEntry[];
   period: PeriodWindow;
   previousTotals: LedgerTotals;
   totals: LedgerTotals;
@@ -165,6 +174,8 @@ const SOURCE_TABLES: LedgerSource[] = [
   "payments",
   "payouts",
   "commissions",
+  "admin_growth_marketing_expenses",
+  "admin_referral_reward_liability",
 ];
 
 function asTrimmedString(value: unknown) {
@@ -409,10 +420,7 @@ function isWithinWindow(dateValue: string | null | undefined, window: PeriodWind
   return parsed >= window.start && parsed <= window.end;
 }
 
-function isWithinPreviousWindow(
-  dateValue: string | null | undefined,
-  window: PeriodWindow,
-) {
+function isWithinPreviousWindow(dateValue: string | null | undefined, window: PeriodWindow) {
   if (!window.previousStart || !window.previousEnd) return false;
   if (!dateValue) return false;
 
@@ -433,34 +441,6 @@ function getMetricChange(current: number, previous: number) {
   const diff = current - previous;
   const pct = getChangePercent(current, previous);
   return `${formatSignedMoney(diff)} / ${formatSignedPercent(pct)}`;
-}
-
-function getDateValue(row: AnyRow) {
-  return (
-    asTrimmedString(row.date) ||
-    asTrimmedString(row.occurred_at) ||
-    asTrimmedString(row.transaction_date) ||
-    asTrimmedString(row.posted_at) ||
-    asTrimmedString(row.paid_at) ||
-    asTrimmedString(row.payout_date) ||
-    asTrimmedString(row.available_on) ||
-    asTrimmedString(row.collected_at) ||
-    asTrimmedString(row.created_at) ||
-    asTrimmedString(row.updated_at) ||
-    ""
-  );
-}
-
-function getId(row: AnyRow, source: LedgerSource, index: number) {
-  return (
-    asTrimmedString(row.id) ||
-    asTrimmedString(row.transaction_id) ||
-    asTrimmedString(row.plaid_transaction_id) ||
-    asTrimmedString(row.payment_intent_id) ||
-    asTrimmedString(row.stripe_id) ||
-    asTrimmedString(row.stripe_payment_intent_id) ||
-    `${source}-${index}`
-  );
 }
 
 function getText(row: AnyRow, keys: string[]) {
@@ -494,6 +474,36 @@ function getMetadataText(row: AnyRow) {
   );
 }
 
+function getDateValue(row: AnyRow) {
+  return (
+    asTrimmedString(row.date) ||
+    asTrimmedString(row.cost_date) ||
+    asTrimmedString(row.occurred_at) ||
+    asTrimmedString(row.transaction_date) ||
+    asTrimmedString(row.posted_at) ||
+    asTrimmedString(row.paid_at) ||
+    asTrimmedString(row.payout_date) ||
+    asTrimmedString(row.available_on) ||
+    asTrimmedString(row.collected_at) ||
+    asTrimmedString(row.created_at) ||
+    asTrimmedString(row.updated_at) ||
+    ""
+  );
+}
+
+function getId(row: AnyRow, source: LedgerSource, index: number) {
+  return (
+    asTrimmedString(row.id) ||
+    asTrimmedString(row.transaction_id) ||
+    asTrimmedString(row.plaid_transaction_id) ||
+    asTrimmedString(row.payment_intent_id) ||
+    asTrimmedString(row.stripe_id) ||
+    asTrimmedString(row.stripe_payment_intent_id) ||
+    asTrimmedString(row.campaign_id) ||
+    `${source}-${index}`
+  );
+}
+
 function getStatus(row: AnyRow, source: LedgerSource) {
   if (source === "admin_plaid_transactions") {
     return getOptionalBoolean(row.pending) ? "pending" : "posted";
@@ -502,6 +512,8 @@ function getStatus(row: AnyRow, source: LedgerSource) {
   return (
     getText(row, [
       "status",
+      "normalized_status",
+      "financial_treatment",
       "payment_status",
       "repayment_status",
       "payout_status",
@@ -520,8 +532,13 @@ function getBankStatus(row: AnyRow, source: LedgerSource) {
     return getOptionalBoolean(row.pending) ? "Pending" : "Posted";
   }
 
-  if (source === "expense_ledger" || source === "cash_flow_lines") {
-    return "Manual";
+  if (
+    source === "expense_ledger" ||
+    source === "cash_flow_lines" ||
+    source === "admin_growth_marketing_expenses" ||
+    source === "admin_referral_reward_liability"
+  ) {
+    return "Manual / View";
   }
 
   return getText(row, ["bank_status", "posting_status", "status"]) || "Recorded";
@@ -532,7 +549,12 @@ function getReviewStatus(row: AnyRow, source: LedgerSource) {
     return asTrimmedString(row.review_status) || "needs_review";
   }
 
-  if (source === "expense_ledger" || source === "cash_flow_lines") {
+  if (
+    source === "expense_ledger" ||
+    source === "cash_flow_lines" ||
+    source === "admin_growth_marketing_expenses" ||
+    source === "admin_referral_reward_liability"
+  ) {
     return "reviewed";
   }
 
@@ -558,6 +580,8 @@ function sourceLabel(source: LedgerSource) {
     payments: "Payments",
     payouts: "Payouts",
     commissions: "Commissions",
+    admin_growth_marketing_expenses: "Growth Marketing Expenses",
+    admin_referral_reward_liability: "Referral Reward Liability",
     manual: "Manual",
   };
 
@@ -576,6 +600,7 @@ function statusClasses(status: string) {
     normalized.includes("approved") ||
     normalized.includes("collected") ||
     normalized.includes("reviewed") ||
+    normalized.includes("issued") ||
     normalized.includes("auto_categorized")
   ) {
     return "border-emerald-100 bg-emerald-50 text-emerald-800";
@@ -585,6 +610,7 @@ function statusClasses(status: string) {
     normalized.includes("pending") ||
     normalized.includes("processing") ||
     normalized.includes("review") ||
+    normalized.includes("qualified") ||
     normalized.includes("not_started")
   ) {
     return "border-amber-100 bg-amber-50 text-amber-800";
@@ -597,7 +623,9 @@ function statusClasses(status: string) {
     normalized.includes("void") ||
     normalized.includes("denied") ||
     normalized.includes("canceled") ||
-    normalized.includes("refunded")
+    normalized.includes("cancelled") ||
+    normalized.includes("refunded") ||
+    normalized.includes("rejected")
   ) {
     return "border-rose-100 bg-rose-50 text-rose-800";
   }
@@ -621,10 +649,7 @@ function hasFinancialRole(role: string) {
   return FINANCE_ROLES.includes(role.trim().toLowerCase());
 }
 
-async function safeRows<T>(
-  query: PromiseLike<SafeQueryResponse>,
-  label: string,
-): Promise<T[]> {
+async function safeRows<T>(query: PromiseLike<SafeQueryResponse>, label: string): Promise<T[]> {
   try {
     const result = await query;
 
@@ -680,19 +705,11 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
     ),
   ]);
 
-  const profile = (profileChecks.flat().find(Boolean) || {}) as Record<
-    string,
-    unknown
-  >;
-
+  const profile = (profileChecks.flat().find(Boolean) || {}) as AnyRow;
   const role = asTrimmedString(profile.role) || "admin";
   const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
+    profile.is_active === undefined ? true : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(profile.can_access_financials);
   const envAllowed = envAdminEmails.includes(userEmail);
 
   return {
@@ -731,8 +748,7 @@ function deriveTrustSafetyAccount(row: AnyRow, source: LedgerSource) {
     if (planKey === "book_and_bark_plan") {
       return {
         account: "Trust & Safety Receivable - Book & Bark",
-        quickBooksAccount:
-          "Accounts Receivable: Trust & Safety Booking Deductions",
+        quickBooksAccount: "Accounts Receivable: Trust & Safety Booking Deductions",
         taxTreatment:
           "Booking-deduction receivable for financed Trust & Safety plan; CPA review.",
       };
@@ -748,8 +764,7 @@ function deriveTrustSafetyAccount(row: AnyRow, source: LedgerSource) {
   if (source === "booking_trust_safety_deductions") {
     return {
       account: "Trust & Safety Booking Deduction Recovery",
-      quickBooksAccount:
-        "Accounts Receivable: Trust & Safety Booking Deductions",
+      quickBooksAccount: "Accounts Receivable: Trust & Safety Booking Deductions",
       taxTreatment:
         "Recovery of Book & Bark balance from completed booking payouts; CPA review.",
     };
@@ -777,19 +792,6 @@ function deriveTrustSafetyAccount(row: AnyRow, source: LedgerSource) {
       account: "Trust & Safety Refunds",
       quickBooksAccount: "Refunds and Allowances: Trust & Safety",
       taxTreatment: "Contra-revenue or refund; CPA review.",
-    };
-  }
-
-  if (
-    eventType === "payment_collected" ||
-    eventType === "down_payment_collected" ||
-    eventType === "installment_collected" ||
-    eventType === "booking_deduction_collected"
-  ) {
-    return {
-      account: "Trust & Safety Plan Revenue",
-      quickBooksAccount: "Service Revenue: Trust & Safety",
-      taxTreatment: "Trust & Safety cash collected; CPA review.",
     };
   }
 
@@ -826,8 +828,7 @@ function derivePlaidAccount(row: AnyRow) {
     return {
       account: "Bank Transfers",
       quickBooksAccount: "Transfer: Business Bank Accounts",
-      taxTreatment:
-        "Balance sheet transfer between accounts; excluded from P&L.",
+      taxTreatment: "Balance sheet transfer between accounts; excluded from P&L.",
     };
   }
 
@@ -867,6 +868,102 @@ function derivePlaidAccount(row: AnyRow) {
     account: "Uncategorized Bank Activity",
     quickBooksAccount: "Ask My Accountant",
     taxTreatment: "Needs accounting classification.",
+  };
+}
+
+function deriveGrowthMarketingAccount(row: AnyRow) {
+  const category =
+    asTrimmedString(row.financial_category) ||
+    asTrimmedString(row.category) ||
+    asTrimmedString(row.campaign_type) ||
+    "Growth Marketing Expense";
+  const section =
+    asTrimmedString(row.financial_statement_section) || "Operating Expenses";
+  const normalized = `${category} ${section}`.toLowerCase();
+
+  if (
+    normalized.includes("print") ||
+    normalized.includes("flyer") ||
+    normalized.includes("yard") ||
+    normalized.includes("qr")
+  ) {
+    return {
+      account: "Growth Marketing - Print & Local Advertising",
+      quickBooksAccount: "Advertising & Marketing: Print / Local",
+      taxTreatment:
+        "Marketing and advertising expense; CPA should confirm substantiation.",
+    };
+  }
+
+  if (
+    normalized.includes("paid") ||
+    normalized.includes("ad") ||
+    normalized.includes("campaign")
+  ) {
+    return {
+      account: "Growth Marketing - Paid Advertising",
+      quickBooksAccount: "Advertising & Marketing: Paid Ads",
+      taxTreatment: "Advertising expense; CPA should confirm deductibility.",
+    };
+  }
+
+  return {
+    account: category,
+    quickBooksAccount: `Advertising & Marketing: ${section}`,
+    taxTreatment: "Growth marketing expense from campaign cost tracking; CPA review.",
+  };
+}
+
+function deriveReferralRewardAccount(row: AnyRow) {
+  const financialTreatment = asTrimmedString(row.financial_treatment).toLowerCase();
+  const category = asTrimmedString(row.financial_category) || "Referral Rewards";
+  const normalized = `${category} ${financialTreatment}`.toLowerCase();
+
+  if (financialTreatment.includes("pending")) {
+    return {
+      account: "Pending Referral Reward Liability",
+      quickBooksAccount: "Current Liabilities: Referral Rewards Payable",
+      taxTreatment:
+        "Pending referral reward liability; not a P&L expense until issued, credited, or paid.",
+    };
+  }
+
+  if (normalized.includes("ambassador")) {
+    return {
+      account: "Ambassador Referral Reward Expense",
+      quickBooksAccount: "Commissions Expense: Ambassador Rewards",
+      taxTreatment: "Issued Ambassador reward expense; CPA review.",
+    };
+  }
+
+  if (normalized.includes("partner")) {
+    return {
+      account: "Partner Referral Reward Expense",
+      quickBooksAccount: "Commissions Expense: Partner Rewards",
+      taxTreatment: "Issued Partner reward expense; CPA review.",
+    };
+  }
+
+  if (normalized.includes("guru")) {
+    return {
+      account: "Guru Referral Reward Expense",
+      quickBooksAccount: "Commissions Expense: Guru Referral Rewards",
+      taxTreatment: "Issued Guru referral reward expense; CPA review.",
+    };
+  }
+
+  if (normalized.includes("pawperks") || normalized.includes("petperks")) {
+    return {
+      account: "PawPerks Reward Expense",
+      quickBooksAccount: "Customer Credits / Referral Rewards: PawPerks",
+      taxTreatment: "Issued Pet Parent referral reward or customer credit; CPA review.",
+    };
+  }
+
+  return {
+    account: `${category} Expense`,
+    quickBooksAccount: "Commissions Expense: Referral Rewards",
+    taxTreatment: "Issued referral reward expense; CPA review.",
   };
 }
 
@@ -911,6 +1008,14 @@ function deriveAccountFromText(text: string, source: LedgerSource, row?: AnyRow)
 
   if (source === "financial_statement_lines") {
     return deriveStatementLineAccount(row || {});
+  }
+
+  if (source === "admin_growth_marketing_expenses") {
+    return deriveGrowthMarketingAccount(row || {});
+  }
+
+  if (source === "admin_referral_reward_liability") {
+    return deriveReferralRewardAccount(row || {});
   }
 
   const normalized = text.toLowerCase();
@@ -1053,6 +1158,22 @@ function amountFromRow(row: AnyRow, source: LedgerSource) {
     return amountFromTrustSafetyRow(row, source);
   }
 
+  if (source === "admin_growth_marketing_expenses") {
+    return Math.abs(toNumber(row.amount));
+  }
+
+  if (source === "admin_referral_reward_liability") {
+    const amount = Math.abs(
+      toNumber(row.normalized_amount) ||
+        toNumber(row.amount) ||
+        toNumber(row.reward_amount) ||
+        toNumber(row.credit_amount),
+    );
+    const treatment = asTrimmedString(row.financial_treatment).toLowerCase();
+
+    return treatment.includes("pending") ? -amount : amount;
+  }
+
   if (source === "stripe_balance_transactions") {
     return (
       centsAwareAmount(row.net) ||
@@ -1113,6 +1234,27 @@ function getDescription(row: AnyRow, source: LedgerSource) {
     return getTrustSafetyDescription(row, source);
   }
 
+  if (source === "admin_growth_marketing_expenses") {
+    return (
+      asTrimmedString(row.description) ||
+      asTrimmedString(row.campaign_name) ||
+      `${asTrimmedString(row.financial_category) || "Growth Marketing Expense"} · ${
+        asTrimmedString(row.financial_statement_section) || "Operating Expenses"
+      }`
+    );
+  }
+
+  if (source === "admin_referral_reward_liability") {
+    return (
+      asTrimmedString(row.description) ||
+      `${asTrimmedString(row.financial_category) || "Referral Reward"} · ${
+        asTrimmedString(row.financial_treatment) ||
+        asTrimmedString(row.normalized_status) ||
+        "recorded"
+      }`
+    );
+  }
+
   if (source === "admin_plaid_transactions") {
     return (
       asTrimmedString(row.merchant_name) ||
@@ -1152,6 +1294,11 @@ function getCategoryType(row: AnyRow, source: LedgerSource) {
     return asTrimmedString(row.sitguru_category_type) || "uncategorized";
   }
 
+  if (source === "admin_growth_marketing_expenses") return "growth_marketing_expense";
+  if (source === "admin_referral_reward_liability") {
+    return asTrimmedString(row.financial_treatment) || "referral_reward";
+  }
+
   if (source === "expense_ledger") return "expense";
   if (source === "cash_flow_lines") return "manual_cash_flow_line";
   if (source === "financial_statement_lines") return "statement_line";
@@ -1189,6 +1336,15 @@ function getCashImpact(amount: number, row: AnyRow, source: LedgerSource) {
     return -amount;
   }
 
+  if (source === "admin_growth_marketing_expenses") {
+    return -Math.abs(amount);
+  }
+
+  if (source === "admin_referral_reward_liability") {
+    const treatment = asTrimmedString(row.financial_treatment).toLowerCase();
+    return treatment.includes("issued") ? -Math.abs(amount) : 0;
+  }
+
   if (source === "expense_ledger" || source === "payouts" || source === "commissions") {
     return -Math.abs(amount);
   }
@@ -1207,17 +1363,20 @@ function getPnlImpact(amount: number, row: AnyRow, source: LedgerSource) {
     return 0;
   }
 
+  if (source === "admin_growth_marketing_expenses") return -Math.abs(amount);
+
+  if (source === "admin_referral_reward_liability") {
+    const treatment = asTrimmedString(row.financial_treatment).toLowerCase();
+    return treatment.includes("issued") ? -Math.abs(amount) : 0;
+  }
+
   if (source === "expense_ledger") return -Math.abs(amount);
   if (source === "financial_statement_lines" || source === "cash_flow_lines") return 0;
 
   return amount;
 }
 
-function normalizeLedgerEntry(
-  row: AnyRow,
-  source: LedgerSource,
-  index: number,
-): LedgerEntry {
+function normalizeLedgerEntry(row: AnyRow, source: LedgerSource, index: number): LedgerEntry {
   const sourceId = getId(row, source, index);
   const explicitDebit = toNumber(row.debit) || toNumber(row.debit_amount);
   const explicitCredit = toNumber(row.credit) || toNumber(row.credit_amount);
@@ -1304,7 +1463,9 @@ function normalizeLedgerEntry(
       (source === "bank_transactions" ||
       source === "admin_plaid_transactions" ||
       source === "stripe_balance_transactions" ||
-      source === "trust_safety_financial_events"
+      source === "trust_safety_financial_events" ||
+      source === "admin_growth_marketing_expenses" ||
+      source === "admin_referral_reward_liability"
         ? "Needs reconciliation review"
         : "Not reconciled"),
     taxTreatment: accountInfo.taxTreatment,
@@ -1313,6 +1474,17 @@ function normalizeLedgerEntry(
 }
 
 async function getSourceRows(source: LedgerSource) {
+  if (source === "admin_growth_marketing_expenses") {
+    return safeRows<AnyRow>(
+      supabaseAdmin
+        .from(source)
+        .select("*")
+        .order("cost_date", { ascending: false })
+        .limit(1000),
+      source,
+    );
+  }
+
   return safeRows<AnyRow>(
     supabaseAdmin
       .from(source)
@@ -1323,10 +1495,21 @@ async function getSourceRows(source: LedgerSource) {
   );
 }
 
+function isGrowthEntry(entry: LedgerEntry) {
+  return (
+    entry.source === "admin_growth_marketing_expenses" ||
+    entry.source === "admin_referral_reward_liability" ||
+    entry.account.toLowerCase().includes("referral reward") ||
+    entry.account.toLowerCase().includes("pawperks") ||
+    entry.account.toLowerCase().includes("growth marketing")
+  );
+}
+
 function calculateTotals(entries: LedgerEntry[]): LedgerTotals {
   const totalDebits = entries.reduce((sum, entry) => sum + entry.debit, 0);
   const totalCredits = entries.reduce((sum, entry) => sum + entry.credit, 0);
   const difference = totalDebits - totalCredits;
+
   const trustSafetyEntries = entries.filter(
     (entry) =>
       entry.source.includes("trust_safety") ||
@@ -1341,6 +1524,32 @@ function calculateTotals(entries: LedgerEntry[]): LedgerTotals {
     (sum, entry) => sum + entry.credit,
     0,
   );
+
+  const growthEntries = entries.filter(isGrowthEntry);
+  const growthMarketingEntries = growthEntries.filter(
+    (entry) => entry.source === "admin_growth_marketing_expenses",
+  );
+  const referralRewardEntries = growthEntries.filter(
+    (entry) => entry.source === "admin_referral_reward_liability",
+  );
+  const growthMarketingDebits = growthMarketingEntries.reduce(
+    (sum, entry) => sum + entry.debit,
+    0,
+  );
+  const referralRewardDebits = referralRewardEntries.reduce(
+    (sum, entry) => sum + entry.debit,
+    0,
+  );
+  const referralRewardCredits = referralRewardEntries.reduce(
+    (sum, entry) => sum + entry.credit,
+    0,
+  );
+  const pendingReferralLiability = referralRewardEntries
+    .filter((entry) => entry.account.toLowerCase().includes("liability"))
+    .reduce((sum, entry) => sum + entry.credit, 0);
+  const issuedReferralExpense = referralRewardEntries
+    .filter((entry) => !entry.account.toLowerCase().includes("liability"))
+    .reduce((sum, entry) => sum + entry.debit, 0);
 
   const cashIn = entries
     .filter((entry) => entry.cashImpact > 0)
@@ -1372,7 +1581,9 @@ function calculateTotals(entries: LedgerEntry[]): LedgerTotals {
     (entry) =>
       entry.source === "manual" ||
       entry.source === "expense_ledger" ||
-      entry.source === "cash_flow_lines",
+      entry.source === "cash_flow_lines" ||
+      entry.source === "admin_growth_marketing_expenses" ||
+      entry.source === "admin_referral_reward_liability",
   ).length;
 
   const plaidRows = entries.filter(
@@ -1409,6 +1620,12 @@ function calculateTotals(entries: LedgerEntry[]): LedgerTotals {
     trustSafetyDebits,
     trustSafetyCredits,
     trustSafetyNet: trustSafetyDebits - trustSafetyCredits,
+    growthRows: growthEntries.length,
+    growthMarketingDebits,
+    referralRewardDebits,
+    referralRewardCredits,
+    pendingReferralLiability,
+    issuedReferralExpense,
   };
 }
 
@@ -1485,11 +1702,14 @@ async function getGeneralLedgerData(periodKey: PeriodKey): Promise<GeneralLedger
       entry.account.toLowerCase().includes("checkr"),
   );
 
+  const growthEntries = entries.filter(isGrowthEntry);
+
   return {
     entries,
     sourceCounts,
     accountSummary,
     trustSafetyEntries,
+    growthEntries,
     period,
     previousTotals,
     totals,
@@ -1597,8 +1817,8 @@ function EmptyLedgerState() {
       </p>
       <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
         Connect Stripe, NFCU/Plaid bank activity, Trust & Safety records,
-        payment records, payout records, commissions, expenses, or manual ledger
-        rows to populate the General Ledger.
+        payment records, payout records, commissions, growth/referral views,
+        expenses, or manual ledger rows to populate the General Ledger.
       </p>
     </div>
   );
@@ -1888,6 +2108,11 @@ function ReadinessPanel({ ledger }: { ledger: GeneralLedgerData }) {
       detail: `${ledger.totals.manualRows.toLocaleString()} manual or ledger-controlled rows are included.`,
     },
     {
+      label: "Growth / Referral Rows",
+      ready: ledger.totals.growthRows > 0,
+      detail: `${ledger.totals.growthRows.toLocaleString()} growth marketing or referral reward rows are included.`,
+    },
+    {
       label: "Pending / Posted",
       ready: ledger.totals.postedRows > 0 || ledger.totals.pendingRows > 0,
       detail: `${ledger.totals.postedRows.toLocaleString()} posted and ${ledger.totals.pendingRows.toLocaleString()} pending rows are visible.`,
@@ -1903,11 +2128,6 @@ function ReadinessPanel({ ledger }: { ledger: GeneralLedgerData }) {
       label: "Cash Impact",
       ready: ledger.totals.cashIn > 0 || ledger.totals.cashOut > 0,
       detail: `${money(ledger.totals.cashIn)} cash in and ${money(ledger.totals.cashOut)} cash out.`,
-    },
-    {
-      label: "P&L Impact",
-      ready: ledger.totals.pnlIncome > 0 || ledger.totals.pnlExpenses > 0,
-      detail: `${money(ledger.totals.pnlIncome)} income and ${money(ledger.totals.pnlExpenses)} expenses.`,
     },
   ];
 
@@ -1925,8 +2145,8 @@ function ReadinessPanel({ ledger }: { ledger: GeneralLedgerData }) {
           </h2>
           <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
             These checks confirm whether the ledger has bank rows, manual rows,
-            P&L impact, cash impact, and review visibility for the selected
-            period.
+            growth and referral reward rows, cash impact, and review visibility
+            for the selected period.
           </p>
         </div>
 
@@ -2007,7 +2227,8 @@ export default async function AdminGeneralLedgerPage({
                 CPA-ready master ledger view for SitGuru financial activity. This
                 combines P&L activity, Cash Flow activity, NFCU/Plaid bank rows,
                 manual expenses, Trust & Safety activity, Stripe activity,
-                payouts, commissions, and statement mappings into debit, credit,
+                payouts, commissions, growth marketing costs, referral reward
+                liabilities, and statement mappings into debit, credit,
                 cash-impact, and P&L-impact rows.
               </p>
 
@@ -2057,7 +2278,7 @@ export default async function AdminGeneralLedgerPage({
             <StatCard
               label="Ledger Rows"
               value={ledger.totals.rowCount.toLocaleString()}
-              detail="Rows from bank, manual, Trust & Safety, Stripe, statements, payouts, payments, and commissions."
+              detail="Rows from bank, manual, Trust & Safety, Stripe, statements, payouts, payments, commissions, and growth/referral views."
               tone="emerald"
             />
             <StatCard
@@ -2122,7 +2343,7 @@ export default async function AdminGeneralLedgerPage({
             <StatCard
               label="Manual Rows"
               value={ledger.totals.manualRows.toLocaleString()}
-              detail="Expense ledger and manual cash-flow line rows."
+              detail="Expense ledger, manual cash-flow line, growth, and referral view rows."
               tone="slate"
             />
           </div>
@@ -2154,6 +2375,33 @@ export default async function AdminGeneralLedgerPage({
             value={money(ledger.totals.trustSafetyNet)}
             detail="Debit minus credit for Trust & Safety ledger rows."
             tone="slate"
+          />
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Growth Ledger Rows"
+            value={ledger.totals.growthRows.toLocaleString()}
+            detail="Growth marketing and referral reward rows from live Supabase views."
+            tone="emerald"
+          />
+          <StatCard
+            label="Growth Marketing Debits"
+            value={money(ledger.totals.growthMarketingDebits)}
+            detail="Campaign, advertising, print, QR, flyer, and local growth spend."
+            tone="blue"
+          />
+          <StatCard
+            label="Issued Referral Expense"
+            value={money(ledger.totals.issuedReferralExpense)}
+            detail="Issued PawPerks, Guru, Ambassador, and Partner referral rewards."
+            tone="violet"
+          />
+          <StatCard
+            label="Pending Reward Liability"
+            value={money(ledger.totals.pendingReferralLiability)}
+            detail="Qualified or approved referral rewards not yet issued, credited, or paid."
+            tone="amber"
           />
         </section>
 

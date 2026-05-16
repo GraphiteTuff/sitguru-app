@@ -79,6 +79,29 @@ type TrustSafetyActuals = {
   monthlyPlanStarts: number;
 };
 
+type GrowthCampaignRoiRow = Record<string, unknown>;
+type GrowthFinancialSummaryRow = Record<string, unknown>;
+type GrowthMarketingExpenseRow = Record<string, unknown>;
+
+type GrowthForecastActuals = {
+  campaignCount: number;
+  totalClicks: number;
+  totalLeads: number;
+  totalSignups: number;
+  totalBookings: number;
+  attributedRevenue: number;
+  trackedMarketingCost: number;
+  netGrowthReturn: number;
+  averageRoiPercent: number;
+  costPerSignup: number;
+  costPerBooking: number;
+  monthlyMarketingExpenseAverage: number;
+  issuedReferralRewardExpense: number;
+  pendingReferralRewardLiability: number;
+  bestGrowthSignal: string;
+  bestRecommendation: string;
+};
+
 type ForecastMonth = {
   monthNumber: number;
   label: string;
@@ -96,6 +119,9 @@ type ForecastMonth = {
   trustSafetyStripeFees: number;
   trustSafetyNetCash: number;
   grossProfit: number;
+  growthMarketingSpend: number;
+  referralRewardExpense: number;
+  acquisitionCostPerBooking: number;
   operatingExpenses: number;
   netIncome: number;
   financingCash: number;
@@ -655,6 +681,141 @@ async function archiveProFormaScenario(formData: FormData) {
   revalidatePath("/admin/financials/pro-forma");
 }
 
+function getGrowthCampaignName(row: GrowthCampaignRoiRow) {
+  return asTrimmedString(row.campaign_name) || "Unassigned Campaign";
+}
+
+function getGrowthSignal(row: GrowthCampaignRoiRow) {
+  return asTrimmedString(row.growth_signal) || "needs_more_data";
+}
+
+function getGrowthRecommendation(row: GrowthCampaignRoiRow) {
+  return (
+    asTrimmedString(row.admin_recommendation) ||
+    "Keep tracking campaign events before making a strong scaling decision."
+  );
+}
+
+function getGrowthActuals({
+  campaignRows,
+  summaryRows,
+  marketingExpenseRows,
+}: {
+  campaignRows: GrowthCampaignRoiRow[];
+  summaryRows: GrowthFinancialSummaryRow[];
+  marketingExpenseRows: GrowthMarketingExpenseRow[];
+}): GrowthForecastActuals {
+  const activeCampaignRows = campaignRows.filter((row) =>
+    getGrowthCampaignName(row),
+  );
+
+  const totalClicks = activeCampaignRows.reduce(
+    (sum, row) => sum + toNumber(row.clicks),
+    0,
+  );
+  const totalLeads = activeCampaignRows.reduce(
+    (sum, row) => sum + toNumber(row.leads),
+    0,
+  );
+  const totalSignups = activeCampaignRows.reduce(
+    (sum, row) => sum + toNumber(row.signups),
+    0,
+  );
+  const totalBookings = activeCampaignRows.reduce(
+    (sum, row) => sum + toNumber(row.bookings),
+    0,
+  );
+  const attributedRevenue = activeCampaignRows.reduce(
+    (sum, row) => sum + toNumber(row.attributed_revenue),
+    0,
+  );
+  const trackedMarketingCost = activeCampaignRows.reduce(
+    (sum, row) => sum + toNumber(row.total_cost),
+    0,
+  );
+  const netGrowthReturn = activeCampaignRows.reduce(
+    (sum, row) => sum + toNumber(row.net_growth_return),
+    0,
+  );
+
+  const weightedCostPerSignup =
+    totalSignups > 0 ? trackedMarketingCost / totalSignups : 0;
+  const weightedCostPerBooking =
+    totalBookings > 0 ? trackedMarketingCost / totalBookings : 0;
+
+  const roiRows = activeCampaignRows
+    .map((row) => toNumber(row.roi_percent))
+    .filter((value) => Number.isFinite(value) && value !== 0);
+  const averageRoiPercent = roiRows.length
+    ? roiRows.reduce((sum, value) => sum + value, 0) / roiRows.length
+    : trackedMarketingCost > 0
+      ? ((attributedRevenue - trackedMarketingCost) / trackedMarketingCost) * 100
+      : 0;
+
+  const marketingSpendTotal = marketingExpenseRows.reduce(
+    (sum, row) => sum + toNumber(row.amount),
+    0,
+  );
+
+  const marketingDates = marketingExpenseRows
+    .map((row) => asTrimmedString(row.cost_date) || asTrimmedString(row.created_at))
+    .filter(Boolean)
+    .map((value) => value.slice(0, 7));
+  const marketingMonthCount = new Set(marketingDates).size || 1;
+
+  const issuedReferralRewardExpense = summaryRows
+    .filter(
+      (row) =>
+        asTrimmedString(row.source) === "referral_rewards" &&
+        asTrimmedString(row.financial_statement_section) ===
+          "issued_reward_expense",
+    )
+    .reduce((sum, row) => sum + toNumber(row.total_amount), 0);
+
+  const pendingReferralRewardLiability = summaryRows
+    .filter(
+      (row) =>
+        asTrimmedString(row.source) === "referral_rewards" &&
+        asTrimmedString(row.financial_statement_section) ===
+          "pending_reward_liability",
+    )
+    .reduce((sum, row) => sum + toNumber(row.total_amount), 0);
+
+  const topCampaign = [...activeCampaignRows].sort((a, b) => {
+    const leftBookings = toNumber(a.bookings);
+    const rightBookings = toNumber(b.bookings);
+    if (leftBookings !== rightBookings) return rightBookings - leftBookings;
+
+    const leftRevenue = toNumber(a.attributed_revenue);
+    const rightRevenue = toNumber(b.attributed_revenue);
+    if (leftRevenue !== rightRevenue) return rightRevenue - leftRevenue;
+
+    return toNumber(b.roi_percent) - toNumber(a.roi_percent);
+  })[0];
+
+  return {
+    campaignCount: activeCampaignRows.length,
+    totalClicks,
+    totalLeads,
+    totalSignups,
+    totalBookings,
+    attributedRevenue,
+    trackedMarketingCost: trackedMarketingCost || marketingSpendTotal,
+    netGrowthReturn:
+      netGrowthReturn || attributedRevenue - (trackedMarketingCost || marketingSpendTotal),
+    averageRoiPercent,
+    costPerSignup: weightedCostPerSignup,
+    costPerBooking: weightedCostPerBooking,
+    monthlyMarketingExpenseAverage: marketingSpendTotal / marketingMonthCount,
+    issuedReferralRewardExpense,
+    pendingReferralRewardLiability,
+    bestGrowthSignal: topCampaign ? getGrowthSignal(topCampaign) : "needs_more_data",
+    bestRecommendation: topCampaign
+      ? getGrowthRecommendation(topCampaign)
+      : "Add campaign events and costs to improve Pro Forma growth forecasting.",
+  };
+}
+
 function getTrustSafetyEventAmountCents(row: TrustSafetyFinancialEventRow) {
   return (
     toNumber(row.net_amount_cents) ||
@@ -717,6 +878,7 @@ function getTrustSafetyActuals({
 function buildForecast(
   assumptions: Assumptions,
   trustSafetyActuals: TrustSafetyActuals,
+  growthActuals: GrowthForecastActuals,
 ): ForecastMonth[] {
   const forecastMonths = Math.max(
     1,
@@ -806,8 +968,22 @@ function buildForecast(
     const grossProfit =
       platformRevenue + trustSafetyCashCollected - refunds - trustSafetyVendorCosts - trustSafetyStripeFees;
 
+    const actualCostPerBooking = growthActuals.costPerBooking || 0;
+    const growthMarketingSpend =
+      actualCostPerBooking > 0
+        ? Math.max(
+            assumptions.monthlyMarketingSpend,
+            projectedBookings * actualCostPerBooking,
+          )
+        : assumptions.monthlyMarketingSpend;
+    const referralRewardExpense =
+      growthActuals.issuedReferralRewardExpense > 0
+        ? growthActuals.issuedReferralRewardExpense / forecastMonths
+        : 0;
+
     const operatingExpenses =
-      assumptions.monthlyMarketingSpend +
+      growthMarketingSpend +
+      referralRewardExpense +
       assumptions.monthlySoftwareSpend +
       assumptions.monthlyAdminSpend +
       assumptions.monthlyInsuranceSpend +
@@ -843,6 +1019,9 @@ function buildForecast(
       trustSafetyStripeFees,
       trustSafetyNetCash,
       grossProfit,
+      growthMarketingSpend,
+      referralRewardExpense,
+      acquisitionCostPerBooking: actualCostPerBooking,
       operatingExpenses,
       netIncome,
       financingCash,
@@ -1044,11 +1223,13 @@ function getForecastReadinessItems({
   forecast,
   savedScenarioCount,
   trustSafetyActuals,
+  growthActuals,
 }: {
   assumptions: Assumptions;
   forecast: ForecastMonth[];
   savedScenarioCount: number;
   trustSafetyActuals: TrustSafetyActuals;
+  growthActuals: GrowthForecastActuals;
 }): ForecastReadinessItem[] {
   const totalOperatingExpenses =
     assumptions.monthlyMarketingSpend +
@@ -1104,7 +1285,14 @@ function getForecastReadinessItems({
       status: totalOperatingExpenses > 0 ? "ready" : "needs_review",
       detail: `${moneyExact(
         totalOperatingExpenses,
-      )} estimated recurring monthly operating expenses.`,
+      )} estimated recurring monthly operating expenses before growth actual overrides.`,
+    },
+    {
+      label: "Growth ROI actuals",
+      status: growthActuals.campaignCount > 0 ? "ready" : "needs_review",
+      detail: growthActuals.campaignCount
+        ? `${growthActuals.campaignCount.toLocaleString()} tracked campaign${growthActuals.campaignCount === 1 ? "" : "s"}; ${moneyExact(growthActuals.costPerBooking)} cost per booking and ${percent(growthActuals.averageRoiPercent)} average ROI.`
+        : "No campaign ROI rows found yet, so Pro Forma uses manual marketing assumptions.",
     },
     {
       label: "Cash runway assumptions",
@@ -1126,6 +1314,114 @@ function getForecastReadinessItems({
   ];
 }
 
+
+function GrowthForecastPanel({
+  growthActuals,
+  forecast,
+}: {
+  growthActuals: GrowthForecastActuals;
+  forecast: ForecastMonth[];
+}) {
+  const projectedGrowthSpend = forecast.reduce(
+    (sum, row) => sum + row.growthMarketingSpend,
+    0,
+  );
+  const projectedReferralRewards = forecast.reduce(
+    (sum, row) => sum + row.referralRewardExpense,
+    0,
+  );
+  const projectedBookings = forecast.reduce(
+    (sum, row) => sum + row.projectedBookings,
+    0,
+  );
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+            Growth ROI Forecast Link
+          </p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+            Marketing and referral actuals now inform Pro Forma.
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            This section reads the Growth & Referrals financial views and uses
+            tracked cost per booking, campaign ROI, and issued referral reward
+            expense to strengthen the forecast model.
+          </p>
+        </div>
+
+        <ActionLink href="/admin/referrals" label="Open Growth & Referrals" primary />
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Tracked Campaigns"
+          value={growthActuals.campaignCount.toLocaleString()}
+          detail={`${growthActuals.totalClicks.toLocaleString()} clicks, ${growthActuals.totalSignups.toLocaleString()} signups, ${growthActuals.totalBookings.toLocaleString()} bookings.`}
+          tone="emerald"
+        />
+        <StatCard
+          label="Cost Per Booking"
+          value={moneyExact(growthActuals.costPerBooking)}
+          detail={
+            growthActuals.costPerBooking > 0
+              ? "Used as a forecast acquisition-cost floor when higher than manual marketing spend."
+              : "No campaign booking cost yet; manual marketing spend remains the forecast driver."
+          }
+          tone="sky"
+        />
+        <StatCard
+          label="Growth ROI"
+          value={percent(growthActuals.averageRoiPercent)}
+          detail={`${moneyExact(growthActuals.attributedRevenue)} attributed revenue against ${moneyExact(growthActuals.trackedMarketingCost)} tracked cost.`}
+          tone={growthActuals.averageRoiPercent >= 0 ? "violet" : "rose"}
+        />
+        <StatCard
+          label="Referral Liability"
+          value={moneyExact(growthActuals.pendingReferralRewardLiability)}
+          detail="Pending rewards remain a balance-sheet liability until issued, paid, or credited."
+          tone="amber"
+        />
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <div className="rounded-[1.5rem] border border-slate-100 bg-[#fbfefd] p-5">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+            Forecast impact
+          </p>
+          <div className="mt-4 space-y-3 text-sm font-semibold text-slate-600">
+            <div className="flex items-center justify-between gap-4">
+              <span>Projected bookings</span>
+              <span className="font-black text-slate-950">{number(projectedBookings)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span>Projected growth marketing spend</span>
+              <span className="font-black text-slate-950">{moneyExact(projectedGrowthSpend)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span>Projected issued referral rewards</span>
+              <span className="font-black text-slate-950">{moneyExact(projectedReferralRewards)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-5">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+            Growth signal
+          </p>
+          <p className="mt-2 text-xl font-black capitalize text-slate-950">
+            {growthActuals.bestGrowthSignal.replaceAll("_", " ")}
+          </p>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            {growthActuals.bestRecommendation}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function ScenarioRepository({
   scenarios,
@@ -1254,7 +1550,14 @@ function ScenarioRepository({
 }
 
 async function getProFormaData() {
-  const [rows, trustSafetyPurchases, trustSafetyEvents] = await Promise.all([
+  const [
+    rows,
+    trustSafetyPurchases,
+    trustSafetyEvents,
+    growthCampaignRows,
+    growthFinancialSummaryRows,
+    growthMarketingExpenseRows,
+  ] = await Promise.all([
     safeRows<ProFormaRow>(
       supabaseAdmin
         .from("proforma_assumptions")
@@ -1281,6 +1584,29 @@ async function getProFormaData() {
         .limit(1500),
       "trust_safety_financial_events",
     ),
+    safeRows<GrowthCampaignRoiRow>(
+      supabaseAdmin
+        .from("admin_growth_campaign_roi")
+        .select("*")
+        .order("bookings", { ascending: false })
+        .limit(250),
+      "admin_growth_campaign_roi",
+    ),
+    safeRows<GrowthFinancialSummaryRow>(
+      supabaseAdmin
+        .from("admin_growth_financial_summary")
+        .select("*")
+        .limit(250),
+      "admin_growth_financial_summary",
+    ),
+    safeRows<GrowthMarketingExpenseRow>(
+      supabaseAdmin
+        .from("admin_growth_marketing_expenses")
+        .select("*")
+        .order("cost_date", { ascending: false })
+        .limit(1000),
+      "admin_growth_marketing_expenses",
+    ),
   ]);
 
   const scenarioRows = rows;
@@ -1293,7 +1619,12 @@ async function getProFormaData() {
     purchases: trustSafetyPurchases,
     events: trustSafetyEvents,
   });
-  const forecast = buildForecast(assumptions, trustSafetyActuals);
+  const growthActuals = getGrowthActuals({
+    campaignRows: growthCampaignRows,
+    summaryRows: growthFinancialSummaryRows,
+    marketingExpenseRows: growthMarketingExpenseRows,
+  });
+  const forecast = buildForecast(assumptions, trustSafetyActuals, growthActuals);
 
   const totalGrossBookingVolume = forecast.reduce(
     (sum, row) => sum + row.grossBookingVolume,
@@ -1345,6 +1676,14 @@ async function getProFormaData() {
     (sum, row) => sum + row.operatingExpenses,
     0,
   );
+  const totalGrowthMarketingSpend = forecast.reduce(
+    (sum, row) => sum + row.growthMarketingSpend,
+    0,
+  );
+  const totalProjectedReferralRewards = forecast.reduce(
+    (sum, row) => sum + row.referralRewardExpense,
+    0,
+  );
 
   const totalNetIncome = forecast.reduce((sum, row) => sum + row.netIncome, 0);
 
@@ -1367,11 +1706,13 @@ async function getProFormaData() {
     scenarios,
     trustSafetyActuals,
     forecast,
+    growthActuals,
     readinessItems: getForecastReadinessItems({
       assumptions,
       forecast,
       savedScenarioCount: scenarioRows.length,
       trustSafetyActuals,
+      growthActuals,
     }),
     totals: {
       totalGrossBookingVolume,
@@ -1386,6 +1727,8 @@ async function getProFormaData() {
       totalTrustSafetyStripeFees,
       totalTrustSafetyNetCash,
       totalOperatingExpenses,
+      totalGrowthMarketingSpend,
+      totalProjectedReferralRewards,
       totalNetIncome,
       endingCash,
       breakEvenMonth,
@@ -1525,6 +1868,11 @@ export default async function AdminProFormaPage() {
 
         <IntegrationFlowPanel />
 
+        <GrowthForecastPanel
+          growthActuals={proForma.growthActuals}
+          forecast={proForma.forecast}
+        />
+
         <section className="grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
           <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
@@ -1534,7 +1882,7 @@ export default async function AdminProFormaPage() {
               Update SitGuru forecast inputs.
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              These assumptions save into the pro forma scenario repository. The active scenario drives this forecast, and Trust & Safety assumptions now model Guru starts, plan mix, Checkr costs, Stripe fees, Pawstep collections, and Book & Bark recovery.
+              These assumptions save into the pro forma scenario repository. The active scenario drives this forecast, and Trust & Safety assumptions now model Guru starts, plan mix, Checkr costs, Stripe fees, Pawstep collections, Book & Bark recovery, campaign ROI, cost per booking, and referral reward expense.
             </p>
 
             <form action={saveProFormaAssumptions} className="mt-6 grid gap-5">
@@ -1859,7 +2207,7 @@ export default async function AdminProFormaPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[1180px] w-full text-left text-sm">
+            <table className="min-w-[1320px] w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Month</th>
@@ -1868,6 +2216,7 @@ export default async function AdminProFormaPage() {
                   <th className="px-4 py-3 text-right">T&S Gurus</th>
                   <th className="px-4 py-3 text-right">T&S Cash</th>
                   <th className="px-4 py-3 text-right">Book & Bark</th>
+                  <th className="px-4 py-3 text-right">Growth Spend</th>
                   <th className="px-4 py-3 text-right">Checkr/Stripe</th>
                   <th className="px-4 py-3 text-right">Net Income</th>
                   <th className="px-4 py-3 text-right">Ending Cash</th>
@@ -1894,6 +2243,9 @@ export default async function AdminProFormaPage() {
                     <td className="px-4 py-4 text-right font-semibold text-amber-700">
                       {money(row.trustSafetyBookingDeductionRecovery)}
                     </td>
+                    <td className="px-4 py-4 text-right font-semibold text-sky-700">
+                      {money(row.growthMarketingSpend + row.referralRewardExpense)}
+                    </td>
                     <td className="px-4 py-4 text-right font-semibold text-rose-700">
                       {money(row.trustSafetyVendorCosts + row.trustSafetyStripeFees)}
                     </td>
@@ -1918,7 +2270,7 @@ export default async function AdminProFormaPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-3">
+        <section className="grid gap-6 xl:grid-cols-4">
           <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
               Gross Booking Volume
@@ -1940,6 +2292,18 @@ export default async function AdminProFormaPage() {
             </p>
             <p className="mt-3 text-sm text-slate-600">
               Projected Guru payout activity based on payout percentage.
+            </p>
+          </div>
+
+          <div className="rounded-[2rem] border border-amber-100 bg-white p-5 shadow-sm sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+              Growth Spend Projection
+            </p>
+            <p className="mt-3 text-4xl font-black text-slate-950">
+              {money(proForma.totals.totalGrowthMarketingSpend)}
+            </p>
+            <p className="mt-3 text-sm text-slate-600">
+              Projected marketing spend using manual assumptions and actual cost-per-booking data when available.
             </p>
           </div>
 

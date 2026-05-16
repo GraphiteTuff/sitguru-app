@@ -15,6 +15,10 @@ export default function GuruShell({ children }: GuruShellProps) {
           { href: "/guru/dashboard", label: "Dashboard" },
           { href: "/guru/dashboard/messages", label: "Messages" },
           { href: "/guru/dashboard/bookings", label: "Bookings" },
+          {
+            href: "/guru/dashboard/referrals",
+            label: "Guru Referrals & Rewards",
+          },
           { href: "/guru/dashboard/settings", label: "Settings" },
         ]}
         rightSlot={
@@ -34,6 +38,11 @@ export default function GuruShell({ children }: GuruShellProps) {
         links={[
           { href: "/guru/dashboard", label: "Guru Dashboard" },
           { href: "/guru/dashboard/messages", label: "Messages" },
+          { href: "/guru/dashboard/bookings", label: "Bookings" },
+          {
+            href: "/guru/dashboard/referrals",
+            label: "Guru Referrals & Rewards",
+          },
           { href: "/guru/dashboard/settings", label: "Settings" },
         ]}
       />

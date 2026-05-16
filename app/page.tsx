@@ -3,12 +3,7 @@
 import { Open_Sans } from "next/font/google";
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import PhoneCodeLogin from "@/components/auth/PhoneCodeLogin";
-import PawPerksRewardCard from "@/components/customer/PawPerksRewardCard";
-import PawPerksRewardStates, {
-  type PawPerksAudience,
-} from "@/components/customer/PawPerksRewardStates";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
@@ -18,18 +13,15 @@ const openSans = Open_Sans({
   display: "swap",
 });
 
-const heroImagePath = "/images/hero/sitguru-pet-care-signup-bandanas.jpg";
+const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
 
 const heroServiceOptions = [
   "Dog Walking",
   "Pet Sitting",
   "Boarding",
-  "Doggy Day Care",
   "Drop-In Visits",
-  "House Sitting",
+  "Doggy Day Care",
   "Training Support",
-  "Medication Help",
-  "Custom Care",
 ];
 
 const zipCodeFallbackMap: Record<
@@ -85,188 +77,87 @@ const initialSearchFormState: SearchFormState = {
   zipCode: "",
 };
 
-const serviceCards = [
-  {
-    title: "Dog Walking",
-    description:
-      "Book trusted local walking help for daily routines, midday breaks, and active dogs that need dependable exercise.",
-    icon: "🐕",
-  },
-  {
-    title: "Pet Sitting",
-    description:
-      "Find in-home care for pets who do best with familiar surroundings, personalized attention, and a calmer routine.",
-    icon: "🏡",
-  },
-  {
-    title: "Boarding",
-    description:
-      "Choose overnight care with local Gurus who offer a safe, home-style experience for pets while you are away.",
-    icon: "🛏️",
-  },
-  {
-    title: "Drop-In Visits",
-    description:
-      "Great for feedings, potty breaks, medication check-ins, litter care, and quick visits throughout the day.",
-    icon: "⏰",
-  },
-  {
-    title: "Doggy Day Care",
-    description:
-      "Perfect for daytime supervision, play, and companionship when your pet needs care while you work or travel locally.",
-    icon: "☀️",
-  },
-  {
-    title: "Training Support",
-    description:
-      "Connect with trainers and behavior-focused Gurus who can help with structure, routines, and confidence-building.",
-    icon: "🎓",
-  },
+type Guru = {
+  [key: string]: unknown;
+  id: string | number;
+  user_id?: string | null;
+  slug?: string | null;
+  display_name?: string | null;
+  full_name?: string | null;
+  title?: string | null;
+  city?: string | null;
+  state?: string | null;
+  hourly_rate?: number | null;
+  rate?: number | null;
+  rating_avg?: number | null;
+  rating?: number | null;
+  review_count?: number | null;
+  is_verified?: boolean | null;
+  profile_photo_url?: string | null;
+  photo_url?: string | null;
+  avatar_url?: string | null;
+  image_url?: string | null;
+  services?: string[] | null;
+  is_public?: boolean | null;
+  is_active?: boolean | null;
+};
+
+type GuruCard = {
+  id: string;
+  name: string;
+  role: string;
+  location: string;
+  rating: string;
+  reviewCount: number;
+  priceLabel: string;
+  image: string;
+  badge: string;
+  href: string;
+};
+
+type ProgramCard = {
+  title: string;
+  eyebrow: string;
+  description: string;
+  href: string;
+  applyHref: string;
+  icon: string;
+  image: string;
+  imageAlt: string;
+  primaryCta: string;
+  secondaryCta: string;
+  featured: boolean;
+};
+
+const trustItems = [
+  "Trusted local Gurus",
+  "Verified & reviewed",
+  "Secure & safe",
+  "Care you can count on",
 ];
 
-const specialties = [
-  "Puppy Care",
-  "Senior Pet Care",
-  "Medication Support",
-  "Special Needs Care",
-  "Cat Care",
-  "Multi-Pet Homes",
-  "Training Support",
-  "Pet Transport",
-  "Custom Care Requests",
-];
-
-const pillars = [
+const programPathways = [
   {
-    number: "01",
-    title: "Find a Guru",
-    description:
-      "Search local Gurus by service, profile, location, and availability with a cleaner browsing experience built for Pet Parents.",
-  },
-  {
-    number: "02",
-    title: "Choose a service",
-    description:
-      "Walking, sitting, boarding, drop-ins, day care, training support, and flexible care options all in one modern marketplace.",
-  },
-  {
-    number: "03",
-    title: "Match care to your pet",
-    description:
-      "Use pet profiles, care notes, service preferences, and special instructions to request more tailored help.",
-  },
-  {
-    number: "04",
-    title: "Book with confidence",
-    description:
-      "Trust signals, clearer profiles, review visibility, and structured information help customers feel better before they book.",
-  },
-  {
-    number: "05",
-    title: "Get support throughout care",
-    description:
-      "SitGuru is being built to support customers before, during, and after bookings with a more visible help experience.",
-  },
-];
-
-const features = [
-  {
-    title: "Trusted local Gurus",
-    description:
-      "Browse pet care Gurus with clearer profiles, visible services, review signals, and a more modern local marketplace feel.",
+    title: "Pet Parents",
+    description: "Anyone can join SitGuru to find trusted local care",
+    href: "/search",
     icon: "🐾",
   },
   {
-    title: "Cleaner mobile-first booking",
-    description:
-      "The SitGuru experience is designed to feel easier on mobile, faster to understand, and better suited for real booking decisions.",
-    icon: "📱",
+    title: "Gurus",
+    description: "Anyone can apply to offer care through SitGuru",
+    href: "/guru/signup",
+    icon: "🦮",
   },
   {
-    title: "Better trust visibility",
-    description:
-      "Verification, ratings, profile details, and structured sections help customers understand who they are considering.",
-    icon: "🛡️",
-  },
-  {
-    title: "Flexible care options",
-    description:
-      "SitGuru is positioned for standard pet care plus premium and specialty services that go beyond generic sitter listings.",
-    icon: "✨",
+    title: "SitGuru Programs",
+    description: "Additional ways to earn, refer, and grow the community",
+    href: "/programs",
+    icon: "🤝",
   },
 ];
 
-const trustPoints = [
-  "Verified Guru badges",
-  "Cleaner profile layouts",
-  "Ratings and reviews that are easier to scan",
-  "Clearer service and pricing visibility",
-  "Pet-centered booking direction",
-  "Responsive marketplace design built for growth",
-];
-
-const testimonials = [
-  {
-    quote:
-      "This feels easier to understand than older pet care platforms. I can quickly compare providers and actually tell what makes each one different.",
-    name: "Danielle R.",
-    role: "Pet Parent, Pennsylvania",
-  },
-  {
-    quote:
-      "The trust signals feel more visible and the layout is easier on mobile. It gives a better first impression when I’m looking for someone to trust.",
-    name: "Ashley M.",
-    role: "Pet Parent, Philadelphia",
-  },
-  {
-    quote:
-      "It feels more modern, less cluttered, and more focused on what matters when choosing care for a pet.",
-    name: "Marcus T.",
-    role: "Pet Parent, Allentown",
-  },
-];
-
-const guruTypes = [
-  "Pet sitters",
-  "Dog walkers",
-  "Boarding providers",
-  "Drop-in caregivers",
-  "Dog trainers",
-  "Experienced Pet Parents",
-  "Students",
-  "Professionals",
-  "Trusted local helpers",
-];
-
-const bottomHeroServices = [
-  {
-    title: "Walks & Drop-ins",
-    description: "Daily walks and quick visits",
-    icon: "🐕",
-  },
-  {
-    title: "Boarding & Sitting",
-    description: "Overnight stays in loving homes",
-    icon: "🏡",
-  },
-  {
-    title: "Day Care",
-    description: "Play, socialization and fun",
-    icon: "☘️",
-  },
-  {
-    title: "Training Support",
-    description: "Positive training and guidance",
-    icon: "🎾",
-  },
-  {
-    title: "Trusted Reviews",
-    description: "Real reviews from real Pet Parents",
-    icon: "⭐",
-  },
-];
-
-const homepagePrograms = [
+const homepagePrograms: ProgramCard[] = [
   {
     title: "Student Hire Program",
     eyebrow: "Featured earning pathway",
@@ -299,168 +190,85 @@ const homepagePrograms = [
     title: "Ambassador Program",
     eyebrow: "Together, we grow together",
     description:
-      "For Vet Techs, Veterinarians, Trainers, pet-care professionals, and community supporters who want to refer Gurus and Pet Parents while helping SitGuru grow.",
-    href: "/programs/ambassadors",
+      "For Vet Techs, Veterinarians, Trainers, pet-care professionals, friends, family, and community supporters who want to refer Pet Parents and Gurus while helping SitGuru grow.",
+    href: "/ambassadors",
     applyHref: "/programs/ambassadors/apply",
     icon: "🤝",
     image: "/images/ambassadors/ambassador-program2.jpg",
-    imageAlt: "Veterinary professionals smiling while caring for a kitten",
+    imageAlt: "Pet-care professionals smiling while caring for a pet",
     primaryCta: "Become an Ambassador",
     secondaryCta: "Ambassador Details",
     featured: false,
   },
 ];
 
-type Guru = {
-  id: string;
-  slug?: string | null;
-  full_name?: string | null;
-  title?: string | null;
-  bio?: string | null;
-  city?: string | null;
-  state?: string | null;
-  rate?: number | null;
-  experience_years?: number | null;
-  is_verified?: boolean | null;
-  is_active?: boolean | null;
-  services?: string[] | null;
-  image_url?: string | null;
-  rating?: number | null;
-};
-
-type CarouselItem = {
-  id: string;
-  name: string;
-  role: string;
-  location: string;
-  rating: string;
-  image: string;
-  petType: string;
-  badge?: string;
-  href: string;
-};
-
-type InterestType = "customer" | "guru" | "both";
-
-type LaunchFormState = {
-  fullName: string;
-  email: string;
-  phone: string;
-  zipCode: string;
-  interestType: InterestType;
-  petTypes: string;
-  servicesOffered: string;
-  notes: string;
-  source: string;
-};
-
-const fallbackCarouselItems: CarouselItem[] = [
+const popularServices = [
   {
-    id: "fallback-1",
-    name: "Sarah Jones",
-    role: "Dog Walking Guru",
-    location: "Quakertown, Pennsylvania",
-    rating: "4.9",
-    image:
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80",
-    petType: "Dogs",
-    badge: "Verified",
-    href: "/search",
+    title: "Dog Walking",
+    icon: "🐕",
+    href: "/search?service=Dog%20Walking",
   },
   {
-    id: "fallback-2",
-    name: "Emily Carter",
-    role: "Pet Sitting Guru",
-    location: "Allentown, Pennsylvania",
-    rating: "4.8",
-    image:
-      "https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?auto=format&fit=crop&w=900&q=80",
-    petType: "Cats & Dogs",
-    badge: "Top Rated",
-    href: "/search",
+    title: "Pet Sitting",
+    icon: "🏡",
+    href: "/search?service=Pet%20Sitting",
   },
   {
-    id: "fallback-3",
-    name: "Marcus Lee",
-    role: "Boarding Guru",
-    location: "Bethlehem, Pennsylvania",
-    rating: "4.9",
-    image:
-      "https://images.unsplash.com/photo-1518717758536-85ae29035b6d?auto=format&fit=crop&w=900&q=80",
-    petType: "Dogs",
-    badge: "Trusted",
-    href: "/search",
+    title: "Boarding",
+    icon: "🛏️",
+    href: "/search?service=Boarding",
+  },
+  {
+    title: "Drop-In Visits",
+    icon: "⏰",
+    href: "/search?service=Drop-In%20Visits",
+  },
+  {
+    title: "Doggy Day Care",
+    icon: "☀️",
+    href: "/search?service=Doggy%20Day%20Care",
+  },
+  {
+    title: "Training Support",
+    icon: "🎓",
+    href: "/search?service=Training%20Support",
   },
 ];
 
-const initialLaunchFormState: LaunchFormState = {
-  fullName: "",
-  email: "",
-  phone: "",
-  zipCode: "",
-  interestType: "customer",
-  petTypes: "",
-  servicesOffered: "",
-  notes: "",
-  source: "direct",
-};
-
-const audienceOptions: {
-  value: InterestType;
-  label: string;
-  description: string;
-  emoji: string;
-}[] = [
-  {
-    value: "customer",
-    label: "Pet Parent",
-    description: "I need care for my pet.",
-    emoji: "🐶",
-  },
-  {
-    value: "guru",
-    label: "Pet Care Guru",
-    description: "I offer pet care services.",
-    emoji: "🧘",
-  },
-  {
-    value: "both",
-    label: "Both",
-    description: "I need care and may offer services.",
-    emoji: "✨",
-  },
-];
-
-function formatLocation(city?: string | null, state?: string | null) {
-  if (city && state) return `${city}, ${state}`;
-  if (city) return city;
-  if (state) return state;
-  return "Location not listed";
+function GoogleIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0">
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"
+      />
+    </svg>
+  );
 }
 
-function getPetType(services?: string[] | null) {
-  if (!services || services.length === 0) return "Pet Care";
-  if (services.includes("Cat Care") || services.includes("Cat Sitting"))
-    return "Cats";
-  if (services.includes("Dog Walking")) return "Dogs";
-  if (services.includes("Pet Sitting")) return "Cats & Dogs";
-  return services[0];
-}
-
-function mapGurusToCarouselItems(gurus: Guru[]): CarouselItem[] {
-  return gurus.map((guru) => ({
-    id: guru.id,
-    name: guru.full_name || "Trusted Guru",
-    role: guru.title || "Pet Care Guru",
-    location: formatLocation(guru.city, guru.state),
-    rating: guru.rating ? guru.rating.toFixed(1) : "New",
-    image:
-      guru.image_url ||
-      "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
-    petType: getPetType(guru.services),
-    badge: guru.is_verified ? "Verified" : "Trusted",
-    href: `/gurus/${guru.slug || guru.id}`,
-  }));
+function AppleIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 shrink-0 fill-current"
+    >
+      <path d="M16.37 1.51c0 1.08-.44 2.13-1.16 2.91-.77.84-2.04 1.48-3.09 1.39-.13-1.04.39-2.18 1.1-2.94.78-.85 2.15-1.48 3.15-1.36z" />
+      <path d="M20.62 17.47c-.55 1.27-.82 1.84-1.53 2.96-.99 1.51-2.38 3.39-4.11 3.4-1.54.01-1.94-1-4.02-.99-2.08.01-2.52 1-4.06.99-1.73-.01-3.05-1.71-4.04-3.22-2.76-4.22-3.05-9.18-1.35-11.82 1.2-1.87 3.1-2.97 4.88-2.97 1.81 0 2.95 1 4.45 1 1.45 0 2.34-1 4.44-1 1.59 0 3.27.87 4.47 2.36-3.93 2.16-3.29 7.78.87 9.29z" />
+    </svg>
+  );
 }
 
 function detectSourceFromUrl() {
@@ -487,26 +295,11 @@ function normalizeZipCode(value: string) {
   return value.replace(/\D/g, "").slice(0, 5);
 }
 
-function formatPhoneWithDashes(value: string) {
-  const digitsOnly = value.replace(/\D/g, "").slice(0, 11);
-
-  const normalizedDigits =
-    digitsOnly.length === 11 && digitsOnly.startsWith("1")
-      ? digitsOnly.slice(1)
-      : digitsOnly.slice(0, 10);
-
-  if (normalizedDigits.length <= 3) {
-    return normalizedDigits;
-  }
-
-  if (normalizedDigits.length <= 6) {
-    return `${normalizedDigits.slice(0, 3)}-${normalizedDigits.slice(3)}`;
-  }
-
-  return `${normalizedDigits.slice(0, 3)}-${normalizedDigits.slice(
-    3,
-    6,
-  )}-${normalizedDigits.slice(6)}`;
+function formatLocation(city?: string | null, state?: string | null) {
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  if (state) return state;
+  return "Local area";
 }
 
 async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
@@ -516,9 +309,7 @@ async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
 
   const fallback = zipCodeFallbackMap[normalizedZip];
 
-  if (fallback) {
-    return fallback;
-  }
+  if (fallback) return fallback;
 
   const response = await fetch(`https://api.zippopotam.us/us/${normalizedZip}`);
 
@@ -536,302 +327,414 @@ async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
   };
 }
 
-function CaregiverCarousel({ items }: { items: CarouselItem[] }) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+function getGuruName(guru: Guru) {
+  return guru.display_name || guru.full_name || "Trusted Guru";
+}
 
-  const displayItems = useMemo(
-    () => (items.length > 0 ? items : fallbackCarouselItems),
-    [items],
-  );
+function getGuruPhotoUrl(guru: Guru) {
+  const possiblePhoto =
+    guru.profile_photo_url || guru.photo_url || guru.avatar_url || guru.image_url || "";
 
-  const total = displayItems.length;
-  const hasMultipleItems = total > 1;
+  const photoUrl = String(possiblePhoto || "").trim();
 
-  const goToSlide = (
-    index: number,
-    eventName = "homepage_carousel_slide_selected",
-  ) => {
-    if (!hasMultipleItems) return;
+  if (!photoUrl) return "";
 
-    const safeIndex = (index + total) % total;
-    const item = displayItems[safeIndex];
+  const lowerPhotoUrl = photoUrl.toLowerCase();
 
-    setActiveIndex(safeIndex);
-
-    trackEvent({
-      eventName,
-      eventType: "engagement",
-      source: detectSourceFromUrl(),
-      guruId: item?.id?.startsWith("fallback") ? undefined : item?.id,
-      metadata: {
-        selected_index: safeIndex,
-        guru_name: item?.name || "",
-        guru_role: item?.role || "",
-        location: item?.location || "",
-      },
-    });
-  };
-
-  const nextSlide = () => {
-    if (!hasMultipleItems) return;
-
-    const nextIndex = activeIndex >= total - 1 ? 0 : activeIndex + 1;
-
-    trackEvent({
-      eventName: "homepage_carousel_next_clicked",
-      eventType: "engagement",
-      source: detectSourceFromUrl(),
-      metadata: {
-        active_index: activeIndex,
-        next_index: nextIndex,
-      },
-    });
-
-    goToSlide(nextIndex);
-  };
-
-  const prevSlide = () => {
-    if (!hasMultipleItems) return;
-
-    const previousIndex = activeIndex <= 0 ? total - 1 : activeIndex - 1;
-
-    trackEvent({
-      eventName: "homepage_carousel_previous_clicked",
-      eventType: "engagement",
-      source: detectSourceFromUrl(),
-      metadata: {
-        active_index: activeIndex,
-        previous_index: previousIndex,
-      },
-    });
-
-    goToSlide(previousIndex);
-  };
-
-  useEffect(() => {
-    if (!hasMultipleItems || isCarouselPaused) return;
-
-    const rotationTimer = window.setInterval(() => {
-      setActiveIndex((currentIndex) =>
-        currentIndex >= total - 1 ? 0 : currentIndex + 1,
-      );
-    }, 5000);
-
-    return () => {
-      window.clearInterval(rotationTimer);
-    };
-  }, [hasMultipleItems, isCarouselPaused, total]);
-
-  if (total === 0) {
-    return null;
+  if (
+    lowerPhotoUrl.startsWith("/images/") ||
+    lowerPhotoUrl.includes("sitguru-logo") ||
+    lowerPhotoUrl.includes("sitguru-message-avatar") ||
+    lowerPhotoUrl.includes("sitguru-admin-avatar")
+  ) {
+    return "";
   }
 
+  return photoUrl;
+}
+
+function getGuruHref(guru: Guru) {
+  if (guru.slug) return `/guru/${guru.slug}`;
+  return `/guru/${guru.id}`;
+}
+
+function getGuruRating(guru: Guru) {
+  if (typeof guru.rating_avg === "number") return guru.rating_avg;
+  if (typeof guru.rating === "number") return guru.rating;
+  return 0;
+}
+
+function getGuruRate(guru: Guru) {
+  if (typeof guru.hourly_rate === "number") return guru.hourly_rate;
+  if (typeof guru.rate === "number") return guru.rate;
+  return null;
+}
+
+function getGuruRole(guru: Guru) {
+  if (guru.title) return guru.title;
+  const services = Array.isArray(guru.services) ? guru.services : [];
+  const firstService = services.find((service) => typeof service === "string");
+
+  if (firstService) return `${firstService} Guru`;
+
+  return "Pet Care Guru";
+}
+
+function mapGurusToCards(gurus: Guru[]): GuruCard[] {
+  return gurus
+    .map((guru) => {
+      const photoUrl = getGuruPhotoUrl(guru);
+
+      if (!photoUrl) {
+        console.warn("Homepage Guru skipped because no account photo is wired:", {
+          id: guru.id,
+          slug: guru.slug,
+          name: getGuruName(guru),
+        });
+
+        return null;
+      }
+
+      const rate = getGuruRate(guru);
+      const rating = getGuruRating(guru);
+      const reviews = Number(guru.review_count || 0);
+
+      return {
+        id: String(guru.id),
+        name: getGuruName(guru),
+        role: getGuruRole(guru),
+        location: formatLocation(guru.city, guru.state),
+        rating: rating > 0 ? rating.toFixed(1) : "New",
+        reviewCount: reviews,
+        priceLabel:
+          rate !== null && Number.isFinite(rate)
+            ? `From $${rate} / visit`
+            : "View pricing",
+        image: photoUrl,
+        badge: guru.is_verified ? "Verified" : "Trusted",
+        href: getGuruHref(guru),
+      };
+    })
+    .filter((guru): guru is GuruCard => Boolean(guru));
+}
+
+function buildSearchHref(searchForm: SearchFormState) {
+  const params = new URLSearchParams();
+
+  if (searchForm.service) params.set("service", searchForm.service);
+  if (searchForm.zipCode) params.set("zip", searchForm.zipCode);
+  if (searchForm.city) params.set("city", searchForm.city);
+  if (searchForm.state) params.set("state", searchForm.state);
+
+  const queryString = params.toString();
+
+  return queryString ? `/search?${queryString}` : "/search";
+}
+
+function TrustRow() {
   return (
-    <section className="section-space overflow-hidden bg-white">
-      <div className="page-container">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-3xl">
-            <div className="section-kicker">Trusted local pet care</div>
-
-            <h2 className="mt-4 text-slate-950">
-              Meet local Gurus Pet Parents can feel good about
-            </h2>
-
-            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              Browse real SitGuru providers in a warm, modern, easy-to-scan
-              layout built for confidence and discovery.
-            </p>
-          </div>
-
-          {hasMultipleItems ? (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={prevSlide}
-                className="btn-secondary relative z-20 h-11 w-11 rounded-full p-0"
-                aria-label="Previous slide"
-              >
-                ←
-              </button>
-
-              <button
-                type="button"
-                onClick={nextSlide}
-                className="btn-secondary relative z-20 h-11 w-11 rounded-full p-0"
-                aria-label="Next slide"
-              >
-                →
-              </button>
-            </div>
-          ) : null}
-        </div>
-
+    <div className="grid grid-cols-4 gap-2 rounded-2xl border border-slate-100 bg-white/90 px-3 py-3 shadow-sm backdrop-blur">
+      {trustItems.map((item) => (
         <div
-          className="relative mt-8 overflow-hidden"
-          onMouseEnter={() => setIsCarouselPaused(true)}
-          onMouseLeave={() => setIsCarouselPaused(false)}
-          onFocus={() => setIsCarouselPaused(true)}
-          onBlur={() => setIsCarouselPaused(false)}
-          style={
-            {
-              "--homepage-carousel-step": "324px",
-            } as CSSProperties
-          }
+          key={item}
+          className="flex flex-col items-center gap-1 text-center text-[9px] font-black leading-tight text-slate-700 sm:flex-row sm:text-left sm:text-xs"
         >
-          <div className="sm:[--homepage-carousel-step:364px] lg:[--homepage-carousel-step:384px]">
-            <div
-              className="flex gap-6 transition-transform duration-500 ease-out will-change-transform"
-              style={{
-                transform: `translateX(calc(-${activeIndex} * var(--homepage-carousel-step)))`,
-              }}
-            >
-              {displayItems.map((item) => (
-                <article
-                  key={item.id}
-                  className="panel flex min-h-[440px] min-w-[300px] max-w-[300px] flex-shrink-0 flex-col overflow-hidden sm:min-w-[340px] sm:max-w-[340px] lg:min-w-[360px] lg:max-w-[360px]"
-                >
-                  <div className="relative h-72 overflow-hidden rounded-t-3xl">
-                    <img
-                      src={item.image}
-                      alt={`${item.name} with pets`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            ✓
+          </span>
+          <span>{item}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-                    <div className="absolute left-4 top-4 flex gap-2">
-                      {item.badge ? (
-                        <span className="chip">{item.badge}</span>
-                      ) : null}
-                      <span className="badge">⭐ {item.rating}</span>
-                    </div>
-                  </div>
+function HeroSignupCard({
+  onGoogleSignup,
+  onTrack,
+}: {
+  onGoogleSignup: () => void;
+  onTrack: (label: string, destination: string) => void;
+}) {
+  return (
+    <aside className="w-full max-w-[340px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[360px]">
+      <h2 className="text-[2.15rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.65rem]">
+        Create your free account
+      </h2>
+      <p className="mt-2 text-sm font-semibold text-slate-500">
+        Join in less than a minute.
+      </p>
 
-                  <div className="flex flex-1 flex-col p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-slate-900">
-                          {item.name}
-                        </h3>
+      <div className="mt-6 grid gap-3">
+        <button
+          type="button"
+          onClick={onGoogleSignup}
+          className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50"
+        >
+          <GoogleIcon />
+          Continue with Google
+        </button>
 
-                        <p className="mt-1 text-sm font-semibold text-emerald-700">
-                          {item.role}
-                        </p>
-                      </div>
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          title="Apple login is coming soon"
+          className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-400 shadow-sm"
+        >
+          <AppleIcon />
+          Continue with Apple — Coming Soon
+        </button>
 
-                      <span className="badge shrink-0">{item.petType}</span>
-                    </div>
+        <Link
+          href="/signup"
+          onClick={() => onTrack("Continue with phone", "/signup")}
+          className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50"
+        >
+          ☎ Continue with phone
+        </Link>
+      </div>
 
-                    <p className="mt-3 text-sm text-slate-600">
-                      {item.location}
-                    </p>
+      <div className="my-5 flex items-center gap-4">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs font-bold text-slate-400">or</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
 
-                    <div className="mt-auto flex flex-col gap-3 pt-6 sm:flex-row">
-                      <Link
-                        href={item.href}
-                        className="btn-primary w-full text-center sm:w-auto"
-                        onClick={() =>
-                          trackEvent({
-                            eventName: "guru_profile_view_clicked",
-                            eventType: "profile",
-                            source: detectSourceFromUrl(),
-                            guruId: item.id.startsWith("fallback")
-                              ? undefined
-                              : item.id,
-                            metadata: {
-                              location: "homepage_carousel",
-                              guru_name: item.name,
-                              guru_role: item.role,
-                              destination: item.href,
-                            },
-                          })
-                        }
-                      >
-                        View Profile
-                      </Link>
+      <div className="grid gap-3">
+        <Link
+          href="/signup"
+          onClick={() => onTrack("Full Name Sign Up", "/signup")}
+          className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50/50"
+        >
+          Full name
+        </Link>
+        <Link
+          href="/signup"
+          onClick={() => onTrack("Email Sign Up", "/signup")}
+          className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50/50"
+        >
+          Email
+        </Link>
+        <Link
+          href="/signup"
+          onClick={() => onTrack("Zip Sign Up", "/signup")}
+          className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50/50"
+        >
+          ZIP code optional
+        </Link>
+        <Link
+          href="/signup"
+          onClick={() => onTrack("Sign Up Free Hero Card", "/signup")}
+          className="mt-1 rounded-xl bg-emerald-700 px-5 py-3 text-center text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
+        >
+          Sign Up Free
+        </Link>
+      </div>
 
-                      <Link
-                        href="/search"
-                        className="btn-secondary w-full text-center sm:w-auto"
-                        onClick={() =>
-                          trackEvent({
-                            eventName: "browse_all_clicked",
-                            eventType: "navigation",
-                            source: detectSourceFromUrl(),
-                            metadata: {
-                              location: "homepage_carousel",
-                            },
-                          })
-                        }
-                      >
-                        Browse All
-                      </Link>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
+      <p className="mt-4 text-center text-xs font-semibold text-slate-500">
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          onClick={() => onTrack("Login From Hero Card", "/login")}
+          className="font-black text-emerald-700 hover:text-emerald-800 hover:underline"
+        >
+          Log in
+        </Link>
+      </p>
+    </aside>
+  );
+}
 
-          {hasMultipleItems ? (
-            <div className="mt-8 flex justify-center gap-2">
-              {displayItems.map((_, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => goToSlide(index)}
-                  className={`h-2.5 rounded-full transition-all ${
-                    index === activeIndex
-                      ? "w-6 bg-emerald-600"
-                      : "w-2.5 bg-slate-300 hover:bg-slate-400"
-                  }`}
-                  aria-label={`Go to slide ${index + 1}`}
-                />
-              ))}
-            </div>
-          ) : null}
+function HeroVisual() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,1)_0%,rgba(250,252,252,0.97)_42%,rgba(236,253,245,0.78)_100%)]" />
+
+      <img
+        src={heroImagePath}
+        alt=""
+        className="absolute right-[-142px] top-[54px] h-[360px] w-[485px] max-w-none object-cover object-center opacity-100 sm:right-[-88px] sm:top-[38px] sm:h-[470px] sm:w-[620px] lg:right-[24%] lg:top-[20px] lg:h-[585px] lg:w-[680px] xl:right-[25%] xl:top-[12px] xl:h-[640px] xl:w-[740px] 2xl:right-[26%]"
+        style={{
+          WebkitMaskImage:
+            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 12%, rgba(0,0,0,0.45) 27%, rgba(0,0,0,0.82) 43%, black 62%, black 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
+          maskImage:
+            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 12%, rgba(0,0,0,0.45) 27%, rgba(0,0,0,0.82) 43%, black 62%, black 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
+          WebkitMaskComposite: "source-in",
+          maskComposite: "intersect",
+        }}
+        loading="eager"
+      />
+
+      <div className="absolute inset-y-0 left-0 w-[60%] bg-gradient-to-r from-white via-white/78 to-white/10" />
+      <div className="absolute inset-y-0 left-[36%] w-[24%] bg-gradient-to-r from-white/24 via-white/8 to-transparent blur-3xl" />
+      <div className="absolute inset-y-0 right-0 w-[18%] bg-gradient-to-l from-emerald-50/62 via-emerald-50/18 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-[16%] bg-gradient-to-b from-white/76 via-white/28 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-[34%] bg-gradient-to-t from-emerald-50/82 via-white/8 to-transparent" />
+    </div>
+  );
+}
+
+function GuruCardView({
+  guru,
+  onTrack,
+}: {
+  guru: GuruCard;
+  onTrack: (label: string, destination: string) => void;
+}) {
+  return (
+    <Link
+      href={guru.href}
+      onClick={() => onTrack(`Guru Card ${guru.name}`, guru.href)}
+      className="group min-w-[230px] max-w-[230px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)] sm:min-w-[260px] sm:max-w-[260px]"
+    >
+      <div className="relative h-28 overflow-hidden sm:h-36">
+        <img
+          src={guru.image}
+          alt={`${guru.name}, ${guru.role}`}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          loading="lazy"
+        />
+        <span className="absolute left-2 top-2 rounded-full border border-white/80 bg-white/95 px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm sm:left-3 sm:top-3 sm:text-[10px]">
+          {guru.badge}
+        </span>
+        <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-emerald-700 shadow-sm">
+          ♡
+        </span>
+      </div>
+
+      <div className="p-3 sm:p-4">
+        <h3 className="text-sm font-black text-slate-950 sm:text-base">
+          {guru.name}
+        </h3>
+        <p className="mt-1 text-[10px] font-bold text-emerald-700 sm:text-xs">
+          {guru.role}
+        </p>
+        <p className="mt-1 text-[10px] text-slate-600 sm:text-xs">
+          {guru.location}
+        </p>
+
+        <div className="mt-3 flex items-end justify-between gap-2 sm:mt-4">
+          <p className="text-[10px] font-black text-slate-900 sm:text-xs">
+            <span className="text-amber-500">★</span> {guru.rating}
+          </p>
+          <p className="text-[10px] font-black text-emerald-800 sm:text-xs">
+            {guru.priceLabel}
+          </p>
         </div>
       </div>
-    </section>
+    </Link>
+  );
+}
+
+function ProgramHeroCard({
+  program,
+  onTrack,
+}: {
+  program: ProgramCard;
+  onTrack: (label: string, destination: string) => void;
+}) {
+  return (
+    <article
+      className={`overflow-hidden rounded-[28px] border transition ${
+        program.featured
+          ? "border-amber-200 bg-amber-50 shadow-[0_18px_40px_rgba(245,158,11,0.12)]"
+          : "border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.07)]"
+      }`}
+    >
+      <div
+        className={`relative overflow-hidden ${
+          program.featured ? "h-72 bg-sky-100 lg:h-60" : "h-64 lg:h-60"
+        }`}
+      >
+        <img
+          src={program.image}
+          alt={program.imageAlt}
+          className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
+          loading="lazy"
+        />
+
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/48 via-slate-950/10 to-transparent" />
+
+        <div
+          className={`absolute bottom-4 left-4 flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-lg ${
+            program.featured
+              ? "bg-amber-400 text-amber-950 shadow-amber-900/10"
+              : "bg-emerald-700 text-white shadow-emerald-900/15"
+          }`}
+        >
+          {program.icon}
+        </div>
+      </div>
+
+      <div className="p-5">
+        <p
+          className={`text-xs font-black uppercase tracking-[0.16em] ${
+            program.featured ? "text-amber-700" : "text-emerald-700"
+          }`}
+        >
+          {program.eyebrow}
+        </p>
+
+        <h3 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-950">
+          {program.title}
+        </h3>
+
+        <p className="mt-2 text-sm leading-6 text-slate-700">
+          {program.description}
+        </p>
+
+        <div className="mt-5 flex flex-col gap-2">
+          <Link
+            href={program.applyHref}
+            onClick={() =>
+              onTrack(
+                `${program.primaryCta} ${program.title}`,
+                program.applyHref,
+              )
+            }
+            className={`inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-black transition ${
+              program.featured
+                ? "bg-amber-400 text-amber-950 hover:bg-amber-300"
+                : "bg-emerald-700 text-white hover:bg-emerald-800"
+            }`}
+          >
+            {program.primaryCta}
+          </Link>
+
+          <Link
+            href={program.href}
+            onClick={() =>
+              onTrack(`${program.secondaryCta} ${program.title}`, program.href)
+            }
+            className={`inline-flex items-center justify-center rounded-full border bg-white px-4 py-2.5 text-sm font-black transition ${
+              program.featured
+                ? "border-amber-300 text-amber-900 hover:bg-amber-50"
+                : "border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+            }`}
+          >
+            {program.secondaryCta}
+          </Link>
+        </div>
+      </div>
+    </article>
   );
 }
 
 export default function HomePage() {
-  const [carouselItems, setCarouselItems] = useState<CarouselItem[]>(
-    fallbackCarouselItems,
-  );
   const [searchForm, setSearchForm] = useState<SearchFormState>(
     initialSearchFormState,
   );
   const [zipLookupStatus, setZipLookupStatus] =
     useState<ZipLookupStatus>("idle");
   const [zipLookupMessage, setZipLookupMessage] = useState("");
-  const [selectedPawPerksAudience, setSelectedPawPerksAudience] =
-    useState<PawPerksAudience>("pet-parent");
+  const [guruCards, setGuruCards] = useState<GuruCard[]>([]);
+  const [source, setSource] = useState("direct");
+  const [isGuruCarouselPaused, setIsGuruCarouselPaused] = useState(false);
+  const guruCarouselRef = useRef<HTMLDivElement | null>(null);
 
-  const [launchForm, setLaunchForm] = useState<LaunchFormState>(
-    initialLaunchFormState,
-  );
-  const [isSubmittingLaunch, setIsSubmittingLaunch] = useState(false);
-  const [launchError, setLaunchError] = useState("");
-  const [launchSuccess, setLaunchSuccess] = useState("");
-
-  const phoneLoginRole = launchForm.interestType === "guru" ? "guru" : "customer";
-  const phoneLoginNextPath =
-    launchForm.interestType === "guru" ? "/guru/dashboard" : "/customer/dashboard";
-
-  const isCustomerSelected = useMemo(
-    () =>
-      launchForm.interestType === "customer" ||
-      launchForm.interestType === "both",
-    [launchForm.interestType],
-  );
-
-  const isGuruSelected = useMemo(
-    () =>
-      launchForm.interestType === "guru" || launchForm.interestType === "both",
-    [launchForm.interestType],
-  );
+  const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
+  const visibleGuruCards = useMemo(() => guruCards.slice(0, 8), [guruCards]);
 
   useEffect(() => {
     if ("scrollRestoration" in window.history) {
@@ -840,22 +743,53 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const source = detectSourceFromUrl();
+    const carousel = guruCarouselRef.current;
 
-    setLaunchForm((prev) => ({
-      ...prev,
-      source,
-    }));
+    if (!carousel || visibleGuruCards.length <= 1) return;
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    if (prefersReducedMotion) return;
+
+    let animationFrameId = 0;
+
+    function moveCarousel() {
+      if (!carousel) return;
+
+      const resetPoint = carousel.scrollWidth / 2;
+
+      if (!isGuruCarouselPaused && resetPoint > carousel.clientWidth) {
+        carousel.scrollLeft += 0.34;
+
+        if (carousel.scrollLeft >= resetPoint - 2) {
+          carousel.scrollLeft = 0;
+        }
+      }
+
+      animationFrameId = window.requestAnimationFrame(moveCarousel);
+    }
+
+    animationFrameId = window.requestAnimationFrame(moveCarousel);
+
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [isGuruCarouselPaused, visibleGuruCards.length]);
+
+  useEffect(() => {
+    const detectedSource = detectSourceFromUrl();
+    setSource(detectedSource);
 
     trackEvent({
       eventName: "homepage_visit",
       eventType: "traffic",
-      source,
+      source: detectedSource,
       metadata: {
         referrer: document.referrer || "",
         url: window.location.href,
         search: window.location.search,
         pathname: window.location.pathname,
+        version: "launch_optimized_clear_audiences",
       },
     });
   }, []);
@@ -864,34 +798,22 @@ export default function HomePage() {
     async function loadHomepageGurus() {
       const { data, error } = await supabase
         .from("gurus")
-        .select(
-          `
-          id,
-          slug,
-          full_name,
-          title,
-          city,
-          state,
-          services,
-          image_url,
-          rating,
-          is_verified,
-          is_active
-        `,
-        )
-        .eq("is_active", true)
-        .order("rating", { ascending: false, nullsFirst: false })
+        .select("*")
+        .or("is_public.eq.true,is_active.eq.true")
+        .order("is_verified", { ascending: false })
+        .order("rating_avg", { ascending: false, nullsFirst: false })
         .limit(8);
 
       if (error) {
-        console.error("Homepage carousel load error:", error.message);
+        console.error("Homepage Guru load error:", error.message);
 
         trackEvent({
-          eventName: "homepage_guru_carousel_load_error",
+          eventName: "homepage_guru_load_error",
           eventType: "system",
           source: detectSourceFromUrl(),
           metadata: {
             error: error.message,
+            version: "launch_optimized_clear_audiences",
           },
         });
 
@@ -901,18 +823,27 @@ export default function HomePage() {
       const gurus = (data || []) as Guru[];
 
       trackEvent({
-        eventName: "homepage_guru_carousel_loaded",
+        eventName: "homepage_gurus_loaded",
         eventType: "system",
         source: detectSourceFromUrl(),
         metadata: {
           guru_count: gurus.length,
-          using_fallback: gurus.length === 0,
+          guru_card_count: mapGurusToCards(gurus).length,
+          using_account_photos_only: true,
+          version: "launch_optimized_clear_audiences",
         },
       });
 
-      if (gurus.length > 0) {
-        setCarouselItems(mapGurusToCarouselItems(gurus));
+      const mappedGuruCards = mapGurusToCards(gurus);
+
+      if (mappedGuruCards.length === 0) {
+        console.warn(
+          "Homepage Guru carousel found Guru rows but no account-photo-backed cards. Check profile_photo_url, photo_url, avatar_url, or image_url on gurus.",
+          { guru_count: gurus.length },
+        );
       }
+
+      setGuruCards(mappedGuruCards);
     }
 
     loadHomepageGurus();
@@ -929,7 +860,7 @@ export default function HomePage() {
 
     if (normalizedZip.length < 5) {
       setZipLookupStatus("idle");
-      setZipLookupMessage("Enter a 5-digit ZIP code to autofill city and state.");
+      setZipLookupMessage("Enter a 5-digit ZIP code to autofill your area.");
       return;
     }
 
@@ -947,7 +878,7 @@ export default function HomePage() {
         if (!result?.city || !result?.state) {
           setZipLookupStatus("not-found");
           setZipLookupMessage(
-            "We could not autofill that ZIP code. You can still enter city and state manually.",
+            "We could not autofill that ZIP code. You can still search.",
           );
           return;
         }
@@ -956,12 +887,14 @@ export default function HomePage() {
           ...prev,
           zipCode: normalizedZip,
           city: result.city,
-          state: result.state,
+          state: result.stateAbbreviation || result.state,
         }));
 
         setZipLookupStatus("found");
         setZipLookupMessage(
-          `Autofilled ${result.city}, ${result.stateAbbreviation || result.state}.`,
+          `Autofilled ${result.city}, ${
+            result.stateAbbreviation || result.state
+          }.`,
         );
       } catch (error) {
         if (!isMounted) return;
@@ -969,7 +902,7 @@ export default function HomePage() {
         console.error("ZIP code lookup failed:", error);
         setZipLookupStatus("error");
         setZipLookupMessage(
-          "ZIP autofill is unavailable right now. You can still enter city and state manually.",
+          "ZIP autofill is unavailable right now. You can still search.",
         );
       }
     }
@@ -992,1398 +925,605 @@ export default function HomePage() {
     }));
   }
 
-  function updateLaunchField<K extends keyof LaunchFormState>(
-    key: K,
-    value: LaunchFormState[K],
-  ) {
-    setLaunchForm((prev) => ({
-      ...prev,
-      [key]:
-        key === "phone"
-          ? (formatPhoneWithDashes(String(value)) as LaunchFormState[K])
-          : value,
-    }));
-  }
-
-  function trackHomepageClick(
-    label: string,
-    location: string,
-    destination?: string,
-  ) {
+  function trackHomepageClick(label: string, destination: string) {
     trackEvent({
       eventName: "homepage_cta_clicked",
       eventType: "navigation",
-      source: launchForm.source || detectSourceFromUrl(),
-      role: launchForm.interestType,
+      source,
       metadata: {
         label,
-        location,
-        destination: destination || "",
-      },
-    });
-  }
-
-  function scrollToLaunchForm(nextAudience?: InterestType) {
-    if (nextAudience) {
-      setLaunchForm((prev) => ({
-        ...prev,
-        interestType: nextAudience,
-      }));
-    }
-
-    trackEvent({
-      eventName: "launch_form_opened",
-      eventType: "lead",
-      source: launchForm.source || detectSourceFromUrl(),
-      role: nextAudience || launchForm.interestType,
-      metadata: {
-        location: "homepage",
-        selected_audience: nextAudience || launchForm.interestType,
-      },
-    });
-
-    const section = document.getElementById("free-signup");
-    if (section) {
-      section.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }
-
-  function handlePawPerksAudienceChange(audience: PawPerksAudience) {
-    setSelectedPawPerksAudience(audience);
-
-    trackEvent({
-      eventName: "homepage_petperks_audience_selected",
-      eventType: "referral",
-      source: launchForm.source || detectSourceFromUrl(),
-      role: audience,
-      metadata: {
-        selected_audience: audience,
-        location: "homepage_petperks_section",
+        destination,
+        version: "launch_optimized_clear_audiences",
       },
     });
   }
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
-    const formData = new FormData(event.currentTarget);
-
     trackEvent({
       eventName: "search_started",
       eventType: "search",
-      source: launchForm.source || detectSourceFromUrl(),
+      source,
       role: "customer",
       metadata: {
-        location: "homepage_top_search",
-        service: String(formData.get("service") || ""),
-        city: String(formData.get("city") || ""),
-        state: String(formData.get("state") || ""),
-        zip_code: String(formData.get("zipCode") || formData.get("zip") || ""),
+        location: "homepage_hero_search",
+        service: searchForm.service,
+        city: searchForm.city,
+        state: searchForm.state,
+        zip_code: searchForm.zipCode,
+        destination: searchHref,
+        version: "launch_optimized_clear_audiences",
       },
     });
+
+    if (
+      !searchForm.service &&
+      !searchForm.zipCode &&
+      !searchForm.city &&
+      !searchForm.state
+    ) {
+      event.preventDefault();
+      window.location.href = "/search";
+    }
   }
 
-  async function handleOAuthSignup(provider: "google" | "apple") {
-    const selectedNextPath =
-      launchForm.interestType === "guru"
-        ? "/guru/dashboard/profile"
-        : "/customer/dashboard/profile";
-
+  async function handleOAuthSignup() {
     const callbackUrl =
       typeof window !== "undefined"
         ? new URL("/auth/callback", window.location.origin)
         : null;
 
     if (callbackUrl) {
-      callbackUrl.searchParams.set("next", selectedNextPath);
-      callbackUrl.searchParams.set("type", launchForm.interestType);
+      callbackUrl.searchParams.set("next", "/customer/dashboard/profile");
+      callbackUrl.searchParams.set("type", "customer");
     }
 
     trackEvent({
       eventName: "homepage_social_signup_clicked",
       eventType: "auth",
-      source: launchForm.source || detectSourceFromUrl(),
-      role: launchForm.interestType,
+      source,
+      role: "customer",
       metadata: {
-        provider,
-        location: "homepage_free_signup_card",
-        selected_next_path: selectedNextPath,
-        force_google_account_picker: provider === "google",
+        provider: "google",
+        location: "homepage_launch_signup_card",
+        selected_next_path: "/customer/dashboard/profile",
+        version: "launch_optimized_clear_audiences",
       },
     });
-
-    const oauthOptions =
-      provider === "google"
-        ? {
-            redirectTo: callbackUrl?.toString(),
-            queryParams: {
-              prompt: "select_account",
-            },
-          }
-        : {
-            redirectTo: callbackUrl?.toString(),
-          };
 
     await supabase.auth.signInWithOAuth({
-      provider,
-      options: oauthOptions,
-    });
-  }
-
-  async function handleLaunchSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSubmittingLaunch(true);
-    setLaunchError("");
-    setLaunchSuccess("");
-
-    trackEvent({
-      eventName: "launch_signup_started",
-      eventType: "lead",
-      source: launchForm.source || detectSourceFromUrl(),
-      role: launchForm.interestType,
-      metadata: {
-        location: "homepage_free_signup_card",
-        has_phone: Boolean(launchForm.phone.trim()),
-        has_zip_code: Boolean(launchForm.zipCode.trim()),
-        has_pet_types: Boolean(launchForm.petTypes.trim()),
-        has_services_offered: Boolean(launchForm.servicesOffered.trim()),
-        has_notes: Boolean(launchForm.notes.trim()),
+      provider: "google",
+      options: {
+        redirectTo: callbackUrl?.toString(),
+        queryParams: {
+          prompt: "select_account",
+        },
       },
     });
-
-    try {
-      const response = await fetch("/api/launch-signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(launchForm),
-      });
-
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          payload?.error || "Unable to create your free SitGuru signup right now.",
-        );
-      }
-
-      trackEvent({
-        eventName: "launch_signup_completed",
-        eventType: "lead",
-        source: launchForm.source || detectSourceFromUrl(),
-        role: launchForm.interestType,
-        metadata: {
-          interest_type: launchForm.interestType,
-          location: "homepage_free_signup_card",
-          has_phone: Boolean(launchForm.phone.trim()),
-          has_zip_code: Boolean(launchForm.zipCode.trim()),
-          has_pet_types: Boolean(launchForm.petTypes.trim()),
-          has_services_offered: Boolean(launchForm.servicesOffered.trim()),
-          has_notes: Boolean(launchForm.notes.trim()),
-        },
-      });
-
-      setLaunchSuccess(
-        "You’re signed up. Welcome to the SitGuru pack — we’ll share launch updates and next steps soon.",
-      );
-
-      setLaunchForm((prev) => ({
-        ...initialLaunchFormState,
-        source: prev.source || "direct",
-      }));
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while submitting your information.";
-
-      trackEvent({
-        eventName: "launch_signup_failed",
-        eventType: "lead",
-        source: launchForm.source || detectSourceFromUrl(),
-        role: launchForm.interestType,
-        metadata: {
-          error: message,
-          location: "homepage_free_signup_card",
-        },
-      });
-
-      setLaunchError(message);
-    } finally {
-      setIsSubmittingLaunch(false);
-    }
   }
 
   return (
     <main
-      className={`${openSans.className} page-shell bg-white text-slate-950 font-light`}
-      style={{ fontWeight: 300 }}
+      className={`${openSans.className} min-h-screen bg-white text-slate-950`}
+      style={{ fontWeight: 300 } as CSSProperties}
     >
-      <section className="border-b border-slate-200 bg-white py-8 sm:py-10">
-        <div className="page-container">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="section-kicker">Find a Guru</div>
-            <h2 className="mt-4 text-slate-950">Start with a simple search</h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              Search by service and location from any device. Start simple now,
-              then continue into richer matching, pet details, and booking flow.
-            </p>
-          </div>
+      <section className="relative overflow-hidden border-b border-slate-100 bg-white">
+        <HeroVisual />
 
-          <form
-            action="/search"
-            onSubmit={handleSearchSubmit}
-            className="panel mx-auto mt-8 max-w-5xl p-6 sm:p-8"
-          >
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
+        <div className="relative z-10 mx-auto grid max-w-7xl gap-6 px-4 pb-5 pt-10 sm:px-6 sm:py-10 lg:min-h-[690px] lg:grid-cols-[minmax(0,690px)_minmax(240px,1fr)_350px] lg:items-center lg:gap-7 lg:px-8 lg:py-12 xl:grid-cols-[minmax(0,720px)_minmax(270px,1fr)_370px] xl:gap-8">
+          <div className="lg:py-8">
+            <div className="grid gap-4 lg:block">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  What service do you need?
-                </label>
-                <select
-                  name="service"
-                  value={searchForm.service}
-                  onChange={(event) =>
-                    updateSearchField("service", event.target.value)
-                  }
-                  className="select w-full"
-                >
-                  <option value="">All services</option>
-                  {heroServiceOptions.map((service) => (
-                    <option key={service} value={service}>
-                      {service}
-                    </option>
-                  ))}
-                </select>
+                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50/95 px-3 py-1 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur sm:text-xs">
+                  A new way to pet care is here
+                </div>
+
+                <div className="mt-4 max-w-[76%] sm:max-w-[590px] lg:max-w-[640px] xl:max-w-[680px]">
+                  <h1 className="text-[2.1rem] font-black leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-[4rem] lg:text-[4.25rem] xl:text-[4.75rem]">
+                    Trusted pet care.
+                    <br />
+                    Made <span className="text-emerald-600">simple.</span>
+                  </h1>
+
+                  <p className="mt-3 max-w-xl text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:max-w-[610px] lg:text-[1.05rem] xl:text-lg">
+                    SitGuru is a new way for Pet Parents to find trusted local
+                    Gurus for walks, sitting, boarding, training and more —
+                    with care, convenience, and community built in.
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  ZIP code
-                </label>
-                <input
-                  name="zipCode"
-                  value={searchForm.zipCode}
-                  onChange={(event) =>
-                    updateSearchField("zipCode", event.target.value)
-                  }
-                  className="input w-full"
-                  inputMode="numeric"
-                  maxLength={5}
-                  placeholder="18951"
-                />
-                <input type="hidden" name="zip" value={searchForm.zipCode} />
-              </div>
+              <form
+                action="/search"
+                onSubmit={handleSearchSubmit}
+                className="relative z-20 mt-9 rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.13)] backdrop-blur sm:mt-8 lg:mt-7 lg:w-[690px] xl:w-[720px]"
+              >
+                <input type="hidden" name="city" value={searchForm.city} />
+                <input type="hidden" name="state" value={searchForm.state} />
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  City
-                </label>
-                <input
-                  name="city"
-                  value={searchForm.city}
-                  onChange={(event) =>
-                    updateSearchField("city", event.target.value)
-                  }
-                  className="input w-full"
-                  placeholder="Quakertown"
-                />
-              </div>
+                <div className="grid gap-3 md:grid-cols-[1.45fr_1fr_auto]">
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      What service do you need?
+                    </span>
+                    <select
+                      name="service"
+                      value={searchForm.service}
+                      onChange={(event) =>
+                        updateSearchField("service", event.target.value)
+                      }
+                      className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                    >
+                      <option value="">All services</option>
+                      {heroServiceOptions.map((service) => (
+                        <option key={service} value={service}>
+                          {service}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  State
-                </label>
-                <input
-                  name="state"
-                  value={searchForm.state}
-                  onChange={(event) =>
-                    updateSearchField("state", event.target.value)
-                  }
-                  className="input w-full"
-                  placeholder="Pennsylvania"
-                />
-              </div>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      ZIP code
+                    </span>
+                    <div className="relative">
+                      <input
+                        name="zip"
+                        value={searchForm.zipCode}
+                        onChange={(event) =>
+                          updateSearchField("zipCode", event.target.value)
+                        }
+                        className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        inputMode="numeric"
+                        maxLength={5}
+                        placeholder="19511"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+                        ⌖
+                      </span>
+                    </div>
+                  </label>
 
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="btn-primary w-full px-10 py-4 text-lg lg:w-auto"
-                >
-                  Search Gurus
-                </button>
+                  <div className="flex items-end">
+                    <button
+                      type="submit"
+                      className="h-12 w-full rounded-xl bg-emerald-700 px-7 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 md:w-auto"
+                    >
+                      Search Gurus
+                    </button>
+                  </div>
+                </div>
+
+                {zipLookupMessage ? (
+                  <p
+                    className={`mt-3 text-xs font-bold ${
+                      zipLookupStatus === "found"
+                        ? "text-emerald-700"
+                        : zipLookupStatus === "loading"
+                          ? "text-slate-500"
+                          : "text-amber-700"
+                    }`}
+                  >
+                    {zipLookupMessage}
+                  </p>
+                ) : null}
+              </form>
+
+              <div className="relative z-20 mt-4 lg:mt-6 lg:w-[640px] xl:w-[670px]">
+                <TrustRow />
               </div>
             </div>
+          </div>
 
-            {zipLookupMessage ? (
-              <p
-                className={`mt-4 text-sm font-semibold ${
-                  zipLookupStatus === "found"
-                    ? "text-emerald-700"
-                    : zipLookupStatus === "loading"
-                      ? "text-slate-500"
-                      : "text-amber-700"
-                }`}
-              >
-                {zipLookupMessage}
-              </p>
-            ) : null}
-          </form>
+          <div className="hidden min-h-[500px] lg:block" />
+
+          <div className="relative z-20 hidden lg:block">
+            <HeroSignupCard
+              onGoogleSignup={handleOAuthSignup}
+              onTrack={trackHomepageClick}
+            />
+          </div>
         </div>
       </section>
 
-      <section className="relative overflow-hidden bg-white px-3 py-5 sm:px-5 sm:py-8 lg:px-8">
-        <div className="mx-auto max-w-7xl overflow-hidden rounded-[28px] border border-slate-100 bg-gradient-to-br from-white via-white to-emerald-50 shadow-[0_28px_90px_rgba(15,23,42,0.10)] sm:rounded-[36px]">
-          <div className="relative overflow-hidden px-5 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-14">
-            <div className="pointer-events-none absolute inset-0">
-              <div className="absolute inset-y-0 right-0 hidden w-[46%] bg-gradient-to-l from-emerald-100/60 via-emerald-50/20 to-transparent lg:block" />
-              <div className="absolute -left-20 top-24 h-72 w-72 rounded-full bg-emerald-100/70 blur-3xl" />
-              <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-amber-100/40 blur-3xl" />
+      <section className="bg-white py-5 sm:py-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black tracking-[-0.035em] text-slate-950 sm:text-3xl">
+                Meet local Gurus Pet Parents love
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-slate-600 sm:text-sm">
+                Real people. Real care. Real reviews.
+              </p>
             </div>
 
-            <div className="relative grid gap-8 lg:grid-cols-[1.08fr_0.92fr] lg:items-start lg:gap-10">
-              <div className="relative z-10">
-                <div className="inline-flex items-center gap-3 rounded-full bg-emerald-50 px-2 py-2 shadow-sm ring-1 ring-emerald-100">
-                  <span className="rounded-full border border-emerald-300 bg-white px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-700">
-                    New
-                  </span>
-                  <span className="pr-3 text-sm font-semibold text-slate-600">
-                    A Smarter Way to Pet Care
-                  </span>
-                </div>
+            <Link
+              href="/search"
+              onClick={() => trackHomepageClick("View all Gurus", "/search")}
+              className="text-xs font-black text-emerald-700 hover:text-emerald-800 hover:underline sm:text-sm"
+            >
+              View all Gurus
+            </Link>
+          </div>
 
-                <h1 className="mt-8 max-w-3xl text-[3.15rem] font-black leading-[0.98] tracking-[-0.06em] text-slate-950 sm:text-[4.25rem] lg:text-[5.15rem]">
-                  Pet care
-                  <br />
-                  just got better.
-                  <br />
-                  <span className="text-emerald-600">
-                    Something new
-                    <br />
-                    is here.
-                  </span>
-                </h1>
-
-                <div className="mt-7 max-w-2xl space-y-4 text-lg leading-8 text-slate-600">
-                  <p>
-                    SitGuru connects Pet Parents with trusted local Gurus for{" "}
-                    <span className="font-bold text-emerald-700">
-                      walking, sitting, boarding, training
-                    </span>{" "}
-                    and more.
-                  </p>
-
-                  <p>
-                    It’s modern pet care, built around trust, convenience, and
-                    happy pets.
-                  </p>
-                </div>
-
-                <div className="mt-8 grid gap-4 text-sm font-bold text-slate-700 sm:grid-cols-3">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                      ♡
-                    </span>
-                    Trusted local Gurus
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                      ✤
-                    </span>
-                    All-in-one pet care
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                      ✓
-                    </span>
-                    Verified & reviewed
-                  </div>
-                </div>
-
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <Link
-                    href="/search"
-                    className="btn-primary w-full sm:w-auto"
-                    onClick={() =>
-                      trackHomepageClick("Find a Guru", "new_hero", "/search")
-                    }
-                  >
-                    Find care near me
-                  </Link>
-
-                  <button
-                    type="button"
-                    onClick={() => scrollToLaunchForm("guru")}
-                    className="btn-secondary w-full sm:w-auto"
-                  >
-                    Become a Guru
-                  </button>
-                </div>
-
-                <div className="mt-8 overflow-hidden rounded-[30px] border border-white/70 bg-white shadow-[0_26px_70px_rgba(15,23,42,0.14)] ring-1 ring-slate-100">
-                  <img
-                    src={heroImagePath}
-                    alt="SitGuru caregiver with happy dogs wearing SitGuru avatar bandanas"
-                    className="h-[260px] w-full object-cover object-center sm:h-[340px] lg:h-[360px]"
-                    loading="eager"
-                  />
-                </div>
-              </div>
-
-              <div
-                id="free-signup"
-                className="relative z-20 rounded-[30px] border border-slate-200 bg-white/95 p-5 shadow-[0_30px_80px_rgba(15,23,42,0.16)] backdrop-blur-sm sm:p-7 lg:mt-6"
-              >
-                <div>
-                  <h2 className="text-3xl font-black tracking-[-0.04em] text-slate-950">
-                    Get started for free
-                  </h2>
-                  <p className="mt-2 text-sm font-medium text-slate-500">
-                    Create your free account in less than a minute.
-                  </p>
-                </div>
-
-                <div className="mt-7 grid gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleOAuthSignup("google")}
-                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40"
-                  >
-                    <span className="text-lg">G</span>
-                    Continue with Google
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleOAuthSignup("apple")}
-                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40"
-                  >
-                    <span className="text-lg"></span>
-                    Continue with Apple
-                  </button>
-                </div>
-
-                <div className="mt-6">
-                  <label className="mb-3 block text-sm font-bold text-slate-800">
-                    I’m joining as a...
-                  </label>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {audienceOptions.slice(0, 2).map((option) => {
-                      const selected = launchForm.interestType === option.value;
-
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => {
-                            updateLaunchField("interestType", option.value);
-
-                            trackEvent({
-                              eventName: "launch_interest_selected",
-                              eventType: "lead",
-                              source: launchForm.source || detectSourceFromUrl(),
-                              role: option.value,
-                              metadata: {
-                                selected_interest: option.value,
-                                location: "homepage_free_signup_card",
-                              },
-                            });
-                          }}
-                          className={`min-h-[104px] rounded-2xl border p-4 text-center transition ${
-                            selected
-                              ? "border-emerald-500 bg-emerald-50 shadow-sm ring-4 ring-emerald-100"
-                              : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
-                          }`}
-                        >
-                          <div className="text-xl">{option.emoji}</div>
-                          <div className="mt-1 text-sm font-black text-slate-900">
-                            {option.label}
-                          </div>
-                          <p className="mt-2 text-xs leading-5 text-slate-500">
-                            {option.description}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => updateLaunchField("interestType", "both")}
-                    className={`mt-3 w-full rounded-2xl border px-4 py-3 text-sm font-bold transition ${
-                      launchForm.interestType === "both"
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-800 ring-4 ring-emerald-100"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/40"
-                    }`}
-                  >
-                    ✨ I’m interested in both
-                  </button>
-                </div>
-
-                <PhoneCodeLogin
-                  nextPath={phoneLoginNextPath}
-                  role={phoneLoginRole}
-                  heading="Continue with phone"
-                  description="Enter your mobile number and we’ll text you a secure 6-digit SitGuru code."
-                  submitLabel="Text me a code"
-                  verifyLabel={
-                    phoneLoginRole === "guru"
-                      ? "Verify & enter Guru Dashboard"
-                      : "Verify & enter Customer Dashboard"
-                  }
-                  compact
+          {visibleGuruCards.length > 0 ? (
+            <div
+              ref={guruCarouselRef}
+              onMouseEnter={() => setIsGuruCarouselPaused(true)}
+              onMouseLeave={() => setIsGuruCarouselPaused(false)}
+              onTouchStart={() => setIsGuruCarouselPaused(true)}
+              onTouchEnd={() => setIsGuruCarouselPaused(false)}
+              onFocus={() => setIsGuruCarouselPaused(true)}
+              onBlur={() => setIsGuruCarouselPaused(false)}
+              className="mt-5 flex gap-3 overflow-x-auto scroll-smooth pb-4 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+              aria-label="Featured local Gurus carousel"
+            >
+              {[...visibleGuruCards, ...visibleGuruCards].map((guru, index) => (
+                <GuruCardView
+                  key={`${guru.id}-${index}`}
+                  guru={guru}
+                  onTrack={trackHomepageClick}
                 />
-
-                <div className="my-6 flex items-center gap-4">
-                  <div className="h-px flex-1 bg-slate-200" />
-                  <span className="text-sm font-semibold text-slate-400">
-                    or finish the quick form
-                  </span>
-                  <div className="h-px flex-1 bg-slate-200" />
-                </div>
-
-                <form onSubmit={handleLaunchSubmit} className="space-y-5">
-                  <div>
-                    <label className="mb-2 block text-sm font-bold text-slate-800">
-                      Full name
-                    </label>
-                    <input
-                      type="text"
-                      value={launchForm.fullName}
-                      onChange={(e) =>
-                        updateLaunchField("fullName", e.target.value)
-                      }
-                      placeholder="Your full name"
-                      className="input w-full"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-bold text-slate-800">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={launchForm.email}
-                      onChange={(e) =>
-                        updateLaunchField("email", e.target.value)
-                      }
-                      placeholder="you@example.com"
-                      className="input w-full"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-bold text-slate-800">
-                        ZIP code
-                      </label>
-                      <input
-                        type="text"
-                        value={launchForm.zipCode}
-                        onChange={(e) =>
-                          updateLaunchField(
-                            "zipCode",
-                            normalizeZipCode(e.target.value),
-                          )
-                        }
-                        placeholder="Optional"
-                        className="input w-full"
-                        inputMode="numeric"
-                        maxLength={5}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-bold text-slate-800">
-                        Phone
-                      </label>
-                      <input
-                        type="tel"
-                        value={launchForm.phone}
-                        onChange={(e) =>
-                          updateLaunchField("phone", e.target.value)
-                        }
-                        placeholder="856-555-1234"
-                        className="input w-full"
-                        inputMode="tel"
-                        maxLength={12}
-                      />
-                    </div>
-                  </div>
-
-                  {isCustomerSelected ? (
-                    <div>
-                      <label className="mb-2 block text-sm font-bold text-slate-800">
-                        Pet type(s)
-                      </label>
-                      <input
-                        type="text"
-                        value={launchForm.petTypes}
-                        onChange={(e) =>
-                          updateLaunchField("petTypes", e.target.value)
-                        }
-                        placeholder="Dogs, cats, puppies, senior pets..."
-                        className="input w-full"
-                      />
-                    </div>
-                  ) : null}
-
-                  {isGuruSelected ? (
-                    <div>
-                      <label className="mb-2 block text-sm font-bold text-slate-800">
-                        Services offered
-                      </label>
-                      <input
-                        type="text"
-                        value={launchForm.servicesOffered}
-                        onChange={(e) =>
-                          updateLaunchField("servicesOffered", e.target.value)
-                        }
-                        placeholder="Pet sitting, walks, boarding, training..."
-                        className="input w-full"
-                      />
-                    </div>
-                  ) : null}
-
-                  <div>
-                    <label className="mb-2 block text-sm font-bold text-slate-800">
-                      Notes
-                    </label>
-                    <textarea
-                      value={launchForm.notes}
-                      onChange={(e) => updateLaunchField("notes", e.target.value)}
-                      rows={3}
-                      placeholder="Tell us what you’d love to see."
-                      className="input min-h-[96px] w-full resize-y"
-                    />
-                  </div>
-
-                  {launchError ? (
-                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                      {launchError}
-                    </div>
-                  ) : null}
-
-                  {launchSuccess ? (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                      {launchSuccess}
-                    </div>
-                  ) : null}
-
-                  <button
-                    type="submit"
-                    disabled={isSubmittingLaunch}
-                    className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSubmittingLaunch ? "Signing up..." : "Sign up for free"}
-                  </button>
-
-                  <p className="text-center text-sm text-slate-500">
-                    Already have an account?{" "}
-                    <Link
-                      href="/login"
-                      className="font-black text-emerald-700 hover:text-emerald-800 hover:underline"
-                      onClick={() =>
-                        trackHomepageClick(
-                          "Login",
-                          "homepage_free_signup_card",
-                          "/login",
-                        )
-                      }
-                    >
-                      Log in
-                    </Link>
-                  </p>
-                </form>
-              </div>
+              ))}
             </div>
+          ) : (
+            <div className="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50/50 p-5 text-sm font-semibold text-slate-700">
+              Guru profiles are loading from account photos. Visit Find Care to
+              view all available Gurus while profile photos finish syncing to the
+              homepage carousel.
+            </div>
+          )}
+        </div>
+      </section>
 
-            <div className="relative z-30 mt-8 rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-md">
-              <h2 className="text-center text-2xl font-black tracking-[-0.04em] text-slate-950">
-                Everything you need. All in one place.
+      <section className="bg-white pb-7 sm:pb-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid overflow-hidden rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 shadow-[0_18px_45px_rgba(15,23,42,0.08)] lg:grid-cols-3">
+            <div className="border-b border-emerald-100 p-5 lg:border-b-0 lg:border-r lg:p-6">
+              <h2 className="text-lg font-black tracking-[-0.03em] text-slate-950 lg:text-xl">
+                Share SitGuru. Earn PetPerks.
               </h2>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                {bottomHeroServices.map((service) => (
-                  <div key={service.title} className="text-center">
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-lg text-emerald-700 ring-1 ring-emerald-100">
-                      {service.icon}
-                    </div>
-                    <h3 className="mt-3 text-sm font-black text-slate-800">
-                      {service.title}
-                    </h3>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      {service.description}
+              <div className="mt-5 grid gap-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xl">
+                    🐾
+                  </span>
+                  <div>
+                    <p className="font-black text-slate-950">
+                      Give $10. Get $10.
                     </p>
+                    <p className="text-sm font-semibold text-slate-600">
+                      for Pet Parents
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-xl">
+                    🤝
+                  </span>
+                  <div>
+                    <p className="font-black text-slate-950">
+                      Refer a Guru. Earn $20.
+                    </p>
+                    <p className="text-sm font-semibold text-slate-600">
+                      for future Gurus
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Link
+                href="/signup"
+                onClick={() =>
+                  trackHomepageClick("PetPerks Learn More", "/signup")
+                }
+                className="mt-6 inline-flex rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
+              >
+                Learn more
+              </Link>
+            </div>
+
+            <div className="border-b border-emerald-100 p-5 lg:border-b-0 lg:border-r lg:p-6">
+              <h2 className="text-lg font-black tracking-[-0.03em] text-slate-950 lg:text-xl">
+                Anyone can join. Anyone can apply.
+              </h2>
+
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
+                Pet Parents use SitGuru to find trusted local care. Gurus apply
+                to offer care. SitGuru Programs create additional ways to earn,
+                refer, and help grow the SitGuru Pet Community.
+              </p>
+
+              <div className="mt-5 grid gap-4">
+                {programPathways.map((program) => (
+                  <Link
+                    key={program.title}
+                    href={program.href}
+                    onClick={() =>
+                      trackHomepageClick(program.title, program.href)
+                    }
+                    className="group flex items-start gap-3 rounded-2xl p-2 transition hover:bg-white"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-xl shadow-sm">
+                      {program.icon}
+                    </span>
+                    <div>
+                      <p className="font-black text-slate-950 group-hover:text-emerald-800">
+                        {program.title}
+                      </p>
+                      <p className="text-sm font-semibold leading-5 text-slate-600">
+                        {program.description}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link
+                  href="/search"
+                  onClick={() => trackHomepageClick("Find Care", "/search")}
+                  className="inline-flex rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-800"
+                >
+                  Find Care
+                </Link>
+
+                <Link
+                  href="/guru/signup"
+                  onClick={() =>
+                    trackHomepageClick("Become a Guru", "/guru/signup")
+                  }
+                  className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  Become a Guru
+                </Link>
+
+                <Link
+                  href="/programs"
+                  onClick={() =>
+                    trackHomepageClick("Explore Programs", "/programs")
+                  }
+                  className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  Explore Programs
+                </Link>
+              </div>
+            </div>
+
+            <div className="p-5 lg:p-6">
+              <h2 className="text-lg font-black tracking-[-0.03em] text-slate-950 lg:text-xl">
+                How SitGuru works
+              </h2>
+
+              <div className="mt-5 grid gap-4">
+                {[
+                  [
+                    "1",
+                    "Find a Guru",
+                    "Search local care by service & location",
+                  ],
+                  ["2", "Choose a service", "Pick the right care for your pet"],
+                  [
+                    "3",
+                    "Book with confidence",
+                    "Secure, trusted, and supported",
+                  ],
+                ].map(([number, title, description]) => (
+                  <div key={title} className="flex items-start gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
+                      {number}
+                    </span>
+                    <div>
+                      <p className="font-black text-slate-950">{title}</p>
+                      <p className="text-sm font-semibold text-slate-600">
+                        {description}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
+
+              <Link
+                href="/how-it-works"
+                onClick={() =>
+                  trackHomepageClick("See how it works", "/how-it-works")
+                }
+                className="mt-6 inline-flex items-center gap-2 text-sm font-black text-emerald-700 hover:text-emerald-800 hover:underline"
+              >
+                See how it works →
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      <CaregiverCarousel items={carouselItems} />
-
-      <section className="bg-gradient-to-br from-white via-slate-50 to-emerald-50 py-10 sm:py-14">
-        <div className="page-container">
-          <section className="rounded-[34px] border border-emerald-100 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
-            <div className="grid gap-8 xl:grid-cols-[0.82fr_1.18fr] xl:items-start">
+      <section className="bg-gradient-to-br from-white via-emerald-50/30 to-white pb-8 sm:pb-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-[34px] border border-emerald-100 bg-white/90 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
+            <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
               <div>
-                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-emerald-800">
-                  PetPerks Referral Program
-                </div>
-
-                <h2 className="mt-4 !text-3xl !font-bold !leading-tight text-slate-950 sm:!text-4xl">
-                  Share SitGuru. Earn PetPerks.
-                </h2>
-
-                <p className="mt-4 text-base leading-7 text-slate-700">
-                  Invite Pet Parents or future Gurus and earn rewards when they
-                  join the pack and complete eligible activity.
-                </p>
-
-                <div className="mt-6">
-                  <PawPerksRewardStates
-                    selectedAudience={selectedPawPerksAudience}
-                    onAudienceChange={handlePawPerksAudienceChange}
-                  />
-                </div>
-
-                <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                  <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
-                    Simple launch-friendly rewards
-                  </p>
-
-                  <div className="mt-4 grid gap-3">
-                    <div className="rounded-2xl border border-emerald-100 bg-white p-4">
-                      <p className="text-sm font-bold text-emerald-700">
-                        Pet Parents
-                      </p>
-                      <p className="mt-1 text-lg font-black text-slate-950">
-                        Give $10. Get $10.
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-sky-100 bg-white p-4">
-                      <p className="text-sm font-bold text-sky-700">
-                        Future Gurus
-                      </p>
-                      <p className="mt-1 text-lg font-black text-slate-950">
-                        Refer a Guru. Earn $20.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <PawPerksRewardCard
-                selectedAudience={selectedPawPerksAudience}
-                referralCode="COMMUNITY"
-              />
-            </div>
-          </section>
-
-          <section className="mt-10 rounded-[34px] border border-emerald-100 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
-            <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
-              <div>
-                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-emerald-800">
+                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-emerald-800">
                   SitGuru Programs
                 </div>
 
-                <h2 className="mt-4 !text-3xl !font-bold !leading-tight text-slate-950 sm:!text-4xl">
-                  Flexible pathways to earn, serve, and grow with SitGuru.
+                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-slate-950 sm:text-4xl">
+                  Anyone can join. Anyone can apply.
                 </h2>
 
-                <p className="mt-4 text-base leading-7 text-slate-700">
-                  SitGuru gives students, veterans, approved SkillBridge
-                  applicants, pet-care professionals, and community supporters a
-                  public pathway to earn, refer, support local Pet Parents, and
-                  grow with the SitGuru Pet Community.
+                <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
+                  Pet Parents use SitGuru to find trusted local care. Gurus apply
+                  to offer care. SitGuru Programs create additional ways to earn,
+                  refer, and help grow the SitGuru Pet Community.
                 </p>
 
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Link
-                    href="/programs/apply?program=student-hire"
-                    className="btn-primary w-full sm:w-auto"
+                    href="/search"
+                    onClick={() =>
+                      trackHomepageClick("Find Care Programs Section", "/search")
+                    }
+                    className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-sky-400 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:brightness-105 sm:w-auto"
+                  >
+                    Find Care
+                  </Link>
+
+                  <Link
+                    href="/guru/signup"
                     onClick={() =>
                       trackHomepageClick(
-                        "Start Student Hire",
-                        "homepage_programs_highlight",
-                        "/programs/apply?program=student-hire",
+                        "Become a Guru Programs Section",
+                        "/guru/signup",
                       )
                     }
+                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
                   >
-                    Start Student Hire
+                    Become a Guru
                   </Link>
 
                   <Link
                     href="/programs"
-                    className="btn-secondary w-full sm:w-auto"
                     onClick={() =>
-                      trackHomepageClick(
-                        "View SitGuru Programs",
-                        "homepage_programs_highlight",
-                        "/programs",
-                      )
+                      trackHomepageClick("Explore Programs", "/programs")
                     }
+                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
                   >
-                    Compare Programs
+                    Explore Programs
                   </Link>
                 </div>
 
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <span className="chip">Student Hire</span>
-                  <span className="chip">Veterans Hire</span>
-                  <span className="chip">SkillBridge applicants</span>
-                  <span className="chip">Ambassador Program</span>
-                  <span className="chip">Referral rewards</span>
-                  <span className="chip">Community growth</span>
+                <div className="mt-7 flex flex-wrap gap-3">
+                  {[
+                    "Student Hire",
+                    "Veterans Hire",
+                    "SkillBridge applicants",
+                    "Ambassador Program",
+                    "Referral rewards",
+                    "Community growth",
+                  ].map((chip) => (
+                    <span
+                      key={chip}
+                      className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-800"
+                    >
+                      {chip}
+                    </span>
+                  ))}
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-3">
                 {homepagePrograms.map((program) => (
-                  <div
+                  <ProgramHeroCard
                     key={program.title}
-                    className={`overflow-hidden rounded-[26px] border transition ${
-                      program.featured
-                        ? "border-amber-200 bg-amber-50 hover:border-amber-300 hover:bg-amber-100/70"
-                        : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/40"
-                    }`}
-                  >
-                    <div
-                      className={`relative overflow-hidden ${
-                        program.title === "Student Hire Program"
-                          ? "h-80 bg-sky-100 md:h-52 lg:h-56"
-                          : "h-64 md:h-52 lg:h-56"
-                      }`}
-                    >
-                      <img
-                        src={program.image}
-                        alt={program.imageAlt}
-                        className={`h-full w-full transition duration-500 hover:scale-105 ${
-                          program.title === "Student Hire Program"
-                            ? "object-contain object-center md:object-cover md:object-center"
-                            : "object-cover object-top"
-                        }`}
-                        loading="lazy"
-                      />
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/45 via-slate-950/10 to-transparent" />
-
-                      <div
-                        className={`absolute bottom-4 left-4 flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-lg ${
-                          program.featured
-                            ? "bg-amber-400 text-amber-950 shadow-amber-900/10"
-                            : "bg-emerald-700 text-white shadow-emerald-900/15"
-                        }`}
-                      >
-                        {program.icon}
-                      </div>
-                    </div>
-
-                    <div className="p-5">
-                      <p
-                        className={`text-xs font-bold uppercase tracking-[0.16em] ${
-                          program.featured
-                            ? "text-amber-700"
-                            : "text-emerald-700"
-                        }`}
-                      >
-                        {program.eyebrow}
-                      </p>
-
-                      <h3 className="mt-2 text-lg font-bold text-slate-950">
-                        {program.title}
-                      </h3>
-
-                      <p className="mt-2 text-sm leading-6 text-slate-700">
-                        {program.description}
-                      </p>
-
-                      <div className="mt-5 flex flex-col gap-2">
-                        <Link
-                          href={program.applyHref}
-                          className={`inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                            program.featured
-                              ? "bg-amber-400 text-amber-950 hover:bg-amber-300"
-                              : "bg-emerald-700 text-white hover:bg-emerald-800"
-                          }`}
-                          onClick={() =>
-                            trackHomepageClick(
-                              `${program.primaryCta} ${program.title}`,
-                              "homepage_programs_card",
-                              program.applyHref,
-                            )
-                          }
-                        >
-                          {program.primaryCta}
-                        </Link>
-
-                        <Link
-                          href={program.href}
-                          className={`inline-flex items-center justify-center rounded-full border bg-white px-4 py-2.5 text-sm font-semibold transition ${
-                            program.featured
-                              ? "border-amber-300 text-amber-900 hover:bg-amber-50"
-                              : "border-emerald-200 text-emerald-800 hover:bg-emerald-50"
-                          }`}
-                          onClick={() =>
-                            trackHomepageClick(
-                              `${program.secondaryCta} ${program.title}`,
-                              "homepage_programs_card",
-                              program.href,
-                            )
-                          }
-                        >
-                          {program.secondaryCta}
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
+                    program={program}
+                    onTrack={trackHomepageClick}
+                  />
                 ))}
               </div>
             </div>
-          </section>
-        </div>
-      </section>
-
-      <section className="section-space bg-slate-50">
-        <div className="page-container">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="section-kicker">How SitGuru works</div>
-            <h2 className="mt-4 text-slate-950">
-              The 5 pillars guiding the SitGuru experience
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              SitGuru is being shaped around trust, service clarity, better
-              matching, modern discovery, and stronger customer confidence.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-5">
-            {pillars.map((pillar) => (
-              <div
-                key={pillar.number}
-                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
-                  {pillar.number}
-                </p>
-                <h3 className="mt-3 text-xl font-bold text-slate-950">
-                  {pillar.title}
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-slate-700">
-                  {pillar.description}
-                </p>
-              </div>
-            ))}
           </div>
         </div>
       </section>
 
-      <section className="section-space bg-white">
-        <div className="page-container">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="section-kicker">Popular services</div>
-            <h2 className="mt-4 text-slate-950">
-              A marketplace that feels familiar but more elevated
+      <section className="bg-white pb-8 sm:pb-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950 sm:text-2xl">
+              Popular services
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              SitGuru gives Pet Parents a cleaner, warmer, and more trusted way
-              to find local pet care — with flexible services, clearer profiles,
-              and a more elevated experience built around pets, people, and
-              community.
-            </p>
+
+            <Link
+              href="/search"
+              onClick={() =>
+                trackHomepageClick("Browse all services", "/search")
+              }
+              className="text-sm font-black text-emerald-700 hover:text-emerald-800 hover:underline"
+            >
+              Browse all services
+            </Link>
           </div>
 
-          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {serviceCards.map((service) => (
-              <div
+          <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-6 sm:gap-4">
+            {popularServices.map((service) => (
+              <Link
                 key={service.title}
-                className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 shadow-sm"
+                href={service.href}
+                onClick={() => trackHomepageClick(service.title, service.href)}
+                className="group rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-sm transition hover:-translate-y-1 hover:border-emerald-200 hover:bg-emerald-50/40 hover:shadow-md"
               >
-                <div className="text-3xl">{service.icon}</div>
-                <h3 className="mt-4 text-xl font-bold text-slate-950">
+                <div className="text-2xl">{service.icon}</div>
+                <p className="mt-2 text-xs font-black text-slate-800 group-hover:text-emerald-800">
                   {service.title}
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-slate-700">
-                  {service.description}
                 </p>
-              </div>
+              </Link>
             ))}
           </div>
+        </div>
+      </section>
 
-          <div className="mt-8 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <h3 className="text-xl font-bold text-slate-950">
-                  Premium and specialty care direction
-                </h3>
-                <p className="mt-3 text-base leading-7 text-slate-700">
-                  SitGuru can stand out by supporting specialized requests like
-                  puppy care, senior care, medication support, transport, and
-                  custom pet care needs.
-                </p>
-              </div>
+      <section className="bg-white pb-10 sm:pb-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[30px] bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 p-6 text-center text-white shadow-[0_24px_70px_rgba(6,78,59,0.28)] sm:p-9">
+            <h2 className="text-2xl font-black tracking-[-0.04em] text-white sm:text-3xl">
+              Ready to get started?
+            </h2>
+            <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-emerald-50 sm:text-base">
+              Find trusted pet care or join SitGuru and be part of something
+              new.
+            </p>
 
+            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
               <Link
                 href="/search"
-                className="btn-secondary w-full lg:w-auto"
+                onClick={() =>
+                  trackHomepageClick("Find Care Near Me Final CTA", "/search")
+                }
+                className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-400"
+              >
+                ⌖ Find Care Near Me
+              </Link>
+
+              <Link
+                href="/guru/signup"
                 onClick={() =>
                   trackHomepageClick(
-                    "Browse Services Through Search",
-                    "premium_specialty_care",
-                    "/search",
+                    "Become a Guru Final CTA",
+                    "/guru/signup",
                   )
                 }
+                className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
               >
-                Browse Services Through Search
+                Become a Guru
+              </Link>
+
+              <Link
+                href="/programs"
+                onClick={() =>
+                  trackHomepageClick("Explore Programs Final CTA", "/programs")
+                }
+                className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
+              >
+                Explore Programs
               </Link>
             </div>
+          </div>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              {specialties.map((item) => (
-                <span key={item} className="chip">
-                  {item}
+          <div className="mt-7 grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
+            {[
+              "Secure payments",
+              "Trust & Safety focused",
+              "ID verified",
+              "Protected by SitGuru",
+            ].map((item) => (
+              <div key={item} className="text-xs font-black text-slate-600">
+                <span className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 text-emerald-700">
+                  ⛨
                 </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section-space bg-slate-50">
-        <div className="page-container">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
-              <div className="section-kicker">Match care to the pet</div>
-              <h2 className="mt-4 text-slate-950">
-                Better pet profiles make booking more accurate
-              </h2>
-              <p className="mt-4 text-base leading-7 text-slate-700">
-                SitGuru should not stop at service selection alone. Customers
-                should be able to match care to the pet through photos, notes,
-                medication details, temperament, feeding instructions, and
-                special needs.
-              </p>
-              <ul className="mt-6 space-y-3 text-sm leading-7 text-slate-700">
-                <li>• Pet photos and profile details</li>
-                <li>• Size, age, and care notes</li>
-                <li>• Medication and special instructions</li>
-                <li>• One-time and recurring care context</li>
-              </ul>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-800 bg-[#0f172a] p-7 !text-white shadow-sm sm:p-8">
-              <div className="inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-400/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] !text-emerald-200">
-                Better than generic booking
-              </div>
-              <h2 className="mt-4 !text-white">
-                SitGuru can feel smarter without feeling harder
-              </h2>
-              <p className="mt-4 text-base leading-7 !text-slate-100">
-                The booking journey should stay simple while collecting the
-                right information to help Gurus understand the pet and the
-                requested care.
-              </p>
-              <div className="mt-6 grid gap-3">
-                {[
-                  "Choose service",
-                  "Select pet(s)",
-                  "Add care notes",
-                  "Choose one-time or recurring",
-                  "Review with confidence",
-                ].map((step, index) => (
-                  <div
-                    key={step}
-                    className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold !text-white shadow-sm"
-                  >
-                    {index + 1}. {step}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section-space bg-white">
-        <div className="page-container">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="section-kicker">Who are Gurus?</div>
-            <h2 className="mt-4 text-slate-950">
-              Real local caregivers from a variety of backgrounds
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              The word Guru is flexible on purpose. It supports different types
-              of pet care and trusted local providers while staying easy for Pet
-              Parents to understand.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {guruTypes.map((type) => (
-              <div
-                key={type}
-                className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
-              >
-                <p className="text-base font-semibold text-slate-900">{type}</p>
+                {item}
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section-space bg-white">
-        <div className="page-container">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
-              <div className="section-kicker">For Pet Parents</div>
-              <h2 className="mt-4 text-slate-950">
-                Find care that feels more trustworthy from the start
-              </h2>
-              <p className="mt-4 text-base leading-7 text-slate-700">
-                Browse nearby Gurus, compare services, and choose someone who
-                feels right for your pet. SitGuru is being shaped to reduce
-                confusion and make booking feel more confident.
-              </p>
-              <ul className="mt-6 space-y-3 text-sm text-slate-700">
-                <li>• Browse local pet care providers</li>
-                <li>• Compare services and profile clarity</li>
-                <li>• Look for visible trust signals</li>
-                <li>• Book with more confidence</li>
-              </ul>
-              <div className="mt-6">
-                <Link
-                  href="/search"
-                  className="btn-primary w-full sm:w-auto"
-                  onClick={() =>
-                    trackHomepageClick(
-                      "Search for a Guru",
-                      "for_pet_parents",
-                      "/search",
-                    )
-                  }
-                >
-                  Search for a Guru
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-800 bg-[#0f172a] p-7 !text-white shadow-sm sm:p-8">
-              <div className="inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-400/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] !text-emerald-200">
-                For Gurus
-              </div>
-              <h2 className="mt-4 !text-white">
-                Offer services through a stronger local marketplace identity
-              </h2>
-              <p className="mt-4 text-base leading-7 !text-slate-100">
-                SitGuru gives care providers a more modern way to show services,
-                build trust, and connect with local Pet Parents looking for help.
-              </p>
-              <ul className="mt-6 space-y-3 text-sm leading-7 !text-slate-100">
-                <li>• Explain what makes you different</li>
-                <li>• Offer multiple services</li>
-                <li>• Build trust through profile clarity</li>
-                <li>• Grow as a local Guru</li>
-              </ul>
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={() => scrollToLaunchForm("guru")}
-                  className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
-                >
-                  Join as a Guru
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section-space bg-slate-50">
-        <div className="page-container">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="section-kicker">
-              Why Pet Parents will choose SitGuru
-            </div>
-            <h2 className="mt-4 text-slate-950">
-              Cleaner, clearer, warmer, and more trust-first
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-              SitGuru is being built to make discovery feel modern for Pet
-              Parents while making it easier to search, compare, and choose
-              care.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <div className="text-3xl">{feature.icon}</div>
-                <h3 className="mt-4 text-xl font-bold text-slate-950">
-                  {feature.title}
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-slate-700">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section-space bg-white">
-        <div className="page-container">
-          <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-            <div>
-              <div className="section-kicker">Book with confidence</div>
-              <h2 className="mt-4 text-slate-950">
-                Trust signals should be visible, not buried
-              </h2>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-                Pet Parents need reassurance. SitGuru should visibly support
-                that through cleaner profiles, stronger trust presentation, and
-                more understandable service information.
-              </p>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-7">
-              <div className="grid gap-3">
-                {trustPoints.map((point) => (
-                  <div
-                    key={point}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm"
-                  >
-                    {point}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section-space bg-slate-50">
-        <div className="page-container">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
-              <div className="section-kicker">Get support throughout care</div>
-              <h2 className="mt-4 text-slate-950">
-                Support should feel built into the experience
-              </h2>
-              <p className="mt-4 text-base leading-7 text-slate-700">
-                SitGuru should help customers before, during, and after bookings
-                with clearer support access, trust guidance, and more visible
-                help.
-              </p>
-              <ul className="mt-6 space-y-3 text-sm leading-7 text-slate-700">
-                <li>• Booking help and common questions</li>
-                <li>• Trust and safety guidance</li>
-                <li>• Easier support discovery from key pages</li>
-                <li>• Better reassurance throughout care</li>
-              </ul>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
-              <div className="section-kicker">What comes next</div>
-              <h2 className="mt-4 text-slate-950">
-                Homepage sets the direction for the rest of the platform
-              </h2>
-              <p className="mt-4 text-base leading-7 text-slate-700">
-                After this page, the strongest next updates are the search page,
-                public Guru profile, booking flow, customer dashboard, and My
-                Pets experience.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <span className="chip">Find a Guru page</span>
-                <span className="chip">Guru public profile</span>
-                <span className="chip">Booking flow</span>
-                <span className="chip">Customer dashboard</span>
-                <span className="chip">My Pets</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section-space bg-white">
-        <div className="page-container">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="section-kicker">
-              Early impression and social proof
-            </div>
-            <h2 className="mt-4 text-slate-950">
-              Messaging should feel human and easy to trust
-            </h2>
-          </div>
-
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {testimonials.map((testimonial) => (
-              <div
-                key={testimonial.name}
-                className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 shadow-sm"
-              >
-                <p className="text-base leading-7 text-slate-700">
-                  “{testimonial.quote}”
-                </p>
-                <div className="mt-6 border-t border-slate-200 pt-4">
-                  <p className="font-semibold text-slate-950">
-                    {testimonial.name}
-                  </p>
-                  <p className="text-sm text-slate-600">{testimonial.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section-space bg-slate-950 text-white">
-        <div className="page-container">
-          <div className="rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,#0f172a,#111827_45%,#0b1220)] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.25)] sm:p-10">
-            <div className="mx-auto max-w-3xl text-center">
-              <div className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-1.5 text-sm font-semibold text-emerald-300">
-                Ready to get started?
-              </div>
-
-              <h2 className="mt-5 !text-3xl !font-bold !leading-tight !text-white sm:!text-4xl">
-                Search for trusted pet care through SitGuru
-              </h2>
-
-              <p className="mx-auto mt-4 max-w-2xl !text-base !leading-7 !text-slate-200 sm:!text-lg">
-                Browse local Gurus, compare profiles, and start finding care
-                that feels right for your pet. Or sign up for free and be part
-                of what launches next.
-              </p>
-
-              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-                <Link
-                  href="/search"
-                  className="btn-primary w-full sm:w-auto"
-                  onClick={() =>
-                    trackHomepageClick("Find a Guru", "final_cta", "/search")
-                  }
-                >
-                  Find a Guru
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => scrollToLaunchForm("both")}
-                  className="inline-flex w-full items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold !text-white transition hover:bg-white/15 sm:w-auto"
-                >
-                  Sign up for free
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </section>

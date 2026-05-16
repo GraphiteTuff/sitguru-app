@@ -328,6 +328,256 @@ async function writeAuditTrail({
   }
 }
 
+
+function metadataString(metadata: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = safeString(metadata[key], 200);
+
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function metadataNumber(metadata: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = metadata[key];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const parsed = Number(value.replace(/[$,%\s,]/g, ""));
+
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+
+  return 0;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function normalizeGrowthEventType(eventName: string, eventType: string) {
+  const normalized = `${eventName} ${eventType}`.toLowerCase();
+
+  if (
+    normalized.includes("booking_completed") ||
+    normalized.includes("completed_booking") ||
+    normalized.includes("first_booking") ||
+    normalized.includes("paid_booking") ||
+    normalized.includes("booking_paid")
+  ) {
+    return "completed_booking";
+  }
+
+  if (normalized.includes("booking") || normalized.includes("checkout")) {
+    return "booking";
+  }
+
+  if (
+    normalized.includes("pet_parent_signup") ||
+    normalized.includes("customer_signup") ||
+    normalized.includes("guru_signup") ||
+    normalized.includes("account_created") ||
+    normalized.includes("signup") ||
+    normalized.includes("sign_up") ||
+    normalized.includes("registration")
+  ) {
+    return "signup";
+  }
+
+  if (
+    normalized.includes("ambassador_application") ||
+    normalized.includes("partner_application") ||
+    normalized.includes("program_application") ||
+    normalized.includes("application_submitted") ||
+    normalized.includes("apply") ||
+    normalized.includes("lead")
+  ) {
+    return "lead";
+  }
+
+  if (
+    normalized.includes("qr_scan") ||
+    normalized.includes("scan") ||
+    normalized.includes("click") ||
+    normalized.includes("cta")
+  ) {
+    return "click";
+  }
+
+  if (
+    normalized.includes("page_view") ||
+    normalized.includes("view") ||
+    normalized.includes("visit")
+  ) {
+    return "page_view";
+  }
+
+  return eventType || eventName;
+}
+
+function shouldMirrorToGrowthCampaignEvents({
+  eventName,
+  eventType,
+  source,
+  pagePath,
+  role,
+  metadata,
+}: {
+  eventName: string;
+  eventType: string;
+  source: string;
+  pagePath: string;
+  role: string | null;
+  metadata: Record<string, unknown>;
+}) {
+  const normalizedRole = String(role || "").toLowerCase();
+  const normalizedText = `${eventName} ${eventType} ${source} ${pagePath}`.toLowerCase();
+
+  if (
+    normalizedRole.includes("admin") ||
+    normalizedText.includes("/admin") ||
+    normalizedText.includes("audit") ||
+    normalizedText.includes("financial") ||
+    normalizedText.includes("security") ||
+    normalizedText.includes("export")
+  ) {
+    return false;
+  }
+
+  const campaignFields = [
+    "campaignId",
+    "campaign_id",
+    "campaignSlug",
+    "campaign_slug",
+    "campaignName",
+    "campaign_name",
+    "utm_campaign",
+    "utmCampaign",
+    "utm_source",
+    "utmSource",
+    "utm_medium",
+    "utmMedium",
+    "referralCode",
+    "referral_code",
+    "qrCode",
+    "qr_code",
+    "adId",
+    "ad_id",
+  ];
+
+  const hasCampaignField = campaignFields.some((key) => safeString(metadata[key], 200));
+
+  if (hasCampaignField) return true;
+
+  return [
+    "page_view",
+    "view",
+    "visit",
+    "click",
+    "qr_scan",
+    "scan",
+    "lead",
+    "application",
+    "signup",
+    "sign_up",
+    "registration",
+    "booking",
+    "checkout",
+  ].some((keyword) => normalizedText.includes(keyword));
+}
+
+async function writeGrowthCampaignEvent({
+  userId,
+  eventName,
+  eventType,
+  source,
+  pagePath,
+  guruId,
+  bookingId,
+  sessionId,
+  metadata,
+}: {
+  userId: string | null;
+  eventName: string;
+  eventType: string;
+  source: string;
+  pagePath: string;
+  guruId: string | null;
+  bookingId: string | null;
+  sessionId: string | null;
+  metadata: Record<string, unknown>;
+}) {
+  void userId;
+  void pagePath;
+  void guruId;
+  void bookingId;
+  void sessionId;
+
+  const campaignId = metadataString(metadata, ["campaignId", "campaign_id"]);
+  const campaignSlug =
+    metadataString(metadata, ["campaignSlug", "campaign_slug", "utm_campaign", "utmCampaign"]) ||
+    source ||
+    "unassigned";
+  const campaignName =
+    metadataString(metadata, ["campaignName", "campaign_name", "campaign", "utm_campaign"]) ||
+    campaignSlug ||
+    "Unassigned Campaign";
+  const campaignSource =
+    metadataString(metadata, ["utm_source", "utmSource", "source", "referralSource"]) ||
+    source ||
+    "direct";
+  const normalizedEventType = normalizeGrowthEventType(eventName, eventType);
+
+  const revenue = metadataNumber(metadata, ["revenue", "attributedRevenue", "attributed_revenue"]);
+  const bookingAmount = metadataNumber(metadata, [
+    "bookingAmount",
+    "booking_amount",
+    "grossAmount",
+    "gross_amount",
+    "totalAmount",
+    "total_amount",
+  ]);
+  const amount = metadataNumber(metadata, ["amount", "value"]);
+
+  const growthPayload: Record<string, unknown> = {
+    campaign_slug: campaignSlug,
+    campaign_name: campaignName,
+    source: campaignSource,
+    event_type: normalizedEventType,
+    revenue,
+    booking_amount: bookingAmount,
+    amount,
+    created_at: new Date().toISOString(),
+  };
+
+  if (campaignId && isUuid(campaignId)) {
+    growthPayload.campaign_id = campaignId;
+  }
+
+  try {
+    const { error } = await supabaseAdmin
+      .from("growth_campaign_events")
+      .insert(growthPayload);
+
+    if (!error) return true;
+
+    console.warn("Growth campaign event mirror skipped:", error);
+    return false;
+  } catch (error) {
+    console.warn("Growth campaign event mirror skipped:", error);
+    return false;
+  }
+}
+
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => null)) as TrackBody | null;
@@ -407,6 +657,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const mirroredToGrowthCampaigns = shouldMirrorToGrowthCampaignEvents({
+      eventName,
+      eventType,
+      source,
+      pagePath,
+      role: actorRole || role || null,
+      metadata,
+    })
+      ? await writeGrowthCampaignEvent({
+          userId: user?.id || null,
+          eventName,
+          eventType,
+          source,
+          pagePath,
+          guruId: guruId || null,
+          bookingId: bookingId || null,
+          sessionId: sessionId || null,
+          metadata,
+        })
+      : false;
+
     if (
       shouldMirrorToAuditLog({
         eventName,
@@ -444,6 +715,7 @@ export async function POST(req: NextRequest) {
         auditArea,
         auditAction,
       }),
+      mirroredToGrowthCampaigns,
     });
   } catch (error) {
     console.error("Analytics route error:", error);

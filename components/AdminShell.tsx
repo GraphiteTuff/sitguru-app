@@ -32,27 +32,71 @@ type AdminShellProps = {
   children: ReactNode;
 };
 
-const primaryNav = [
+type AdminNavItem = {
+  label: string;
+  href: string;
+  icon: any;
+  pageTitle?: string;
+};
+
+const primaryNav: AdminNavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Bookings", href: "/admin/bookings", icon: CalendarDays },
   { label: "Customers", href: "/admin/customers", icon: Users },
   { label: "Gurus", href: "/admin/gurus", icon: ShieldCheck },
   { label: "Messages", href: "/admin/messages", icon: MessageCircle },
-  { label: "Programs", href: "/admin/programs", icon: Sparkles },
-  { label: "Partners", href: "/admin/partners", icon: Users },
+  {
+    label: "Growth & Referrals",
+    href: "/admin/programs",
+    icon: Sparkles,
+    pageTitle: "Growth & Referral Command Center",
+  },
+  {
+    label: "Partner Network",
+    href: "/admin/partners",
+    icon: Users,
+  },
 ];
 
-const financialNav = [
-  { label: "Financial Overview", href: "/admin/financials", icon: CircleDollarSign },
-  { label: "Profit & Loss", href: "/admin/financials/profit-loss", icon: FileText },
-  { label: "Balance Sheet", href: "/admin/financials/balance-sheet", icon: BookOpen },
-  { label: "Cash Flow", href: "/admin/financials/cash-flow", icon: WalletCards },
-  { label: "Pro Forma", href: "/admin/financials/pro-forma", icon: BarChart3 },
-  { label: "Commissions", href: "/admin/financials/commissions", icon: ClipboardList },
-  { label: "Payouts", href: "/admin/financials/payouts", icon: Download },
+const financialNav: AdminNavItem[] = [
+  {
+    label: "Financial Overview",
+    href: "/admin/financials",
+    icon: CircleDollarSign,
+  },
+  {
+    label: "Profit & Loss",
+    href: "/admin/financials/profit-loss",
+    icon: FileText,
+  },
+  {
+    label: "Balance Sheet",
+    href: "/admin/financials/balance-sheet",
+    icon: BookOpen,
+  },
+  {
+    label: "Cash Flow",
+    href: "/admin/financials/cash-flow",
+    icon: WalletCards,
+  },
+  {
+    label: "Pro Forma",
+    href: "/admin/financials/pro-forma",
+    icon: BarChart3,
+  },
+  {
+    label: "Referral & Program Payouts",
+    href: "/admin/financials/commissions",
+    icon: ClipboardList,
+  },
+  {
+    label: "Guru & Platform Payouts",
+    href: "/admin/financials/payouts",
+    icon: Download,
+  },
 ];
 
-const analyticsNav = [
+const analyticsNav: AdminNavItem[] = [
   { label: "Analytics", href: "/admin/analytics", icon: Gauge },
   { label: "Reports & Exports", href: "/admin/reports", icon: FileText },
   { label: "Audit Trail", href: "/admin/audit-trail", icon: ClipboardList },
@@ -98,7 +142,7 @@ function NavGroup({
   pathname,
 }: {
   title: string;
-  items: typeof primaryNav;
+  items: AdminNavItem[];
   pathname: string;
 }) {
   return (
@@ -134,7 +178,9 @@ export default function AdminShell({ children }: AdminShellProps) {
   const [profileOpen, setProfileOpen] = useState(false);
 
   const pageTitle = useMemo(() => {
-    if (pathname === "/admin" || pathname === "/admin/dashboard") return "Dashboard";
+    if (pathname === "/admin" || pathname === "/admin/dashboard") {
+      return "Dashboard";
+    }
 
     const allItems = [...primaryNav, ...financialNav, ...analyticsNav];
 
@@ -143,7 +189,7 @@ export default function AdminShell({ children }: AdminShellProps) {
       .sort((a, b) => b.href.length - a.href.length)
       .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 
-    return found?.label ?? "Admin Control";
+    return found?.pageTitle ?? found?.label ?? "Admin Control";
   }, [pathname]);
 
   return (
