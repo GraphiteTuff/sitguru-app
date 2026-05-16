@@ -16,15 +16,36 @@ const openSans = Open_Sans({
 const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
 
 const homepageDemoGuruNames = [
-  "Maya Reynolds",
-  "Sofia Martinez",
   "Avery Johnson",
-  "Nina Patel",
+  "Brad Norway",
   "Caleb Brooks",
-  "Olivia Chen",
   "Darius Miller",
   "Emma Walsh",
+  "Maya Reynolds",
+  "Nina Patel",
+  "Olivia Chen",
+  "Sofia Martinez",
+  "Suzy Q",
 ];
+
+function normalizeGuruNameForMatch(value: string | null | undefined) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+const homepageDemoGuruNameSet = new Set(
+  homepageDemoGuruNames.map((name) => normalizeGuruNameForMatch(name)),
+);
+
+const homepageDemoGuruFallbackImages: Record<string, string> = {
+  "avery johnson": "/images/demo/guru-avery.jpg",
+  "caleb brooks": "/images/demo/guru-caleb.jpg",
+  "darius miller": "/images/demo/guru-darius.jpg",
+  "emma walsh": "/images/demo/guru-emma.jpg",
+  "maya reynolds": "/images/demo/guru-maya.jpg",
+  "nina patel": "/images/demo/guru-nina.jpg",
+  "olivia chen": "/images/demo/guru-olivia.jpg",
+  "sofia martinez": "/images/demo/guru-sofia.jpg",
+};
 
 const heroServiceOptions = [
   "Dog Walking",
@@ -351,7 +372,7 @@ async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
 }
 
 function getGuruName(guru: Guru) {
-  return guru.display_name || guru.full_name || "Trusted Guru";
+  return guru.full_name || guru.display_name || "Trusted Guru";
 }
 
 function getGuruPhotoUrl(guru: Guru) {
@@ -365,7 +386,6 @@ function getGuruPhotoUrl(guru: Guru) {
   const lowerPhotoUrl = photoUrl.toLowerCase();
 
   if (
-    lowerPhotoUrl.startsWith("/images/") ||
     lowerPhotoUrl.includes("sitguru-logo") ||
     lowerPhotoUrl.includes("sitguru-message-avatar") ||
     lowerPhotoUrl.includes("sitguru-admin-avatar")
@@ -373,7 +393,83 @@ function getGuruPhotoUrl(guru: Guru) {
     return "";
   }
 
+  if (
+    lowerPhotoUrl.startsWith("/images/") &&
+    !lowerPhotoUrl.startsWith("/images/demo/")
+  ) {
+    return "";
+  }
+
   return photoUrl;
+}
+
+function getHomepageGuruFallbackImage(guru: Guru) {
+  const normalizedName = normalizeGuruNameForMatch(guru.full_name || guru.display_name);
+
+  return homepageDemoGuruFallbackImages[normalizedName] || heroImagePath;
+}
+
+function isHomepageDemoGuru(guru: Guru) {
+  const normalizedFullName = normalizeGuruNameForMatch(guru.full_name);
+  const normalizedDisplayName = normalizeGuruNameForMatch(guru.display_name);
+
+  return (
+    homepageDemoGuruNameSet.has(normalizedFullName) ||
+    homepageDemoGuruNameSet.has(normalizedDisplayName)
+  );
+}
+
+function getHomepageDemoGuruSortIndex(guru: Guru) {
+  const normalizedFullName = normalizeGuruNameForMatch(guru.full_name);
+  const normalizedDisplayName = normalizeGuruNameForMatch(guru.display_name);
+  const matchedName = homepageDemoGuruNameSet.has(normalizedFullName)
+    ? normalizedFullName
+    : normalizedDisplayName;
+
+  const index = homepageDemoGuruNames
+    .map((name) => normalizeGuruNameForMatch(name))
+    .indexOf(matchedName);
+
+  return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
+}
+
+function sortAndDedupeHomepageGurus(gurus: Guru[]) {
+  const groupedGurus = new Map<string, Guru[]>();
+
+  gurus.forEach((guru) => {
+    if (!isHomepageDemoGuru(guru)) return;
+
+    const normalizedName = normalizeGuruNameForMatch(
+      guru.full_name || guru.display_name,
+    );
+
+    if (!normalizedName) return;
+
+    const existingGroup = groupedGurus.get(normalizedName) || [];
+    existingGroup.push(guru);
+    groupedGurus.set(normalizedName, existingGroup);
+  });
+
+  return homepageDemoGuruNames
+    .map((name) => {
+      const normalizedName = normalizeGuruNameForMatch(name);
+      const candidates = groupedGurus.get(normalizedName) || [];
+
+      return candidates.sort((a, b) => {
+        const aHasPhoto = getGuruPhotoUrl(a) ? 1 : 0;
+        const bHasPhoto = getGuruPhotoUrl(b) ? 1 : 0;
+
+        if (aHasPhoto !== bHasPhoto) return bHasPhoto - aHasPhoto;
+
+        const aVerified = a.is_verified ? 1 : 0;
+        const bVerified = b.is_verified ? 1 : 0;
+
+        if (aVerified !== bVerified) return bVerified - aVerified;
+
+        return getGuruRating(b) - getGuruRating(a);
+      })[0];
+    })
+    .filter((guru): guru is Guru => Boolean(guru));
 }
 
 function getGuruHref(guru: Guru) {
@@ -406,17 +502,7 @@ function getGuruRole(guru: Guru) {
 function mapGurusToCards(gurus: Guru[]): GuruCard[] {
   return gurus
     .map((guru) => {
-      const photoUrl = getGuruPhotoUrl(guru);
-
-      if (!photoUrl) {
-        console.warn("Homepage Guru skipped because no account photo is wired:", {
-          id: guru.id,
-          slug: guru.slug,
-          name: getGuruName(guru),
-        });
-
-        return null;
-      }
+      const photoUrl = getGuruPhotoUrl(guru) || getHomepageGuruFallbackImage(guru);
 
       const rate = getGuruRate(guru);
       const rating = getGuruRating(guru);
@@ -480,7 +566,7 @@ function HeroSignupCard({
   onTrack: (label: string, destination: string) => void;
 }) {
   return (
-    <aside className="w-full max-w-[340px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[360px]">
+    <aside className="w-full rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 lg:max-w-[340px] xl:max-w-[360px]">
       <h2 className="text-[2.15rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.65rem]">
         Create your free account
       </h2>
@@ -618,6 +704,10 @@ function GuruCardView({
           alt={`${guru.name}, ${guru.role}`}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           loading="lazy"
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = heroImagePath;
+          }}
         />
         <span className="absolute left-2 top-2 rounded-full border border-white/80 bg-white/95 px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm sm:left-3 sm:top-3 sm:text-[10px]">
           {guru.badge}
@@ -827,8 +917,7 @@ export default function HomePage() {
         .eq("is_public", true)
         .eq("is_active", true)
         .eq("is_bookable", true)
-        .order("is_verified", { ascending: false })
-        .order("rating_avg", { ascending: false, nullsFirst: false });
+        .limit(30);
 
       if (error) {
         console.error("Homepage Guru load error:", error.message);
@@ -846,17 +935,7 @@ export default function HomePage() {
         return;
       }
 
-      const gurus = Array.from(
-        new Map(
-          ((data || []) as Guru[])
-            .sort(
-              (a, b) =>
-                homepageDemoGuruNames.indexOf(getGuruName(a)) -
-                homepageDemoGuruNames.indexOf(getGuruName(b)),
-            )
-            .map((guru) => [getGuruName(guru), guru]),
-        ).values(),
-      );
+      const gurus = sortAndDedupeHomepageGurus((data || []) as Guru[]);
 
       trackEvent({
         eventName: "homepage_gurus_loaded",
@@ -874,8 +953,11 @@ export default function HomePage() {
 
       if (mappedGuruCards.length === 0) {
         console.warn(
-          "Homepage Guru carousel found Guru rows but no account-photo-backed cards. Check profile_photo_url, photo_url, avatar_url, or image_url on gurus.",
-          { guru_count: gurus.length },
+          "Homepage Guru carousel found no approved demo Guru cards. Check the public/bookable status and photo fields for the approved homepage Guru names.",
+          {
+            guru_count: gurus.length,
+            approved_homepage_guru_names: homepageDemoGuruNames,
+          },
         );
       }
 
