@@ -31,85 +31,8 @@ function isProtectedGuruDashboardPath(pathname: string) {
   return pathname === "/guru/dashboard" || pathname.startsWith("/guru/dashboard/");
 }
 
-const ALLOWED_EXACT_PATHS = new Set([
-  "/launch",
-  "/about",
-  "/privacy",
-  "/terms",
-  "/help",
-  "/login",
-  "/signup",
-  "/admin/login",
-  "/guru/login",
-  "/guru/signup",
-  "/guru/application",
-  "/become-a-guru",
-  "/favicon.ico",
-  "/robots.txt",
-  "/sitemap.xml",
-]);
-
-const ALLOWED_PREFIXES = [
-  "/api/",
-  "/_next",
-  "/images/",
-  "/about/",
-  "/privacy/",
-  "/terms/",
-  "/help/",
-  "/auth",
-
-  // Public/prelaunch app routes.
-  "/customer",
-  "/dashboard",
-  "/messages",
-  "/bookings",
-  "/pets",
-  "/profile",
-  "/rewards",
-  "/referrals",
-  "/search",
-  "/guru/application",
-  "/guru/success-center",
-  "/become-a-guru",
-
-  // Protected routes are allowed through prelaunch,
-  // then protected by auth/role logic below.
-  "/admin",
-  "/guru/dashboard",
-  "/guru/bookings",
-  "/guru/availability",
-  "/guru/resources",
-  "/guru/pet-families",
-];
-
-const ALLOWED_PUBLIC_FILES = new Set([
-  "/sitguru-logo-cropped.png",
-  "/sitguru-logo-cropped.png.png",
-]);
-
-function isStaticAsset(pathname: string) {
-  return /\.(png|jpg|jpeg|gif|webp|svg|ico|css|js|map|txt|xml|woff|woff2|ttf|eot)$/i.test(
-    pathname,
-  );
-}
-
-function isAllowedPrelaunchPath(pathname: string) {
-  if (ALLOWED_EXACT_PATHS.has(pathname)) return true;
-
-  if (ALLOWED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    return true;
-  }
-
-  if (ALLOWED_PUBLIC_FILES.has(pathname)) return true;
-
-  if (isStaticAsset(pathname)) return true;
-
-  return false;
-}
-
 function getSiteMode() {
-  return process.env.SITE_MODE === "live" ? "live" : "prelaunch";
+  return process.env.SITE_MODE === "prelaunch" ? "prelaunch" : "live";
 }
 
 function makeSessionCookieOptions(options: CookieOptions): CookieOptions {
@@ -122,17 +45,10 @@ function makeSessionCookieOptions(options: CookieOptions): CookieOptions {
     maxAge?: number;
   };
 
-  /**
-   * Keep sign-out/removal cookies working.
-   */
   if (typeof sessionOptions.maxAge === "number" && sessionOptions.maxAge <= 0) {
     return sessionOptions;
   }
 
-  /**
-   * Remove long-term persistence.
-   * This makes Supabase auth cookies browser-session cookies.
-   */
   delete sessionOptions.maxAge;
   delete sessionOptions.expires;
 
@@ -224,22 +140,22 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const siteMode = getSiteMode();
 
-  // Public homepage should stay gated during pre-launch.
-  if (siteMode === "prelaunch" && pathname === "/") {
-    const launchUrl = request.nextUrl.clone();
-    launchUrl.pathname = "/launch";
-    launchUrl.search = "";
-
-    return NextResponse.redirect(launchUrl);
+  if (siteMode === "live" && pathname === "/launch") {
+    return NextResponse.redirect(
+      makeRedirectUrl({
+        request,
+        pathname: "/",
+      }),
+    );
   }
 
-  // Keep public routes gated, but allow direct app testing routes above.
-  if (siteMode === "prelaunch" && !isAllowedPrelaunchPath(pathname)) {
-    const launchUrl = request.nextUrl.clone();
-    launchUrl.pathname = "/launch";
-    launchUrl.search = "";
-
-    return NextResponse.redirect(launchUrl);
+  if (siteMode === "prelaunch" && pathname === "/") {
+    return NextResponse.redirect(
+      makeRedirectUrl({
+        request,
+        pathname: "/launch",
+      }),
+    );
   }
 
   const requiresAdminAccess = isProtectedAdminPath(pathname) && !isAdminLoginPath(pathname);
@@ -343,10 +259,6 @@ export async function middleware(request: NextRequest) {
   const userEmail = normalizeEmail(user.email);
   const isSuperUser = isSuperUserEmail(userEmail);
 
-  /**
-   * Only jason@sitguru.com and nette@sitguru.com are Super Users.
-   * Super Users can access Admin, Guru, and Customer portals.
-   */
   if (isSuperUser) {
     return response;
   }
