@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type CarouselItem = {
@@ -25,18 +25,25 @@ export default function CaregiverCarousel({
   items = [],
 }: CaregiverCarouselProps) {
   const displayItems = items.length > 0 ? items : fallbackCarouselItems;
+
   const hasMultipleItems = displayItems.length > 1;
 
   const [activeIndex, setActiveIndex] = useState(0);
 
-  /**
-   * These widths match the card width classes below:
-   * mobile: 304px card + 24px gap = 328
-   * small/tablet: 340px card + 24px gap = 364
-   * desktop: 360px card + 24px gap = 384
-   *
-   * The CSS variable lets Tailwind handle responsive values without JS resize logic.
-   */
+  useEffect(() => {
+    if (!hasMultipleItems) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setActiveIndex((currentIndex) =>
+        currentIndex >= displayItems.length - 1 ? 0 : currentIndex + 1
+      );
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [displayItems.length, hasMultipleItems]);
+
   const goToPrevious = () => {
     if (!hasMultipleItems) {
       return;
@@ -115,7 +122,7 @@ export default function CaregiverCarousel({
         >
           <div className="sm:[--caregiver-slide-width:364px] lg:[--caregiver-slide-width:384px]">
             <div
-              className="flex gap-6 transition-transform duration-500 ease-out will-change-transform"
+              className="flex gap-6 transition-transform duration-700 ease-in-out will-change-transform"
               style={{
                 transform: `translateX(calc(-${activeIndex} * var(--caregiver-slide-width)))`,
               }}
@@ -168,16 +175,16 @@ export default function CaregiverCarousel({
                     <div className="mt-auto flex flex-col gap-3 pt-6 sm:flex-row">
                       <Link
                         href={item.href}
-                        className="btn-primary w-full text-center sm:w-auto"
+                        className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                       >
-                        View profile
+                        View Profile
                       </Link>
 
                       <Link
-                        href="/gurus"
-                        className="btn-secondary w-full text-center sm:w-auto"
+                        href="/search"
+                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
                       >
-                        Browse all
+                        Find Care
                       </Link>
                     </div>
                   </div>
@@ -185,47 +192,25 @@ export default function CaregiverCarousel({
               ))}
             </div>
           </div>
-
-          {hasMultipleItems && (
-            <div className="mt-6 flex items-center justify-center gap-2">
-              {displayItems.map((item, index) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-label={`Go to caregiver ${index + 1}`}
-                  onClick={() => goToSlide(index)}
-                  className={`h-3 rounded-full transition-all ${
-                    activeIndex === index
-                      ? "w-6 bg-emerald-500"
-                      : "w-3 bg-slate-300 hover:bg-slate-400"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
-
-          {hasMultipleItems && (
-            <div className="mt-4 flex items-center justify-center gap-3 md:hidden">
-              <button
-                type="button"
-                aria-label="Previous caregiver"
-                onClick={goToPrevious}
-                className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-xl font-bold text-slate-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-              >
-                ←
-              </button>
-
-              <button
-                type="button"
-                aria-label="Next caregiver"
-                onClick={goToNext}
-                className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-xl font-bold text-slate-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-              >
-                →
-              </button>
-            </div>
-          )}
         </div>
+
+        {hasMultipleItems && (
+          <div className="mt-8 flex items-center justify-center gap-3">
+            {displayItems.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-label={`Go to caregiver ${index + 1}`}
+                onClick={() => goToSlide(index)}
+                className={`h-3 w-3 rounded-full transition-all duration-300 ${
+                  activeIndex === index
+                    ? "bg-emerald-600"
+                    : "bg-slate-300 hover:bg-slate-400"
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
