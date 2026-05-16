@@ -31,10 +31,6 @@ function isProtectedGuruDashboardPath(pathname: string) {
   return pathname === "/guru/dashboard" || pathname.startsWith("/guru/dashboard/");
 }
 
-function getSiteMode() {
-  return process.env.SITE_MODE === "prelaunch" ? "prelaunch" : "live";
-}
-
 function makeSessionCookieOptions(options: CookieOptions): CookieOptions {
   const sessionOptions = {
     ...options,
@@ -138,27 +134,10 @@ function makeRedirectUrl({
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const siteMode = getSiteMode();
 
-  if (siteMode === "live" && pathname === "/launch") {
-    return NextResponse.redirect(
-      makeRedirectUrl({
-        request,
-        pathname: "/",
-      }),
-    );
-  }
+  const requiresAdminAccess =
+    isProtectedAdminPath(pathname) && !isAdminLoginPath(pathname);
 
-  if (siteMode === "prelaunch" && pathname === "/") {
-    return NextResponse.redirect(
-      makeRedirectUrl({
-        request,
-        pathname: "/launch",
-      }),
-    );
-  }
-
-  const requiresAdminAccess = isProtectedAdminPath(pathname) && !isAdminLoginPath(pathname);
   const requiresGuruAccess =
     isProtectedGuruDashboardPath(pathname) && !isGuruLoginPath(pathname);
 
@@ -309,7 +288,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(
       makeRedirectUrl({
         request,
-        pathname: siteMode === "prelaunch" ? "/launch" : "/",
+        pathname: "/",
       }),
     );
   }
