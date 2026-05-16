@@ -15,7 +15,16 @@ const openSans = Open_Sans({
 
 const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
 
-const homepageDemoGuruNames = [
+const heroServiceOptions = [
+  "Dog Walking",
+  "Pet Sitting",
+  "Boarding",
+  "Drop-In Visits",
+  "Doggy Day Care",
+  "Training Support",
+];
+
+const approvedHomepageGuruNames = [
   "Avery Johnson",
   "Brad Norway",
   "Caleb Brooks",
@@ -28,33 +37,22 @@ const homepageDemoGuruNames = [
   "Suzy Q",
 ];
 
-function normalizeGuruNameForMatch(value: string | null | undefined) {
-  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-const homepageDemoGuruNameSet = new Set(
-  homepageDemoGuruNames.map((name) => normalizeGuruNameForMatch(name)),
+const approvedHomepageGuruNameSet = new Set(
+  approvedHomepageGuruNames.map((name) => name.toLowerCase()),
 );
 
-const homepageDemoGuruFallbackImages: Record<string, string> = {
-  "avery johnson": "/images/demo/guru-avery.jpg",
-  "caleb brooks": "/images/demo/guru-caleb.jpg",
-  "darius miller": "/images/demo/guru-darius.jpg",
-  "emma walsh": "/images/demo/guru-emma.jpg",
-  "maya reynolds": "/images/demo/guru-maya.jpg",
-  "nina patel": "/images/demo/guru-nina.jpg",
-  "olivia chen": "/images/demo/guru-olivia.jpg",
-  "sofia martinez": "/images/demo/guru-sofia.jpg",
+const approvedHomepageGuruPhotoPaths: Record<string, string> = {
+  "Avery Johnson": "/images/demo/gurus/avery-johnson.png",
+  "Brad Norway": "/images/demo/gurus/brad-norway.png",
+  "Caleb Brooks": "/images/demo/gurus/caleb-brooks.png",
+  "Darius Miller": "/images/demo/gurus/darius-miller.png",
+  "Emma Walsh": "/images/demo/gurus/emma-walsh.png",
+  "Maya Reynolds": "/images/demo/gurus/maya-reynolds.png",
+  "Nina Patel": "/images/demo/gurus/nina-patel.png",
+  "Olivia Chen": "/images/demo/gurus/olivia-chen.png",
+  "Sofia Martinez": "/images/demo/gurus/sofia-martinez.png",
+  "Suzy Q": "/images/demo/gurus/suzy-q.png",
 };
-
-const heroServiceOptions = [
-  "Dog Walking",
-  "Pet Sitting",
-  "Boarding",
-  "Drop-In Visits",
-  "Doggy Day Care",
-  "Training Support",
-];
 
 const zipCodeFallbackMap: Record<
   string,
@@ -303,18 +301,6 @@ function AppleIcon() {
   );
 }
 
-function PhoneIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5 shrink-0 fill-current"
-    >
-      <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1C10.61 21 3 13.39 3 4c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.24.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
-    </svg>
-  );
-}
-
 function detectSourceFromUrl() {
   if (typeof window === "undefined") return "direct";
 
@@ -372,104 +358,61 @@ async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
 }
 
 function getGuruName(guru: Guru) {
-  return guru.full_name || guru.display_name || "Trusted Guru";
+  return guru.display_name || guru.full_name || "Trusted Guru";
+}
+
+function getApprovedHomepageGuruName(guru: Guru) {
+  const guruName = String(getGuruName(guru) || "").trim();
+  const normalizedGuruName = guruName.toLowerCase();
+
+  if (!approvedHomepageGuruNameSet.has(normalizedGuruName)) {
+    return "";
+  }
+
+  return (
+    approvedHomepageGuruNames.find(
+      (approvedName) => approvedName.toLowerCase() === normalizedGuruName,
+    ) || ""
+  );
 }
 
 function getGuruPhotoUrl(guru: Guru) {
+  const approvedName = getApprovedHomepageGuruName(guru);
+  const approvedPhotoPath = approvedName
+    ? approvedHomepageGuruPhotoPaths[approvedName]
+    : "";
+
   const possiblePhoto =
-    guru.profile_photo_url || guru.photo_url || guru.avatar_url || guru.image_url || "";
+    guru.profile_photo_url ||
+    guru.photo_url ||
+    guru.avatar_url ||
+    guru.image_url ||
+    approvedPhotoPath ||
+    "";
 
   const photoUrl = String(possiblePhoto || "").trim();
 
-  if (!photoUrl) return "";
+  if (!photoUrl) return approvedPhotoPath || "";
 
   const lowerPhotoUrl = photoUrl.toLowerCase();
+
+  if (lowerPhotoUrl.startsWith("/images/demo/gurus/")) {
+    return photoUrl;
+  }
 
   if (
     lowerPhotoUrl.includes("sitguru-logo") ||
     lowerPhotoUrl.includes("sitguru-message-avatar") ||
     lowerPhotoUrl.includes("sitguru-admin-avatar")
   ) {
-    return "";
+    return approvedPhotoPath || "";
   }
 
-  if (
-    lowerPhotoUrl.startsWith("/images/") &&
-    !lowerPhotoUrl.startsWith("/images/demo/")
-  ) {
-    return "";
+  if (lowerPhotoUrl.startsWith("/images/") && !lowerPhotoUrl.startsWith("/images/demo/gurus/")) {
+    return approvedPhotoPath || "";
   }
 
   return photoUrl;
-}
-
-function getHomepageGuruFallbackImage(guru: Guru) {
-  const normalizedName = normalizeGuruNameForMatch(guru.full_name || guru.display_name);
-
-  return homepageDemoGuruFallbackImages[normalizedName] || heroImagePath;
-}
-
-function isHomepageDemoGuru(guru: Guru) {
-  const normalizedFullName = normalizeGuruNameForMatch(guru.full_name);
-  const normalizedDisplayName = normalizeGuruNameForMatch(guru.display_name);
-
-  return (
-    homepageDemoGuruNameSet.has(normalizedFullName) ||
-    homepageDemoGuruNameSet.has(normalizedDisplayName)
-  );
-}
-
-function getHomepageDemoGuruSortIndex(guru: Guru) {
-  const normalizedFullName = normalizeGuruNameForMatch(guru.full_name);
-  const normalizedDisplayName = normalizeGuruNameForMatch(guru.display_name);
-  const matchedName = homepageDemoGuruNameSet.has(normalizedFullName)
-    ? normalizedFullName
-    : normalizedDisplayName;
-
-  const index = homepageDemoGuruNames
-    .map((name) => normalizeGuruNameForMatch(name))
-    .indexOf(matchedName);
-
-  return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
-}
-
-function sortAndDedupeHomepageGurus(gurus: Guru[]) {
-  const groupedGurus = new Map<string, Guru[]>();
-
-  gurus.forEach((guru) => {
-    if (!isHomepageDemoGuru(guru)) return;
-
-    const normalizedName = normalizeGuruNameForMatch(
-      guru.full_name || guru.display_name,
-    );
-
-    if (!normalizedName) return;
-
-    const existingGroup = groupedGurus.get(normalizedName) || [];
-    existingGroup.push(guru);
-    groupedGurus.set(normalizedName, existingGroup);
-  });
-
-  return homepageDemoGuruNames
-    .map((name) => {
-      const normalizedName = normalizeGuruNameForMatch(name);
-      const candidates = groupedGurus.get(normalizedName) || [];
-
-      return candidates.sort((a, b) => {
-        const aHasPhoto = getGuruPhotoUrl(a) ? 1 : 0;
-        const bHasPhoto = getGuruPhotoUrl(b) ? 1 : 0;
-
-        if (aHasPhoto !== bHasPhoto) return bHasPhoto - aHasPhoto;
-
-        const aVerified = a.is_verified ? 1 : 0;
-        const bVerified = b.is_verified ? 1 : 0;
-
-        if (aVerified !== bVerified) return bVerified - aVerified;
-
-        return getGuruRating(b) - getGuruRating(a);
-      })[0];
-    })
-    .filter((guru): guru is Guru => Boolean(guru));
 }
 
 function getGuruHref(guru: Guru) {
@@ -500,9 +443,29 @@ function getGuruRole(guru: Guru) {
 }
 
 function mapGurusToCards(gurus: Guru[]): GuruCard[] {
+  const mappedNames = new Set<string>();
+
   return gurus
     .map((guru) => {
-      const photoUrl = getGuruPhotoUrl(guru) || getHomepageGuruFallbackImage(guru);
+      const approvedName = getApprovedHomepageGuruName(guru);
+
+      if (!approvedName || mappedNames.has(approvedName)) {
+        return null;
+      }
+
+      mappedNames.add(approvedName);
+
+      const photoUrl = getGuruPhotoUrl(guru);
+
+      if (!photoUrl) {
+        console.warn("Homepage Guru skipped because no account photo is wired:", {
+          id: guru.id,
+          slug: guru.slug,
+          name: approvedName,
+        });
+
+        return null;
+      }
 
       const rate = getGuruRate(guru);
       const rating = getGuruRating(guru);
@@ -510,7 +473,7 @@ function mapGurusToCards(gurus: Guru[]): GuruCard[] {
 
       return {
         id: String(guru.id),
-        name: getGuruName(guru),
+        name: approvedName,
         role: getGuruRole(guru),
         location: formatLocation(guru.city, guru.state),
         rating: rating > 0 ? rating.toFixed(1) : "New",
@@ -566,7 +529,7 @@ function HeroSignupCard({
   onTrack: (label: string, destination: string) => void;
 }) {
   return (
-    <aside className="w-full rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 lg:max-w-[340px] xl:max-w-[360px]">
+    <aside className="w-full max-w-[340px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[360px]">
       <h2 className="text-[2.15rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.65rem]">
         Create your free account
       </h2>
@@ -600,8 +563,7 @@ function HeroSignupCard({
           onClick={() => onTrack("Continue with phone", "/signup")}
           className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50"
         >
-          <PhoneIcon />
-          Continue with phone
+          ☎ Continue with phone
         </Link>
       </div>
 
@@ -704,10 +666,6 @@ function GuruCardView({
           alt={`${guru.name}, ${guru.role}`}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           loading="lazy"
-          onError={(event) => {
-            event.currentTarget.onerror = null;
-            event.currentTarget.src = heroImagePath;
-          }}
         />
         <span className="absolute left-2 top-2 rounded-full border border-white/80 bg-white/95 px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm sm:left-3 sm:top-3 sm:text-[10px]">
           {guru.badge}
@@ -848,7 +806,7 @@ export default function HomePage() {
   const guruCarouselRef = useRef<HTMLDivElement | null>(null);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
-  const visibleGuruCards = useMemo(() => guruCards, [guruCards]);
+  const visibleGuruCards = useMemo(() => guruCards.slice(0, 10), [guruCards]);
 
   useEffect(() => {
     if ("scrollRestoration" in window.history) {
@@ -875,7 +833,7 @@ export default function HomePage() {
       const resetPoint = carousel.scrollWidth / 2;
 
       if (!isGuruCarouselPaused && resetPoint > carousel.clientWidth) {
-        carousel.scrollLeft += 0.42;
+        carousel.scrollLeft += 0.34;
 
         if (carousel.scrollLeft >= resetPoint - 2) {
           carousel.scrollLeft = 0;
@@ -913,11 +871,13 @@ export default function HomePage() {
       const { data, error } = await supabase
         .from("gurus")
         .select("*")
-        .in("full_name", homepageDemoGuruNames)
+        .in("full_name", approvedHomepageGuruNames)
         .eq("is_public", true)
         .eq("is_active", true)
         .eq("is_bookable", true)
-        .limit(30);
+        .order("is_verified", { ascending: false })
+        .order("rating_avg", { ascending: false, nullsFirst: false })
+        .limit(20);
 
       if (error) {
         console.error("Homepage Guru load error:", error.message);
@@ -935,7 +895,7 @@ export default function HomePage() {
         return;
       }
 
-      const gurus = sortAndDedupeHomepageGurus((data || []) as Guru[]);
+      const gurus = (data || []) as Guru[];
 
       trackEvent({
         eventName: "homepage_gurus_loaded",
@@ -953,11 +913,8 @@ export default function HomePage() {
 
       if (mappedGuruCards.length === 0) {
         console.warn(
-          "Homepage Guru carousel found no approved demo Guru cards. Check the public/bookable status and photo fields for the approved homepage Guru names.",
-          {
-            guru_count: gurus.length,
-            approved_homepage_guru_names: homepageDemoGuruNames,
-          },
+          "Homepage Guru carousel found Guru rows but no account-photo-backed cards. Check profile_photo_url, photo_url, avatar_url, or image_url on gurus.",
+          { guru_count: gurus.length },
         );
       }
 
@@ -1226,12 +1183,6 @@ export default function HomePage() {
                   </p>
                 ) : null}
               </form>
-              <div className="relative z-20 mt-6 flex justify-center lg:hidden">
-                <HeroSignupCard
-                  onGoogleSignup={handleOAuthSignup}
-                  onTrack={trackHomepageClick}
-                />
-              </div>
 
               <div className="relative z-20 mt-4 lg:mt-6 lg:w-[640px] xl:w-[670px]">
                 <TrustRow />
