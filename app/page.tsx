@@ -15,6 +15,17 @@ const openSans = Open_Sans({
 
 const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
 
+const homepageDemoGuruNames = [
+  "Maya Reynolds",
+  "Sofia Martinez",
+  "Avery Johnson",
+  "Nina Patel",
+  "Caleb Brooks",
+  "Olivia Chen",
+  "Darius Miller",
+  "Emma Walsh",
+];
+
 const heroServiceOptions = [
   "Dog Walking",
   "Pet Sitting",
@@ -271,6 +282,18 @@ function AppleIcon() {
   );
 }
 
+function PhoneIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 shrink-0 fill-current"
+    >
+      <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1C10.61 21 3 13.39 3 4c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.24.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
+    </svg>
+  );
+}
+
 function detectSourceFromUrl() {
   if (typeof window === "undefined") return "direct";
 
@@ -491,7 +514,8 @@ function HeroSignupCard({
           onClick={() => onTrack("Continue with phone", "/signup")}
           className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50"
         >
-          ☎ Continue with phone
+          <PhoneIcon />
+          Continue with phone
         </Link>
       </div>
 
@@ -734,7 +758,7 @@ export default function HomePage() {
   const guruCarouselRef = useRef<HTMLDivElement | null>(null);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
-  const visibleGuruCards = useMemo(() => guruCards.slice(0, 8), [guruCards]);
+  const visibleGuruCards = useMemo(() => guruCards, [guruCards]);
 
   useEffect(() => {
     if ("scrollRestoration" in window.history) {
@@ -761,7 +785,7 @@ export default function HomePage() {
       const resetPoint = carousel.scrollWidth / 2;
 
       if (!isGuruCarouselPaused && resetPoint > carousel.clientWidth) {
-        carousel.scrollLeft += 0.34;
+        carousel.scrollLeft += 0.42;
 
         if (carousel.scrollLeft >= resetPoint - 2) {
           carousel.scrollLeft = 0;
@@ -799,10 +823,12 @@ export default function HomePage() {
       const { data, error } = await supabase
         .from("gurus")
         .select("*")
-        .or("is_public.eq.true,is_active.eq.true")
+        .in("full_name", homepageDemoGuruNames)
+        .eq("is_public", true)
+        .eq("is_active", true)
+        .eq("is_bookable", true)
         .order("is_verified", { ascending: false })
-        .order("rating_avg", { ascending: false, nullsFirst: false })
-        .limit(8);
+        .order("rating_avg", { ascending: false, nullsFirst: false });
 
       if (error) {
         console.error("Homepage Guru load error:", error.message);
@@ -820,7 +846,17 @@ export default function HomePage() {
         return;
       }
 
-      const gurus = (data || []) as Guru[];
+      const gurus = Array.from(
+        new Map(
+          ((data || []) as Guru[])
+            .sort(
+              (a, b) =>
+                homepageDemoGuruNames.indexOf(getGuruName(a)) -
+                homepageDemoGuruNames.indexOf(getGuruName(b)),
+            )
+            .map((guru) => [getGuruName(guru), guru]),
+        ).values(),
+      );
 
       trackEvent({
         eventName: "homepage_gurus_loaded",
@@ -1108,7 +1144,6 @@ export default function HomePage() {
                   </p>
                 ) : null}
               </form>
-
               <div className="relative z-20 mt-6 flex justify-center lg:hidden">
                 <HeroSignupCard
                   onGoogleSignup={handleOAuthSignup}
