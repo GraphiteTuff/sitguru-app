@@ -1108,119 +1108,12 @@ export default function HomePage() {
                   </p>
                 ) : null}
               </form>
-              {/* Mobile Signup Card */}
-              <div className="mt-6 lg:hidden">
-                <div className="overflow-hidden rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur">
-                  <h2 className="text-[clamp(2.5rem,8vw,4rem)] font-black leading-[0.95] tracking-[-0.04em] text-slate-950">
-                    Create your
-                    <br />
-                    free account
-                  </h2>
 
-                  <p className="mt-3 text-lg font-medium text-slate-500">
-                    Join in less than a minute.
-                  </p>
-
-                  <div className="mt-6 space-y-4">
-                    <button
-                      type="button"
-                      className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white text-lg font-medium text-slate-600 shadow-sm"
-                    >
-                      Continue with Google
-                    </button>
-
-                    <button
-                      type="button"
-                      className="flex h-20 w-full items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-6 text-center text-lg font-medium text-slate-400 shadow-sm"
-                    >
-                      Continue with Apple — Coming Soon
-                    </button>
-
-                    <button
-                      type="button"
-                      className="flex h-16 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white text-lg font-black text-slate-700 shadow-sm"
-                    >
-                      Continue with phone
-                    </button>
-                  </div>
-
-                  <div className="my-6 flex items-center gap-4">
-                    <div className="h-px flex-1 bg-slate-200" />
-                    <span className="text-sm font-bold uppercase tracking-[0.25em] text-slate-400">
-                      or
-                    </span>
-                    <div className="h-px flex-1 bg-slate-200" />
-                  </div>
-
-                  <div className="space-y-4">
-                    <input
-                      type="text"
-                      placeholder="Full name"
-                      className="h-16 w-full rounded-2xl border border-slate-200 px-5 text-lg outline-none"
-                    />
-
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      className="h-16 w-full rounded-2xl border border-slate-200 px-5 text-lg outline-none"
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="ZIP code optional"
-                      className="h-16 w-full rounded-2xl border border-slate-200 px-5 text-lg outline-none"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    className="mt-6 flex h-16 w-full items-center justify-center rounded-2xl bg-emerald-700 text-xl font-black text-white shadow-lg transition hover:bg-emerald-800"
-                  >
-                    Sign Up Free
-                  </button>
-
-                  <p className="mt-4 text-center text-base font-medium text-slate-500">
-                    Already have an account?
-                    <span className="ml-1 font-black text-emerald-700">
-                      Log in
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-
-
-              <div className="relative z-20 mt-4 lg:hidden">
-                <div className="rounded-3xl border border-emerald-100 bg-white/95 p-5 shadow-lg shadow-emerald-100/50">
-                  <div className="flex flex-col gap-4">
-                    <div>
-                      <p className="text-lg font-black text-slate-900">
-                        Create your free account in less than a minute.
-                      </p>
-
-                      <p className="mt-1 text-sm font-medium leading-6 text-slate-600">
-                        Save pets, message trusted Gurus, manage bookings,
-                        and access SitGuru features from one place.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      <Link
-                        href="/signup"
-                        className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
-                      >
-                        Sign Up Free
-                      </Link>
-
-                      <Link
-                        href="/guru/signup"
-                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
-                      >
-                        Become a Guru
-                      </Link>
-                    </div>
-                  </div>
-                </div>
+              <div className="relative z-20 mt-6 flex justify-center lg:hidden">
+                <HeroSignupCard
+                  onGoogleSignup={handleOAuthSignup}
+                  onTrack={trackHomepageClick}
+                />
               </div>
 
               <div className="relative z-20 mt-4 lg:mt-6 lg:w-[640px] xl:w-[670px]">
