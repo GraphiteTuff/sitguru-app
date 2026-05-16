@@ -47,8 +47,15 @@ const adminRoutes = {
   generalLedger: "/admin/financials/general-ledger",
   reconciliation: "/admin/financials/reconciliation",
   proForma: "/admin/financials/pro-forma",
+  taxReports: "/admin/financials/tax-reports",
+  cpaHandoff: "/admin/financials/cpa-handoff",
   commissions: "/admin/commissions",
   payouts: "/admin/payouts",
+  financialPayouts: "/admin/financials/payouts",
+  financialExports: "/admin/financials/exports",
+  reportsDaily: "/admin/financials/reports/daily",
+  reportsWeekly: "/admin/financials/reports/weekly",
+  reportsCustom: "/admin/financials/reports/custom",
   exports: "/admin/exports",
   auditTrail: "/admin/audit-trail",
   launchSignups: "/admin/launch-signups",
@@ -85,6 +92,7 @@ const navSections = [
       { label: "General Ledger", href: adminRoutes.generalLedger, icon: ClipboardList },
       { label: "Reconciliation", href: adminRoutes.reconciliation, icon: ShieldCheck },
       { label: "Pro Forma", href: adminRoutes.proForma, icon: PieChart },
+      { label: "Tax Center", href: adminRoutes.taxReports, icon: FileSpreadsheet },
       { label: "Commissions", href: adminRoutes.commissions, icon: HandCoins },
       { label: "Payouts", href: adminRoutes.payouts, icon: WalletCards },
     ],
@@ -129,7 +137,7 @@ function AdminLogo() {
         width={320}
         height={132}
         priority
-        className="h-auto w-[132px]"
+        className="h-auto w-[118px]"
       />
     </Link>
   );
@@ -165,12 +173,12 @@ function SidebarSection({
   }[];
 }) {
   return (
-    <div className="mb-5">
-      <p className="mb-2 px-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
+    <div className="mb-3">
+      <p className="mb-1.5 px-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
         {title}
       </p>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {items.map((item) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href);
@@ -181,18 +189,18 @@ function SidebarSection({
               href={item.href}
               className={
                 active
-                  ? "group flex items-center gap-3 rounded-2xl bg-green-800 px-3 py-3 text-sm font-black text-white shadow-sm transition hover:bg-green-900"
-                  : "group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-slate-700 transition hover:bg-white hover:text-green-950 hover:shadow-sm"
+                  ? "group flex items-center gap-2.5 rounded-xl bg-green-800 px-2.5 py-2 text-sm font-black text-white shadow-sm transition hover:bg-green-900"
+                  : "group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-bold text-slate-700 transition hover:bg-white hover:text-green-950 hover:shadow-sm"
               }
             >
               <span
                 className={
                   active
-                    ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white"
-                    : "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 ring-1 ring-[#edf2ec] transition group-hover:text-green-800"
+                    ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white"
+                    : "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 ring-1 ring-[#edf2ec] transition group-hover:text-green-800"
                 }
               >
-                <Icon size={17} />
+                <Icon size={16} />
               </span>
 
               <span className="truncate">{item.label}</span>
@@ -235,6 +243,7 @@ function AdminFooter() {
     {
       title: "Operations",
       links: [
+        { label: "Dashboard", href: adminRoutes.dashboard },
         { label: "Bookings", href: adminRoutes.bookings },
         { label: "Customers", href: adminRoutes.customers },
         { label: "Gurus", href: adminRoutes.gurus },
@@ -243,11 +252,9 @@ function AdminFooter() {
       ],
     },
     {
-      title: "Financials",
+      title: "Financial Statements",
       links: [
         { label: "Financial Overview", href: adminRoutes.financials },
-        { label: "Banking", href: adminRoutes.banking },
-        { label: "Stripe Transactions", href: adminRoutes.stripe },
         { label: "Profit & Loss", href: adminRoutes.profitLoss },
         { label: "Balance Sheet", href: adminRoutes.balanceSheet },
         { label: "Cash Flow", href: adminRoutes.cashFlow },
@@ -257,8 +264,30 @@ function AdminFooter() {
       ],
     },
     {
+      title: "Financial Operations",
+      links: [
+        { label: "Banking", href: adminRoutes.banking },
+        { label: "Stripe Transactions", href: adminRoutes.stripe },
+        { label: "Commissions", href: adminRoutes.commissions },
+        { label: "Payouts", href: adminRoutes.payouts },
+        { label: "Financial Payout Analytics", href: adminRoutes.financialPayouts },
+      ],
+    },
+    {
+      title: "Reports, Taxes & Exports",
+      links: [
+        { label: "Tax Center", href: adminRoutes.taxReports },
+        { label: "CPA Handoff", href: adminRoutes.cpaHandoff },
+        { label: "Daily Report", href: adminRoutes.reportsDaily },
+        { label: "Weekly Report", href: adminRoutes.reportsWeekly },
+        { label: "Custom Report", href: adminRoutes.reportsCustom },
+        { label: "Financial Export Center", href: adminRoutes.financialExports },
+      ],
+    },
+    {
       title: "Growth",
       links: [
+        { label: "Growth & Referrals", href: adminRoutes.referrals },
         { label: "Launch Signups", href: adminRoutes.launchSignups },
         { label: "Programs", href: adminRoutes.programs },
         { label: "Partners", href: adminRoutes.partners },
@@ -277,14 +306,14 @@ function AdminFooter() {
 
   return (
     <footer className="mt-6 rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-      <div className="grid gap-8 xl:grid-cols-[1.1fr_2fr]">
+      <div className="grid gap-8 xl:grid-cols-[1fr_3fr]">
         <div>
           <AdminLogo />
 
           <p className="mt-4 max-w-md text-sm font-semibold leading-6 text-slate-600">
-            SitGuru Admin keeps bookings, Gurus, customers, messages, financials,
-            programs, referrals, partners, and reporting connected in one clean
-            operating center.
+            SitGuru Admin keeps bookings, Gurus, customers, messages,
+            financials, programs, referrals, partners, taxes, and reporting
+            connected in one clean operating center.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
@@ -303,7 +332,7 @@ function AdminFooter() {
           </div>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {footerSections.map((section) => (
             <div key={section.title}>
               <h3 className="text-sm font-black uppercase tracking-[0.16em] text-green-800">
@@ -338,8 +367,12 @@ function AdminFooter() {
             Settings
           </Link>
 
-          <Link href={adminRoutes.exports} className="transition hover:text-green-800">
+          <Link href={adminRoutes.financialExports} className="transition hover:text-green-800">
             Exports
+          </Link>
+
+          <Link href={adminRoutes.taxReports} className="transition hover:text-green-800">
+            Tax Center
           </Link>
 
           <Link href={adminRoutes.auditTrail} className="transition hover:text-green-800">
@@ -361,51 +394,51 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f7f8f4] text-slate-950">
-      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid min-h-screen lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="hidden border-r border-[#e5ebe2] bg-[#fcfdfb] lg:block">
           <div className="sticky top-0 flex h-screen flex-col">
-            <div className="border-b border-[#e8eee5] px-5 py-5">
+            <div className="border-b border-[#e8eee5] px-4 py-4">
               <AdminLogo />
 
-              <div className="mt-4">
-                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-green-700">
+              <div className="mt-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-green-700">
                   SitGuru HQ
                 </p>
 
-                <h2 className="mt-2 text-[3.35rem] font-black leading-[0.9] tracking-tight text-green-950">
+                <h2 className="mt-1 text-[2.35rem] font-black leading-[0.9] tracking-tight text-green-950">
                   Admin
                   <br />
                   Control
                 </h2>
 
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
                   Trusted Pet Care. Simplified.
                 </p>
               </div>
 
               <Link
                 href="/"
-                className="mt-5 flex items-center justify-center gap-2 rounded-2xl border border-green-100 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:border-green-300 hover:bg-green-50"
+                className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-green-100 bg-white px-3 py-2 text-xs font-black text-green-900 shadow-sm transition hover:border-green-300 hover:bg-green-50"
               >
-                <Home size={17} />
+                <Home size={15} />
                 Back to Homepage
               </Link>
             </div>
 
-            <div className="px-5 pt-4">
-              <div className="rounded-[1.5rem] border border-[#d8eadb] bg-white p-4 shadow-sm">
-                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-green-800">
+            <div className="px-4 pt-3">
+              <div className="rounded-[1.15rem] border border-[#d8eadb] bg-white p-3 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-800">
                   Platform View
                 </p>
 
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                  Oversee users, approvals, bookings, payments, disputes, partner
-                  growth, reporting, and messages from one clean operations hub.
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">
+                  Oversee users, approvals, bookings, payments, disputes,
+                  partner growth, reporting, taxes, and messages.
                 </p>
               </div>
             </div>
 
-            <nav className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <nav className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
               {navSections.map((section) => (
                 <SidebarSection
                   key={section.title}
@@ -416,13 +449,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </nav>
 
-            <div className="border-t border-[#e8eee5] px-5 py-4">
+            <div className="border-t border-[#e8eee5] px-4 py-3">
               <Link
                 href={adminRoutes.settings}
-                className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-slate-700 transition hover:bg-white hover:text-green-950 hover:shadow-sm"
+                className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-bold text-slate-700 transition hover:bg-white hover:text-green-950 hover:shadow-sm"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white ring-1 ring-[#edf2ec]">
-                  <Settings size={17} />
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white ring-1 ring-[#edf2ec]">
+                  <Settings size={16} />
                 </span>
 
                 <span>Settings</span>
@@ -486,7 +519,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   </Link>
 
                   <Link
-                    href={adminRoutes.exports}
+                    href={adminRoutes.financialExports}
                     className="hidden items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:border-green-300 hover:bg-white sm:inline-flex"
                   >
                     <BarChart3 size={16} />

@@ -61,11 +61,19 @@ function getReminderSummary(results?: ReminderResult[]) {
     .join("\n");
 }
 
+function getTodaySnoozeKey(alertId: string) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  return `sitguru-cpa-alert-snoozed-${alertId}-${today}`;
+}
+
 export default function ManagementAlerts({
   alerts,
 }: {
   alerts: ManagementAlert[];
 }) {
+  const safeAlerts = Array.isArray(alerts) ? alerts : [];
+
   const [showPopup, setShowPopup] = useState(false);
   const [sendingAlertId, setSendingAlertId] = useState<string | null>(null);
   const [lastReminderResponse, setLastReminderResponse] =
@@ -73,17 +81,34 @@ export default function ManagementAlerts({
 
   const priorityAlert = useMemo(() => {
     return (
-      alerts.find((alert) => alert.severity === "critical") ||
-      alerts.find((alert) => alert.severity === "warning") ||
-      alerts[0]
+      safeAlerts.find((alert) => alert.severity === "critical") ||
+      safeAlerts.find((alert) => alert.severity === "warning") ||
+      safeAlerts[0] ||
+      null
     );
-  }, [alerts]);
+  }, [safeAlerts]);
+
+  const hasGrowthAlert = useMemo(() => {
+    return safeAlerts.some((alert) =>
+      `${alert.title} ${alert.description} ${alert.href}`
+        .toLowerCase()
+        .includes("growth") ||
+      `${alert.title} ${alert.description} ${alert.href}`
+        .toLowerCase()
+        .includes("referral") ||
+      `${alert.title} ${alert.description} ${alert.href}`
+        .toLowerCase()
+        .includes("pawperks") ||
+      `${alert.title} ${alert.description} ${alert.href}`
+        .toLowerCase()
+        .includes("marketing"),
+    );
+  }, [safeAlerts]);
 
   useEffect(() => {
     if (!priorityAlert) return;
 
-    const today = new Date().toISOString().slice(0, 10);
-    const snoozeKey = `sitguru-cpa-alert-snoozed-${priorityAlert.id}-${today}`;
+    const snoozeKey = getTodaySnoozeKey(priorityAlert.id);
 
     if (window.localStorage.getItem(snoozeKey) !== "true") {
       setShowPopup(true);
@@ -93,10 +118,7 @@ export default function ManagementAlerts({
   function snoozeToday() {
     if (!priorityAlert) return;
 
-    const today = new Date().toISOString().slice(0, 10);
-    const snoozeKey = `sitguru-cpa-alert-snoozed-${priorityAlert.id}-${today}`;
-
-    window.localStorage.setItem(snoozeKey, "true");
+    window.localStorage.setItem(getTodaySnoozeKey(priorityAlert.id), "true");
     setShowPopup(false);
   }
 
@@ -116,6 +138,7 @@ export default function ManagementAlerts({
           description: alert.description,
           severity: alert.severity,
           dueLabel: alert.dueLabel,
+          context: "CPA handoff reminders, Growth & Referrals, PawPerks, marketing ROI, reward liability, and export readiness.",
         }),
       });
 
@@ -166,6 +189,12 @@ export default function ManagementAlerts({
 
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                 {priorityAlert.description}
+              </p>
+
+              <p className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold leading-5 text-emerald-900">
+                CPA package reminders should include marketing costs, issued
+                referral rewards, pending PawPerks / referral liabilities,
+                campaign ROI notes, payout exceptions, and export readiness.
               </p>
 
               {lastReminderResponse ? (
@@ -231,9 +260,10 @@ export default function ManagementAlerts({
             </h2>
             <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
               These alerts help management stay ahead of monthly close,
-              quarterly CPA review, annual tax package preparation, and export
-              deadlines. Admins can receive the same alert by popup, email, and
-              text message.
+              quarterly CPA review, annual tax package preparation, Growth
+              &amp; Referrals review, PawPerks liabilities, campaign ROI backup,
+              and export deadlines. Admins can receive the same alert by popup,
+              email, and text message.
             </p>
           </div>
 
@@ -259,6 +289,23 @@ export default function ManagementAlerts({
           </div>
         </div>
 
+        {hasGrowthAlert ? (
+          <div className="mt-5 rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+              Growth &amp; Referral CPA Reminder Active
+            </p>
+            <h3 className="mt-2 text-xl font-black text-slate-950">
+              Include PawPerks, referral rewards, and campaign ROI in CPA review.
+            </h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+              The CPA handoff workflow should now flag marketing expenses,
+              campaign costs, issued rewards, pending reward liabilities, and
+              campaign performance notes so they are not missed during close,
+              tax prep, or export review.
+            </p>
+          </div>
+        ) : null}
+
         {lastReminderResponse ? (
           <div
             className={`mt-5 rounded-[1.25rem] border p-4 ${
@@ -283,7 +330,7 @@ export default function ManagementAlerts({
         ) : null}
 
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          {alerts.map((alert) => {
+          {safeAlerts.map((alert) => {
             const styles = severityClasses(alert.severity);
 
             return (
@@ -345,9 +392,11 @@ export default function ManagementAlerts({
             Connect email and text providers
           </h3>
           <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-            The reminder buttons are now wired to an API route. To send real
-            messages, add the email and SMS environment variables for management
-            recipients and providers.
+            The reminder buttons are wired to the CPA reminder API route. To
+            send real messages, add the email and SMS environment variables for
+            management recipients and providers. Reminder payloads now include
+            CPA handoff, Growth &amp; Referrals, PawPerks, campaign ROI, reward
+            liability, and export readiness context.
           </p>
         </div>
       </section>
