@@ -8,7 +8,6 @@ import Footer from "@/components/Footer";
 export default function RouteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  const isLaunchPage = pathname === "/launch";
   const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
 
   const isAuthPage =
@@ -75,15 +74,10 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     return <main className="admin-theme site-main min-h-screen">{children}</main>;
   }
 
-  if (isLaunchPage || isAuthPage) {
+  if (isAuthPage) {
     return <main className="site-main min-h-screen">{children}</main>;
   }
 
-  /*
-   * Private Guru and Pet Parent pages render their own dashboard headers.
-   * Do not render the public marketing header here, or private portal pages
-   * can show duplicate headers.
-   */
   if (isGuruPrivatePage || isCustomerPrivatePage) {
     return (
       <>
