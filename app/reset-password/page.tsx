@@ -163,26 +163,32 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f3f8f5] px-4 py-10 text-slate-950">
-      <div className="mx-auto flex min-h-[80vh] max-w-5xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.12)] lg:grid-cols-[0.9fr_1.1fr]">
-          <section className="bg-gradient-to-br from-green-950 via-emerald-800 to-emerald-600 p-8 text-white sm:p-10">
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-100">
+    <main className="min-h-screen bg-[#f3f8f5] px-3 py-4 text-slate-950 sm:px-5 sm:py-8 lg:px-8 lg:py-10">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-5xl items-center justify-center sm:min-h-[calc(100vh-4rem)]">
+        <div className="grid w-full overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.12)] sm:rounded-[2rem] lg:grid-cols-[0.9fr_1.1fr]">
+          <section className="bg-gradient-to-br from-green-950 via-emerald-800 to-emerald-600 p-5 text-white sm:p-8 lg:p-10">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-100 sm:text-xs sm:tracking-[0.24em]">
               SitGuru Account Care
             </p>
 
-            <h1 className="mt-8 max-w-sm text-5xl font-black leading-[0.95] tracking-tight sm:text-6xl">
-              Let’s get you back in.
-            </h1>
+            <div className="mt-5 rounded-[1.5rem] bg-white/95 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur sm:mt-8 sm:rounded-[2rem] sm:p-7">
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-2xl sm:h-12 sm:w-12">
+                🐾
+              </div>
 
-            <p className="mt-5 max-w-md text-base font-bold leading-7 text-white/90">
-              Create a new password and continue using SitGuru with peace of
-              mind.
-            </p>
+              <h1 className="max-w-sm text-4xl font-black leading-[0.95] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+                Let’s get you back in.
+              </h1>
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-2">
+              <p className="mt-4 max-w-md text-base font-bold leading-7 text-slate-700 sm:mt-5 sm:text-lg sm:leading-8">
+                Create a new password and continue using SitGuru with peace of
+                mind.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:mt-8 sm:grid-cols-2 sm:gap-4">
               <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                <p className="text-2xl">🐾</p>
+                <p className="text-2xl">💚</p>
                 <p className="mt-3 text-sm font-black text-white">
                   Pet Parent friendly
                 </p>
@@ -196,7 +202,7 @@ export default function ResetPasswordPage() {
               </div>
             </div>
 
-            <div className="mt-8 rounded-3xl border border-white/15 bg-white/10 p-5">
+            <div className="mt-5 rounded-3xl border border-white/15 bg-white/10 p-4 sm:mt-8 sm:p-5">
               <p className="text-sm font-black text-white">
                 Your account stays protected.
               </p>
@@ -207,9 +213,9 @@ export default function ResetPasswordPage() {
             </div>
           </section>
 
-          <section className="p-8 sm:p-10 lg:p-12">
+          <section className="p-5 sm:p-8 lg:p-12">
             <div className="mx-auto max-w-md">
-              <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700 sm:text-xs sm:tracking-[0.28em]">
                 SitGuru Account Security
               </p>
 
@@ -223,19 +229,19 @@ export default function ResetPasswordPage() {
               </p>
 
               {checkingSession ? (
-                <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-green-800">
+                <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-green-800 sm:mt-8">
                   Checking your secure reset session...
                 </div>
               ) : null}
 
               {!checkingSession && error && !hasRecoverySession ? (
-                <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-bold leading-6 text-amber-800">
+                <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-bold leading-6 text-amber-800 sm:mt-8">
                   {error}
 
                   <div className="mt-4">
                     <Link
                       href="/forgot-password"
-                      className="inline-flex rounded-full bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
+                      className="inline-flex w-full justify-center rounded-full bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900 sm:w-auto"
                     >
                       Send Me a Fresh Link
                     </Link>
@@ -244,7 +250,7 @@ export default function ResetPasswordPage() {
               ) : null}
 
               {!checkingSession && hasRecoverySession ? (
-                <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                <form onSubmit={handleSubmit} className="mt-6 space-y-5 sm:mt-8">
                   <div>
                     <label
                       htmlFor="password"
@@ -259,7 +265,7 @@ export default function ResetPasswordPage() {
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       autoComplete="new-password"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                       placeholder="Create your new password"
                       required
                     />
@@ -281,7 +287,7 @@ export default function ResetPasswordPage() {
                         setConfirmPassword(event.target.value)
                       }
                       autoComplete="new-password"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                       placeholder="Confirm your new password"
                       required
                     />
