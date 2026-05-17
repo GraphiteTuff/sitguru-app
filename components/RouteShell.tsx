@@ -10,13 +10,20 @@ export default function RouteShell({ children }: { children: ReactNode }) {
 
   const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
 
+  const isPasswordResetPage =
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
+    pathname === "/auth/recover" ||
+    pathname.startsWith("/auth/recover/");
+
   const isAuthPage =
     pathname === "/login" ||
     pathname === "/signup" ||
     pathname === "/guru/login" ||
     pathname === "/guru/signup" ||
     pathname === "/admin/login" ||
-    pathname.startsWith("/auth/");
+    pathname.startsWith("/auth/") ||
+    isPasswordResetPage;
 
   const isGuruDashboardPage =
     pathname === "/guru/dashboard" || pathname.startsWith("/guru/dashboard/");
