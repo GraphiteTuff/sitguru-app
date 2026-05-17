@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 type CarouselItem = {
@@ -15,16 +15,69 @@ type CarouselItem = {
   href: string;
 };
 
+const approvedGuruImages: Record<string, string> = {
+  "Avery Johnson": "/images/demo/avery-johnson.png",
+  "Brad Norway": "/images/demo/brad-norway.png",
+  "Caleb Brooks": "/images/demo/caleb-brooks.png",
+  "Darius Miller": "/images/demo/darius-miller.png",
+  "Emma Walsh": "/images/demo/emma-walsh.png",
+  "Maya Reynolds": "/images/demo/maya-reynolds.png",
+  "Nina Patel": "/images/demo/nina-patel.png",
+  "Olivia Chen": "/images/demo/olivia-chen.png",
+  "Sofia Martinez": "/images/demo/sofia-martinez.png",
+  "Suzy Q": "/images/demo/suzy-q.png",
+};
+
+const approvedGuruNames = new Set(Object.keys(approvedGuruImages));
+
 const fallbackCarouselItems: CarouselItem[] = [];
 
 type CaregiverCarouselProps = {
   items?: CarouselItem[];
 };
 
+function getSafeImageForItem(item: CarouselItem) {
+  const approvedImage = approvedGuruImages[item.name];
+
+  if (approvedImage) {
+    return approvedImage;
+  }
+
+  return item.image || "/images/demo/avery-johnson.png";
+}
+
+function dedupeAndApproveItems(items: CarouselItem[]) {
+  const seenNames = new Set<string>();
+
+  return items
+    .filter((item) => approvedGuruNames.has(item.name))
+    .filter((item) => {
+      if (seenNames.has(item.name)) {
+        return false;
+      }
+
+      seenNames.add(item.name);
+      return true;
+    })
+    .map((item) => ({
+      ...item,
+      image: getSafeImageForItem(item),
+      badge: item.badge || "Verified",
+    }));
+}
+
 export default function CaregiverCarousel({
   items = [],
 }: CaregiverCarouselProps) {
-  const displayItems = items.length > 0 ? items : fallbackCarouselItems;
+  const displayItems = useMemo(() => {
+    const approvedItems = dedupeAndApproveItems(items);
+
+    if (approvedItems.length > 0) {
+      return approvedItems;
+    }
+
+    return fallbackCarouselItems;
+  }, [items]);
 
   const hasMultipleItems = displayItems.length > 1;
 
@@ -37,12 +90,18 @@ export default function CaregiverCarousel({
 
     const interval = setInterval(() => {
       setActiveIndex((currentIndex) =>
-        currentIndex >= displayItems.length - 1 ? 0 : currentIndex + 1
+        currentIndex >= displayItems.length - 1 ? 0 : currentIndex + 1,
       );
     }, 4000);
 
     return () => clearInterval(interval);
   }, [displayItems.length, hasMultipleItems]);
+
+  useEffect(() => {
+    if (activeIndex > displayItems.length - 1) {
+      setActiveIndex(0);
+    }
+  }, [activeIndex, displayItems.length]);
 
   const goToPrevious = () => {
     if (!hasMultipleItems) {
@@ -50,7 +109,7 @@ export default function CaregiverCarousel({
     }
 
     setActiveIndex((currentIndex) =>
-      currentIndex <= 0 ? displayItems.length - 1 : currentIndex - 1
+      currentIndex <= 0 ? displayItems.length - 1 : currentIndex - 1,
     );
   };
 
@@ -60,7 +119,7 @@ export default function CaregiverCarousel({
     }
 
     setActiveIndex((currentIndex) =>
-      currentIndex >= displayItems.length - 1 ? 0 : currentIndex + 1
+      currentIndex >= displayItems.length - 1 ? 0 : currentIndex + 1,
     );
   };
 
@@ -129,16 +188,19 @@ export default function CaregiverCarousel({
             >
               {displayItems.map((item) => (
                 <article
-                  key={item.id}
+                  key={`${item.id}-${item.name}`}
                   className="panel flex h-auto min-w-[304px] max-w-[304px] flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:min-w-[340px] sm:max-w-[340px] lg:min-w-[360px] lg:max-w-[360px]"
                 >
                   <Link href={item.href} className="group block">
                     <div className="relative h-72 overflow-hidden rounded-t-3xl bg-slate-100">
                       <img
                         src={item.image}
-                        alt={`${item.name} with pets`}
+                        alt={`${item.name}, ${item.role}`}
                         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                         loading="lazy"
+                        onError={(event) => {
+                          event.currentTarget.src = getSafeImageForItem(item);
+                        }}
                       />
 
                       <div className="absolute left-4 top-4 flex flex-wrap gap-2">
@@ -198,7 +260,7 @@ export default function CaregiverCarousel({
           <div className="mt-8 flex items-center justify-center gap-3">
             {displayItems.map((item, index) => (
               <button
-                key={item.id}
+                key={`${item.id}-${item.name}-dot`}
                 type="button"
                 aria-label={`Go to caregiver ${index + 1}`}
                 onClick={() => goToSlide(index)}
