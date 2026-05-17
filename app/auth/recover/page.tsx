@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function getFriendlyRecoveryError(message: string) {
   const normalized = message.toLowerCase();
@@ -21,11 +21,16 @@ function getFriendlyRecoveryError(message: string) {
 
 export default function RecoverPasswordPage() {
   const router = useRouter();
+  const hasStartedRef = useRef(false);
 
   const [tokenHash, setTokenHash] = useState("");
   const [type, setType] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const hasRequiredLinkParts = useMemo(() => {
+    return Boolean(tokenHash) && type === "recovery";
+  }, [tokenHash, type]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -34,23 +39,53 @@ export default function RecoverPasswordPage() {
     setType(params.get("type") || "");
   }, []);
 
-  const hasRequiredLinkParts = useMemo(() => {
-    return Boolean(tokenHash) && type === "recovery";
-  }, [tokenHash, type]);
+  useEffect(() => {
+    async function verifyAndContinue() {
+      if (hasStartedRef.current) return;
 
-  async function handleContinue() {
-    if (loading) return;
+      if (!tokenHash && !type) return;
 
-    setLoading(true);
-    setError("");
+      hasStartedRef.current = true;
+      setLoading(true);
+      setError("");
 
-    if (!hasRequiredLinkParts) {
-      setError(
-        "This password reset link is missing required security details. Please request a new reset link.",
-      );
-      setLoading(false);
-      return;
+      if (!hasRequiredLinkParts) {
+        setError(
+          "This password reset link is missing required security details. Please request a new reset link.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { supabase } = await import("@/lib/supabase");
+
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: "recovery",
+        });
+
+        if (verifyError) {
+          setError(getFriendlyRecoveryError(verifyError.message));
+          setLoading(false);
+          return;
+        }
+
+        router.replace("/reset-password");
+        router.refresh();
+      } catch {
+        setError("Unable to verify your password reset link.");
+        setLoading(false);
+      }
     }
+
+    verifyAndContinue();
+  }, [hasRequiredLinkParts, router, tokenHash, type]);
+
+  async function handleTryAgain() {
+    hasStartedRef.current = false;
+    setError("");
+    setLoading(true);
 
     try {
       const { supabase } = await import("@/lib/supabase");
@@ -84,53 +119,47 @@ export default function RecoverPasswordPage() {
             </p>
 
             <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-              Continue password reset
+              Opening secure reset page
             </h1>
 
             <p className="mt-4 text-base leading-7 text-slate-600">
-              For your security, click the button below to verify this reset
-              link and continue to create a new SitGuru password.
+              We’re verifying your SitGuru password reset link and taking you to
+              the page where you can create a new password.
             </p>
           </div>
 
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
-            <p className="m-0 text-sm font-bold leading-6 text-green-900">
-              This extra step helps protect your account from email preview
-              scanners and keeps password resets safer for Pet Parents, Gurus,
-              Ambassadors, and Admin/Super User accounts.
-            </p>
-          </div>
+          {loading && !error ? (
+            <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
+              <p className="m-0 text-sm font-bold leading-6 text-green-900">
+                Please wait a moment. Your secure password reset page is opening.
+              </p>
+            </div>
+          ) : null}
 
           {error ? (
-            <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 px-4 py-4 text-sm font-bold leading-6 text-red-700">
+            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-4 text-sm font-bold leading-6 text-red-700">
               {error}
 
-              <div className="mt-4">
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                {hasRequiredLinkParts ? (
+                  <button
+                    type="button"
+                    onClick={handleTryAgain}
+                    className="inline-flex justify-center rounded-full bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
+                  >
+                    Try Again
+                  </button>
+                ) : null}
+
                 <Link
                   href="/forgot-password"
-                  className="inline-flex rounded-full bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
+                  className="inline-flex justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-green-800 transition hover:bg-emerald-50"
                 >
-                  Request a new reset link
+                  Request New Link
                 </Link>
               </div>
             </div>
           ) : null}
-
-          {!hasRequiredLinkParts ? (
-            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-bold leading-6 text-amber-800">
-              This recovery page loaded correctly, but this link is missing the
-              required reset details. Please request a new reset link.
-            </div>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={loading || !hasRequiredLinkParts}
-            className="mt-7 flex w-full items-center justify-center rounded-2xl bg-green-800 px-5 py-4 text-base font-black text-white shadow-sm transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {loading ? "Verifying reset link..." : "Continue to Reset Password"}
-          </button>
 
           <div className="mt-6 grid gap-3 text-sm font-bold sm:grid-cols-2">
             <Link
