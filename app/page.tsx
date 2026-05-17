@@ -281,7 +281,7 @@ const programPathways = [
   {
     title: "Gurus",
     description: "Anyone can apply to offer care through SitGuru",
-    href: "/guru/signup",
+    href: "/become-a-guru",
     icon: "🦮",
   },
   {
@@ -1354,9 +1354,9 @@ export default function HomePage() {
                 </Link>
 
                 <Link
-                  href="/guru/signup"
+                  href="/become-a-guru"
                   onClick={() =>
-                    trackHomepageClick("Become a Guru", "/guru/signup")
+                    trackHomepageClick("Become a Guru", "/become-a-guru")
                   }
                   className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
                 >
@@ -1456,11 +1456,11 @@ export default function HomePage() {
                   </Link>
 
                   <Link
-                    href="/guru/signup"
+                    href="/become-a-guru"
                     onClick={() =>
                       trackHomepageClick(
                         "Become a Guru Programs Section",
-                        "/guru/signup",
+                        "/become-a-guru",
                       )
                     }
                     className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
@@ -1571,9 +1571,9 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="/guru/signup"
+                href="/become-a-guru"
                 onClick={() =>
-                  trackHomepageClick("Become a Guru Final CTA", "/guru/signup")
+                  trackHomepageClick("Become a Guru Final CTA", "/become-a-guru")
                 }
                 className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
               >
