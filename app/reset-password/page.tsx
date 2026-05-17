@@ -1,19 +1,8 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  Lock,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 function getFriendlyAuthError(message: string) {
   const normalized = message.toLowerCase();
@@ -34,112 +23,30 @@ function getFriendlyAuthError(message: string) {
   return message || "Unable to verify your password reset link.";
 }
 
-function ResetPasswordLoadingCard() {
-  return (
-    <main className="min-h-screen overflow-hidden bg-[#f7f8f4] text-slate-950">
-      <div className="absolute left-0 top-0 h-[420px] w-[420px] rounded-full bg-emerald-100/70 blur-3xl" />
-      <div className="absolute bottom-0 right-0 h-[480px] w-[480px] rounded-full bg-sky-100/70 blur-3xl" />
-
-      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-5 py-6 sm:px-8">
-        <Link
-          href="/"
-          className="inline-flex items-center rounded-2xl transition hover:opacity-90"
-          aria-label="Back to SitGuru homepage"
-        >
-          <Image
-            src="/images/sitguru-logo-cropped.png"
-            alt="SitGuru"
-            width={320}
-            height={132}
-            priority
-            className="h-auto w-[140px]"
-          />
-        </Link>
-
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Login
-        </Link>
-      </header>
-
-      <section className="relative z-10 mx-auto grid min-h-[calc(100vh-112px)] max-w-7xl place-items-center px-5 py-10 sm:px-8">
-        <div className="w-full max-w-xl rounded-[2.25rem] border border-emerald-100 bg-white p-8 shadow-[0_30px_90px_rgba(15,23,42,0.13)] sm:p-10">
-          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-green-800">
-            <ShieldCheck className="h-4 w-4" />
-            Secure Password Reset
-          </span>
-
-          <h1 className="mt-6 text-4xl font-black tracking-tight text-green-950 sm:text-5xl">
-            Reset password
-          </h1>
-
-          <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-green-800">
-            Loading your reset session...
-          </div>
-        </div>
-      </section>
-    </main>
-  );
-}
-
-function ResetPasswordContent() {
+export default function ResetPasswordPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [hasRecoverySession, setHasRecoverySession] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const passwordsMatch = useMemo(() => {
+    return password.length > 0 && confirmPassword.length > 0 && password === confirmPassword;
+  }, [password, confirmPassword]);
 
   useEffect(() => {
     let mounted = true;
 
-    async function checkRecoverySession() {
+    async function checkSession() {
       setCheckingSession(true);
       setError("");
 
       try {
-        const code = searchParams.get("code");
-        const errorDescription =
-          searchParams.get("error_description") ||
-          searchParams.get("error") ||
-          searchParams.get("error_code");
-
-        if (errorDescription) {
-          if (!mounted) return;
-
-          setHasRecoverySession(false);
-          setError(getFriendlyAuthError(errorDescription));
-          return;
-        }
-
-        if (code) {
-          const { error: exchangeError } =
-            await supabase.auth.exchangeCodeForSession(code);
-
-          if (exchangeError) {
-            if (!mounted) return;
-
-            setHasRecoverySession(false);
-            setError(getFriendlyAuthError(exchangeError.message));
-            return;
-          }
-
-          if (mounted) {
-            setHasRecoverySession(true);
-          }
-
-          return;
-        }
+        const { supabase } = await import("@/lib/supabase");
 
         const {
           data: { session },
@@ -164,10 +71,10 @@ function ResetPasswordContent() {
 
         setHasRecoverySession(true);
       } catch {
-        if (mounted) {
-          setHasRecoverySession(false);
-          setError("Unable to verify your password reset session.");
-        }
+        if (!mounted) return;
+
+        setHasRecoverySession(false);
+        setError("Unable to verify your password reset session.");
       } finally {
         if (mounted) {
           setCheckingSession(false);
@@ -175,12 +82,12 @@ function ResetPasswordContent() {
       }
     }
 
-    checkRecoverySession();
+    checkSession();
 
     return () => {
       mounted = false;
     };
-  }, [searchParams, supabase]);
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -218,12 +125,15 @@ function ResetPasswordContent() {
     setLoading(true);
 
     try {
+      const { supabase } = await import("@/lib/supabase");
+
       const { error: updateError } = await supabase.auth.updateUser({
         password: cleanPassword,
       });
 
       if (updateError) {
         setError(updateError.message || "Could not update password.");
+        setLoading(false);
         return;
       }
 
@@ -232,200 +142,127 @@ function ResetPasswordContent() {
       setMessage("Password updated successfully. Redirecting to login...");
 
       setTimeout(() => {
-        router.push("/login?status=password-updated");
+        router.replace("/login?status=password-updated");
         router.refresh();
       }, 1200);
     } catch {
       setError("Something went wrong while updating your password.");
-    } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f7f8f4] text-slate-950">
-      <div className="absolute left-0 top-0 h-[420px] w-[420px] rounded-full bg-emerald-100/70 blur-3xl" />
-      <div className="absolute bottom-0 right-0 h-[480px] w-[480px] rounded-full bg-sky-100/70 blur-3xl" />
+    <main className="min-h-screen bg-slate-100 px-4 py-10 text-slate-950">
+      <div className="mx-auto flex min-h-[75vh] max-w-xl items-center justify-center">
+        <div className="w-full rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
+          <div className="mb-8">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+              SitGuru Account Security
+            </p>
 
-      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-5 py-6 sm:px-8">
-        <Link
-          href="/"
-          className="inline-flex items-center rounded-2xl transition hover:opacity-90"
-          aria-label="Back to SitGuru homepage"
-        >
-          <Image
-            src="/images/sitguru-logo-cropped.png"
-            alt="SitGuru"
-            width={320}
-            height={132}
-            priority
-            className="h-auto w-[140px]"
-          />
-        </Link>
+            <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+              Reset password
+            </h1>
 
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Login
-        </Link>
-      </header>
-
-      <section className="relative z-10 mx-auto grid min-h-[calc(100vh-112px)] max-w-7xl place-items-center px-5 py-10 sm:px-8">
-        <div className="w-full max-w-xl rounded-[2.25rem] border border-emerald-100 bg-white p-8 shadow-[0_30px_90px_rgba(15,23,42,0.13)] sm:p-10">
-          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-green-800">
-            <ShieldCheck className="h-4 w-4" />
-            Secure Password Reset
-          </span>
-
-          <h1 className="mt-6 text-4xl font-black tracking-tight text-green-950 sm:text-5xl">
-            Reset password
-          </h1>
-
-          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-            Enter a new password for your SitGuru account. This works for Pet
-            Parents, Gurus, Ambassadors, and Admin/Super User accounts.
-          </p>
+            <p className="mt-4 text-base leading-7 text-slate-600">
+              Create a new password for your SitGuru account.
+            </p>
+          </div>
 
           {checkingSession ? (
-            <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-green-800">
-              Checking your reset session...
+            <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
+              <p className="m-0 text-sm font-bold leading-6 text-green-900">
+                Checking your secure reset session...
+              </p>
             </div>
-          ) : (
-            <>
-              {error && !hasRecoverySession ? (
-                <div className="mt-8 rounded-2xl border border-red-100 bg-red-50 px-4 py-4 text-sm font-bold leading-6 text-red-700">
-                  {error}
+          ) : null}
 
-                  <div className="mt-4">
-                    <Link
-                      href="/forgot-password"
-                      className="inline-flex rounded-full bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
-                    >
-                      Request a new reset link
-                    </Link>
-                  </div>
+          {!checkingSession && error && !hasRecoverySession ? (
+            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-4 text-sm font-bold leading-6 text-red-700">
+              {error}
+
+              <div className="mt-4">
+                <Link
+                  href="/forgot-password"
+                  className="inline-flex rounded-full bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
+                >
+                  Request New Reset Link
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
+          {!checkingSession && hasRecoverySession ? (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label
+                  htmlFor="password"
+                  className="mb-2 block text-sm font-black text-slate-800"
+                >
+                  New Password
+                </label>
+
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="new-password"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  placeholder="Enter new password"
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="confirm-password"
+                  className="mb-2 block text-sm font-black text-slate-800"
+                >
+                  Confirm Password
+                </label>
+
+                <input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  autoComplete="new-password"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  placeholder="Confirm new password"
+                  required
+                />
+              </div>
+
+              {password && confirmPassword && !passwordsMatch ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+                  Passwords do not match yet.
                 </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-                  <div>
-                    <label
-                      htmlFor="password"
-                      className="mb-2 block text-sm font-black text-slate-800"
-                    >
-                      New Password
-                    </label>
+              ) : null}
 
-                    <div className="flex items-center rounded-2xl border border-emerald-100 bg-[#eef6ff] px-4 py-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-4 focus-within:ring-emerald-100">
-                      <Lock className="h-5 w-5 shrink-0 text-slate-400" />
+              {error ? (
+                <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-700">
+                  {error}
+                </div>
+              ) : null}
 
-                      <input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        autoComplete="new-password"
-                        className="ml-3 w-full bg-transparent text-base font-semibold text-slate-950 outline-none placeholder:text-slate-400"
-                        placeholder="Enter new password"
-                        required
-                      />
+              {message ? (
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-green-800">
+                  {message}
+                </div>
+              ) : null}
 
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((value) => !value)}
-                        className="ml-3 rounded-full p-1 text-slate-500 transition hover:bg-white hover:text-green-800"
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-5 w-5" />
-                        ) : (
-                          <Eye className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex w-full items-center justify-center rounded-2xl bg-green-800 px-5 py-4 text-base font-black text-white shadow-sm transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loading ? "Updating password..." : "Update Password"}
+              </button>
+            </form>
+          ) : null}
 
-                  <div>
-                    <label
-                      htmlFor="confirm-password"
-                      className="mb-2 block text-sm font-black text-slate-800"
-                    >
-                      Confirm Password
-                    </label>
-
-                    <div className="flex items-center rounded-2xl border border-emerald-100 bg-[#eef6ff] px-4 py-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-4 focus-within:ring-emerald-100">
-                      <Lock className="h-5 w-5 shrink-0 text-slate-400" />
-
-                      <input
-                        id="confirm-password"
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={confirmPassword}
-                        onChange={(event) =>
-                          setConfirmPassword(event.target.value)
-                        }
-                        autoComplete="new-password"
-                        className="ml-3 w-full bg-transparent text-base font-semibold text-slate-950 outline-none placeholder:text-slate-400"
-                        placeholder="Confirm new password"
-                        required
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowConfirmPassword((value) => !value)
-                        }
-                        className="ml-3 rounded-full p-1 text-slate-500 transition hover:bg-white hover:text-green-800"
-                        aria-label={
-                          showConfirmPassword
-                            ? "Hide confirm password"
-                            : "Show confirm password"
-                        }
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-5 w-5" />
-                        ) : (
-                          <Eye className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {error ? (
-                    <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-700">
-                      {error}
-                    </div>
-                  ) : null}
-
-                  {message ? (
-                    <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-green-800">
-                      <CheckCircle2 className="h-5 w-5 shrink-0" />
-                      {message}
-                    </div>
-                  ) : null}
-
-                  <button
-                    type="submit"
-                    disabled={loading || checkingSession || !hasRecoverySession}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-4 text-base font-black text-white shadow-[0_12px_30px_rgba(22,101,52,0.22)] transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {loading ? (
-                      <>
-                        <Sparkles className="h-5 w-5 animate-pulse" />
-                        Updating password...
-                      </>
-                    ) : (
-                      "Update Password"
-                    )}
-                  </button>
-                </form>
-              )}
-            </>
-          )}
-
-          <div className="mt-6 grid gap-3 text-sm font-bold text-slate-500 sm:grid-cols-2">
+          <div className="mt-6 grid gap-3 text-sm font-bold sm:grid-cols-2">
             <Link
               href="/login"
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-green-800 transition hover:border-emerald-200 hover:bg-emerald-50"
@@ -455,15 +292,7 @@ function ResetPasswordContent() {
             </Link>
           </div>
         </div>
-      </section>
+      </div>
     </main>
-  );
-}
-
-export default function ResetPasswordPage() {
-  return (
-    <Suspense fallback={<ResetPasswordLoadingCard />}>
-      <ResetPasswordContent />
-    </Suspense>
   );
 }
