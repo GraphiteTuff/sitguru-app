@@ -6,13 +6,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
+  Eye,
+  EyeOff,
+  Gift,
   Heart,
   Loader2,
+  Lock,
+  Mail,
   PawPrint,
+  Phone,
   Search,
   ShieldCheck,
   Sparkles,
   Star,
+  Tag,
+  User,
 } from "lucide-react";
 
 import PhoneCodeLogin from "@/components/auth/PhoneCodeLogin";
@@ -25,6 +33,7 @@ type SignupForm = {
   lastName: string;
   email: string;
   password: string;
+  confirmPassword: string;
   referralCode: string;
   accountType: SignupAccountType;
 };
@@ -34,13 +43,14 @@ const initialForm: SignupForm = {
   lastName: "",
   email: "",
   password: "",
+  confirmPassword: "",
   referralCode: "",
   accountType: "pet_parent",
 };
 
 function getAccountTypeLabel(accountType: SignupAccountType) {
   if (accountType === "future_guru") return "Future Guru";
-  if (accountType === "both") return "Pet Parent + Future Guru";
+  if (accountType === "both") return "SitGuru";
   return "Pet Parent";
 }
 
@@ -96,6 +106,8 @@ function SignupPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const selectedAccountTypeLabel = getAccountTypeLabel(form.accountType);
   const phoneSignupRole = getPhoneSignupRole(form.accountType);
@@ -125,6 +137,7 @@ function SignupPageContent() {
     const lastName = form.lastName.trim();
     const email = form.email.trim().toLowerCase();
     const password = form.password;
+    const confirmPassword = form.confirmPassword;
     const fullName = getFullName(firstName, lastName);
     const role = getProfileRole(form.accountType);
 
@@ -140,6 +153,11 @@ function SignupPageContent() {
 
     if (password.length < 8) {
       setErrorMessage("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMessage("The passwords do not match yet.");
       return;
     }
 
@@ -212,354 +230,523 @@ function SignupPageContent() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#d9fff1_0%,#f8fffc_38%,#ffffff_100%)] px-5 py-12 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-6rem)] max-w-6xl items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8 lg:p-10">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dcfff2_0%,#f8fffc_42%,#ffffff_100%)] px-3 py-4 text-slate-950 sm:px-5 sm:py-8 lg:px-8 lg:py-10">
+      <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+        <section className="rounded-[1.75rem] border border-emerald-100 bg-white/80 p-5 shadow-[0_18px_54px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8 lg:sticky lg:top-8 lg:p-10">
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-800 ring-1 ring-emerald-200">
-            <Sparkles className="h-4 w-4" />
+            <Gift className="h-4 w-4" />
             Join SitGuru Free
           </div>
 
-          <h1 className="mt-5 max-w-2xl text-5xl font-black leading-[0.95] tracking-[-0.055em] text-slate-950 sm:text-6xl">
-            Create your free account and get started with trusted pet care.
+          <h1 className="mt-5 max-w-2xl text-4xl font-black leading-[0.98] tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
+            Create your free SitGuru account
           </h1>
 
-          <p className="mt-5 max-w-xl text-lg leading-7 text-slate-600">
-            Join for free as a Pet Parent, a future Guru, or both with a
-            cleaner, more modern experience built to grow with SitGuru.
+          <p className="mt-4 max-w-xl text-base font-semibold leading-7 text-slate-600 sm:text-lg">
+            Join as a Pet Parent, Future Guru, or both. It only takes a minute
+            to get started.
           </p>
 
-          <div className="mt-7 rounded-[1.6rem] border border-emerald-100 bg-emerald-50 p-5 sm:p-6">
-            <div className="inline-flex rounded-full bg-white px-4 py-1.5 text-xs font-black uppercase tracking-[0.28em] text-emerald-700 ring-1 ring-emerald-100">
-              SitGuru PetPerks
+          <div className="mt-7 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-100 bg-white p-4 text-center shadow-sm">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50">
+                <Gift className="h-6 w-6 text-emerald-700" />
+              </div>
+              <h2 className="mt-3 text-base font-black text-slate-950">
+                Free Account
+              </h2>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                Create your account and get started today.
+              </p>
             </div>
 
-            <h2 className="mt-4 text-3xl font-black leading-[0.95] tracking-[-0.045em] text-slate-950 sm:text-4xl">
-              Join free, refer others, and help the SitGuru community grow.
-            </h2>
+            <div className="rounded-2xl border border-sky-100 bg-white p-4 text-center shadow-sm">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50">
+                <Search className="h-6 w-6 text-sky-600" />
+              </div>
+              <h2 className="mt-3 text-base font-black text-slate-950">
+                Book Care
+              </h2>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                Find and book trusted pet care near you.
+              </p>
+            </div>
 
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              If you arrived through a SitGuru referral link, your signup will
-              connect to PetPerks. Rewards are earned only after eligible first
-              paid booking activity is completed.
-            </p>
+            <div className="rounded-2xl border border-purple-100 bg-white p-4 text-center shadow-sm">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50">
+                <Star className="h-6 w-6 text-purple-600" />
+              </div>
+              <h2 className="mt-3 text-base font-black text-slate-950">
+                Earn Rewards
+              </h2>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                Refer friends and earn SitGuru rewards.
+              </p>
+            </div>
+          </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <Heart className="h-6 w-6 text-purple-600" />
-                <h3 className="mt-3 text-2xl font-black leading-none tracking-[-0.04em]">
-                  Give $10. Get $10.
-                </h3>
-                <p className="mt-2 text-xs leading-5 text-slate-600">
-                  Pet Parent rewards are earned after the referred Pet Parent
-                  completes their first eligible paid booking.
-                </p>
+          <div className="mt-7 rounded-[1.6rem] border border-emerald-100 bg-emerald-50 p-5">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
+                <PawPrint className="h-6 w-6 text-emerald-700" />
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
-                <h3 className="mt-3 text-2xl font-black leading-none tracking-[-0.04em]">
-                  Refer a Guru. Earn $20.
-                </h3>
-                <p className="mt-2 text-xs leading-5 text-slate-600">
-                  Guru referral rewards are earned after the referred Guru is
-                  approved and completes their first eligible paid booking.
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+                  SitGuru PetPerks
                 </p>
-              </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <Heart className="h-6 w-6 fill-emerald-400 text-emerald-500" />
-                <h3 className="mt-3 text-2xl font-black leading-none tracking-[-0.04em]">
-                  Join as Both
-                </h3>
-                <p className="mt-2 text-xs leading-5 text-slate-600">
-                  Pet Parents can also become Gurus. PetPerks can track both
-                  paths after eligible activity.
+                <h2 className="mt-2 text-2xl font-black leading-tight tracking-[-0.035em] text-slate-950">
+                  Join free. Refer friends. Earn rewards.
+                </h2>
+
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  If you arrived through a referral link, your signup will
+                  connect to PetPerks. Rewards are earned after eligible first
+                  paid booking activity is completed.
                 </p>
+
+                <Link
+                  href="/petperks"
+                  className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  Learn more about PetPerks
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <Sparkles className="h-5 w-5 text-orange-400" />
-              <h3 className="mt-3 text-2xl font-black tracking-[-0.04em]">
-                Free Account
-              </h3>
-              <p className="mt-1 text-xs leading-5 text-slate-600">
-                Join SitGuru for free and get started today.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <Search className="h-5 w-5 text-sky-500" />
-              <h3 className="mt-3 text-2xl font-black tracking-[-0.04em]">
-                Book Care
-              </h3>
-              <p className="mt-1 text-xs leading-5 text-slate-600">
-                Pet Parents can find trusted pet care nearby.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <ShieldCheck className="h-5 w-5 text-emerald-500" />
-              <h3 className="mt-3 text-2xl font-black tracking-[-0.04em]">
-                Earn as a Guru
-              </h3>
-              <p className="mt-1 text-xs leading-5 text-slate-600">
-                Future Gurus can offer pet care services.
-              </p>
+          <div className="mt-7 hidden overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 lg:block">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">🐶</div>
+              <div>
+                <p className="text-sm font-black text-green-900">
+                  Trusted Pet Care. Simplified.
+                </p>
+                <p className="text-xs font-semibold text-slate-500">
+                  Built for Pet Parents, Gurus, and the SitGuru community.
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:p-8">
-          <div className="inline-flex rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-800 ring-1 ring-emerald-200">
-            Free Account
-          </div>
-
-          <h2 className="mt-4 text-4xl font-black leading-[0.95] tracking-[-0.05em] text-slate-950 sm:text-5xl">
-            Start using SitGuru for free
-          </h2>
-
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Create your free account to book pet care, save favorite Gurus, or
-            begin offering services.
-          </p>
-
-          <div className="mt-6">
-            <p className="mb-3 text-sm font-black text-slate-900">
-              Account type
-            </p>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={() => updateForm("accountType", "pet_parent")}
-                className={`rounded-2xl border p-4 text-left transition ${
-                  form.accountType === "pet_parent"
-                    ? "border-emerald-400 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.12)]"
-                    : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
-                }`}
-              >
-                <div className="text-xl">🐶</div>
-                <p className="mt-2 text-sm font-black text-slate-950">
-                  Pet Parent
-                </p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  I want to find, book, and share trusted pet care.
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => updateForm("accountType", "future_guru")}
-                className={`rounded-2xl border p-4 text-left transition ${
-                  form.accountType === "future_guru"
-                    ? "border-emerald-400 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.12)]"
-                    : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
-                }`}
-              >
-                <div className="text-xl">⭐</div>
-                <p className="mt-2 text-sm font-black text-slate-950">
-                  Future Guru
-                </p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  I want to offer pet care services and earn with SitGuru.
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => updateForm("accountType", "both")}
-                className={`rounded-2xl border p-4 text-left transition ${
-                  form.accountType === "both"
-                    ? "border-emerald-400 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.12)]"
-                    : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
-                }`}
-              >
-                <div className="text-xl">🐾</div>
-                <p className="mt-2 text-sm font-black text-slate-950">Both</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  I want to book pet care and also offer services as a Guru.
-                </p>
-              </button>
-            </div>
-          </div>
-
-          <PhoneCodeLogin
-            role={phoneSignupRole}
-            nextPath={phoneSignupRedirect}
-            heading="Continue with phone"
-            description="Enter your mobile number and we’ll text you a secure 6-digit SitGuru code."
-            submitLabel="Text me a code"
-            verifyLabel="Verify & continue"
-            compact
-          />
-
-          <div className="my-6 flex items-center gap-4">
-            <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
-              or finish the quick form
-            </span>
-            <div className="h-px flex-1 bg-slate-200" />
-          </div>
-
-          <form onSubmit={handleEmailSignup} className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor="first-name"
-                  className="mb-2 block text-sm font-black text-slate-900"
-                >
-                  First name
-                </label>
-                <input
-                  id="first-name"
-                  value={form.firstName}
-                  onChange={(event) =>
-                    updateForm("firstName", event.target.value)
-                  }
-                  placeholder="First name"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-                />
+        <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_54px_rgba(15,23,42,0.10)] sm:p-8 lg:p-10">
+          <div className="mx-auto max-w-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="inline-flex rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-800 ring-1 ring-emerald-200">
+                Free Account
               </div>
-
-              <div>
-                <label
-                  htmlFor="last-name"
-                  className="mb-2 block text-sm font-black text-slate-900"
-                >
-                  Last name
-                </label>
-                <input
-                  id="last-name"
-                  value={form.lastName}
-                  onChange={(event) =>
-                    updateForm("lastName", event.target.value)
-                  }
-                  placeholder="Last name"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="email"
-                className="mb-2 block text-sm font-black text-slate-900"
-              >
-                Email address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={form.email}
-                onChange={(event) => updateForm("email", event.target.value)}
-                placeholder="you@example.com"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="referral-code"
-                className="mb-2 block text-sm font-black text-slate-900"
-              >
-                Referral code{" "}
-                <span className="font-bold text-slate-400">optional</span>
-              </label>
-              <input
-                id="referral-code"
-                value={form.referralCode}
-                onChange={(event) =>
-                  updateForm("referralCode", event.target.value)
-                }
-                placeholder="Referral code or invite link code"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-              />
-              <p className="mt-2 text-xs font-semibold text-slate-500">
-                PetPerks rewards are only earned after eligible first paid
-                booking activity is completed.
-              </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-sm font-black text-slate-900"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={form.password}
-                onChange={(event) =>
-                  updateForm("password", event.target.value)
-                }
-                placeholder="Create a password"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-              />
-              <p className="mt-2 text-xs font-semibold text-slate-500">
-                Use at least 8 characters.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-sky-400 px-5 py-4 text-sm font-black text-white shadow-[0_16px_35px_rgba(14,165,233,0.22)] transition hover:from-emerald-600 hover:to-sky-500 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ArrowRight className="h-4 w-4" />
-              )}
-              {isSubmitting
-                ? "Creating account..."
-                : `Create free ${selectedAccountTypeLabel} account`}
-            </button>
-
-            {successMessage ? (
-              <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-                <CheckCircle2 className="h-4 w-4" />
-                {successMessage}
-              </div>
-            ) : null}
-
-            {errorMessage ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                {errorMessage}
-              </div>
-            ) : null}
-          </form>
-
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-black text-slate-900">
-              Already have an account?
-            </p>
-
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Link
-                href="/customer/login"
-                className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
-              >
-                Pet Parent Login
-              </Link>
 
               <Link
-                href="/guru/login"
-                className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-50"
+                href="/"
+                className="rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm font-black text-green-900 transition hover:bg-white"
               >
-                Guru Login
+                Home
               </Link>
             </div>
 
-            <p className="mt-3 rounded-xl bg-white px-4 py-3 text-xs font-bold leading-5 text-slate-600 ring-1 ring-slate-200">
-              You selected {selectedAccountTypeLabel}. Your login route and
-              dashboard will match the account mode you choose.
+            <h2 className="mt-5 text-4xl font-black leading-[0.95] tracking-[-0.05em] text-slate-950 sm:text-5xl">
+              Start using SitGuru for free
+            </h2>
+
+            <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+              Choose how you want to join, then create your account with email.
+              Phone sign-up is still available below.
             </p>
+
+            <div className="mt-7 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <p className="mb-4 text-lg font-black text-slate-950">
+                1. Choose your account type
+              </p>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => updateForm("accountType", "pet_parent")}
+                  className={`relative rounded-2xl border p-4 text-center transition ${
+                    form.accountType === "pet_parent"
+                      ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.12)]"
+                      : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
+                  }`}
+                >
+                  {form.accountType === "pet_parent" ? (
+                    <span className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </span>
+                  ) : null}
+
+                  <div className="text-3xl">🐶</div>
+                  <p className="mt-3 text-base font-black text-emerald-800">
+                    Pet Parent
+                  </p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Find, book, and save trusted pet care.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => updateForm("accountType", "future_guru")}
+                  className={`relative rounded-2xl border p-4 text-center transition ${
+                    form.accountType === "future_guru"
+                      ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.12)]"
+                      : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
+                  }`}
+                >
+                  {form.accountType === "future_guru" ? (
+                    <span className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </span>
+                  ) : null}
+
+                  <div className="text-3xl">⭐</div>
+                  <p className="mt-3 text-base font-black text-slate-950">
+                    Future Guru
+                  </p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Offer pet care services and earn with SitGuru.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => updateForm("accountType", "both")}
+                  className={`relative rounded-2xl border p-4 text-center transition ${
+                    form.accountType === "both"
+                      ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.12)]"
+                      : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
+                  }`}
+                >
+                  {form.accountType === "both" ? (
+                    <span className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </span>
+                  ) : null}
+
+                  <div className="text-3xl">🐾</div>
+                  <p className="mt-3 text-base font-black text-slate-950">
+                    Both
+                  </p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Book care and also offer services as a Guru.
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <p className="mb-4 text-lg font-black text-slate-950">
+                2. Create your account with email
+              </p>
+
+              <form onSubmit={handleEmailSignup} className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="first-name"
+                      className="mb-2 block text-sm font-black text-slate-900"
+                    >
+                      First name
+                    </label>
+
+                    <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 transition focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100">
+                      <User className="h-5 w-5 shrink-0 text-slate-400" />
+                      <input
+                        id="first-name"
+                        value={form.firstName}
+                        onChange={(event) =>
+                          updateForm("firstName", event.target.value)
+                        }
+                        placeholder="First name"
+                        className="ml-3 w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="last-name"
+                      className="mb-2 block text-sm font-black text-slate-900"
+                    >
+                      Last name
+                    </label>
+
+                    <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 transition focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100">
+                      <User className="h-5 w-5 shrink-0 text-slate-400" />
+                      <input
+                        id="last-name"
+                        value={form.lastName}
+                        onChange={(event) =>
+                          updateForm("lastName", event.target.value)
+                        }
+                        placeholder="Last name"
+                        className="ml-3 w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="mb-2 block text-sm font-black text-slate-900"
+                  >
+                    Email address
+                  </label>
+
+                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 transition focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100">
+                    <Mail className="h-5 w-5 shrink-0 text-slate-400" />
+                    <input
+                      id="email"
+                      type="email"
+                      value={form.email}
+                      onChange={(event) =>
+                        updateForm("email", event.target.value)
+                      }
+                      placeholder="you@example.com"
+                      className="ml-3 w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="password"
+                    className="mb-2 block text-sm font-black text-slate-900"
+                  >
+                    Password
+                  </label>
+
+                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 transition focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100">
+                    <Lock className="h-5 w-5 shrink-0 text-slate-400" />
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={form.password}
+                      onChange={(event) =>
+                        updateForm("password", event.target.value)
+                      }
+                      placeholder="Create a password"
+                      className="ml-3 w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="ml-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-emerald-50 hover:text-green-800"
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                    Use at least 8 characters.
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="confirm-password"
+                    className="mb-2 block text-sm font-black text-slate-900"
+                  >
+                    Confirm password
+                  </label>
+
+                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 transition focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100">
+                    <Lock className="h-5 w-5 shrink-0 text-slate-400" />
+                    <input
+                      id="confirm-password"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={form.confirmPassword}
+                      onChange={(event) =>
+                        updateForm("confirmPassword", event.target.value)
+                      }
+                      placeholder="Confirm your password"
+                      className="ml-3 w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowConfirmPassword((value) => !value)
+                      }
+                      className="ml-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-emerald-50 hover:text-green-800"
+                      aria-label={
+                        showConfirmPassword
+                          ? "Hide confirmed password"
+                          : "Show confirmed password"
+                      }
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="referral-code"
+                    className="mb-2 block text-sm font-black text-slate-900"
+                  >
+                    Referral code{" "}
+                    <span className="font-bold text-slate-400">optional</span>
+                  </label>
+
+                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 transition focus-within:border-emerald-400 focus-within:ring-4 focus-within:ring-emerald-100">
+                    <Tag className="h-5 w-5 shrink-0 text-slate-400" />
+                    <input
+                      id="referral-code"
+                      value={form.referralCode}
+                      onChange={(event) =>
+                        updateForm("referralCode", event.target.value)
+                      }
+                      placeholder="Referral code or invite link"
+                      className="ml-3 w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                    PetPerks rewards are earned after eligible first paid
+                    booking activity is completed.
+                  </p>
+                </div>
+
+                {successMessage ? (
+                  <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    {successMessage}
+                  </div>
+                ) : null}
+
+                {errorMessage ? (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                    {errorMessage}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-sky-500 px-5 py-4 text-base font-black text-white shadow-[0_16px_35px_rgba(14,165,233,0.22)] transition hover:from-emerald-700 hover:to-sky-600 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
+                  {isSubmitting
+                    ? "Creating account..."
+                    : `Create my ${selectedAccountTypeLabel} account`}
+                </button>
+
+                <p className="text-center text-xs font-semibold leading-5 text-slate-500">
+                  By creating an account, you agree to SitGuru’s{" "}
+                  <Link
+                    href="/terms"
+                    className="font-black text-green-800 hover:underline"
+                  >
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="/privacy"
+                    className="font-black text-green-800 hover:underline"
+                  >
+                    Privacy Policy
+                  </Link>
+                  .
+                </p>
+              </form>
+            </div>
+
+            <div className="mt-5 rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-4 sm:p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
+                  <Phone className="h-6 w-6 text-emerald-700" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-lg font-black text-slate-950">
+                    3. Prefer to sign up with your mobile number?
+                  </p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                    Phone sign-up is available too. We’ll text you a secure
+                    6-digit code to verify your number.
+                  </p>
+
+                  <div className="mt-4 rounded-[1.35rem] border border-emerald-200 bg-white p-4">
+                    <PhoneCodeLogin
+                      role={phoneSignupRole}
+                      nextPath={phoneSignupRedirect}
+                      heading="Use phone instead"
+                      description="Enter your U.S. mobile number and we’ll text you a secure SitGuru code."
+                      submitLabel="Text me a code"
+                      verifyLabel="Verify & continue"
+                      compact
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 text-center sm:p-5">
+              <p className="text-sm font-black text-slate-900">
+                Already part of SitGuru?
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+                >
+                  <User className="h-4 w-4" />
+                  Pet Parent Login
+                </Link>
+
+                <Link
+                  href="/guru/login"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-50"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  Guru Login
+                </Link>
+              </div>
+
+              <Link
+                href="/admin/login"
+                className="mt-4 inline-flex text-xs font-black text-green-800 hover:underline"
+              >
+                Admin Login
+              </Link>
+
+              <p className="mt-3 text-xs font-bold leading-5 text-slate-500">
+                You’ll be taken to the right dashboard for your account.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-3 text-center text-xs font-black text-slate-500 sm:grid-cols-3">
+              <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-100">
+                Free to join
+              </div>
+              <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-100">
+                Trusted by pet lovers
+              </div>
+              <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-100">
+                Secure & private
+              </div>
+            </div>
           </div>
         </section>
       </div>
