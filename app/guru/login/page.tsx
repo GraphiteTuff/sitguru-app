@@ -11,7 +11,6 @@ import {
   Lock,
   Mail,
   PawPrint,
-  ShieldCheck,
   User,
 } from "lucide-react";
 import { login } from "@/app/auth/actions";
@@ -55,11 +54,26 @@ export default function GuruLoginPage() {
                 Guru Login
               </div>
 
-              <h1 className="text-5xl font-black leading-[0.98] tracking-[-0.045em] text-[#061525] drop-shadow-[0_2px_0_rgba(15,23,42,0.04)] sm:text-6xl">
+              <h1
+                className="text-5xl font-black leading-[0.98] tracking-[-0.045em] sm:text-6xl"
+                style={{
+                  color: "#061525",
+                  WebkitTextFillColor: "#061525",
+                  opacity: 1,
+                  textShadow: "0 2px 0 rgba(15, 23, 42, 0.06)",
+                }}
+              >
                 Welcome back, Guru.
               </h1>
 
-              <p className="mx-auto mt-4 max-w-sm text-lg font-bold leading-8 text-[#0f172a]">
+              <p
+                className="mx-auto mt-4 max-w-sm text-lg font-black leading-8"
+                style={{
+                  color: "#061525",
+                  WebkitTextFillColor: "#061525",
+                  opacity: 1,
+                }}
+              >
                 Sign in to manage your profile, bookings, messages,
                 availability, and earnings.
               </p>
@@ -71,7 +85,12 @@ export default function GuruLoginPage() {
               <div>
                 <label
                   htmlFor="email"
-                  className="mb-2 block text-base font-black text-[#061525]"
+                  className="mb-2 block text-base font-black"
+                  style={{
+                    color: "#061525",
+                    WebkitTextFillColor: "#061525",
+                    opacity: 1,
+                  }}
                 >
                   Email
                 </label>
@@ -86,7 +105,12 @@ export default function GuruLoginPage() {
                     required
                     autoComplete="email"
                     placeholder="guru@sitguru.com"
-                    className="ml-3 w-full bg-transparent text-lg font-semibold text-[#061525] outline-none placeholder:text-slate-400"
+                    className="ml-3 w-full bg-transparent text-lg font-semibold outline-none placeholder:text-slate-400"
+                    style={{
+                      color: "#061525",
+                      WebkitTextFillColor: "#061525",
+                      opacity: 1,
+                    }}
                   />
                 </div>
               </div>
@@ -94,7 +118,12 @@ export default function GuruLoginPage() {
               <div>
                 <label
                   htmlFor="password"
-                  className="mb-2 block text-base font-black text-[#061525]"
+                  className="mb-2 block text-base font-black"
+                  style={{
+                    color: "#061525",
+                    WebkitTextFillColor: "#061525",
+                    opacity: 1,
+                  }}
                 >
                   Password
                 </label>
@@ -109,7 +138,12 @@ export default function GuruLoginPage() {
                     required
                     autoComplete="current-password"
                     placeholder="Enter password"
-                    className="ml-3 w-full bg-transparent text-lg font-semibold text-[#061525] outline-none placeholder:text-slate-400"
+                    className="ml-3 w-full bg-transparent text-lg font-semibold outline-none placeholder:text-slate-400"
+                    style={{
+                      color: "#061525",
+                      WebkitTextFillColor: "#061525",
+                      opacity: 1,
+                    }}
                   />
 
                   <button
@@ -167,26 +201,41 @@ export default function GuruLoginPage() {
               </Link>
             </div>
 
-            <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50/85 px-5 py-5 text-left shadow-sm sm:flex sm:items-start sm:gap-5">
-              <div className="mx-auto mb-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#047857] shadow-md sm:mx-0 sm:mb-0">
-                <ShieldCheck className="h-8 w-8 text-white" />
-              </div>
+            <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50/90 px-5 py-7 text-center shadow-sm">
+              <p
+                className="text-sm font-black uppercase tracking-[0.18em]"
+                style={{
+                  color: "#065f46",
+                  WebkitTextFillColor: "#065f46",
+                  opacity: 1,
+                }}
+              >
+                Simple. Secure. Guru-friendly.
+              </p>
 
-              <div className="text-center sm:text-left">
-                <p className="text-sm font-black uppercase tracking-[0.18em] text-[#065f46]">
-                  Simple. Secure. Guru-friendly.
-                </p>
+              <p
+                className="mx-auto mt-2 max-w-sm text-base font-bold leading-7"
+                style={{
+                  color: "#064e3b",
+                  WebkitTextFillColor: "#064e3b",
+                  opacity: 1,
+                }}
+              >
+                Your Guru account helps you manage care requests, messages,
+                availability, and SitGuru earnings in one place.
+              </p>
 
-                <p className="mt-2 text-base font-semibold leading-7 text-[#061525]">
-                  Your Guru account helps you manage care requests, messages,
-                  availability, and SitGuru earnings in one place.
-                </p>
-
-                <p className="mt-3 text-base font-semibold leading-7 text-[#0f172a]">
-                  New to SitGuru? Apply as a Guru and start building your pet
-                  care profile.
-                </p>
-              </div>
+              <p
+                className="mx-auto mt-3 max-w-sm text-base font-semibold leading-7"
+                style={{
+                  color: "#0f172a",
+                  WebkitTextFillColor: "#0f172a",
+                  opacity: 1,
+                }}
+              >
+                New to SitGuru? Apply as a Guru and start building your pet care
+                profile.
+              </p>
             </div>
 
             <p className="mt-5 text-center text-sm font-bold leading-6 text-[#334155]">
