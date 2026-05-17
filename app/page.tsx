@@ -132,69 +132,126 @@ type ProgramCard = {
 
 const demoGuruCards: GuruCard[] = [
   {
-    id: "demo-maya",
-    name: "Maya R.",
+    id: "demo-avery-johnson",
+    name: "Avery Johnson",
     role: "Dog Walking Guru",
     location: "Philadelphia, PA",
-    rating: "4.9",
-    reviewCount: 38,
+    rating: "5.0",
+    reviewCount: 42,
     priceLabel: "From $22 / visit",
-    image: "/images/hero/sitguru-dog-walking-hero.jpg",
+    image: "/images/demo/avery-johnson.png",
     badge: "Demo Guru",
     href: "/search?service=Dog%20Walking&city=Philadelphia&state=PA",
   },
   {
-    id: "demo-jordan",
-    name: "Jordan P.",
-    role: "Pet Sitting Guru",
-    location: "Quakertown, PA",
-    rating: "5.0",
-    reviewCount: 24,
-    priceLabel: "From $28 / visit",
-    image: "/images/ambassadors/student-hire2.jpg",
-    badge: "Demo Guru",
-    href: "/search?service=Pet%20Sitting&city=Quakertown&state=PA",
-  },
-  {
-    id: "demo-alexis",
-    name: "Alexis M.",
+    id: "demo-brad-norway",
+    name: "Brad Norway",
     role: "Boarding Guru",
     location: "Bethlehem, PA",
-    rating: "4.8",
-    reviewCount: 31,
+    rating: "4.9",
+    reviewCount: 36,
     priceLabel: "From $44 / night",
-    image: "/images/ambassadors/ambassador-program2.jpg",
+    image: "/images/demo/brad-norway.png",
     badge: "Demo Guru",
     href: "/search?service=Boarding&city=Bethlehem&state=PA",
   },
   {
-    id: "demo-chris",
-    name: "Chris T.",
+    id: "demo-caleb-brooks",
+    name: "Caleb Brooks",
     role: "Drop-In Visit Guru",
     location: "Allentown, PA",
-    rating: "4.9",
-    reviewCount: 19,
+    rating: "4.8",
+    reviewCount: 29,
     priceLabel: "From $20 / visit",
-    image: "/images/ambassadors/veteran-ambassador2.jpg",
+    image: "/images/demo/caleb-brooks.png",
     badge: "Demo Guru",
     href: "/search?service=Drop-In%20Visits&city=Allentown&state=PA",
   },
   {
-    id: "demo-sam",
-    name: "Sam K.",
+    id: "demo-darius-miller",
+    name: "Darius Miller",
     role: "Doggy Day Care Guru",
     location: "Camden, NJ",
-    rating: "New",
-    reviewCount: 0,
-    priceLabel: "View pricing",
-    image: defaultGuruAvatarPath,
+    rating: "5.0",
+    reviewCount: 31,
+    priceLabel: "From $30 / day",
+    image: "/images/demo/darius-miller.png",
     badge: "Demo Guru",
     href: "/search?service=Doggy%20Day%20Care&city=Camden&state=NJ",
   },
+  {
+    id: "demo-emma-walsh",
+    name: "Emma Walsh",
+    role: "Pet Sitting Guru",
+    location: "Quakertown, PA",
+    rating: "4.9",
+    reviewCount: 27,
+    priceLabel: "From $28 / visit",
+    image: "/images/demo/emma-walsh.png",
+    badge: "Demo Guru",
+    href: "/search?service=Pet%20Sitting&city=Quakertown&state=PA",
+  },
+  {
+    id: "demo-maya-reynolds",
+    name: "Maya Reynolds",
+    role: "Dog Walking Guru",
+    location: "Philadelphia, PA",
+    rating: "4.9",
+    reviewCount: 38,
+    priceLabel: "From $24 / visit",
+    image: "/images/demo/maya-reynolds.png",
+    badge: "Demo Guru",
+    href: "/search?service=Dog%20Walking&city=Philadelphia&state=PA",
+  },
+  {
+    id: "demo-nina-patel",
+    name: "Nina Patel",
+    role: "Training Support Guru",
+    location: "Allentown, PA",
+    rating: "5.0",
+    reviewCount: 33,
+    priceLabel: "From $35 / visit",
+    image: "/images/demo/nina-patel.png",
+    badge: "Demo Guru",
+    href: "/search?service=Training%20Support&city=Allentown&state=PA",
+  },
+  {
+    id: "demo-olivia-chen",
+    name: "Olivia Chen",
+    role: "Pet Sitting Guru",
+    location: "Bethlehem, PA",
+    rating: "4.8",
+    reviewCount: 25,
+    priceLabel: "From $26 / visit",
+    image: "/images/demo/olivia-chen.png",
+    badge: "Demo Guru",
+    href: "/search?service=Pet%20Sitting&city=Bethlehem&state=PA",
+  },
+  {
+    id: "demo-sofia-martinez",
+    name: "Sofia Martinez",
+    role: "Boarding Guru",
+    location: "Quakertown, PA",
+    rating: "4.9",
+    reviewCount: 34,
+    priceLabel: "From $46 / night",
+    image: "/images/demo/sofia-martinez.png",
+    badge: "Demo Guru",
+    href: "/search?service=Boarding&city=Quakertown&state=PA",
+  },
+  {
+    id: "demo-suzy-q",
+    name: "Suzy Q",
+    role: "Drop-In Visit Guru",
+    location: "Camden, NJ",
+    rating: "New",
+    reviewCount: 0,
+    priceLabel: "From $20 / visit",
+    image: "/images/demo/suzy-q.png",
+    badge: "Demo Guru",
+    href: "/search?service=Drop-In%20Visits&city=Camden&state=NJ",
+  },
 ];
-
-const useLiveHomepageGurus =
-  process.env.NEXT_PUBLIC_USE_LIVE_HOMEPAGE_GURUS === "true";
 
 const trustItems = [
   "Trusted local Gurus",
@@ -851,71 +908,18 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!useLiveHomepageGurus) {
-      setGuruCards(demoGuruCards);
+    setGuruCards(demoGuruCards);
 
-      trackEvent({
-        eventName: "homepage_demo_gurus_loaded",
-        eventType: "system",
-        source: detectSourceFromUrl(),
-        metadata: {
-          guru_card_count: demoGuruCards.length,
-          using_demo_gurus: true,
-          version: "launch_optimized_clear_audiences",
-        },
-      });
-
-      return;
-    }
-
-    async function loadHomepageGurus() {
-      const { data, error } = await supabase
-        .from("gurus")
-        .select("*")
-        .or("is_public.eq.true,is_active.eq.true")
-        .order("is_verified", { ascending: false })
-        .order("rating_avg", { ascending: false, nullsFirst: false })
-        .limit(8);
-
-      if (error) {
-        console.error("Homepage Guru load error:", error.message);
-
-        trackEvent({
-          eventName: "homepage_guru_load_error",
-          eventType: "system",
-          source: detectSourceFromUrl(),
-          metadata: {
-            error: error.message,
-            fallback: "demo_gurus",
-            version: "launch_optimized_clear_audiences",
-          },
-        });
-
-        setGuruCards(demoGuruCards);
-        return;
-      }
-
-      const gurus = (data || []) as Guru[];
-      const mappedGuruCards = mapGurusToCards(gurus);
-
-      trackEvent({
-        eventName: "homepage_gurus_loaded",
-        eventType: "system",
-        source: detectSourceFromUrl(),
-        metadata: {
-          guru_count: gurus.length,
-          guru_card_count: mappedGuruCards.length,
-          using_demo_fallback: mappedGuruCards.length === 0,
-          version: "launch_optimized_clear_audiences",
-        },
-      });
-
-      setGuruCards(
-        mappedGuruCards.length > 0 ? mappedGuruCards : demoGuruCards,
-      );
-    }
-
-    loadHomepageGurus();
+    trackEvent({
+      eventName: "homepage_demo_gurus_loaded",
+      eventType: "system",
+      source: detectSourceFromUrl(),
+      metadata: {
+        guru_card_count: demoGuruCards.length,
+        using_demo_gurus_only: true,
+        version: "launch_optimized_demo_gurus_only",
+      },
+    });
   }, []);
 
   useEffect(() => {
