@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 function getFriendlyAuthError(message: string) {
   const normalized = message.toLowerCase();
@@ -35,6 +36,8 @@ export default function ResetPasswordPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [hasRecoverySession, setHasRecoverySession] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const passwordsMatch = useMemo(() => {
     return (
@@ -219,16 +222,33 @@ export default function ResetPasswordPage() {
                     New Password
                   </label>
 
-                  <input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    autoComplete="new-password"
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                    placeholder="Create your new password"
-                    required
-                  />
+                  <div className="flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-100">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      autoComplete="new-password"
+                      className="w-full bg-transparent text-base text-slate-950 outline-none placeholder:text-slate-400"
+                      placeholder="Create your new password"
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="ml-3 rounded-full p-1.5 text-slate-500 transition hover:bg-emerald-50 hover:text-green-800"
+                      aria-label={
+                        showPassword ? "Hide new password" : "Show new password"
+                      }
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -239,18 +259,39 @@ export default function ResetPasswordPage() {
                     Confirm Password
                   </label>
 
-                  <input
-                    id="confirm-password"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(event) =>
-                      setConfirmPassword(event.target.value)
-                    }
-                    autoComplete="new-password"
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                    placeholder="Confirm your new password"
-                    required
-                  />
+                  <div className="flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-100">
+                    <input
+                      id="confirm-password"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(event) =>
+                        setConfirmPassword(event.target.value)
+                      }
+                      autoComplete="new-password"
+                      className="w-full bg-transparent text-base text-slate-950 outline-none placeholder:text-slate-400"
+                      placeholder="Confirm your new password"
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowConfirmPassword((value) => !value)
+                      }
+                      className="ml-3 rounded-full p-1.5 text-slate-500 transition hover:bg-emerald-50 hover:text-green-800"
+                      aria-label={
+                        showConfirmPassword
+                          ? "Hide confirmed password"
+                          : "Show confirmed password"
+                      }
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {password && confirmPassword && !passwordsMatch ? (
