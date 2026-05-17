@@ -14,6 +14,7 @@ const openSans = Open_Sans({
 });
 
 const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
+const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
 
 const heroServiceOptions = [
   "Dog Walking",
@@ -128,6 +129,72 @@ type ProgramCard = {
   secondaryCta: string;
   featured: boolean;
 };
+
+const demoGuruCards: GuruCard[] = [
+  {
+    id: "demo-maya",
+    name: "Maya R.",
+    role: "Dog Walking Guru",
+    location: "Philadelphia, PA",
+    rating: "4.9",
+    reviewCount: 38,
+    priceLabel: "From $22 / visit",
+    image: "/images/hero/sitguru-dog-walking-hero.jpg",
+    badge: "Demo Guru",
+    href: "/search?service=Dog%20Walking&city=Philadelphia&state=PA",
+  },
+  {
+    id: "demo-jordan",
+    name: "Jordan P.",
+    role: "Pet Sitting Guru",
+    location: "Quakertown, PA",
+    rating: "5.0",
+    reviewCount: 24,
+    priceLabel: "From $28 / visit",
+    image: "/images/ambassadors/student-hire2.jpg",
+    badge: "Demo Guru",
+    href: "/search?service=Pet%20Sitting&city=Quakertown&state=PA",
+  },
+  {
+    id: "demo-alexis",
+    name: "Alexis M.",
+    role: "Boarding Guru",
+    location: "Bethlehem, PA",
+    rating: "4.8",
+    reviewCount: 31,
+    priceLabel: "From $44 / night",
+    image: "/images/ambassadors/ambassador-program2.jpg",
+    badge: "Demo Guru",
+    href: "/search?service=Boarding&city=Bethlehem&state=PA",
+  },
+  {
+    id: "demo-chris",
+    name: "Chris T.",
+    role: "Drop-In Visit Guru",
+    location: "Allentown, PA",
+    rating: "4.9",
+    reviewCount: 19,
+    priceLabel: "From $20 / visit",
+    image: "/images/ambassadors/veteran-ambassador2.jpg",
+    badge: "Demo Guru",
+    href: "/search?service=Drop-In%20Visits&city=Allentown&state=PA",
+  },
+  {
+    id: "demo-sam",
+    name: "Sam K.",
+    role: "Doggy Day Care Guru",
+    location: "Camden, NJ",
+    rating: "New",
+    reviewCount: 0,
+    priceLabel: "View pricing",
+    image: defaultGuruAvatarPath,
+    badge: "Demo Guru",
+    href: "/search?service=Doggy%20Day%20Care&city=Camden&state=NJ",
+  },
+];
+
+const useLiveHomepageGurus =
+  process.env.NEXT_PUBLIC_USE_LIVE_HOMEPAGE_GURUS === "true";
 
 const trustItems = [
   "Trusted local Gurus",
@@ -333,21 +400,23 @@ function getGuruName(guru: Guru) {
 
 function getGuruPhotoUrl(guru: Guru) {
   const possiblePhoto =
-    guru.profile_photo_url || guru.photo_url || guru.avatar_url || guru.image_url || "";
+    guru.profile_photo_url ||
+    guru.photo_url ||
+    guru.avatar_url ||
+    guru.image_url ||
+    "";
 
   const photoUrl = String(possiblePhoto || "").trim();
 
-  if (!photoUrl) return "";
+  if (!photoUrl) return defaultGuruAvatarPath;
 
   const lowerPhotoUrl = photoUrl.toLowerCase();
 
   if (
-    lowerPhotoUrl.startsWith("/images/") ||
     lowerPhotoUrl.includes("sitguru-logo") ||
-    lowerPhotoUrl.includes("sitguru-message-avatar") ||
     lowerPhotoUrl.includes("sitguru-admin-avatar")
   ) {
-    return "";
+    return defaultGuruAvatarPath;
   }
 
   return photoUrl;
@@ -381,41 +450,28 @@ function getGuruRole(guru: Guru) {
 }
 
 function mapGurusToCards(gurus: Guru[]): GuruCard[] {
-  return gurus
-    .map((guru) => {
-      const photoUrl = getGuruPhotoUrl(guru);
+  return gurus.map((guru) => {
+    const photoUrl = getGuruPhotoUrl(guru);
+    const rate = getGuruRate(guru);
+    const rating = getGuruRating(guru);
+    const reviews = Number(guru.review_count || 0);
 
-      if (!photoUrl) {
-        console.warn("Homepage Guru skipped because no account photo is wired:", {
-          id: guru.id,
-          slug: guru.slug,
-          name: getGuruName(guru),
-        });
-
-        return null;
-      }
-
-      const rate = getGuruRate(guru);
-      const rating = getGuruRating(guru);
-      const reviews = Number(guru.review_count || 0);
-
-      return {
-        id: String(guru.id),
-        name: getGuruName(guru),
-        role: getGuruRole(guru),
-        location: formatLocation(guru.city, guru.state),
-        rating: rating > 0 ? rating.toFixed(1) : "New",
-        reviewCount: reviews,
-        priceLabel:
-          rate !== null && Number.isFinite(rate)
-            ? `From $${rate} / visit`
-            : "View pricing",
-        image: photoUrl,
-        badge: guru.is_verified ? "Verified" : "Trusted",
-        href: getGuruHref(guru),
-      };
-    })
-    .filter((guru): guru is GuruCard => Boolean(guru));
+    return {
+      id: String(guru.id),
+      name: getGuruName(guru),
+      role: getGuruRole(guru),
+      location: formatLocation(guru.city, guru.state),
+      rating: rating > 0 ? rating.toFixed(1) : "New",
+      reviewCount: reviews,
+      priceLabel:
+        rate !== null && Number.isFinite(rate)
+          ? `From $${rate} / visit`
+          : "View pricing",
+      image: photoUrl,
+      badge: guru.is_verified ? "Verified" : "Trusted",
+      href: getGuruHref(guru),
+    };
+  });
 }
 
 function buildSearchHref(searchForm: SearchFormState) {
@@ -728,7 +784,7 @@ export default function HomePage() {
   const [zipLookupStatus, setZipLookupStatus] =
     useState<ZipLookupStatus>("idle");
   const [zipLookupMessage, setZipLookupMessage] = useState("");
-  const [guruCards, setGuruCards] = useState<GuruCard[]>([]);
+  const [guruCards, setGuruCards] = useState<GuruCard[]>(demoGuruCards);
   const [source, setSource] = useState("direct");
   const [isGuruCarouselPaused, setIsGuruCarouselPaused] = useState(false);
   const guruCarouselRef = useRef<HTMLDivElement | null>(null);
@@ -795,6 +851,23 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    if (!useLiveHomepageGurus) {
+      setGuruCards(demoGuruCards);
+
+      trackEvent({
+        eventName: "homepage_demo_gurus_loaded",
+        eventType: "system",
+        source: detectSourceFromUrl(),
+        metadata: {
+          guru_card_count: demoGuruCards.length,
+          using_demo_gurus: true,
+          version: "launch_optimized_clear_audiences",
+        },
+      });
+
+      return;
+    }
+
     async function loadHomepageGurus() {
       const { data, error } = await supabase
         .from("gurus")
@@ -813,14 +886,17 @@ export default function HomePage() {
           source: detectSourceFromUrl(),
           metadata: {
             error: error.message,
+            fallback: "demo_gurus",
             version: "launch_optimized_clear_audiences",
           },
         });
 
+        setGuruCards(demoGuruCards);
         return;
       }
 
       const gurus = (data || []) as Guru[];
+      const mappedGuruCards = mapGurusToCards(gurus);
 
       trackEvent({
         eventName: "homepage_gurus_loaded",
@@ -828,22 +904,15 @@ export default function HomePage() {
         source: detectSourceFromUrl(),
         metadata: {
           guru_count: gurus.length,
-          guru_card_count: mapGurusToCards(gurus).length,
-          using_account_photos_only: true,
+          guru_card_count: mappedGuruCards.length,
+          using_demo_fallback: mappedGuruCards.length === 0,
           version: "launch_optimized_clear_audiences",
         },
       });
 
-      const mappedGuruCards = mapGurusToCards(gurus);
-
-      if (mappedGuruCards.length === 0) {
-        console.warn(
-          "Homepage Guru carousel found Guru rows but no account-photo-backed cards. Check profile_photo_url, photo_url, avatar_url, or image_url on gurus.",
-          { guru_count: gurus.length },
-        );
-      }
-
-      setGuruCards(mappedGuruCards);
+      setGuruCards(
+        mappedGuruCards.length > 0 ? mappedGuruCards : demoGuruCards,
+      );
     }
 
     loadHomepageGurus();
@@ -1026,8 +1095,8 @@ export default function HomePage() {
 
                   <p className="mt-3 max-w-xl text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:max-w-[610px] lg:text-[1.05rem] xl:text-lg">
                     SitGuru is a new way for Pet Parents to find trusted local
-                    Gurus for walks, sitting, boarding, training and more —
-                    with care, convenience, and community built in.
+                    Gurus for walks, sitting, boarding, training and more — with
+                    care, convenience, and community built in.
                   </p>
                 </div>
               </div>
@@ -1169,15 +1238,14 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50/50 p-5 text-sm font-semibold text-slate-700">
-              Guru profiles are loading from account photos. Visit Find Care to
-              view all available Gurus while profile photos finish syncing to the
-              homepage carousel.
+              Featured Guru profiles are loading. Visit Find Care to view all
+              available Gurus while the homepage carousel syncs.
             </div>
           )}
         </div>
       </section>
 
-      <section className="bg-white pb-7 sm:pb-12">
+      <section id="how-sitguru-works" className="bg-white pb-7 sm:pb-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid overflow-hidden rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 shadow-[0_18px_45px_rgba(15,23,42,0.08)] lg:grid-cols-3">
             <div className="border-b border-emerald-100 p-5 lg:border-b-0 lg:border-r lg:p-6">
@@ -1327,9 +1395,9 @@ export default function HomePage() {
               </div>
 
               <Link
-                href="/how-it-works"
+                href="/#how-sitguru-works"
                 onClick={() =>
-                  trackHomepageClick("See how it works", "/how-it-works")
+                  trackHomepageClick("See how it works", "/#how-sitguru-works")
                 }
                 className="mt-6 inline-flex items-center gap-2 text-sm font-black text-emerald-700 hover:text-emerald-800 hover:underline"
               >
@@ -1354,16 +1422,19 @@ export default function HomePage() {
                 </h2>
 
                 <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
-                  Pet Parents use SitGuru to find trusted local care. Gurus apply
-                  to offer care. SitGuru Programs create additional ways to earn,
-                  refer, and help grow the SitGuru Pet Community.
+                  Pet Parents use SitGuru to find trusted local care. Gurus
+                  apply to offer care. SitGuru Programs create additional ways
+                  to earn, refer, and help grow the SitGuru Pet Community.
                 </p>
 
                 <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Link
                     href="/search"
                     onClick={() =>
-                      trackHomepageClick("Find Care Programs Section", "/search")
+                      trackHomepageClick(
+                        "Find Care Programs Section",
+                        "/search",
+                      )
                     }
                     className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-sky-400 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:brightness-105 sm:w-auto"
                   >
@@ -1488,10 +1559,7 @@ export default function HomePage() {
               <Link
                 href="/guru/signup"
                 onClick={() =>
-                  trackHomepageClick(
-                    "Become a Guru Final CTA",
-                    "/guru/signup",
-                  )
+                  trackHomepageClick("Become a Guru Final CTA", "/guru/signup")
                 }
                 className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
               >
