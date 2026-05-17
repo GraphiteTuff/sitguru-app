@@ -106,7 +106,7 @@ const guruNavLinks: NavLink[] = [
 const adminNavLinks: NavLink[] = [
   { label: "Admin", href: "/admin" },
   { label: "Messages", href: "/admin/messages" },
-  { label: "Customers", href: "/admin/customers" },
+  { label: "Pet Parents", href: "/admin/customers" },
   { label: "Gurus", href: "/admin/gurus" },
   { label: "Referrals", href: "/admin/referrals" },
 ];
@@ -275,10 +275,10 @@ function getProfileAvatar(profile: ProfileRow | null) {
 }
 
 function getInitials(name?: string | null, email?: string | null) {
-  const value = (name || email || "Customer").replace(/@.*/, "");
+  const value = (name || email || "Pet Parent").replace(/@.*/, "");
   const parts = value.split(/[\s._-]+/).filter(Boolean);
 
-  const first = parts[0]?.charAt(0) || "C";
+  const first = parts[0]?.charAt(0) || "P";
   const second = parts[1]?.charAt(0) || "";
 
   return `${first}${second}`.toUpperCase();
@@ -687,7 +687,7 @@ export default function Header({ user = null }: HeaderProps) {
           { label: "Dashboard", href: "/admin" },
           { label: "Update Profile", href: "/admin/profile" },
           { label: "Messages", href: "/admin/messages" },
-          { label: "Customers", href: "/admin/customers" },
+          { label: "Pet Parents", href: "/admin/customers" },
           { label: "Gurus", href: "/admin/gurus" },
           { label: "Referrals", href: "/admin/referrals" },
         ]
@@ -972,10 +972,10 @@ export default function Header({ user = null }: HeaderProps) {
               </Link>
 
               <Link
-                href="/customer/login"
+                href="/login"
                 className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50"
               >
-                Customer Login
+                Pet Parent Login
               </Link>
 
               <Link
@@ -1083,11 +1083,11 @@ export default function Header({ user = null }: HeaderProps) {
                 </Link>
 
                 <Link
-                  href="/customer/login"
+                  href="/login"
                   onClick={() => setMobileOpen(false)}
                   className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800"
                 >
-                  Customer Login
+                  Pet Parent Login
                 </Link>
 
                 <Link
