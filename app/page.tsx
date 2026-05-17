@@ -713,12 +713,11 @@ function GuruCardView({
       onClick={() => onTrack(`Guru Card ${guru.name}`, guru.href)}
       className="group min-w-[230px] max-w-[230px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)] sm:min-w-[260px] sm:max-w-[260px]"
     >
-      <div className="relative h-28 overflow-hidden bg-slate-100 sm:h-36">
+      <div className="relative flex h-36 items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 to-emerald-50/40 p-2 sm:h-44 sm:p-3">
         <img
           src={guru.image}
           alt={`${guru.name}, ${guru.role}`}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-          style={{ objectPosition: guru.imagePosition || "center 22%" }}
+          className="h-full w-full object-contain object-center transition duration-500 group-hover:scale-[1.02]"
           loading="lazy"
         />
         <span className="absolute left-2 top-2 rounded-full border border-white/80 bg-white/95 px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm sm:left-3 sm:top-3 sm:text-[10px]">
@@ -930,7 +929,7 @@ export default function HomePage() {
       metadata: {
         guru_card_count: demoGuruCards.length,
         using_demo_gurus_only: true,
-        version: "launch_optimized_demo_gurus_only_framing_fix",
+        version: "launch_optimized_demo_gurus_full_image_fit",
       },
     });
   }, []);
