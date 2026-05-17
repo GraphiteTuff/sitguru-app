@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ScrollToTopButton from "@/components/ScrollToTopButton";
 
 export default function RouteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -78,11 +79,21 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     isCustomerBookingsPage;
 
   if (isAdminPage) {
-    return <main className="admin-theme site-main min-h-screen">{children}</main>;
+    return (
+      <>
+        <main className="admin-theme site-main min-h-screen">{children}</main>
+        <ScrollToTopButton />
+      </>
+    );
   }
 
   if (isAuthPage) {
-    return <main className="site-main min-h-screen">{children}</main>;
+    return (
+      <>
+        <main className="site-main min-h-screen">{children}</main>
+        <ScrollToTopButton />
+      </>
+    );
   }
 
   if (isGuruPrivatePage || isCustomerPrivatePage) {
@@ -90,6 +101,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
       <>
         <div className="site-main bg-white">{children}</div>
         <Footer />
+        <ScrollToTopButton />
       </>
     );
   }
@@ -99,6 +111,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
       <Header />
       <main className="site-main min-h-[70vh]">{children}</main>
       <Footer />
+      <ScrollToTopButton />
     </>
   );
 }
