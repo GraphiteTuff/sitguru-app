@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
+
 function getBaseUrl(request: NextRequest) {
   const forwardedProto = request.headers.get("x-forwarded-proto");
   const forwardedHost = request.headers.get("x-forwarded-host");
@@ -33,7 +35,9 @@ function redirectWithMessage(
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
 
-  const email = String(formData.get("email") || "").trim();
+  const email = String(formData.get("email") || "")
+    .trim()
+    .toLowerCase();
   const password = String(formData.get("password") || "");
 
   if (!email || !password) {
@@ -41,6 +45,14 @@ export async function POST(request: NextRequest) {
       request,
       "error",
       "Please enter both email and password.",
+    );
+  }
+
+  if (!SUPER_USER_EMAILS.has(email)) {
+    return redirectWithMessage(
+      request,
+      "error",
+      "This account is not authorized for admin access.",
     );
   }
 
@@ -74,11 +86,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const verifiedEmail = String(user.email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!SUPER_USER_EMAILS.has(verifiedEmail)) {
+    await supabase.auth.signOut();
+
+    return redirectWithMessage(
+      request,
+      "error",
+      "This account is not authorized for admin access.",
+    );
+  }
+
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (profileError) {
     await supabase.auth.signOut();
@@ -90,7 +116,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (profile?.role !== "admin") {
+  if (profile?.role && profile.role !== "admin") {
     await supabase.auth.signOut();
 
     return redirectWithMessage(
@@ -100,28 +126,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: aalData, error: aalError } =
-    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-  if (aalError) {
-    return redirectWithMessage(
-      request,
-      "error",
-      aalError.message || "Unable to verify MFA status.",
-    );
-  }
-
   const baseUrl = getBaseUrl(request);
 
-  if (aalData?.currentLevel === "aal2") {
-    return NextResponse.redirect(new URL("/admin", baseUrl));
-  }
-
-  if (aalData?.nextLevel === "aal2") {
-    return NextResponse.redirect(
-      new URL("/admin/security/mfa/challenge", baseUrl),
-    );
-  }
-
-  return NextResponse.redirect(new URL("/admin/security/mfa", baseUrl));
+  return NextResponse.redirect(new URL("/admin", baseUrl));
 }

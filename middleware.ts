@@ -19,16 +19,38 @@ function isAdminLoginPath(pathname: string) {
   return pathname === "/admin/login";
 }
 
+function isAdminApiPath(pathname: string) {
+  return pathname === "/api/admin" || pathname.startsWith("/api/admin/");
+}
+
+function isAdminPath(pathname: string) {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
+function isAdminAreaPath(pathname: string) {
+  return isAdminPath(pathname) || isAdminApiPath(pathname);
+}
+
 function isGuruLoginPath(pathname: string) {
   return pathname === "/guru/login" || pathname === "/guru/signup";
 }
 
 function isProtectedAdminPath(pathname: string) {
-  return pathname === "/admin" || pathname.startsWith("/admin/");
+  return isAdminPath(pathname) && !isAdminLoginPath(pathname);
 }
 
 function isProtectedGuruDashboardPath(pathname: string) {
   return pathname === "/guru/dashboard" || pathname.startsWith("/guru/dashboard/");
+}
+
+function hasSupabaseAuthCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some(
+      (cookie) =>
+        cookie.name.startsWith("sb-") &&
+        cookie.name.toLowerCase().includes("auth-token"),
+    );
 }
 
 function makeSessionCookieOptions(options: CookieOptions): CookieOptions {
@@ -51,21 +73,17 @@ function makeSessionCookieOptions(options: CookieOptions): CookieOptions {
   return sessionOptions;
 }
 
-function isAdminRole(role: string | null | undefined) {
-  const normalized = normalizeValue(role);
-
-  return [
-    "admin",
-    "owner",
-    "super_admin",
-    "super user",
-    "superuser",
-    "founder",
-    "ceo",
-    "founder/ceo",
-    "co-founder",
-    "cofounder",
-  ].includes(normalized);
+function expireSupabaseCookies(request: NextRequest, response: NextResponse) {
+  for (const cookie of request.cookies.getAll()) {
+    if (cookie.name.startsWith("sb-")) {
+      response.cookies.set({
+        name: cookie.name,
+        value: "",
+        path: "/",
+        maxAge: 0,
+      });
+    }
+  }
 }
 
 function isGuruRole(role: string | null | undefined) {
@@ -116,10 +134,12 @@ function makeRedirectUrl({
   request,
   pathname,
   nextPath,
+  error,
 }: {
   request: NextRequest;
   pathname: string;
   nextPath?: string;
+  error?: string;
 }) {
   const redirectUrl = request.nextUrl.clone();
   redirectUrl.pathname = pathname;
@@ -129,29 +149,20 @@ function makeRedirectUrl({
     redirectUrl.searchParams.set("next", nextPath);
   }
 
+  if (error) {
+    redirectUrl.searchParams.set("error", error);
+  }
+
   return redirectUrl;
 }
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  const requiresAdminAccess =
-    isProtectedAdminPath(pathname) && !isAdminLoginPath(pathname);
-
-  const requiresGuruAccess =
-    isProtectedGuruDashboardPath(pathname) && !isGuruLoginPath(pathname);
-
-  if (!requiresAdminAccess && !requiresGuruAccess) {
-    return NextResponse.next();
-  }
-
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  const supabase = createServerClient(
+function createSupabaseMiddlewareClient(
+  request: NextRequest,
+  responseRef: {
+    current: NextResponse;
+  },
+) {
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -169,13 +180,13 @@ export async function middleware(request: NextRequest) {
             ...sessionOptions,
           });
 
-          response = NextResponse.next({
+          responseRef.current = NextResponse.next({
             request: {
               headers: request.headers,
             },
           });
 
-          response.cookies.set({
+          responseRef.current.cookies.set({
             name,
             value,
             ...sessionOptions,
@@ -194,13 +205,13 @@ export async function middleware(request: NextRequest) {
             ...removalOptions,
           });
 
-          response = NextResponse.next({
+          responseRef.current = NextResponse.next({
             request: {
               headers: request.headers,
             },
           });
 
-          response.cookies.set({
+          responseRef.current.cookies.set({
             name,
             value: "",
             ...removalOptions,
@@ -209,11 +220,49 @@ export async function middleware(request: NextRequest) {
       },
     },
   );
+}
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  const requiresAdminAccess = isProtectedAdminPath(pathname);
+  const requiresGuruAccess =
+    isProtectedGuruDashboardPath(pathname) && !isGuruLoginPath(pathname);
+
+  const shouldCheckForLeavingAdmin =
+    !isAdminAreaPath(pathname) && hasSupabaseAuthCookie(request);
+
+  if (!requiresAdminAccess && !requiresGuruAccess && !shouldCheckForLeavingAdmin) {
+    return NextResponse.next();
+  }
+
+  const responseRef = {
+    current: NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    }),
+  };
+
+  const supabase = createSupabaseMiddlewareClient(request, responseRef);
 
   const {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser();
+
+  if (shouldCheckForLeavingAdmin) {
+    if (user && isSuperUserEmail(user.email)) {
+      await supabase.auth.signOut();
+
+      const signedOutResponse = responseRef.current;
+      expireSupabaseCookies(request, signedOutResponse);
+
+      return signedOutResponse;
+    }
+
+    return responseRef.current;
+  }
 
   if (userError || !user) {
     if (requiresAdminAccess) {
@@ -238,8 +287,28 @@ export async function middleware(request: NextRequest) {
   const userEmail = normalizeEmail(user.email);
   const isSuperUser = isSuperUserEmail(userEmail);
 
-  if (isSuperUser) {
-    return response;
+  if (requiresAdminAccess && !isSuperUser) {
+    await supabase.auth.signOut();
+
+    const redirectResponse = NextResponse.redirect(
+      makeRedirectUrl({
+        request,
+        pathname: "/admin/login",
+        error: "This account is not authorized for admin access.",
+      }),
+    );
+
+    expireSupabaseCookies(request, redirectResponse);
+
+    return redirectResponse;
+  }
+
+  if (requiresAdminAccess && isSuperUser) {
+    return responseRef.current;
+  }
+
+  if (requiresGuruAccess && isSuperUser) {
+    return responseRef.current;
   }
 
   const { data: profile } = await supabase
@@ -258,9 +327,6 @@ export async function middleware(request: NextRequest) {
   const roles = (roleRows || [])
     .map((row) => String(row.role || "").trim().toLowerCase())
     .filter(Boolean);
-
-  const hasAdminRole =
-    isAdminRole(profileRole) || roles.some((role) => isAdminRole(role));
 
   const hasGuruRole =
     isGuruRole(profileRole) ||
@@ -284,15 +350,6 @@ export async function middleware(request: NextRequest) {
     hasGuruRow = Boolean(guruRow?.id);
   }
 
-  if (requiresAdminAccess && !hasAdminRole) {
-    return NextResponse.redirect(
-      makeRedirectUrl({
-        request,
-        pathname: "/",
-      }),
-    );
-  }
-
   if (requiresGuruAccess && !hasGuruRole && !hasGuruRow) {
     const applicationUrl = makeRedirectUrl({
       request,
@@ -308,7 +365,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(applicationUrl);
   }
 
-  return response;
+  return responseRef.current;
 }
 
 export const config = {
