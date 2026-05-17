@@ -141,8 +141,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 42,
     priceLabel: "From $22 / visit",
     image: "/images/demo/avery-johnson.png",
-    imagePosition: "center 26%",
-    badge: "Demo Guru",
+    imagePosition: "center 38%",
+    badge: "Trusted",
     href: "/search?service=Dog%20Walking&city=Philadelphia&state=PA",
   },
   {
@@ -154,8 +154,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 36,
     priceLabel: "From $44 / night",
     image: "/images/demo/brad-norway.png",
-    imagePosition: "center 22%",
-    badge: "Demo Guru",
+    imagePosition: "center 40%",
+    badge: "Trusted",
     href: "/search?service=Boarding&city=Bethlehem&state=PA",
   },
   {
@@ -167,8 +167,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 29,
     priceLabel: "From $20 / visit",
     image: "/images/demo/caleb-brooks.png",
-    imagePosition: "center 22%",
-    badge: "Demo Guru",
+    imagePosition: "center 42%",
+    badge: "Trusted",
     href: "/search?service=Drop-In%20Visits&city=Allentown&state=PA",
   },
   {
@@ -180,8 +180,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 31,
     priceLabel: "From $30 / day",
     image: "/images/demo/darius-miller.png",
-    imagePosition: "center 18%",
-    badge: "Demo Guru",
+    imagePosition: "center 38%",
+    badge: "Trusted",
     href: "/search?service=Doggy%20Day%20Care&city=Camden&state=NJ",
   },
   {
@@ -193,8 +193,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 27,
     priceLabel: "From $28 / visit",
     image: "/images/demo/emma-walsh.png",
-    imagePosition: "center 18%",
-    badge: "Demo Guru",
+    imagePosition: "center 42%",
+    badge: "Trusted",
     href: "/search?service=Pet%20Sitting&city=Quakertown&state=PA",
   },
   {
@@ -206,8 +206,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 38,
     priceLabel: "From $24 / visit",
     image: "/images/demo/maya-reynolds.png",
-    imagePosition: "center 18%",
-    badge: "Demo Guru",
+    imagePosition: "center 40%",
+    badge: "Trusted",
     href: "/search?service=Dog%20Walking&city=Philadelphia&state=PA",
   },
   {
@@ -219,8 +219,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 33,
     priceLabel: "From $35 / visit",
     image: "/images/demo/nina-patel.png",
-    imagePosition: "center 18%",
-    badge: "Demo Guru",
+    imagePosition: "center 42%",
+    badge: "Trusted",
     href: "/search?service=Training%20Support&city=Allentown&state=PA",
   },
   {
@@ -232,8 +232,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 25,
     priceLabel: "From $26 / visit",
     image: "/images/demo/olivia-chen.png",
-    imagePosition: "center 18%",
-    badge: "Demo Guru",
+    imagePosition: "center 40%",
+    badge: "Trusted",
     href: "/search?service=Pet%20Sitting&city=Bethlehem&state=PA",
   },
   {
@@ -245,8 +245,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 34,
     priceLabel: "From $46 / night",
     image: "/images/demo/sofia-martinez.png",
-    imagePosition: "center 18%",
-    badge: "Demo Guru",
+    imagePosition: "center 42%",
+    badge: "Trusted",
     href: "/search?service=Boarding&city=Quakertown&state=PA",
   },
   {
@@ -258,8 +258,8 @@ const demoGuruCards: GuruCard[] = [
     reviewCount: 0,
     priceLabel: "From $20 / visit",
     image: "/images/demo/suzy-q.png",
-    imagePosition: "center 18%",
-    badge: "Demo Guru",
+    imagePosition: "center 40%",
+    badge: "Trusted",
     href: "/search?service=Drop-In%20Visits&city=Camden&state=NJ",
   },
 ];
@@ -536,7 +536,7 @@ function mapGurusToCards(gurus: Guru[]): GuruCard[] {
           ? `From $${rate} / visit`
           : "View pricing",
       image: photoUrl,
-      imagePosition: "center 22%",
+      imagePosition: "center 34%",
       badge: guru.is_verified ? "Verified" : "Trusted",
       href: getGuruHref(guru),
     };
@@ -713,16 +713,14 @@ function GuruCardView({
       onClick={() => onTrack(`Guru Card ${guru.name}`, guru.href)}
       className="group min-w-[230px] max-w-[230px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)] sm:min-w-[260px] sm:max-w-[260px]"
     >
-      <div className="relative flex h-36 items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 to-emerald-50/40 p-2 sm:h-44 sm:p-3">
+      <div className="relative h-36 overflow-hidden bg-slate-100 sm:h-44">
         <img
           src={guru.image}
           alt={`${guru.name}, ${guru.role}`}
-          className="h-full w-full object-contain object-center transition duration-500 group-hover:scale-[1.02]"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          style={{ objectPosition: guru.imagePosition || "center 40%" }}
           loading="lazy"
         />
-        <span className="absolute left-2 top-2 rounded-full border border-white/80 bg-white/95 px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm sm:left-3 sm:top-3 sm:text-[10px]">
-          {guru.badge}
-        </span>
         <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-emerald-700 shadow-sm">
           ♡
         </span>
@@ -859,7 +857,7 @@ export default function HomePage() {
   const guruCarouselRef = useRef<HTMLDivElement | null>(null);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
-  const visibleGuruCards = useMemo(() => guruCards.slice(0, 8), [guruCards]);
+  const visibleGuruCards = useMemo(() => guruCards.slice(0, 10), [guruCards]);
 
   useEffect(() => {
     if ("scrollRestoration" in window.history) {
@@ -929,7 +927,7 @@ export default function HomePage() {
       metadata: {
         guru_card_count: demoGuruCards.length,
         using_demo_gurus_only: true,
-        version: "launch_optimized_demo_gurus_full_image_fit",
+        version: "launch_optimized_demo_gurus_cover_no_demo_badge",
       },
     });
   }, []);
