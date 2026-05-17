@@ -167,10 +167,10 @@ export default function ResetPasswordPage() {
   return (
     <main className="min-h-screen bg-[#f3f8f5] px-3 py-4 text-slate-950 sm:px-5 sm:py-8 lg:px-8 lg:py-10">
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-2xl items-center justify-center sm:min-h-[calc(100vh-4rem)]">
-        <section className="w-full rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.12)] sm:rounded-[2rem] sm:p-8 lg:p-12">
+        <section className="w-full rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_54px_rgba(15,23,42,0.10)] sm:rounded-[2rem] sm:p-7 lg:p-10">
           <div className="mx-auto max-w-md">
-            <div className="mb-6 flex justify-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-emerald-50 text-3xl shadow-sm">
+            <div className="mb-5 flex justify-center sm:mb-6">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-2xl shadow-sm sm:h-14 sm:w-14 sm:rounded-3xl sm:text-3xl">
                 🐾
               </div>
             </div>
@@ -189,13 +189,13 @@ export default function ResetPasswordPage() {
             </p>
 
             {checkingSession ? (
-              <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center text-sm font-bold text-green-800 sm:mt-8">
+              <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center text-sm font-bold text-green-800">
                 Checking your secure reset session...
               </div>
             ) : null}
 
             {!checkingSession && error && !hasRecoverySession ? (
-              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-center text-sm font-bold leading-6 text-amber-800 sm:mt-8">
+              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-center text-sm font-bold leading-6 text-amber-800">
                 {error}
 
                 <div className="mt-4">
@@ -210,7 +210,7 @@ export default function ResetPasswordPage() {
             ) : null}
 
             {!checkingSession && hasRecoverySession ? (
-              <form onSubmit={handleSubmit} className="mt-6 space-y-5 sm:mt-8">
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4 sm:space-y-5">
                 <div>
                   <label
                     htmlFor="password"
@@ -313,12 +313,12 @@ export default function ResetPasswordPage() {
 
             <div className="mt-6 rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-4 text-center">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                Simple. Secure. SitGuru friendly.
+                Simple. Secure. SitGuru-friendly.
               </p>
 
-              <p className="mt-2 text-sm font-bold leading-6 text-green-900">
-                SitGuru keeps password resets simple, secure, and friendly for
-                Pet Parents, Gurus, and Admin/Super User accounts.
+              <p className="mt-2 text-sm font-semibold leading-6 text-green-900">
+                Password resets are simple, secure, and friendly for Pet
+                Parents, Gurus, and Admin/Super User accounts.
               </p>
 
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
