@@ -36,9 +36,18 @@ export default function ScrollToTopButton() {
       type="button"
       onClick={scrollToTop}
       aria-label="Scroll back to top"
-      className="fixed bottom-5 right-4 z-[90] flex h-12 w-12 items-center justify-center rounded-full border border-emerald-200 bg-green-800 text-white shadow-[0_14px_35px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:bg-green-900 focus:outline-none focus:ring-4 focus:ring-emerald-200 sm:bottom-6 sm:right-6 sm:h-13 sm:w-13"
+      title="Back to top"
+      className="fixed bottom-5 right-4 z-[90] flex h-16 w-16 items-center justify-center rounded-[45%_55%_50%_50%/55%_55%_45%_45%] bg-green-800 text-white shadow-[0_16px_36px_rgba(15,23,42,0.24)] ring-1 ring-emerald-200/80 transition hover:-translate-y-0.5 hover:bg-green-900 focus:outline-none focus:ring-4 focus:ring-emerald-200 sm:bottom-6 sm:right-6"
     >
-      <ArrowUp className="h-5 w-5" />
+      <span className="absolute -top-2 left-2.5 h-5 w-5 rounded-full bg-green-800 ring-1 ring-emerald-200/80 transition group-hover:bg-green-900" />
+      <span className="absolute -top-3 left-1/2 h-5 w-5 -translate-x-1/2 rounded-full bg-green-800 ring-1 ring-emerald-200/80" />
+      <span className="absolute -top-2 right-2.5 h-5 w-5 rounded-full bg-green-800 ring-1 ring-emerald-200/80" />
+      <span className="absolute -right-1 top-3 h-4 w-4 rounded-full bg-green-800 ring-1 ring-emerald-200/80" />
+      <span className="absolute -left-1 top-3 h-4 w-4 rounded-full bg-green-800 ring-1 ring-emerald-200/80" />
+
+      <span className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur">
+        <ArrowUp className="h-6 w-6" />
+      </span>
     </button>
   );
 }
