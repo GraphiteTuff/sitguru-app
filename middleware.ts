@@ -43,6 +43,17 @@ function isProtectedGuruDashboardPath(pathname: string) {
   return pathname === "/guru/dashboard" || pathname.startsWith("/guru/dashboard/");
 }
 
+function isPasswordRecoveryPath(pathname: string) {
+  return (
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
+    pathname === "/auth/recover" ||
+    pathname === "/auth/callback" ||
+    pathname.startsWith("/auth/recover/") ||
+    pathname.startsWith("/auth/callback/")
+  );
+}
+
 function hasSupabaseAuthCookie(request: NextRequest) {
   return request.cookies
     .getAll()
@@ -224,6 +235,10 @@ function createSupabaseMiddlewareClient(
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (isPasswordRecoveryPath(pathname)) {
+    return NextResponse.next();
+  }
 
   const requiresAdminAccess = isProtectedAdminPath(pathname);
   const requiresGuruAccess =
