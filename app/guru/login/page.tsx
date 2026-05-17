@@ -11,6 +11,7 @@ import {
   Mail,
   PawPrint,
   ShieldCheck,
+  User,
 } from "lucide-react";
 import { login } from "@/app/auth/actions";
 
@@ -22,7 +23,7 @@ export default function GuruLoginPage() {
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-2xl items-center justify-center sm:min-h-[calc(100vh-4rem)]">
         <section className="w-full rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_54px_rgba(15,23,42,0.10)] sm:rounded-[2rem] sm:p-7 lg:p-10">
           <div className="mx-auto max-w-md">
-            <div className="mb-5 flex items-center justify-between gap-4">
+            <div className="mb-6 flex items-center justify-between gap-4">
               <Link
                 href="/"
                 className="inline-flex items-center rounded-2xl transition hover:opacity-90"
@@ -34,7 +35,7 @@ export default function GuruLoginPage() {
                   width={76}
                   height={76}
                   priority
-                  className="h-14 w-14 rounded-2xl border border-emerald-100 bg-white object-cover shadow-sm"
+                  className="h-14 w-14 rounded-2xl border border-emerald-100 bg-emerald-600 object-cover shadow-sm"
                 />
               </Link>
 
@@ -47,7 +48,7 @@ export default function GuruLoginPage() {
               </Link>
             </div>
 
-            <div className="mb-6 text-center">
+            <div className="mb-7 text-center">
               <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-800">
                 <PawPrint className="h-4 w-4" />
                 Guru Login
@@ -142,7 +143,7 @@ export default function GuruLoginPage() {
               </Link>
 
               <Link
-                href="/signup?accountType=guru"
+                href="/signup?accountType=future_guru"
                 className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-green-800 transition hover:border-emerald-300 hover:bg-white"
               >
                 Become a Guru
@@ -150,14 +151,15 @@ export default function GuruLoginPage() {
 
               <Link
                 href="/login"
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-green-800"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-green-800"
               >
+                <User className="h-4 w-4" />
                 Pet Parent Login
               </Link>
 
               <Link
                 href="/"
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-green-800"
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-green-800"
               >
                 Back to Homepage
               </Link>
@@ -179,7 +181,7 @@ export default function GuruLoginPage() {
               </p>
             </div>
 
-            <p className="mt-5 text-center text-xs font-bold leading-5 text-slate-400">
+            <p className="mt-5 text-center text-xs font-bold leading-5 text-slate-500">
               Need help? Contact{" "}
               <a
                 href="mailto:support@sitguru.com"
