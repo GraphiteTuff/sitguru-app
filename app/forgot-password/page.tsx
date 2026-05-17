@@ -1,8 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+
+function getResetRedirectUrl() {
+  if (typeof window === "undefined") {
+    return "https://www.sitguru.com/reset-password";
+  }
+
+  return `${window.location.origin}/reset-password`;
+}
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -10,8 +18,11 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const resetRedirectUrl = useMemo(() => getResetRedirectUrl(), []);
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
     setLoading(true);
     setError("");
     setMessage("");
@@ -24,17 +35,25 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      normalizedEmail,
+      {
+        redirectTo: resetRedirectUrl,
+      },
+    );
 
-    if (error) {
-      setError(error.message);
+    if (resetError) {
+      setError(
+        resetError.message ||
+          "We could not send the reset email. Please try again.",
+      );
       setLoading(false);
       return;
     }
 
-    setMessage("Password reset email sent. Check your inbox and spam folder.");
+    setMessage(
+      "If an account exists for that email, a password reset link has been sent. Please check your inbox, spam, junk, and promotions folders.",
+    );
     setLoading(false);
   }
 
@@ -43,37 +62,49 @@ export default function ForgotPasswordPage() {
       <div className="mx-auto flex min-h-[70vh] max-w-md items-center justify-center">
         <div className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
           <div className="mb-6">
-            <p className="text-sm font-semibold text-emerald-600">SitGuru Access</p>
-            <h1 className="mt-2 text-3xl font-black text-slate-900">Forgot password</h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Enter your email and we’ll send you a secure password reset link.
+            <p className="text-sm font-semibold text-emerald-600">
+              SitGuru Access
+            </p>
+
+            <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+              Forgot password
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Enter the email connected to your SitGuru account and we’ll send
+              you a secure link to reset your password.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
+              <label
+                htmlFor="email"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
                 Email
               </label>
+
               <input
+                id="email"
                 type="email"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-emerald-500"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@sitguru.com"
+                placeholder="you@example.com"
                 autoComplete="email"
                 required
               />
             </div>
 
             {error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
                 {error}
               </div>
             ) : null}
 
             {message ? (
-              <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
                 {message}
               </div>
             ) : null}
@@ -81,25 +112,37 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              className="w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Sending reset link..." : "Send reset link"}
             </button>
           </form>
 
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+            This reset page works for Pet Parents, Gurus, Future Gurus,
+            Ambassadors, and Admin/Super User accounts.
+          </div>
+
           <div className="mt-5 space-y-2">
             <Link
               href="/login"
-              className="block text-sm font-semibold text-emerald-600 hover:underline"
+              className="block text-sm font-semibold text-emerald-700 hover:underline"
             >
               Back to customer login
             </Link>
 
             <Link
-              href="/admin/login"
-              className="block text-sm font-semibold text-emerald-600 hover:underline"
+              href="/guru/login"
+              className="block text-sm font-semibold text-emerald-700 hover:underline"
             >
-              Back to admin login
+              Back to Guru login
+            </Link>
+
+            <Link
+              href="/admin/login"
+              className="block text-sm font-semibold text-emerald-700 hover:underline"
+            >
+              Back to Admin login
             </Link>
           </div>
         </div>
