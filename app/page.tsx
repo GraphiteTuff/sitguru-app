@@ -24,36 +24,6 @@ const heroServiceOptions = [
   "Training Support",
 ];
 
-const approvedHomepageGuruNames = [
-  "Avery Johnson",
-  "Brad Norway",
-  "Caleb Brooks",
-  "Darius Miller",
-  "Emma Walsh",
-  "Maya Reynolds",
-  "Nina Patel",
-  "Olivia Chen",
-  "Sofia Martinez",
-  "Suzy Q",
-];
-
-const approvedHomepageGuruNameSet = new Set(
-  approvedHomepageGuruNames.map((name) => name.toLowerCase()),
-);
-
-const approvedHomepageGuruPhotoPaths: Record<string, string> = {
-  "Avery Johnson": "/images/demo/gurus/avery-johnson.png",
-  "Brad Norway": "/images/demo/gurus/brad-norway.png",
-  "Caleb Brooks": "/images/demo/gurus/caleb-brooks.png",
-  "Darius Miller": "/images/demo/gurus/darius-miller.png",
-  "Emma Walsh": "/images/demo/gurus/emma-walsh.png",
-  "Maya Reynolds": "/images/demo/gurus/maya-reynolds.png",
-  "Nina Patel": "/images/demo/gurus/nina-patel.png",
-  "Olivia Chen": "/images/demo/gurus/olivia-chen.png",
-  "Sofia Martinez": "/images/demo/gurus/sofia-martinez.png",
-  "Suzy Q": "/images/demo/gurus/suzy-q.png",
-};
-
 const zipCodeFallbackMap: Record<
   string,
   { city: string; state: string; stateAbbreviation: string }
@@ -361,55 +331,23 @@ function getGuruName(guru: Guru) {
   return guru.display_name || guru.full_name || "Trusted Guru";
 }
 
-function getApprovedHomepageGuruName(guru: Guru) {
-  const guruName = String(getGuruName(guru) || "").trim();
-  const normalizedGuruName = guruName.toLowerCase();
-
-  if (!approvedHomepageGuruNameSet.has(normalizedGuruName)) {
-    return "";
-  }
-
-  return (
-    approvedHomepageGuruNames.find(
-      (approvedName) => approvedName.toLowerCase() === normalizedGuruName,
-    ) || ""
-  );
-}
-
 function getGuruPhotoUrl(guru: Guru) {
-  const approvedName = getApprovedHomepageGuruName(guru);
-  const approvedPhotoPath = approvedName
-    ? approvedHomepageGuruPhotoPaths[approvedName]
-    : "";
-
   const possiblePhoto =
-    guru.profile_photo_url ||
-    guru.photo_url ||
-    guru.avatar_url ||
-    guru.image_url ||
-    approvedPhotoPath ||
-    "";
+    guru.profile_photo_url || guru.photo_url || guru.avatar_url || guru.image_url || "";
 
   const photoUrl = String(possiblePhoto || "").trim();
 
-  if (!photoUrl) return approvedPhotoPath || "";
+  if (!photoUrl) return "";
 
   const lowerPhotoUrl = photoUrl.toLowerCase();
 
-  if (lowerPhotoUrl.startsWith("/images/demo/gurus/")) {
-    return photoUrl;
-  }
-
   if (
+    lowerPhotoUrl.startsWith("/images/") ||
     lowerPhotoUrl.includes("sitguru-logo") ||
     lowerPhotoUrl.includes("sitguru-message-avatar") ||
     lowerPhotoUrl.includes("sitguru-admin-avatar")
   ) {
-    return approvedPhotoPath || "";
-  }
-
-  if (lowerPhotoUrl.startsWith("/images/") && !lowerPhotoUrl.startsWith("/images/demo/gurus/")) {
-    return approvedPhotoPath || "";
+    return "";
   }
 
   return photoUrl;
@@ -443,25 +381,15 @@ function getGuruRole(guru: Guru) {
 }
 
 function mapGurusToCards(gurus: Guru[]): GuruCard[] {
-  const mappedNames = new Set<string>();
-
   return gurus
     .map((guru) => {
-      const approvedName = getApprovedHomepageGuruName(guru);
-
-      if (!approvedName || mappedNames.has(approvedName)) {
-        return null;
-      }
-
-      mappedNames.add(approvedName);
-
       const photoUrl = getGuruPhotoUrl(guru);
 
       if (!photoUrl) {
         console.warn("Homepage Guru skipped because no account photo is wired:", {
           id: guru.id,
           slug: guru.slug,
-          name: approvedName,
+          name: getGuruName(guru),
         });
 
         return null;
@@ -473,7 +401,7 @@ function mapGurusToCards(gurus: Guru[]): GuruCard[] {
 
       return {
         id: String(guru.id),
-        name: approvedName,
+        name: getGuruName(guru),
         role: getGuruRole(guru),
         location: formatLocation(guru.city, guru.state),
         rating: rating > 0 ? rating.toFixed(1) : "New",
@@ -806,7 +734,7 @@ export default function HomePage() {
   const guruCarouselRef = useRef<HTMLDivElement | null>(null);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
-  const visibleGuruCards = useMemo(() => guruCards.slice(0, 10), [guruCards]);
+  const visibleGuruCards = useMemo(() => guruCards.slice(0, 8), [guruCards]);
 
   useEffect(() => {
     if ("scrollRestoration" in window.history) {
@@ -871,13 +799,10 @@ export default function HomePage() {
       const { data, error } = await supabase
         .from("gurus")
         .select("*")
-        .in("full_name", approvedHomepageGuruNames)
-        .eq("is_public", true)
-        .eq("is_active", true)
-        .eq("is_bookable", true)
+        .or("is_public.eq.true,is_active.eq.true")
         .order("is_verified", { ascending: false })
         .order("rating_avg", { ascending: false, nullsFirst: false })
-        .limit(20);
+        .limit(8);
 
       if (error) {
         console.error("Homepage Guru load error:", error.message);
