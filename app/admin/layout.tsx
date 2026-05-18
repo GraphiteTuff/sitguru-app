@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   ClipboardList,
   BarChart3,
+  ChevronDown,
   CalendarDays,
   CreditCard,
   FileBarChart,
@@ -125,6 +126,46 @@ const topHeaderLinks = [
   { label: "Financials", href: adminRoutes.financials },
 ];
 
+const mobileQuickLinks = [
+  {
+    label: "Sales & Marketing",
+    href: adminRoutes.salesMarketing,
+    icon: Megaphone,
+    description: "Outreach, signups, campaigns",
+    featured: true,
+  },
+  {
+    label: "Growth",
+    href: adminRoutes.referrals,
+    icon: Link2,
+    description: "Referrals and PawPerks",
+    featured: false,
+  },
+  {
+    label: "Programs",
+    href: adminRoutes.programs,
+    icon: ShieldCheck,
+    description: "Ambassadors and hiring paths",
+    featured: false,
+  },
+  {
+    label: "Partners",
+    href: adminRoutes.partners,
+    icon: HandCoins,
+    description: "Partner network",
+    featured: false,
+  },
+];
+
+const mobileGrowthLinks = [
+  { label: "Sales & Marketing", href: adminRoutes.salesMarketing, icon: Megaphone },
+  { label: "Growth & Referrals", href: adminRoutes.referrals, icon: Link2 },
+  { label: "Launch Signups", href: adminRoutes.launchSignups, icon: UserPlus },
+  { label: "Programs", href: adminRoutes.programs, icon: ShieldCheck },
+  { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
+  { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
+];
+
 function isActivePath(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   if (href === "/admin") return pathname === "/admin";
@@ -222,7 +263,131 @@ function SidebarSection({
 function MobileNav({ pathname }: { pathname: string }) {
   return (
     <div className="border-t border-[#e5ebe2] bg-[#fcfdfb] px-4 py-3 lg:hidden">
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="grid grid-cols-2 gap-2">
+        {mobileQuickLinks.map((item) => {
+          const Icon = item.icon;
+          const active = isActivePath(pathname, item.href);
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={
+                item.featured || active
+                  ? "rounded-2xl border border-green-800 bg-green-800 p-3 text-white shadow-sm"
+                  : "rounded-2xl border border-green-100 bg-white p-3 text-green-950 shadow-sm"
+              }
+            >
+              <span className="flex items-center gap-2 text-xs font-black">
+                <span
+                  className={
+                    item.featured || active
+                      ? "flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 text-white"
+                      : "flex h-8 w-8 items-center justify-center rounded-xl bg-green-50 text-green-800"
+                  }
+                >
+                  <Icon size={16} />
+                </span>
+                {item.label}
+              </span>
+
+              <span
+                className={
+                  item.featured || active
+                    ? "mt-1 block text-[10px] font-bold leading-4 text-white/80"
+                    : "mt-1 block text-[10px] font-bold leading-4 text-slate-500"
+                }
+              >
+                {item.description}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      <details className="group mt-3 rounded-2xl border border-green-100 bg-white shadow-sm">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-green-950 marker:hidden">
+          <span className="flex items-center gap-2">
+            <Megaphone size={17} className="text-green-800" />
+            Growth quick menu
+          </span>
+
+          <ChevronDown
+            size={18}
+            className="text-green-800 transition group-open:rotate-180"
+          />
+        </summary>
+
+        <div className="grid gap-2 border-t border-green-50 p-3">
+          {mobileGrowthLinks.map((item) => {
+            const Icon = item.icon;
+            const active = isActivePath(pathname, item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={
+                  active
+                    ? "flex items-center gap-2 rounded-xl bg-green-800 px-3 py-2.5 text-xs font-black text-white"
+                    : "flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2.5 text-xs font-black text-green-900"
+                }
+              >
+                <Icon size={15} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </details>
+
+      <details className="group mt-3 rounded-2xl border border-[#dfe7df] bg-white shadow-sm">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-slate-900 marker:hidden">
+          <span className="flex items-center gap-2">
+            <Gauge size={17} className="text-green-800" />
+            All admin sections
+          </span>
+
+          <ChevronDown
+            size={18}
+            className="text-green-800 transition group-open:rotate-180"
+          />
+        </summary>
+
+        <div className="grid gap-4 border-t border-[#edf3ee] p-3">
+          {navSections.map((section) => (
+            <div key={section.title}>
+              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                {section.title}
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActivePath(pathname, item.href);
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={
+                        active
+                          ? "flex items-center gap-2 rounded-xl bg-green-800 px-3 py-2.5 text-xs font-black text-white"
+                          : "flex items-center gap-2 rounded-xl border border-green-50 bg-green-50 px-3 py-2.5 text-xs font-black text-green-900"
+                      }
+                    >
+                      <Icon size={15} />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         {topHeaderLinks.map((item) => {
           const active = isActivePath(pathname, item.href);
 
