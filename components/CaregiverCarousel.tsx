@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
 type CarouselItem = {
@@ -82,20 +82,51 @@ export default function CaregiverCarousel({
   const hasMultipleItems = displayItems.length > 1;
 
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const resumeTimeoutRef = useRef<number | null>(null);
+
+  const clearResumeTimer = () => {
+    if (resumeTimeoutRef.current !== null) {
+      window.clearTimeout(resumeTimeoutRef.current);
+      resumeTimeoutRef.current = null;
+    }
+  };
+
+  const pauseCarousel = () => {
+    clearResumeTimer();
+    setIsPaused(true);
+  };
+
+  const resumeCarouselSoon = () => {
+    clearResumeTimer();
+
+    resumeTimeoutRef.current = window.setTimeout(() => {
+      setIsPaused(false);
+      resumeTimeoutRef.current = null;
+    }, 1800);
+  };
 
   useEffect(() => {
-    if (!hasMultipleItems) {
+    if (!hasMultipleItems || isPaused) {
       return;
     }
 
-    const interval = setInterval(() => {
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    if (prefersReducedMotion) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
       setActiveIndex((currentIndex) =>
         currentIndex >= displayItems.length - 1 ? 0 : currentIndex + 1,
       );
-    }, 4000);
+    }, 3600);
 
-    return () => clearInterval(interval);
-  }, [displayItems.length, hasMultipleItems]);
+    return () => window.clearInterval(interval);
+  }, [displayItems.length, hasMultipleItems, isPaused]);
 
   useEffect(() => {
     if (activeIndex > displayItems.length - 1) {
@@ -103,14 +134,24 @@ export default function CaregiverCarousel({
     }
   }, [activeIndex, displayItems.length]);
 
+  useEffect(() => {
+    return () => {
+      clearResumeTimer();
+    };
+  }, []);
+
   const goToPrevious = () => {
     if (!hasMultipleItems) {
       return;
     }
 
+    pauseCarousel();
+
     setActiveIndex((currentIndex) =>
       currentIndex <= 0 ? displayItems.length - 1 : currentIndex - 1,
     );
+
+    resumeCarouselSoon();
   };
 
   const goToNext = () => {
@@ -118,13 +159,19 @@ export default function CaregiverCarousel({
       return;
     }
 
+    pauseCarousel();
+
     setActiveIndex((currentIndex) =>
       currentIndex >= displayItems.length - 1 ? 0 : currentIndex + 1,
     );
+
+    resumeCarouselSoon();
   };
 
   const goToSlide = (index: number) => {
+    pauseCarousel();
     setActiveIndex(index);
+    resumeCarouselSoon();
   };
 
   if (displayItems.length === 0) {
@@ -173,17 +220,28 @@ export default function CaregiverCarousel({
 
         <div
           className="relative mt-8 overflow-hidden"
+          onMouseEnter={pauseCarousel}
+          onMouseLeave={() => setIsPaused(false)}
+          onTouchStart={pauseCarousel}
+          onTouchEnd={resumeCarouselSoon}
+          onTouchCancel={resumeCarouselSoon}
+          onFocus={pauseCarousel}
+          onBlur={() => setIsPaused(false)}
           style={
             {
-              "--caregiver-slide-width": "328px",
+              "--caregiver-slide-width": "304px",
+              "--caregiver-slide-gap": "24px",
+              WebkitOverflowScrolling: "touch",
+              touchAction: "pan-y",
             } as React.CSSProperties
           }
         >
-          <div className="sm:[--caregiver-slide-width:364px] lg:[--caregiver-slide-width:384px]">
+          <div className="sm:[--caregiver-slide-width:340px] lg:[--caregiver-slide-width:360px]">
             <div
               className="flex gap-6 transition-transform duration-700 ease-in-out will-change-transform"
               style={{
-                transform: `translateX(calc(-${activeIndex} * var(--caregiver-slide-width)))`,
+                transform: `translate3d(calc(-${activeIndex} * (var(--caregiver-slide-width) + var(--caregiver-slide-gap))), 0, 0)`,
+                WebkitTransform: `translate3d(calc(-${activeIndex} * (var(--caregiver-slide-width) + var(--caregiver-slide-gap))), 0, 0)`,
               }}
             >
               {displayItems.map((item) => (
