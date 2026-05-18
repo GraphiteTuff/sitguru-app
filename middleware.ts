@@ -19,10 +19,6 @@ function isAdminLoginPath(pathname: string) {
   return pathname === "/admin/login";
 }
 
-function isAdminApiPath(pathname: string) {
-  return pathname === "/api/admin" || pathname.startsWith("/api/admin/");
-}
-
 function isAdminPath(pathname: string) {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
