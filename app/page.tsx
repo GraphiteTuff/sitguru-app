@@ -1551,10 +1551,25 @@ export default function HomePage() {
       <section className="bg-white pb-10 sm:pb-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="overflow-hidden rounded-[30px] bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 p-6 text-center text-white shadow-[0_24px_70px_rgba(6,78,59,0.28)] sm:p-9">
-            <h2 className="text-2xl font-black tracking-[-0.04em] text-white sm:text-3xl">
+            <h2
+              className="text-2xl font-black tracking-[-0.04em] sm:text-3xl"
+              style={{
+                color: "#ffffff",
+                WebkitTextFillColor: "#ffffff",
+                opacity: 1,
+                textShadow: "0 2px 18px rgba(0, 0, 0, 0.2)",
+              }}
+            >
               Ready to get started?
             </h2>
-            <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-emerald-50 sm:text-base">
+            <p
+              className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 sm:text-base"
+              style={{
+                color: "#ecfdf5",
+                WebkitTextFillColor: "#ecfdf5",
+                opacity: 1,
+              }}
+            >
               Find trusted pet care or join SitGuru and be part of something
               new.
             </p>
