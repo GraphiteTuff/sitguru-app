@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown,
@@ -17,11 +17,102 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
+type AdminAccount = {
+  displayName: string;
+  email: string;
+  roleLabel: string;
+};
+
+const SUPER_ADMIN_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
+
+function getAdminAccountFromEmail(email?: string | null): AdminAccount {
+  const normalizedEmail = (email || "").trim().toLowerCase();
+
+  if (normalizedEmail === "jason@sitguru.com") {
+    return {
+      displayName: "Jason",
+      email: "jason@sitguru.com",
+      roleLabel: "SitGuru Super Admin",
+    };
+  }
+
+  if (normalizedEmail === "nette@sitguru.com") {
+    return {
+      displayName: "Danette",
+      email: "nette@sitguru.com",
+      roleLabel: "SitGuru Super Admin",
+    };
+  }
+
+  if (normalizedEmail.includes("sales") || normalizedEmail.includes("marketing")) {
+    return {
+      displayName: "Danette",
+      email: normalizedEmail,
+      roleLabel: "Sales & Marketing",
+    };
+  }
+
+  if (normalizedEmail) {
+    const nameFromEmail = normalizedEmail
+      .split("@")[0]
+      .replace(/[._-]+/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+    return {
+      displayName: nameFromEmail || "Admin User",
+      email: normalizedEmail,
+      roleLabel: SUPER_ADMIN_EMAILS.has(normalizedEmail)
+        ? "SitGuru Super Admin"
+        : "SitGuru Admin",
+    };
+  }
+
+  return {
+    displayName: "Admin User",
+    email: "Signed in",
+    roleLabel: "SitGuru Admin",
+  };
+}
+
 export default function AdminAccountMenu() {
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [account, setAccount] = useState<AdminAccount>(() =>
+    getAdminAccountFromEmail(null),
+  );
+
+  const topButtonRoleLabel = useMemo(() => {
+    return account.roleLabel.replace("SitGuru ", "");
+  }, [account.roleLabel]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCurrentAdmin() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!mounted) {
+        return;
+      }
+
+      setAccount(getAdminAccountFromEmail(user?.email));
+    }
+
+    loadCurrentAdmin();
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccount(getAdminAccountFromEmail(session?.user?.email));
+    });
+
+    return () => {
+      mounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -87,12 +178,12 @@ export default function AdminAccountMenu() {
         </span>
 
         <span className="min-w-0 pr-1 text-left">
-          <span className="block truncate text-sm font-black text-white">
-            Admin User
+          <span className="block max-w-[9rem] truncate text-sm font-black text-white">
+            {account.displayName}
           </span>
 
-          <span className="block truncate text-xs font-semibold text-white/85">
-            Super Admin
+          <span className="block max-w-[9rem] truncate text-xs font-semibold text-white/85">
+            {topButtonRoleLabel}
           </span>
         </span>
 
@@ -121,15 +212,15 @@ export default function AdminAccountMenu() {
 
               <div className="min-w-0">
                 <p className="truncate text-xl font-black leading-tight text-slate-950">
-                  Admin User
+                  {account.displayName}
                 </p>
 
-                <p className="mt-1 truncate text-sm font-semibold text-slate-500">
-                  admin@sitguru.com
+                <p className="mt-1 truncate text-sm font-semibold text-slate-600">
+                  {account.email}
                 </p>
 
                 <p className="mt-1 text-base font-black text-green-800">
-                  SitGuru Admin
+                  {account.roleLabel}
                 </p>
               </div>
             </div>
