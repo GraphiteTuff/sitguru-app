@@ -27,10 +27,6 @@ function isAdminPath(pathname: string) {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
-function isAdminAreaPath(pathname: string) {
-  return isAdminPath(pathname) || isAdminApiPath(pathname);
-}
-
 function isGuruLoginPath(pathname: string) {
   return pathname === "/guru/login" || pathname === "/guru/signup";
 }
@@ -52,16 +48,6 @@ function isPasswordRecoveryPath(pathname: string) {
     pathname.startsWith("/auth/recover/") ||
     pathname.startsWith("/auth/callback/")
   );
-}
-
-function hasSupabaseAuthCookie(request: NextRequest) {
-  return request.cookies
-    .getAll()
-    .some(
-      (cookie) =>
-        cookie.name.startsWith("sb-") &&
-        cookie.name.toLowerCase().includes("auth-token"),
-    );
 }
 
 function makeSessionCookieOptions(options: CookieOptions): CookieOptions {
@@ -244,10 +230,7 @@ export async function middleware(request: NextRequest) {
   const requiresGuruAccess =
     isProtectedGuruDashboardPath(pathname) && !isGuruLoginPath(pathname);
 
-  const shouldCheckForLeavingAdmin =
-    !isAdminAreaPath(pathname) && hasSupabaseAuthCookie(request);
-
-  if (!requiresAdminAccess && !requiresGuruAccess && !shouldCheckForLeavingAdmin) {
+  if (!requiresAdminAccess && !requiresGuruAccess) {
     return NextResponse.next();
   }
 
@@ -265,19 +248,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser();
-
-  if (shouldCheckForLeavingAdmin) {
-    if (user && isSuperUserEmail(user.email)) {
-      await supabase.auth.signOut();
-
-      const signedOutResponse = responseRef.current;
-      expireSupabaseCookies(request, signedOutResponse);
-
-      return signedOutResponse;
-    }
-
-    return responseRef.current;
-  }
 
   if (userError || !user) {
     if (requiresAdminAccess) {
@@ -302,6 +272,10 @@ export async function middleware(request: NextRequest) {
   const userEmail = normalizeEmail(user.email);
   const isSuperUser = isSuperUserEmail(userEmail);
 
+  if (requiresAdminAccess && isSuperUser) {
+    return responseRef.current;
+  }
+
   if (requiresAdminAccess && !isSuperUser) {
     await supabase.auth.signOut();
 
@@ -316,10 +290,6 @@ export async function middleware(request: NextRequest) {
     expireSupabaseCookies(request, redirectResponse);
 
     return redirectResponse;
-  }
-
-  if (requiresAdminAccess && isSuperUser) {
-    return responseRef.current;
   }
 
   if (requiresGuruAccess && isSuperUser) {
