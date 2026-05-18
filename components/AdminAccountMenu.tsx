@@ -25,8 +25,107 @@ type AdminAccount = {
 
 const SUPER_ADMIN_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
 
+function normalizeEmail(email?: string | null) {
+  return (email || "").trim().toLowerCase();
+}
+
+function getStoredSessionEmail() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const possibleKeys = [
+    "sitguru-session",
+    "sb-session",
+    "supabase.auth.token",
+  ];
+
+  for (const key of possibleKeys) {
+    const storedValue =
+      window.sessionStorage.getItem(key) || window.localStorage.getItem(key);
+
+    if (!storedValue) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(storedValue);
+
+      const email =
+        parsed?.user?.email ||
+        parsed?.currentSession?.user?.email ||
+        parsed?.session?.user?.email ||
+        parsed?.access_token?.user?.email;
+
+      if (email) {
+        return normalizeEmail(email);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  for (let index = 0; index < window.sessionStorage.length; index += 1) {
+    const key = window.sessionStorage.key(index);
+
+    if (!key || !key.includes("auth")) {
+      continue;
+    }
+
+    const storedValue = window.sessionStorage.getItem(key);
+
+    if (!storedValue) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(storedValue);
+      const email =
+        parsed?.user?.email ||
+        parsed?.currentSession?.user?.email ||
+        parsed?.session?.user?.email;
+
+      if (email) {
+        return normalizeEmail(email);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+
+    if (!key || !key.includes("auth")) {
+      continue;
+    }
+
+    const storedValue = window.localStorage.getItem(key);
+
+    if (!storedValue) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(storedValue);
+      const email =
+        parsed?.user?.email ||
+        parsed?.currentSession?.user?.email ||
+        parsed?.session?.user?.email;
+
+      if (email) {
+        return normalizeEmail(email);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 function getAdminAccountFromEmail(email?: string | null): AdminAccount {
-  const normalizedEmail = (email || "").trim().toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
 
   if (normalizedEmail === "jason@sitguru.com") {
     return {
@@ -69,7 +168,7 @@ function getAdminAccountFromEmail(email?: string | null): AdminAccount {
 
   return {
     displayName: "Admin User",
-    email: "Signed in",
+    email: "Checking session...",
     roleLabel: "SitGuru Admin",
   };
 }
@@ -91,21 +190,48 @@ export default function AdminAccountMenu() {
     let mounted = true;
 
     async function loadCurrentAdmin() {
+      const storedEmail = getStoredSessionEmail();
+
+      if (storedEmail && mounted) {
+        setAccount(getAdminAccountFromEmail(storedEmail));
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const sessionEmail = session?.user?.email;
+
+      if (sessionEmail && mounted) {
+        setAccount(getAdminAccountFromEmail(sessionEmail));
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!mounted) {
+      const userEmail = user?.email;
+
+      if (userEmail && mounted) {
+        setAccount(getAdminAccountFromEmail(userEmail));
         return;
       }
 
-      setAccount(getAdminAccountFromEmail(user?.email));
+      if (!storedEmail && mounted) {
+        setAccount({
+          displayName: "Admin User",
+          email: "Signed in",
+          roleLabel: "SitGuru Admin",
+        });
+      }
     }
 
     loadCurrentAdmin();
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAccount(getAdminAccountFromEmail(session?.user?.email));
+      const sessionEmail = session?.user?.email || getStoredSessionEmail();
+      setAccount(getAdminAccountFromEmail(sessionEmail));
     });
 
     return () => {
