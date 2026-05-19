@@ -90,6 +90,7 @@ async function requireAdminUser() {
     return {
       user: null,
       response: NextResponse.redirect("/admin/login"),
+      error: "Unauthorized. Please sign in as admin again.",
     };
   }
 
@@ -125,12 +126,15 @@ async function requireAdminUser() {
 function buildPlaidLaunchHtml({
   linkToken,
   baseUrl,
+  receivedRedirectUri,
 }: {
   linkToken: string;
   baseUrl: string;
+  receivedRedirectUri: string | null;
 }) {
   const safeToken = JSON.stringify(linkToken);
   const safeBaseUrl = JSON.stringify(baseUrl);
+  const safeReceivedRedirectUri = JSON.stringify(receivedRedirectUri);
 
   return `<!doctype html>
 <html lang="en">
@@ -236,7 +240,7 @@ function buildPlaidLaunchHtml({
       <h1>Connect bank account</h1>
       <p>
         Plaid is ready to open. This launch page uses Plaid's direct browser script,
-        not the React Plaid button, so it should work through ngrok.
+        not the React Plaid button.
       </p>
 
       <div id="status" class="status">Loading Plaid Link...</div>
@@ -253,6 +257,7 @@ function buildPlaidLaunchHtml({
     const openButton = document.getElementById("openPlaid");
     const baseUrl = ${safeBaseUrl};
     const linkToken = ${safeToken};
+    const receivedRedirectUri = ${safeReceivedRedirectUri};
 
     function setStatus(message) {
       statusBox.textContent = message;
@@ -267,7 +272,7 @@ function buildPlaidLaunchHtml({
     async function exchangePublicToken(publicToken, metadata) {
       setStatus("Plaid connected. Exchanging public token with SitGuru...");
 
-      const response = await fetch("/api/plaid/exchange-public-token", {
+      const response = await fetch("/api/plaid/exchange-token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -294,9 +299,15 @@ function buildPlaidLaunchHtml({
         return;
       }
 
-      const handler = window.Plaid.create({
+      const plaidConfig = {
         token: linkToken,
         onLoad: function () {
+          if (receivedRedirectUri) {
+            setStatus("Plaid OAuth return detected. Reopening Plaid Link to finish connection...");
+            handler.open();
+            return;
+          }
+
           setStatus("Plaid Link loaded. Click Open Plaid Link.");
         },
         onSuccess: async function (public_token, metadata) {
@@ -319,7 +330,13 @@ function buildPlaidLaunchHtml({
             console.log("Plaid event:", eventName);
           }
         }
-      });
+      };
+
+      if (receivedRedirectUri) {
+        plaidConfig.receivedRedirectUri = receivedRedirectUri;
+      }
+
+      const handler = window.Plaid.create(plaidConfig);
 
       openButton.addEventListener("click", function () {
         setStatus("Opening Plaid Link...");
@@ -327,6 +344,11 @@ function buildPlaidLaunchHtml({
       });
 
       setStatus("Plaid Link is ready. Click Open Plaid Link.");
+
+      if (receivedRedirectUri) {
+        setStatus("Plaid OAuth return detected. Opening Plaid Link...");
+        handler.open();
+      }
     }
 
     initializePlaid();
@@ -354,6 +376,8 @@ export async function GET(request: NextRequest) {
     assertPlaidConfigured();
 
     const redirectUri = getPlaidRedirectUri();
+    const receivedRedirectUri =
+      request.nextUrl.searchParams.get("received_redirect_uri");
 
     const response = await plaidClient.linkTokenCreate({
       user: {
@@ -370,6 +394,7 @@ export async function GET(request: NextRequest) {
     const html = buildPlaidLaunchHtml({
       linkToken: response.data.link_token,
       baseUrl,
+      receivedRedirectUri,
     });
 
     return new NextResponse(html, {
