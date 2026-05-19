@@ -3,7 +3,7 @@
 import { Open_Sans } from "next/font/google";
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
@@ -711,13 +711,13 @@ function GuruCardView({
     <Link
       href={guru.href}
       onClick={() => onTrack(`Guru Card ${guru.name}`, guru.href)}
-      className="group min-w-[230px] max-w-[230px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)] sm:min-w-[260px] sm:max-w-[260px]"
+      className="group min-w-[270px] max-w-[270px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)] sm:min-w-[310px] sm:max-w-[310px] lg:min-w-[330px] lg:max-w-[330px]"
     >
-      <div className="relative h-36 overflow-hidden bg-slate-100 sm:h-44">
+      <div className="relative h-52 overflow-hidden bg-slate-100 sm:h-64 lg:h-72">
         <img
           src={guru.image}
           alt={`${guru.name}, ${guru.role}`}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
           style={{ objectPosition: guru.imagePosition || "center 40%" }}
           loading="lazy"
         />
@@ -853,8 +853,6 @@ export default function HomePage() {
   const [zipLookupMessage, setZipLookupMessage] = useState("");
   const [guruCards, setGuruCards] = useState<GuruCard[]>(demoGuruCards);
   const [source, setSource] = useState("direct");
-  const [isGuruCarouselPaused, setIsGuruCarouselPaused] = useState(false);
-  const guruCarouselRef = useRef<HTMLDivElement | null>(null);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
   const visibleGuruCards = useMemo(() => guruCards.slice(0, 10), [guruCards]);
@@ -864,40 +862,6 @@ export default function HomePage() {
       window.history.scrollRestoration = "manual";
     }
   }, []);
-
-  useEffect(() => {
-    const carousel = guruCarouselRef.current;
-
-    if (!carousel || visibleGuruCards.length <= 1) return;
-
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-
-    if (prefersReducedMotion) return;
-
-    let animationFrameId = 0;
-
-    function moveCarousel() {
-      if (!carousel) return;
-
-      const resetPoint = carousel.scrollWidth / 2;
-
-      if (!isGuruCarouselPaused && resetPoint > carousel.clientWidth) {
-        carousel.scrollLeft += 0.34;
-
-        if (carousel.scrollLeft >= resetPoint - 2) {
-          carousel.scrollLeft = 0;
-        }
-      }
-
-      animationFrameId = window.requestAnimationFrame(moveCarousel);
-    }
-
-    animationFrameId = window.requestAnimationFrame(moveCarousel);
-
-    return () => window.cancelAnimationFrame(animationFrameId);
-  }, [isGuruCarouselPaused, visibleGuruCards.length]);
 
   useEffect(() => {
     const detectedSource = detectSourceFromUrl();
@@ -1232,23 +1196,83 @@ export default function HomePage() {
 
           {visibleGuruCards.length > 0 ? (
             <div
-              ref={guruCarouselRef}
-              onMouseEnter={() => setIsGuruCarouselPaused(true)}
-              onMouseLeave={() => setIsGuruCarouselPaused(false)}
-              onTouchStart={() => setIsGuruCarouselPaused(true)}
-              onTouchEnd={() => setIsGuruCarouselPaused(false)}
-              onFocus={() => setIsGuruCarouselPaused(true)}
-              onBlur={() => setIsGuruCarouselPaused(false)}
-              className="mt-5 flex gap-3 overflow-x-auto scroll-smooth pb-4 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+              className="sitguru-guru-carousel relative mt-5 overflow-hidden pb-5"
               aria-label="Featured local Gurus carousel"
             >
-              {[...visibleGuruCards, ...visibleGuruCards].map((guru, index) => (
-                <GuruCardView
-                  key={`${guru.id}-${index}`}
-                  guru={guru}
-                  onTrack={trackHomepageClick}
-                />
-              ))}
+              <style>{`
+                .sitguru-guru-carousel {
+                  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 4%, #000 96%, transparent 100%);
+                  mask-image: linear-gradient(to right, transparent 0%, #000 4%, #000 96%, transparent 100%);
+                  -webkit-transform: translateZ(0);
+                  transform: translateZ(0);
+                }
+
+                .sitguru-guru-carousel-track {
+                  display: flex;
+                  width: max-content;
+                  animation: sitguruGuruMarquee 52s linear infinite;
+                  -webkit-animation: sitguruGuruMarquee 52s linear infinite;
+                  transform: translate3d(0, 0, 0);
+                  -webkit-transform: translate3d(0, 0, 0);
+                  will-change: transform;
+                }
+
+                .sitguru-guru-carousel:hover .sitguru-guru-carousel-track,
+                .sitguru-guru-carousel:focus-within .sitguru-guru-carousel-track {
+                  animation-play-state: paused;
+                  -webkit-animation-play-state: paused;
+                }
+
+                @keyframes sitguruGuruMarquee {
+                  0% {
+                    transform: translate3d(0, 0, 0);
+                  }
+                  100% {
+                    transform: translate3d(-50%, 0, 0);
+                  }
+                }
+
+                @-webkit-keyframes sitguruGuruMarquee {
+                  0% {
+                    -webkit-transform: translate3d(0, 0, 0);
+                  }
+                  100% {
+                    -webkit-transform: translate3d(-50%, 0, 0);
+                  }
+                }
+
+                @media (max-width: 640px) {
+                  .sitguru-guru-carousel-track {
+                    animation-duration: 46s;
+                    -webkit-animation-duration: 46s;
+                  }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                  .sitguru-guru-carousel-track {
+                    animation: none;
+                    -webkit-animation: none;
+                  }
+                }
+              `}</style>
+
+              <div className="sitguru-guru-carousel-track">
+                {[0, 1].map((loopIndex) => (
+                  <div
+                    key={`guru-carousel-loop-${loopIndex}`}
+                    aria-hidden={loopIndex === 1}
+                    className="flex shrink-0 gap-4 pr-4 sm:gap-5 sm:pr-5"
+                  >
+                    {visibleGuruCards.map((guru) => (
+                      <GuruCardView
+                        key={`${guru.id}-${loopIndex}`}
+                        guru={guru}
+                        onTrack={trackHomepageClick}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50/50 p-5 text-sm font-semibold text-slate-700">
