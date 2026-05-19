@@ -262,7 +262,8 @@ export default function PhoneCodeLogin({
 
     if (error) {
       setErrorMessage(
-        error.message || "We could not send a new SitGuru code. Please try again.",
+        error.message ||
+          "We could not send a new SitGuru code. Please try again.",
       );
       return;
     }
@@ -270,7 +271,10 @@ export default function PhoneCodeLogin({
     setStatusMessage("New SitGuru code sent. Use the latest text message.");
   }
 
-  async function syncProfileAfterPhoneLogin(userId: string, userEmail: string | null) {
+  async function syncProfileAfterPhoneLogin(
+    userId: string,
+    userEmail: string | null,
+  ) {
     const { data: existingProfile, error: existingProfileError } = await supabase
       .from("profiles")
       .select("role, email, full_name, first_name, last_name")
@@ -371,25 +375,46 @@ export default function PhoneCodeLogin({
 
   return (
     <section
-      className={`rounded-[1.5rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm ${
+      className={`rounded-[1.5rem] border border-emerald-200 bg-white shadow-sm ${
         compact ? "mt-0 p-4" : "mt-8 p-5"
       }`}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+        <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 shadow-sm">
           <ShieldCheck className="h-5 w-5" />
         </span>
 
         <div className="min-w-0 flex-1">
-          <h3 className="text-xl font-black tracking-tight text-slate-950">
+          <h3
+            className="text-2xl font-black tracking-tight"
+            style={{
+              color: "#1f2937",
+              WebkitTextFillColor: "#1f2937",
+              opacity: 1,
+            }}
+          >
             {heading}
           </h3>
 
-          <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+          <p
+            className="mt-1 text-base font-bold leading-7"
+            style={{
+              color: "#334155",
+              WebkitTextFillColor: "#334155",
+              opacity: 1,
+            }}
+          >
             {description}
           </p>
 
-          <p className="mt-3 inline-flex rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
+          <p
+            className="mt-3 inline-flex rounded-full bg-white px-3 py-1 text-xs font-black ring-1 ring-emerald-200"
+            style={{
+              color: "#065f46",
+              WebkitTextFillColor: "#065f46",
+              opacity: 1,
+            }}
+          >
             Signing in as: {roleLabel}
           </p>
         </div>
@@ -400,7 +425,12 @@ export default function PhoneCodeLogin({
           <div className="space-y-2">
             <label
               htmlFor="phone-login-number"
-              className="block text-sm font-black text-slate-800"
+              className="block text-sm font-black"
+              style={{
+                color: "#1f2937",
+                WebkitTextFillColor: "#1f2937",
+                opacity: 1,
+              }}
             >
               Mobile phone number
             </label>
@@ -418,11 +448,23 @@ export default function PhoneCodeLogin({
                 onChange={(event) => handlePhoneChange(event.target.value)}
                 placeholder="(856) 555-1234"
                 maxLength={14}
-                className="ml-3 w-full bg-transparent text-base font-bold text-slate-900 placeholder:text-slate-400 outline-none"
+                className="ml-3 w-full bg-transparent text-base font-bold placeholder:text-slate-400 outline-none"
+                style={{
+                  color: "#0f172a",
+                  WebkitTextFillColor: "#0f172a",
+                  opacity: 1,
+                }}
               />
             </div>
 
-            <p className="text-xs font-semibold leading-5 text-slate-500">
+            <p
+              className="text-sm font-semibold leading-6"
+              style={{
+                color: "#64748b",
+                WebkitTextFillColor: "#64748b",
+                opacity: 1,
+              }}
+            >
               Enter your U.S. mobile number. SitGuru sends it securely as +1
               format for your 6-digit code.
             </p>
@@ -431,7 +473,7 @@ export default function PhoneCodeLogin({
           <button
             type="submit"
             disabled={isSending}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-base font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {isSending ? "Sending SitGuru code..." : submitLabel}
@@ -439,13 +481,27 @@ export default function PhoneCodeLogin({
         </form>
       ) : (
         <form onSubmit={handleVerifyCode} className="mt-5 space-y-4">
-          <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3">
-            <div className="flex items-center gap-2 text-sm font-black text-emerald-700">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <div
+              className="flex items-center gap-2 text-sm font-black"
+              style={{
+                color: "#047857",
+                WebkitTextFillColor: "#047857",
+                opacity: 1,
+              }}
+            >
               <MessageSquareText className="h-4 w-4 shrink-0" />
               Code sent to {displaySentPhone || normalizedPhone}
             </div>
 
-            <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+            <p
+              className="mt-2 text-sm font-semibold leading-6"
+              style={{
+                color: "#475569",
+                WebkitTextFillColor: "#475569",
+                opacity: 1,
+              }}
+            >
               Use the newest SitGuru code you received. Older codes may not
               verify.
             </p>
@@ -458,7 +514,12 @@ export default function PhoneCodeLogin({
                 setStatusMessage("");
                 setErrorMessage("");
               }}
-              className="mt-2 text-xs font-black text-slate-500 underline-offset-4 hover:text-emerald-700 hover:underline"
+              className="mt-2 text-sm font-black underline-offset-4 hover:underline"
+              style={{
+                color: "#334155",
+                WebkitTextFillColor: "#334155",
+                opacity: 1,
+              }}
             >
               Use a different number
             </button>
@@ -467,7 +528,12 @@ export default function PhoneCodeLogin({
           <div className="space-y-2">
             <label
               htmlFor="phone-login-code"
-              className="block text-sm font-black text-slate-800"
+              className="block text-sm font-black"
+              style={{
+                color: "#1f2937",
+                WebkitTextFillColor: "#1f2937",
+                opacity: 1,
+              }}
             >
               6-digit SitGuru code
             </label>
@@ -489,14 +555,19 @@ export default function PhoneCodeLogin({
               }}
               placeholder="123456"
               maxLength={6}
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-center text-2xl font-black tracking-[0.35em] text-slate-950 placeholder:text-slate-300 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-center text-2xl font-black tracking-[0.35em] placeholder:text-slate-300 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              style={{
+                color: "#0f172a",
+                WebkitTextFillColor: "#0f172a",
+                opacity: 1,
+              }}
             />
           </div>
 
           <button
             type="submit"
             disabled={isVerifying}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-base font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {isVerifying ? "Verifying..." : verifyLabel}
@@ -506,7 +577,7 @@ export default function PhoneCodeLogin({
             type="button"
             onClick={handleSendNewCode}
             disabled={isSending}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {isSending ? "Sending new code..." : "Send a new SitGuru code"}
