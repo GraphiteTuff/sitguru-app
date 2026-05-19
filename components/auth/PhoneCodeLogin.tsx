@@ -6,13 +6,17 @@ import {
   CheckCircle2,
   Loader2,
   MessageSquareText,
+  Phone,
   ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
+type PhoneLoginRole = "customer" | "guru";
+type ProfileRole = "customer" | "guru" | "both";
+
 type PhoneCodeLoginProps = {
   nextPath: string;
-  role: "customer" | "guru";
+  role: PhoneLoginRole;
   heading?: string;
   description?: string;
   submitLabel?: string;
@@ -20,13 +24,25 @@ type PhoneCodeLoginProps = {
   compact?: boolean;
 };
 
-function getSafeRedirectPath(value: string, fallback: string) {
+function getSafeRedirectPath(
+  value: string,
+  fallback: string,
+  role: PhoneLoginRole,
+) {
   try {
     const decoded = decodeURIComponent(value || "").trim();
 
     if (!decoded.startsWith("/")) return fallback;
     if (decoded.startsWith("//")) return fallback;
     if (decoded.includes("://")) return fallback;
+
+    if (role === "customer" && decoded.startsWith("/guru")) {
+      return fallback;
+    }
+
+    if (role === "guru" && decoded.startsWith("/customer")) {
+      return fallback;
+    }
 
     return decoded;
   } catch {
@@ -82,12 +98,54 @@ function isProbablyValidE164Phone(value: string) {
   return /^\+[1-9]\d{9,14}$/.test(value);
 }
 
-function getRoleLabel(role: "customer" | "guru") {
-  return role === "guru" ? "Pet Care Guru" : "Pet Parent";
+function getRoleLabel(role: PhoneLoginRole) {
+  return role === "guru" ? "Future Guru" : "Pet Parent";
 }
 
-function getProfileRole(role: "customer" | "guru") {
+function getRequestedProfileRole(role: PhoneLoginRole): ProfileRole {
   return role === "guru" ? "guru" : "customer";
+}
+
+function getMergedProfileRole(
+  existingRole: string | null | undefined,
+  requestedRole: ProfileRole,
+): ProfileRole {
+  if (existingRole === "both") return "both";
+
+  if (existingRole === "customer" && requestedRole === "guru") {
+    return "both";
+  }
+
+  if (existingRole === "guru" && requestedRole === "customer") {
+    return "both";
+  }
+
+  if (existingRole === "customer" || existingRole === "guru") {
+    return existingRole;
+  }
+
+  return requestedRole;
+}
+
+function getDefaultPath(role: PhoneLoginRole) {
+  return role === "guru"
+    ? "/guru/dashboard/profile"
+    : "/customer/dashboard/profile";
+}
+
+async function safelyAddUserRole(userId: string, role: PhoneLoginRole) {
+  try {
+    const { error } = await supabase.from("user_roles").insert({
+      user_id: userId,
+      role,
+    });
+
+    if (error && error.code !== "23505") {
+      console.warn("Phone login user_roles insert skipped:", error.message);
+    }
+  } catch (error) {
+    console.warn("Phone login user_roles sync skipped:", error);
+  }
 }
 
 export default function PhoneCodeLogin({
@@ -95,18 +153,17 @@ export default function PhoneCodeLogin({
   role,
   heading = "Continue with phone",
   description = "Enter your mobile number and we’ll text you a secure 6-digit SitGuru code.",
-  submitLabel = "Text me a code",
+  submitLabel = "Text me a SitGuru code",
   verifyLabel = "Verify & continue",
   compact = false,
 }: PhoneCodeLoginProps) {
   const router = useRouter();
 
-  const fallbackPath =
-    role === "guru" ? "/guru/dashboard" : "/customer/dashboard";
+  const fallbackPath = getDefaultPath(role);
 
   const safeNextPath = useMemo(
-    () => getSafeRedirectPath(nextPath, fallbackPath),
-    [nextPath, fallbackPath],
+    () => getSafeRedirectPath(nextPath, fallbackPath, role),
+    [nextPath, fallbackPath, role],
   );
 
   const [phone, setPhone] = useState("");
@@ -119,19 +176,38 @@ export default function PhoneCodeLogin({
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
 
+  const roleLabel = getRoleLabel(role);
+  const requestedProfileRole = getRequestedProfileRole(role);
+
   function handlePhoneChange(value: string) {
     const digitsOnly = getDigitsOnly(value);
 
-    /**
-     * Keep the visual format user-friendly while preserving a clean
-     * E.164 value for Supabase/Twilio behind the scenes.
-     */
     if (!digitsOnly) {
       setPhone("");
       return;
     }
 
     setPhone(formatPhoneForDisplay(digitsOnly));
+    setErrorMessage("");
+    setStatusMessage("");
+  }
+
+  async function sendCodeToPhone(phoneToSend: string) {
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: phoneToSend,
+      options: {
+        shouldCreateUser: true,
+        data: {
+          role: requestedProfileRole,
+          account_type: requestedProfileRole,
+          signup_method: "phone",
+          signup_role: role,
+          source: "phone_login",
+        },
+      },
+    });
+
+    return error;
   }
 
   async function handleSendCode(event: FormEvent<HTMLFormElement>) {
@@ -144,29 +220,20 @@ export default function PhoneCodeLogin({
 
     if (!isProbablyValidE164Phone(formattedPhone)) {
       setErrorMessage(
-        "Enter a valid mobile number in the format (856) 555-1234.",
+        "Enter a valid U.S. mobile number in the format (856) 555-1234.",
       );
       return;
     }
 
     setIsSending(true);
 
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: formattedPhone,
-      options: {
-        shouldCreateUser: true,
-        data: {
-          role: getProfileRole(role),
-          source: "phone_login",
-        },
-      },
-    });
+    const error = await sendCodeToPhone(formattedPhone);
 
     setIsSending(false);
 
     if (error) {
       setErrorMessage(
-        error.message || "We could not send the code. Please try again.",
+        error.message || "We could not send the SitGuru code. Please try again.",
       );
       return;
     }
@@ -174,7 +241,79 @@ export default function PhoneCodeLogin({
     setNormalizedPhone(formattedPhone);
     setDisplaySentPhone(formatPhoneForDisplay(formattedPhone));
     setCodeSent(true);
-    setStatusMessage("Code sent. Check your text messages.");
+    setStatusMessage("SitGuru code sent. Check your text messages.");
+  }
+
+  async function handleSendNewCode() {
+    setErrorMessage("");
+    setStatusMessage("");
+    setCode("");
+
+    if (!normalizedPhone) {
+      setCodeSent(false);
+      return;
+    }
+
+    setIsSending(true);
+
+    const error = await sendCodeToPhone(normalizedPhone);
+
+    setIsSending(false);
+
+    if (error) {
+      setErrorMessage(
+        error.message || "We could not send a new SitGuru code. Please try again.",
+      );
+      return;
+    }
+
+    setStatusMessage("New SitGuru code sent. Use the latest text message.");
+  }
+
+  async function syncProfileAfterPhoneLogin(userId: string, userEmail: string | null) {
+    const { data: existingProfile, error: existingProfileError } = await supabase
+      .from("profiles")
+      .select("role, email, full_name, first_name, last_name")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (existingProfileError) {
+      console.warn(
+        "Phone login existing profile lookup failed:",
+        existingProfileError.message,
+      );
+    }
+
+    const mergedRole = getMergedProfileRole(
+      existingProfile?.role,
+      requestedProfileRole,
+    );
+
+    const profilePayload = {
+      id: userId,
+      email: existingProfile?.email || userEmail,
+      role: mergedRole,
+    };
+
+    const { error: profileError } = await supabase.from("profiles").upsert(
+      profilePayload,
+      {
+        onConflict: "id",
+      },
+    );
+
+    if (profileError) {
+      console.warn("Phone login profile sync failed:", profileError.message);
+    }
+
+    await safelyAddUserRole(userId, role);
+
+    if (mergedRole === "both") {
+      await safelyAddUserRole(userId, "customer");
+      await safelyAddUserRole(userId, "guru");
+    }
+
+    return mergedRole;
   }
 
   async function handleVerifyCode(event: FormEvent<HTMLFormElement>) {
@@ -186,12 +325,12 @@ export default function PhoneCodeLogin({
     const cleanCode = code.replace(/\D/g, "");
 
     if (!normalizedPhone) {
-      setErrorMessage("Please send a code first.");
+      setErrorMessage("Please send a SitGuru code first.");
       return;
     }
 
     if (cleanCode.length !== 6) {
-      setErrorMessage("Enter the 6-digit code from your text message.");
+      setErrorMessage("Enter the 6-digit SitGuru code from your text message.");
       return;
     }
 
@@ -206,7 +345,8 @@ export default function PhoneCodeLogin({
     if (error || !data.session) {
       setIsVerifying(false);
       setErrorMessage(
-        error?.message || "That code did not work. Please try again.",
+        error?.message ||
+          "That SitGuru code did not work. Please check the latest text message and try again.",
       );
       return;
     }
@@ -216,16 +356,7 @@ export default function PhoneCodeLogin({
       const userEmail = data.user?.email || null;
 
       if (userId) {
-        await supabase.from("profiles").upsert(
-          {
-            id: userId,
-            email: userEmail,
-            role: getProfileRole(role),
-          },
-          {
-            onConflict: "id",
-          },
-        );
+        await syncProfileAfterPhoneLogin(userId, userEmail);
       }
     } catch (profileError) {
       console.error("Phone login profile sync failed:", profileError);
@@ -241,25 +372,25 @@ export default function PhoneCodeLogin({
   return (
     <section
       className={`rounded-[1.5rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm ${
-        compact ? "mt-4 p-4" : "mt-8 p-5"
+        compact ? "mt-0 p-4" : "mt-8 p-5"
       }`}
     >
-      <div className="flex items-start gap-3">
-        <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
           <ShieldCheck className="h-5 w-5" />
         </span>
 
-        <div>
-          <h3 className="text-xl font-bold tracking-tight text-slate-950">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-xl font-black tracking-tight text-slate-950">
             {heading}
           </h3>
 
-          <p className="mt-1 text-sm leading-6 text-slate-600">
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
             {description}
           </p>
 
-          <p className="mt-2 inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
-            Signing in as: {getRoleLabel(role)}
+          <p className="mt-3 inline-flex rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
+            Signing in as: {roleLabel}
           </p>
         </div>
       </div>
@@ -269,46 +400,55 @@ export default function PhoneCodeLogin({
           <div className="space-y-2">
             <label
               htmlFor="phone-login-number"
-              className="block text-sm font-bold text-slate-800"
+              className="block text-sm font-black text-slate-800"
             >
               Mobile phone number
             </label>
 
-            <input
-              id="phone-login-number"
-              name="phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(event) => handlePhoneChange(event.target.value)}
-              placeholder="(856) 555-1234"
-              maxLength={14}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-            />
+            <div className="flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-100">
+              <Phone className="h-5 w-5 shrink-0 text-emerald-700" />
 
-            <p className="text-xs font-medium text-slate-500">
-              Enter your U.S. mobile number. SitGuru will securely send it as +1
-              format for the 6-digit verification code.
+              <input
+                id="phone-login-number"
+                name="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(event) => handlePhoneChange(event.target.value)}
+                placeholder="(856) 555-1234"
+                maxLength={14}
+                className="ml-3 w-full bg-transparent text-base font-bold text-slate-900 placeholder:text-slate-400 outline-none"
+              />
+            </div>
+
+            <p className="text-xs font-semibold leading-5 text-slate-500">
+              Enter your U.S. mobile number. SitGuru sends it securely as +1
+              format for your 6-digit code.
             </p>
           </div>
 
           <button
             type="submit"
             disabled={isSending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {isSending ? "Sending code..." : submitLabel}
+            {isSending ? "Sending SitGuru code..." : submitLabel}
           </button>
         </form>
       ) : (
         <form onSubmit={handleVerifyCode} className="mt-5 space-y-4">
           <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3">
-            <div className="flex items-center gap-2 text-sm font-bold text-emerald-700">
-              <MessageSquareText className="h-4 w-4" />
+            <div className="flex items-center gap-2 text-sm font-black text-emerald-700">
+              <MessageSquareText className="h-4 w-4 shrink-0" />
               Code sent to {displaySentPhone || normalizedPhone}
             </div>
+
+            <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+              Use the newest SitGuru code you received. Older codes may not
+              verify.
+            </p>
 
             <button
               type="button"
@@ -318,7 +458,7 @@ export default function PhoneCodeLogin({
                 setStatusMessage("");
                 setErrorMessage("");
               }}
-              className="mt-2 text-xs font-bold text-slate-500 underline-offset-4 hover:text-emerald-700 hover:underline"
+              className="mt-2 text-xs font-black text-slate-500 underline-offset-4 hover:text-emerald-700 hover:underline"
             >
               Use a different number
             </button>
@@ -327,9 +467,9 @@ export default function PhoneCodeLogin({
           <div className="space-y-2">
             <label
               htmlFor="phone-login-code"
-              className="block text-sm font-bold text-slate-800"
+              className="block text-sm font-black text-slate-800"
             >
-              6-digit code
+              6-digit SitGuru code
             </label>
 
             <input
@@ -343,18 +483,20 @@ export default function PhoneCodeLogin({
                 const nextValue = event.target.value
                   .replace(/\D/g, "")
                   .slice(0, 6);
+
                 setCode(nextValue);
+                setErrorMessage("");
               }}
               placeholder="123456"
               maxLength={6}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-2xl font-black tracking-[0.35em] text-slate-950 placeholder:text-slate-300 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-center text-2xl font-black tracking-[0.35em] text-slate-950 placeholder:text-slate-300 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
             />
           </div>
 
           <button
             type="submit"
             disabled={isVerifying}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {isVerifying ? "Verifying..." : verifyLabel}
@@ -362,35 +504,25 @@ export default function PhoneCodeLogin({
 
           <button
             type="button"
-            onClick={() => {
-              setCode("");
-              setErrorMessage("");
-              setStatusMessage("");
-              setCodeSent(false);
-
-              window.setTimeout(() => {
-                const phoneInput = document.getElementById(
-                  "phone-login-number",
-                );
-                phoneInput?.focus();
-              }, 0);
-            }}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+            onClick={handleSendNewCode}
+            disabled={isSending}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            Send a new code
+            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {isSending ? "Sending new code..." : "Send a new SitGuru code"}
           </button>
         </form>
       )}
 
       {statusMessage ? (
-        <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-          <CheckCircle2 className="h-4 w-4" />
+        <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
           {statusMessage}
         </div>
       ) : null}
 
       {errorMessage ? (
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
           {errorMessage}
         </div>
       ) : null}
