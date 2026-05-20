@@ -336,11 +336,12 @@ const fallbackOverview: FinancialOverviewResponse = {
   },
   sourceHealth: [
     {
-      id: "fallback-preview-source",
-      table: "preview",
-      ok: true,
+      id: "live-data-unavailable-source",
+      table: "live_financial_overview",
+      ok: false,
       rowCount: 0,
-      message: "Preview fallback loaded while live financial overview data loads.",
+      message:
+        "Live financial overview data is unavailable. No preview or estimated financial numbers are being shown.",
     },
   ],
   plaidBanking: {
@@ -360,199 +361,185 @@ const fallbackOverview: FinancialOverviewResponse = {
   kpis: [
     {
       label: "Gross Bookings",
-      value: "$1,287,540",
-      rawValue: 1287540,
-      change: "Preview",
-      helper: "safe fallback",
+      value: "$0",
+      rawValue: 0,
+      change: "Live data unavailable",
+      helper: "no fallback shown",
       tone: "green",
     },
     {
       label: "Platform Revenue",
-      value: "$192,845",
-      rawValue: 192845,
-      change: "Preview",
-      helper: "safe fallback",
+      value: "$0",
+      rawValue: 0,
+      change: "Live data unavailable",
+      helper: "no fallback shown",
       tone: "green",
     },
     {
       label: "Guru Payouts",
-      value: "$732,619",
-      rawValue: 732619,
-      change: "Preview",
-      helper: "safe fallback",
+      value: "$0",
+      rawValue: 0,
+      change: "Live data unavailable",
+      helper: "no fallback shown",
       tone: "green",
     },
     {
       label: "Partner Commissions",
-      value: "$78,214",
-      rawValue: 78214,
-      change: "Preview",
-      helper: "safe fallback",
+      value: "$0",
+      rawValue: 0,
+      change: "Live data unavailable",
+      helper: "no fallback shown",
       tone: "blue",
     },
     {
       label: "Stripe Fees",
-      value: "$23,761",
-      rawValue: 23761,
-      change: "Preview",
-      helper: "safe fallback",
+      value: "$0",
+      rawValue: 0,
+      change: "Live data unavailable",
+      helper: "no fallback shown",
       tone: "blue",
     },
     {
       label: "Refunds / Chargebacks",
-      value: "$5,914",
-      rawValue: 5914,
-      change: "Preview",
-      helper: "safe fallback",
+      value: "$0",
+      rawValue: 0,
+      change: "Live data unavailable",
+      helper: "no fallback shown",
       tone: "red",
     },
     {
       label: "Net Margin",
-      value: "16.8%",
-      rawValue: 16.8,
-      change: "Preview",
-      helper: "safe fallback",
+      value: "0%",
+      rawValue: 0,
+      change: "Live data unavailable",
+      helper: "no fallback shown",
       tone: "green",
     },
     {
       label: "Cash Balance",
-      value: "$1,183,459",
-      rawValue: 1183459,
-      change: "Preview",
-      helper: "safe fallback",
+      value: "$0",
+      rawValue: 0,
+      change: "Live data unavailable",
+      helper: "no fallback shown",
       tone: "green",
     },
   ],
   breakEven: {
-    percent: 78,
-    target: 1450000,
-    currentContribution: 1134200,
-    remaining: 313300,
-    runwayMonths: 7.4,
+    percent: 0,
+    target: 0,
+    currentContribution: 0,
+    remaining: 0,
+    runwayMonths: 0,
   },
   bookingsToCashFunnel: [
     {
       label: "Gross Bookings",
-      value: "$1,287,540",
-      rawValue: 1287540,
+      value: "$0",
+      rawValue: 0,
       widthClass: "w-full",
     },
     {
       label: "Less Cancellations",
-      value: "$5,914",
-      rawValue: 5914,
-      widthClass: "w-1/6",
+      value: "$0",
+      rawValue: 0,
+      widthClass: "w-full",
     },
     {
       label: "Net Bookings",
-      value: "$1,281,626",
-      rawValue: 1281626,
-      widthClass: "w-5/6",
+      value: "$0",
+      rawValue: 0,
+      widthClass: "w-full",
     },
     {
       label: "Collected Cash",
-      value: "$925,464",
-      rawValue: 925464,
-      widthClass: "w-4/6",
+      value: "$0",
+      rawValue: 0,
+      widthClass: "w-full",
     },
     {
       label: "Payouts & Fees",
-      value: "$834,594",
-      rawValue: 834594,
-      widthClass: "w-3/6",
+      value: "$0",
+      rawValue: 0,
+      widthClass: "w-full",
     },
     {
       label: "Net Cash Retained",
-      value: "$290,762",
-      rawValue: 290762,
-      widthClass: "w-2/6",
+      value: "$0",
+      rawValue: 0,
+      widthClass: "w-full",
     },
   ],
   guruPayoutStatus: {
-    paid: 732619,
-    processing: 157310,
-    pending: 66410,
-    total: 732619,
+    paid: 0,
+    processing: 0,
+    pending: 0,
+    total: 0,
   },
   partnerCommissionStatus: {
-    paid: 48214,
-    pending: 19842,
-    processing: 9970,
-    total: 78214,
+    paid: 0,
+    pending: 0,
+    processing: 0,
+    total: 0,
   },
   cashRunway: {
-    months: 7.4,
-    cashBalance: 1183459,
-    monthlyBurn: 158020,
-    runwayEndLabel: "Jan 20, 2026",
+    months: 0,
+    cashBalance: 0,
+    monthlyBurn: 0,
+    runwayEndLabel: "Live data unavailable",
   },
-  revenueTrend: [
-    { label: "Dec", platformRevenue: 81000, grossBookings: 489000 },
-    { label: "Jan", platformRevenue: 96400, grossBookings: 618000 },
-    { label: "Feb", platformRevenue: 111800, grossBookings: 747000 },
-    { label: "Mar", platformRevenue: 131100, grossBookings: 901000 },
-    { label: "Apr", platformRevenue: 150400, grossBookings: 1055000 },
-    { label: "May", platformRevenue: 192845, grossBookings: 1287540 },
-  ],
-  expenseTrend: [
-    { month: "Dec", payouts: 51283, commissions: 5474, fees: 1663, other: 11061 },
-    { month: "Jan", payouts: 61052, commissions: 6518, fees: 1980, other: 13168 },
-    { month: "Feb", payouts: 73262, commissions: 7821, fees: 2376, other: 15802 },
-    { month: "Mar", payouts: 87914, commissions: 9386, fees: 2851, other: 18962 },
-    { month: "Apr", payouts: 102567, commissions: 10950, fees: 3327, other: 22123 },
-    { month: "May", payouts: 122103, commissions: 13036, fees: 3960, other: 26337 },
-  ],
+  revenueTrend: [],
+  expenseTrend: [],
   cashFlowByCategory: [
     {
       label: "Platform Revenue",
-      value: 192845,
-      displayValue: "$192,845",
+      value: 0,
+      displayValue: "$0",
       type: "inflow",
     },
     {
       label: "Payouts",
-      value: -732619,
-      displayValue: "-$732,619",
+      value: 0,
+      displayValue: "$0",
       type: "outflow",
     },
     {
       label: "Partner Commissions",
-      value: -78214,
-      displayValue: "-$78,214",
+      value: 0,
+      displayValue: "$0",
       type: "outflow",
     },
     {
       label: "Stripe Fees",
-      value: -23761,
-      displayValue: "-$23,761",
+      value: 0,
+      displayValue: "$0",
       type: "outflow",
     },
     {
       label: "Refunds / Chargebacks",
-      value: -5914,
-      displayValue: "-$5,914",
+      value: 0,
+      displayValue: "$0",
       type: "outflow",
     },
     {
       label: "Operating Expenses",
-      value: -158020,
-      displayValue: "-$158,020",
+      value: 0,
+      displayValue: "$0",
       type: "outflow",
     },
     {
       label: "Net Cash Flow",
-      value: 290762,
-      displayValue: "$290,762",
+      value: 0,
+      displayValue: "$0",
       type: "net",
     },
   ],
   managementAlerts: [
     {
-      id: "preview-alert",
-      title: "Financial Overview is loading live data",
+      id: "live-financial-data-unavailable",
+      title: "Live financial data unavailable",
       description:
-        "Safe fallback values are shown until the live overview API responds.",
-      severity: "info",
+        "SitGuru is showing zero-only placeholders because the live financial overview API did not return usable data. No preview, estimated, or make-believe financial numbers are displayed.",
+      severity: "warning",
       href: "/admin/financials",
     },
   ],
@@ -1692,7 +1679,7 @@ function TrustSafetyFinancialsPanel({
                 : "border-amber-200 bg-amber-50 text-amber-800"
             }`}
           >
-            {safeFinancials.isLive ? "Live Supabase" : "Preview / Offline"}
+            {safeFinancials.isLive ? "Live Supabase" : "Unavailable / Offline"}
           </span>
 
           <Link
@@ -1826,7 +1813,7 @@ function GrowthReferralFinancialsPanel({
                 : "border-amber-200 bg-amber-50 text-amber-800"
             }`}
           >
-            {safeFinancials.isLive ? "Live Supabase Views" : "Preview / Offline"}
+            {safeFinancials.isLive ? "Live Supabase Views" : "Unavailable / Offline"}
           </span>
 
           <Link
@@ -2157,7 +2144,7 @@ function RecentExportActivity() {
       setMessage(
         json.isLive
           ? "Live export history connected."
-          : json.message || "Showing preview export activity.",
+          : json.message || "Export activity is unavailable.",
       );
     } catch (error) {
       setHistory([]);
@@ -2201,7 +2188,7 @@ function RecentExportActivity() {
                 : "border-amber-200 bg-amber-50 text-amber-800"
             }`}
           >
-            {isLive ? "Live Supabase" : "Preview / Offline"}
+            {isLive ? "Live Supabase" : "Unavailable / Offline"}
           </span>
 
           <button
@@ -2371,11 +2358,11 @@ function SourceHealthPanel({
       {fallbackUsed ? (
         <div className="mt-5 rounded-[1.25rem] border border-amber-100 bg-amber-50 p-4">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-            Safe Fallback Active
+            Live Data Unavailable
           </p>
           <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
-            At least part of the dashboard is using fallback values. This is
-            expected while financial source tables and columns are being wired.
+            Live financial data is unavailable for this section. SitGuru is showing
+            zero-only placeholders so no preview or estimated financial numbers are displayed.
           </p>
         </div>
       ) : null}
@@ -2557,7 +2544,7 @@ export default function AdminFinancialsPage() {
 
       if (!response.ok || !json.ok) {
         setOverview(fallbackOverview);
-        setLoadMessage("Unable to load live overview. Showing safe fallback.");
+        setLoadMessage("Unable to load live overview. Showing zero-only placeholders — no fallback financial numbers.");
         return;
       }
 
@@ -2565,7 +2552,7 @@ export default function AdminFinancialsPage() {
       setLoadMessage(
         json.isLive
           ? "Live Supabase financial overview connected."
-          : "Safe fallback data loaded while source tables are completed.",
+          : "Live overview API returned unavailable data. Showing zero-only placeholders — no fallback financial numbers.",
       );
     } catch (error) {
       setOverview(fallbackOverview);
@@ -2603,7 +2590,7 @@ export default function AdminFinancialsPage() {
                       : "border-amber-200 bg-amber-50 text-amber-700"
                   }`}
                 >
-                  {overview.isLive ? "Live" : "Fallback"}
+                  {overview.isLive ? "Live" : "Unavailable"}
                 </span>
                 <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-blue-800">
                   {segmentLabel} View
