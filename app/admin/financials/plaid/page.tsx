@@ -15,6 +15,7 @@ type PlaidAccount = {
   current_balance?: number | null;
   available_balance?: number | null;
   iso_currency_code?: string | null;
+  plaid_environment?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -25,6 +26,7 @@ type PlaidItem = {
   plaid_environment?: string | null;
   transactions_last_synced_at?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type PlaidTransaction = {
@@ -62,6 +64,7 @@ type BankingData = {
   transactions: PlaidTransaction[];
   totalTransactions: number;
   lastSyncedAt: string | null;
+  plaidEnvironment: string;
 };
 
 function getMessageText(value?: string) {
@@ -80,6 +83,16 @@ function money(value?: number | null, currency = "USD") {
     currency,
     maximumFractionDigits: 2,
   }).format(Number.isFinite(Number(value)) ? Number(value) : 0);
+}
+
+function titleCase(value?: string | null) {
+  if (!value) return "Unknown";
+
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function formatDate(value?: string | null) {
@@ -114,10 +127,7 @@ function isBusinessCheckingOrSavings(account: PlaidAccount) {
   const name = `${account.name || ""} ${account.official_name || ""}`.toLowerCase();
   const subtype = String(account.subtype || "").toLowerCase();
 
-  const isCheckingOrSavings = subtype === "checking" || subtype === "savings";
-  const looksBusiness = name.includes("business");
-
-  return isCheckingOrSavings && looksBusiness;
+  return (subtype === "checking" || subtype === "savings") && name.includes("business");
 }
 
 async function getCurrentAdminUserId() {
@@ -155,15 +165,19 @@ async function getBankingData(): Promise<BankingData> {
       transactions: [],
       totalTransactions: 0,
       lastSyncedAt: null,
+      plaidEnvironment: process.env.PLAID_ENV || "unknown",
     };
   }
+
+  const currentEnvironment = process.env.PLAID_ENV || "production";
 
   const { data: accountRows, error: accountError } = await supabaseAdmin
     .from("admin_plaid_accounts")
     .select(
-      "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, created_at, updated_at",
+      "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, plaid_environment, created_at, updated_at",
     )
     .eq("user_id", userId)
+    .eq("plaid_environment", currentEnvironment)
     .order("created_at", { ascending: false });
 
   if (accountError) {
@@ -184,9 +198,10 @@ async function getBankingData(): Promise<BankingData> {
     const { data: itemRows, error: itemError } = await supabaseAdmin
       .from("admin_plaid_items")
       .select(
-        "item_id, institution_name, plaid_environment, transactions_last_synced_at, created_at",
+        "item_id, institution_name, plaid_environment, transactions_last_synced_at, created_at, updated_at",
       )
       .eq("user_id", userId)
+      .eq("plaid_environment", currentEnvironment)
       .in("item_id", itemIds)
       .order("created_at", { ascending: false });
 
@@ -242,12 +257,19 @@ async function getBankingData(): Promise<BankingData> {
       .sort()
       .reverse()[0] || null;
 
+  const plaidEnvironment =
+    items.find((item) => item.plaid_environment)?.plaid_environment ||
+    accounts.find((account) => account.plaid_environment)?.plaid_environment ||
+    currentEnvironment ||
+    "unknown";
+
   return {
     accounts,
     items,
     transactions,
     totalTransactions,
     lastSyncedAt,
+    plaidEnvironment,
   };
 }
 
@@ -258,15 +280,17 @@ export default async function AdminPlaidFinancialsPage({
   const errorMessage = getMessageText(params?.error);
   const statusMessage = getMessageText(params?.status);
 
-  const { accounts, items, transactions, totalTransactions, lastSyncedAt } =
-    await getBankingData();
+  const {
+    accounts,
+    items,
+    transactions,
+    totalTransactions,
+    lastSyncedAt,
+    plaidEnvironment,
+  } = await getBankingData();
 
-  const checkingAccount = accounts.find(
-    (account) => account.subtype === "checking",
-  );
-  const savingsAccount = accounts.find(
-    (account) => account.subtype === "savings",
-  );
+  const checkingAccount = accounts.find((account) => account.subtype === "checking");
+  const savingsAccount = accounts.find((account) => account.subtype === "savings");
 
   const totalCurrentBalance = accounts.reduce(
     (total, account) => total + Number(account.current_balance || 0),
@@ -277,6 +301,8 @@ export default async function AdminPlaidFinancialsPage({
     (total, account) => total + Number(account.available_balance || 0),
     0,
   );
+
+  const hasProductionConnection = plaidEnvironment === "production";
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -310,29 +336,43 @@ export default async function AdminPlaidFinancialsPage({
             </Link>
 
             <Link
-              href="/api/plaid/start"
+              href="/api/plaid/update-mode"
               className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
             >
-              Open Plaid Secure Link
+              Authorize Transactions
             </Link>
           </div>
         </div>
 
         <section className="mb-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-            NFCU Business Banking Active
-          </p>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                NFCU Business Banking Active
+              </p>
 
-          <p className="mt-2 text-sm font-bold leading-6 text-emerald-950">
-            SitGuru is connected to NFCU Business Checking and Business Savings.
-            Personal and test accounts have been removed from the active banking
-            view.
-          </p>
+              <p className="mt-2 text-sm font-bold leading-6 text-emerald-950">
+                SitGuru is connected to NFCU Business Checking and Business
+                Savings. Personal and test accounts have been removed from the
+                active banking view.
+              </p>
+            </div>
+
+            <span
+              className={`inline-flex w-fit rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ${
+                hasProductionConnection
+                  ? "border-emerald-300 bg-white text-emerald-800"
+                  : "border-amber-300 bg-amber-50 text-amber-800"
+              }`}
+            >
+              {hasProductionConnection ? "Production Connected" : "Review Plaid Mode"}
+            </span>
+          </div>
 
           <div className="mt-4 grid gap-3 text-xs font-bold text-slate-700 md:grid-cols-4">
             <div className="rounded-2xl border border-emerald-200 bg-white p-3">
               <p className="text-slate-500">Plaid Mode</p>
-              <p className="mt-1 text-slate-950">Development</p>
+              <p className="mt-1 text-slate-950">{titleCase(plaidEnvironment)}</p>
             </div>
 
             <div className="rounded-2xl border border-emerald-200 bg-white p-3">
@@ -347,15 +387,13 @@ export default async function AdminPlaidFinancialsPage({
 
             <div className="rounded-2xl border border-emerald-200 bg-white p-3">
               <p className="text-slate-500">Last Sync</p>
-              <p className="mt-1 text-slate-950">
-                {formatDateTime(lastSyncedAt)}
-              </p>
+              <p className="mt-1 text-slate-950">{formatDateTime(lastSyncedAt)}</p>
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
-              href="/api/plaid/create-link-token"
+              href="/api/plaid/link-token"
               className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
             >
               Test Link Token JSON
@@ -597,9 +635,7 @@ export default async function AdminPlaidFinancialsPage({
                             transaction.is_excluded_from_reports
                           }
                           reviewStatus={transaction.review_status}
-                          manuallyCategorized={
-                            transaction.manually_categorized
-                          }
+                          manuallyCategorized={transaction.manually_categorized}
                         />
                       </td>
 
@@ -641,8 +677,10 @@ export default async function AdminPlaidFinancialsPage({
               </p>
 
               <p className="mx-auto mt-2 max-w-lg text-sm font-semibold leading-6 text-slate-600">
-                Click “Sync Transactions” to pull the latest NFCU Business
-                Checking and Business Savings transactions into SitGuru.
+                Click “Authorize Transactions” first if Plaid says additional
+                consent is required. Then click “Sync Transactions” to pull the
+                latest NFCU Business Checking and Business Savings activity into
+                SitGuru.
               </p>
             </div>
           )}
