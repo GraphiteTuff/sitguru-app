@@ -679,21 +679,21 @@ function HeroVisual() {
       <img
         src={heroImagePath}
         alt=""
-        className="absolute right-[-142px] top-[54px] h-[360px] w-[485px] max-w-none object-cover object-center opacity-100 sm:right-[-88px] sm:top-[38px] sm:h-[470px] sm:w-[620px] lg:right-[24%] lg:top-[20px] lg:h-[585px] lg:w-[680px] xl:right-[25%] xl:top-[12px] xl:h-[640px] xl:w-[740px] 2xl:right-[26%]"
+        className="absolute right-[-190px] top-[54px] h-[360px] w-[570px] max-w-none object-cover object-center opacity-100 sm:right-[-150px] sm:top-[38px] sm:h-[470px] sm:w-[720px] lg:right-[13%] lg:top-[20px] lg:h-[585px] lg:w-[860px] xl:right-[14%] xl:top-[12px] xl:h-[640px] xl:w-[920px] 2xl:right-[15%]"
         style={{
           WebkitMaskImage:
-            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 12%, rgba(0,0,0,0.45) 27%, rgba(0,0,0,0.82) 43%, black 62%, black 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
+            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 8%, rgba(0,0,0,0.5) 20%, rgba(0,0,0,0.9) 36%, black 56%, rgba(0,0,0,0.92) 72%, rgba(0,0,0,0.5) 88%, transparent 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
           maskImage:
-            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 12%, rgba(0,0,0,0.45) 27%, rgba(0,0,0,0.82) 43%, black 62%, black 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
+            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 8%, rgba(0,0,0,0.5) 20%, rgba(0,0,0,0.9) 36%, black 56%, rgba(0,0,0,0.92) 72%, rgba(0,0,0,0.5) 88%, transparent 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
           WebkitMaskComposite: "source-in",
           maskComposite: "intersect",
         }}
         loading="eager"
       />
 
-      <div className="absolute inset-y-0 left-0 w-[60%] bg-gradient-to-r from-white via-white/78 to-white/10" />
-      <div className="absolute inset-y-0 left-[36%] w-[24%] bg-gradient-to-r from-white/24 via-white/8 to-transparent blur-3xl" />
-      <div className="absolute inset-y-0 right-0 w-[18%] bg-gradient-to-l from-emerald-50/62 via-emerald-50/18 to-transparent" />
+      <div className="absolute inset-y-0 left-0 w-[62%] bg-gradient-to-r from-white via-white/76 to-white/0" />
+      <div className="absolute inset-y-0 left-[36%] w-[28%] bg-gradient-to-r from-white/30 via-white/12 to-transparent blur-3xl" />
+      <div className="absolute inset-y-0 right-0 w-[32%] bg-gradient-to-l from-emerald-50/70 via-emerald-50/18 to-transparent" />
       <div className="absolute inset-x-0 top-0 h-[16%] bg-gradient-to-b from-white/76 via-white/28 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 h-[34%] bg-gradient-to-t from-emerald-50/82 via-white/8 to-transparent" />
     </div>
