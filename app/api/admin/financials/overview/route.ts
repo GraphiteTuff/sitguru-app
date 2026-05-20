@@ -81,6 +81,19 @@ type ManagementAlert = {
 };
 
 type PlaidBankingSummary = {
+  connectedBusinessAccounts: number;
+  businessCheckingAccounts: number;
+  businessSavingsAccounts: number;
+  currentCashBalance: number;
+  availableCashBalance: number;
+  postedTransactions: number;
+  pendingTransactions: number;
+  needsReviewTransactions: number;
+  manualCategorizedTransactions: number;
+  uncategorizedTransactions: number;
+  businessOnlyFeed: boolean;
+  lastSyncedAt: string | null;
+
   businessAccountCount: number;
   checkingCount: number;
   savingsCount: number;
@@ -102,7 +115,6 @@ type PlaidBankingSummary = {
   cashIn: number;
   cashOut: number;
   netCashFlow: number;
-  lastSyncedAt: string | null;
   status: "ready" | "needs_review" | "not_connected";
   message: string;
 };
@@ -334,7 +346,11 @@ function isInsideDateWindow(
   return true;
 }
 
-function getRangeWindow(range: string, explicitStart: string | null, explicitEnd: string | null) {
+function getRangeWindow(
+  range: string,
+  explicitStart: string | null,
+  explicitEnd: string | null,
+) {
   if (explicitStart || explicitEnd) {
     return {
       startDate: explicitStart,
@@ -344,11 +360,19 @@ function getRangeWindow(range: string, explicitStart: string | null, explicitEnd
 
   const now = new Date();
   const endDate = now.toISOString().slice(0, 10);
+  const start = new Date(now);
 
   if (range === "all") {
     return {
       startDate: null,
       endDate: null,
+    };
+  }
+
+  if (range === "today") {
+    return {
+      startDate: endDate,
+      endDate,
     };
   }
 
@@ -359,19 +383,15 @@ function getRangeWindow(range: string, explicitStart: string | null, explicitEnd
     };
   }
 
-  const days =
-    range === "7d"
-      ? 7
-      : range === "30d"
-        ? 30
-        : range === "90d"
-          ? 90
-          : range === "12m"
-            ? 365
-            : 30;
-
-  const start = new Date(now);
-  start.setDate(start.getDate() - days);
+  if (range === "week" || range === "7d") {
+    start.setDate(now.getDate() - 7);
+  } else if (range === "quarter" || range === "90d") {
+    start.setMonth(now.getMonth() - 3);
+  } else if (range === "annual" || range === "12m") {
+    start.setFullYear(now.getFullYear() - 1);
+  } else {
+    start.setMonth(now.getMonth() - 1);
+  }
 
   return {
     startDate: start.toISOString().slice(0, 10),
@@ -385,10 +405,21 @@ function monthsBack(count: number) {
 
   for (let index = count - 1; index >= 0; index -= 1) {
     const month = new Date(now.getFullYear(), now.getMonth() - index, 1);
-    const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59, 999);
+    const end = new Date(
+      month.getFullYear(),
+      month.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
 
     rows.push({
-      key: `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`,
+      key: `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}`,
       label: month.toLocaleDateString("en-US", {
         month: "short",
         year: "2-digit",
@@ -552,47 +583,8 @@ function isArchivedRow(row: AnyRow) {
   );
 }
 
-function getTrustSafetyRemainingBalance(row: AnyRow) {
-  const paymentStatus = getStatus(row);
-  const repaymentStatus = asTrimmedString(row.repayment_status).toLowerCase();
-
-  if (
-    ["canceled", "cancelled", "refunded", "voided", "failed"].includes(paymentStatus) ||
-    repaymentStatus === "canceled"
-  ) {
-    return 0;
-  }
-
-  return Math.max(0, centsToDollars(row.remaining_balance_cents));
-}
-
-function getMonthLabel(value: string) {
-  const date = parseDate(value);
-
-  if (!date) return "";
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    year: "2-digit",
-  });
-}
-
-function widthClassFor(value: number, max: number) {
-  if (max <= 0) return "w-[5%]";
-
-  const percent = Math.max(5, Math.min(100, Math.round((value / max) * 100)));
-
-  if (percent >= 95) return "w-full";
-  if (percent >= 85) return "w-11/12";
-  if (percent >= 75) return "w-10/12";
-  if (percent >= 65) return "w-9/12";
-  if (percent >= 55) return "w-8/12";
-  if (percent >= 45) return "w-7/12";
-  if (percent >= 35) return "w-6/12";
-  if (percent >= 25) return "w-5/12";
-  if (percent >= 15) return "w-4/12";
-
-  return "w-3/12";
+function getPlaidEnvironment() {
+  return process.env.PLAID_ENV?.trim() || "production";
 }
 
 function getEnvAdminEmails() {
@@ -710,9 +702,7 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
     profile.is_active === undefined
       ? true
       : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
+  const explicitFinanceAccess = getOptionalBoolean(profile.can_access_financials);
   const envAllowed = envAdminEmails.includes(userEmail);
 
   return {
@@ -722,6 +712,46 @@ async function getAdminIdentity(): Promise<AdminIdentity | null> {
     canAccessFinancials:
       active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
   };
+}
+
+function getNewestProductionItemIds(items: AnyRow[]) {
+  const currentEnvironment = getPlaidEnvironment();
+
+  const productionItems = items
+    .filter(
+      (item) =>
+        asTrimmedString(item.plaid_environment) === currentEnvironment ||
+        (!asTrimmedString(item.plaid_environment) &&
+          currentEnvironment === "production"),
+    )
+    .sort((a, b) => {
+      const aDate = parseDate(asTrimmedString(a.created_at))?.getTime() || 0;
+      const bDate = parseDate(asTrimmedString(b.created_at))?.getTime() || 0;
+      return bDate - aDate;
+    });
+
+  const newestItemId = asTrimmedString(productionItems[0]?.item_id);
+
+  return newestItemId ? new Set([newestItemId]) : new Set<string>();
+}
+
+function getActiveBusinessAccounts(accounts: AnyRow[], items: AnyRow[]) {
+  const currentEnvironment = getPlaidEnvironment();
+  const activeItemIds = getNewestProductionItemIds(items);
+
+  return accounts
+    .filter(
+      (account) =>
+        asTrimmedString(account.plaid_environment) === currentEnvironment ||
+        (!asTrimmedString(account.plaid_environment) &&
+          currentEnvironment === "production"),
+    )
+    .filter((account) =>
+      activeItemIds.size
+        ? activeItemIds.has(asTrimmedString(account.item_id))
+        : true,
+    )
+    .filter(isBusinessCheckingOrSavings);
 }
 
 function buildPlaidBankingSummary({
@@ -737,24 +767,35 @@ function buildPlaidBankingSummary({
   startDate: string | null;
   endDate: string | null;
 }): PlaidBankingSummary {
-  const businessAccounts = accounts.filter(isBusinessCheckingOrSavings);
+  const businessAccounts = getActiveBusinessAccounts(accounts, items);
   const allowedAccountIds = new Set(
     businessAccounts
       .map((account) => asTrimmedString(account.account_id))
       .filter(Boolean),
   );
 
+  const activeItemIds = new Set(
+    businessAccounts.map((account) => asTrimmedString(account.item_id)).filter(Boolean),
+  );
+
   const businessTransactions = transactions
     .filter((transaction) =>
       allowedAccountIds.has(asTrimmedString(transaction.account_id)),
+    )
+    .filter((transaction) =>
+      activeItemIds.size
+        ? activeItemIds.has(asTrimmedString(transaction.item_id))
+        : true,
     )
     .filter((transaction) => !transaction.removed_at)
     .filter((transaction) => isInsideDateWindow(transaction, startDate, endDate));
 
   const reportableTransactions = businessTransactions.filter(isReportableTransaction);
+
   const postedRows = businessTransactions.filter(
     (transaction) => !getOptionalBoolean(transaction.pending),
   ).length;
+
   const pendingRows = businessTransactions.filter((transaction) =>
     getOptionalBoolean(transaction.pending),
   ).length;
@@ -820,6 +861,9 @@ function buildPlaidBankingSummary({
     .reduce((sum, amount) => sum + Math.abs(amount), 0);
 
   const itemSyncedDates = items
+    .filter((item) =>
+      activeItemIds.size ? activeItemIds.has(asTrimmedString(item.item_id)) : true,
+    )
     .map((item) => asTrimmedString(item.transactions_last_synced_at))
     .filter(Boolean)
     .sort();
@@ -849,7 +893,22 @@ function buildPlaidBankingSummary({
         ? "NFCU business banking is connected, but some rows still need category review."
         : "NFCU Business Checking and Business Savings are connected and reporting.";
 
+  const netCashFlow = cashIn - cashOut;
+
   return {
+    connectedBusinessAccounts: businessAccounts.length,
+    businessCheckingAccounts: checkingCount,
+    businessSavingsAccounts: savingsCount,
+    currentCashBalance: currentCash,
+    availableCashBalance: availableCash,
+    postedTransactions: postedRows,
+    pendingTransactions: pendingRows,
+    needsReviewTransactions: needsReviewRows,
+    manualCategorizedTransactions: manualCategorizedRows,
+    uncategorizedTransactions: uncategorizedRows,
+    businessOnlyFeed: true,
+    lastSyncedAt,
+
     businessAccountCount: businessAccounts.length,
     checkingCount,
     savingsCount,
@@ -870,8 +929,7 @@ function buildPlaidBankingSummary({
     transfers,
     cashIn,
     cashOut,
-    netCashFlow: cashIn - cashOut,
-    lastSyncedAt,
+    netCashFlow,
     status,
     message,
   };
@@ -922,8 +980,8 @@ function buildRevenueTrend({
     return {
       label: month.label,
       platformRevenue:
-        plaidRevenue ||
-        paymentMonthRows.reduce((sum, row) => sum + getNetAmount(row), 0),
+        paymentMonthRows.reduce((sum, row) => sum + getNetAmount(row), 0) ||
+        plaidRevenue,
       grossBookings: bookingGross || paymentGross || plaidRevenue,
     };
   });
@@ -962,7 +1020,9 @@ function buildExpenseTrend({
 
     return {
       month: month.label,
-      payouts: payoutRows.filter(inMonth).reduce((sum, row) => sum + getPayoutAmount(row), 0),
+      payouts: payoutRows
+        .filter(inMonth)
+        .reduce((sum, row) => sum + getPayoutAmount(row), 0),
       commissions: commissionRows
         .filter(inMonth)
         .reduce((sum, row) => sum + getCommissionAmount(row), 0),
@@ -977,13 +1037,24 @@ function buildExpenseTrend({
 function buildPayoutStatus(rows: AnyRow[]): PayoutStatus {
   const paid = rows.filter((row) => {
     const status = getStatus(row);
-    return status.includes("paid") || status.includes("complete") || status.includes("succeeded");
+    return (
+      status.includes("paid") ||
+      status.includes("complete") ||
+      status.includes("succeeded")
+    );
   }).length;
 
-  const processing = rows.filter((row) => getStatus(row).includes("processing")).length;
+  const processing = rows.filter((row) =>
+    getStatus(row).includes("processing"),
+  ).length;
+
   const pending = rows.filter((row) => {
     const status = getStatus(row);
-    return status.includes("pending") || status.includes("queued") || status.includes("ready");
+    return (
+      status.includes("pending") ||
+      status.includes("queued") ||
+      status.includes("ready")
+    );
   }).length;
 
   return {
@@ -997,13 +1068,24 @@ function buildPayoutStatus(rows: AnyRow[]): PayoutStatus {
 function buildCommissionStatus(rows: AnyRow[]): CommissionStatus {
   const paid = rows.filter((row) => {
     const status = getStatus(row);
-    return status.includes("paid") || status.includes("complete") || status.includes("succeeded");
+    return (
+      status.includes("paid") ||
+      status.includes("complete") ||
+      status.includes("succeeded")
+    );
   }).length;
 
-  const processing = rows.filter((row) => getStatus(row).includes("processing")).length;
+  const processing = rows.filter((row) =>
+    getStatus(row).includes("processing"),
+  ).length;
+
   const pending = rows.filter((row) => {
     const status = getStatus(row);
-    return status.includes("pending") || status.includes("queued") || status.includes("ready");
+    return (
+      status.includes("pending") ||
+      status.includes("queued") ||
+      status.includes("ready")
+    );
   }).length;
 
   return {
@@ -1130,11 +1212,12 @@ export async function GET(request: Request) {
     );
   }
 
-  const range = getSearchParam(request.url, "range", "30d");
+  const range = getSearchParam(request.url, "range", "month");
   const segment = getSearchParam(request.url, "segment", "all");
   const explicitStart = getDateOrNull(getSearchParam(request.url, "startDate"));
   const explicitEnd = getDateOrNull(getSearchParam(request.url, "endDate"));
   const { startDate, endDate } = getRangeWindow(range, explicitStart, explicitEnd);
+  const plaidEnvironment = getPlaidEnvironment();
 
   const [
     sourceHealth,
@@ -1160,31 +1243,40 @@ export async function GET(request: Request) {
     bookingDeductions,
   ] = await Promise.all([
     Promise.all(TABLE_NAMES.map(checkSource)),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("admin_plaid_accounts")
         .select("*")
+        .eq("user_id", actor.id)
+        .eq("plaid_environment", plaidEnvironment)
         .order("created_at", { ascending: false })
         .limit(1000),
       "admin_plaid_accounts",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("admin_plaid_transactions")
         .select("*")
+        .eq("user_id", actor.id)
         .is("removed_at", null)
         .order("date", { ascending: false })
         .limit(10000),
       "admin_plaid_transactions",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("admin_plaid_items")
         .select("*")
+        .eq("user_id", actor.id)
+        .eq("plaid_environment", plaidEnvironment)
         .order("created_at", { ascending: false })
         .limit(1000),
       "admin_plaid_items",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("bookings")
@@ -1193,6 +1285,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "bookings",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("customer_bookings")
@@ -1201,6 +1294,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "customer_bookings",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("payments")
@@ -1209,6 +1303,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "payments",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("stripe_transactions")
@@ -1217,6 +1312,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "stripe_transactions",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("stripe_balance_transactions")
@@ -1225,6 +1321,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "stripe_balance_transactions",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("expense_ledger")
@@ -1233,6 +1330,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "expense_ledger",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("cash_flow_lines")
@@ -1241,6 +1339,7 @@ export async function GET(request: Request) {
         .limit(1000),
       "cash_flow_lines",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("balance_sheet_lines")
@@ -1249,6 +1348,7 @@ export async function GET(request: Request) {
         .limit(1000),
       "balance_sheet_lines",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("financial_statement_lines")
@@ -1257,6 +1357,7 @@ export async function GET(request: Request) {
         .limit(1000),
       "financial_statement_lines",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("guru_payouts")
@@ -1265,6 +1366,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "guru_payouts",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("payouts")
@@ -1273,6 +1375,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "payouts",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("commissions")
@@ -1281,6 +1384,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "commissions",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("partner_commissions")
@@ -1289,6 +1393,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "partner_commissions",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("proforma_assumptions")
@@ -1297,6 +1402,7 @@ export async function GET(request: Request) {
         .limit(1000),
       "proforma_assumptions",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("guru_trust_safety_plan_purchases")
@@ -1305,6 +1411,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "guru_trust_safety_plan_purchases",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("trust_safety_financial_events")
@@ -1313,6 +1420,7 @@ export async function GET(request: Request) {
         .limit(5000),
       "trust_safety_financial_events",
     ),
+
     safeRows<AnyRow>(
       supabaseAdmin
         .from("booking_trust_safety_deductions")
@@ -1323,24 +1431,28 @@ export async function GET(request: Request) {
     ),
   ]);
 
-  const bookingRows = [...bookingRowsA, ...bookingRowsB]
-    .filter((row) => !isArchivedRow(row))
-    .filter((row) => isInsideDateWindow(row, startDate, endDate));
+  const bookingRows = [...bookingRowsA, ...bookingRowsB].filter(
+    (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
+  );
 
-  const activePaymentRows = paymentRows
-    .filter((row) => !isArchivedRow(row))
-    .filter((row) => isInsideDateWindow(row, startDate, endDate));
+  const filteredPaymentRows = paymentRows.filter(
+    (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
+  );
 
-  const activeExpenseRows = expenseRows
-    .filter((row) => !isArchivedRow(row))
-    .filter((row) => isInsideDateWindow(row, startDate, endDate));
+  const filteredStripeRows = [...stripeRows, ...stripeBalanceRows].filter(
+    (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
+  );
 
-  const activeCashFlowLines = cashFlowLines.filter((row) => !isArchivedRow(row));
-  const activeBalanceSheetLines = balanceSheetLines.filter((row) => !isArchivedRow(row));
-  const activeStatementLines = statementLines.filter((row) => !isArchivedRow(row));
-  const activeProformaRows = proformaRows.filter((row) => !isArchivedRow(row));
-  const activeTrustSafetyPurchases = trustSafetyPurchases.filter(
-    (row) => !isArchivedRow(row),
+  const filteredExpenseRows = expenseRows.filter(
+    (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
+  );
+
+  const payoutRows = [...payoutRowsA, ...payoutRowsB].filter(
+    (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
+  );
+
+  const commissionRows = [...commissionRowsA, ...commissionRowsB].filter(
+    (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
   );
 
   const plaidBanking = buildPlaidBankingSummary({
@@ -1351,234 +1463,321 @@ export async function GET(request: Request) {
     endDate,
   });
 
-  const businessAccounts = plaidAccounts.filter(isBusinessCheckingOrSavings);
-  const allowedAccountIds = new Set(
-    businessAccounts
-      .map((account) => asTrimmedString(account.account_id))
-      .filter(Boolean),
+  const activeBusinessAccounts = getActiveBusinessAccounts(plaidAccounts, plaidItems);
+  const activeAccountIds = new Set(
+    activeBusinessAccounts.map((account) => asTrimmedString(account.account_id)),
   );
 
-  const businessTransactions = plaidTransactions
-    .filter((transaction) =>
-      allowedAccountIds.has(asTrimmedString(transaction.account_id)),
-    )
+  const activeBusinessTransactions = plaidTransactions
+    .filter((transaction) => activeAccountIds.has(asTrimmedString(transaction.account_id)))
     .filter((transaction) => !transaction.removed_at)
     .filter((transaction) => isInsideDateWindow(transaction, startDate, endDate));
 
-  const reportableBusinessTransactions = businessTransactions.filter(
-    isReportableTransaction,
-  );
+  const grossBookings =
+    bookingRows.reduce((sum, row) => sum + getGrossAmount(row), 0) ||
+    filteredPaymentRows.reduce((sum, row) => sum + getGrossAmount(row), 0);
 
-  const manualExpenseTotal = activeExpenseRows.reduce(
-    (sum, row) => sum + getManualExpenseAmount(row),
+  const platformRevenue =
+    filteredPaymentRows.reduce((sum, row) => sum + getNetAmount(row), 0) ||
+    plaidBanking.revenue;
+
+  const guruPayouts = payoutRows.reduce(
+    (sum, row) => sum + getPayoutAmount(row),
     0,
   );
 
-  const grossBookings =
-    bookingRows.reduce((sum, row) => sum + getGrossAmount(row), 0) ||
-    activePaymentRows.reduce((sum, row) => sum + getGrossAmount(row), 0) ||
-    plaidBanking.revenue;
-
-  const platformRevenue =
-    activePaymentRows.reduce((sum, row) => sum + getNetAmount(row), 0) ||
-    plaidBanking.revenue;
-
-  const bankExpenseTotal = plaidBanking.expenses;
-  const totalExpenses = bankExpenseTotal + manualExpenseTotal;
-
-  const payoutRows = [...payoutRowsA, ...payoutRowsB]
-    .filter((row) => !isArchivedRow(row))
-    .filter((row) => isInsideDateWindow(row, startDate, endDate));
-
-  const commissionRows = [...commissionRowsA, ...commissionRowsB]
-    .filter((row) => !isArchivedRow(row))
-    .filter((row) => isInsideDateWindow(row, startDate, endDate));
-
-  const payoutTotal = payoutRows.reduce((sum, row) => sum + getPayoutAmount(row), 0);
-  const commissionTotal = commissionRows.reduce(
+  const partnerCommissions = commissionRows.reduce(
     (sum, row) => sum + getCommissionAmount(row),
     0,
   );
 
-  const stripeFees =
-    stripeBalanceRows
-      .filter((row) => isInsideDateWindow(row, startDate, endDate))
-      .reduce((sum, row) => sum + Math.abs(toCentsAwareAmount(row.fee)), 0) ||
-    stripeRows
-      .filter((row) => isInsideDateWindow(row, startDate, endDate))
-      .reduce((sum, row) => sum + Math.abs(toCentsAwareAmount(row.fee)), 0);
-
-  const refunds = stripeRows
-    .filter((row) => isInsideDateWindow(row, startDate, endDate))
-    .filter((row) => getStatus(row).includes("refund"))
-    .reduce((sum, row) => sum + Math.abs(toCentsAwareAmount(row.amount)), 0);
-
-  const netIncome =
-    platformRevenue - totalExpenses - payoutTotal - commissionTotal - stripeFees - refunds;
-
-  const trustSafetyReceivables = activeTrustSafetyPurchases.reduce(
-    (sum, row) => sum + getTrustSafetyRemainingBalance(row),
+  const stripeFees = filteredStripeRows.reduce(
+    (sum, row) =>
+      sum +
+      Math.abs(
+        toCentsAwareAmount(row.fee) ||
+          toCentsAwareAmount(row.stripe_fee) ||
+          toCentsAwareAmount(row.fee_amount),
+      ),
     0,
   );
 
-  const manualRows =
-    activeExpenseRows.length +
-    activeCashFlowLines.length +
-    activeBalanceSheetLines.length +
-    activeStatementLines.length;
+  const refundsAndChargebacks =
+    filteredStripeRows
+      .filter((row) => {
+        const status = getStatus(row);
+        const description = `${getString(row, [
+          "description",
+          "type",
+          "reporting_category",
+        ])}`.toLowerCase();
 
-  const reconciliationIssues =
-    plaidBanking.needsReviewRows +
-    plaidBanking.uncategorizedRows +
-    Math.round(plaidBanking.pendingRows / 2);
-
-  const reconciliationScore =
-    plaidBanking.transactionRows === 0
-      ? 0
-      : Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round(100 - (reconciliationIssues / plaidBanking.transactionRows) * 100),
-          ),
+        return (
+          status.includes("refund") ||
+          status.includes("chargeback") ||
+          description.includes("refund") ||
+          description.includes("chargeback") ||
+          description.includes("dispute")
         );
+      })
+      .reduce((sum, row) => sum + Math.abs(toCentsAwareAmount(row.amount)), 0) +
+    activeBusinessTransactions
+      .filter((row) => getString(row, ["sitguru_category"]).toLowerCase().includes("refund"))
+      .reduce((sum, row) => sum + getAbsoluteTransactionAmount(row), 0);
 
-  const monthlyBurn = Math.max(totalExpenses + payoutTotal + commissionTotal + stripeFees, 0);
+  const bankOperatingExpenses = plaidBanking.expenses;
+  const manualExpenses = filteredExpenseRows.reduce(
+    (sum, row) => sum + getManualExpenseAmount(row),
+    0,
+  );
+
+  const operatingExpenses = bankOperatingExpenses + manualExpenses;
+  const totalExpenses =
+    guruPayouts +
+    partnerCommissions +
+    stripeFees +
+    refundsAndChargebacks +
+    operatingExpenses;
+
+  const netIncome = platformRevenue - totalExpenses;
+  const netMargin = platformRevenue > 0 ? (netIncome / platformRevenue) * 100 : 0;
+
+  const currentCash = plaidBanking.currentCash;
+  const availableCash = plaidBanking.availableCash;
+  const monthlyBurn = Math.max(0, operatingExpenses + stripeFees + partnerCommissions);
   const cashRunwayMonths =
-    monthlyBurn > 0 ? Math.floor(plaidBanking.currentCash / monthlyBurn) : 0;
-
-  const runwayDate = new Date();
-  runwayDate.setMonth(runwayDate.getMonth() + Math.max(cashRunwayMonths, 0));
-
-  const breakEvenContribution =
-    platformRevenue - totalExpenses - payoutTotal - commissionTotal - stripeFees;
+    monthlyBurn > 0 ? Number((currentCash / monthlyBurn).toFixed(1)) : 0;
 
   const breakEvenPercent =
     BREAK_EVEN_TARGET > 0
-      ? Math.max(0, Math.min(100, (breakEvenContribution / BREAK_EVEN_TARGET) * 100))
+      ? Math.max(
+          0,
+          Math.min(100, Number(((platformRevenue / BREAK_EVEN_TARGET) * 100).toFixed(1))),
+        )
       : 0;
 
-  const revenueTrend = buildRevenueTrend({
-    businessTransactions,
-    bookingRows,
-    paymentRows: activePaymentRows,
-  });
+  const netBookings = Math.max(0, grossBookings - refundsAndChargebacks);
+  const collectedCash = plaidBanking.cashIn || platformRevenue;
+  const payoutAndFees = guruPayouts + partnerCommissions + stripeFees;
+  const netCashRetained = collectedCash - payoutAndFees - operatingExpenses;
 
-  const expenseTrend = buildExpenseTrend({
-    businessTransactions,
-    manualExpenses: activeExpenseRows,
-    payoutRows,
-    commissionRows,
-    stripeRows: [...stripeRows, ...stripeBalanceRows],
-  });
+  const bookingsToCashFunnelValues = [
+    grossBookings,
+    refundsAndChargebacks,
+    netBookings,
+    collectedCash,
+    payoutAndFees,
+    netCashRetained,
+  ];
 
-  const funnelValues = [
+  const funnelMax = Math.max(...bookingsToCashFunnelValues.map(Math.abs), 1);
+
+  const bookingsToCashFunnel: FunnelRow[] = [
     {
       label: "Gross Bookings",
+      value: formatCurrency(grossBookings),
       rawValue: grossBookings,
+      widthClass: widthClassFor(grossBookings, funnelMax),
     },
     {
-      label: "Platform Revenue",
-      rawValue: platformRevenue,
+      label: "Less Cancellations",
+      value: formatCurrency(refundsAndChargebacks),
+      rawValue: refundsAndChargebacks,
+      widthClass: widthClassFor(refundsAndChargebacks, funnelMax),
     },
     {
-      label: "Bank Cash In",
-      rawValue: plaidBanking.cashIn,
+      label: "Net Bookings",
+      value: formatCurrency(netBookings),
+      rawValue: netBookings,
+      widthClass: widthClassFor(netBookings, funnelMax),
     },
     {
-      label: "Net Cash Flow",
-      rawValue: plaidBanking.netCashFlow,
+      label: "Collected Cash",
+      value: formatCurrency(collectedCash),
+      rawValue: collectedCash,
+      widthClass: widthClassFor(collectedCash, funnelMax),
+    },
+    {
+      label: "Payouts & Fees",
+      value: formatCurrency(payoutAndFees),
+      rawValue: payoutAndFees,
+      widthClass: widthClassFor(payoutAndFees, funnelMax),
+    },
+    {
+      label: "Net Cash Retained",
+      value: formatCurrency(netCashRetained),
+      rawValue: netCashRetained,
+      widthClass: widthClassFor(Math.abs(netCashRetained), funnelMax),
     },
   ];
 
-  const maxFunnelValue = Math.max(...funnelValues.map((row) => Math.abs(row.rawValue)), 1);
+  const revenueTrend = buildRevenueTrend({
+    businessTransactions: activeBusinessTransactions,
+    bookingRows,
+    paymentRows: filteredPaymentRows,
+  });
+
+  const expenseTrend = buildExpenseTrend({
+    businessTransactions: activeBusinessTransactions,
+    manualExpenses: filteredExpenseRows,
+    payoutRows,
+    commissionRows,
+    stripeRows: filteredStripeRows,
+  });
 
   const cashFlowByCategory: CashFlowCategory[] = [
     {
-      label: "Bank Cash In",
-      value: plaidBanking.cashIn,
-      displayValue: formatCurrency(plaidBanking.cashIn),
+      label: "Platform Revenue",
+      value: platformRevenue,
+      displayValue: formatCurrency(platformRevenue),
       type: "inflow",
     },
     {
-      label: "Bank Cash Out",
-      value: plaidBanking.cashOut,
-      displayValue: formatCurrency(plaidBanking.cashOut),
+      label: "Owner Contributions",
+      value: plaidBanking.ownerContributions,
+      displayValue: formatCurrency(plaidBanking.ownerContributions),
+      type: "inflow",
+    },
+    {
+      label: "Guru Payouts",
+      value: -guruPayouts,
+      displayValue: `-${formatCurrency(guruPayouts)}`,
       type: "outflow",
     },
     {
-      label: "Manual Expenses",
-      value: manualExpenseTotal,
-      displayValue: formatCurrency(manualExpenseTotal),
+      label: "Partner Commissions",
+      value: -partnerCommissions,
+      displayValue: `-${formatCurrency(partnerCommissions)}`,
+      type: "outflow",
+    },
+    {
+      label: "Stripe Fees",
+      value: -stripeFees,
+      displayValue: `-${formatCurrency(stripeFees)}`,
+      type: "outflow",
+    },
+    {
+      label: "Refunds / Chargebacks",
+      value: -refundsAndChargebacks,
+      displayValue: `-${formatCurrency(refundsAndChargebacks)}`,
+      type: "outflow",
+    },
+    {
+      label: "Operating Expenses",
+      value: -operatingExpenses,
+      displayValue: `-${formatCurrency(operatingExpenses)}`,
       type: "outflow",
     },
     {
       label: "Net Cash Flow",
-      value: plaidBanking.netCashFlow - manualExpenseTotal,
-      displayValue: formatCurrency(plaidBanking.netCashFlow - manualExpenseTotal),
+      value: netCashRetained,
+      displayValue: formatCurrency(netCashRetained),
       type: "net",
     },
   ];
 
-  const kpis: DashboardKpi[] = [
-    {
-      label: "Current Cash",
-      value: formatCurrency(plaidBanking.currentCash),
-      rawValue: plaidBanking.currentCash,
-      change: plaidBanking.lastSyncedAt ? "Live Plaid/NFCU" : "Not synced",
-      helper: "Current balance from NFCU Business Checking and Business Savings.",
-      tone: plaidBanking.currentCash >= 0 ? "green" : "red",
-    },
-    {
-      label: "Available Cash",
-      value: formatCurrency(plaidBanking.availableCash),
-      rawValue: plaidBanking.availableCash,
-      change: `${plaidBanking.businessAccountCount} business accounts`,
-      helper: "Available cash across connected business banking accounts.",
-      tone: plaidBanking.availableCash >= 0 ? "green" : "red",
-    },
-    {
-      label: "Platform Revenue",
-      value: formatCurrency(platformRevenue),
-      rawValue: platformRevenue,
-      change: `${plaidBanking.postedRows.toLocaleString()} posted bank rows`,
-      helper: "Reviewed income activity from Plaid/NFCU and payment records.",
-      tone: "green",
-    },
-    {
-      label: "Total Expenses",
-      value: formatCurrency(totalExpenses),
-      rawValue: totalExpenses,
-      change: `${activeExpenseRows.length.toLocaleString()} manual expense rows`,
-      helper: "Bank expenses plus manual expense ledger rows.",
-      tone: totalExpenses > 0 ? "red" : "green",
-    },
-    {
-      label: "Net Income",
-      value: formatCurrency(netIncome),
-      rawValue: netIncome,
-      change: netIncome >= 0 ? "Positive" : "Loss",
-      helper: "Estimated from revenue minus bank, manual, payout, commission, fee, and refund costs.",
-      tone: netIncome >= 0 ? "green" : "red",
-    },
-    {
-      label: "Needs Review",
-      value: plaidBanking.needsReviewRows.toLocaleString(),
-      rawValue: plaidBanking.needsReviewRows,
-      change: `${plaidBanking.uncategorizedRows.toLocaleString()} uncategorized`,
-      helper: "Bank transactions still needing category or report review.",
-      tone: plaidBanking.needsReviewRows ? "red" : "green",
-    },
-  ];
+  const reconciliationScore =
+    plaidBanking.transactionRows === 0
+      ? 0
+      : Math.round(
+          ((plaidBanking.manualCategorizedRows + plaidBanking.autoCategorizedRows) /
+            plaidBanking.transactionRows) *
+            100,
+        );
 
   const managementAlerts = buildManagementAlerts({
     plaidBanking,
-    manualRows,
-    proformaRows: activeProformaRows.length,
+    manualRows:
+      filteredExpenseRows.length +
+      cashFlowLines.length +
+      balanceSheetLines.length +
+      statementLines.length,
+    proformaRows: proformaRows.length,
     reconciliationScore,
     netIncome,
     cashRunwayMonths,
   });
+
+  const trustSafetyRevenue =
+    trustSafetyPurchases.reduce(
+      (sum, row) => sum + centsToDollars(row.amount_paid_cents),
+      0,
+    ) +
+    trustSafetyEvents.reduce(
+      (sum, row) => sum + toCentsAwareAmount(row.amount),
+      0,
+    ) +
+    bookingDeductions.reduce(
+      (sum, row) => sum + centsToDollars(row.amount_cents),
+      0,
+    );
+
+  const kpis: DashboardKpi[] = [
+    {
+      label: "Gross Bookings",
+      value: formatCurrency(grossBookings),
+      rawValue: grossBookings,
+      change: "Live",
+      helper: "bookings/payments",
+      tone: "green",
+    },
+    {
+      label: "Platform Revenue",
+      value: formatCurrency(platformRevenue + trustSafetyRevenue),
+      rawValue: platformRevenue + trustSafetyRevenue,
+      change: "Live",
+      helper: "payments/banking",
+      tone: "green",
+    },
+    {
+      label: "Guru Payouts",
+      value: formatCurrency(guruPayouts),
+      rawValue: guruPayouts,
+      change: "Live",
+      helper: "payout rows",
+      tone: "green",
+    },
+    {
+      label: "Partner Commissions",
+      value: formatCurrency(partnerCommissions),
+      rawValue: partnerCommissions,
+      change: "Live",
+      helper: "commission rows",
+      tone: "blue",
+    },
+    {
+      label: "Stripe Fees",
+      value: formatCurrency(stripeFees),
+      rawValue: stripeFees,
+      change: "Live",
+      helper: "Stripe tables",
+      tone: "blue",
+    },
+    {
+      label: "Refunds / Chargebacks",
+      value: formatCurrency(refundsAndChargebacks),
+      rawValue: refundsAndChargebacks,
+      change: "Live",
+      helper: "Stripe/banking",
+      tone: refundsAndChargebacks > 0 ? "red" : "green",
+    },
+    {
+      label: "Net Margin",
+      value: formatPercent(netMargin),
+      rawValue: netMargin,
+      change: "Live",
+      helper: "calculated",
+      tone: netMargin < 0 ? "red" : "green",
+    },
+    {
+      label: "Cash Balance",
+      value: formatCurrency(currentCash),
+      rawValue: currentCash,
+      change: "Live",
+      helper: "NFCU/Plaid",
+      tone: currentCash < 0 ? "red" : "green",
+    },
+  ];
 
   const response: FinancialOverviewResponse = {
     ok: true,
@@ -1594,31 +1793,29 @@ export async function GET(request: Request) {
     plaidBanking,
     kpis,
     breakEven: {
-      percent: Number(formatPercent(breakEvenPercent).replace("%", "")),
+      percent: breakEvenPercent,
       target: BREAK_EVEN_TARGET,
-      currentContribution: breakEvenContribution,
-      remaining: Math.max(0, BREAK_EVEN_TARGET - breakEvenContribution),
+      currentContribution: platformRevenue,
+      remaining: Math.max(0, BREAK_EVEN_TARGET - platformRevenue),
       runwayMonths: cashRunwayMonths,
     },
-    bookingsToCashFunnel: funnelValues.map((row) => ({
-      label: row.label,
-      value: formatCurrency(row.rawValue),
-      rawValue: row.rawValue,
-      widthClass: widthClassFor(Math.abs(row.rawValue), maxFunnelValue),
-    })),
+    bookingsToCashFunnel,
     guruPayoutStatus: buildPayoutStatus(payoutRows),
     partnerCommissionStatus: buildCommissionStatus(commissionRows),
     cashRunway: {
       months: cashRunwayMonths,
-      cashBalance: plaidBanking.currentCash,
+      cashBalance: currentCash,
       monthlyBurn,
       runwayEndLabel:
         cashRunwayMonths > 0
-          ? runwayDate.toLocaleDateString("en-US", {
+          ? new Date(
+              Date.now() + cashRunwayMonths * 30 * 24 * 60 * 60 * 1000,
+            ).toLocaleDateString("en-US", {
               month: "short",
+              day: "numeric",
               year: "numeric",
             })
-          : "Not available",
+          : "Unavailable",
     },
     revenueTrend,
     expenseTrend,
