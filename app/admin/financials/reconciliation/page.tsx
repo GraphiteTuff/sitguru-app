@@ -799,7 +799,7 @@ function bookingToStripeItem(row: GenericRow, index: number): ReconciliationItem
 
   return {
     id: `booking-stripe-${reference}`,
-    source: "Booking Stripe Payment",
+    source: "Booking Payment Match Candidate",
     label:
       asTrimmedString(row.customer_name) ||
       asTrimmedString(row.pet_parent_name) ||
@@ -811,10 +811,12 @@ function bookingToStripeItem(row: GenericRow, index: number): ReconciliationItem
     reviewStatus: "recorded",
     date: formatDate(getRowDate(row)),
     reference,
-    category: fee ? `Stripe payment · Fee ${moneyExact(fee)}` : "Stripe payment",
-    issueType: "Stripe booking payment check",
+    category: fee
+      ? `Booking match support · Fee ${moneyExact(fee)}`
+      : "Booking match support",
+    issueType: "Booking payment match support",
     recommendation:
-      "Confirm this booking payment is represented in Stripe activity, payout batches, Plaid/NFCU deposits, P&L, Cash Flow, and General Ledger.",
+      "Use this booking only as matching support. Revenue should come from Stripe/payment tables, while Plaid/NFCU rows confirm deposits and payouts.",
   };
 }
 
@@ -1224,7 +1226,7 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     {
       label: "Stripe / Payment Activity",
       status: stripeItems.length > 0 ? "ready" : "needs_review",
-      detail: `${stripeItems.length.toLocaleString()} Stripe rows are available from bookings, Stripe payouts, Stripe tables, and Plaid/NFCU deposit candidates.`,
+      detail: `${stripeItems.length.toLocaleString()} Stripe rows and booking match candidates are available. Stripe/payment tables remain the source of payment truth; bookings and Plaid/NFCU deposits are matching support.`,
     },
     {
       label: "Trust & Safety Activity",
@@ -1422,9 +1424,9 @@ function ReconciliationChecks({ data }: { data: ReconciliationData }) {
           </h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
             These checks compare bank activity, manual entries, Stripe activity,
-            Trust & Safety rows, Growth & Referrals, reward liabilities, and
-            reporting lines so SitGuru’s financial statements can be reviewed
-            cleanly.
+            Trust & Safety rows, Growth & Referrals, reward liabilities,
+            booking match candidates, Plaid/NFCU deposit support, and reporting
+            lines so SitGuru’s financial statements can be reviewed cleanly.
           </p>
         </div>
 
@@ -1593,7 +1595,7 @@ function ReconciliationFlowPanel() {
   const steps = [
     "Plaid/NFCU bank rows are checked for pending, posted, needs review, excluded, and uncategorized states.",
     "Manual expenses and manual statement lines are checked so they do not accidentally duplicate bank activity.",
-    "Stripe activity is reviewed against expected deposits, refunds, fees, and payment records.",
+    "Stripe/payment tables are reviewed as the source of payment truth, while bookings and Plaid/NFCU bank deposits are used as matching support only.",
     "Trust & Safety and Growth & Referrals are checked against receivables, liabilities, reward payouts, campaign costs, and vendor costs.",
     "Exception queues show what needs cleanup before P&L, Cash Flow, General Ledger, Balance Sheet, and payout review are final.",
   ];
@@ -1637,8 +1639,8 @@ function SourceCoveragePanel({ data }: { data: ReconciliationData }) {
       </h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">
         Missing sources are skipped safely. Row counts help confirm whether bank,
-        Stripe, manual, Trust & Safety, Growth Marketing, and Referral Reward
-        views are feeding this reconciliation pass.
+        Stripe/payment, manual, Trust & Safety, Growth Marketing, Referral Reward,
+        booking match, and Plaid/NFCU deposit support are feeding this reconciliation pass.
       </p>
 
       <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -1703,8 +1705,9 @@ export default async function AdminReconciliationPage() {
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 Review whether NFCU/Plaid bank activity, manual entries, Stripe
-                records, Trust & Safety activity, Growth & Referrals, P&L, Cash
-                Flow, General Ledger, and Balance Sheet support are aligned
+                records, booking match candidates, Plaid/NFCU deposit support,
+                Trust & Safety activity, Growth & Referrals, P&L, Cash Flow,
+                General Ledger, and Balance Sheet support are aligned
                 before financial reports are finalized.
               </p>
             </div>
@@ -1799,7 +1802,7 @@ export default async function AdminReconciliationPage() {
             <StatCard
               label="Stripe Rows"
               value={data.totals.stripeRows.toLocaleString()}
-              detail="Stripe transactions and balance rows available for matching."
+              detail="Stripe/payment rows, payout rows, booking match candidates, and Plaid/NFCU deposit candidates available for reconciliation support."
               tone="sky"
             />
 
@@ -1888,9 +1891,9 @@ export default async function AdminReconciliationPage() {
           <ItemsTable
             eyebrow="Stripe Matching"
             title="Stripe activity"
-            description="Stripe rows should eventually be matched to bank deposits, processing fees, refunds, chargebacks, and payments."
+            description="Stripe/payment rows are the source of payment truth. Booking rows and Plaid/NFCU deposit rows are included here only as match candidates for deposits, payouts, fees, refunds, and chargebacks."
             rows={data.stripeItems}
-            emptyMessage="No Stripe rows found yet."
+            emptyMessage="No Stripe/payment rows or booking match candidates found yet."
           />
 
           <ItemsTable
