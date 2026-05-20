@@ -1,3 +1,4 @@
+import { Products } from "plaid";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -43,6 +44,10 @@ function getPlaidRedirectUri() {
   }
 
   return redirectUri;
+}
+
+function getPlaidEnvironment() {
+  return process.env.PLAID_ENV?.trim() || "production";
 }
 
 function getErrorMessage(error: unknown) {
@@ -99,11 +104,13 @@ async function requireAdminUser() {
 }
 
 async function getNewestPlaidItem(userId: string) {
-  const plaidEnvironment = process.env.PLAID_ENV || "production";
+  const plaidEnvironment = getPlaidEnvironment();
 
   const { data, error } = await supabaseAdmin
     .from("admin_plaid_items")
-    .select("item_id, access_token, institution_name, plaid_environment, created_at")
+    .select(
+      "item_id, access_token, institution_name, plaid_environment, created_at",
+    )
     .eq("user_id", userId)
     .eq("plaid_environment", plaidEnvironment)
     .order("created_at", { ascending: false })
@@ -346,7 +353,7 @@ export async function GET(request: NextRequest) {
       country_codes: getPlaidCountryCodes(),
       language: "en",
       access_token: item.access_token,
-      products: ["transactions"],
+      products: [Products.Transactions],
       ...(redirectUri ? { redirect_uri: redirectUri } : {}),
     });
 
