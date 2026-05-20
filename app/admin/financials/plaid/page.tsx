@@ -3,6 +3,17 @@ import PlaidTransactionCategoryControls from "@/components/admin/PlaidTransactio
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
+type TransactionFilter =
+  | "all"
+  | "needs_review"
+  | "auto_categorized"
+  | "manual"
+  | "pending"
+  | "posted"
+  | "transfers"
+  | "income"
+  | "expenses";
+
 type PlaidAccount = {
   id: string;
   account_id: string;
@@ -55,6 +66,7 @@ type AdminPlaidFinancialsPageProps = {
   searchParams?: Promise<{
     error?: string;
     status?: string;
+    filter?: string;
   }>;
 };
 
@@ -63,9 +75,69 @@ type BankingData = {
   items: PlaidItem[];
   transactions: PlaidTransaction[];
   totalTransactions: number;
+  postedTransactions: number;
+  pendingTransactions: number;
+  needsReviewTransactions: number;
+  autoCategorizedTransactions: number;
+  manualCategorizedTransactions: number;
+  transferTransactions: number;
+  incomeTransactions: number;
+  expenseTransactions: number;
   lastSyncedAt: string | null;
   plaidEnvironment: string;
 };
+
+const transactionFilters: Array<{
+  label: string;
+  value: TransactionFilter;
+  description: string;
+}> = [
+  {
+    label: "All",
+    value: "all",
+    description: "All business banking transactions.",
+  },
+  {
+    label: "Needs Review",
+    value: "needs_review",
+    description: "Uncategorized or review-needed transactions.",
+  },
+  {
+    label: "Auto Categorized",
+    value: "auto_categorized",
+    description: "Transactions categorized by SitGuru rules.",
+  },
+  {
+    label: "Manual",
+    value: "manual",
+    description: "Transactions manually reviewed by admin.",
+  },
+  {
+    label: "Pending",
+    value: "pending",
+    description: "Pending NFCU/Plaid transactions.",
+  },
+  {
+    label: "Posted",
+    value: "posted",
+    description: "Posted NFCU/Plaid transactions.",
+  },
+  {
+    label: "Transfers",
+    value: "transfers",
+    description: "Internal checking/savings transfers.",
+  },
+  {
+    label: "Income",
+    value: "income",
+    description: "Bank transactions categorized as income.",
+  },
+  {
+    label: "Expenses",
+    value: "expenses",
+    description: "Bank transactions categorized as expenses.",
+  },
+];
 
 function getMessageText(value?: string) {
   if (!value) return "";
@@ -75,6 +147,23 @@ function getMessageText(value?: string) {
   } catch {
     return value;
   }
+}
+
+function normalizeFilter(value?: string): TransactionFilter {
+  const allowed = transactionFilters.map((filter) => filter.value);
+
+  if (value && allowed.includes(value as TransactionFilter)) {
+    return value as TransactionFilter;
+  }
+
+  return "all";
+}
+
+function getFilterLabel(filterValue: TransactionFilter) {
+  return (
+    transactionFilters.find((filter) => filter.value === filterValue)?.label ||
+    "All"
+  );
 }
 
 function money(value?: number | null, currency = "USD") {
@@ -124,10 +213,102 @@ function formatDateTime(value?: string | null) {
 }
 
 function isBusinessCheckingOrSavings(account: PlaidAccount) {
-  const name = `${account.name || ""} ${account.official_name || ""}`.toLowerCase();
+  const name =
+    `${account.name || ""} ${account.official_name || ""}`.toLowerCase();
   const subtype = String(account.subtype || "").toLowerCase();
 
-  return (subtype === "checking" || subtype === "savings") && name.includes("business");
+  return (
+    (subtype === "checking" || subtype === "savings") &&
+    name.includes("business")
+  );
+}
+
+function transactionMatchesFilter(
+  transaction: PlaidTransaction,
+  filter: TransactionFilter,
+) {
+  const categoryType = String(
+    transaction.sitguru_category_type || "",
+  ).toLowerCase();
+  const reviewStatus = String(transaction.review_status || "").toLowerCase();
+
+  if (filter === "all") return true;
+  if (filter === "needs_review") {
+    return (
+      reviewStatus === "needs_review" ||
+      !transaction.sitguru_category ||
+      transaction.sitguru_category === "Uncategorized"
+    );
+  }
+  if (filter === "auto_categorized") return reviewStatus === "auto_categorized";
+  if (filter === "manual") return Boolean(transaction.manually_categorized);
+  if (filter === "pending") return Boolean(transaction.pending);
+  if (filter === "posted") return !transaction.pending;
+  if (filter === "transfers") return categoryType === "transfer";
+  if (filter === "income") return categoryType === "income";
+  if (filter === "expenses") return categoryType === "expense";
+
+  return true;
+}
+
+function getTransactionTone(transaction: PlaidTransaction) {
+  const categoryType = String(
+    transaction.sitguru_category_type || "",
+  ).toLowerCase();
+
+  if (categoryType === "income") {
+    return "text-emerald-700";
+  }
+
+  if (categoryType === "transfer") {
+    return "text-blue-700";
+  }
+
+  if (categoryType === "expense") {
+    return "text-slate-950";
+  }
+
+  return "text-slate-950";
+}
+
+function getAmountDisplay(transaction: PlaidTransaction) {
+  const amount = Number(transaction.amount || 0);
+  const categoryType = String(
+    transaction.sitguru_category_type || "",
+  ).toLowerCase();
+
+  /*
+    Plaid uses positive amounts for money leaving an account and negative amounts
+    for money entering an account. For admin readability, income is displayed as
+    positive cash-in and expenses stay positive cash-out.
+  */
+  if (categoryType === "income" && amount < 0) {
+    return `+${money(Math.abs(amount), transaction.iso_currency_code || "USD")}`;
+  }
+
+  if (categoryType === "transfer") {
+    return money(Math.abs(amount), transaction.iso_currency_code || "USD");
+  }
+
+  return money(amount, transaction.iso_currency_code || "USD");
+}
+
+function categoryBadgeClasses(transaction: PlaidTransaction) {
+  const reviewStatus = String(transaction.review_status || "").toLowerCase();
+
+  if (transaction.manually_categorized) {
+    return "border-blue-200 bg-blue-50 text-blue-800";
+  }
+
+  if (reviewStatus === "auto_categorized") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+
+  if (reviewStatus === "needs_review") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
 async function getCurrentAdminUserId() {
@@ -155,7 +336,9 @@ async function getCurrentAdminUserId() {
   return user.id;
 }
 
-async function getBankingData(): Promise<BankingData> {
+async function getBankingData(
+  selectedFilter: TransactionFilter,
+): Promise<BankingData> {
   const userId = await getCurrentAdminUserId();
 
   if (!userId) {
@@ -164,6 +347,14 @@ async function getBankingData(): Promise<BankingData> {
       items: [],
       transactions: [],
       totalTransactions: 0,
+      postedTransactions: 0,
+      pendingTransactions: 0,
+      needsReviewTransactions: 0,
+      autoCategorizedTransactions: 0,
+      manualCategorizedTransactions: 0,
+      transferTransactions: 0,
+      incomeTransactions: 0,
+      expenseTransactions: 0,
       lastSyncedAt: null,
       plaidEnvironment: process.env.PLAID_ENV || "unknown",
     };
@@ -214,23 +405,9 @@ async function getBankingData(): Promise<BankingData> {
 
   const accountIds = accounts.map((account) => account.account_id);
 
-  let totalTransactions = 0;
-  let transactions: PlaidTransaction[] = [];
+  let allTransactions: PlaidTransaction[] = [];
 
   if (accountIds.length) {
-    const { count, error: countError } = await supabaseAdmin
-      .from("admin_plaid_transactions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .in("account_id", accountIds)
-      .is("removed_at", null);
-
-    if (countError) {
-      console.error("Plaid transaction count error:", countError);
-    }
-
-    totalTransactions = count || 0;
-
     const { data: transactionRows, error: transactionError } =
       await supabaseAdmin
         .from("admin_plaid_transactions")
@@ -241,14 +418,44 @@ async function getBankingData(): Promise<BankingData> {
         .in("account_id", accountIds)
         .is("removed_at", null)
         .order("date", { ascending: false })
-        .limit(12);
+        .limit(150);
 
     if (transactionError) {
       console.error("Plaid transactions load error:", transactionError);
     }
 
-    transactions = (transactionRows || []) as PlaidTransaction[];
+    allTransactions = (transactionRows || []) as PlaidTransaction[];
   }
+
+  const totalTransactions = allTransactions.length;
+  const postedTransactions = allTransactions.filter(
+    (transaction) => !transaction.pending,
+  ).length;
+  const pendingTransactions = allTransactions.filter(
+    (transaction) => transaction.pending,
+  ).length;
+  const needsReviewTransactions = allTransactions.filter((transaction) =>
+    transactionMatchesFilter(transaction, "needs_review"),
+  ).length;
+  const autoCategorizedTransactions = allTransactions.filter((transaction) =>
+    transactionMatchesFilter(transaction, "auto_categorized"),
+  ).length;
+  const manualCategorizedTransactions = allTransactions.filter((transaction) =>
+    transactionMatchesFilter(transaction, "manual"),
+  ).length;
+  const transferTransactions = allTransactions.filter((transaction) =>
+    transactionMatchesFilter(transaction, "transfers"),
+  ).length;
+  const incomeTransactions = allTransactions.filter((transaction) =>
+    transactionMatchesFilter(transaction, "income"),
+  ).length;
+  const expenseTransactions = allTransactions.filter((transaction) =>
+    transactionMatchesFilter(transaction, "expenses"),
+  ).length;
+
+  const transactions = allTransactions
+    .filter((transaction) => transactionMatchesFilter(transaction, selectedFilter))
+    .slice(0, 30);
 
   const lastSyncedAt =
     items
@@ -268,6 +475,14 @@ async function getBankingData(): Promise<BankingData> {
     items,
     transactions,
     totalTransactions,
+    postedTransactions,
+    pendingTransactions,
+    needsReviewTransactions,
+    autoCategorizedTransactions,
+    manualCategorizedTransactions,
+    transferTransactions,
+    incomeTransactions,
+    expenseTransactions,
     lastSyncedAt,
     plaidEnvironment,
   };
@@ -279,17 +494,28 @@ export default async function AdminPlaidFinancialsPage({
   const params = await searchParams;
   const errorMessage = getMessageText(params?.error);
   const statusMessage = getMessageText(params?.status);
+  const selectedFilter = normalizeFilter(params?.filter);
 
   const {
     accounts,
     items,
     transactions,
     totalTransactions,
+    postedTransactions,
+    pendingTransactions,
+    needsReviewTransactions,
+    autoCategorizedTransactions,
+    manualCategorizedTransactions,
+    transferTransactions,
+    incomeTransactions,
+    expenseTransactions,
     lastSyncedAt,
     plaidEnvironment,
-  } = await getBankingData();
+  } = await getBankingData(selectedFilter);
 
-  const checkingAccount = accounts.find((account) => account.subtype === "checking");
+  const checkingAccount = accounts.find(
+    (account) => account.subtype === "checking",
+  );
   const savingsAccount = accounts.find((account) => account.subtype === "savings");
 
   const totalCurrentBalance = accounts.reduce(
@@ -304,9 +530,54 @@ export default async function AdminPlaidFinancialsPage({
 
   const hasProductionConnection = plaidEnvironment === "production";
 
+  const metricCards = [
+    {
+      label: "Connected Accounts",
+      value: accounts.length.toLocaleString(),
+      helper: "Business checking + savings only",
+    },
+    {
+      label: "Total Transactions",
+      value: totalTransactions.toLocaleString(),
+      helper: `${postedTransactions} posted · ${pendingTransactions} pending`,
+    },
+    {
+      label: "Needs Review",
+      value: needsReviewTransactions.toLocaleString(),
+      helper: "Uncategorized or review queue",
+    },
+    {
+      label: "Auto Categorized",
+      value: autoCategorizedTransactions.toLocaleString(),
+      helper: `${manualCategorizedTransactions} manually categorized`,
+    },
+    {
+      label: "Current Balance",
+      value: money(totalCurrentBalance),
+      helper: "NFCU current cash balance",
+    },
+    {
+      label: "Available Balance",
+      value: money(totalAvailableBalance),
+      helper: "Cash available for operations",
+    },
+  ];
+
+  const filterCounts: Record<TransactionFilter, number> = {
+    all: totalTransactions,
+    needs_review: needsReviewTransactions,
+    auto_categorized: autoCategorizedTransactions,
+    manual: manualCategorizedTransactions,
+    pending: pendingTransactions,
+    posted: postedTransactions,
+    transfers: transferTransactions,
+    income: incomeTransactions,
+    expenses: expenseTransactions,
+  };
+
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1680px]">
         <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <Link
@@ -320,7 +591,7 @@ export default async function AdminPlaidFinancialsPage({
               Plaid Bank Connections
             </h1>
 
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
               Connect, sync, categorize, and review NFCU Business Checking and
               Business Savings activity. Category choices feed SitGuru financial
               reports.
@@ -420,42 +691,23 @@ export default async function AdminPlaidFinancialsPage({
           </div>
         ) : null}
 
-        <section className="mb-6 grid gap-4 md:grid-cols-4">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Connected Accounts
-            </p>
-            <p className="mt-2 text-4xl font-black text-slate-950">
-              {accounts.length}
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Total Transactions
-            </p>
-            <p className="mt-2 text-4xl font-black text-slate-950">
-              {totalTransactions}
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Current Balance
-            </p>
-            <p className="mt-2 text-4xl font-black text-slate-950">
-              {money(totalCurrentBalance)}
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Available Balance
-            </p>
-            <p className="mt-2 text-4xl font-black text-slate-950">
-              {money(totalAvailableBalance)}
-            </p>
-          </div>
+        <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          {metricCards.map((card) => (
+            <div
+              key={card.label}
+              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                {card.label}
+              </p>
+              <p className="mt-2 text-3xl font-black text-slate-950">
+                {card.value}
+              </p>
+              <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                {card.helper}
+              </p>
+            </div>
+          ))}
         </section>
 
         <section className="mb-6 grid gap-4 md:grid-cols-2">
@@ -558,60 +810,91 @@ export default async function AdminPlaidFinancialsPage({
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <p className="text-sm font-black uppercase tracking-wide text-slate-500">
                 Recent Activity
               </p>
 
-              <h2 className="mt-2 text-2xl font-black text-slate-950">
+              <h2 className="mt-2 text-3xl font-black text-slate-950">
                 Categorized business transactions
               </h2>
 
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
                 Auto-categories feed SitGuru financial reports. Manual category
                 changes are saved and will not be overwritten by future Plaid
-                syncs. Bank Status shows whether NFCU/Plaid says the transaction
-                is pending or posted.
+                syncs. Transfers should stay marked as transfers so they do not
+                inflate revenue or operating expense reporting.
               </p>
             </div>
 
             <Link
               href="/api/plaid/sync-transactions"
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
+              className="inline-flex w-fit items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
             >
               Sync Now
             </Link>
           </div>
 
+          <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap gap-2">
+              {transactionFilters.map((filter) => {
+                const isActive = selectedFilter === filter.value;
+
+                return (
+                  <Link
+                    key={filter.value}
+                    href={
+                      filter.value === "all"
+                        ? "/admin/financials/plaid"
+                        : `/admin/financials/plaid?filter=${filter.value}`
+                    }
+                    title={filter.description}
+                    className={`rounded-full border px-4 py-2 text-xs font-black transition ${
+                      isActive
+                        ? "border-emerald-700 bg-emerald-700 text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800"
+                    }`}
+                  >
+                    {filter.label}
+                    <span className="ml-2 opacity-75">
+                      {filterCounts[filter.value].toLocaleString()}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
           {transactions.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] text-left text-sm">
-                <thead>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full min-w-[1480px] text-left text-sm">
+                <thead className="bg-slate-50">
                   <tr className="border-b border-slate-200 text-xs font-black uppercase tracking-wide text-slate-500">
-                    <th className="pb-3">Date</th>
-                    <th className="pb-3">Description</th>
-                    <th className="pb-3">Category</th>
-                    <th className="pb-3">Merchant</th>
-                    <th className="pb-3">Channel</th>
-                    <th className="pb-3">Bank Status</th>
-                    <th className="pb-3 text-right">Amount</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Description</th>
+                    <th className="px-4 py-3">Category Controls</th>
+                    <th className="px-4 py-3">Merchant</th>
+                    <th className="px-4 py-3">Channel</th>
+                    <th className="px-4 py-3">Bank Status</th>
+                    <th className="px-4 py-3">Review</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
                   </tr>
                 </thead>
 
-                <tbody>
+                <tbody className="bg-white">
                   {transactions.map((transaction) => (
                     <tr
                       key={transaction.transaction_id}
                       className="border-b border-slate-100 align-top last:border-0"
                     >
-                      <td className="py-4 pr-4 font-bold text-slate-600">
+                      <td className="px-4 py-5 font-bold text-slate-600">
                         {formatDate(transaction.date)}
                       </td>
 
-                      <td className="max-w-[280px] py-4 pr-4">
-                        <p className="font-black text-slate-950">
+                      <td className="w-[340px] max-w-[340px] px-4 py-5">
+                        <p className="font-black leading-5 text-slate-950">
                           {transaction.name || "Transaction"}
                         </p>
 
@@ -619,35 +902,51 @@ export default async function AdminPlaidFinancialsPage({
                           <p className="mt-2 text-xs font-black text-emerald-700">
                             Current: {transaction.sitguru_category}
                           </p>
+                        ) : (
+                          <p className="mt-2 text-xs font-black text-amber-700">
+                            Current: Uncategorized
+                          </p>
+                        )}
+
+                        {transaction.is_excluded_from_reports ? (
+                          <p className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-600">
+                            Excluded from reports
+                          </p>
                         ) : null}
                       </td>
 
-                      <td className="py-4 pr-4">
-                        <PlaidTransactionCategoryControls
-                          transactionId={transaction.transaction_id}
-                          currentCategory={transaction.sitguru_category}
-                          currentCategoryType={transaction.sitguru_category_type}
-                          currentReportSection={
-                            transaction.sitguru_report_section
-                          }
-                          currentNotes={transaction.sitguru_notes}
-                          isExcludedFromReports={
-                            transaction.is_excluded_from_reports
-                          }
-                          reviewStatus={transaction.review_status}
-                          manuallyCategorized={transaction.manually_categorized}
-                        />
+                      <td className="w-[420px] px-4 py-5">
+                        <div className="max-w-[390px]">
+                          <PlaidTransactionCategoryControls
+                            transactionId={transaction.transaction_id}
+                            currentCategory={transaction.sitguru_category}
+                            currentCategoryType={
+                              transaction.sitguru_category_type
+                            }
+                            currentReportSection={
+                              transaction.sitguru_report_section
+                            }
+                            currentNotes={transaction.sitguru_notes}
+                            isExcludedFromReports={
+                              transaction.is_excluded_from_reports
+                            }
+                            reviewStatus={transaction.review_status}
+                            manuallyCategorized={
+                              transaction.manually_categorized
+                            }
+                          />
+                        </div>
                       </td>
 
-                      <td className="py-4 pr-4 font-bold text-slate-600">
+                      <td className="px-4 py-5 font-bold text-slate-600">
                         {transaction.merchant_name || "—"}
                       </td>
 
-                      <td className="py-4 pr-4 font-bold capitalize text-slate-600">
+                      <td className="px-4 py-5 font-bold capitalize text-slate-600">
                         {transaction.payment_channel || "—"}
                       </td>
 
-                      <td className="py-4 pr-4">
+                      <td className="px-4 py-5">
                         <span
                           className={
                             transaction.pending
@@ -659,11 +958,24 @@ export default async function AdminPlaidFinancialsPage({
                         </span>
                       </td>
 
-                      <td className="py-4 text-right font-black text-slate-950">
-                        {money(
-                          transaction.amount,
-                          transaction.iso_currency_code || "USD",
-                        )}
+                      <td className="px-4 py-5">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${categoryBadgeClasses(
+                            transaction,
+                          )}`}
+                        >
+                          {transaction.manually_categorized
+                            ? "Manual"
+                            : titleCase(transaction.review_status || "Needs Review")}
+                        </span>
+                      </td>
+
+                      <td
+                        className={`px-4 py-5 text-right font-black ${getTransactionTone(
+                          transaction,
+                        )}`}
+                      >
+                        {getAmountDisplay(transaction)}
                       </td>
                     </tr>
                   ))}
@@ -673,14 +985,14 @@ export default async function AdminPlaidFinancialsPage({
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center">
               <p className="text-lg font-black text-slate-950">
-                No transactions displayed yet.
+                No transactions displayed for {getFilterLabel(selectedFilter)}.
               </p>
 
               <p className="mx-auto mt-2 max-w-lg text-sm font-semibold leading-6 text-slate-600">
-                Click “Authorize Transactions” first if Plaid says additional
-                consent is required. Then click “Sync Transactions” to pull the
-                latest NFCU Business Checking and Business Savings activity into
-                SitGuru.
+                Try another filter, click “Authorize Transactions” if Plaid says
+                additional consent is required, or click “Sync Transactions” to
+                pull the latest NFCU Business Checking and Business Savings
+                activity into SitGuru.
               </p>
             </div>
           )}
