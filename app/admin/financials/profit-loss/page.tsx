@@ -72,6 +72,7 @@ type ExpenseLedgerRow = Record<string, unknown>;
 type FinancialLineRow = Record<string, unknown>;
 type GrowthMarketingExpenseRow = Record<string, unknown>;
 type ReferralRewardLiabilityRow = Record<string, unknown>;
+type StripeFinancialRow = Record<string, unknown> & { __source_table?: string };
 
 type CategorySummary = {
   category: string;
@@ -93,7 +94,7 @@ type ReportTransaction = {
   bankStatus: string;
   reviewStatus: string;
   manuallyCategorized: boolean;
-  source: "Plaid/NFCU" | "Manual" | "Growth/Referral";
+  source: "Stripe/Payments" | "Plaid/NFCU" | "Manual" | "Growth/Referral";
 };
 
 type StatementLine = {
@@ -165,6 +166,11 @@ type ProfitLossData = {
     postedCount: number;
     manualCategorizedCount: number;
     autoCategorizedCount: number;
+    stripeRevenueCount: number;
+    stripeExpenseCount: number;
+    stripePaymentRevenueTotal: number;
+    stripeFeeRefundExpenseTotal: number;
+    bankIncomeNotRevenueTotal: number;
   };
 };
 
@@ -887,7 +893,7 @@ function isProfitLossTransaction(transaction: PlaidTransactionRow) {
     !transaction.is_excluded_from_reports &&
     !transaction.removed_at &&
     isReviewedForReports(transaction) &&
-    (type === "income" || type === "expense")
+    type === "expense"
   );
 }
 
@@ -1325,32 +1331,398 @@ function normalizeStatementLine(row: FinancialLineRow): StatementLine {
   };
 }
 
+
+function getStripeText(row: StripeFinancialRow, keys: string[]) {
+  for (const key of keys) {
+    const value = asTrimmedString(row[key]);
+
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function getStripeDate(row: StripeFinancialRow) {
+  return (
+    getStripeText(row, [
+      "created_at",
+      "updated_at",
+      "created",
+      "date",
+      "paid_at",
+      "posted_at",
+      "available_on",
+      "occurred_at",
+    ]) || null
+  );
+}
+
+function getStripeSourceTable(row: StripeFinancialRow) {
+  return asTrimmedString(row.__source_table);
+}
+
+function toCentsAwareAmount(value: unknown) {
+  const amount = toNumber(value);
+
+  if (Math.abs(amount) >= 10000 && Number.isInteger(amount)) {
+    return amount / 100;
+  }
+
+  return amount;
+}
+
+function getStripeMoney(row: StripeFinancialRow, keys: string[]) {
+  for (const key of keys) {
+    if (!(key in row)) continue;
+
+    const value = toNumber(row[key]);
+
+    if (!value) continue;
+
+    const lowerKey = key.toLowerCase();
+
+    if (
+      lowerKey.includes("cents") ||
+      lowerKey.includes("_cent") ||
+      lowerKey === "amount_received" ||
+      lowerKey === "amount_captured" ||
+      lowerKey === "amount_refunded" ||
+      lowerKey === "application_fee_amount"
+    ) {
+      return value / 100;
+    }
+
+    return toCentsAwareAmount(value);
+  }
+
+  return 0;
+}
+
+function rowHasStripePaymentReference(row: StripeFinancialRow) {
+  return Boolean(
+    getStripeText(row, [
+      "stripe_reference",
+      "stripe_id",
+      "stripe_checkout_session_id",
+      "stripe_session_id",
+      "stripe_payment_intent_id",
+      "payment_intent_id",
+      "stripe_charge_id",
+      "charge_id",
+      "balance_transaction_id",
+      "stripe_balance_transaction_id",
+      "stripe_customer_id",
+      "stripe_subscription_id",
+      "stripe_refund_id",
+      "stripe_dispute_id",
+    ]),
+  );
+}
+
+function getStripeStatus(row: StripeFinancialRow) {
+  return getStripeText(row, [
+    "status",
+    "payment_status",
+    "stripe_status",
+    "charge_status",
+    "repayment_status",
+  ]).toLowerCase();
+}
+
+function getStripeActivityText(row: StripeFinancialRow) {
+  return [
+    getStripeSourceTable(row),
+    getStripeText(row, ["type", "event_type", "transaction_type", "reporting_category"]),
+    getStripeText(row, ["description", "memo", "name", "statement_descriptor"]),
+    getStripeStatus(row),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function isArchivedStripeRow(row: StripeFinancialRow) {
+  return Boolean(
+    row.deleted_at ||
+      row.voided_at ||
+      row.archived_at ||
+      row.removed_at ||
+      row.is_deleted === true ||
+      row.is_void === true ||
+      row.is_active === false,
+  );
+}
+
+function isSuccessfulStripeRow(row: StripeFinancialRow) {
+  const status = getStripeStatus(row);
+
+  if (!status) return true;
+
+  if (
+    status.includes("fail") ||
+    status.includes("cancel") ||
+    status.includes("void") ||
+    status.includes("unpaid")
+  ) {
+    return false;
+  }
+
+  return (
+    status.includes("paid") ||
+    status.includes("posted") ||
+    status.includes("succeeded") ||
+    status.includes("complete") ||
+    status.includes("confirmed") ||
+    status.includes("available") ||
+    status.includes("recorded")
+  );
+}
+
+function isStripeRevenueRow(row: StripeFinancialRow) {
+  const source = getStripeSourceTable(row).toLowerCase();
+  const text = getStripeActivityText(row);
+
+  if (!rowHasStripePaymentReference(row)) return false;
+  if (!isSuccessfulStripeRow(row)) return false;
+
+  if (
+    text.includes("refund") ||
+    text.includes("dispute") ||
+    text.includes("chargeback") ||
+    text.includes("payout") ||
+    text.includes("transfer") ||
+    text.includes("fee")
+  ) {
+    return false;
+  }
+
+  return (
+    source === "payments" ||
+    source === "stripe_transactions" ||
+    source === "stripe_balance_transactions"
+  );
+}
+
+function isStripeExpenseRow(row: StripeFinancialRow) {
+  const text = getStripeActivityText(row);
+
+  if (!rowHasStripePaymentReference(row)) return false;
+
+  return (
+    text.includes("fee") ||
+    text.includes("refund") ||
+    text.includes("dispute") ||
+    text.includes("chargeback") ||
+    getStripeMoney(row, [
+      "stripe_fee",
+      "stripe_fee_cents",
+      "fee",
+      "fee_cents",
+      "fee_amount",
+      "fee_amount_cents",
+      "processing_fee",
+      "processing_fee_cents",
+      "amount_refunded",
+      "amount_refunded_cents",
+      "refund_amount",
+      "refund_amount_cents",
+      "dispute_amount",
+      "dispute_amount_cents",
+    ]) > 0
+  );
+}
+
+function getStripeRevenueAmount(row: StripeFinancialRow) {
+  return Math.abs(
+    getStripeMoney(row, [
+      "platform_revenue",
+      "platform_revenue_cents",
+      "platform_fee",
+      "platform_fee_cents",
+      "sitguru_fee",
+      "sitguru_fee_cents",
+      "sitguru_fee_amount",
+      "sitguru_fee_amount_cents",
+      "application_fee_amount",
+      "application_fee_amount_cents",
+      "net_amount",
+      "net_amount_cents",
+      "net",
+      "amount",
+      "amount_cents",
+      "amount_received",
+      "amount_captured",
+      "gross_amount",
+      "gross_amount_cents",
+    ]),
+  );
+}
+
+function getStripeExpenseAmount(row: StripeFinancialRow) {
+  const text = getStripeActivityText(row);
+
+  if (text.includes("refund") || text.includes("dispute") || text.includes("chargeback")) {
+    return Math.abs(
+      getStripeMoney(row, [
+        "amount_refunded",
+        "amount_refunded_cents",
+        "refund_amount",
+        "refund_amount_cents",
+        "dispute_amount",
+        "dispute_amount_cents",
+        "chargeback_amount",
+        "chargeback_amount_cents",
+        "amount",
+        "amount_cents",
+      ]),
+    );
+  }
+
+  return Math.abs(
+    getStripeMoney(row, [
+      "stripe_fee",
+      "stripe_fee_cents",
+      "fee",
+      "fee_cents",
+      "fee_amount",
+      "fee_amount_cents",
+      "processing_fee",
+      "processing_fee_cents",
+    ]),
+  );
+}
+
+function getStripeRevenueCategory(row: StripeFinancialRow) {
+  const source = getStripeSourceTable(row);
+
+  if (source === "payments") return "Platform Revenue";
+
+  return "Stripe Customer Revenue";
+}
+
+function getStripeExpenseCategory(row: StripeFinancialRow) {
+  const text = getStripeActivityText(row);
+
+  if (text.includes("refund")) return "Refunds";
+  if (text.includes("dispute") || text.includes("chargeback")) return "Disputes / Chargebacks";
+
+  return "Payment Processing Fees";
+}
+
+function groupStripeRevenueByCategory(rows: StripeFinancialRow[]) {
+  const map = new Map<string, CategorySummary>();
+
+  for (const row of rows) {
+    const category = getStripeRevenueCategory(row);
+    const key = `income:Stripe/Payments:${category}`;
+    const current = map.get(key);
+    const amount = getStripeRevenueAmount(row);
+
+    if (current) {
+      current.amount += amount;
+      current.count += 1;
+    } else {
+      map.set(key, {
+        category,
+        type: "income",
+        section: "Stripe/Payments",
+        amount,
+        count: 1,
+      });
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+}
+
+function groupStripeExpensesByCategory(rows: StripeFinancialRow[]) {
+  const map = new Map<string, CategorySummary>();
+
+  for (const row of rows) {
+    const category = getStripeExpenseCategory(row);
+    const key = `expense:Stripe/Payments:${category}`;
+    const current = map.get(key);
+    const amount = getStripeExpenseAmount(row);
+
+    if (current) {
+      current.amount += amount;
+      current.count += 1;
+    } else {
+      map.set(key, {
+        category,
+        type: "expense",
+        section: "Stripe/Payments",
+        amount,
+        count: 1,
+      });
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+}
+
+function toStripeReportTransaction(row: StripeFinancialRow, index: number): ReportTransaction {
+  const isExpense = isStripeExpenseRow(row) && !isStripeRevenueRow(row);
+  const category = isExpense ? getStripeExpenseCategory(row) : getStripeRevenueCategory(row);
+  const amount = isExpense ? -Math.abs(getStripeExpenseAmount(row)) : getStripeRevenueAmount(row);
+
+  return {
+    id:
+      getStripeText(row, [
+        "id",
+        "stripe_payment_intent_id",
+        "payment_intent_id",
+        "stripe_charge_id",
+        "charge_id",
+        "balance_transaction_id",
+        "stripe_balance_transaction_id",
+      ]) || `stripe-row-${index}`,
+    date: formatDateShort(getStripeDate(row)),
+    name:
+      getStripeText(row, ["description", "name", "statement_descriptor", "type"]) ||
+      "Stripe payment activity",
+    merchant: getStripeSourceTable(row) || "Stripe",
+    category,
+    type: isExpense ? "expense" : "income",
+    section: "Stripe/Payments",
+    amount,
+    bankStatus: "Stripe",
+    reviewStatus: "reviewed",
+    manuallyCategorized: false,
+    source: "Stripe/Payments",
+  };
+}
+
 function calculatePeriodMetrics({
   reportTransactions,
   manualExpenses,
+  stripeRevenueRows = [],
+  stripeExpenseRows = [],
   growthMarketingExpenses = [],
   issuedReferralRewards = [],
 }: {
   reportTransactions: PlaidTransactionRow[];
   manualExpenses: ExpenseLedgerRow[];
+  stripeRevenueRows?: StripeFinancialRow[];
+  stripeExpenseRows?: StripeFinancialRow[];
   growthMarketingExpenses?: GrowthMarketingExpenseRow[];
   issuedReferralRewards?: ReferralRewardLiabilityRow[];
 }): PeriodMetrics {
-  const incomeTransactions = reportTransactions.filter(
-    (transaction) => getTransactionType(transaction) === "income",
-  );
-
   const expenseTransactions = reportTransactions.filter(
     (transaction) => getTransactionType(transaction) === "expense",
   );
 
-  const totalRevenue = incomeTransactions.reduce(
-    (sum, transaction) => sum + getProfitLossAmount(transaction),
+  const totalRevenue = stripeRevenueRows.reduce(
+    (sum, row) => sum + getStripeRevenueAmount(row),
     0,
   );
 
   const plaidExpenses = expenseTransactions.reduce(
     (sum, transaction) => sum + getProfitLossAmount(transaction),
+    0,
+  );
+
+  const stripeExpenseTotal = stripeExpenseRows.reduce(
+    (sum, row) => sum + getStripeExpenseAmount(row),
     0,
   );
 
@@ -1371,6 +1743,7 @@ function calculatePeriodMetrics({
 
   const totalExpenses =
     plaidExpenses +
+    stripeExpenseTotal +
     manualExpenseTotal +
     growthMarketingExpenseTotal +
     issuedReferralRewardExpenseTotal;
@@ -1385,7 +1758,11 @@ function calculatePeriodMetrics({
     operatingIncome: netIncome,
     netIncome,
     netMargin: totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0,
-    reportableTransactions: reportTransactions.length + manualExpenses.length,
+    reportableTransactions:
+      reportTransactions.length +
+      manualExpenses.length +
+      stripeRevenueRows.length +
+      stripeExpenseRows.length,
     cashFlow: netIncome,
   };
 }
@@ -1400,6 +1777,9 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     statementLinesResult,
     growthMarketingExpensesResult,
     referralRewardLiabilityResult,
+    paymentsResult,
+    stripeTransactionsResult,
+    stripeBalanceTransactionsResult,
   ] = await Promise.all([
       supabaseAdmin
         .from("admin_plaid_accounts")
@@ -1437,6 +1817,21 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
         .select("*")
         .order("created_at", { ascending: false })
         .limit(2500),
+      supabaseAdmin
+        .from("payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      supabaseAdmin
+        .from("stripe_transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      supabaseAdmin
+        .from("stripe_balance_transactions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
     ]);
 
   if (accountsResult.error) {
@@ -1475,6 +1870,24 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     );
   }
 
+  if (paymentsResult.error) {
+    console.warn("Profit & Loss payments query skipped:", paymentsResult.error);
+  }
+
+  if (stripeTransactionsResult.error) {
+    console.warn(
+      "Profit & Loss Stripe transactions query skipped:",
+      stripeTransactionsResult.error,
+    );
+  }
+
+  if (stripeBalanceTransactionsResult.error) {
+    console.warn(
+      "Profit & Loss Stripe balance transactions query skipped:",
+      stripeBalanceTransactionsResult.error,
+    );
+  }
+
   const accounts = ((accountsResult.data || []) as PlaidAccountRow[]).filter(
     isBusinessCheckingOrSavings,
   );
@@ -1497,6 +1910,23 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     (referralRewardLiabilityResult.data || []) as ReferralRewardLiabilityRow[]
   ).filter(isIssuedReferralReward);
 
+  const allStripeRows: StripeFinancialRow[] = [
+    ...((paymentsResult.data || []) as StripeFinancialRow[]).map((row) => ({
+      ...row,
+      __source_table: "payments",
+    })),
+    ...((stripeTransactionsResult.data || []) as StripeFinancialRow[]).map((row) => ({
+      ...row,
+      __source_table: "stripe_transactions",
+    })),
+    ...((stripeBalanceTransactionsResult.data || []) as StripeFinancialRow[]).map(
+      (row) => ({
+        ...row,
+        __source_table: "stripe_balance_transactions",
+      }),
+    ),
+  ].filter((row) => !isArchivedStripeRow(row));
+
   const statementLines = ((statementLinesResult.data || []) as FinancialLineRow[])
     .map(normalizeStatementLine)
     .filter((line) => line.id);
@@ -1517,6 +1947,14 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     isWithinWindow(getReferralRewardDate(reward), period),
   );
 
+  const filteredStripeRevenueRows = allStripeRows
+    .filter(isStripeRevenueRow)
+    .filter((row) => isWithinWindow(getStripeDate(row), period));
+
+  const filteredStripeExpenseRows = allStripeRows
+    .filter(isStripeExpenseRow)
+    .filter((row) => isWithinWindow(getStripeDate(row), period));
+
   const previousTransactions = allTransactions.filter((transaction) =>
     isWithinPreviousWindow(transaction.date, period),
   );
@@ -1532,6 +1970,14 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
   const previousIssuedReferralRewards = allIssuedReferralRewards.filter((reward) =>
     isWithinPreviousWindow(getReferralRewardDate(reward), period),
   );
+
+  const previousStripeRevenueRows = allStripeRows
+    .filter(isStripeRevenueRow)
+    .filter((row) => isWithinPreviousWindow(getStripeDate(row), period));
+
+  const previousStripeExpenseRows = allStripeRows
+    .filter(isStripeExpenseRow)
+    .filter((row) => isWithinPreviousWindow(getStripeDate(row), period));
 
   const reportTransactions = filteredTransactions.filter(isProfitLossTransaction);
   const needsReviewTransactions = filteredTransactions.filter(isNeedsReview);
@@ -1553,16 +1999,21 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     );
   });
 
-  const incomeTransactions = reportTransactions.filter(
-    (transaction) => getTransactionType(transaction) === "income",
+  const bankIncomeNotRevenueTransactions = filteredTransactions.filter(
+    (transaction) =>
+      !transaction.is_excluded_from_reports &&
+      !transaction.removed_at &&
+      isReviewedForReports(transaction) &&
+      getTransactionType(transaction) === "income",
   );
 
   const expenseTransactions = reportTransactions.filter(
     (transaction) => getTransactionType(transaction) === "expense",
   );
 
-  const revenueByCategory = groupTransactionsByCategory(incomeTransactions);
+  const revenueByCategory = groupStripeRevenueByCategory(filteredStripeRevenueRows);
   const plaidExpenseByCategory = groupTransactionsByCategory(expenseTransactions);
+  const stripeExpenseByCategory = groupStripeExpensesByCategory(filteredStripeExpenseRows);
   const manualExpenseByCategory = groupManualExpensesByCategory(filteredManualExpenses);
   const growthExpenseByCategory = groupGrowthExpensesByCategory(
     filteredGrowthMarketingExpenses,
@@ -1570,6 +2021,7 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
   );
   const expenseByCategory = mergeCategorySummaries([
     ...plaidExpenseByCategory,
+    ...stripeExpenseByCategory,
     ...manualExpenseByCategory,
     ...growthExpenseByCategory,
   ]);
@@ -1578,6 +2030,8 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
   const periodMetrics = calculatePeriodMetrics({
     reportTransactions,
     manualExpenses: filteredManualExpenses,
+    stripeRevenueRows: filteredStripeRevenueRows,
+    stripeExpenseRows: filteredStripeExpenseRows,
     growthMarketingExpenses: filteredGrowthMarketingExpenses,
     issuedReferralRewards: filteredIssuedReferralRewards,
   });
@@ -1585,6 +2039,8 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
   const previousMetrics = calculatePeriodMetrics({
     reportTransactions: previousReportTransactions,
     manualExpenses: previousManualExpenses,
+    stripeRevenueRows: previousStripeRevenueRows,
+    stripeExpenseRows: previousStripeExpenseRows,
     growthMarketingExpenses: previousGrowthMarketingExpenses,
     issuedReferralRewards: previousIssuedReferralRewards,
   });
@@ -1613,6 +2069,13 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     (transaction) => getReviewStatus(transaction) === "auto_categorized",
   ).length;
 
+  const recentStripeReportTransactions = [
+    ...filteredStripeRevenueRows,
+    ...filteredStripeExpenseRows,
+  ]
+    .slice(0, 10)
+    .map(toStripeReportTransaction);
+
   const recentPlaidReportTransactions = reportTransactions
     .slice(0, 10)
     .map(toReportTransaction);
@@ -1635,6 +2098,7 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
   ].slice(0, 16);
 
   const recentReportTransactions = [
+    ...recentStripeReportTransactions,
     ...recentPlaidReportTransactions,
     ...recentManualExpenses,
     ...recentGrowthExpenses,
@@ -1704,6 +2168,20 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
       postedCount,
       manualCategorizedCount,
       autoCategorizedCount,
+      stripeRevenueCount: filteredStripeRevenueRows.length,
+      stripeExpenseCount: filteredStripeExpenseRows.length,
+      stripePaymentRevenueTotal: filteredStripeRevenueRows.reduce(
+        (sum, row) => sum + getStripeRevenueAmount(row),
+        0,
+      ),
+      stripeFeeRefundExpenseTotal: filteredStripeExpenseRows.reduce(
+        (sum, row) => sum + getStripeExpenseAmount(row),
+        0,
+      ),
+      bankIncomeNotRevenueTotal: bankIncomeNotRevenueTransactions.reduce(
+        (sum, transaction) => sum + getProfitLossAmount(transaction),
+        0,
+      ),
     },
   };
 }
@@ -2714,7 +3192,7 @@ export default async function AdminProfitLossPage({
                 "money",
               )}
               comparisonLabel={pnl.period.comparisonLabel}
-              detail={`${pnl.revenueByCategory.length} reviewed revenue categories.`}
+              detail={`${pnl.revenueByCategory.length} Stripe/payment revenue categories. Bank income excluded: ${money(pnl.totals.bankIncomeNotRevenueTotal)}.`}
               tone="emerald"
             />
 
@@ -2753,7 +3231,7 @@ export default async function AdminProfitLossPage({
                 "number",
               )}
               comparisonLabel={pnl.period.comparisonLabel}
-              detail={`${pnl.totals.manualCategorizedCount.toLocaleString()} manual bank categories, ${pnl.totals.manualExpenseCount.toLocaleString()} manual expenses, and ${(
+              detail={`${pnl.totals.stripeRevenueCount.toLocaleString()} Stripe revenue rows, ${pnl.totals.manualExpenseCount.toLocaleString()} manual expenses, and ${(
                 pnl.totals.growthMarketingExpenseCount +
                 pnl.totals.issuedReferralRewardCount
               ).toLocaleString()} growth/referral rows.`}
@@ -2797,8 +3275,7 @@ export default async function AdminProfitLossPage({
                 {pnl.period.label} Statement of Operations
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                This statement includes reviewed bank-fed income and expenses,
-                plus manual operating expense entries for the selected period.
+                This statement uses Stripe/payment rows for revenue. Plaid/NFCU bank income, owner deposits, and transfers stay out of revenue until matched to actual customer payment records.
               </p>
             </div>
 
@@ -2907,7 +3384,7 @@ export default async function AdminProfitLossPage({
               title="Expense Sections"
               description="Expenses grouped by report section from bank-fed and manual categories."
               rows={pnl.expenseBySection}
-              emptyMessage="No reviewed expense transactions are available for this period."
+              emptyMessage="No reviewed expense transactions, Stripe fees/refunds, or manual expenses are available for this period."
             />
           </div>
         </section>
@@ -2915,25 +3392,25 @@ export default async function AdminProfitLossPage({
         <section className="grid gap-8 xl:grid-cols-2">
           <CategoryBreakdown
             title="Revenue Detail"
-            description="Reviewed income categories that feed the P&L for this period."
+            description="Stripe/payment revenue categories that feed the P&L for this period. Bank deposits and owner transfers are intentionally excluded from revenue."
             rows={pnl.revenueByCategory}
-            emptyMessage="No reviewed income transactions are available for this period."
+            emptyMessage="No Stripe/payment customer revenue is available for this period."
           />
 
           <CategoryBreakdown
             title="Expense Detail"
-            description="Reviewed expense categories and manual expense categories that feed the P&L for this period."
+            description="Reviewed bank expenses, Stripe fees/refunds, and manual expense categories that feed the P&L for this period."
             rows={pnl.expenseByCategory}
-            emptyMessage="No reviewed expense transactions are available for this period."
+            emptyMessage="No reviewed expense transactions, Stripe fees/refunds, or manual expenses are available for this period."
           />
         </section>
 
         <TransactionsTable
           eyebrow="Recent Report Activity"
           title="Transactions included in P&L"
-          description="These reviewed income, reviewed expenses, and manual expenses are included in the selected period."
+          description="These Stripe/payment revenue rows, reviewed bank expenses, Stripe fees/refunds, and manual expenses are included in the selected period."
           rows={pnl.recentReportTransactions}
-          emptyMessage="No reportable Plaid/NFCU or manual transactions are included in this period yet."
+          emptyMessage="No Stripe/payment revenue, reviewed bank expenses, or manual transactions are included in this period yet."
         />
 
         <TransactionsTable
