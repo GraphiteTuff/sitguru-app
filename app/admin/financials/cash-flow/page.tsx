@@ -200,7 +200,7 @@ const SECTION_OPTIONS: { value: CashFlowSectionKey; label: string }[] = [
 ];
 
 const LINE_PRESETS = [
-  { section: "operating", label: "Cash Received from Bookings" },
+  { section: "operating", label: "Stripe / Payment Cash Received" },
   { section: "operating", label: "Other Operating Cash In" },
   { section: "operating", label: "Cash Paid for Operating Expenses" },
   { section: "operating", label: "Refunds / Credits Paid" },
@@ -224,9 +224,9 @@ const DEFAULT_CASH_FLOW_LINES: CashFlowLine[] = [
     dbId: "",
     isSaved: false,
     section: "operating",
-    label: "Cash In from Income",
+    label: "Reviewed Bank Cash In",
     amount: 0,
-    notes: "Reviewed income transactions from NFCU Business Checking/Savings.",
+    notes: "Reviewed bank-credit transactions from NFCU Business Checking/Savings. Cash movement only; Stripe/payments drive P&L revenue.",
     displayOrder: 10,
     source: "admin_plaid_transactions",
   },
@@ -2075,7 +2075,7 @@ function ReadinessPanel({ cashFlow }: { cashFlow: CashFlowData }) {
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
             This checks whether NFCU business accounts, categorized cash
             activity, manual expenses, transfers, and cash balances are ready
-            for the selected period.
+            for the selected period. Bank cash-in is cash movement only; Stripe/payments drive P&L revenue.
           </p>
         </div>
 
@@ -2257,7 +2257,7 @@ export default async function AdminCashFlowPage({
       label: "Cash In",
       value: cashFlow.totals.cashIn,
       detail:
-        "Income, owner contributions, and positive financing cash movement.",
+        "Reviewed bank cash-in, owner contributions, and positive financing cash movement. This is cash movement, not P&L revenue.",
       tone: "bg-emerald-400",
     },
     {
@@ -2302,7 +2302,7 @@ export default async function AdminCashFlowPage({
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 Tracks real cash movement from NFCU Business Checking and
-                Business Savings, including income, expenses, owner
+                Business Savings, including reviewed bank credits, expenses, owner
                 contributions, owner draws, transfers, manual expenses, growth
                 marketing cash out, issued referral rewards, pending activity,
                 and current cash position.
@@ -2389,7 +2389,7 @@ export default async function AdminCashFlowPage({
                 cashFlow.previousMetrics.cashIn,
               )}
               comparisonLabel={cashFlow.period.comparisonLabel}
-              detail="Income, owner contributions, and positive cash movement."
+              detail="Reviewed bank cash-in, owner contributions, and positive cash movement. Stripe/payments drive revenue."
               tone="emerald"
             />
 
@@ -2656,7 +2656,8 @@ export default async function AdminCashFlowPage({
                   Transfers between NFCU Business Checking and Business Savings
                   are shown separately so the bank movement is visible without
                   incorrectly treating transfers as revenue or operating
-                  expense.
+                  expense. Reviewed bank cash-in is also kept separate from
+                  P&L revenue unless supported by Stripe/payment records.
                 </p>
               </div>
             </div>
@@ -2667,7 +2668,7 @@ export default async function AdminCashFlowPage({
               </p>
               <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
                 P&L shows profit. Cash Flow shows actual money movement. This
-                page includes income, expenses, manual operating expenses, owner
+                page includes reviewed bank credits, expenses, manual operating expenses, owner
                 equity, owner draws, transfers, growth marketing cash out,
                 issued referral reward cash out, pending activity, posted bank
                 activity, and available cash from NFCU business banking.
@@ -2679,7 +2680,7 @@ export default async function AdminCashFlowPage({
         <CashActivityTable
           eyebrow="Recent Cash Activity"
           title="Transactions included in cash flow"
-          description="Reviewed cash-impacting Plaid/NFCU transactions and manual operating expenses for the selected period."
+          description="Reviewed cash-impacting Plaid/NFCU transactions and manual operating expenses for the selected period. Bank cash-in is shown as cash movement, not platform revenue."
           rows={cashFlow.recentActivity}
           emptyMessage="No reviewed cash-flow activity is available for this period yet."
         />
