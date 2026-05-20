@@ -228,10 +228,6 @@ function toCentsAwareAmount(value: unknown) {
   return raw;
 }
 
-function centsToDollars(value: unknown) {
-  return toNumber(value) / 100;
-}
-
 function getOptionalBoolean(value: unknown) {
   if (typeof value === "boolean") return value;
 
@@ -953,22 +949,15 @@ function buildPlaidBankingSummary({
 }
 
 function buildRevenueTrend({
-  businessTransactions,
   bookingRows,
   paymentRows,
 }: {
-  businessTransactions: AnyRow[];
   bookingRows: AnyRow[];
   paymentRows: AnyRow[];
 }): TrendPoint[] {
   const months = monthsBack(6);
 
   return months.map((month) => {
-    const transactionRows = businessTransactions.filter((row) => {
-      const rowDate = parseDate(getRowDate(row));
-      return Boolean(rowDate && rowDate >= month.start && rowDate <= month.end);
-    });
-
     const bookingMonthRows = bookingRows.filter((row) => {
       const rowDate = parseDate(getRowDate(row));
       return Boolean(rowDate && rowDate >= month.start && rowDate <= month.end);
@@ -978,11 +967,6 @@ function buildRevenueTrend({
       const rowDate = parseDate(getRowDate(row));
       return Boolean(rowDate && rowDate >= month.start && rowDate <= month.end);
     });
-
-    const plaidRevenue = transactionRows
-      .filter(isReportableTransaction)
-      .filter((row) => getTransactionType(row) === "income")
-      .reduce((sum, row) => sum + getAbsoluteTransactionAmount(row), 0);
 
     const bookingGross = bookingMonthRows.reduce(
       (sum, row) => sum + getGrossAmount(row),
@@ -996,10 +980,11 @@ function buildRevenueTrend({
 
     return {
       label: month.label,
-      platformRevenue:
-        paymentMonthRows.reduce((sum, row) => sum + getNetAmount(row), 0) ||
-        plaidRevenue,
-      grossBookings: bookingGross || paymentGross || plaidRevenue,
+      platformRevenue: paymentMonthRows.reduce(
+        (sum, row) => sum + getNetAmount(row),
+        0,
+      ),
+      grossBookings: bookingGross || paymentGross,
     };
   });
 }
@@ -1255,9 +1240,6 @@ export async function GET(request: Request) {
     commissionRowsA,
     commissionRowsB,
     proformaRows,
-    trustSafetyPurchases,
-    trustSafetyEvents,
-    bookingDeductions,
   ] = await Promise.all([
     Promise.all(TABLE_NAMES.map(checkSource)),
 
@@ -1419,33 +1401,6 @@ export async function GET(request: Request) {
         .limit(1000),
       "proforma_assumptions",
     ),
-
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("guru_trust_safety_plan_purchases")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5000),
-      "guru_trust_safety_plan_purchases",
-    ),
-
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("trust_safety_financial_events")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5000),
-      "trust_safety_financial_events",
-    ),
-
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("booking_trust_safety_deductions")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5000),
-      "booking_trust_safety_deductions",
-    ),
   ]);
 
   const bookingRows = [...bookingRowsA, ...bookingRowsB].filter(
@@ -1494,9 +1449,10 @@ export async function GET(request: Request) {
     bookingRows.reduce((sum, row) => sum + getGrossAmount(row), 0) ||
     filteredPaymentRows.reduce((sum, row) => sum + getGrossAmount(row), 0);
 
-  const platformRevenue =
-    filteredPaymentRows.reduce((sum, row) => sum + getNetAmount(row), 0) ||
-    plaidBanking.revenue;
+  const platformRevenue = filteredPaymentRows.reduce(
+    (sum, row) => sum + getNetAmount(row),
+    0,
+  );
 
   const guruPayouts = payoutRows.reduce(
     (sum, row) => sum + getPayoutAmount(row),
@@ -1560,7 +1516,6 @@ export async function GET(request: Request) {
   const netMargin = platformRevenue > 0 ? (netIncome / platformRevenue) * 100 : 0;
 
   const currentCash = plaidBanking.currentCash;
-  const availableCash = plaidBanking.availableCash;
   const monthlyBurn = Math.max(0, operatingExpenses + stripeFees + partnerCommissions);
   const cashRunwayMonths =
     monthlyBurn > 0 ? Number((currentCash / monthlyBurn).toFixed(1)) : 0;
@@ -1574,7 +1529,7 @@ export async function GET(request: Request) {
       : 0;
 
   const netBookings = Math.max(0, grossBookings - refundsAndChargebacks);
-  const collectedCash = plaidBanking.cashIn || platformRevenue;
+  const collectedCash = platformRevenue;
   const payoutAndFees = guruPayouts + partnerCommissions + stripeFees;
   const netCashRetained = collectedCash - payoutAndFees - operatingExpenses;
 
@@ -1629,7 +1584,6 @@ export async function GET(request: Request) {
   ];
 
   const revenueTrend = buildRevenueTrend({
-    businessTransactions: activeBusinessTransactions,
     bookingRows,
     paymentRows: filteredPaymentRows,
   });
@@ -1715,19 +1669,16 @@ export async function GET(request: Request) {
     cashRunwayMonths,
   });
 
-  const trustSafetyRevenue =
-    trustSafetyPurchases.reduce(
-      (sum, row) => sum + centsToDollars(row.amount_paid_cents),
-      0,
-    ) +
-    trustSafetyEvents.reduce(
-      (sum, row) => sum + toCentsAwareAmount(row.amount),
-      0,
-    ) +
-    bookingDeductions.reduce(
-      (sum, row) => sum + centsToDollars(row.amount_cents),
-      0,
-    );
+  if (plaidBanking.revenue > 0 && platformRevenue === 0) {
+    managementAlerts.unshift({
+      id: "bank-income-not-platform-revenue",
+      title: "Bank income is not counted as Platform Revenue",
+      description:
+        "Plaid bank credits exist, but Platform Revenue remains $0 until matching Stripe/payment revenue is recorded.",
+      severity: "info",
+      href: "/admin/financials/plaid",
+    });
+  }
 
   const kpis: DashboardKpi[] = [
     {
@@ -1740,10 +1691,10 @@ export async function GET(request: Request) {
     },
     {
       label: "Platform Revenue",
-      value: formatCurrency(platformRevenue + trustSafetyRevenue),
-      rawValue: platformRevenue + trustSafetyRevenue,
+      value: formatCurrency(platformRevenue),
+      rawValue: platformRevenue,
       change: "Live",
-      helper: "payments/banking",
+      helper: "Stripe/payments only",
       tone: "green",
     },
     {
