@@ -272,6 +272,23 @@ function formatPercent(value: number) {
   return `${Number.isFinite(value) ? value.toFixed(1) : "0.0"}%`;
 }
 
+function widthClassFor(value: number, maxValue: number) {
+  const safeMax = Math.max(Math.abs(maxValue), 1);
+  const percent = Math.max(
+    6,
+    Math.min(100, Math.round((Math.abs(value) / safeMax) * 100)),
+  );
+
+  if (percent >= 95) return "w-full";
+  if (percent >= 83) return "w-5/6";
+  if (percent >= 66) return "w-4/6";
+  if (percent >= 50) return "w-3/6";
+  if (percent >= 33) return "w-2/6";
+  if (percent >= 16) return "w-1/6";
+
+  return "w-[6%]";
+}
+
 function getString(row: AnyRow, keys: string[]) {
   for (const key of keys) {
     const value = row[key];
