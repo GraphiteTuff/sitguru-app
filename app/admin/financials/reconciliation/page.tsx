@@ -457,8 +457,7 @@ function isStripeRelatedBooking(row: GenericRow) {
       asTrimmedString(row.stripe_payment_intent_id) ||
       asTrimmedString(row.charge_id) ||
       asTrimmedString(row.stripe_charge_id) ||
-      asTrimmedString(row.checkout_session_id) ||
-      asTrimmedString(row.payment_status),
+      asTrimmedString(row.checkout_session_id),
   );
 }
 
