@@ -43,22 +43,21 @@ type SourceHealth = {
 
 const candidateTables = {
   stripeTransactions: [
-    "trust_safety_financial_events",
-    "bookings",
-    "guru_trust_safety_plan_purchases",
-    "stripe_transactions",
-    "stripe_payment_intents",
-    "stripe_charges",
     "payments",
     "booking_payments",
-    "financial_transactions",
+    "stripe_transactions",
+    "stripe_balance_transactions",
+    "stripe_payment_intents",
+    "stripe_charges",
+    "trust_safety_financial_events",
+    "guru_trust_safety_plan_purchases",
+    "booking_trust_safety_deductions",
   ],
   stripePayouts: [
     "stripe_payouts",
     "stripe_transfers",
     "payouts",
     "financial_payouts",
-    "bookings",
   ],
   stripeRefunds: [
     "stripe_refunds",
@@ -74,7 +73,7 @@ const candidateTables = {
     "financial_disputes",
   ],
   plaidTransactions: [
-    "plaid_transactions",
+    "admin_plaid_transactions",
     "bank_transactions",
     "financial_bank_transactions",
     "banking_transactions",
@@ -318,6 +317,7 @@ function getStripeType(row: AnyRow): StripeTransactionType {
     "type",
     "transaction_type",
     "stripe_type",
+    "reporting_category",
   ]).toLowerCase();
 
   const description = getText(row, ["description", "memo", "name"]).toLowerCase();
@@ -384,9 +384,35 @@ function rowHasStripeReference(row: AnyRow) {
       "stripe_charge_id",
       "charge_id",
       "balance_transaction_id",
+      "stripe_balance_transaction_id",
       "stripe_customer_id",
       "stripe_subscription_id",
+      "stripe_payout_id",
+      "stripe_refund_id",
+      "stripe_dispute_id",
     ]),
+  );
+}
+
+function rowLooksLikeRealStripePayment(row: AnyRow) {
+  const source = getText(row, ["__source_table"]).toLowerCase();
+  const status = getStripeStatus(row);
+  const type = getStripeType(row);
+
+  if (!rowHasStripeReference(row)) return false;
+  if (status === "failed") return false;
+  if (type !== "payment" && type !== "adjustment") return false;
+
+  /*
+    Do not let generic bookings/customer records become Stripe revenue.
+    Payments are allowed only when they live in payment/Stripe tables and
+    contain a Stripe reference.
+  */
+  return (
+    source.includes("payment") ||
+    source.includes("stripe") ||
+    source.includes("trust_safety") ||
+    source.includes("deduction")
   );
 }
 
@@ -445,6 +471,9 @@ function normalizeStripeTransaction(row: AnyRow, index: number) {
     "net_payment",
     "net_payment_cents",
     "guru_net_amount",
+    "platform_revenue",
+    "platform_fee",
+    "sitguru_fee",
   ]);
 
   const net = explicitNet || Math.max(amount - fee, 0);
@@ -463,6 +492,7 @@ function normalizeStripeTransaction(row: AnyRow, index: number) {
         "stripe_payment_intent_id",
         "charge_id",
         "stripe_charge_id",
+        "balance_transaction_id",
       ]) || `stripe-transaction-${index}`,
     createdAt: getDate(row) || new Date().toISOString(),
     customerName: getText(
@@ -498,6 +528,7 @@ function normalizeStripeTransaction(row: AnyRow, index: number) {
         "stripe_charge_id",
         "charge_id",
         "balance_transaction_id",
+        "stripe_balance_transaction_id",
         "id",
       ]) || "Pending reference",
     bookingReference:
@@ -505,6 +536,7 @@ function normalizeStripeTransaction(row: AnyRow, index: number) {
       null,
     matchedBankDeposit: reconciliationStatus === "matched",
     reconciliationStatus,
+    sourceTable: getText(row, ["__source_table"]),
   };
 }
 
@@ -595,6 +627,7 @@ function normalizeRefund(row: AnyRow, index: number) {
       null,
     matchedBankDeposit: false,
     reconciliationStatus: getReconciliationStatus(row),
+    sourceTable: getText(row, ["__source_table"]),
   };
 }
 
@@ -629,6 +662,7 @@ function normalizeDispute(row: AnyRow, index: number) {
       null,
     matchedBankDeposit: false,
     reconciliationStatus: getReconciliationStatus(row),
+    sourceTable: getText(row, ["__source_table"]),
   };
 }
 
@@ -697,7 +731,7 @@ function buildSourceHealth(params: {
       message: params.plaidConnected.length
         ? `${connectedTableMessage(
             params.plaidConnected,
-          )} Stripe-related bank deposits are available for matching when payout deposits are present.`
+          )} Stripe payout deposits will match here when customer payment payouts exist.`
         : "No Plaid/NFCU banking source table was found yet.",
       rowCount: params.plaidStripeDeposits,
     },
@@ -717,6 +751,10 @@ function uniqueByReference<T extends { id: string; stripeReference?: string }>(r
   }
 
   return unique;
+}
+
+function getLiveConnectedStatus(sourceHealth: SourceHealth[]) {
+  return sourceHealth.some((source) => source.ok);
 }
 
 export async function GET(request: Request) {
@@ -748,28 +786,28 @@ export async function GET(request: Request) {
     queryCandidateTables(candidateTables.plaidTransactions),
   ]);
 
-  const stripeRows = stripeTransactionResult.rows
-    .filter(rowHasStripeReference)
+  const stripePaymentRows = stripeTransactionResult.rows
+    .filter(rowLooksLikeRealStripePayment)
     .filter((row) => isWithinRange(row, startDate, endDate));
 
   const payoutRows = stripePayoutResult.rows
     .filter((row) => rowHasStripeReference(row) || rowLooksLikePayout(row))
     .filter((row) => isWithinRange(row, startDate, endDate));
 
-  const refundRows = stripeRefundResult.rows.filter((row) =>
-    isWithinRange(row, startDate, endDate),
-  );
+  const refundRows = stripeRefundResult.rows
+    .filter(rowHasStripeReference)
+    .filter((row) => isWithinRange(row, startDate, endDate));
 
-  const disputeRows = stripeDisputeResult.rows.filter((row) =>
-    isWithinRange(row, startDate, endDate),
-  );
+  const disputeRows = stripeDisputeResult.rows
+    .filter(rowHasStripeReference)
+    .filter((row) => isWithinRange(row, startDate, endDate));
 
   const plaidRows = plaidResult.rows.filter((row) =>
     isWithinRange(row, startDate, endDate),
   );
 
   const transactions = uniqueByReference([
-    ...stripeRows.map(normalizeStripeTransaction),
+    ...stripePaymentRows.map(normalizeStripeTransaction),
     ...refundRows.map(normalizeRefund),
     ...disputeRows.map(normalizeDispute),
   ])
@@ -840,15 +878,16 @@ export async function GET(request: Request) {
     plaidStripeDeposits: plaidStripeDeposits.length,
   });
 
-  const isLive = sourceHealth.some((source) => source.ok && source.rowCount > 0);
+  const isLive = getLiveConnectedStatus(sourceHealth);
+  const hasStripeRows = transactions.length > 0 || payouts.length > 0;
 
   return NextResponse.json({
     ok: true,
     isLive,
     generatedAt,
-    message: isLive
+    message: hasStripeRows
       ? "Live Stripe and Plaid/NFCU financial data connected."
-      : "Stripe and Plaid/NFCU sources are connected only when matching tables contain rows.",
+      : "Stripe financial route is connected. No live Stripe customer payments or payouts have been recorded yet.",
     range,
     summary: {
       grossPayments,
