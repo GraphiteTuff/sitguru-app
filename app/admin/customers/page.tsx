@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
   CircleDollarSign,
@@ -14,6 +15,8 @@ import {
   Repeat2,
   Search,
   Share2,
+  ShieldCheck,
+  Trash2,
   TrendingUp,
   UserRound,
   Users,
@@ -37,6 +40,12 @@ type ProfileRow = {
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
+  mobile_phone?: string | null;
+  email_confirmed_at?: string | null;
+  phone_confirmed_at?: string | null;
+  confirmed_at?: string | null;
   role?: string | null;
   user_role?: string | null;
   account_type?: string | null;
@@ -153,6 +162,7 @@ type CustomerInsight = {
   state: string;
   country: string;
   zipCode: string;
+  phone: string;
   source: string;
   campaign: string;
   bookingCount: number;
@@ -165,6 +175,22 @@ type CustomerInsight = {
   lastBookingDate: string | null;
   firstSeenDate: string | null;
   segment: string;
+};
+
+type CleanupCustomerRecord = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  sourceTable: string;
+  issue: string;
+  reason: string;
+  bookingCount: number;
+  petCount: number;
+  messageCount: number;
+  totalSpend: number;
+  createdAt: string | null;
+  safeToDelete: boolean;
 };
 
 type LocationInsight = {
@@ -325,6 +351,84 @@ function isCustomerProfile(profile: ProfileRow) {
     role.includes("client") ||
     role.includes("owner")
   );
+}
+
+function getPhone(row: AnyRow) {
+  return getText(row, ["phone", "phone_number", "mobile_phone", "mobile"], "");
+}
+
+function hasVerifiedContact(row: AnyRow) {
+  return Boolean(
+    asString(row.email_confirmed_at) ||
+      asString(row.phone_confirmed_at) ||
+      asString(row.confirmed_at),
+  );
+}
+
+function hasProfileLocation(profile: ProfileRow) {
+  return Boolean(
+    getCity(profile as AnyRow) ||
+      getState(profile as AnyRow) ||
+      getZipCode(profile as AnyRow),
+  );
+}
+
+function hasUsablePetParentSignal({
+  profile,
+  bookingCount,
+  petCount,
+  messageCount,
+  totalSpend,
+}: {
+  profile: ProfileRow;
+  bookingCount: number;
+  petCount: number;
+  messageCount: number;
+  totalSpend: number;
+}) {
+  const email = asString(profile.email);
+  const phone = getPhone(profile as AnyRow);
+
+  return Boolean(
+    email ||
+      phone ||
+      hasVerifiedContact(profile as AnyRow) ||
+      bookingCount > 0 ||
+      petCount > 0 ||
+      messageCount > 0 ||
+      totalSpend > 0,
+  );
+}
+
+function getCleanupReason({
+  profile,
+  bookingCount,
+  petCount,
+  messageCount,
+  totalSpend,
+}: {
+  profile?: ProfileRow | null;
+  bookingCount: number;
+  petCount: number;
+  messageCount: number;
+  totalSpend: number;
+}) {
+  const reasons: string[] = [];
+
+  if (!profile) {
+    reasons.push("No matching profile row");
+  } else {
+    if (!asString(profile.email)) reasons.push("No email");
+    if (!getPhone(profile as AnyRow)) reasons.push("No phone");
+    if (!hasVerifiedContact(profile as AnyRow)) reasons.push("No verified contact");
+  }
+
+  if (bookingCount === 0) reasons.push("0 bookings");
+  if (petCount === 0) reasons.push("0 pets");
+  if (messageCount === 0) reasons.push("0 messages");
+  if (totalSpend === 0) reasons.push("$0 spend");
+
+  return reasons.join(" · ");
 }
 
 function getRowBoolean(row: AnyRow, keys: string[]) {
@@ -958,26 +1062,186 @@ async function getCustomerIntelligenceData() {
   const rawNetworkClicks = ((networkClicksResult.data || []) as AnyRow[]).filter(Boolean);
   const rawPartnerCampaigns = ((partnerCampaignsResult.data || []) as AnyRow[]).filter(Boolean);
 
-  const hiddenCustomerIds = new Set(
+  const demoProfileIds = new Set(
     rawProfiles
       .filter((profile) => isDemoLikeRow(profile as AnyRow))
       .map((profile) => profile.id)
       .filter(Boolean),
   );
 
-  const profiles = rawProfiles.filter(
+  const customerProfileCandidates = rawProfiles.filter(
     (profile) =>
+      Boolean(profile.id) &&
       isCustomerProfile(profile) &&
       !isDemoLikeRow(profile as AnyRow) &&
-      !hiddenCustomerIds.has(profile.id),
+      !demoProfileIds.has(profile.id),
   );
 
-  const liveCustomerIds = new Set(
-    profiles.map((profile) => profile.id).filter(Boolean),
+  const candidateCustomerIds = new Set(
+    customerProfileCandidates.map((profile) => profile.id).filter(Boolean),
+  );
+
+  const customerIdsByEmail = new Map(
+    customerProfileCandidates
+      .map((profile) => [
+        asString(profile.email).toLowerCase(),
+        profile.id,
+      ] as const)
+      .filter(([email, id]) => Boolean(email) && Boolean(id)),
+  );
+
+  function getCandidateBookingCustomerId(booking: BookingRow) {
+    const possibleIds = [
+      booking.customer_id,
+      booking.pet_owner_id,
+      booking.pet_parent_id,
+      booking.client_id,
+      booking.user_id,
+    ]
+      .map((value) => asString(value))
+      .filter(Boolean);
+
+    const matchedId = possibleIds.find((id) => candidateCustomerIds.has(id));
+    if (matchedId) return matchedId;
+
+    const matchedEmail = customerIdsByEmail.get(
+      asString(booking.customer_email).toLowerCase(),
+    );
+
+    return matchedEmail || null;
+  }
+
+  function getCandidatePetOwnerId(pet: PetRow) {
+    const possibleIds = [
+      pet.owner_profile_id,
+      pet.owner_id,
+      pet.customer_id,
+      pet.user_id,
+      pet.pet_owner_id,
+    ]
+      .map((value) => asString(value))
+      .filter(Boolean);
+
+    return possibleIds.find((id) => candidateCustomerIds.has(id)) || null;
+  }
+
+  function hasCandidateCustomerMessageParticipant(message: MessageRow) {
+    return getMessageParticipantIds(message).some((id) =>
+      candidateCustomerIds.has(id),
+    );
+  }
+
+  const nonDemoBookings = rawBookings.filter(
+    (booking) =>
+      !isDemoLikeRow(booking as AnyRow) &&
+      !hasHiddenCustomerReference(booking as AnyRow, demoProfileIds),
+  );
+  const nonDemoPets = rawPets.filter(
+    (pet) =>
+      !isDemoLikeRow(pet as AnyRow) &&
+      !hasHiddenCustomerReference(pet as AnyRow, demoProfileIds),
+  );
+  const nonDemoMessages = rawMessages.filter(
+    (message) =>
+      !isDemoLikeRow(message as AnyRow) &&
+      !hasHiddenCustomerReference(message as AnyRow, demoProfileIds),
+  );
+
+  const candidateBookings = nonDemoBookings.filter((booking) =>
+    Boolean(getCandidateBookingCustomerId(booking)),
+  );
+  const candidatePets = nonDemoPets.filter((pet) =>
+    Boolean(getCandidatePetOwnerId(pet)),
+  );
+  const candidateMessages = nonDemoMessages.filter((message) =>
+    hasCandidateCustomerMessageParticipant(message),
+  );
+
+  const bookingStatsByCustomerId = new Map<
+    string,
+    {
+      bookingCount: number;
+      paidBookingCount: number;
+      completedBookingCount: number;
+      totalSpend: number;
+      lastBookingDate: string | null;
+      firstBookingDate: string | null;
+    }
+  >();
+
+  for (const booking of candidateBookings) {
+    const customerId = getCandidateBookingCustomerId(booking);
+    if (!customerId) continue;
+
+    const current =
+      bookingStatsByCustomerId.get(customerId) || {
+        bookingCount: 0,
+        paidBookingCount: 0,
+        completedBookingCount: 0,
+        totalSpend: 0,
+        lastBookingDate: null,
+        firstBookingDate: null,
+      };
+
+    const bookingDate = getBookingDate(booking);
+
+    current.bookingCount += 1;
+    current.paidBookingCount += isPaidBooking(booking) ? 1 : 0;
+    current.completedBookingCount += isCompletedBooking(booking) ? 1 : 0;
+    current.totalSpend += getBookingAmount(booking);
+    current.lastBookingDate = getMostRecentDate([
+      current.lastBookingDate,
+      bookingDate,
+    ]);
+    current.firstBookingDate = getOldestDate([
+      current.firstBookingDate,
+      booking.created_at || null,
+      bookingDate,
+    ]);
+
+    bookingStatsByCustomerId.set(customerId, current);
+  }
+
+  const petOwnerCountMap = new Map<string, number>();
+
+  for (const pet of candidatePets) {
+    const ownerId = getCandidatePetOwnerId(pet);
+    if (!ownerId) continue;
+
+    petOwnerCountMap.set(ownerId, (petOwnerCountMap.get(ownerId) || 0) + 1);
+  }
+
+  const messageCountMap = new Map<string, number>();
+
+  for (const message of candidateMessages) {
+    for (const participantId of getMessageParticipantIds(message)) {
+      if (!candidateCustomerIds.has(participantId)) continue;
+
+      messageCountMap.set(
+        participantId,
+        (messageCountMap.get(participantId) || 0) + 1,
+      );
+    }
+  }
+
+  const visibleProfiles = customerProfileCandidates.filter((profile) => {
+    const bookingStats = bookingStatsByCustomerId.get(profile.id);
+
+    return hasUsablePetParentSignal({
+      profile,
+      bookingCount: bookingStats?.bookingCount || 0,
+      petCount: petOwnerCountMap.get(profile.id) || 0,
+      messageCount: messageCountMap.get(profile.id) || 0,
+      totalSpend: bookingStats?.totalSpend || 0,
+    });
+  });
+
+  const visibleCustomerIds = new Set(
+    visibleProfiles.map((profile) => profile.id).filter(Boolean),
   );
 
   const liveCustomerIdsByEmail = new Map(
-    profiles
+    visibleProfiles
       .map((profile) => [
         asString(profile.email).toLowerCase(),
         profile.id,
@@ -996,7 +1260,7 @@ async function getCustomerIntelligenceData() {
       .map((value) => asString(value))
       .filter(Boolean);
 
-    const matchedId = possibleIds.find((id) => liveCustomerIds.has(id));
+    const matchedId = possibleIds.find((id) => visibleCustomerIds.has(id));
     if (matchedId) return matchedId;
 
     const matchedEmail = liveCustomerIdsByEmail.get(
@@ -1017,31 +1281,24 @@ async function getCustomerIntelligenceData() {
       .map((value) => asString(value))
       .filter(Boolean);
 
-    return possibleIds.find((id) => liveCustomerIds.has(id)) || null;
+    return possibleIds.find((id) => visibleCustomerIds.has(id)) || null;
   }
 
   function hasLiveCustomerMessageParticipant(message: MessageRow) {
-    return getMessageParticipantIds(message).some((id) => liveCustomerIds.has(id));
+    return getMessageParticipantIds(message).some((id) =>
+      visibleCustomerIds.has(id),
+    );
   }
 
-  const bookings = rawBookings.filter(
-    (booking) =>
-      !isDemoLikeRow(booking as AnyRow) &&
-      !hasHiddenCustomerReference(booking as AnyRow, hiddenCustomerIds) &&
-      Boolean(getLiveBookingCustomerId(booking)),
+  const profiles = visibleProfiles;
+  const bookings = candidateBookings.filter((booking) =>
+    Boolean(getLiveBookingCustomerId(booking)),
   );
-  const pets = rawPets.filter(
-    (pet) =>
-      !isDemoLikeRow(pet as AnyRow) &&
-      !hasHiddenCustomerReference(pet as AnyRow, hiddenCustomerIds) &&
-      Boolean(getLivePetOwnerId(pet)),
+  const pets = candidatePets.filter((pet) => Boolean(getLivePetOwnerId(pet)));
+  const messages = candidateMessages.filter((message) =>
+    hasLiveCustomerMessageParticipant(message),
   );
-  const messages = rawMessages.filter(
-    (message) =>
-      !isDemoLikeRow(message as AnyRow) &&
-      !hasHiddenCustomerReference(message as AnyRow, hiddenCustomerIds) &&
-      hasLiveCustomerMessageParticipant(message),
-  );
+
   const launchSignups = rawLaunchSignups.filter((row) => !isDemoLikeRow(row));
   const launchWaitlist = rawLaunchWaitlist.filter((row) => !isDemoLikeRow(row));
   const referralClicks = rawReferralClicks.filter((row) => !isDemoLikeRow(row));
@@ -1055,13 +1312,13 @@ async function getCustomerIntelligenceData() {
 
   const hiddenDemoRows =
     rawProfiles.length -
-    profiles.length +
+    customerProfileCandidates.length +
     rawBookings.length -
-    bookings.length +
+    nonDemoBookings.length +
     rawPets.length -
-    pets.length +
+    nonDemoPets.length +
     rawMessages.length -
-    messages.length +
+    nonDemoMessages.length +
     rawLaunchSignups.length -
     launchSignups.length +
     rawLaunchWaitlist.length -
@@ -1074,6 +1331,188 @@ async function getCustomerIntelligenceData() {
     networkClicks.length +
     rawPartnerCampaigns.length -
     partnerCampaigns.length;
+
+  const cleanupRecords: CleanupCustomerRecord[] = customerProfileCandidates
+    .filter((profile) => !visibleCustomerIds.has(profile.id))
+    .map((profile) => {
+      const bookingStats = bookingStatsByCustomerId.get(profile.id);
+      const bookingCount = bookingStats?.bookingCount || 0;
+      const petCount = petOwnerCountMap.get(profile.id) || 0;
+      const messageCount = messageCountMap.get(profile.id) || 0;
+      const totalSpend = bookingStats?.totalSpend || 0;
+      const email = asString(profile.email);
+      const phone = getPhone(profile as AnyRow);
+      const hasContact = Boolean(email || phone || hasVerifiedContact(profile as AnyRow));
+      const hasActivity =
+        bookingCount > 0 || petCount > 0 || messageCount > 0 || totalSpend > 0;
+
+      return {
+        id: profile.id,
+        name: getDisplayName(profile as AnyRow, "Incomplete Pet Parent"),
+        email,
+        phone,
+        sourceTable: "profiles",
+        issue: hasActivity
+          ? "Needs verification review"
+          : "Incomplete / empty profile",
+        reason: getCleanupReason({
+          profile,
+          bookingCount,
+          petCount,
+          messageCount,
+          totalSpend,
+        }),
+        bookingCount,
+        petCount,
+        messageCount,
+        totalSpend,
+        createdAt: profile.created_at || profile.updated_at || null,
+        safeToDelete: !hasContact && !hasActivity,
+      };
+    });
+
+  const orphanCustomerMap = new Map<string, CleanupCustomerRecord>();
+
+  function upsertOrphanRecord({
+    id,
+    sourceTable,
+    name,
+    email,
+    createdAt,
+    bookingAmount = 0,
+    bookingCount = 0,
+    petCount = 0,
+    messageCount = 0,
+  }: {
+    id: string;
+    sourceTable: string;
+    name?: string;
+    email?: string;
+    createdAt?: string | null;
+    bookingAmount?: number;
+    bookingCount?: number;
+    petCount?: number;
+    messageCount?: number;
+  }) {
+    if (!id || candidateCustomerIds.has(id) || visibleCustomerIds.has(id)) return;
+    if (demoProfileIds.has(id)) return;
+
+    const current =
+      orphanCustomerMap.get(id) ||
+      {
+        id,
+        name: name || "Orphaned customer ID",
+        email: email || "",
+        phone: "",
+        sourceTable,
+        issue: "Orphaned customer reference",
+        reason: "No matching profile row",
+        bookingCount: 0,
+        petCount: 0,
+        messageCount: 0,
+        totalSpend: 0,
+        createdAt: createdAt || null,
+        safeToDelete: false,
+      };
+
+    current.sourceTable = current.sourceTable.includes(sourceTable)
+      ? current.sourceTable
+      : `${current.sourceTable}, ${sourceTable}`;
+    current.name =
+      current.name === "Orphaned customer ID" && name ? name : current.name;
+    current.email = current.email || email || "";
+    current.bookingCount += bookingCount;
+    current.petCount += petCount;
+    current.messageCount += messageCount;
+    current.totalSpend += bookingAmount;
+    current.createdAt = getOldestDate([current.createdAt, createdAt || null]);
+    current.reason = getCleanupReason({
+      profile: null,
+      bookingCount: current.bookingCount,
+      petCount: current.petCount,
+      messageCount: current.messageCount,
+      totalSpend: current.totalSpend,
+    });
+    current.safeToDelete =
+      !current.email &&
+      current.bookingCount === 0 &&
+      current.petCount === 0 &&
+      current.messageCount === 0 &&
+      current.totalSpend === 0;
+
+    orphanCustomerMap.set(id, current);
+  }
+
+  for (const booking of nonDemoBookings) {
+    const directIds = [
+      booking.customer_id,
+      booking.pet_owner_id,
+      booking.pet_parent_id,
+      booking.client_id,
+      booking.user_id,
+    ]
+      .map((value) => asString(value))
+      .filter(Boolean);
+
+    for (const id of directIds) {
+      upsertOrphanRecord({
+        id,
+        sourceTable: "bookings",
+        name: getDisplayName(booking as AnyRow, "Orphaned booking customer"),
+        email: asString(booking.customer_email),
+        createdAt: booking.created_at || getBookingDate(booking),
+        bookingAmount: getBookingAmount(booking),
+        bookingCount: 1,
+      });
+    }
+  }
+
+  for (const pet of nonDemoPets) {
+    const directIds = [
+      pet.owner_profile_id,
+      pet.owner_id,
+      pet.customer_id,
+      pet.user_id,
+      pet.pet_owner_id,
+    ]
+      .map((value) => asString(value))
+      .filter(Boolean);
+
+    for (const id of directIds) {
+      upsertOrphanRecord({
+        id,
+        sourceTable: "pets",
+        name: getDisplayName(pet as AnyRow, "Orphaned pet owner"),
+        createdAt: pet.created_at || null,
+        petCount: 1,
+      });
+    }
+  }
+
+  for (const message of nonDemoMessages) {
+    for (const id of getMessageParticipantIds(message)) {
+      upsertOrphanRecord({
+        id,
+        sourceTable: "messages",
+        createdAt: message.created_at || null,
+        messageCount: 1,
+      });
+    }
+  }
+
+  const orphanCleanupRecords = Array.from(orphanCustomerMap.values()).filter(
+    (record) => !visibleCustomerIds.has(record.id),
+  );
+
+  const allCleanupRecords = [...cleanupRecords, ...orphanCleanupRecords]
+    .sort((a, b) => {
+      if (a.safeToDelete !== b.safeToDelete) return a.safeToDelete ? -1 : 1;
+      return (
+        new Date(b.createdAt || 0).getTime() -
+        new Date(a.createdAt || 0).getTime()
+      );
+    })
+    .slice(0, 25);
 
   const signupRows = [...launchSignups, ...launchWaitlist];
   const clickRows = [...referralClicks, ...networkClicks];
@@ -1089,13 +1528,14 @@ async function getCustomerIntelligenceData() {
 
     customerMap.set(profile.id, {
       id: profile.id,
-      name: getDisplayName(profile as AnyRow, "Customer"),
+      name: getDisplayName(profile as AnyRow, "Pet Parent"),
       email: profile.email || "",
       avatarUrl: profile.avatar_url || "",
       city: getCity(profile as AnyRow),
       state: getState(profile as AnyRow),
       country: getCountry(profile as AnyRow),
       zipCode: getZipCode(profile as AnyRow),
+      phone: getPhone(profile as AnyRow),
       source,
       campaign: getCampaign(profile as AnyRow),
       bookingCount: 0,
@@ -1148,32 +1588,37 @@ async function getCustomerIntelligenceData() {
     customerMap.set(customerId, existing);
   }
 
-  const petOwnerCountMap = new Map<string, number>();
+  const visiblePetOwnerCountMap = new Map<string, number>();
 
   for (const pet of pets) {
-    const ownerId = getPetOwnerId(pet);
+    const ownerId = getLivePetOwnerId(pet);
     if (!ownerId) continue;
 
-    petOwnerCountMap.set(ownerId, (petOwnerCountMap.get(ownerId) || 0) + 1);
+    visiblePetOwnerCountMap.set(
+      ownerId,
+      (visiblePetOwnerCountMap.get(ownerId) || 0) + 1,
+    );
   }
 
-  for (const [customerId, petCount] of petOwnerCountMap.entries()) {
+  for (const [customerId, petCount] of visiblePetOwnerCountMap.entries()) {
     const existing = customerMap.get(customerId);
     if (existing) existing.petCount = petCount;
   }
 
-  const messageCountMap = new Map<string, number>();
+  const visibleMessageCountMap = new Map<string, number>();
 
   for (const message of messages) {
     for (const participantId of getMessageParticipantIds(message)) {
-      messageCountMap.set(
+      if (!visibleCustomerIds.has(participantId)) continue;
+
+      visibleMessageCountMap.set(
         participantId,
-        (messageCountMap.get(participantId) || 0) + 1,
+        (visibleMessageCountMap.get(participantId) || 0) + 1,
       );
     }
   }
 
-  for (const [customerId, messageCount] of messageCountMap.entries()) {
+  for (const [customerId, messageCount] of visibleMessageCountMap.entries()) {
     const existing = customerMap.get(customerId);
     if (existing) existing.messageCount = messageCount;
   }
@@ -1282,7 +1727,7 @@ async function getCustomerIntelligenceData() {
       {
         label: "Lead",
         value: segments.lead,
-        helper: "No booking yet",
+        helper: "Verified contact, location, or activity but no booking yet",
       },
     ],
     topCities: toChartItemsFromLocations(locationInsights.cities),
@@ -1297,6 +1742,7 @@ async function getCustomerIntelligenceData() {
     pets,
     messages,
     customers: sortedCustomers,
+    cleanupRecords: allCleanupRecords,
     locationInsights,
     sourceInsights,
     socialSourceInsights,
@@ -1321,6 +1767,8 @@ async function getCustomerIntelligenceData() {
       socialClicks,
       topSocialPlatform: socialSourceInsights[0]?.label || "None yet",
       hiddenDemoRows,
+      cleanupRecords: allCleanupRecords.length,
+      safeDeleteCandidates: allCleanupRecords.filter((record) => record.safeToDelete).length,
     },
   };
 }
@@ -1392,9 +1840,9 @@ export default async function AdminCustomerIntelligencePage() {
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             icon={<Users size={22} />}
-            label="Customers"
+            label="Pet Parents"
             value={number(data.metrics.totalCustomers)}
-            detail="Real Pet Parent profiles plus customer IDs found in bookings"
+            detail="Visible records with contact, verification, location, pets, bookings, messages, or spend"
           />
 
           <StatCard
@@ -1421,10 +1869,10 @@ export default async function AdminCustomerIntelligencePage() {
           />
 
           <StatCard
-            icon={<Search size={22} />}
-            label="Demo Rows Hidden"
-            value={number(data.metrics.hiddenDemoRows)}
-            detail="Filtered from live customer, booking, pet, message, and growth KPIs"
+            icon={<AlertTriangle size={22} />}
+            label="Cleanup Review"
+            value={number(data.metrics.cleanupRecords)}
+            detail={`${number(data.metrics.safeDeleteCandidates)} safe-delete candidates · ${number(data.metrics.hiddenDemoRows)} demo/test rows hidden`}
           />
         </section>
 
@@ -1464,6 +1912,11 @@ export default async function AdminCustomerIntelligencePage() {
             detail={`Top platform: ${data.metrics.topSocialPlatform}`}
           />
         </section>
+
+
+        {data.cleanupRecords.length ? (
+          <CleanupReviewPanel records={data.cleanupRecords} />
+        ) : null}
 
         <section className="grid items-start gap-5 xl:grid-cols-12">
           <div className="xl:col-span-4">
@@ -1716,6 +2169,111 @@ function DashboardCard({ children }: { children: ReactNode }) {
     <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
       {children}
     </div>
+  );
+}
+
+
+function CleanupReviewPanel({ records }: { records: CleanupCustomerRecord[] }) {
+  const safeDeleteCount = records.filter((record) => record.safeToDelete).length;
+
+  return (
+    <section className="rounded-[30px] border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-amber-800">
+            <AlertTriangle size={15} />
+            Pet Parent Cleanup Queue
+          </div>
+
+          <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+            Incomplete or orphaned records are hidden from visible Pet Parents.
+          </h2>
+
+          <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-700">
+            These records do not count as live Pet Parents. Safe-delete candidates
+            have no contact information, no pets, no bookings, no messages, and
+            no spend. Records with any activity are protected for review instead
+            of being treated as normal customers.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-black text-amber-900">
+          {number(safeDeleteCount)} safe to delete · {number(records.length)} total review records
+        </div>
+      </div>
+
+      <div className="mt-5 overflow-hidden rounded-3xl border border-amber-200 bg-white">
+        <div className="grid gap-3 border-b border-amber-100 bg-amber-100/70 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-amber-900 md:grid-cols-[1.25fr_0.85fr_1.3fr_0.7fr]">
+          <div>Record</div>
+          <div>Status</div>
+          <div>Reason</div>
+          <div>Action</div>
+        </div>
+
+        <div className="divide-y divide-amber-100">
+          {records.map((record) => (
+            <div
+              key={`${record.sourceTable}-${record.id}`}
+              className="grid gap-3 px-4 py-4 text-sm md:grid-cols-[1.25fr_0.85fr_1.3fr_0.7fr] md:items-center"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-black text-slate-950">
+                  {record.name}
+                </p>
+                <p className="mt-1 truncate text-xs font-bold text-slate-500">
+                  {record.email || record.phone || record.id}
+                </p>
+                <p className="mt-1 text-xs font-bold text-slate-400">
+                  Source: {record.sourceTable} · Created {formatDate(record.createdAt)}
+                </p>
+              </div>
+
+              <div>
+                <span
+                  className={[
+                    "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black",
+                    record.safeToDelete
+                      ? "border-rose-200 bg-rose-50 text-rose-800"
+                      : "border-sky-200 bg-sky-50 text-sky-800",
+                  ].join(" ")}
+                >
+                  {record.safeToDelete ? (
+                    <Trash2 size={14} />
+                  ) : (
+                    <ShieldCheck size={14} />
+                  )}
+                  {record.safeToDelete ? "Safe Delete Candidate" : "Review / Protect"}
+                </span>
+              </div>
+
+              <div>
+                <p className="font-bold leading-6 text-slate-700">
+                  {record.reason}
+                </p>
+                <p className="mt-1 text-xs font-bold text-slate-500">
+                  {number(record.bookingCount)} bookings · {number(record.petCount)} pets · {number(record.messageCount)} messages · {money(record.totalSpend)}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {record.safeToDelete ? (
+                  <Link
+                    href={`/admin/customers/${record.id}`}
+                    className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800 transition hover:bg-rose-100"
+                  >
+                    Review delete
+                  </Link>
+                ) : (
+                  <span className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600">
+                    Protected
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
