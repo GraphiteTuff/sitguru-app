@@ -518,11 +518,14 @@ export default function CustomerInsightsTable({
           <div className="rounded-[26px] border border-[#e3ece5] bg-white p-8 text-center">
             <Search className="mx-auto mb-3 text-slate-400" size={34} />
             <p className="text-base font-black text-slate-950">
-              No customers match these filters.
+              {customers.length === 0
+                ? "No real Pet Parent signups yet."
+                : "No customers match these filters."}
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-500">
-              Try clearing filters or searching another customer, source, or
-              location.
+              {customers.length === 0
+                ? "New live Pet Parent signups will appear here after a real profile is created in Supabase."
+                : "Try clearing filters or searching another customer, source, or location."}
             </p>
           </div>
         ) : null}
@@ -713,11 +716,14 @@ export default function CustomerInsightsTable({
                   >
                     <Search className="mx-auto mb-3 text-slate-400" size={34} />
                     <p className="text-base font-black text-slate-950">
-                      No customers match these filters.
+                      {customers.length === 0
+                        ? "No real Pet Parent signups yet."
+                        : "No customers match these filters."}
                     </p>
                     <p className="mt-1 text-sm font-semibold text-slate-500">
-                      Try clearing filters or searching another customer,
-                      source, or location.
+                      {customers.length === 0
+                        ? "New live Pet Parent signups will appear here after a real profile is created in Supabase."
+                        : "Try clearing filters or searching another customer, source, or location."}
                     </p>
                   </td>
                 </tr>
