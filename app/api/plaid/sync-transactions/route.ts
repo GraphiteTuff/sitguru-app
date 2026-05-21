@@ -11,6 +11,7 @@ type PlaidItemRow = {
   institution_name?: string | null;
   plaid_environment?: string | null;
   transactions_cursor?: string | null;
+  created_at?: string | null;
 };
 
 type PlaidAccountRow = {
@@ -26,6 +27,19 @@ type AutoCategory = {
   sitguru_category_type: string;
   sitguru_report_section: string;
   is_excluded_from_reports: boolean;
+};
+
+type ItemSyncResult = {
+  item_id: string;
+  institution_name?: string | null;
+  status: "synced" | "skipped" | "failed";
+  added: number;
+  modified: number;
+  removed: number;
+  auto_categorized: number;
+  skipped_non_business_transactions: number;
+  error?: string;
+  needs_reauthorization?: boolean;
 };
 
 function getErrorMessage(error: unknown) {
@@ -47,16 +61,41 @@ function getErrorMessage(error: unknown) {
   return "Unable to sync Plaid transactions.";
 }
 
+function getPlaidErrorCode(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof error.response === "object" &&
+    error.response !== null &&
+    "data" in error.response &&
+    typeof error.response.data === "object" &&
+    error.response.data !== null &&
+    "error_code" in error.response.data &&
+    typeof error.response.data.error_code === "string"
+  ) {
+    return error.response.data.error_code;
+  }
+
+  return null;
+}
+
 function asDateString(value?: string | null) {
   if (!value) return null;
   return value;
 }
 
 function isBusinessCheckingOrSavings(account: PlaidAccountRow) {
-  const name = `${account.name || ""} ${account.official_name || ""}`.toLowerCase();
+  const name = `${account.name || ""} ${
+    account.official_name || ""
+  }`.toLowerCase();
+
   const subtype = String(account.subtype || "").toLowerCase();
 
-  return (subtype === "checking" || subtype === "savings") && name.includes("business");
+  return (
+    (subtype === "checking" || subtype === "savings") &&
+    name.includes("business")
+  );
 }
 
 function autoCategorizeTransaction(transaction: {
@@ -64,10 +103,18 @@ function autoCategorizeTransaction(transaction: {
   merchant_name?: string | null;
   amount?: number | null;
 }): AutoCategory {
-  const text = `${transaction.name || ""} ${transaction.merchant_name || ""}`.toLowerCase();
+  const text = `${transaction.name || ""} ${
+    transaction.merchant_name || ""
+  }`.toLowerCase();
+
   const amount = Number(transaction.amount || 0);
 
-  if (text.includes("transfer from savings") || text.includes("transfer to checking")) {
+  if (
+    text.includes("transfer from savings") ||
+    text.includes("transfer to checking") ||
+    text.includes("transfer from checking") ||
+    text.includes("transfer to savings")
+  ) {
     return {
       sitguru_category: "Transfer Between Accounts",
       sitguru_category_type: "transfer",
@@ -101,7 +148,9 @@ function autoCategorizeTransaction(transaction: {
     text.includes("supabase") ||
     text.includes("vercel") ||
     text.includes("twilio") ||
-    text.includes("google")
+    text.includes("google") ||
+    text.includes("openai") ||
+    text.includes("chatgpt")
   ) {
     return {
       sitguru_category: "Software / SaaS",
@@ -114,6 +163,7 @@ function autoCategorizeTransaction(transaction: {
   if (
     text.includes("meta") ||
     text.includes("facebook") ||
+    text.includes("instagram") ||
     text.includes("penny") ||
     text.includes("pennypower")
   ) {
@@ -152,6 +202,10 @@ function autoCategorizeTransaction(transaction: {
     };
   }
 
+  /*
+    Plaid uses positive amounts for money leaving the account and negative
+    amounts for money entering the account.
+  */
   if (amount < 0) {
     return {
       sitguru_category: "Other Income",
@@ -221,7 +275,10 @@ async function requireAdminUser() {
   if (userError || !user) {
     return {
       user: null,
-      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      response: NextResponse.json(
+        { error: "Unauthorized. Please sign in as admin again." },
+        { status: 401 },
+      ),
     };
   }
 
@@ -259,6 +316,253 @@ async function requireAdminUser() {
   };
 }
 
+async function upsertPlaidTransaction({
+  item,
+  transaction,
+}: {
+  item: PlaidItemRow;
+  transaction: {
+    account_id: string;
+    transaction_id: string;
+    name: string;
+    merchant_name?: string | null;
+    amount: number;
+    iso_currency_code?: string | null;
+    unofficial_currency_code?: string | null;
+    date: string;
+    authorized_date?: string | null;
+    pending: boolean;
+    payment_channel?: string | null;
+    category?: string[] | null;
+    category_id?: string | null;
+    personal_finance_category?: unknown;
+  };
+}) {
+  const { error } = await supabaseAdmin.from("admin_plaid_transactions").upsert(
+    {
+      user_id: item.user_id,
+      item_id: item.item_id,
+      account_id: transaction.account_id,
+      transaction_id: transaction.transaction_id,
+      name: transaction.name,
+      merchant_name: transaction.merchant_name || null,
+      amount: transaction.amount,
+      iso_currency_code: transaction.iso_currency_code || null,
+      unofficial_currency_code: transaction.unofficial_currency_code || null,
+      date: asDateString(transaction.date),
+      authorized_date: asDateString(transaction.authorized_date),
+      pending: transaction.pending,
+      payment_channel: transaction.payment_channel || null,
+      category: transaction.category || null,
+      category_id: transaction.category_id || null,
+      personal_finance_category: transaction.personal_finance_category || null,
+      raw: transaction,
+      removed_at: null,
+      updated_at: new Date().toISOString(),
+    },
+    {
+      onConflict: "transaction_id",
+    },
+  );
+
+  if (error) {
+    throw new Error(`Unable to save Plaid transaction: ${error.message}`);
+  }
+
+  const category = autoCategorizeTransaction(transaction);
+
+  await applyAutoCategory({
+    userId: item.user_id,
+    transactionId: transaction.transaction_id,
+    category,
+  });
+}
+
+async function syncSinglePlaidItem({
+  item,
+  allowedAccountIds,
+}: {
+  item: PlaidItemRow;
+  allowedAccountIds: Set<string>;
+}): Promise<ItemSyncResult> {
+  let totalAdded = 0;
+  let totalModified = 0;
+  let totalRemoved = 0;
+  let skippedTransactions = 0;
+  let autoCategorized = 0;
+
+  try {
+    let cursor = item.transactions_cursor || undefined;
+    let hasMore = true;
+    let pageCount = 0;
+
+    while (hasMore) {
+      pageCount += 1;
+
+      const syncResponse = await plaidClient.transactionsSync({
+        access_token: item.access_token,
+        cursor,
+        count: 500,
+      });
+
+      const added = syncResponse.data.added || [];
+      const modified = syncResponse.data.modified || [];
+      const removed = syncResponse.data.removed || [];
+
+      for (const transaction of added) {
+        if (!allowedAccountIds.has(transaction.account_id)) {
+          skippedTransactions += 1;
+          continue;
+        }
+
+        await upsertPlaidTransaction({
+          item,
+          transaction: {
+            account_id: transaction.account_id,
+            transaction_id: transaction.transaction_id,
+            name: transaction.name,
+            merchant_name: transaction.merchant_name || null,
+            amount: transaction.amount,
+            iso_currency_code: transaction.iso_currency_code || null,
+            unofficial_currency_code:
+              transaction.unofficial_currency_code || null,
+            date: transaction.date,
+            authorized_date: transaction.authorized_date || null,
+            pending: transaction.pending,
+            payment_channel: transaction.payment_channel || null,
+            category: transaction.category || null,
+            category_id: transaction.category_id || null,
+            personal_finance_category:
+              transaction.personal_finance_category || null,
+          },
+        });
+
+        autoCategorized += 1;
+        totalAdded += 1;
+      }
+
+      for (const transaction of modified) {
+        if (!allowedAccountIds.has(transaction.account_id)) {
+          skippedTransactions += 1;
+          continue;
+        }
+
+        await upsertPlaidTransaction({
+          item,
+          transaction: {
+            account_id: transaction.account_id,
+            transaction_id: transaction.transaction_id,
+            name: transaction.name,
+            merchant_name: transaction.merchant_name || null,
+            amount: transaction.amount,
+            iso_currency_code: transaction.iso_currency_code || null,
+            unofficial_currency_code:
+              transaction.unofficial_currency_code || null,
+            date: transaction.date,
+            authorized_date: transaction.authorized_date || null,
+            pending: transaction.pending,
+            payment_channel: transaction.payment_channel || null,
+            category: transaction.category || null,
+            category_id: transaction.category_id || null,
+            personal_finance_category:
+              transaction.personal_finance_category || null,
+          },
+        });
+
+        autoCategorized += 1;
+        totalModified += 1;
+      }
+
+      for (const removedTransaction of removed) {
+        const { error: removeError } = await supabaseAdmin
+          .from("admin_plaid_transactions")
+          .update({
+            removed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", item.user_id)
+          .eq("transaction_id", removedTransaction.transaction_id);
+
+        if (removeError) {
+          throw new Error(
+            `Unable to mark removed transaction: ${removeError.message}`,
+          );
+        }
+
+        totalRemoved += 1;
+      }
+
+      cursor = syncResponse.data.next_cursor;
+      hasMore = Boolean(syncResponse.data.has_more);
+
+      if (pageCount > 20) {
+        throw new Error(
+          `Plaid transaction sync exceeded 20 pages for item ${item.item_id}.`,
+        );
+      }
+    }
+
+    const { error: cursorError } = await supabaseAdmin
+      .from("admin_plaid_items")
+      .update({
+        transactions_cursor: cursor || null,
+        transactions_last_synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", item.user_id)
+      .eq("item_id", item.item_id);
+
+    if (cursorError) {
+      throw new Error(`Unable to update Plaid sync cursor: ${cursorError.message}`);
+    }
+
+    return {
+      item_id: item.item_id,
+      institution_name: item.institution_name,
+      status: "synced",
+      added: totalAdded,
+      modified: totalModified,
+      removed: totalRemoved,
+      auto_categorized: autoCategorized,
+      skipped_non_business_transactions: skippedTransactions,
+    };
+  } catch (error) {
+    const plaidErrorCode = getPlaidErrorCode(error);
+    const message = getErrorMessage(error);
+
+    if (
+      plaidErrorCode === "ADDITIONAL_CONSENT_REQUIRED" ||
+      plaidErrorCode === "ITEM_LOGIN_REQUIRED" ||
+      plaidErrorCode === "INVALID_ACCESS_TOKEN"
+    ) {
+      return {
+        item_id: item.item_id,
+        institution_name: item.institution_name,
+        status: "skipped",
+        added: totalAdded,
+        modified: totalModified,
+        removed: totalRemoved,
+        auto_categorized: autoCategorized,
+        skipped_non_business_transactions: skippedTransactions,
+        needs_reauthorization: true,
+        error: message,
+      };
+    }
+
+    return {
+      item_id: item.item_id,
+      institution_name: item.institution_name,
+      status: "failed",
+      added: totalAdded,
+      modified: totalModified,
+      removed: totalRemoved,
+      auto_categorized: autoCategorized,
+      skipped_non_business_transactions: skippedTransactions,
+      error: message,
+    };
+  }
+}
+
 export async function POST(request: NextRequest) {
   const adminCheck = await requireAdminUser();
 
@@ -268,6 +572,7 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => ({}))) as {
     item_id?: string;
+    sync_all_items?: boolean;
   };
 
   const currentPlaidEnvironment = getPlaidEnvironment();
@@ -276,7 +581,7 @@ export async function POST(request: NextRequest) {
     let itemQuery = supabaseAdmin
       .from("admin_plaid_items")
       .select(
-        "id, user_id, item_id, access_token, institution_name, plaid_environment, transactions_cursor",
+        "id, user_id, item_id, access_token, institution_name, plaid_environment, transactions_cursor, created_at",
       )
       .eq("user_id", adminCheck.user.id)
       .eq("plaid_environment", currentPlaidEnvironment)
@@ -297,15 +602,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const items = (itemRows || []) as PlaidItemRow[];
+    let items = (itemRows || []) as PlaidItemRow[];
 
     if (!items.length) {
       return NextResponse.json(
         {
           error: `No connected Plaid items found for Plaid environment "${currentPlaidEnvironment}". Connect NFCU Business Checking again in the current environment.`,
+          plaid_environment: currentPlaidEnvironment,
         },
         { status: 404 },
       );
+    }
+
+    /*
+      Normal button sync should use the newest Plaid Item. During setup/testing,
+      multiple duplicate Items can exist for the same NFCU accounts. Syncing all of
+      them can fail when an older Item lacks Transactions consent.
+    */
+    if (!body.item_id && !body.sync_all_items) {
+      items = [items[0]];
     }
 
     const itemIds = items.map((item) => item.item_id);
@@ -338,193 +653,101 @@ export async function POST(request: NextRequest) {
         {
           error:
             "No Business Checking or Business Savings accounts are saved for this Plaid environment.",
+          plaid_environment: currentPlaidEnvironment,
         },
         { status: 404 },
       );
     }
 
-    let totalAdded = 0;
-    let totalModified = 0;
-    let totalRemoved = 0;
-    let skippedTransactions = 0;
-    let autoCategorized = 0;
-    const syncedItems: string[] = [];
+    const results: ItemSyncResult[] = [];
 
     for (const item of items) {
-      let cursor = item.transactions_cursor || undefined;
-      let hasMore = true;
-      let pageCount = 0;
+      const itemAllowedAccountIds = new Set(
+        businessAccounts
+          .filter((account) => account.item_id === item.item_id)
+          .map((account) => account.account_id),
+      );
 
-      while (hasMore) {
-        pageCount += 1;
-
-        const syncResponse = await plaidClient.transactionsSync({
-          access_token: item.access_token,
-          cursor,
-          count: 500,
+      if (!itemAllowedAccountIds.size) {
+        results.push({
+          item_id: item.item_id,
+          institution_name: item.institution_name,
+          status: "skipped",
+          added: 0,
+          modified: 0,
+          removed: 0,
+          auto_categorized: 0,
+          skipped_non_business_transactions: 0,
+          error:
+            "This Plaid Item has no saved Business Checking or Business Savings accounts.",
         });
-
-        const added = syncResponse.data.added || [];
-        const modified = syncResponse.data.modified || [];
-        const removed = syncResponse.data.removed || [];
-
-        for (const transaction of added) {
-          if (!allowedAccountIds.has(transaction.account_id)) {
-            skippedTransactions += 1;
-            continue;
-          }
-
-          const { error: insertError } = await supabaseAdmin
-            .from("admin_plaid_transactions")
-            .upsert(
-              {
-                user_id: item.user_id,
-                item_id: item.item_id,
-                account_id: transaction.account_id,
-                transaction_id: transaction.transaction_id,
-                name: transaction.name,
-                merchant_name: transaction.merchant_name || null,
-                amount: transaction.amount,
-                iso_currency_code: transaction.iso_currency_code || null,
-                unofficial_currency_code:
-                  transaction.unofficial_currency_code || null,
-                date: asDateString(transaction.date),
-                authorized_date: asDateString(transaction.authorized_date),
-                pending: transaction.pending,
-                payment_channel: transaction.payment_channel || null,
-                category: transaction.category || null,
-                category_id: transaction.category_id || null,
-                personal_finance_category:
-                  transaction.personal_finance_category || null,
-                raw: transaction,
-                removed_at: null,
-                updated_at: new Date().toISOString(),
-              },
-              {
-                onConflict: "transaction_id",
-              },
-            );
-
-          if (insertError) {
-            console.error("Plaid transaction insert error:", insertError);
-          } else {
-            const category = autoCategorizeTransaction(transaction);
-            await applyAutoCategory({
-              userId: item.user_id,
-              transactionId: transaction.transaction_id,
-              category,
-            });
-            autoCategorized += 1;
-            totalAdded += 1;
-          }
-        }
-
-        for (const transaction of modified) {
-          if (!allowedAccountIds.has(transaction.account_id)) {
-            skippedTransactions += 1;
-            continue;
-          }
-
-          const { error: updateError } = await supabaseAdmin
-            .from("admin_plaid_transactions")
-            .upsert(
-              {
-                user_id: item.user_id,
-                item_id: item.item_id,
-                account_id: transaction.account_id,
-                transaction_id: transaction.transaction_id,
-                name: transaction.name,
-                merchant_name: transaction.merchant_name || null,
-                amount: transaction.amount,
-                iso_currency_code: transaction.iso_currency_code || null,
-                unofficial_currency_code:
-                  transaction.unofficial_currency_code || null,
-                date: asDateString(transaction.date),
-                authorized_date: asDateString(transaction.authorized_date),
-                pending: transaction.pending,
-                payment_channel: transaction.payment_channel || null,
-                category: transaction.category || null,
-                category_id: transaction.category_id || null,
-                personal_finance_category:
-                  transaction.personal_finance_category || null,
-                raw: transaction,
-                removed_at: null,
-                updated_at: new Date().toISOString(),
-              },
-              {
-                onConflict: "transaction_id",
-              },
-            );
-
-          if (updateError) {
-            console.error("Plaid transaction update error:", updateError);
-          } else {
-            const category = autoCategorizeTransaction(transaction);
-            await applyAutoCategory({
-              userId: item.user_id,
-              transactionId: transaction.transaction_id,
-              category,
-            });
-            autoCategorized += 1;
-            totalModified += 1;
-          }
-        }
-
-        for (const removedTransaction of removed) {
-          const { error: removeError } = await supabaseAdmin
-            .from("admin_plaid_transactions")
-            .update({
-              removed_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("transaction_id", removedTransaction.transaction_id);
-
-          if (removeError) {
-            console.error("Plaid transaction remove error:", removeError);
-          } else {
-            totalRemoved += 1;
-          }
-        }
-
-        cursor = syncResponse.data.next_cursor;
-        hasMore = Boolean(syncResponse.data.has_more);
-
-        if (pageCount > 20) {
-          throw new Error(
-            `Plaid transaction sync exceeded 20 pages for item ${item.item_id}.`,
-          );
-        }
+        continue;
       }
 
-      const { error: cursorError } = await supabaseAdmin
-        .from("admin_plaid_items")
-        .update({
-          transactions_cursor: cursor || null,
-          transactions_last_synced_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("item_id", item.item_id);
+      const result = await syncSinglePlaidItem({
+        item,
+        allowedAccountIds: itemAllowedAccountIds,
+      });
 
-      if (cursorError) {
-        console.error("Plaid cursor update error:", cursorError);
-      }
+      results.push(result);
+    }
 
-      syncedItems.push(item.item_id);
+    const totalAdded = results.reduce((sum, result) => sum + result.added, 0);
+    const totalModified = results.reduce(
+      (sum, result) => sum + result.modified,
+      0,
+    );
+    const totalRemoved = results.reduce((sum, result) => sum + result.removed, 0);
+    const autoCategorized = results.reduce(
+      (sum, result) => sum + result.auto_categorized,
+      0,
+    );
+    const skippedTransactions = results.reduce(
+      (sum, result) => sum + result.skipped_non_business_transactions,
+      0,
+    );
+
+    const syncedResults = results.filter((result) => result.status === "synced");
+    const skippedResults = results.filter(
+      (result) => result.status === "skipped",
+    );
+    const failedResults = results.filter((result) => result.status === "failed");
+    const needsReauthorization = results.filter(
+      (result) => result.needs_reauthorization,
+    );
+
+    if (!syncedResults.length && failedResults.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Plaid transaction sync failed.",
+          plaid_environment: currentPlaidEnvironment,
+          results,
+          first_error: failedResults[0]?.error || "Unknown sync error.",
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
       ok: true,
       message:
-        "Business checking/savings transactions synced and auto-categorized successfully.",
+        totalAdded + totalModified > 0
+          ? "Business checking/savings transactions synced and auto-categorized successfully."
+          : "Plaid transaction sync completed. No new business transactions were returned yet.",
       plaid_environment: currentPlaidEnvironment,
-      items_synced: syncedItems.length,
+      items_requested: items.length,
+      items_synced: syncedResults.length,
+      items_skipped: skippedResults.length,
+      items_failed: failedResults.length,
+      items_needing_reauthorization: needsReauthorization.length,
       business_accounts_synced: allowedAccountIds.size,
-      item_ids: syncedItems,
       added: totalAdded,
       modified: totalModified,
       removed: totalRemoved,
       auto_categorized: autoCategorized,
       skipped_non_business_transactions: skippedTransactions,
+      results,
     });
   } catch (error) {
     const message = getErrorMessage(error);

@@ -324,6 +324,173 @@ function isCustomerProfile(profile: ProfileRow) {
   );
 }
 
+function getRowBoolean(row: AnyRow, keys: string[]) {
+  return keys.some((key) => {
+    const value = row[key];
+
+    if (typeof value === "boolean") return value;
+
+    if (typeof value === "number") return value === 1;
+
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      return ["true", "yes", "y", "1"].includes(normalized);
+    }
+
+    return false;
+  });
+}
+
+function getRowSearchText(row: AnyRow, keys: string[]) {
+  return keys
+    .map((key) => asString(row[key]))
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function hasDemoKeyword(value: string) {
+  const normalized = value.toLowerCase();
+
+  return [
+    /\bdemo\b/,
+    /\bfake\b/,
+    /\btest\b/,
+    /\btester\b/,
+    /\bsample\b/,
+    /\bseed\b/,
+    /\bseeded\b/,
+    /\bdummy\b/,
+    /\bmock\b/,
+    /\bsandbox\b/,
+    /\bplaceholder\b/,
+    /\blorem\b/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function isDemoEmail(value: string) {
+  const email = value.trim().toLowerCase();
+
+  if (!email) return false;
+
+  const domain = email.includes("@") ? email.split("@").pop() || "" : "";
+
+  return (
+    email.includes("+test@") ||
+    email.includes("+demo@") ||
+    email.includes("+fake@") ||
+    email.includes("demo+") ||
+    email.includes("test+") ||
+    [
+      "example.com",
+      "example.org",
+      "example.net",
+      "test.com",
+      "demo.com",
+      "fake.com",
+      "mailinator.com",
+      "localhost",
+    ].includes(domain)
+  );
+}
+
+function isDemoLikeRow(row: AnyRow) {
+  const deletedAt = asString(row.deleted_at || row.archived_at || row.removed_at);
+  if (deletedAt) return true;
+
+  if (
+    getRowBoolean(row, [
+      "is_demo",
+      "demo",
+      "is_test",
+      "test_account",
+      "is_fake",
+      "fake",
+      "sandbox",
+      "seeded",
+      "is_seed",
+      "sample",
+      "archived",
+      "is_archived",
+    ])
+  ) {
+    return true;
+  }
+
+  const emailText = getRowSearchText(row, [
+    "email",
+    "customer_email",
+    "pet_parent_email",
+    "owner_email",
+    "sender_email",
+    "recipient_email",
+  ]);
+
+  if (emailText.split(/\s+/).some(isDemoEmail)) return true;
+
+  const identifierText = getRowSearchText(row, [
+    "id",
+    "user_id",
+    "customer_id",
+    "pet_owner_id",
+    "client_id",
+    "owner_id",
+    "sender_id",
+    "recipient_id",
+    "from_user_id",
+    "to_user_id",
+  ]);
+
+  if (hasDemoKeyword(identifierText)) return true;
+
+  const visibleText = getRowSearchText(row, [
+    "full_name",
+    "display_name",
+    "first_name",
+    "last_name",
+    "name",
+    "customer_name",
+    "pet_parent_name",
+    "owner_name",
+    "pet_name",
+    "source",
+    "signup_source",
+    "referral_source",
+    "lead_source",
+    "acquisition_source",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "campaign",
+    "campaign_name",
+    "notes",
+    "description",
+  ]);
+
+  return hasDemoKeyword(visibleText);
+}
+
+function hasHiddenCustomerReference(row: AnyRow, hiddenCustomerIds: Set<string>) {
+  if (!hiddenCustomerIds.size) return false;
+
+  const possibleIds = [
+    row.id,
+    row.user_id,
+    row.customer_id,
+    row.pet_owner_id,
+    row.client_id,
+    row.owner_id,
+    row.sender_id,
+    row.recipient_id,
+    row.from_user_id,
+    row.to_user_id,
+  ]
+    .map((value) => asString(value))
+    .filter(Boolean);
+
+  return possibleIds.some((id) => hiddenCustomerIds.has(id));
+}
+
 function getCustomerId(booking: BookingRow) {
   return (
     booking.customer_id ||
@@ -766,16 +933,77 @@ async function getCustomerIntelligenceData() {
     ),
   ]);
 
-  const profiles = ((profilesResult.data || []) as ProfileRow[]).filter(Boolean);
-  const bookings = ((bookingsResult.data || []) as BookingRow[]).filter(Boolean);
-  const pets = ((petsResult.data || []) as PetRow[]).filter(Boolean);
-  const messages = ((messagesResult.data || []) as MessageRow[]).filter(Boolean);
-  const launchSignups = ((launchSignupsResult.data || []) as AnyRow[]).filter(Boolean);
-  const launchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).filter(Boolean);
-  const referralClicks = ((referralClicksResult.data || []) as AnyRow[]).filter(Boolean);
-  const referralConversions = ((referralConversionsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkClicks = ((networkClicksResult.data || []) as AnyRow[]).filter(Boolean);
-  const partnerCampaigns = ((partnerCampaignsResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawProfiles = ((profilesResult.data || []) as ProfileRow[]).filter(Boolean);
+  const rawBookings = ((bookingsResult.data || []) as BookingRow[]).filter(Boolean);
+  const rawPets = ((petsResult.data || []) as PetRow[]).filter(Boolean);
+  const rawMessages = ((messagesResult.data || []) as MessageRow[]).filter(Boolean);
+  const rawLaunchSignups = ((launchSignupsResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawLaunchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawReferralClicks = ((referralClicksResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawReferralConversions = ((referralConversionsResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawNetworkClicks = ((networkClicksResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawPartnerCampaigns = ((partnerCampaignsResult.data || []) as AnyRow[]).filter(Boolean);
+
+  const hiddenCustomerIds = new Set(
+    rawProfiles
+      .filter((profile) => isDemoLikeRow(profile as AnyRow))
+      .map((profile) => profile.id)
+      .filter(Boolean),
+  );
+
+  const profiles = rawProfiles.filter(
+    (profile) =>
+      isCustomerProfile(profile) &&
+      !isDemoLikeRow(profile as AnyRow) &&
+      !hiddenCustomerIds.has(profile.id),
+  );
+  const bookings = rawBookings.filter(
+    (booking) =>
+      !isDemoLikeRow(booking as AnyRow) &&
+      !hasHiddenCustomerReference(booking as AnyRow, hiddenCustomerIds),
+  );
+  const pets = rawPets.filter(
+    (pet) =>
+      !isDemoLikeRow(pet as AnyRow) &&
+      !hasHiddenCustomerReference(pet as AnyRow, hiddenCustomerIds),
+  );
+  const messages = rawMessages.filter(
+    (message) =>
+      !isDemoLikeRow(message as AnyRow) &&
+      !hasHiddenCustomerReference(message as AnyRow, hiddenCustomerIds),
+  );
+  const launchSignups = rawLaunchSignups.filter((row) => !isDemoLikeRow(row));
+  const launchWaitlist = rawLaunchWaitlist.filter((row) => !isDemoLikeRow(row));
+  const referralClicks = rawReferralClicks.filter((row) => !isDemoLikeRow(row));
+  const referralConversions = rawReferralConversions.filter(
+    (row) => !isDemoLikeRow(row),
+  );
+  const networkClicks = rawNetworkClicks.filter((row) => !isDemoLikeRow(row));
+  const partnerCampaigns = rawPartnerCampaigns.filter(
+    (row) => !isDemoLikeRow(row),
+  );
+
+  const hiddenDemoRows =
+    rawProfiles.length -
+    profiles.length +
+    rawBookings.length -
+    bookings.length +
+    rawPets.length -
+    pets.length +
+    rawMessages.length -
+    messages.length +
+    rawLaunchSignups.length -
+    launchSignups.length +
+    rawLaunchWaitlist.length -
+    launchWaitlist.length +
+    rawReferralClicks.length -
+    referralClicks.length +
+    rawReferralConversions.length -
+    referralConversions.length +
+    rawNetworkClicks.length -
+    networkClicks.length +
+    rawPartnerCampaigns.length -
+    partnerCampaigns.length;
 
   const signupRows = [...launchSignups, ...launchWaitlist];
   const clickRows = [...referralClicks, ...networkClicks];
@@ -786,7 +1014,6 @@ async function getCustomerIntelligenceData() {
 
   for (const profile of profiles) {
     if (!profile.id) continue;
-    if (!isCustomerProfile(profile)) continue;
 
     const source = normalizeSource(getSource(profile as AnyRow));
 
@@ -1053,6 +1280,7 @@ async function getCustomerIntelligenceData() {
       socialRevenue,
       socialClicks,
       topSocialPlatform: socialSourceInsights[0]?.label || "None yet",
+      hiddenDemoRows,
     },
   };
 }
@@ -1086,9 +1314,9 @@ export default async function AdminCustomerIntelligencePage() {
                   Customer Intelligence
                 </h1>
                 <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
-                  Real Supabase insights for customer value, repeat behavior,
-                  location demand, source attribution, social growth, and
-                  exportable reporting.
+                  Live Supabase insights for real Pet Parent value, repeat
+                  behavior, location demand, source attribution, social growth,
+                  and exportable reporting with demo/test rows filtered out.
                 </p>
               </div>
             </div>
@@ -1121,12 +1349,12 @@ export default async function AdminCustomerIntelligencePage() {
           </div>
         </div>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             icon={<Users size={22} />}
             label="Customers"
             value={number(data.metrics.totalCustomers)}
-            detail="Profiles plus customer IDs found in bookings"
+            detail="Real Pet Parent profiles plus customer IDs found in bookings"
           />
 
           <StatCard
@@ -1150,6 +1378,13 @@ export default async function AdminCustomerIntelligencePage() {
             detail={`${data.metrics.averageBookingsPerCustomer.toFixed(
               1,
             )} avg bookings per customer`}
+          />
+
+          <StatCard
+            icon={<Search size={22} />}
+            label="Demo Rows Hidden"
+            value={number(data.metrics.hiddenDemoRows)}
+            detail="Filtered from live customer, booking, pet, message, and growth KPIs"
           />
         </section>
 
@@ -1426,9 +1661,10 @@ export default async function AdminCustomerIntelligencePage() {
           this page reads `profiles`, `bookings`, `pets`, `messages`,
           `launch_signups`, `launch_waitlist`, `referral_clicks`,
           `referral_conversions`, `network_click_events`, and
-          `partner_campaigns`. Customer KPIs, social attribution, source charts,
-          location charts, and exportable report data are calculated from live
-          rows.
+          `partner_campaigns`. Demo, fake, test, sample, sandbox, archived, and
+          deleted rows are filtered in-memory before Customer KPIs, social
+          attribution, source charts, location charts, and exportable report
+          data are calculated from live rows.
         </div>
       </div>
     </main>
