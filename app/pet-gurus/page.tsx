@@ -125,11 +125,11 @@ export default function PetGurusPage() {
                 Get started
               </p>
 
-              <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 Ready to become a Pet Guru?
               </h2>
 
-              <p className="mt-5 text-base leading-7 text-slate-200 sm:text-lg sm:leading-8">
+              <p className="mt-5 text-base leading-7 text-white/90 sm:text-lg sm:leading-8">
                 Create your free SitGuru account and start building your local
                 pet care profile.
               </p>
