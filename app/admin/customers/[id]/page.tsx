@@ -1,12 +1,20 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
+  CheckCircle2,
   CircleDollarSign,
+  Clock3,
+  Database,
   Mail,
   MapPin,
   MessageSquare,
   PawPrint,
+  ShieldCheck,
+  Trash2,
   UserRound,
 } from "lucide-react";
 
@@ -21,6 +29,13 @@ type PageProps = {
 };
 
 type AnyRow = Record<string, unknown>;
+
+type VerificationStatus =
+  | "verified"
+  | "active"
+  | "pending"
+  | "incomplete"
+  | "missing";
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -81,15 +96,15 @@ function formatDate(value: unknown) {
   });
 }
 
-function getDisplayName(row: AnyRow | null | undefined) {
-  if (!row) return "Customer";
+function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+  if (!row && !authUser) return "Customer";
 
   const firstName = getText(row, ["first_name", "firstName"]);
   const lastName = getText(row, ["last_name", "lastName"]);
 
   if (firstName || lastName) return `${firstName} ${lastName}`.trim();
 
-  return getText(
+  const profileName = getText(
     row,
     [
       "full_name",
@@ -100,12 +115,27 @@ function getDisplayName(row: AnyRow | null | undefined) {
       "owner_name",
       "email",
     ],
-    "Customer",
+    "",
   );
+
+  if (profileName) return profileName;
+
+  const authEmail = getText(authUser, ["email"]);
+  return authEmail || "Customer";
 }
 
-function getEmail(row: AnyRow | null | undefined) {
-  return getText(row, ["email", "customer_email", "pet_parent_email"], "No email found");
+function getEmail(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+  const profileEmail = getText(row, ["email", "customer_email", "pet_parent_email"]);
+  const authEmail = getText(authUser, ["email"]);
+
+  return profileEmail || authEmail || "No email found";
+}
+
+function getPhone(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+  const profilePhone = getText(row, ["phone", "phone_number", "mobile", "mobile_phone"]);
+  const authPhone = getText(authUser, ["phone"]);
+
+  return profilePhone || authPhone || "No phone found";
 }
 
 function getLocation(row: AnyRow | null | undefined) {
@@ -153,7 +183,7 @@ function getBookingAmount(row: AnyRow) {
 }
 
 function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(
     value,
   );
 }
@@ -175,6 +205,208 @@ async function safeSelect(
   } catch {
     return [];
   }
+}
+
+async function getAuthUser(customerId: string) {
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(customerId);
+
+    if (error || !data?.user) return null;
+
+    return data.user as unknown as AnyRow;
+  } catch {
+    return null;
+  }
+}
+
+function getVerifiedFields(profile: AnyRow | null, authUser: AnyRow | null) {
+  const profileEmail = getText(profile, ["email", "customer_email", "pet_parent_email"]);
+  const authEmail = getText(authUser, ["email"]);
+  const profilePhone = getText(profile, ["phone", "phone_number", "mobile", "mobile_phone"]);
+  const authPhone = getText(authUser, ["phone"]);
+
+  const emailConfirmedAt = getText(authUser, ["email_confirmed_at", "confirmed_at"]);
+  const phoneConfirmedAt = getText(authUser, ["phone_confirmed_at"]);
+  const lastSignInAt = getText(authUser, ["last_sign_in_at"]);
+
+  return {
+    hasEmail: Boolean(profileEmail || authEmail),
+    hasPhone: Boolean(profilePhone || authPhone),
+    emailConfirmedAt,
+    phoneConfirmedAt,
+    lastSignInAt,
+    hasConfirmedEmail: Boolean(emailConfirmedAt),
+    hasConfirmedPhone: Boolean(phoneConfirmedAt),
+    hasAuthUser: Boolean(authUser),
+  };
+}
+
+function getVerificationStatus({
+  profile,
+  authUser,
+  bookingsCount,
+  petsCount,
+  messagesCount,
+  paidBookings,
+}: {
+  profile: AnyRow | null;
+  authUser: AnyRow | null;
+  bookingsCount: number;
+  petsCount: number;
+  messagesCount: number;
+  paidBookings: number;
+}) {
+  const verifiedFields = getVerifiedFields(profile, authUser);
+  const hasActivity = bookingsCount > 0 || petsCount > 0 || messagesCount > 0 || paidBookings > 0;
+  const hasContact = verifiedFields.hasEmail || verifiedFields.hasPhone;
+  const hasVerifiedContact = verifiedFields.hasConfirmedEmail || verifiedFields.hasConfirmedPhone;
+
+  if (!profile && !authUser) {
+    return {
+      status: "missing" as VerificationStatus,
+      label: "Missing Record",
+      description: "No matching profile or Supabase auth user was found for this ID.",
+    };
+  }
+
+  if (hasVerifiedContact && hasActivity) {
+    return {
+      status: "verified" as VerificationStatus,
+      label: "Verified Pet Parent",
+      description: "This Pet Parent has verified contact information and real platform activity.",
+    };
+  }
+
+  if (hasActivity) {
+    return {
+      status: "active" as VerificationStatus,
+      label: "Active / Needs Verification Review",
+      description: "This record has activity, so it should not be hard-deleted. Verify contact details before cleanup.",
+    };
+  }
+
+  if (hasContact || verifiedFields.hasAuthUser) {
+    return {
+      status: "pending" as VerificationStatus,
+      label: "Pending Signup",
+      description: "This person started signup or has an auth identity, but has not added pets, messages, or bookings yet.",
+    };
+  }
+
+  return {
+    status: "incomplete" as VerificationStatus,
+    label: "Incomplete / Unverified",
+    description: "No usable contact information or activity was found. This record is safe to review for deletion.",
+  };
+}
+
+function getStatusStyles(status: VerificationStatus) {
+  if (status === "verified") {
+    return {
+      card: "border-emerald-200 bg-emerald-50",
+      icon: "bg-emerald-700 text-white",
+      title: "text-emerald-950",
+      badge: "border-emerald-200 bg-white text-emerald-800",
+    };
+  }
+
+  if (status === "active") {
+    return {
+      card: "border-sky-200 bg-sky-50",
+      icon: "bg-sky-700 text-white",
+      title: "text-sky-950",
+      badge: "border-sky-200 bg-white text-sky-800",
+    };
+  }
+
+  if (status === "pending") {
+    return {
+      card: "border-amber-200 bg-amber-50",
+      icon: "bg-amber-600 text-white",
+      title: "text-amber-950",
+      badge: "border-amber-200 bg-white text-amber-800",
+    };
+  }
+
+  if (status === "missing") {
+    return {
+      card: "border-slate-200 bg-slate-50",
+      icon: "bg-slate-700 text-white",
+      title: "text-slate-950",
+      badge: "border-slate-200 bg-white text-slate-700",
+    };
+  }
+
+  return {
+    card: "border-rose-200 bg-rose-50",
+    icon: "bg-rose-700 text-white",
+    title: "text-rose-950",
+    badge: "border-rose-200 bg-white text-rose-800",
+  };
+}
+
+async function deleteIncompletePetParentAction(formData: FormData) {
+  "use server";
+
+  const customerId = String(formData.get("customerId") || "");
+
+  if (!isUuid(customerId)) {
+    redirect("/admin/customers?cleanup=invalid-id");
+  }
+
+  const [{ data: profile }, authUser, bookings, pets, sentMessages, receivedMessages] = await Promise.all([
+    supabaseAdmin.from("profiles").select("*").eq("id", customerId).maybeSingle(),
+    getAuthUser(customerId),
+    safeSelect("bookings", "id,total_customer_paid,customer_total_amount,total_amount,amount,price,subtotal,service_total,total_paid", (query) =>
+      query.or(
+        [
+          `customer_id.eq.${customerId}`,
+          `pet_owner_id.eq.${customerId}`,
+          `user_id.eq.${customerId}`,
+          `pet_parent_id.eq.${customerId}`,
+        ].join(","),
+      ),
+    ),
+    safeSelect("pets", "id", (query) =>
+      query.or([`owner_profile_id.eq.${customerId}`, `owner_id.eq.${customerId}`].join(",")),
+    ),
+    safeSelect("messages", "id", (query) => query.eq("sender_id", customerId)),
+    safeSelect("messages", "id", (query) => query.eq("recipient_id", customerId)),
+  ]);
+
+  const profileRow = (profile ?? null) as AnyRow | null;
+  const paidBookings = bookings.filter((booking) => getBookingAmount(booking) > 0).length;
+  const messages = [...sentMessages, ...receivedMessages];
+  const verifiedFields = getVerifiedFields(profileRow, authUser);
+
+  const safeToDelete =
+    Boolean(profileRow) &&
+    bookings.length === 0 &&
+    pets.length === 0 &&
+    messages.length === 0 &&
+    paidBookings === 0 &&
+    !verifiedFields.hasEmail &&
+    !verifiedFields.hasPhone &&
+    !verifiedFields.hasConfirmedEmail &&
+    !verifiedFields.hasConfirmedPhone;
+
+  if (!safeToDelete) {
+    redirect(`/admin/customers/${customerId}?cleanup=blocked`);
+  }
+
+  await supabaseAdmin.from("profiles").delete().eq("id", customerId);
+
+  if (authUser && !verifiedFields.hasEmail && !verifiedFields.hasPhone) {
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(customerId);
+    } catch {
+      // If the auth user cannot be deleted, keep the admin flow moving. The profile was the visible admin record.
+    }
+  }
+
+  revalidatePath("/admin/customers");
+  revalidatePath("/admin/customer-intelligence");
+  redirect("/admin/customers?cleanup=deleted-incomplete-pet-parent");
 }
 
 export default async function AdminCustomerDetailPage({ params }: PageProps) {
@@ -204,11 +436,10 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
     );
   }
 
-  const profileResult = await supabaseAdmin
-    .from("profiles")
-    .select("*")
-    .eq("id", customerId)
-    .maybeSingle();
+  const [profileResult, authUser] = await Promise.all([
+    supabaseAdmin.from("profiles").select("*").eq("id", customerId).maybeSingle(),
+    getAuthUser(customerId),
+  ]);
 
   const profile = (profileResult.data ?? null) as AnyRow | null;
 
@@ -239,8 +470,9 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
   ]);
 
   const messages = [...sentMessages, ...receivedMessages];
-  const name = getDisplayName(profile);
-  const email = getEmail(profile);
+  const name = getDisplayName(profile, authUser);
+  const email = getEmail(profile, authUser);
+  const phone = getPhone(profile, authUser);
   const location = getLocation(profile);
   const role = getText(profile, ["role", "user_role", "account_type"], "customer");
   const source = getText(
@@ -260,6 +492,38 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
   const paidBookings = bookings.filter((booking) => getBookingAmount(booking) > 0).length;
   const averageBookingValue = bookings.length > 0 ? totalSpend / bookings.length : 0;
   const lastBooking = bookings[0] ?? null;
+  const verifiedFields = getVerifiedFields(profile, authUser);
+  const verification = getVerificationStatus({
+    profile,
+    authUser,
+    bookingsCount: bookings.length,
+    petsCount: pets.length,
+    messagesCount: messages.length,
+    paidBookings,
+  });
+  const statusStyles = getStatusStyles(verification.status);
+
+  const cleanupReasons = [
+    verifiedFields.hasAuthUser ? "Supabase auth identity found" : "No Supabase auth identity found",
+    verifiedFields.hasEmail ? "Email available" : "No email found",
+    verifiedFields.hasPhone ? "Phone available" : "No phone found",
+    verifiedFields.hasConfirmedEmail ? "Email verified" : "Email not verified",
+    verifiedFields.hasConfirmedPhone ? "Phone verified" : "Phone not verified",
+    bookings.length > 0 ? `${bookings.length} booking record(s)` : "No bookings",
+    pets.length > 0 ? `${pets.length} pet profile record(s)` : "No pets",
+    messages.length > 0 ? `${messages.length} message record(s)` : "No messages",
+  ];
+
+  const safeToDelete =
+    Boolean(profile) &&
+    bookings.length === 0 &&
+    pets.length === 0 &&
+    messages.length === 0 &&
+    paidBookings === 0 &&
+    !verifiedFields.hasEmail &&
+    !verifiedFields.hasPhone &&
+    !verifiedFields.hasConfirmedEmail &&
+    !verifiedFields.hasConfirmedPhone;
 
   return (
     <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
@@ -281,14 +545,14 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
 
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-800">
-                  Admin / Customer Detail
+                  Admin / Pet Parent Detail
                 </p>
                 <h1 className="mt-1 text-4xl font-black tracking-tight sm:text-5xl">
                   {name}
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm font-semibold text-slate-700">
-                  Live Supabase Pet Parent profile, booking activity, pets, messages, and
-                  acquisition details.
+                  Live Supabase Pet Parent profile, account verification, booking activity,
+                  pets, messages, and cleanup controls.
                 </p>
               </div>
             </div>
@@ -315,7 +579,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
 
         {!profile ? (
           <div className="mt-5 rounded-[2rem] border border-amber-100 bg-amber-50 p-5 shadow-sm">
-            <h2 className="text-2xl font-black">Customer profile not found</h2>
+            <h2 className="text-2xl font-black">Pet Parent profile not found</h2>
             <p className="mt-2 text-sm font-semibold text-amber-900">
               This route is working, so it will not 404 anymore. However, the profile ID does
               not currently exist in the live Supabase `profiles` table. It may have been one
@@ -323,6 +587,77 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
             </p>
           </div>
         ) : null}
+
+        <section className={["mt-5 rounded-[2rem] border p-5 shadow-sm", statusStyles.card].join(" ")}>
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex gap-4">
+              <div className={["flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", statusStyles.icon].join(" ")}>
+                {verification.status === "verified" || verification.status === "active" ? (
+                  <ShieldCheck className="h-6 w-6" />
+                ) : verification.status === "pending" ? (
+                  <Clock3 className="h-6 w-6" />
+                ) : (
+                  <AlertTriangle className="h-6 w-6" />
+                )}
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className={["text-2xl font-black", statusStyles.title].join(" ")}>
+                    Pet Parent Verification
+                  </h2>
+                  <span className={["rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.12em]", statusStyles.badge].join(" ")}>
+                    {verification.label}
+                  </span>
+                </div>
+                <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-700">
+                  {verification.description}
+                </p>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {cleanupReasons.map((reason) => (
+                    <div key={reason} className="rounded-2xl border border-white/70 bg-white/75 px-3 py-2 text-xs font-black text-slate-700 shadow-sm">
+                      {reason}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full rounded-3xl border border-white/70 bg-white/80 p-4 shadow-sm xl:max-w-sm">
+              <p className="flex items-center gap-2 text-sm font-black text-slate-950">
+                <Database className="h-4 w-4 text-emerald-700" />
+                Admin cleanup controls
+              </p>
+              <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
+                Hard delete is only enabled for records with no contact info, no pets, no
+                bookings, no messages, and no verified auth contact. Real Pet Parents should
+                be kept or reviewed manually.
+              </p>
+
+              {safeToDelete ? (
+                <form action={deleteIncompletePetParentAction} className="mt-4">
+                  <input type="hidden" name="customerId" value={customerId} />
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-800"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete incomplete record
+                  </button>
+                </form>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="flex items-start gap-2 text-xs font-bold leading-5 text-slate-700">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+                    Delete is locked because this record has contact data, auth data, or
+                    activity. Keep it for review unless you add a separate archive workflow.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
@@ -400,6 +735,22 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                     Email
                   </p>
                   <p className="text-sm font-black">{email}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-500">
+                    {verifiedFields.hasConfirmedEmail ? "Email verified" : "Email not verified"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <UserRound className="mt-0.5 h-5 w-5 text-emerald-700" />
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                    Phone
+                  </p>
+                  <p className="text-sm font-black">{phone}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-500">
+                    {verifiedFields.hasConfirmedPhone ? "Phone verified" : "Phone not verified"}
+                  </p>
                 </div>
               </div>
 
@@ -433,7 +784,16 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                     Created
                   </p>
                   <p className="mt-1 text-sm font-black">
-                    {formatDate(profile?.created_at)}
+                    {formatDate(profile?.created_at || authUser?.created_at)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                    Last Sign In
+                  </p>
+                  <p className="mt-1 text-sm font-black">
+                    {formatDate(verifiedFields.lastSignInAt)}
                   </p>
                 </div>
 
@@ -443,6 +803,15 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                   </p>
                   <p className="mt-1 text-sm font-black">
                     {formatDate(lastBooking ? getBookingDate(lastBooking) : null)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                    Auth Identity
+                  </p>
+                  <p className="mt-1 text-sm font-black">
+                    {verifiedFields.hasAuthUser ? "Found" : "Not found"}
                   </p>
                 </div>
               </div>
