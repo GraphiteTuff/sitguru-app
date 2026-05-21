@@ -1,23 +1,23 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, PawPrint } from "lucide-react";
+import { Heart, MapPin, PawPrint, ShieldCheck } from "lucide-react";
 
 const pillars = [
   {
+    title: "Local Care, Wherever You Are",
+    description:
+      "Whether care happens in a city, small town, suburb, neighborhood, or township, SitGuru is built to support trusted local pet care connections.",
+  },
+  {
+    title: "Pet Parents Helping Pet Parents",
+    description:
+      "We are local Pet Parents too. SitGuru is shaped around the same concerns families have when choosing someone to care for a pet they love.",
+  },
+  {
     title: "Trust Before Transactions",
     description:
-      "SitGuru is being built to help Pet Parents feel confident in who they choose, not rushed into a decision. We believe trust, clarity, and consistency should come before convenience alone.",
-  },
-  {
-    title: "Community-Centered Care",
-    description:
-      "We want SitGuru to feel more connected than a typical online marketplace. Our vision is to support meaningful relationships between Pet Parents and Gurus so care feels personal, reliable, and rooted in real connection.",
-  },
-  {
-    title: "Pet-Parent Perspective",
-    description:
-      "Every part of SitGuru is being shaped around the real concerns Pet Parents carry — communication, reliability, transparency, and peace of mind when placing their pets in someone else’s care.",
+      "Pet care should feel personal, clear, and reassuring. SitGuru is built to help Pet Parents choose with confidence and help Gurus stand out through trust.",
   },
 ];
 
@@ -25,48 +25,48 @@ const values = [
   {
     title: "Trust",
     description:
-      "We believe pet care begins with confidence in the people, the process, and the platform behind the experience.",
+      "Pet Parents should feel confident in the people, process, and platform behind every care connection.",
   },
   {
     title: "Care",
     description:
-      "Every decision should reflect the well-being of pets and the peace of mind of the people who love them.",
+      "Every feature should support the well-being of pets and the peace of mind of the people who love them.",
   },
   {
     title: "Community",
     description:
-      "SitGuru is being built to strengthen local care relationships and create a more connected pet care experience.",
+      "SitGuru is built to support local care relationships across states, neighborhoods, towns, and townships.",
   },
   {
     title: "Clarity",
     description:
-      "Pet Parents and Gurus deserve a platform that feels transparent, organized, and easy to navigate.",
+      "Pet Parents and Gurus deserve a platform that feels simple, organized, transparent, and easy to use.",
   },
   {
     title: "Connection",
     description:
-      "The best care grows through communication, consistency, and relationships that build over time.",
+      "The best care grows through communication, consistency, trust, and relationships that build over time.",
   },
 ];
 
 const steps = [
   {
     number: "01",
-    title: "Discover trusted care",
+    title: "Find local care",
     description:
-      "Explore Gurus, review services, and find care options that feel aligned with your pet’s needs, routine, and personality.",
+      "Pet Parents can discover Gurus nearby and compare services, profiles, and care options that fit their pet’s needs.",
   },
   {
     number: "02",
-    title: "Share what matters most",
+    title: "Connect with confidence",
     description:
-      "Keep important pet details visible and organized so care can feel more informed, personalized, and reassuring from the beginning.",
+      "Clear profiles, helpful details, and trust-focused tools help Pet Parents feel better about who they choose.",
   },
   {
     number: "03",
-    title: "Build lasting relationships",
+    title: "Build trusted relationships",
     description:
-      "Use communication and booking tools designed to support continuity, trust, and stronger long-term care connections.",
+      "SitGuru is designed to support better communication, repeat care, and stronger long-term pet care connections.",
   },
 ];
 
@@ -74,25 +74,34 @@ const audience = [
   {
     title: "For Pet Parents",
     description:
-      "SitGuru is being built to make finding care feel more reassuring and less overwhelming. It is designed for Pet Parents who want more than convenience — they want trust, communication, and confidence in the people caring for their pets.",
+      "SitGuru helps Pet Parents find trusted local pet care with more confidence. Whether you live in a city, suburb, small town, or township, the goal is the same: help you connect with reliable Gurus who care.",
     points: [
       "Find care with greater confidence",
-      "Keep pet details organized in one place",
-      "Stay connected throughout the care journey",
-      "Build trusted relationships over time",
+      "Connect with trusted local Gurus",
+      "Keep pet care details easier to manage",
+      "Build repeat relationships with providers you trust",
     ],
   },
   {
     title: "For Gurus",
     description:
-      "SitGuru is also being built for caregivers who lead with heart. We want Gurus to have a platform where professionalism, communication, and genuine care can stand out in a meaningful way.",
+      "A Guru is an expert pet care provider — a sitter, walker, trainer, groomer, boarding provider, drop-in caregiver, or experienced pet person who helps Pet Parents care for their pets.",
     points: [
-      "Build a trusted professional presence",
-      "Show services and availability clearly",
-      "Connect with the right families",
-      "Grow through consistency, communication, and care",
+      "Create a trusted professional presence",
+      "Help Pet Parents understand your services",
+      "Get discovered in your local community",
+      "Grow through communication, consistency, and care",
     ],
   },
+];
+
+const localSupportPoints = [
+  "Every state",
+  "Every community",
+  "Every city",
+  "Every town",
+  "Every township",
+  "Every trusted local care connection",
 ];
 
 const pets = [
@@ -132,7 +141,7 @@ function SectionEyebrow({
   icon = "paw",
   children,
 }: {
-  icon?: "paw" | "heart";
+  icon?: "paw" | "heart" | "map" | "shield";
   children: ReactNode;
 }) {
   return (
@@ -140,11 +149,15 @@ function SectionEyebrow({
       <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
         {icon === "heart" ? (
           <Heart className="h-4 w-4" />
+        ) : icon === "map" ? (
+          <MapPin className="h-4 w-4" />
+        ) : icon === "shield" ? (
+          <ShieldCheck className="h-4 w-4" />
         ) : (
           <PawPrint className="h-4 w-4" />
         )}
       </span>
-      <p className="text-sm font-semibold uppercase tracking-[0.28em] text-emerald-700">
+      <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700 sm:tracking-[0.28em]">
         {children}
       </p>
     </div>
@@ -165,13 +178,13 @@ export default function AboutPage() {
       </div>
 
       <section className="relative border-b border-emerald-100 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.16),_transparent_34%),linear-gradient(180deg,_#f7fffb_0%,_#effcf5_100%)]">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-18 lg:px-8 lg:py-24">
           <div className="mx-auto max-w-5xl text-center">
             <div className="flex items-center justify-center gap-2">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                 <Heart className="h-4 w-4" />
               </span>
-              <p className="text-sm font-semibold uppercase tracking-[0.32em] text-emerald-700">
+              <p className="text-sm font-black uppercase tracking-[0.28em] text-emerald-700 sm:tracking-[0.32em]">
                 About SitGuru
               </p>
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -179,29 +192,33 @@ export default function AboutPage() {
               </span>
             </div>
 
-            <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              A more trusted, community-centered future for pet care.
+            <h1 className="mt-6 text-4xl font-black leading-[1.05] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+              Built by Pet Parents. Made for trusted local pet care.
             </h1>
 
-            <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
-              SitGuru is being built to help Pet Parents find dependable care
-              with greater confidence, while giving caring Gurus a platform
-              where trust, connection, professionalism, and heart can stand
-              out. Our goal is to create an experience that feels more personal
-              than transactional and more supportive than impersonal.
+            <p className="mx-auto mt-6 max-w-3xl text-base font-semibold leading-8 text-slate-700 sm:text-lg">
+              SitGuru is a pet care marketplace helping Pet Parents connect with
+              trusted local Gurus — expert pet care providers who lead with
+              care, communication, reliability, and heart.
             </p>
 
-            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <p className="mx-auto mt-4 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
+              We support Pet Parents and Gurus no matter which state, community,
+              city, town, or township they call home. Because at the heart of
+              SitGuru, we are local Pet Parents too.
+            </p>
+
+            <div className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
-                href="/"
-                className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
+                href="/signup"
+                className="inline-flex min-h-[52px] w-full items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
               >
-                Join the Waitlist
+                Join SitGuru Free
               </Link>
 
               <Link
                 href="/become-a-guru"
-                className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                className="inline-flex min-h-[52px] w-full items-center justify-center rounded-full border border-emerald-200 bg-white px-7 py-4 text-base font-black text-emerald-700 transition hover:bg-emerald-50 sm:w-auto"
               >
                 Become a Guru
               </Link>
@@ -210,21 +227,23 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 pb-8 pt-12 sm:px-6 lg:px-8">
-        <div className="grid gap-6 md:grid-cols-3">
+      <section className="relative mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
+        <div className="grid gap-5 md:grid-cols-3">
           {pillars.map((pillar, index) => (
             <div
               key={pillar.title}
               className="relative rounded-[28px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
             >
               <span className="absolute right-5 top-5 text-emerald-200">
-                {index === 1 ? (
+                {index === 0 ? (
+                  <MapPin className="h-5 w-5" />
+                ) : index === 1 ? (
                   <Heart className="h-5 w-5" />
                 ) : (
                   <PawPrint className="h-5 w-5" />
                 )}
               </span>
-              <h2 className="text-xl font-bold text-slate-900">
+              <h2 className="pr-8 text-xl font-black text-slate-900">
                 {pillar.title}
               </h2>
               <p className="mt-3 text-sm leading-7 text-slate-600">
@@ -235,78 +254,114 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-          <div className="rounded-[32px] border border-emerald-100 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.06)] lg:p-10">
+      <section className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+          <div className="rounded-[32px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-8 lg:p-10">
             <SectionEyebrow icon="paw">Why SitGuru Exists</SectionEyebrow>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-              Pet care should feel personal, supported, and informed.
+              Pet care should feel personal, local, and supported.
             </h2>
             <p className="mt-5 text-base leading-8 text-slate-600">
               Choosing care for a beloved pet should never feel rushed,
-              unclear, or disconnected. Pet Parents deserve a better
-              experience — one where they can feel more confident in who they
-              choose, more supported throughout the process, and more at ease
-              knowing their pets are at the center of the experience.
+              confusing, or disconnected. Pet Parents deserve to feel confident
+              in who they choose, and Gurus deserve a place where real care,
+              professionalism, and communication can stand out.
             </p>
             <p className="mt-5 text-base leading-8 text-slate-600">
-              SitGuru is being built to create that better standard. We want
-              to make it easier for Pet Parents to discover trusted care while
-              also giving Gurus a platform where genuine compassion,
-              communication, and professionalism can be seen and valued.
+              SitGuru was built from a Pet Parent perspective. We know what it
+              feels like to love pets deeply, worry about their routine, and
+              want someone dependable nearby who will treat them with genuine
+              care.
             </p>
           </div>
 
-          <div className="rounded-[32px] border border-emerald-200 bg-emerald-50 p-8 shadow-[0_10px_30px_rgba(16,185,129,0.08)]">
-            <SectionEyebrow icon="heart">
-              What Makes SitGuru Different
-            </SectionEyebrow>
-            <ul className="mt-6 space-y-4 text-sm leading-7 text-slate-700">
-              <li>Built to support trust, not just transactions</li>
-              <li>Community-centered and relationship-driven by design</li>
-              <li>Focused on what Pet Parents actually worry about</li>
-              <li>Created to elevate Gurus who truly care</li>
-              <li>Committed to a more human, connected experience</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div className="rounded-[32px] border border-emerald-100 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.06)] lg:p-10">
-          <div className="max-w-3xl">
-            <SectionEyebrow icon="heart">
-              Care Starts with the Right People
-            </SectionEyebrow>
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-              Built for Gurus who lead with heart.
+          <div className="rounded-[32px] border border-emerald-200 bg-emerald-50 p-6 shadow-[0_10px_30px_rgba(16,185,129,0.08)] sm:p-8">
+            <SectionEyebrow icon="map">Local Support</SectionEyebrow>
+            <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+              Wherever care happens, SitGuru is built to support it.
             </h2>
-            <p className="mt-5 text-base leading-8 text-slate-600">
-              At SitGuru, we believe the best pet care begins with genuine
-              compassion. Great caregivers are not simply available — they are
-              attentive, dependable, communicative, and invested in the comfort
-              and well-being of the pets they serve.
+            <p className="mt-4 text-base leading-8 text-slate-700">
+              Pet care is local. It happens between real people in real
+              communities. SitGuru is here to support Pet Parents and Gurus
+              across the places they live, work, walk, visit, and provide care.
             </p>
-            <p className="mt-5 text-base leading-8 text-slate-600">
-              That belief is part of what shapes SitGuru. We want to create a
-              platform where Gurus who truly care can stand out, and where Pet
-              Parents can feel that the person they choose is not just offering
-              a service, but showing real heart, responsibility, and care.
-            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {localSupportPoints.map((point) => (
+                <div
+                  key={point}
+                  className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm"
+                >
+                  {point}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-[32px] border border-emerald-100 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.06)] lg:p-10">
+      <section className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-[32px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-8 lg:p-10">
+          <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <SectionEyebrow icon="shield">What Is a Guru?</SectionEyebrow>
+              <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                A Guru is an expert pet care provider.
+              </h2>
+            </div>
+
+            <div>
+              <p className="text-base leading-8 text-slate-600">
+                On SitGuru, a Guru can be a sitter, walker, trainer, groomer,
+                boarding provider, drop-in caregiver, or experienced pet person
+                who helps Pet Parents care for their pets.
+              </p>
+              <p className="mt-5 text-base leading-8 text-slate-600">
+                Gurus are more than available helpers. They are people who lead
+                with reliability, communication, compassion, and respect for
+                each pet’s routine, personality, and needs.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid gap-6 md:grid-cols-2">
+          {audience.map((group, index) => (
+            <div
+              key={group.title}
+              className="rounded-[28px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-8"
+            >
+              <SectionEyebrow icon={index === 0 ? "heart" : "paw"}>
+                {group.title}
+              </SectionEyebrow>
+              <p className="mt-4 text-sm leading-7 text-slate-600 sm:text-base sm:leading-8">
+                {group.description}
+              </p>
+              <ul className="mt-6 space-y-3 text-sm leading-7 text-slate-600">
+                {group.points.map((point) => (
+                  <li key={point} className="flex items-start gap-3">
+                    <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-[32px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-8 lg:p-10">
           <div className="max-w-2xl">
             <SectionEyebrow icon="paw">How SitGuru Works</SectionEyebrow>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-              Thoughtful steps for a more connected care experience.
+              A simpler way to connect Pet Parents and trusted Gurus.
             </h2>
           </div>
 
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
+          <div className="mt-9 grid gap-5 md:grid-cols-3">
             {steps.map((step) => (
               <div
                 key={step.number}
@@ -315,7 +370,7 @@ export default function AboutPage() {
                 <p className="text-sm font-black tracking-[0.24em] text-emerald-700">
                   {step.number}
                 </p>
-                <h3 className="mt-4 text-xl font-bold text-slate-900">
+                <h3 className="mt-4 text-xl font-black text-slate-900">
                   {step.title}
                 </h3>
                 <p className="mt-3 text-sm leading-7 text-slate-600">
@@ -327,57 +382,28 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div className="grid gap-6 md:grid-cols-2">
-          {audience.map((group, index) => (
-            <div
-              key={group.title}
-              className="rounded-[28px] border border-emerald-100 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
-            >
-              <SectionEyebrow icon={index === 0 ? "heart" : "paw"}>
-                {group.title}
-              </SectionEyebrow>
-              <p className="mt-4 text-sm leading-7 text-slate-600">
-                {group.description}
-              </p>
-              <ul className="mt-6 space-y-3 text-sm leading-7 text-slate-600">
-                {group.points.map((point) => (
-                  <li key={point} className="flex items-start gap-3">
-                    <span className="mt-2 h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                    <span>{point}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-[32px] border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#f0fdf4_50%,#ffffff_100%)] p-8 shadow-[0_10px_30px_rgba(16,185,129,0.08)] lg:p-10">
+      <section className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-[32px] border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#f0fdf4_50%,#ffffff_100%)] p-6 shadow-[0_10px_30px_rgba(16,185,129,0.08)] sm:p-8 lg:p-10">
           <SectionEyebrow icon="heart">Built on Human Connection</SectionEyebrow>
           <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Real questions deserve real people.
+            Technology should make pet care feel more human, not less.
           </h2>
           <p className="mt-5 max-w-4xl text-base leading-8 text-slate-700">
-            At SitGuru, we believe pet care should feel personal at every
-            level. That includes not only the relationship between Pet Parents
-            and Gurus, but also the support behind the platform itself. When
-            questions or concerns arise, customers should never feel like they
-            are navigating the experience alone.
+            SitGuru is built around real people, real pets, and real local
+            communities. The platform can make discovery, profiles, and booking
+            easier, but the heart of care will always be human connection.
           </p>
           <p className="mt-5 max-w-4xl text-base leading-8 text-slate-700">
-            While technology can help make the experience smoother and more
-            organized, we believe it should never replace genuine human
-            communication. SitGuru is being built with a commitment to real
-            contact, thoughtful support, and the comfort of knowing there is a
-            human being ready to listen, respond, and help.
+            When questions or concerns come up, Pet Parents and Gurus should not
+            feel alone. Our goal is to build an experience that feels
+            thoughtful, responsive, and supportive from the first search to the
+            last update.
           </p>
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div className="rounded-[32px] border border-emerald-100 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.06)] lg:p-10">
+      <section className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-[32px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-8 lg:p-10">
           <div className="max-w-3xl">
             <SectionEyebrow icon="paw">Our Values</SectionEyebrow>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
@@ -385,7 +411,7 @@ export default function AboutPage() {
             </h2>
           </div>
 
-          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-9 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
             {values.map((value, index) => (
               <div
                 key={value.title}
@@ -398,7 +424,7 @@ export default function AboutPage() {
                     <Heart className="h-4 w-4" />
                   )}
                 </span>
-                <h3 className="text-lg font-bold text-slate-900">
+                <h3 className="text-lg font-black text-slate-900">
                   {value.title}
                 </h3>
                 <p className="mt-3 text-sm leading-7 text-slate-600">
@@ -410,17 +436,17 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+      <section className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="rounded-[32px] border border-emerald-100 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-6 lg:p-8">
           <div className="sr-only">
             <h2>The People Behind SitGuru</h2>
             <p>
-              Built by pet parents who believe care should feel more human.
+              Built by Pet Parents who believe care should feel more human.
               SitGuru is being built by husband-and-wife founders Jason and
               Danette. Their shared vision is to create a more trusted,
               thoughtful, and community-centered experience for pet care — one
-              where pets come first, communication matters, and people who
-              truly care can stand out.
+              where pets come first, communication matters, and people who truly
+              care can stand out.
             </p>
           </div>
 
@@ -435,24 +461,25 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div className="rounded-[32px] border border-emerald-100 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.06)] lg:p-10">
+      <section className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-[32px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-8 lg:p-10">
           <div className="max-w-3xl">
-            <SectionEyebrow icon="paw">Meet the Pets Behind the Mission</SectionEyebrow>
+            <SectionEyebrow icon="paw">
+              Meet the Pets Behind the Mission
+            </SectionEyebrow>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
               Our own pet family helps shape the heart behind SitGuru.
             </h2>
             <p className="mt-5 text-base leading-8 text-slate-600">
-              SitGuru is personal to us because we are pet parents, too. Our
+              SitGuru is personal to us because we are Pet Parents too. Our
               family includes Scout and Rogue, our German Shorthaired Pointers,
               Delilah, our American Cocker Spaniel, and our cats, Taco and
-              Belle. Living with a full and beloved pet family continues to
-              remind us that every pet has a unique personality, routine, and
-              need for thoughtful care.
+              Belle. They remind us every day that every pet has a unique
+              personality, routine, comfort zone, and need for thoughtful care.
             </p>
           </div>
 
-          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="mt-9 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {pets.map((pet) => (
               <div
                 key={pet.name}
@@ -468,7 +495,7 @@ export default function AboutPage() {
                   />
                 </div>
                 <div className="p-5">
-                  <h3 className="text-lg font-bold text-slate-950">
+                  <h3 className="text-lg font-black text-slate-950">
                     {pet.name}
                   </h3>
                   <p className="mt-1 text-sm text-slate-600">{pet.type}</p>
@@ -479,13 +506,13 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-5xl px-4 pb-20 pt-16 sm:px-6 lg:px-8">
-        <div className="rounded-[32px] border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_100%)] p-8 text-center shadow-[0_10px_30px_rgba(16,185,129,0.08)] sm:p-10">
+      <section className="relative mx-auto max-w-5xl px-4 pb-20 pt-12 sm:px-6 lg:px-8">
+        <div className="rounded-[32px] border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_100%)] p-6 text-center shadow-[0_10px_30px_rgba(16,185,129,0.08)] sm:p-10">
           <div className="flex items-center justify-center gap-2">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
               <Heart className="h-4 w-4" />
             </span>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-emerald-700">
+            <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-700 sm:tracking-[0.28em]">
               Join SitGuru
             </p>
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -494,26 +521,26 @@ export default function AboutPage() {
           </div>
 
           <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Be part of a more trusted and connected future for pet care.
+            Be part of a more trusted local pet care marketplace.
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-600">
-            SitGuru is being built for Pet Parents who want greater confidence
-            and for Gurus who want to grow through meaningful care
-            relationships. Join us as we build a platform centered on trust,
-            communication, and care that feels personal.
+            SitGuru is built for Pet Parents who want confidence and for Gurus
+            who want to connect with families in the communities they serve.
+            Wherever pet care happens, our goal is to make it feel more trusted,
+            more personal, and more supported.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              href="/"
-              className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
+              href="/signup"
+              className="inline-flex min-h-[52px] w-full items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
             >
-              Join the Waitlist
+              Join SitGuru Free
             </Link>
 
             <Link
               href="/become-a-guru"
-              className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+              className="inline-flex min-h-[52px] w-full items-center justify-center rounded-full border border-emerald-200 bg-white px-7 py-4 text-base font-black text-emerald-700 transition hover:bg-emerald-50 sm:w-auto"
             >
               Become a Guru
             </Link>
