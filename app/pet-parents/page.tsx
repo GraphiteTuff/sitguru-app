@@ -116,18 +116,24 @@ export default function PetParentsPage() {
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-5 pb-16 sm:px-6 sm:pb-20">
-        <div className="rounded-[2rem] bg-slate-950 p-6 text-white shadow-xl sm:p-10">
+        <div className="rounded-[2rem] bg-slate-950 p-6 shadow-xl sm:p-10">
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-300">
                 Get started
               </p>
 
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              <h2
+                className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl"
+                style={{ color: "#ffffff" }}
+              >
                 Ready to find pet care?
               </h2>
 
-              <p className="mt-5 text-base leading-7 text-white/90 sm:text-lg sm:leading-8">
+              <p
+                className="mt-5 text-base leading-7 sm:text-lg sm:leading-8"
+                style={{ color: "rgba(255, 255, 255, 0.92)" }}
+              >
                 Create your free SitGuru account and start connecting with local
                 Pet Gurus.
               </p>
