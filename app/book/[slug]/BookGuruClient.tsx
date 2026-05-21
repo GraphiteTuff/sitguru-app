@@ -235,7 +235,7 @@ const timeWindowOptions = [
   "Specific time needed",
 ];
 
-const visitLengthOptions = ["30 minutes", "60 minutes", "90 minutes"];
+const visitLengthOptions = ["15 minutes", "30 minutes", "60 minutes", "90 minutes"];
 
 const tipOptions: {
   key: TipChoice;
@@ -560,6 +560,8 @@ function getServicePrice(key: ServiceKey, visitLength: string) {
   const basePrice =
     serviceOptions.find((option) => option.key === key)?.basePrice || 25;
 
+  if (visitLength === "15 minutes") return Math.max(15, basePrice - 10);
+  if (visitLength === "30 minutes") return basePrice;
   if (visitLength === "60 minutes") return basePrice + 15;
   if (visitLength === "90 minutes") return basePrice + 30;
 
@@ -1042,7 +1044,7 @@ export default function BookGuruClient({
   const [hoverDate, setHoverDate] = useState("");
   const [timeWindow, setTimeWindow] = useState("Flexible");
   const [customPreferredTime, setCustomPreferredTime] = useState("");
-  const [visitLength, setVisitLength] = useState("60 minutes");
+  const [visitLength, setVisitLength] = useState("15 minutes");
   const [careZipCode, setCareZipCode] = useState("");
   const [careCity, setCareCity] = useState("");
   const [careState, setCareState] = useState("");
