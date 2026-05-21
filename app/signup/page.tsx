@@ -9,7 +9,6 @@ import {
   Eye,
   EyeOff,
   Gift,
-  Heart,
   Loader2,
   Lock,
   Mail,
@@ -263,26 +262,26 @@ function SignupPageContent() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dcfff2_0%,#f8fffc_42%,#ffffff_100%)] px-3 py-4 text-slate-950 sm:px-5 sm:py-8 lg:px-8 lg:py-10">
-      <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-        <section className="rounded-[1.75rem] border border-emerald-100 bg-white/85 p-5 shadow-[0_18px_54px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8 lg:sticky lg:top-8 lg:p-10">
-          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-800 ring-1 ring-emerald-200">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 lg:grid lg:grid-cols-[0.9fr_1.1fr] lg:items-start lg:gap-6">
+        <section className="order-2 rounded-[1.5rem] border border-emerald-100 bg-white/85 p-5 shadow-[0_18px_54px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8 lg:sticky lg:top-8 lg:order-1 lg:rounded-[1.75rem] lg:p-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-xs font-black text-emerald-800 ring-1 ring-emerald-200 sm:text-sm">
             <Gift className="h-4 w-4" />
             Join SitGuru Free
           </div>
 
-          <h1 className="mt-5 max-w-2xl text-4xl font-black leading-[0.98] tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
+          <h1 className="mt-4 max-w-2xl text-3xl font-black leading-[1] tracking-[-0.045em] text-slate-950 sm:mt-5 sm:text-5xl lg:text-6xl">
             Create your free SitGuru account
           </h1>
 
-          <p className="mt-4 max-w-xl text-base font-semibold leading-7 text-slate-600 sm:text-lg">
-            Join as a Pet Parent, Future Guru, or both. Phone sign-up is now
-            fast, secure, and ready to use.
+          <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-slate-600 sm:mt-4 sm:text-lg sm:leading-7">
+            Join as a Pet Parent, Future Guru, or both. Phone sign-up is fast,
+            secure, and ready to use.
           </p>
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:mt-7 sm:grid-cols-3">
             <div className="rounded-2xl border border-emerald-100 bg-white p-4 text-center shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50">
-                <Phone className="h-6 w-6 text-emerald-700" />
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 sm:h-12 sm:w-12">
+                <Phone className="h-5 w-5 text-emerald-700 sm:h-6 sm:w-6" />
               </div>
               <h2 className="mt-3 text-base font-black text-slate-950">
                 Phone First
@@ -293,8 +292,8 @@ function SignupPageContent() {
             </div>
 
             <div className="rounded-2xl border border-sky-100 bg-white p-4 text-center shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50">
-                <Search className="h-6 w-6 text-sky-600" />
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 sm:h-12 sm:w-12">
+                <Search className="h-5 w-5 text-sky-600 sm:h-6 sm:w-6" />
               </div>
               <h2 className="mt-3 text-base font-black text-slate-950">
                 Book Care
@@ -305,8 +304,8 @@ function SignupPageContent() {
             </div>
 
             <div className="rounded-2xl border border-purple-100 bg-white p-4 text-center shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50">
-                <Star className="h-6 w-6 text-purple-600" />
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 sm:h-12 sm:w-12">
+                <Star className="h-5 w-5 text-purple-600 sm:h-6 sm:w-6" />
               </div>
               <h2 className="mt-3 text-base font-black text-slate-950">
                 Offer Care
@@ -317,18 +316,18 @@ function SignupPageContent() {
             </div>
           </div>
 
-          <div className="mt-7 rounded-[1.6rem] border border-emerald-100 bg-emerald-50 p-5">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
-                <PawPrint className="h-6 w-6 text-emerald-700" />
+          <div className="mt-5 rounded-[1.35rem] border border-emerald-100 bg-emerald-50 p-4 sm:mt-7 sm:rounded-[1.6rem] sm:p-5">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm sm:h-12 sm:w-12">
+                <PawPrint className="h-5 w-5 text-emerald-700 sm:h-6 sm:w-6" />
               </div>
 
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700 sm:text-xs sm:tracking-[0.22em]">
                   SitGuru PetPerks
                 </p>
 
-                <h2 className="mt-2 text-2xl font-black leading-tight tracking-[-0.035em] text-slate-950">
+                <h2 className="mt-2 text-2xl font-black leading-tight tracking-[-0.035em] text-slate-950 sm:text-3xl">
                   Join free. Refer friends. Earn rewards.
                 </h2>
 
@@ -349,9 +348,9 @@ function SignupPageContent() {
             </div>
           </div>
 
-          <div className="mt-7 hidden overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 lg:block">
+          <div className="mt-5 overflow-hidden rounded-[1.35rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-4 sm:mt-7 sm:rounded-[1.75rem] sm:p-5">
             <div className="flex items-center gap-3">
-              <div className="text-3xl">🐶</div>
+              <div className="text-2xl sm:text-3xl">🐶</div>
               <div>
                 <p className="text-sm font-black text-green-900">
                   Trusted Pet Care. Simplified.
@@ -364,23 +363,23 @@ function SignupPageContent() {
           </div>
         </section>
 
-        <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-4 shadow-[0_18px_54px_rgba(15,23,42,0.10)] sm:p-8 lg:p-10">
+        <section className="order-1 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-[0_18px_54px_rgba(15,23,42,0.10)] sm:p-8 lg:order-2 lg:rounded-[1.75rem] lg:p-10">
           <div className="mx-auto max-w-2xl">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-800 ring-1 ring-emerald-200">
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-2 text-xs font-black text-emerald-800 ring-1 ring-emerald-200 sm:px-4 sm:text-sm">
                 <Sparkles className="h-4 w-4" />
                 Free Account
               </div>
 
               <Link
                 href="/"
-                className="rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm font-black text-green-900 transition hover:bg-white"
+                className="rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-green-900 transition hover:bg-white sm:text-sm"
               >
                 Home
               </Link>
             </div>
 
-            <h2 className="mt-5 text-4xl font-black leading-[0.95] tracking-[-0.05em] text-slate-950 sm:text-5xl">
+            <h2 className="mt-5 text-3xl font-black leading-[1] tracking-[-0.045em] text-slate-950 sm:text-5xl sm:leading-[0.95]">
               Start using SitGuru for free
             </h2>
 
@@ -389,9 +388,9 @@ function SignupPageContent() {
               send you to the correct setup dashboard.
             </p>
 
-            <div className="mt-7 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="mt-5 rounded-[1.35rem] border border-slate-200 bg-white p-4 shadow-sm sm:mt-7 sm:rounded-[1.5rem] sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-lg font-black text-slate-950">
+                <p className="text-base font-black text-slate-950 sm:text-lg">
                   1. Choose your account type
                 </p>
 
@@ -404,7 +403,7 @@ function SignupPageContent() {
                 <button
                   type="button"
                   onClick={() => updateForm("accountType", "pet_parent")}
-                  className={`relative min-h-[150px] rounded-2xl border p-4 text-center transition ${
+                  className={`relative flex min-h-[92px] items-center gap-3 rounded-2xl border p-4 text-left transition sm:block sm:min-h-[150px] sm:text-center ${
                     form.accountType === "pet_parent"
                       ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.12)]"
                       : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
@@ -417,18 +416,20 @@ function SignupPageContent() {
                   ) : null}
 
                   <div className="text-3xl">🐶</div>
-                  <p className="mt-3 text-base font-black text-emerald-800">
-                    Pet Parent
-                  </p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    Find, book, and save trusted pet care.
-                  </p>
+                  <div>
+                    <p className="text-base font-black text-emerald-800 sm:mt-3">
+                      Pet Parent
+                    </p>
+                    <p className="mt-1 max-w-[15rem] text-sm font-semibold leading-5 text-slate-600 sm:mx-auto sm:mt-2 sm:leading-6">
+                      Find, book, and save trusted pet care.
+                    </p>
+                  </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => updateForm("accountType", "future_guru")}
-                  className={`relative min-h-[150px] rounded-2xl border p-4 text-center transition ${
+                  className={`relative flex min-h-[92px] items-center gap-3 rounded-2xl border p-4 text-left transition sm:block sm:min-h-[150px] sm:text-center ${
                     form.accountType === "future_guru"
                       ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.12)]"
                       : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
@@ -441,18 +442,20 @@ function SignupPageContent() {
                   ) : null}
 
                   <div className="text-3xl">⭐</div>
-                  <p className="mt-3 text-base font-black text-slate-950">
-                    Future Guru
-                  </p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    Offer pet care services and earn with SitGuru.
-                  </p>
+                  <div>
+                    <p className="text-base font-black text-slate-950 sm:mt-3">
+                      Future Guru
+                    </p>
+                    <p className="mt-1 max-w-[15rem] text-sm font-semibold leading-5 text-slate-600 sm:mx-auto sm:mt-2 sm:leading-6">
+                      Offer pet care services and earn with SitGuru.
+                    </p>
+                  </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => updateForm("accountType", "both")}
-                  className={`relative min-h-[150px] rounded-2xl border p-4 text-center transition ${
+                  className={`relative flex min-h-[92px] items-center gap-3 rounded-2xl border p-4 text-left transition sm:block sm:min-h-[150px] sm:text-center ${
                     form.accountType === "both"
                       ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.12)]"
                       : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
@@ -465,18 +468,20 @@ function SignupPageContent() {
                   ) : null}
 
                   <div className="text-3xl">🐾</div>
-                  <p className="mt-3 text-base font-black text-slate-950">
-                    Both
-                  </p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    Book care and also offer services as a Guru.
-                  </p>
+                  <div>
+                    <p className="text-base font-black text-slate-950 sm:mt-3">
+                      Both
+                    </p>
+                    <p className="mt-1 max-w-[15rem] text-sm font-semibold leading-5 text-slate-600 sm:mx-auto sm:mt-2 sm:leading-6">
+                      Book care and also offer services as a Guru.
+                    </p>
+                  </div>
                 </button>
               </div>
             </div>
 
-            <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-lg font-black text-slate-950">
+            <div className="mt-4 rounded-[1.35rem] border border-slate-200 bg-white p-4 shadow-sm sm:mt-5 sm:rounded-[1.5rem] sm:p-5">
+              <p className="text-base font-black text-slate-950 sm:text-lg">
                 2. Choose how to create your account
               </p>
 
@@ -491,8 +496,8 @@ function SignupPageContent() {
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
-                      <Phone className="h-6 w-6 text-emerald-700" />
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm sm:h-12 sm:w-12">
+                      <Phone className="h-5 w-5 text-emerald-700 sm:h-6 sm:w-6" />
                     </div>
 
                     <div>
@@ -521,8 +526,8 @@ function SignupPageContent() {
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
-                      <Mail className="h-6 w-6 text-sky-600" />
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm sm:h-12 sm:w-12">
+                      <Mail className="h-5 w-5 text-sky-600 sm:h-6 sm:w-6" />
                     </div>
 
                     <div>
@@ -539,15 +544,15 @@ function SignupPageContent() {
             </div>
 
             {form.signupMethod === "phone" ? (
-              <div className="mt-5 rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-4 shadow-sm sm:p-5">
+              <div className="mt-4 rounded-[1.35rem] border border-emerald-100 bg-emerald-50 p-4 shadow-sm sm:mt-5 sm:rounded-[1.5rem] sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
-                    <ShieldCheck className="h-6 w-6 text-emerald-700" />
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm sm:h-12 sm:w-12">
+                    <ShieldCheck className="h-5 w-5 text-emerald-700 sm:h-6 sm:w-6" />
                   </div>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-black text-slate-950">
+                      <p className="text-base font-black text-slate-950 sm:text-lg">
                         3. Verify with your mobile number
                       </p>
 
@@ -561,7 +566,7 @@ function SignupPageContent() {
                       SitGuru account.
                     </p>
 
-                    <div className="mt-4 rounded-[1.35rem] border border-emerald-200 bg-white p-4">
+                    <div className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-white p-3 sm:rounded-[1.35rem] sm:p-4">
                       <PhoneCodeLogin
                         role={phoneSignupRole}
                         nextPath={phoneSignupRedirect}
@@ -586,8 +591,8 @@ function SignupPageContent() {
             ) : null}
 
             {form.signupMethod === "email" ? (
-              <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                <p className="mb-4 text-lg font-black text-slate-950">
+              <div className="mt-4 rounded-[1.35rem] border border-slate-200 bg-white p-4 shadow-sm sm:mt-5 sm:rounded-[1.5rem] sm:p-5">
+                <p className="mb-4 text-base font-black text-slate-950 sm:text-lg">
                   3. Create your account with email
                 </p>
 
@@ -824,7 +829,7 @@ function SignupPageContent() {
               </div>
             ) : null}
 
-            <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 text-center sm:p-5">
+            <div className="mt-4 rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4 text-center sm:mt-5 sm:rounded-[1.5rem] sm:p-5">
               <p className="text-sm font-black text-slate-900">
                 Already part of SitGuru?
               </p>
@@ -859,7 +864,7 @@ function SignupPageContent() {
               </p>
             </div>
 
-            <div className="mt-5 grid gap-3 text-center text-xs font-black text-slate-500 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 text-center text-xs font-black text-slate-500 sm:mt-5 sm:grid-cols-3">
               <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-100">
                 Free to join
               </div>
