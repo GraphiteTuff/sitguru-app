@@ -78,9 +78,9 @@ type NavLink = {
 
 const publicNavLinks: NavLink[] = [
   { label: "Home", href: "/" },
-  { label: "Find Care", href: "/search" },
+  { label: "Find Care", href: "/pet-parents" },
   { label: "My Pets", href: "/pets" },
-  { label: "Become a Guru", href: "/become-a-guru" },
+  { label: "Become a Guru", href: "/pet-gurus" },
 ];
 
 const customerNavLinks: NavLink[] = [
@@ -293,6 +293,14 @@ function pathMatches(pathname: string | null, targetPath: string) {
 function getActiveAliases(href: string) {
   if (href === "/customer/dashboard") {
     return ["/customer/dashboard"];
+  }
+
+  if (href === "/pet-parents") {
+    return ["/pet-parents", "/find-care"];
+  }
+
+  if (href === "/pet-gurus") {
+    return ["/pet-gurus", "/become-a-guru"];
   }
 
   if (href === "/search") {
