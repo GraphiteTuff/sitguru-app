@@ -413,7 +413,9 @@ function initialsFromName(name: string) {
 }
 
 function cleanZip(value?: string | null) {
-  return String(value || "").replace(/\D/g, "").slice(0, 5);
+  return String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 5);
 }
 
 function cleanCurrencyInput(value: string) {
@@ -480,9 +482,7 @@ function getGuruServiceLatitude(guru: GuruProfileRow | null) {
 function getGuruServiceLongitude(guru: GuruProfileRow | null) {
   if (!guru) return null;
 
-  return toNullableNumber(
-    guru.service_longitude ?? guru.longitude ?? guru.lng,
-  );
+  return toNullableNumber(guru.service_longitude ?? guru.longitude ?? guru.lng);
 }
 
 function getGuruServiceRadiusMiles(guru: GuruProfileRow | null) {
@@ -661,8 +661,7 @@ function formatShortDisplayDate(value: string) {
 
 function compareISODate(a: string, b: string) {
   return (
-    new Date(`${a}T12:00:00`).getTime() -
-    new Date(`${b}T12:00:00`).getTime()
+    new Date(`${a}T12:00:00`).getTime() - new Date(`${b}T12:00:00`).getTime()
   );
 }
 
@@ -883,7 +882,7 @@ function CrossoutMark({ small = false }: { small?: boolean }) {
 }
 
 function fieldClass() {
-  return "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10";
+  return "box-border block min-h-[52px] w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold leading-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10";
 }
 
 function labelClass() {
@@ -902,12 +901,12 @@ function SelectShell({
   help?: boolean;
 }) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className={labelClass()} htmlFor={id}>
         {label}
         {help ? <CircleHelp className="h-3.5 w-3.5 text-slate-400" /> : null}
       </label>
-      <div className="relative">
+      <div className="relative min-w-0">
         {children}
         <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
       </div>
@@ -1001,6 +1000,8 @@ export default function BookGuruClient({
 
   const [pets, setPets] = useState<PetProfile[]>([]);
   const [petsLoading, setPetsLoading] = useState(true);
+  const [customerUserId, setCustomerUserId] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   const [guruProfile, setGuruProfile] = useState<GuruProfileRow | null>(() =>
     mergeGuruProfileWithFallbacks({
@@ -1158,12 +1159,7 @@ export default function BookGuruClient({
       guruServiceLatitude,
       guruServiceLongitude,
     );
-  }, [
-    careLatitude,
-    careLongitude,
-    guruServiceLatitude,
-    guruServiceLongitude,
-  ]);
+  }, [careLatitude, careLongitude, guruServiceLatitude, guruServiceLongitude]);
 
   const serviceAreaStatus = useMemo<ServiceAreaStatus>(() => {
     if (!careZipCode) return "idle";
@@ -1205,7 +1201,8 @@ export default function BookGuruClient({
 
   const serviceAreaTitle = useMemo(() => {
     if (serviceAreaStatus === "inside") return "In this Guru’s service area";
-    if (serviceAreaStatus === "outside") return "Outside this Guru’s service area";
+    if (serviceAreaStatus === "outside")
+      return "Outside this Guru’s service area";
     if (serviceAreaStatus === "missing_guru_location") {
       return "Guru service area needs setup";
     }
@@ -1373,6 +1370,15 @@ export default function BookGuruClient({
   const allAcknowledgementsAccepted =
     detailsAccepted && paymentAccepted && payoutAccepted && termsAccepted;
 
+  const isPetParentLoggedIn = Boolean(customerUserId);
+  const bookingReturnPath = `/book/${guruSlug}`;
+  const signupHref = `/signup?redirect=${encodeURIComponent(
+    bookingReturnPath,
+  )}&role=customer`;
+  const petParentLoginHref = `/customer/login?redirect=${encodeURIComponent(
+    bookingReturnPath,
+  )}`;
+
   useEffect(() => {
     async function loadPetsAndCustomer() {
       const {
@@ -1380,10 +1386,14 @@ export default function BookGuruClient({
       } = await supabase.auth.getUser();
 
       if (!user) {
+        setCustomerUserId(null);
+        setPets([]);
         setPetsLoading(false);
+        setAuthChecked(true);
         return;
       }
 
+      setCustomerUserId(user.id);
       setCustomerEmail(user.email ?? "");
 
       const [{ data: petData }, { data: profileData }] = await Promise.all([
@@ -1403,6 +1413,7 @@ export default function BookGuruClient({
 
       setPets(petData || []);
       setPetsLoading(false);
+      setAuthChecked(true);
 
       if (profileData?.full_name) setCustomerName(profileData.full_name);
     }
@@ -1838,7 +1849,8 @@ export default function BookGuruClient({
   }
 
   function getStepOneErrorMessage() {
-    if (!petName.trim()) return "Please choose or enter a pet before reviewing the booking.";
+    if (!petName.trim())
+      return "Please choose or enter a pet before reviewing the booking.";
 
     if (!bookingDate || isRangeSelectionIncomplete) {
       return dateSelectionMode === "range"
@@ -1877,7 +1889,16 @@ export default function BookGuruClient({
       return;
     }
 
-    if (step === 2) setStep(3);
+    if (step === 2) {
+      if (!isPetParentLoggedIn) {
+        setSubmitError(
+          "Please create a free Pet Parent account or log in before continuing to secure checkout.",
+        );
+        return;
+      }
+
+      setStep(3);
+    }
   }
 
   function handleBack() {
@@ -1891,6 +1912,13 @@ export default function BookGuruClient({
     try {
       setSubmitError("");
 
+      if (!isPetParentLoggedIn) {
+        setSubmitError(
+          "Please create a free Pet Parent account or log in before booking this Guru.",
+        );
+        return;
+      }
+
       if (!resolvedCalendarUsername || !resolvedCalendarEventTypeSlug) {
         setSubmitError(
           "This Guru is not fully connected to scheduling yet. Please try another Guru or contact support.",
@@ -1899,7 +1927,9 @@ export default function BookGuruClient({
       }
 
       if (!petName.trim() || !bookingDate || isRangeSelectionIncomplete) {
-        setSubmitError("Please complete the booking details before confirming.");
+        setSubmitError(
+          "Please complete the booking details before confirming.",
+        );
         return;
       }
 
@@ -2143,7 +2173,7 @@ export default function BookGuruClient({
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] text-slate-950">
+    <main className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] text-slate-950">
       <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
         <section className="relative overflow-hidden rounded-[2rem] bg-[linear-gradient(110deg,#d7fae8_0%,#d8f7ef_48%,#9de0ff_100%)] px-7 py-10 shadow-[0_24px_80px_rgba(15,23,42,0.08)] md:px-12 lg:px-14">
           <div className="relative z-10 max-w-3xl">
@@ -2195,8 +2225,8 @@ export default function BookGuruClient({
           </div>
         </section>
 
-        <div className="mt-7 grid gap-7 xl:grid-cols-[1.18fr_0.82fr]">
-          <section className="space-y-7">
+        <div className="mt-7 grid min-w-0 gap-7 xl:grid-cols-[1.18fr_0.82fr]">
+          <section className="min-w-0 space-y-7">
             {step === 1 ? (
               <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.07)] md:p-7">
                 <div>
@@ -2208,7 +2238,39 @@ export default function BookGuruClient({
                   </p>
                 </div>
 
-                <div className="mt-7 grid gap-5 md:grid-cols-3">
+                {authChecked && !isPetParentLoggedIn ? (
+                  <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-black text-emerald-900">
+                          Preview this booking before creating an account
+                        </p>
+                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-700">
+                          You can review this Guru, choose care details, and
+                          enter your pet name. To actually book and pay
+                          securely, you’ll create a free Pet Parent account or
+                          log in first.
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                        <Link
+                          href={signupHref}
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+                        >
+                          Sign Up Free
+                        </Link>
+                        <Link
+                          href={petParentLoginHref}
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+                        >
+                          Log In
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-7 grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                   <SelectShell id="booking-type" label="Booking Type">
                     <select
                       id="booking-type"
@@ -2246,28 +2308,40 @@ export default function BookGuruClient({
                     </select>
                   </SelectShell>
 
-                  <SelectShell id="pet-profile" label="Pet">
-                    <select
-                      id="pet-profile"
-                      value={selectedPetId}
-                      onChange={(event) => {
-                        setSelectedPetId(event.target.value);
-                        if (!event.target.value) setPetName("");
-                      }}
-                      className={`${fieldClass()} appearance-none pr-10`}
-                      style={forcedSelectStyle}
-                    >
-                      <option value="">
-                        {petsLoading ? "Loading pets..." : "Choose pet"}
-                      </option>
-                      {pets.map((pet) => (
-                        <option key={pet.id} value={pet.id}>
-                          {pet.name}
-                          {pet.breed ? ` (${pet.breed})` : ""}
+                  {isPetParentLoggedIn ? (
+                    <SelectShell id="pet-profile" label="Pet">
+                      <select
+                        id="pet-profile"
+                        value={selectedPetId}
+                        onChange={(event) => {
+                          setSelectedPetId(event.target.value);
+                          if (!event.target.value) setPetName("");
+                        }}
+                        className={`${fieldClass()} appearance-none pr-10`}
+                        style={forcedSelectStyle}
+                      >
+                        <option value="">
+                          {petsLoading ? "Loading pets..." : "Choose pet"}
                         </option>
-                      ))}
-                    </select>
-                  </SelectShell>
+                        {pets.map((pet) => (
+                          <option key={pet.id} value={pet.id}>
+                            {pet.name}
+                            {pet.breed ? ` (${pet.breed})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectShell>
+                  ) : (
+                    <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 md:col-span-2 xl:col-span-1">
+                      <p className="text-xs font-black uppercase tracking-[0.08em] text-emerald-800">
+                        Pet
+                      </p>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                        Saved pets appear after login. For now, enter the pet
+                        name below to preview the request.
+                      </p>
+                    </div>
+                  )}
 
                   <div
                     className={
@@ -2370,11 +2444,7 @@ export default function BookGuruClient({
                     </select>
                   </SelectShell>
 
-                  <SelectShell
-                    id="visit-length"
-                    label="Duration"
-                    help={false}
-                  >
+                  <SelectShell id="visit-length" label="Duration" help={false}>
                     <select
                       id="visit-length"
                       value={visitLength}
@@ -2526,8 +2596,8 @@ export default function BookGuruClient({
                   </div>
                 ) : null}
 
-                {!selectedPetId ? (
-                  <div className="mt-5">
+                {!selectedPetId || !isPetParentLoggedIn ? (
+                  <div className="mt-5 min-w-0">
                     <label className={labelClass()} htmlFor="pet-name">
                       Pet name
                     </label>
@@ -2536,6 +2606,8 @@ export default function BookGuruClient({
                       value={petName}
                       onChange={(event) => setPetName(event.target.value)}
                       className={fieldClass()}
+                      autoComplete="off"
+                      enterKeyHint="next"
                       placeholder="Example: Bella"
                     />
                   </div>
@@ -2661,16 +2733,12 @@ export default function BookGuruClient({
                               hoverRangeEndDate &&
                               isISODateBetween(
                                 cell.iso,
-                                compareISODate(
-                                  hoverRangeEndDate,
-                                  bookingDate,
-                                ) < 0
+                                compareISODate(hoverRangeEndDate, bookingDate) <
+                                  0
                                   ? hoverRangeEndDate
                                   : bookingDate,
-                                compareISODate(
-                                  hoverRangeEndDate,
-                                  bookingDate,
-                                ) < 0
+                                compareISODate(hoverRangeEndDate, bookingDate) <
+                                  0
                                   ? bookingDate
                                   : hoverRangeEndDate,
                               );
@@ -2806,7 +2874,9 @@ export default function BookGuruClient({
                     <textarea
                       id="emergency-notes"
                       value={emergencyNotes}
-                      onChange={(event) => setEmergencyNotes(event.target.value)}
+                      onChange={(event) =>
+                        setEmergencyNotes(event.target.value)
+                      }
                       rows={4}
                       maxLength={500}
                       className={fieldClass()}
@@ -2924,6 +2994,33 @@ export default function BookGuruClient({
                   </div>
                 ) : null}
 
+                {!isPetParentLoggedIn ? (
+                  <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                    <p className="text-base font-black text-emerald-900">
+                      Create a free account to book this Guru
+                    </p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                      Your booking details are ready to review. Create a Pet
+                      Parent account or log in so SitGuru can save the request,
+                      connect it to your pets, and send you to secure checkout.
+                    </p>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                      <Link
+                        href={signupHref}
+                        className="inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+                      >
+                        Sign Up Free
+                      </Link>
+                      <Link
+                        href={petParentLoginHref}
+                        className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+                      >
+                        Pet Parent Login
+                      </Link>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-7 flex flex-wrap gap-3">
                   <button
                     type="button"
@@ -2937,7 +3034,9 @@ export default function BookGuruClient({
                     onClick={handleNext}
                     className="inline-flex min-h-[54px] items-center justify-center rounded-2xl bg-emerald-600 px-6 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
                   >
-                    Continue to Secure Checkout
+                    {isPetParentLoggedIn
+                      ? "Continue to Secure Checkout"
+                      : "Sign Up or Log In to Book"}
                   </button>
                 </div>
               </section>
@@ -3216,7 +3315,7 @@ export default function BookGuruClient({
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-3 gap-3 rounded-2xl border border-slate-200 p-3">
+              <div className="mt-6 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 p-3 sm:grid-cols-3">
                 <BookingStatCard
                   icon={<Home className="h-5 w-5" />}
                   value={String(yearsExperience)}
@@ -3361,9 +3460,7 @@ export default function BookGuruClient({
                 </p>
 
                 <div className="mt-3 flex justify-between gap-4 text-sm">
-                  <span className="font-semibold text-slate-600">
-                    Guru Tip
-                  </span>
+                  <span className="font-semibold text-slate-600">Guru Tip</span>
                   <span className="font-black text-slate-950">
                     {formatMoney(tipAmount)}
                   </span>
@@ -3433,11 +3530,11 @@ export default function BookGuruClient({
 
               <div className="mt-5 space-y-3">
                 {[
-                  "You submit a booking request.",
-                  "Your Guru reviews and confirms.",
-                  "You'll review and pay securely.",
-                  "Care is provided and you're covered.",
-                  "48-hour review window after care.",
+                  "Review the Guru and choose your care details.",
+                  "Create a free account or log in to continue.",
+                  "Review your booking before secure checkout.",
+                  "Your Guru reviews and confirms the request.",
+                  "Care is provided and you're covered by SitGuru.",
                 ].map((item, index) => (
                   <div key={item} className="flex items-start gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-black text-white">
@@ -3482,12 +3579,16 @@ export default function BookGuruClient({
                 </>
               ) : step === 1 ? (
                 <>
-                  Review Booking Before Checkout
+                  {isPetParentLoggedIn
+                    ? "Review Booking Before Checkout"
+                    : "Sign Up or Log In to Book"}
                   <LockKeyhole className="h-5 w-5" />
                 </>
               ) : step === 2 ? (
                 <>
-                  Continue to Checkout
+                  {isPetParentLoggedIn
+                    ? "Continue to Checkout"
+                    : "Sign Up or Log In to Book"}
                   <LockKeyhole className="h-5 w-5" />
                 </>
               ) : (
@@ -3500,7 +3601,9 @@ export default function BookGuruClient({
 
             <div className="flex items-start gap-2 px-2 text-sm font-semibold text-slate-600">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-              <span>You won’t be charged until secure checkout is completed.</span>
+              <span>
+                You won’t be charged until secure checkout is completed.
+              </span>
             </div>
           </aside>
         </div>
