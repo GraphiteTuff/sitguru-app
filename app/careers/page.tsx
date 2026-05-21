@@ -85,7 +85,7 @@ const guruOpportunities: OpportunityCard[] = [
     highlights: [
       "Veterans and military families welcome",
       "Training and support",
-      "Background checks required",
+      "Trust and safety check required",
       "Pathway to Guru status",
     ],
   },
@@ -338,7 +338,7 @@ export default function CareersPage() {
                 {[
                   "Start by becoming a Guru or applying to a program",
                   "Build a profile Pet Parents can find and trust",
-                  "Complete onboarding, trust, safety, and background check steps",
+                  "Complete onboarding, trust, and safety steps",
                   "Grow with SitGuru through reliable care and strong communication",
                 ].map((item) => (
                   <div
@@ -433,7 +433,10 @@ export default function CareersPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <InfoList title="Guru services" items={providerServices} />
-              <InfoList title="Future company areas" items={futureCompanyAreas} />
+              <InfoList
+                title="Future company areas"
+                items={futureCompanyAreas}
+              />
             </div>
           </div>
         </section>
@@ -503,7 +506,10 @@ export default function CareersPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <InfoList title="Partner fits" items={partnerFits} />
-              <InfoList title="Application support" items={applicationSupport} />
+              <InfoList
+                title="Application support"
+                items={applicationSupport}
+              />
             </div>
           </div>
         </section>
