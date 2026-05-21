@@ -2164,6 +2164,122 @@ export default async function AdminCustomerIntelligencePage() {
   );
 }
 
+function escapeSqlValue(value: string) {
+  return value.replace(/'/g, "''");
+}
+
+function buildCleanupReviewSql(record: CleanupCustomerRecord) {
+  const id = escapeSqlValue(record.id);
+
+  return [
+    "-- 1) Check whether this ID exists as a Pet Parent profile",
+    "select id, email, phone, full_name, role, created_at, updated_at",
+    "from profiles",
+    `where id = '${id}';`,
+    "",
+    "-- 2) Check whether this ID exists as a Supabase Auth user",
+    "select id, email, phone, email_confirmed_at, phone_confirmed_at, created_at, last_sign_in_at",
+    "from auth.users",
+    `where id = '${id}';`,
+    "",
+    "-- 3) Check related pet records",
+    "select id, name, owner_id, owner_profile_id, customer_id, user_id, pet_owner_id, created_at",
+    "from pets",
+    `where owner_id = '${id}'`,
+    `   or owner_profile_id = '${id}'`,
+    `   or customer_id = '${id}'`,
+    `   or user_id = '${id}'`,
+    `   or pet_owner_id = '${id}'`,
+    "order by created_at desc;",
+    "",
+    "-- 4) Check related booking/payment records",
+    "select id, customer_id, pet_owner_id, pet_parent_id, client_id, user_id, customer_email, status, payment_status, total_amount, customer_total_amount, created_at",
+    "from bookings",
+    `where customer_id = '${id}'`,
+    `   or pet_owner_id = '${id}'`,
+    `   or pet_parent_id = '${id}'`,
+    `   or client_id = '${id}'`,
+    `   or user_id = '${id}'`,
+    "order by created_at desc;",
+    "",
+    "-- 5) Check related message records",
+    "select id, sender_id, recipient_id, customer_id, user_id, from_user_id, to_user_id, status, is_read, created_at",
+    "from messages",
+    `where sender_id = '${id}'`,
+    `   or recipient_id = '${id}'`,
+    `   or customer_id = '${id}'`,
+    `   or user_id = '${id}'`,
+    `   or from_user_id = '${id}'`,
+    `   or to_user_id = '${id}'`,
+    "order by created_at desc;",
+  ].join("\n");
+}
+
+function buildCleanupDeleteSql(record: CleanupCustomerRecord) {
+  const id = escapeSqlValue(record.id);
+
+  if (!record.safeToDelete) {
+    return [
+      "-- This record is protected because it still has related activity.",
+      "-- Review attached pets, messages, bookings, and auth/profile rows first.",
+      "-- Do not hard-delete protected customer activity from a live system until confirmed fake/test.",
+    ].join("\n");
+  }
+
+  return [
+    "-- Safe-delete candidate cleanup SQL.",
+    "-- Run the review SQL first. Only run this if the review confirms it is fake/test/empty.",
+    "begin;",
+    "",
+    "delete from messages",
+    `where sender_id = '${id}'`,
+    `   or recipient_id = '${id}'`,
+    `   or customer_id = '${id}'`,
+    `   or user_id = '${id}'`,
+    `   or from_user_id = '${id}'`,
+    `   or to_user_id = '${id}';`,
+    "",
+    "delete from pets",
+    `where owner_id = '${id}'`,
+    `   or owner_profile_id = '${id}'`,
+    `   or customer_id = '${id}'`,
+    `   or user_id = '${id}'`,
+    `   or pet_owner_id = '${id}';`,
+    "",
+    "delete from bookings",
+    `where customer_id = '${id}'`,
+    `   or pet_owner_id = '${id}'`,
+    `   or pet_parent_id = '${id}'`,
+    `   or client_id = '${id}'`,
+    `   or user_id = '${id}';`,
+    "",
+    "delete from profiles",
+    `where id = '${id}';`,
+    "",
+    "commit;",
+  ].join("\n");
+}
+
+function getCleanupDecision(record: CleanupCustomerRecord) {
+  if (record.safeToDelete) {
+    return "Safe-delete candidate because there is no contact information, no pets, no bookings, no messages, and no spend.";
+  }
+
+  if (record.bookingCount > 0 || record.totalSpend > 0) {
+    return "Protected. This record has booking or payment activity. Archive/reconcile only after confirming it is fake or test data.";
+  }
+
+  if (record.petCount > 0) {
+    return "Protected. This record has pet records attached. Review pet names and owner references before deleting.";
+  }
+
+  if (record.messageCount > 0) {
+    return "Protected. This record has messages attached. Review the message thread before deleting.";
+  }
+
+  return "Protected for review. Confirm whether this is a partial signup, orphan reference, or test data before deleting.";
+}
+
 function DashboardCard({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
@@ -2175,6 +2291,7 @@ function DashboardCard({ children }: { children: ReactNode }) {
 
 function CleanupReviewPanel({ records }: { records: CleanupCustomerRecord[] }) {
   const safeDeleteCount = records.filter((record) => record.safeToDelete).length;
+  const protectedCount = records.length - safeDeleteCount;
 
   return (
     <section className="rounded-[30px] border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
@@ -2190,15 +2307,48 @@ function CleanupReviewPanel({ records }: { records: CleanupCustomerRecord[] }) {
           </h2>
 
           <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-700">
-            These records do not count as live Pet Parents. Safe-delete candidates
-            have no contact information, no pets, no bookings, no messages, and
-            no spend. Records with any activity are protected for review instead
-            of being treated as normal customers.
+            These records do not count as live Pet Parents. Use the review panel
+            on each row to confirm whether it is a real partial signup, an old
+            test record, or an orphaned reference from pets/messages/bookings.
+            Protected records should not be hard-deleted until the attached
+            activity is reviewed.
           </p>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-amber-200 bg-white p-4">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-900">
+                Review First
+              </p>
+              <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
+                Expand a row, run the review SQL in Supabase, and confirm what
+                table is keeping the record protected.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-900">
+                Protected
+              </p>
+              <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
+                Messages, pets, bookings, or spend exist. Review or archive
+                instead of deleting blindly.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-rose-900">
+                Safe Delete
+              </p>
+              <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
+                Only empty records with no contact and no activity get a
+                delete-ready SQL block.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-black text-amber-900">
-          {number(safeDeleteCount)} safe to delete · {number(records.length)} total review records
+          {number(safeDeleteCount)} safe to delete · {number(protectedCount)} protected · {number(records.length)} total review records
         </div>
       </div>
 
@@ -2211,66 +2361,198 @@ function CleanupReviewPanel({ records }: { records: CleanupCustomerRecord[] }) {
         </div>
 
         <div className="divide-y divide-amber-100">
-          {records.map((record) => (
-            <div
-              key={`${record.sourceTable}-${record.id}`}
-              className="grid gap-3 px-4 py-4 text-sm md:grid-cols-[1.25fr_0.85fr_1.3fr_0.7fr] md:items-center"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-black text-slate-950">
-                  {record.name}
-                </p>
-                <p className="mt-1 truncate text-xs font-bold text-slate-500">
-                  {record.email || record.phone || record.id}
-                </p>
-                <p className="mt-1 text-xs font-bold text-slate-400">
-                  Source: {record.sourceTable} · Created {formatDate(record.createdAt)}
-                </p>
-              </div>
+          {records.map((record) => {
+            const reviewSql = buildCleanupReviewSql(record);
+            const deleteSql = buildCleanupDeleteSql(record);
+            const decision = getCleanupDecision(record);
 
-              <div>
-                <span
-                  className={[
-                    "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black",
-                    record.safeToDelete
-                      ? "border-rose-200 bg-rose-50 text-rose-800"
-                      : "border-sky-200 bg-sky-50 text-sky-800",
-                  ].join(" ")}
-                >
-                  {record.safeToDelete ? (
-                    <Trash2 size={14} />
-                  ) : (
-                    <ShieldCheck size={14} />
-                  )}
-                  {record.safeToDelete ? "Safe Delete Candidate" : "Review / Protect"}
-                </span>
-              </div>
+            return (
+              <details
+                key={`${record.sourceTable}-${record.id}`}
+                className="group"
+              >
+                <summary className="grid cursor-pointer list-none gap-3 px-4 py-4 text-sm transition hover:bg-amber-50 md:grid-cols-[1.25fr_0.85fr_1.3fr_0.7fr] md:items-center">
+                  <div className="min-w-0">
+                    <p className="truncate font-black text-slate-950">
+                      {record.name}
+                    </p>
+                    <p className="mt-1 truncate text-xs font-bold text-slate-500">
+                      {record.email || record.phone || record.id}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-slate-400">
+                      Source: {record.sourceTable} · Created {formatDate(record.createdAt)}
+                    </p>
+                  </div>
 
-              <div>
-                <p className="font-bold leading-6 text-slate-700">
-                  {record.reason}
-                </p>
-                <p className="mt-1 text-xs font-bold text-slate-500">
-                  {number(record.bookingCount)} bookings · {number(record.petCount)} pets · {number(record.messageCount)} messages · {money(record.totalSpend)}
-                </p>
-              </div>
+                  <div>
+                    <span
+                      className={[
+                        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black",
+                        record.safeToDelete
+                          ? "border-rose-200 bg-rose-50 text-rose-800"
+                          : "border-sky-200 bg-sky-50 text-sky-800",
+                      ].join(" ")}
+                    >
+                      {record.safeToDelete ? (
+                        <Trash2 size={14} />
+                      ) : (
+                        <ShieldCheck size={14} />
+                      )}
+                      {record.safeToDelete ? "Safe Delete Candidate" : "Review / Protect"}
+                    </span>
+                  </div>
 
-              <div className="flex flex-col gap-2">
-                {record.safeToDelete ? (
-                  <Link
-                    href={`/admin/customers/${record.id}`}
-                    className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800 transition hover:bg-rose-100"
-                  >
-                    Review delete
-                  </Link>
-                ) : (
-                  <span className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600">
-                    Protected
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
+                  <div>
+                    <p className="font-bold leading-6 text-slate-700">
+                      {record.reason}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">
+                      {number(record.bookingCount)} bookings · {number(record.petCount)} pets · {number(record.messageCount)} messages · {money(record.totalSpend)}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <span
+                      className={[
+                        "inline-flex items-center justify-center rounded-2xl border px-3 py-2 text-xs font-black transition",
+                        record.safeToDelete
+                          ? "border-rose-200 bg-rose-50 text-rose-800 group-open:bg-rose-100"
+                          : "border-sky-200 bg-sky-50 text-sky-800 group-open:bg-sky-100",
+                      ].join(" ")}
+                    >
+                      Review Details
+                    </span>
+                  </div>
+                </summary>
+
+                <div className="border-t border-amber-100 bg-[#fffaf0] px-4 py-5">
+                  <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-amber-200 bg-white p-4">
+                        <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-900">
+                          Admin Decision Guide
+                        </p>
+                        <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                          {decision}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                          Record Signals
+                        </p>
+
+                        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                          <div>
+                            <dt className="font-black text-slate-500">ID</dt>
+                            <dd className="mt-1 break-all font-bold text-slate-900">
+                              {record.id}
+                            </dd>
+                          </div>
+
+                          <div>
+                            <dt className="font-black text-slate-500">Source Table</dt>
+                            <dd className="mt-1 font-bold text-slate-900">
+                              {record.sourceTable}
+                            </dd>
+                          </div>
+
+                          <div>
+                            <dt className="font-black text-slate-500">Email</dt>
+                            <dd className="mt-1 font-bold text-slate-900">
+                              {record.email || "None found"}
+                            </dd>
+                          </div>
+
+                          <div>
+                            <dt className="font-black text-slate-500">Phone</dt>
+                            <dd className="mt-1 font-bold text-slate-900">
+                              {record.phone || "None found"}
+                            </dd>
+                          </div>
+
+                          <div>
+                            <dt className="font-black text-slate-500">Bookings</dt>
+                            <dd className="mt-1 font-bold text-slate-900">
+                              {number(record.bookingCount)}
+                            </dd>
+                          </div>
+
+                          <div>
+                            <dt className="font-black text-slate-500">Pets</dt>
+                            <dd className="mt-1 font-bold text-slate-900">
+                              {number(record.petCount)}
+                            </dd>
+                          </div>
+
+                          <div>
+                            <dt className="font-black text-slate-500">Messages</dt>
+                            <dd className="mt-1 font-bold text-slate-900">
+                              {number(record.messageCount)}
+                            </dd>
+                          </div>
+
+                          <div>
+                            <dt className="font-black text-slate-500">Spend</dt>
+                            <dd className="mt-1 font-bold text-slate-900">
+                              {money(record.totalSpend)}
+                            </dd>
+                          </div>
+                        </dl>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                          What to do
+                        </p>
+
+                        <ul className="mt-3 space-y-2 text-sm font-bold leading-6 text-slate-700">
+                          <li>1. Run the review SQL in Supabase SQL Editor.</li>
+                          <li>2. If messages or pets are real, keep/protect the record.</li>
+                          <li>3. If they are old fake/test rows, remove the fake child rows first.</li>
+                          <li>4. After related activity is gone, the record becomes safe-delete eligible.</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                          Supabase Review SQL
+                        </p>
+                        <pre className="mt-3 max-h-[420px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs font-semibold leading-6 text-slate-100">
+                          <code>{reviewSql}</code>
+                        </pre>
+                      </div>
+
+                      <div
+                        className={[
+                          "rounded-2xl border bg-white p-4",
+                          record.safeToDelete
+                            ? "border-rose-200"
+                            : "border-sky-200",
+                        ].join(" ")}
+                      >
+                        <p
+                          className={[
+                            "text-xs font-black uppercase tracking-[0.12em]",
+                            record.safeToDelete
+                              ? "text-rose-900"
+                              : "text-sky-900",
+                          ].join(" ")}
+                        >
+                          {record.safeToDelete ? "Safe Delete SQL" : "Protected Delete Block"}
+                        </p>
+                        <pre className="mt-3 max-h-[300px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs font-semibold leading-6 text-slate-100">
+                          <code>{deleteSql}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            );
+          })}
         </div>
       </div>
     </section>
