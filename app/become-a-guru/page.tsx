@@ -46,19 +46,19 @@ const steps = [
     step: "01",
     title: "Apply Free",
     description:
-      "Start your SitGuru Guru application at no cost. Share your experience, services, location, and basic profile details.",
+      "Start your SitGuru Guru application for free. Share your experience, services, location, and basic profile details.",
   },
   {
     step: "02",
-    title: "Get Approved",
+    title: "Profile Review",
     description:
-      "SitGuru reviews your profile and guides you through the trust and safety steps needed before accepting bookings.",
+      "SitGuru reviews your profile to help make sure it is clear, complete, and ready for pet parents to understand.",
   },
   {
     step: "03",
-    title: "Complete verification",
+    title: "Trust & Safety",
     description:
-      "Before becoming bookable, approved Gurus may complete identity verification, background screening, and safety agreement approval.",
+      "Before becoming bookable, Gurus may complete simple trust and safety steps designed to help protect pets, families, and the SitGuru community.",
   },
   {
     step: "04",
@@ -69,10 +69,10 @@ const steps = [
 ];
 
 const trustPoints = [
-  "Apply free with no upfront application cost",
-  "No upfront screening fee to start your application",
-  "Screening costs may be deducted from your first completed booking",
-  "Identity and background screening before accepting bookings",
+  "Free to apply",
+  "Simple Guru profile setup",
+  "Trust and safety steps help protect the community",
+  "Clear profiles help pet parents feel confident",
   "Trust badges help approved Gurus stand out",
   "A cleaner profile experience for modern pet care providers",
 ];
@@ -125,23 +125,23 @@ export default function BecomeAGuruPage() {
               <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 !text-slate-800 sm:text-xl">
                 Turn your love for pets into extra income. Join SitGuru as a
                 trusted local pet care Guru and start building your pet care
-                profile at no cost.
+                profile for free.
               </p>
 
               <p className="mt-4 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg sm:leading-8">
-                Apply free today. Once your profile is reviewed and
-                pre-approved, SitGuru will guide you through verification so you
-                can begin accepting pet care bookings in your area.
+                Apply free today. Once your profile is reviewed, SitGuru will
+                guide you through simple trust and safety steps so you can begin
+                accepting pet care bookings in your area.
               </p>
 
               <div className="mt-5 rounded-[26px] border border-emerald-200 bg-white/90 p-5 shadow-sm">
                 <p className="text-sm font-bold uppercase tracking-[0.18em] !text-emerald-700">
-                  No upfront screening fee
+                  Built for trusted pet care
                 </p>
                 <p className="mt-2 text-base leading-7 !text-slate-700">
-                  No upfront screening fee to apply. If approved, screening
-                  costs may be deducted from your first completed SitGuru
-                  booking.
+                  SitGuru uses a simple review process to help pet parents feel
+                  confident and to help approved Gurus stand out with a clear,
+                  trustworthy profile.
                 </p>
               </div>
 
@@ -170,7 +170,7 @@ export default function BecomeAGuruPage() {
 
               <div className="mt-5 flex flex-wrap gap-2">
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold !text-slate-700 shadow-sm">
-                  Apply at no cost
+                  Free to apply
                 </span>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold !text-slate-700 shadow-sm">
                   Founding Guru badge
@@ -205,7 +205,7 @@ export default function BecomeAGuruPage() {
                     Apply free
                   </p>
                   <p className="mt-1 text-sm !text-slate-300">
-                    Start your application without an upfront application cost.
+                    Start your application and build your profile for free.
                   </p>
                 </div>
 
@@ -223,7 +223,8 @@ export default function BecomeAGuruPage() {
                     Built for trust
                   </p>
                   <p className="mt-1 text-sm !text-slate-300">
-                    Verification and stronger first impressions for pet parents.
+                    Simple trust and safety steps help pet parents feel
+                    confident.
                   </p>
                 </div>
 
@@ -386,18 +387,19 @@ export default function BecomeAGuruPage() {
               </h2>
 
               <p className="mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-                The Guru journey should feel simple and low-friction. Apply
-                free, get reviewed, complete verification when approved, then
-                manage your Guru activity inside SitGuru.
+                The Guru journey should feel simple and welcoming. Apply free,
+                get your profile reviewed, complete trust and safety steps when
+                approved, then manage your Guru activity inside SitGuru.
               </p>
 
               <div className="mt-5 rounded-[26px] border border-emerald-200 bg-white p-5 shadow-sm">
                 <p className="text-sm font-bold uppercase tracking-[0.18em] !text-emerald-700">
-                  Option B built in
+                  Trust and safety built in
                 </p>
                 <p className="mt-2 text-sm leading-7 !text-slate-700 sm:text-base">
-                  No upfront screening fee to apply. If approved, screening
-                  costs may be deducted from your first completed booking.
+                  SitGuru uses a simple review process to help keep the
+                  experience safe, clear, and trusted for pet parents, Gurus,
+                  and pets.
                 </p>
               </div>
 
@@ -487,14 +489,15 @@ export default function BecomeAGuruPage() {
               </h2>
 
               <p className="mx-auto mt-4 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-                Start your SitGuru Guru application at no cost. Once reviewed
-                and approved, complete verification and begin accepting pet care
-                bookings through your Guru dashboard.
+                Start your SitGuru Guru application for free. Once reviewed and
+                approved, complete simple trust and safety steps and begin
+                accepting pet care bookings through your Guru dashboard.
               </p>
 
               <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 !text-slate-600 sm:text-base">
-                No upfront screening fee to apply. If approved, screening costs
-                may be deducted from your first completed SitGuru booking.
+                SitGuru is built to help trusted local caregivers create a
+                clearer profile, earn confidence from pet parents, and grow
+                their pet care presence.
               </p>
 
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
