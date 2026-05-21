@@ -1159,6 +1159,13 @@ export default function HomePage() {
               <div className="relative z-20 mt-4 lg:mt-6 lg:w-[640px] xl:w-[670px]">
                 <TrustRow />
               </div>
+
+              <div className="relative z-20 mt-5 flex justify-center lg:hidden">
+                <HeroSignupCard
+                  onGoogleSignup={handleOAuthSignup}
+                  onTrack={trackHomepageClick}
+                />
+              </div>
             </div>
           </div>
 
