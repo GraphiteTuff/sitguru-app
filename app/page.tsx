@@ -1301,6 +1301,96 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="bg-gradient-to-br from-white via-emerald-50/30 to-white pb-8 sm:pb-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-[34px] border border-emerald-100 bg-white/90 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
+            <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
+              <div>
+                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-emerald-800">
+                  SitGuru Programs
+                </div>
+
+                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-slate-950 sm:text-4xl">
+                  Anyone can join. Anyone can apply.
+                </h2>
+
+                <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
+                  Pet Parents use SitGuru to find trusted local care. Gurus
+                  apply to offer care. SitGuru Programs create additional ways
+                  to earn, refer, and help grow the SitGuru Pet Community.
+                </p>
+
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <Link
+                    href="/search"
+                    onClick={() =>
+                      trackHomepageClick(
+                        "Find Care Programs Section",
+                        "/search",
+                      )
+                    }
+                    className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-sky-400 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:brightness-105 sm:w-auto"
+                  >
+                    Find Care
+                  </Link>
+
+                  <Link
+                    href="/become-a-guru"
+                    onClick={() =>
+                      trackHomepageClick(
+                        "Become a Guru Programs Section",
+                        "/become-a-guru",
+                      )
+                    }
+                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
+                  >
+                    Become a Guru
+                  </Link>
+
+                  <Link
+                    href="/programs"
+                    onClick={() =>
+                      trackHomepageClick("Explore Programs", "/programs")
+                    }
+                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
+                  >
+                    Explore Programs
+                  </Link>
+                </div>
+
+                <div className="mt-7 flex flex-wrap gap-3">
+                  {[
+                    "Student Hire",
+                    "Veterans Hire",
+                    "SkillBridge applicants",
+                    "Ambassador Program",
+                    "Referral rewards",
+                    "Community growth",
+                  ].map((chip) => (
+                    <span
+                      key={chip}
+                      className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-800"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-3">
+                {homepagePrograms.map((program) => (
+                  <ProgramHeroCard
+                    key={program.title}
+                    program={program}
+                    onTrack={trackHomepageClick}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="how-sitguru-works" className="bg-white pb-7 sm:pb-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid overflow-hidden rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 shadow-[0_18px_45px_rgba(15,23,42,0.08)] lg:grid-cols-3">
@@ -1459,96 +1549,6 @@ export default function HomePage() {
               >
                 See how it works →
               </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-gradient-to-br from-white via-emerald-50/30 to-white pb-8 sm:pb-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-[34px] border border-emerald-100 bg-white/90 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
-            <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
-              <div>
-                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-emerald-800">
-                  SitGuru Programs
-                </div>
-
-                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-slate-950 sm:text-4xl">
-                  Anyone can join. Anyone can apply.
-                </h2>
-
-                <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
-                  Pet Parents use SitGuru to find trusted local care. Gurus
-                  apply to offer care. SitGuru Programs create additional ways
-                  to earn, refer, and help grow the SitGuru Pet Community.
-                </p>
-
-                <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <Link
-                    href="/search"
-                    onClick={() =>
-                      trackHomepageClick(
-                        "Find Care Programs Section",
-                        "/search",
-                      )
-                    }
-                    className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-sky-400 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:brightness-105 sm:w-auto"
-                  >
-                    Find Care
-                  </Link>
-
-                  <Link
-                    href="/become-a-guru"
-                    onClick={() =>
-                      trackHomepageClick(
-                        "Become a Guru Programs Section",
-                        "/become-a-guru",
-                      )
-                    }
-                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
-                  >
-                    Become a Guru
-                  </Link>
-
-                  <Link
-                    href="/programs"
-                    onClick={() =>
-                      trackHomepageClick("Explore Programs", "/programs")
-                    }
-                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
-                  >
-                    Explore Programs
-                  </Link>
-                </div>
-
-                <div className="mt-7 flex flex-wrap gap-3">
-                  {[
-                    "Student Hire",
-                    "Veterans Hire",
-                    "SkillBridge applicants",
-                    "Ambassador Program",
-                    "Referral rewards",
-                    "Community growth",
-                  ].map((chip) => (
-                    <span
-                      key={chip}
-                      className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-800"
-                    >
-                      {chip}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-5 md:grid-cols-3">
-                {homepagePrograms.map((program) => (
-                  <ProgramHeroCard
-                    key={program.title}
-                    program={program}
-                    onTrack={trackHomepageClick}
-                  />
-                ))}
-              </div>
             </div>
           </div>
         </div>
