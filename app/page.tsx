@@ -1071,11 +1071,22 @@ export default function HomePage() {
                     Made <span className="text-emerald-600">simple.</span>
                   </h1>
 
-                  <p className="mt-3 max-w-xl text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:max-w-[610px] lg:text-[1.05rem] xl:text-lg">
-                    SitGuru is a new way for Pet Parents to find trusted local
-                    Gurus for walks, sitting, boarding, training and more — with
-                    care, convenience, and community built in.
-                  </p>
+                  <div className="mt-3 max-w-xl lg:max-w-[610px]">
+                    <p className="text-sm font-bold uppercase tracking-[0.14em] text-emerald-700 sm:text-[0.8rem]">
+                      Trusted Pet Care Marketplace
+                    </p>
+
+                    <p className="mt-2 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
+                      SitGuru is a trusted pet care marketplace connecting Pet
+                      Parents with local Pet Gurus.
+                    </p>
+
+                    <p className="mt-3 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
+                      Find trusted local Gurus for walks, sitting, boarding,
+                      training and more — with care, convenience, and community
+                      built in.
+                    </p>
+                  </div>
                 </div>
               </div>
 
