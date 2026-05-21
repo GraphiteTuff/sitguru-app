@@ -80,7 +80,7 @@ const publicNavLinks: NavLink[] = [
   { label: "Home", href: "/" },
   { label: "Find Care", href: "/pet-parents" },
   { label: "My Pets", href: "/pets" },
-  { label: "Become a Guru", href: "/pet-gurus" },
+  { label: "Become a Guru", href: "/become-a-guru" },
 ];
 
 const customerNavLinks: NavLink[] = [
@@ -299,8 +299,8 @@ function getActiveAliases(href: string) {
     return ["/pet-parents", "/find-care"];
   }
 
-  if (href === "/pet-gurus") {
-    return ["/pet-gurus", "/become-a-guru"];
+  if (href === "/become-a-guru") {
+    return ["/become-a-guru", "/pet-gurus"];
   }
 
   if (href === "/search") {
