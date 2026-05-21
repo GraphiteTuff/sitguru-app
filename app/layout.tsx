@@ -24,6 +24,11 @@ export const metadata: Metadata = {
     "Pet Parents",
     "Pet Gurus",
   ],
+  verification: {
+    other: {
+      "msvalidate.01": "E2D4A6BA4828D74F5635B3779223975A",
+    },
+  },
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
