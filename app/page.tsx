@@ -15,6 +15,7 @@ const openSans = Open_Sans({
 
 const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
+const sitGuruVideoEmbedUrl = "https://www.youtube.com/embed/Jk5vWCWvvKs?si=12529oKyk7IFLtAj";
 
 const heroServiceOptions = [
   "Dog Walking",
@@ -844,6 +845,69 @@ function ProgramHeroCard({
   );
 }
 
+
+function HomeVideoSection({
+  onTrack,
+}: {
+  onTrack: (label: string, destination: string) => void;
+}) {
+  return (
+    <section className="bg-white py-6 sm:py-10 lg:py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid min-w-0 gap-5 overflow-hidden rounded-[26px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-[0_16px_42px_rgba(15,23,42,0.08)] sm:gap-7 sm:rounded-[32px] sm:p-7 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center lg:p-8">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 sm:text-xs">
+              Quick overview
+            </p>
+            <h2 className="mt-2 text-[1.65rem] font-black leading-[1.05] tracking-[-0.045em] text-slate-950 sm:mt-3 sm:text-3xl lg:text-4xl">
+              See how SitGuru works.
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
+              Watch a short overview of how SitGuru helps Pet Parents find
+              trusted local care and helps Pet Gurus grow their bookings in one
+              simple pet care marketplace.
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
+              <Link
+                href="/search"
+                onClick={() => onTrack("Find Care Video Section", "/search")}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200 sm:w-auto"
+              >
+                Find Pet Care
+              </Link>
+
+              <Link
+                href="/become-a-guru"
+                onClick={() =>
+                  onTrack("Become a Guru Video Section", "/become-a-guru")
+                }
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100 sm:w-auto"
+              >
+                Become a Guru
+              </Link>
+            </div>
+          </div>
+
+          <div className="relative min-w-0 overflow-hidden rounded-[22px] border border-slate-200 bg-slate-950 shadow-[0_16px_38px_rgba(15,23,42,0.14)] sm:rounded-[26px] lg:shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
+            <div className="relative aspect-video w-full">
+              <iframe
+                src={sitGuruVideoEmbedUrl}
+                title="SitGuru Trusted Local Pet Care"
+                className="absolute left-0 top-0 h-full w-full border-0"
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   const [searchForm, setSearchForm] = useState<SearchFormState>(
     initialSearchFormState,
@@ -1204,6 +1268,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <HomeVideoSection onTrack={trackHomepageClick} />
 
       <section className="bg-white py-5 sm:py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
