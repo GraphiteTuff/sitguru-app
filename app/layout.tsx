@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import RouteShell from "@/components/RouteShell";
 
@@ -30,9 +31,9 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/icon.png",
+    icon: [{ url: "/favicon.ico", type: "image/x-icon" }],
+    shortcut: [{ url: "/favicon.ico", type: "image/x-icon" }],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
     title: "SitGuru | Trusted Pet Care. Simplified.",
@@ -42,9 +43,9 @@ export const metadata: Metadata = {
     siteName: "SitGuru",
     images: [
       {
-        url: "/icon.png",
-        width: 512,
-        height: 512,
+        url: "/apple-touch-icon.png",
+        width: 180,
+        height: 180,
         alt: "SitGuru logo",
       },
     ],
@@ -56,7 +57,7 @@ export const metadata: Metadata = {
     title: "SitGuru | Trusted Pet Care. Simplified.",
     description:
       "Find trusted local Pet Gurus for walks, sitting, boarding, training, and more.",
-    images: ["/icon.png"],
+    images: ["/apple-touch-icon.png"],
   },
 };
 
@@ -66,7 +67,7 @@ const organizationSchema = {
   name: "SitGuru",
   alternateName: ["Sit Guru", "SitGuru Pet Care"],
   url: "https://www.sitguru.com",
-  logo: "https://www.sitguru.com/icon.png",
+  logo: "https://www.sitguru.com/apple-touch-icon.png",
   description:
     "SitGuru helps Pet Parents find trusted local Gurus for walks, sitting, boarding, training, and more.",
 };
@@ -87,6 +88,25 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="site-shell min-h-screen bg-[#f8fcfd] text-slate-900 antialiased">
+        <Script id="google-tag-manager" strategy="afterInteractive">
+          {`
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','GTM-KVDPHX4W');
+          `}
+        </Script>
+
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-KVDPHX4W"
+            height="0"
+            width="0"
+            style={{ display: "none", visibility: "hidden" }}
+          />
+        </noscript>
+
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -99,6 +119,7 @@ export default function RootLayout({
             __html: JSON.stringify(websiteSchema),
           }}
         />
+
         <RouteShell>{children}</RouteShell>
       </body>
     </html>
