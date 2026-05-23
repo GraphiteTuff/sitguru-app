@@ -757,7 +757,7 @@ function createFallbackGuruFromSlug(routeSlug: string): GuruRecord {
 
     specialties: ["Puppy Care", "Senior Pet Care", "Multi-Pet Homes"],
     services: ["Dog Walking", "Pet Sitting", "Cat Care", "Drop-In Visits"],
-    certifications: ["Background checked", "SitGuru reviewed"],
+    certifications: ["Trust & Safety reviewed", "SitGuru reviewed"],
 
     is_featured: true,
     is_verified: true,
@@ -1393,6 +1393,8 @@ export default async function GuruProfilePage({
 
   const trustSignals = [
     guru.is_verified ? "Verified profile" : "Profile reviewed",
+    "Free Trust & Safety Review",
+    "Marketplace Fees: Free",
     profileStatus,
     ...certifications.slice(0, 4),
   ];
@@ -1950,7 +1952,7 @@ export default async function GuruProfilePage({
                 Why pet parents trust {firstName}
               </p>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="mt-5 grid gap-4 md:grid-cols-4">
                 {[
                   {
                     title: "Clear profile",
@@ -1961,6 +1963,11 @@ export default async function GuruProfilePage({
                     title: "Pet-first care",
                     copy: "The booking request collects pet details and special instructions.",
                     icon: "🐾",
+                  },
+                  {
+                    title: "Keep 100% of earnings",
+                    copy: "Gurus currently keep 100% of their listed service earnings on SitGuru.",
+                    icon: "💸",
                   },
                   {
                     title: "SitGuru support",
@@ -2079,9 +2086,20 @@ export default async function GuruProfilePage({
                   Message Guru
                 </Link>
 
+                <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <p className="text-sm font-black !text-emerald-700">
+                    Marketplace Fees: Free
+                  </p>
+
+                  <p className="mt-1 text-xs font-semibold leading-5 !text-slate-700">
+                    SitGuru currently tracks marketplace fees as $0 while keeping
+                    the admin reporting ready for future decisions.
+                  </p>
+                </div>
+
                 <p className="mt-4 text-center text-xs font-bold leading-5 !text-slate-600">
                   You will review the request before checkout. You are not
-                  charged from this profile page.
+                  charged from this profile page. Marketplace Fees: Free.
                 </p>
               </div>
             </section>
@@ -2193,8 +2211,8 @@ export default async function GuruProfilePage({
               icon: "🐾",
             },
             {
-              title: "Secure payments",
-              copy: "Booking stays inside the SitGuru experience.",
+              title: "Secure booking experience",
+              copy: "Booking requests, communication, and support stay inside the SitGuru experience.",
               icon: "🔒",
             },
             {

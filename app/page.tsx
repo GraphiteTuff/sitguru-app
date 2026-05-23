@@ -265,10 +265,10 @@ const demoGuruCards: GuruCard[] = [
 ];
 
 const trustItems = [
-  "Trusted local Gurus",
-  "Verified & reviewed",
-  "Secure & safe",
-  "Care you can count on",
+  "Easy signup",
+  "Trusted profiles",
+  "Community-first care",
+  "Optional tipping",
 ];
 
 const programPathways = [
@@ -584,10 +584,10 @@ function HeroSignupCard({
   return (
     <aside className="w-full max-w-[340px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[360px]">
       <h2 className="text-[2.15rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.65rem]">
-        Create your free account
+        Join SitGuru free
       </h2>
       <p className="mt-2 text-sm font-semibold text-slate-500">
-        Join in less than a minute.
+        as a Pet Parent or Guru. Simple signup. Trusted community.
       </p>
 
       <div className="mt-6 grid gap-3">
@@ -1061,7 +1061,7 @@ export default function HomePage() {
             <div className="grid gap-4 lg:block">
               <div>
                 <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50/95 px-3 py-1 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur sm:text-xs">
-                  A new way to pet care is here
+                  Local Trusted Marketplace
                 </div>
 
                 <div className="mt-4 max-w-[76%] sm:max-w-[590px] lg:max-w-[640px] xl:max-w-[680px]">
@@ -1073,18 +1073,17 @@ export default function HomePage() {
 
                   <div className="mt-3 max-w-xl lg:max-w-[610px]">
                     <p className="text-sm font-bold uppercase tracking-[0.14em] text-emerald-700 sm:text-[0.8rem]">
-                      Trusted Pet Care Marketplace
+                      Trusted local pet care marketplace
                     </p>
 
                     <p className="mt-2 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
-                      SitGuru is a trusted pet care marketplace connecting Pet
-                      Parents with local Pet Gurus.
+                      SitGuru connects Pet Parents with trusted local Gurus for
+                      walks, sitting, boarding, training, and more.
                     </p>
 
                     <p className="mt-3 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
-                      Find trusted local Gurus for walks, sitting, boarding,
-                      training and more — with care, convenience, and community
-                      built in.
+                      Simple signup, trusted profiles, and a community-first
+                      experience built around quality pet care.
                     </p>
                   </div>
                 </div>
@@ -1169,6 +1168,21 @@ export default function HomePage() {
 
               <div className="relative z-20 mt-4 lg:mt-6 lg:w-[640px] xl:w-[670px]">
                 <TrustRow />
+
+              <div className="mt-3 grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/90 p-3 shadow-sm sm:grid-cols-3">
+                {[
+                  ["Local Trusted", "Marketplace"],
+                  ["Reviewed", "Profiles"],
+                  ["100%", "Guru earnings kept"],
+                ].map(([value, label]) => (
+                  <div key={label} className="rounded-xl bg-white px-3 py-2 text-center">
+                    <p className="text-lg font-black text-emerald-700">{value}</p>
+                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-600">
+                      {label}
+                    </p>
+                  </div>
+                ))}
+              </div>
               </div>
 
               <div className="relative z-20 mt-5 flex justify-center lg:hidden">
@@ -1315,9 +1329,11 @@ export default function HomePage() {
                 </h2>
 
                 <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
-                  Pet Parents use SitGuru to find trusted local care. Gurus
-                  apply to offer care. SitGuru Programs create additional ways
-                  to earn, refer, and help grow the SitGuru Pet Community.
+                  Pet Parents use SitGuru to find trusted local care with no
+                  marketplace fees. Gurus apply to offer care, keep 100% of
+                  their listed earnings, and may receive optional tips. SitGuru
+                  Programs create additional ways to earn, refer, and help grow
+                  the SitGuru Pet Community.
                 </p>
 
                 <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -1366,6 +1382,8 @@ export default function HomePage() {
                     "Ambassador Program",
                     "Referral rewards",
                     "Community growth",
+                    "Trusted profiles",
+                    "Community-first care",
                   ].map((chip) => (
                     <span
                       key={chip}
@@ -1446,9 +1464,11 @@ export default function HomePage() {
               </h2>
 
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
-                Pet Parents use SitGuru to find trusted local care. Gurus apply
-                to offer care. SitGuru Programs create additional ways to earn,
-                refer, and help grow the SitGuru Pet Community.
+                Pet Parents use SitGuru to find trusted local care with no
+                marketplace fees. Gurus apply to offer care, keep 100% of their
+                listed earnings, and may receive optional tips. SitGuru Programs
+                create additional ways to earn, refer, and help grow the
+                SitGuru Pet Community.
               </p>
 
               <div className="mt-5 grid gap-4">
@@ -1523,7 +1543,7 @@ export default function HomePage() {
                   [
                     "3",
                     "Book with confidence",
-                    "Secure, trusted, and supported",
+                    "Trusted profiles, simple requests, and support when needed",
                   ],
                 ].map(([number, title, description]) => (
                   <div key={title} className="flex items-start gap-3">
@@ -1612,8 +1632,8 @@ export default function HomePage() {
                 opacity: 1,
               }}
             >
-              Find trusted pet care or join SitGuru and be part of something
-              new.
+              Find trusted pet care or join SitGuru and be part of a local,
+              community-first pet care marketplace.
             </p>
 
             <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -1651,9 +1671,9 @@ export default function HomePage() {
 
           <div className="mt-7 grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
             {[
-              "Secure payments",
-              "Trust & Safety focused",
-              "ID verified",
+              "Easy signup",
+              "Reviewed profiles",
+              "Optional tips for Gurus",
               "Protected by SitGuru",
             ].map((item) => (
               <div key={item} className="text-xs font-black text-slate-600">

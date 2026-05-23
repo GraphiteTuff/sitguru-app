@@ -19,18 +19,21 @@ export default function GuruRecognitionBadge({
       crest: "h-9 w-8",
       label: "text-sm",
       star: "text-xs",
+      sublabel: "text-[10px]",
     },
     md: {
       wrapper: "gap-3 rounded-[1.1rem] px-4 py-3",
       crest: "h-12 w-10",
       label: "text-base",
       star: "text-sm",
+      sublabel: "text-xs",
     },
     lg: {
       wrapper: "gap-4 rounded-[1.35rem] px-5 py-4",
       crest: "h-16 w-14",
       label: "text-xl",
       star: "text-base",
+      sublabel: "text-sm",
     },
   };
 
@@ -38,7 +41,7 @@ export default function GuruRecognitionBadge({
 
   return (
     <div
-      className={`inline-flex items-center border border-white/80 bg-white/90 shadow-[0_10px_24px_rgba(15,23,42,0.10)] ${selected.wrapper} ${className}`}
+      className={`inline-flex items-center border border-emerald-100 bg-white/95 shadow-[0_10px_24px_rgba(15,23,42,0.10)] ${selected.wrapper} ${className}`}
     >
       <GuruCrestIcon className={selected.crest} />
 
@@ -47,14 +50,21 @@ export default function GuruRecognitionBadge({
           {label}
         </span>
 
+        <span
+          className={`${selected.sublabel} mt-0.5 font-bold uppercase tracking-[0.12em] !text-emerald-700`}
+        >
+          SitGuru reviewed
+        </span>
+
         {showStars ? (
-          <div className="mt-1 flex items-center gap-1">
+          <div className="mt-1 flex items-center gap-1" aria-label={`${stars} out of 5 recognition stars`}>
             {Array.from({ length: 5 }).map((_, index) => (
               <span
                 key={index}
                 className={`${selected.star} ${
                   index < stars ? "text-amber-400" : "text-slate-300"
                 }`}
+                aria-hidden="true"
               >
                 ★
               </span>

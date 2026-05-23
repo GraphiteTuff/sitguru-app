@@ -269,9 +269,9 @@ const tipOptions: {
   },
 ];
 
-const ESTIMATED_MARKETPLACE_FEE_PERCENT = 15;
-const MIN_MARKETPLACE_FEE_PERCENT = 15;
-const MAX_MARKETPLACE_FEE_PERCENT = 20;
+const ESTIMATED_MARKETPLACE_FEE_PERCENT = 0;
+const MIN_MARKETPLACE_FEE_PERCENT = 0;
+const MAX_MARKETPLACE_FEE_PERCENT = 0;
 const DEFAULT_SERVICE_RADIUS_MILES = 25;
 const EARTH_RADIUS_MILES = 3958.8;
 
@@ -403,13 +403,22 @@ const forcedSelectStyle = {
   backgroundColor: "#ffffff",
 };
 
-function initialsFromName(name: string) {
-  return name
+function initialsFromName(name?: string | null) {
+  return String(name || "SG")
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+function firstNameFromDisplayName(name?: string | null) {
+  return (
+    String(name || "this Guru")
+      .trim()
+      .split(" ")
+      .filter(Boolean)[0] || "this Guru"
+  );
 }
 
 function cleanZip(value?: string | null) {
@@ -1084,9 +1093,7 @@ export default function BookGuruClient({
 
   const marketplaceFeePercent = ESTIMATED_MARKETPLACE_FEE_PERCENT;
 
-  const marketplaceFee = Number(
-    (servicePrice * (marketplaceFeePercent / 100)).toFixed(2),
-  );
+  const marketplaceFee = 0;
 
   const tipAmount = useMemo(
     () =>
@@ -1100,15 +1107,13 @@ export default function BookGuruClient({
 
   const tipCents = dollarsToCents(tipAmount);
 
-  const guruEstimatedBasePayout = Number(
-    (servicePrice - marketplaceFee).toFixed(2),
-  );
+  const guruEstimatedBasePayout = Number(servicePrice.toFixed(2));
 
   const guruEstimatedTotalPayout = Number(
     (guruEstimatedBasePayout + tipAmount).toFixed(2),
   );
 
-  const total = Number((servicePrice + marketplaceFee + tipAmount).toFixed(2));
+  const total = Number((servicePrice + tipAmount).toFixed(2));
 
   const displayPreferredTime =
     timeWindow === "Specific time needed"
@@ -1116,9 +1121,10 @@ export default function BookGuruClient({
       : timeWindow;
 
   const guruDisplayName =
-    guruProfile?.display_name || guruProfile?.full_name || guruName;
+    guruProfile?.display_name || guruProfile?.full_name || guruName || "SitGuru Guru";
 
-  const guruInitials = initialsFromName(guruDisplayName || "SG");
+  const guruFirstName = firstNameFromDisplayName(guruDisplayName);
+  const guruInitials = initialsFromName(guruDisplayName);
 
   const guruPhoto =
     initialGuruPhotoUrl ||
@@ -2110,7 +2116,7 @@ export default function BookGuruClient({
             ? `Emergency / special instructions: ${emergencyNotes.trim()}`
             : "",
           "",
-          `Customer-facing SitGuru marketplace fee estimate: ${marketplaceFeePercent}%`,
+          "Internal SitGuru marketplace fee tracking amount: $0",
           `Guru tip selected: ${formatMoney(
             tipAmount,
           )}. 100% of the tip goes directly to the Guru.`,
@@ -2188,10 +2194,8 @@ export default function BookGuruClient({
             </h1>
 
             <p className="mt-4 max-w-2xl text-lg font-semibold leading-8 text-slate-700">
-              Care that costs less, without feeling less. SitGuru keeps
-              marketplace fees lower than many major care platforms while
-              supporting secure payments, customer care, safety tools, and
-              reliable Guru payouts.
+              Request trusted care with secure checkout, organized booking
+              details, optional tipping, and SitGuru support when needed.
             </p>
           </div>
 
@@ -3057,13 +3061,12 @@ export default function BookGuruClient({
 
                 <div className="mt-6 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 p-5">
                   <p className="flex items-center gap-2 text-lg font-black text-emerald-900">
-                    <CreditCard className="h-5 w-5" />A lower service fee than
-                    many leading care platforms
+                    <CreditCard className="h-5 w-5" /> Secure checkout for
+                    trusted pet care
                   </p>
                   <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">
-                    SitGuru keeps marketplace fees competitive so more of your
-                    booking goes toward quality care, Guru earnings, support,
-                    safety tools, and improving your experience.
+                    Review your booking details, choose an optional Guru tip,
+                    and continue through secure checkout when you are ready.
                   </p>
                 </div>
 
@@ -3153,8 +3156,7 @@ export default function BookGuruClient({
 
                   <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
                     <p className="text-sm font-bold leading-6 text-emerald-900">
-                      Tips are never included in SitGuru’s marketplace fee. Your
-                      Guru receives 100% of the tip you choose.
+                      Your Guru receives 100% of the optional tip you choose.
                     </p>
                   </div>
                 </div>
@@ -3337,7 +3339,7 @@ export default function BookGuruClient({
 
               <div className="mt-5">
                 <p className="text-sm font-black text-slate-950">
-                  About {guruDisplayName.split(" ")[0] || "this Guru"}
+                  About {guruFirstName}
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
                   {guruProfile?.bio ||
@@ -3372,7 +3374,7 @@ export default function BookGuruClient({
                       SitGuru
                     </p>
                     <p className="text-xs font-bold text-slate-600">
-                      Background Checked
+                      SitGuru Reviewed
                     </p>
                   </div>
                 </div>
@@ -3447,18 +3449,17 @@ export default function BookGuruClient({
 
                 <div className="mt-3 flex justify-between gap-4 text-sm">
                   <span className="inline-flex items-center gap-1 font-semibold text-slate-600">
-                    SitGuru Service Fee
+                    Secure Checkout
                     <CircleHelp className="h-3.5 w-3.5" />
                   </span>
-                  <span className="font-black text-slate-950">
-                    {formatMoney(marketplaceFee)}
+                  <span className="font-black text-emerald-700">
+                    Included
                   </span>
                 </div>
 
                 <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
-                  Estimated at {marketplaceFeePercent}%. Final fee may range
-                  from {MIN_MARKETPLACE_FEE_PERCENT}%–
-                  {MAX_MARKETPLACE_FEE_PERCENT}% depending on locality.
+                  Payment protection, booking details, and request tracking are
+                  built into the SitGuru checkout experience.
                 </p>
 
                 <div className="mt-3 flex justify-between gap-4 text-sm">
@@ -3485,21 +3486,20 @@ export default function BookGuruClient({
               <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
                 <p className="flex items-start gap-2 text-xs font-bold leading-5 text-slate-700">
                   <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                  Care that costs less, without feeling less. SitGuru keeps
-                  marketplace fees lower than many major care platforms while
-                  supporting secure payments, customer care, safety tools, and
-                  reliable Guru payouts.
+                  Secure checkout keeps payment protected, booking details
+                  organized, and care requests easy to manage from your
+                  SitGuru dashboard.
                 </p>
               </div>
 
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                  Estimated Guru payout
+                  Guru Earnings
                 </p>
                 <div className="mt-3 space-y-2 text-sm">
                   <div className="flex justify-between gap-4">
                     <span className="font-semibold text-slate-600">
-                      Base payout after SitGuru fee
+                      Service earnings
                     </span>
                     <span className="font-black text-slate-950">
                       {formatMoney(guruEstimatedBasePayout)}
@@ -3507,7 +3507,7 @@ export default function BookGuruClient({
                   </div>
                   <div className="flex justify-between gap-4">
                     <span className="font-semibold text-slate-600">
-                      Tip pass-through
+                      Optional tip
                     </span>
                     <span className="font-black text-emerald-700">
                       +{formatMoney(tipAmount)}
@@ -3515,7 +3515,7 @@ export default function BookGuruClient({
                   </div>
                   <div className="flex justify-between gap-4 border-t border-slate-200 pt-2">
                     <span className="font-black text-slate-950">
-                      Guru estimated total
+                      Guru estimated earnings
                     </span>
                     <span className="font-black text-slate-950">
                       {formatMoney(guruEstimatedTotalPayout)}

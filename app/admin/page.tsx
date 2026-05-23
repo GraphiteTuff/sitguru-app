@@ -205,7 +205,10 @@ function getGrossAmount(booking: AnyRow) {
 
 function getFeeAmount(booking: AnyRow, gross: number) {
   const explicitFee = getAmount(booking, [
+    "marketplace_fee_amount",
+    "trust_and_safety_fee_amount",
     "sitguru_fee_amount",
+    "platform_fee_amount",
     "platform_fee",
     "service_fee",
     "admin_fee",
@@ -213,7 +216,16 @@ function getFeeAmount(booking: AnyRow, gross: number) {
     "commission_amount",
   ]);
 
-  return explicitFee > 0 ? explicitFee : gross * 0.08;
+  return explicitFee > 0 ? explicitFee : 0;
+}
+
+function getTipAmount(booking: AnyRow) {
+  return getAmount(booking, [
+    "tip_amount",
+    "guru_tip_amount",
+    "tip",
+    "gratuity",
+  ]);
 }
 
 function getTaxAmount(booking: AnyRow) {
@@ -235,7 +247,7 @@ function getNetGuruAmount(booking: AnyRow, gross: number, fee: number) {
     "guru_amount",
   ]);
 
-  return explicitNet > 0 ? explicitNet : Math.max(gross - fee, 0);
+  return explicitNet > 0 ? explicitNet : Math.max(gross - fee, 0) + getTipAmount(booking);
 }
 
 function getStatus(row: AnyRow) {
@@ -660,6 +672,14 @@ async function getAdminDashboardData() {
     return sum + getFeeAmount(booking, gross);
   }, 0);
 
+  const totalTips = bookings.reduce((sum, booking) => sum + getTipAmount(booking), 0);
+
+  const totalGuruEarnings = bookings.reduce((sum, booking) => {
+    const gross = getGrossAmount(booking);
+    const fee = getFeeAmount(booking, gross);
+    return sum + getNetGuruAmount(booking, gross, fee);
+  }, 0);
+
   const taxesCollected = bookings.reduce(
     (sum, booking) => sum + getTaxAmount(booking),
     0,
@@ -1022,6 +1042,8 @@ async function getAdminDashboardData() {
     launchSignups,
     grossRevenue,
     netPlatformRevenue,
+    totalTips,
+    totalGuruEarnings,
     taxesCollected,
     realExpenseTotal,
     pendingPayouts,
@@ -1098,24 +1120,34 @@ export default async function AdminDashboardPage() {
 
   const metrics = [
     {
-      title: "Gross Revenue",
+      title: "Booking Volume",
       value: money(data.grossRevenue),
       change: `${Math.abs(data.revenueChange).toFixed(1)}%`,
       trend: data.revenueChange >= 0 ? "up" : "down",
       icon: <CircleDollarSign size={22} />,
       href: adminRoutes.financials,
-      action: "View financials",
+      action: "View activity",
       iconBg: "bg-emerald-100 text-emerald-700",
     },
     {
-      title: "Net Platform Revenue",
+      title: "Marketplace Fees",
       value: money(data.netPlatformRevenue),
-      change: percent(data.platformTakeRate),
+      change: "Currently free",
       trend: "up",
       icon: <BarChart3 size={22} />,
       href: adminRoutes.profitLoss,
-      action: "View P&L",
+      action: "View fee tracking",
       iconBg: "bg-emerald-50 text-emerald-700",
+    },
+    {
+      title: "Tips Sent to Gurus",
+      value: money(data.totalTips),
+      change: "100% tip pass-through",
+      trend: "up",
+      icon: <Gift size={22} />,
+      href: adminRoutes.commissions,
+      action: "View payouts",
+      iconBg: "bg-green-100 text-green-700",
     },
     {
       title: "Pending Payouts",
@@ -1166,8 +1198,8 @@ export default async function AdminDashboardPage() {
             <span className="text-3xl">👋</span>
           </div>
           <p className="text-base font-semibold text-slate-600">
-            Real-time SitGuru operations, financials, network programs, and
-            Supabase activity.
+            Real-time SitGuru operations, marketplace activity, Guru earnings,
+            optional tips, network programs, and Supabase activity.
           </p>
         </div>
 
@@ -1190,7 +1222,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-5">
         <DataHealthTile label="Supabase Source" value="Live data" />
         <DataHealthTile
           label="Bookings Loaded"
@@ -1208,6 +1240,7 @@ export default async function AdminDashboardPage() {
               data.networkMetrics.clicks,
           )}
         />
+        <DataHealthTile label="Marketplace Mode" value="Free" />
       </section>
 
       <section className="grid w-full min-w-0 items-start gap-4 lg:grid-cols-2 2xl:grid-cols-5">
@@ -1270,7 +1303,7 @@ export default async function AdminDashboardPage() {
               <div>
                 <h2 className="text-lg font-black text-white">Cash Position</h2>
                 <p className="text-sm font-semibold text-white/75">
-                  Available balance after pending payouts
+                  Internal balance after pending payouts
                 </p>
               </div>
               <Bell className="text-white/80" />
@@ -1280,7 +1313,7 @@ export default async function AdminDashboardPage() {
               {money(cashPosition)}
             </p>
             <p className="mt-2 text-sm font-bold text-white/75">
-              Updated just now from Supabase bookings and payouts
+              Marketplace fees are tracked internally as $0 during the free launch model
             </p>
 
             <div className="mt-8 h-[70px] rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -1308,10 +1341,10 @@ export default async function AdminDashboardPage() {
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-black text-slate-950">
-                  Revenue Overview
+                  Marketplace Activity
                 </h2>
                 <p className="text-sm font-semibold text-slate-500">
-                  Bookings, platform fees, taxes, payouts, and expenses.
+                  Booking volume, fee tracking, taxes, tips, payouts, and expenses.
                 </p>
               </div>
 
@@ -1322,7 +1355,7 @@ export default async function AdminDashboardPage() {
 
             <div className="space-y-5">
               <ProgressLine
-                title="Gross Revenue"
+                title="Booking Volume"
                 value={money(data.grossRevenue)}
                 percent={revenueTargetPercent}
                 label={`${revenueTargetPercent}% of target`}
@@ -1345,10 +1378,10 @@ export default async function AdminDashboardPage() {
                 label={`${netProfitPercent}% margin`}
               />
               <ProgressLine
-                title="Platform Take Rate"
-                value={percent(data.platformTakeRate)}
-                percent={Math.min(100, data.platformTakeRate * 10)}
-                label="Calculated from booking fees"
+                title="Marketplace Fees"
+                value={money(data.netPlatformRevenue)}
+                percent={0}
+                label="Currently free and tracked as $0"
               />
             </div>
 
@@ -1503,7 +1536,7 @@ export default async function AdminDashboardPage() {
           <DashboardCard>
             <TableHeader
               title="Top Performing Gurus"
-              subtitle="Calculated from real guru rows and bookings."
+              subtitle="Calculated from real Guru rows, bookings, and tips."
               href={adminRoutes.guruPerformance}
             />
 

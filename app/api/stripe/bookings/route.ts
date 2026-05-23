@@ -36,9 +36,9 @@ type GuruServiceRadiusCheck = {
   reason: string;
 };
 
-const DEFAULT_MARKETPLACE_FEE_PERCENT = 15;
-const MIN_MARKETPLACE_FEE_PERCENT = 15;
-const MAX_MARKETPLACE_FEE_PERCENT = 20;
+const DEFAULT_MARKETPLACE_FEE_PERCENT = 0;
+const MIN_MARKETPLACE_FEE_PERCENT = 0;
+const MAX_MARKETPLACE_FEE_PERCENT = 0;
 
 function toIsoDate(date: string) {
   return `${date}T12:00:00`;
@@ -76,13 +76,8 @@ function toSafeCents(value: unknown, fallback = 0) {
   return Math.round(parsed);
 }
 
-function clampMarketplaceFeePercent(value: unknown) {
-  const parsed = toSafeNumber(value, DEFAULT_MARKETPLACE_FEE_PERCENT);
-
-  return Math.min(
-    MAX_MARKETPLACE_FEE_PERCENT,
-    Math.max(MIN_MARKETPLACE_FEE_PERCENT, parsed),
-  );
+function clampMarketplaceFeePercent(_value?: unknown) {
+  return 0;
 }
 
 function jsonError(message: string, status = 400, details?: unknown) {
@@ -935,7 +930,7 @@ export async function POST(req: NextRequest) {
         "platform_fee",
         "platformFee",
       ],
-      Number((subtotalAmount * (marketplaceFeePercent / 100)).toFixed(2)),
+      0,
     );
 
     const tipAmount = getBodyNumber(
@@ -953,7 +948,7 @@ export async function POST(req: NextRequest) {
     const guruEstimatedBasePayout = getBodyNumber(
       body,
       ["guru_estimated_base_payout", "guruEstimatedBasePayout"],
-      Number((subtotalAmount - marketplaceFeeAmount).toFixed(2)),
+      Number(subtotalAmount.toFixed(2)),
     );
 
     const guruEstimatedTotalPayout = getBodyNumber(
@@ -971,7 +966,7 @@ export async function POST(req: NextRequest) {
         "total_amount",
         "total",
       ],
-      Number((subtotalAmount + marketplaceFeeAmount + tipAmount).toFixed(2)),
+      Number((subtotalAmount + tipAmount).toFixed(2)),
     );
 
     const now = new Date().toISOString();
@@ -1123,8 +1118,7 @@ export async function POST(req: NextRequest) {
         `Service radius eligible: ${serviceRadiusCheck.eligible ? "Yes" : "No"}`,
         `Eligibility checked at: ${now}`,
         "",
-        `SitGuru marketplace fee estimate: ${marketplaceFeePercent}%`,
-        `SitGuru marketplace fee amount: $${marketplaceFeeAmount.toFixed(2)}`,
+        "Internal SitGuru marketplace fee tracking amount: $0",
         `Guru tip selected: $${tipAmount.toFixed(2)}. 100% of the tip goes directly to the Guru.`,
         `Estimated Guru payout: $${guruEstimatedTotalPayout.toFixed(2)}`,
       ]

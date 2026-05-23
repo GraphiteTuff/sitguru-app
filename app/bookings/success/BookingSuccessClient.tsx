@@ -70,8 +70,8 @@ export default function BookingSuccessClient({
           </h1>
 
           <p className="mx-auto mt-4 max-w-xl text-center text-lg leading-8 text-slate-600">
-            Your payment was completed successfully. Your Guru will review your
-            booking and respond shortly.
+            Your secure checkout was completed successfully. Your Guru will
+            review the booking request and respond shortly.
           </p>
 
           <div className="mx-auto mt-6 max-w-md rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
@@ -79,6 +79,32 @@ export default function BookingSuccessClient({
             <p className="mt-1 break-all text-sm text-emerald-700">
               {bookingId}
             </p>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <p className="text-center text-sm font-black uppercase tracking-[0.12em] text-emerald-700">
+              What happens next
+            </p>
+
+            <div className="mt-4 grid gap-3">
+              {[
+                "Your booking request is saved in your dashboard.",
+                "Your Guru reviews the care details and availability.",
+                "You will receive updates as the request moves forward.",
+              ].map((item, index) => (
+                <div
+                  key={item}
+                  className="flex items-start gap-3 rounded-2xl bg-white p-3 ring-1 ring-slate-200"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-black text-white">
+                    {index + 1}
+                  </span>
+                  <p className="text-sm font-semibold leading-6 text-slate-700">
+                    {item}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="mt-8 space-y-3">
@@ -96,6 +122,11 @@ export default function BookingSuccessClient({
               Book Another Guru
             </Link>
           </div>
+
+          <p className="mt-5 text-center text-sm font-semibold leading-6 text-slate-500">
+            SitGuru keeps your booking details organized so you can easily track
+            requests, care updates, and future pet care.
+          </p>
         </section>
       </div>
     </main>
