@@ -380,10 +380,10 @@ export default function PrivacyPage() {
 
           <div className="mt-5 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
-              <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+              <h2 className="text-3xl font-black tracking-tight !text-white sm:text-4xl">
                 Different users share different details with SitGuru.
               </h2>
-              <p className="mt-4 text-base font-semibold leading-8 text-white/90">
+              <p className="mt-4 text-base font-semibold leading-8 !text-white/90">
                 Pet Parents, Pet Gurus, Ambassadors, students, community
                 supporters, and military-connected applicants may use different
                 parts of SitGuru. We use submitted information to route support,
@@ -396,17 +396,17 @@ export default function PrivacyPage() {
               {privacyPathways.map((item) => (
                 <div
                   key={item.title}
-                  className="rounded-2xl border border-white/15 bg-white/10 p-4 text-white"
+                  className="rounded-2xl border border-white/15 bg-white/10 p-4 !text-white"
                 >
                   <div className="flex items-start gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-800">
                       {item.icon}
                     </span>
                     <div>
-                      <h3 className="text-sm font-black text-white">
+                      <h3 className="text-sm font-black !text-white">
                         {item.title}
                       </h3>
-                      <p className="mt-1 text-sm font-semibold leading-6 text-white/85">
+                      <p className="mt-1 text-sm font-semibold leading-6 !text-white/85">
                         {item.description}
                       </p>
                     </div>
