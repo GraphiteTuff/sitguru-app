@@ -35,13 +35,13 @@ import AdminAccountMenu from "@/components/AdminAccountMenu";
 
 const adminRoutes = {
   dashboard: "/admin",
-  hr: "/admin/hr",
   bookings: "/admin/bookings",
   customers: "/admin/customers",
   gurus: "/admin/gurus",
   messages: "/admin/messages",
   settings: "/admin/settings",
   trustSafety: "/admin/background-checks",
+  hr: "/admin/hr",
   financials: "/admin/financials",
   banking: "/admin/financials/plaid",
   stripe: "/admin/financials/stripe",
@@ -75,20 +75,23 @@ const navSections = [
     title: "Operations",
     items: [
       { label: "Dashboard", href: adminRoutes.dashboard, icon: Home },
-      { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
       { label: "Bookings", href: adminRoutes.bookings, icon: CalendarDays },
       { label: "Customers", href: adminRoutes.customers, icon: Users },
       { label: "Gurus", href: adminRoutes.gurus, icon: PawPrint },
+      { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
       { label: "Trust & Safety", href: adminRoutes.trustSafety, icon: ShieldCheck },
       { label: "Messages", href: adminRoutes.messages, icon: MessageCircle },
+    ],
+  },
+  {
+    title: "Growth & Marketing",
+    items: [
+      { label: "Sales & Marketing", href: adminRoutes.salesMarketing, icon: Megaphone },
       { label: "Growth & Referrals", href: adminRoutes.referrals, icon: Link2 },
-      {
-        label: "Sales & Marketing",
-        href: adminRoutes.salesMarketing,
-        icon: Megaphone,
-      },
+      { label: "Launch Signups", href: adminRoutes.launchSignups, icon: UserPlus },
       { label: "Programs", href: adminRoutes.programs, icon: ShieldCheck },
       { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
+      { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
     ],
   },
   {
@@ -109,11 +112,11 @@ const navSections = [
     ],
   },
   {
-    title: "Analytics",
+    title: "Analytics & Admin",
     items: [
-      { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
       { label: "Reports & Exports", href: adminRoutes.exports, icon: BarChart3 },
       { label: "Audit Trail", href: adminRoutes.auditTrail, icon: ClipboardList },
+      { label: "Settings", href: adminRoutes.settings, icon: Settings },
     ],
   },
 ];
@@ -121,10 +124,10 @@ const navSections = [
 const topHeaderLinks = [
   { label: "Homepage", href: "/" },
   { label: "Dashboard", href: adminRoutes.dashboard },
-  { label: "HR", href: adminRoutes.hr },
   { label: "Bookings", href: adminRoutes.bookings },
   { label: "Customers", href: adminRoutes.customers },
   { label: "Gurus", href: adminRoutes.gurus },
+  { label: "Human Resources", href: adminRoutes.hr },
   { label: "Trust & Safety", href: adminRoutes.trustSafety },
   { label: "Messages", href: adminRoutes.messages },
   { label: "Financials", href: adminRoutes.financials },
@@ -132,17 +135,17 @@ const topHeaderLinks = [
 
 const mobileQuickLinks = [
   {
-    label: "Human Resources",
+    label: "HR",
     href: adminRoutes.hr,
     icon: HeartHandshake,
-    description: "Hiring and applicants",
+    description: "Hiring and onboarding",
     featured: true,
   },
   {
     label: "Sales & Marketing",
     href: adminRoutes.salesMarketing,
     icon: Megaphone,
-    description: "Outreach, signups, campaigns",
+    description: "Outreach and campaigns",
     featured: false,
   },
   {
@@ -156,19 +159,13 @@ const mobileQuickLinks = [
     label: "Programs",
     href: adminRoutes.programs,
     icon: ShieldCheck,
-    description: "Ambassadors and hiring paths",
-    featured: false,
-  },
-  {
-    label: "Partners",
-    href: adminRoutes.partners,
-    icon: HandCoins,
-    description: "Partner network",
+    description: "Ambassadors and paths",
     featured: false,
   },
 ];
 
 const mobileGrowthLinks = [
+  { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
   { label: "Sales & Marketing", href: adminRoutes.salesMarketing, icon: Megaphone },
   { label: "Growth & Referrals", href: adminRoutes.referrals, icon: Link2 },
   { label: "Launch Signups", href: adminRoutes.launchSignups, icon: UserPlus },
@@ -320,7 +317,7 @@ function MobileNav({ pathname }: { pathname: string }) {
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-green-950 marker:hidden">
           <span className="flex items-center gap-2">
             <Megaphone size={17} className="text-green-800" />
-            Growth quick menu
+            HR, Growth & Marketing
           </span>
 
           <ChevronDown
@@ -427,10 +424,10 @@ function AdminFooter() {
       title: "Operations",
       links: [
         { label: "Dashboard", href: adminRoutes.dashboard },
-        { label: "Human Resources", href: adminRoutes.hr },
         { label: "Bookings", href: adminRoutes.bookings },
         { label: "Customers", href: adminRoutes.customers },
         { label: "Gurus", href: adminRoutes.gurus },
+        { label: "Human Resources", href: adminRoutes.hr },
         { label: "Trust & Safety", href: adminRoutes.trustSafety },
         { label: "Messages", href: adminRoutes.messages },
       ],
@@ -469,7 +466,7 @@ function AdminFooter() {
       ],
     },
     {
-      title: "Growth",
+      title: "Growth & Marketing",
       links: [
         { label: "Growth & Referrals", href: adminRoutes.referrals },
         { label: "Sales & Marketing", href: adminRoutes.salesMarketing },
@@ -617,8 +614,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </p>
 
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">
-                  Oversee users, approvals, bookings, payments, disputes,
-                  partner growth, reporting, taxes, and messages.
+                  Oversee users, approvals, bookings, payments, hiring,
+                  growth, reporting, taxes, and messages.
                 </p>
               </div>
             </div>
