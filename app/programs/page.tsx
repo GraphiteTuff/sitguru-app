@@ -49,7 +49,7 @@ const programs: ProgramDefinition[] = [
     key: "student-hire",
     title: "Student Hire Program",
     shortTitle: "Student Hire",
-    campaign: "Earn with the Pack",
+    campaign: "Join the Pack",
     eyebrow: "Flexible earning for students",
     description:
       "SitGuru helps students, recent grads, high school seniors 18+, trade school students, gap-year students, and summer workers apply for flexible pet care opportunities that can fit around school, breaks, weekends, and summer.",
@@ -109,7 +109,7 @@ const programs: ProgramDefinition[] = [
     key: "community-hire",
     title: "Community Hire Program",
     shortTitle: "Community Hire",
-    campaign: "Work with the Pack",
+    campaign: "Grow with the Pack",
     eyebrow: "Community workforce pathway",
     description:
       "Community Hire is a supported pathway for qualified applicants connected through workforce programs, nonprofits, city, state, federal, community organizations, re-entry support programs, job-readiness programs, and local employment-support partners.",
@@ -133,11 +133,11 @@ const programs: ProgramDefinition[] = [
     benefits: [
       "A supported pathway toward becoming a SitGuru Guru",
       "Local pet care opportunities with onboarding guidance",
-      "A chance to build income, confidence, and service experience",
+      "A chance to build confidence, service experience, and local connections",
       "Connection through workforce and community partners",
       "Trust and safety review when applicable",
       "Community-based opportunity tracking",
-      "Future SitGuru benefits as programs expand",
+      "Future SitGuru growth opportunities as programs expand",
     ],
     steps: [
       "Apply through the Community Hire Program",
@@ -167,19 +167,19 @@ const programs: ProgramDefinition[] = [
   },
   {
     key: "veterans-hire",
-    title: "Veterans Hire Program",
-    shortTitle: "Veterans Hire",
-    campaign: "Serve with the Pack",
-    eyebrow: "Veterans and military-connected pathway",
+    title: "Military Hire Program",
+    shortTitle: "Military Hire",
+    campaign: "Serve the Pack",
+    eyebrow: "Military and veteran-friendly pathway",
     description:
-      "Veterans Hire brings the previous Military Hire Program and SkillBridge Interest List into one stronger SitGuru pathway for veterans, military spouses, Guard, Reserve, dependents over 18, and transitioning service members.",
+      "Military Hire is SitGuru’s military-connected pathway for veterans, military spouses, Guard, Reserve, qualified dependents over 18, and transitioning service members who want to explore flexible local pet care opportunities.",
     href: "#veterans-hire",
     applyHref: "/programs/apply?program=veterans-hire",
     imageSrc: "/images/programs/veterans-hire.jpg",
-    imageAlt: "Military-connected family with a dog representing the SitGuru Veterans Hire Program",
+    imageAlt: "Military-connected family with a dog representing the SitGuru Military Hire Program",
     icon: <Medal size={28} />,
     heroLine:
-      "Bring reliability, accountability, care, and a service mindset to families who need trusted pet care. Veterans Hire includes Military Hire and SkillBridge Interest tracking inside one clean program.",
+      "Bring reliability, accountability, care, and a service mindset to local pet families. Military Hire also keeps SkillBridge Interest organized for future planning if SitGuru expands that pathway.",
     audience: [
       "Veterans",
       "Transitioning service members",
@@ -200,7 +200,7 @@ const programs: ProgramDefinition[] = [
       "SkillBridge interest tracking for future planning",
     ],
     steps: [
-      "Apply through the Veterans Hire Program",
+      "Apply through the Military Hire Program",
       "Share your military-connected background or transition interest",
       "Select Military Hire, SkillBridge Interest, or Veteran Ambassador interest when applicable",
       "Complete your SitGuru applicant profile",
@@ -222,7 +222,7 @@ const programs: ProgramDefinition[] = [
       "SkillBridge Interest included",
       "Veterans welcome",
       "Military spouses",
-      "Serve with the Pack",
+      "Serve the Pack",
     ],
   },
   {
@@ -239,7 +239,7 @@ const programs: ProgramDefinition[] = [
     imageAlt: "Veterinary professional with a pet representing the SitGuru Ambassador Program",
     icon: <HeartHandshake size={28} />,
     heroLine:
-      "Ambassadors help refer Gurus and Pet Parents, promote SitGuru in their own communities, and may become eligible for referral rewards, commission opportunities, bonuses, badges, and Pack Leader recognition with consent.",
+      "Ambassadors help refer Gurus and Pet Parents, promote SitGuru in their own communities, and may become eligible for referral rewards, badges, and Pack Leader recognition with consent.",
     audience: [
       "Student Ambassadors",
       "Vet Tech Ambassadors",
@@ -258,7 +258,7 @@ const programs: ProgramDefinition[] = [
       "Promote SitGuru in your profession or community",
       "Use referral links, QR codes, flyers, and social posts",
       "Track referrals and qualified bookings",
-      "May earn referral rewards or commission opportunities",
+      "May earn eligible referral rewards",
       "Top performers may be featured as Pack Leaders with consent",
     ],
     steps: [
@@ -285,7 +285,7 @@ const programs: ProgramDefinition[] = [
       "Lead the Pack",
       "Grow the Pack",
       "Referral rewards",
-      "Commission tracking",
+      "Referral tracking",
       "Pack Leader recognition",
     ],
   },
@@ -575,14 +575,11 @@ function ProgramCard({ program }: { program: ProgramDefinition }) {
 
             <div>
               <h3 className="text-xl font-black text-green-950">
-                Student Hire is positioned as SitGuru’s largest growth pathway.
+                Student Hire is SitGuru’s easiest student-friendly pathway.
               </h3>
 
               <p className="mt-2 text-sm font-bold leading-7 text-slate-700">
-                Student Hire should feel easy, exciting, and useful: after
-                class, between classes, school breaks, weekends, and summer.
-                Students can also become Student Ambassadors and help grow the
-                Pack on campus.
+                Student Hire is built for real student life: after class, between classes, school breaks, weekends, and summer. Students can also become Student Ambassadors and help grow the Pack on campus.
               </p>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -633,8 +630,7 @@ function ProgramCard({ program }: { program: ProgramDefinition }) {
 
               <p className="mt-3 rounded-2xl border border-blue-200 bg-white px-4 py-3 text-xs font-black leading-6 text-blue-900">
                 Community Hire is a referral and readiness pathway, not
-                full-time employment, part-time employment, or guaranteed job
-                placement.
+                a job placement promise, shift-based role, or guaranteed booking program.
               </p>
             </div>
           </div>
@@ -654,14 +650,11 @@ function ProgramCard({ program }: { program: ProgramDefinition }) {
               </p>
 
               <h3 className="mt-1 text-xl font-black text-amber-950">
-                One stronger Veterans Hire Program.
+                One stronger Military Hire pathway.
               </h3>
 
               <p className="mt-2 text-sm font-bold leading-7 text-amber-950">
-                Veterans Hire now includes the previous Military Hire pathway
-                and the SkillBridge Interest List. SkillBridge is tracked as an
-                interest list unless SitGuru later creates or joins a formally
-                approved SkillBridge training program.
+                Military Hire welcomes veterans, military spouses, Guard, Reserve, dependents over 18, and transitioning service members. SkillBridge Interest is tracked separately for future planning unless SitGuru later creates or joins a formally approved SkillBridge training program.
               </p>
             </div>
           </div>
@@ -686,7 +679,7 @@ function ProgramCard({ program }: { program: ProgramDefinition }) {
 
               <p className="mt-2 text-sm font-bold leading-7 text-green-950">
                 Ambassadors who help SitGuru grow may be eligible for referral
-                rewards, commission opportunities, bonuses, badges, and public
+                rewards, referral opportunities, bonuses, badges, and public
                 recognition as Pack Leaders. Public photos, testimonials, and
                 performance highlights should only be shown with consent.
               </p>
@@ -756,10 +749,7 @@ export default function ProgramsPage() {
                 textShadow: "0 1px 10px rgba(0,0,0,0.24)",
               }}
             >
-              SitGuru programs help students, community members, veterans,
-              military-connected families, and Ambassadors find the right
-              pathway to earn, serve, refer, and grow a trusted pet care network
-              for Pet Parents and Gurus.
+              SitGuru programs help students, community members, military-connected families, and Ambassadors find the right pathway to join, refer, serve, and grow a trusted local pet care community for Pet Parents and Gurus.
             </p>
 
             <div className="mt-7 grid gap-3 sm:flex sm:flex-wrap">
@@ -790,13 +780,13 @@ export default function ProgramsPage() {
 
             <div className="mt-6 flex flex-wrap gap-2">
               <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-black text-green-950 shadow-sm">
-                Earn with the Pack
+                Join the Pack
               </span>
               <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-black text-green-950 shadow-sm">
-                Work with the Pack
+                Grow with the Pack
               </span>
               <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-black text-green-950 shadow-sm">
-                Serve with the Pack
+                Serve the Pack
               </span>
               <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-black text-green-950 shadow-sm">
                 Lead the Pack
@@ -819,17 +809,17 @@ export default function ProgramsPage() {
                     Why Join the Pack
                   </p>
                   <h2 className="text-2xl font-black leading-tight text-green-950 sm:text-3xl">
-                    Apply. Refer. Onboard. Grow.
+                    Choose your path. Apply. Grow.
                   </h2>
                 </div>
               </div>
 
               <div className="space-y-3">
                 {[
-                  "Students can earn through flexible pet care opportunities",
-                  "Community applicants can apply through supported pathways",
-                  "Veterans and military-connected applicants can serve local Pet Parents",
-                  "Ambassadors can refer Gurus and Pet Parents while helping SitGuru grow",
+                  "Students can join flexible pet care opportunities around school",
+                  "Community applicants can come through trusted local partners",
+                  "Military-connected applicants can support local Pet Parents",
+                  "Ambassadors can introduce Gurus, Pet Parents, and partners",
                 ].map((item) => (
                   <div
                     key={item}
@@ -848,7 +838,7 @@ export default function ProgramsPage() {
                 href="/programs/apply?program=student-hire"
                 className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
               >
-                Start Your Application
+                Start Your Path
                 <ArrowRight size={18} />
               </Link>
             </div>
@@ -870,8 +860,8 @@ export default function ProgramsPage() {
           />
           <FeatureCard
             icon={<Medal size={22} />}
-            title="Veterans Hire"
-            description="Veterans Hire includes Military Hire and SkillBridge Interest inside one stronger military-connected pathway."
+            title="Military Hire"
+            description="Military Hire welcomes veterans, military spouses, Guard, Reserve, qualified dependents over 18, and transitioning service members."
           />
           <FeatureCard
             icon={<HeartHandshake size={22} />}
@@ -892,7 +882,7 @@ export default function ProgramsPage() {
               </h2>
 
               <p className="mt-3 text-sm font-semibold leading-7 text-slate-600 sm:text-base">
-                Start with Student Hire, Community Hire, Veterans Hire, or the
+                Start with Student Hire, Community Hire, Military Hire, or the
                 Ambassador Program. Each pathway routes applicants to the right
                 application flow so SitGuru can track source, availability,
                 documents, onboarding needs, referrals, rewards, and next steps.
@@ -949,7 +939,7 @@ export default function ProgramsPage() {
               <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold leading-6 text-amber-900">
                 Approved Gurus provide services as independent contractors.
                 Applying through a program does not guarantee approval, bookings,
-                earnings, employment, commissions, benefits, placement, or full
+                earnings, employment, eligible rewards, benefits, placement, or full
                 Guru status.
               </p>
             </div>
@@ -1085,13 +1075,11 @@ export default function ProgramsPage() {
               </p>
 
               <h2 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-                Top Ambassadors should be rewarded, recognized, and celebrated.
+                Top Ambassadors should be recognized, supported, and celebrated.
               </h2>
 
               <p className="mt-3 text-sm font-bold leading-7 text-green-50 sm:text-base">
-                Ambassadors who help SitGuru grow may be eligible for monetary
-                rewards, referral incentives, commission opportunities, bonuses,
-                and public recognition. With consent, top performers can be
+                Ambassadors who help SitGuru grow may be eligible for referral rewards, recognition, growth opportunities, badges, and community visibility. With consent, top performers can be
                 featured on SitGuru’s homepage carousel or community section as
                 Pack Leaders.
               </p>
@@ -1131,7 +1119,7 @@ export default function ProgramsPage() {
                 items={[
                   "Referral source",
                   "Ambassador type",
-                  "Commission cost",
+                  "Referral tracking",
                   "Booking conversion",
                   "Pack Leader eligibility",
                 ]}
@@ -1161,7 +1149,7 @@ export default function ProgramsPage() {
 
               <p className="mt-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-bold leading-6 text-blue-900">
                 SitGuru Community Hire is a referral and readiness pathway, not
-                a direct employment placement program. SitGuru follows EEOC
+                a direct job placement program. SitGuru follows EEOC
                 guidance for fair, consistent, role-related trust and safety review.
               </p>
 
