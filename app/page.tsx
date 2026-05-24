@@ -140,7 +140,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Philadelphia, PA",
     rating: "5.0",
     reviewCount: 42,
-    priceLabel: "From $22 / visit",
+    priceLabel: "View care options",
     image: "/images/demo/avery-johnson.png",
     imagePosition: "center 38%",
     badge: "Trusted",
@@ -153,7 +153,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Bethlehem, PA",
     rating: "4.9",
     reviewCount: 36,
-    priceLabel: "From $44 / night",
+    priceLabel: "View care options",
     image: "/images/demo/brad-norway.png",
     imagePosition: "center 40%",
     badge: "Trusted",
@@ -166,7 +166,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Allentown, PA",
     rating: "4.8",
     reviewCount: 29,
-    priceLabel: "From $20 / visit",
+    priceLabel: "View care options",
     image: "/images/demo/caleb-brooks.png",
     imagePosition: "center 42%",
     badge: "Trusted",
@@ -179,7 +179,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Camden, NJ",
     rating: "5.0",
     reviewCount: 31,
-    priceLabel: "From $30 / day",
+    priceLabel: "View care options",
     image: "/images/demo/darius-miller.png",
     imagePosition: "center 38%",
     badge: "Trusted",
@@ -192,7 +192,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Quakertown, PA",
     rating: "4.9",
     reviewCount: 27,
-    priceLabel: "From $28 / visit",
+    priceLabel: "View care options",
     image: "/images/demo/emma-walsh.png",
     imagePosition: "center 42%",
     badge: "Trusted",
@@ -205,7 +205,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Philadelphia, PA",
     rating: "4.9",
     reviewCount: 38,
-    priceLabel: "From $24 / visit",
+    priceLabel: "View care options",
     image: "/images/demo/maya-reynolds.png",
     imagePosition: "center 40%",
     badge: "Trusted",
@@ -218,7 +218,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Allentown, PA",
     rating: "5.0",
     reviewCount: 33,
-    priceLabel: "From $35 / visit",
+    priceLabel: "View care options",
     image: "/images/demo/nina-patel.png",
     imagePosition: "center 42%",
     badge: "Trusted",
@@ -231,7 +231,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Bethlehem, PA",
     rating: "4.8",
     reviewCount: 25,
-    priceLabel: "From $26 / visit",
+    priceLabel: "View care options",
     image: "/images/demo/olivia-chen.png",
     imagePosition: "center 40%",
     badge: "Trusted",
@@ -244,7 +244,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Quakertown, PA",
     rating: "4.9",
     reviewCount: 34,
-    priceLabel: "From $46 / night",
+    priceLabel: "View care options",
     image: "/images/demo/sofia-martinez.png",
     imagePosition: "center 42%",
     badge: "Trusted",
@@ -257,7 +257,7 @@ const demoGuruCards: GuruCard[] = [
     location: "Camden, NJ",
     rating: "New",
     reviewCount: 0,
-    priceLabel: "From $20 / visit",
+    priceLabel: "View care options",
     image: "/images/demo/suzy-q.png",
     imagePosition: "center 40%",
     badge: "Trusted",
@@ -266,10 +266,10 @@ const demoGuruCards: GuruCard[] = [
 ];
 
 const trustItems = [
-  "Easy signup",
-  "Trusted profiles",
+  "Free local signup",
+  "Trusted local Gurus",
+  "Easy booking flow",
   "Community-first care",
-  "Optional tipping",
 ];
 
 const programPathways = [
@@ -287,7 +287,7 @@ const programPathways = [
   },
   {
     title: "SitGuru Programs",
-    description: "Additional ways to earn, refer, and grow the community",
+    description: "Additional ways to refer, support, and grow the community",
     href: "/programs",
     icon: "🤝",
   },
@@ -296,9 +296,9 @@ const programPathways = [
 const homepagePrograms: ProgramCard[] = [
   {
     title: "Student Hire Program",
-    eyebrow: "Featured earning pathway",
+    eyebrow: "Featured student pathway",
     description:
-      "For students, recent grads, summer workers, and pet lovers who want a flexible way to earn extra cash after class, between classes, on weekends, during school breaks, or all summer.",
+      "For students, recent grads, summer workers, and pet lovers who want a flexible way to build experience, help local pet families, and grow SitGuru after class, on weekends, during school breaks, or all summer.",
     href: "/programs#student-hire",
     applyHref: "/programs/apply?program=student-hire",
     icon: "🎓",
@@ -309,31 +309,31 @@ const homepagePrograms: ProgramCard[] = [
     featured: true,
   },
   {
-    title: "Veterans Hire Program",
-    eyebrow: "Military-connected pathway",
+    title: "Community Hire Program",
+    eyebrow: "Local neighborhood pathway",
     description:
-      "For veterans, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and approved SkillBridge applicants who want to grow with SitGuru.",
-    href: "/programs#veterans-hire",
-    applyHref: "/programs/apply?program=veterans-hire",
-    icon: "🎖️",
-    image: "/images/ambassadors/veteran-ambassador2.jpg",
-    imageAlt: "Veteran or military-connected pet caregiver relaxing with a dog",
-    primaryCta: "Apply Today",
-    secondaryCta: "Veterans Details",
+      "For local pet lovers, parents, retirees, remote workers, and community members who want a flexible way to offer trusted care, refer neighbors, and help SitGuru grow locally.",
+    href: "/programs#community-hire",
+    applyHref: "/programs/apply?program=community-hire",
+    icon: "🤝",
+    image: "/images/ambassadors/ambassador-program2.jpg",
+    imageAlt: "Community pet-care supporters smiling while caring for a pet",
+    primaryCta: "Start Community Hire",
+    secondaryCta: "Community Details",
     featured: false,
   },
   {
-    title: "Ambassador Program",
-    eyebrow: "Together, we grow together",
+    title: "Military Hire Program",
+    eyebrow: "Military-connected pathway",
     description:
-      "For Vet Techs, Veterinarians, Trainers, pet-care professionals, friends, family, and community supporters who want to refer Pet Parents and Gurus while helping SitGuru grow.",
-    href: "/ambassadors",
-    applyHref: "/programs/ambassadors/apply",
-    icon: "🤝",
-    image: "/images/ambassadors/ambassador-program2.jpg",
-    imageAlt: "Pet-care professionals smiling while caring for a pet",
-    primaryCta: "Become an Ambassador",
-    secondaryCta: "Ambassador Details",
+      "For veterans, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and approved SkillBridge applicants who want flexible local opportunities.",
+    href: "/programs#military-hire",
+    applyHref: "/programs/apply?program=military-hire",
+    icon: "🎖️",
+    image: "/images/ambassadors/veteran-ambassador2.jpg",
+    imageAlt: "Veteran or military-connected pet caregiver relaxing with a dog",
+    primaryCta: "Start Military Hire",
+    secondaryCta: "Military Details",
     featured: false,
   },
 ];
@@ -422,6 +422,11 @@ function detectSourceFromUrl() {
   if (normalized.includes("facebook") || normalized === "fb") return "facebook";
   if (normalized.includes("tiktok") || normalized === "tt") return "tiktok";
   if (normalized.includes("referral")) return "referral";
+  if (normalized.includes("indeed")) return "indeed";
+  if (normalized.includes("careerlink") || normalized.includes("pa-careerlink"))
+    return "careerlink";
+  if (normalized.includes("handshake")) return "handshake";
+  if (normalized.includes("ambassador")) return "ambassador";
   if (normalized.includes("email")) return "email";
 
   return normalized;
@@ -502,12 +507,6 @@ function getGuruRating(guru: Guru) {
   return 0;
 }
 
-function getGuruRate(guru: Guru) {
-  if (typeof guru.hourly_rate === "number") return guru.hourly_rate;
-  if (typeof guru.rate === "number") return guru.rate;
-  return null;
-}
-
 function getGuruRole(guru: Guru) {
   if (guru.title) return guru.title;
   const services = Array.isArray(guru.services) ? guru.services : [];
@@ -521,7 +520,6 @@ function getGuruRole(guru: Guru) {
 function mapGurusToCards(gurus: Guru[]): GuruCard[] {
   return gurus.map((guru) => {
     const photoUrl = getGuruPhotoUrl(guru);
-    const rate = getGuruRate(guru);
     const rating = getGuruRating(guru);
     const reviews = Number(guru.review_count || 0);
 
@@ -532,10 +530,7 @@ function mapGurusToCards(gurus: Guru[]): GuruCard[] {
       location: formatLocation(guru.city, guru.state),
       rating: rating > 0 ? rating.toFixed(1) : "New",
       reviewCount: reviews,
-      priceLabel:
-        rate !== null && Number.isFinite(rate)
-          ? `From $${rate} / visit`
-          : "View pricing",
+      priceLabel: "View care options",
       image: photoUrl,
       imagePosition: "center 34%",
       badge: guru.is_verified ? "Verified" : "Trusted",
@@ -585,10 +580,10 @@ function HeroSignupCard({
   return (
     <aside className="w-full max-w-[340px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[360px]">
       <h2 className="text-[2.15rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.65rem]">
-        Join SitGuru free
+        Join SitGuru
       </h2>
       <p className="mt-2 text-sm font-semibold text-slate-500">
-        as a Pet Parent or Guru. Simple signup. Trusted community.
+        Find trusted local care or apply to become an independent Pet Guru.
       </p>
 
       <div className="mt-6 grid gap-3">
@@ -651,10 +646,10 @@ function HeroSignupCard({
         </Link>
         <Link
           href="/signup"
-          onClick={() => onTrack("Sign Up Free Hero Card", "/signup")}
+          onClick={() => onTrack("Sign Up Hero Card", "/signup")}
           className="mt-1 rounded-xl bg-emerald-700 px-5 py-3 text-center text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
         >
-          Sign Up Free
+          Sign Up
         </Link>
       </div>
 
@@ -940,7 +935,7 @@ export default function HomePage() {
         url: window.location.href,
         search: window.location.search,
         pathname: window.location.pathname,
-        version: "launch_optimized_clear_audiences",
+        version: "easy_signup_trusted_local_launch",
       },
     });
   }, []);
@@ -955,7 +950,7 @@ export default function HomePage() {
       metadata: {
         guru_card_count: demoGuruCards.length,
         using_demo_gurus_only: true,
-        version: "launch_optimized_demo_gurus_cover_no_demo_badge",
+        version: "easy_signup_trusted_local_demo_gurus",
       },
     });
   }, []);
@@ -1044,7 +1039,7 @@ export default function HomePage() {
       metadata: {
         label,
         destination,
-        version: "launch_optimized_clear_audiences",
+        version: "easy_signup_trusted_local_launch",
       },
     });
   }
@@ -1062,7 +1057,7 @@ export default function HomePage() {
         state: searchForm.state,
         zip_code: searchForm.zipCode,
         destination: searchHref,
-        version: "launch_optimized_clear_audiences",
+        version: "easy_signup_trusted_local_launch",
       },
     });
 
@@ -1097,7 +1092,7 @@ export default function HomePage() {
         provider: "google",
         location: "homepage_launch_signup_card",
         selected_next_path: "/customer/dashboard/profile",
-        version: "launch_optimized_clear_audiences",
+        version: "easy_signup_trusted_local_launch",
       },
     });
 
@@ -1141,13 +1136,15 @@ export default function HomePage() {
                     </p>
 
                     <p className="mt-2 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
-                      SitGuru connects Pet Parents with trusted local Gurus for
-                      walks, sitting, boarding, training, and more.
+                      SitGuru connects Pet Parents with trusted independent
+                      local Gurus for walks, sitting, boarding, training, and
+                      more.
                     </p>
 
                     <p className="mt-3 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
-                      Simple signup, trusted profiles, and a community-first
-                      experience built around quality pet care.
+                      Create an account in minutes, explore trusted profiles,
+                      keep booking details organized, and book local care with
+                      confidence.
                     </p>
                   </div>
                 </div>
@@ -1235,9 +1232,9 @@ export default function HomePage() {
 
               <div className="mt-3 grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/90 p-3 shadow-sm sm:grid-cols-3">
                 {[
-                  ["Local Trusted", "Marketplace"],
-                  ["Reviewed", "Profiles"],
-                  ["100%", "Guru earnings kept"],
+                  ["Free", "Local signup"],
+                  ["Local", "Trusted care"],
+                  ["Flexible", "Independent Gurus"],
                 ].map(([value, label]) => (
                   <div key={label} className="rounded-xl bg-white px-3 py-2 text-center">
                     <p className="text-lg font-black text-emerald-700">{value}</p>
@@ -1273,13 +1270,86 @@ export default function HomePage() {
 
       <section className="bg-white py-5 sm:py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-stretch">
+            <div className="rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_16px_42px_rgba(15,23,42,0.07)] sm:p-7">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 sm:text-xs">
+                Easy local signup
+              </p>
+              <h2 className="mt-2 text-2xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-3xl">
+                Built for Pet Parents, Pet Gurus, and local communities.
+              </h2>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
+                Pet Parents can find local care, Pet Gurus can apply to offer
+                services independently, and Ambassadors can help spread the word.
+                SitGuru keeps the experience simple, welcoming, and easy to start.
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {[
+                  ["Free", "Local signup"],
+                  ["Local", "Neighborhood care"],
+                  ["Simple", "Easy next steps"],
+                ].map(([value, label]) => (
+                  <div
+                    key={label}
+                    className="rounded-2xl border border-white bg-white/90 p-4 text-center shadow-sm"
+                  >
+                    <p className="text-xl font-black text-emerald-700">{value}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-slate-600">
+                      {label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[
+                {
+                  title: "For Pet Parents",
+                  body: "Create an account, search local Gurus, keep care details organized, and rebook trusted care with less back-and-forth.",
+                  cta: "Find Pet Care",
+                  href: "/search",
+                },
+                {
+                  title: "For Pet Gurus",
+                  body: "Apply as an independent Pet Guru, choose your services and local area, and accept requests that fit your availability.",
+                  cta: "Become a Guru",
+                  href: "/become-a-guru",
+                },
+              ].map((card) => (
+                <Link
+                  key={card.title}
+                  href={card.href}
+                  onClick={() =>
+                    trackHomepageClick(`${card.title} Signup Card`, card.href)
+                  }
+                  className="group rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_18px_44px_rgba(15,23,42,0.11)] sm:p-6"
+                >
+                  <h3 className="text-lg font-black tracking-[-0.03em] text-slate-950 group-hover:text-emerald-800">
+                    {card.title}
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                    {card.body}
+                  </p>
+                  <span className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition group-hover:bg-emerald-800">
+                    {card.cta}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-5 sm:py-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between gap-4">
             <div>
               <h2 className="text-xl font-black tracking-[-0.035em] text-slate-950 sm:text-3xl">
                 Meet local Gurus Pet Parents love
               </h2>
               <p className="mt-1 text-xs font-semibold text-slate-600 sm:text-sm">
-                Real people. Real care. Real reviews.
+                Real people. Real care. On-platform reviews and booking records.
               </p>
             </div>
 
@@ -1395,11 +1465,11 @@ export default function HomePage() {
                 </h2>
 
                 <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
-                  Pet Parents use SitGuru to find trusted local care with no
-                  marketplace fees. Gurus apply to offer care, keep 100% of
-                  their listed earnings, and may receive optional tips. SitGuru
-                  Programs create additional ways to earn, refer, and help grow
-                  the SitGuru Pet Community.
+                  Pet Parents can find trusted local care. Gurus can apply
+                  as independent service providers and choose the requests
+                  that fit their availability. SitGuru keeps the experience
+                  simple with profiles, booking details, helpful support, and a
+                  community-first way to connect.
                 </p>
 
                 <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -1443,12 +1513,13 @@ export default function HomePage() {
                 <div className="mt-7 flex flex-wrap gap-3">
                   {[
                     "Student Hire",
-                    "Veterans Hire",
+                    "Community Hire",
+                    "Military Hire",
                     "SkillBridge applicants",
-                    "Ambassador Program",
-                    "Referral rewards",
-                    "Community growth",
+                    "Ambassador referrals",
+                    "Easy signup",
                     "Trusted profiles",
+                    "Organized booking records",
                     "Community-first care",
                   ].map((chip) => (
                     <span
@@ -1480,7 +1551,7 @@ export default function HomePage() {
           <div className="grid overflow-hidden rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 shadow-[0_18px_45px_rgba(15,23,42,0.08)] lg:grid-cols-3">
             <div className="border-b border-emerald-100 p-5 lg:border-b-0 lg:border-r lg:p-6">
               <h2 className="text-lg font-black tracking-[-0.03em] text-slate-950 lg:text-xl">
-                Share SitGuru. Earn PetPerks.
+                Share SitGuru. Grow PetPerks.
               </h2>
 
               <div className="mt-5 grid gap-4">
@@ -1490,10 +1561,10 @@ export default function HomePage() {
                   </span>
                   <div>
                     <p className="font-black text-slate-950">
-                      Give $10. Get $10.
+                      Invite Pet Parents
                     </p>
                     <p className="text-sm font-semibold text-slate-600">
-                      for Pet Parents
+                      share trusted local care
                     </p>
                   </div>
                 </div>
@@ -1504,10 +1575,10 @@ export default function HomePage() {
                   </span>
                   <div>
                     <p className="font-black text-slate-950">
-                      Refer a Guru. Earn $20.
+                      Invite future Gurus
                     </p>
                     <p className="text-sm font-semibold text-slate-600">
-                      for future Gurus
+                      help grow the SitGuru community
                     </p>
                   </div>
                 </div>
@@ -1530,11 +1601,11 @@ export default function HomePage() {
               </h2>
 
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
-                Pet Parents use SitGuru to find trusted local care with no
-                marketplace fees. Gurus apply to offer care, keep 100% of their
-                listed earnings, and may receive optional tips. SitGuru Programs
-                create additional ways to earn, refer, and help grow the
-                SitGuru Pet Community.
+                Pet Parents can find trusted local care. Gurus can apply as
+                independent service providers, choose their services and local
+                service areas, and accept requests that fit their availability.
+                SitGuru Programs create additional ways to refer, support, and
+                help grow the SitGuru Pet Community.
               </p>
 
               <div className="mt-5 grid gap-4">
@@ -1608,8 +1679,8 @@ export default function HomePage() {
                   ["2", "Choose a service", "Pick the right care for your pet"],
                   [
                     "3",
-                    "Book with confidence",
-                    "Trusted profiles, simple requests, and support when needed",
+                    "Book on-platform",
+                    "Keep service details, payment records, reviews, and support history documented",
                   ],
                 ].map(([number, title, description]) => (
                   <div key={title} className="flex items-start gap-3">
@@ -1698,8 +1769,9 @@ export default function HomePage() {
                 opacity: 1,
               }}
             >
-              Find trusted pet care or join SitGuru and be part of a local,
-              community-first pet care marketplace.
+              Find trusted pet care or join SitGuru as part of a local,
+              community-first pet care marketplace built around easy signup,
+              trusted profiles, and independent Pet Gurus.
             </p>
 
             <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -1739,8 +1811,8 @@ export default function HomePage() {
             {[
               "Easy signup",
               "Reviewed profiles",
-              "Optional tips for Gurus",
-              "Protected by SitGuru",
+              "Simple signup",
+              "On-platform booking records",
             ].map((item) => (
               <div key={item} className="text-xs font-black text-slate-600">
                 <span className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 text-emerald-700">
