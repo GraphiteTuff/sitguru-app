@@ -129,6 +129,9 @@ const programDefinitions: ProgramDefinition[] = [
       "earn with the pack",
       "student ambassador",
       "campus ambassador",
+      "pa careerlink",
+      "careerlink",
+      "career link",
     ],
   },
   {
@@ -202,10 +205,10 @@ const programDefinitions: ProgramDefinition[] = [
   },
   {
     key: "veterans-hire",
-    title: "Veterans Hire Program",
-    shortTitle: "Veterans Hire",
+    title: "Military Hire Program",
+    shortTitle: "Military Hire",
     campaign: "Serve with the Pack",
-    eyebrow: "Veterans and military-connected pathway",
+    eyebrow: "Military and veteran-connected pathway",
     description:
       "A SitGuru pathway for veterans, transitioning service members, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and SkillBridge-interested active-duty members exploring future pet care, operations, and local service opportunities.",
     href: adminRoutes.veteransHire,
@@ -276,6 +279,9 @@ const programDefinitions: ProgramDefinition[] = [
       "serve with the pack",
       "veteran ambassador",
       "military ambassador",
+      "pa careerlink",
+      "careerlink",
+      "career link",
     ],
   },
   {
@@ -631,6 +637,107 @@ function latestDateFromRows(rows: AnyRow[]) {
     .sort((a, b) => b.getTime() - a.getTime())[0];
 
   return latest?.toISOString() || null;
+}
+
+function getReadableStatus(row: AnyRow) {
+  const status = getStatus(row);
+
+  if (status === "new") return "New";
+  if (status === "pending") return "Pending";
+  if (status === "submitted") return "Submitted";
+  if (status === "review" || status === "reviewing" || status === "in_review") {
+    return "In Review";
+  }
+  if (status === "contacted") return "Contacted";
+  if (status === "interested") return "Interested";
+  if (status === "applied") return "Applied";
+  if (status === "missing_info") return "Missing Info";
+  if (status === "signed_up" || status === "converted") return "Signed Up";
+  if (status === "approved" || status === "active" || status === "accepted") {
+    return "Approved";
+  }
+
+  return (
+    status
+      .split("_")
+      .filter(Boolean)
+      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+      .join(" ") || "New"
+  );
+}
+
+function isCareerLinkRow(row: AnyRow) {
+  const search = getProgramSourceText(row);
+
+  return (
+    search.includes("careerlink") ||
+    search.includes("career link") ||
+    search.includes("pa career") ||
+    search.includes("pacareerlink")
+  );
+}
+
+function isAmbassadorLeadRow(row: AnyRow) {
+  const search = getProgramSourceText(row);
+
+  return (
+    search.includes("ambassador") ||
+    search.includes("student hire") ||
+    search.includes("community hire") ||
+    search.includes("military hire") ||
+    search.includes("veterans hire") ||
+    search.includes("careerlink") ||
+    search.includes("career link")
+  );
+}
+
+function getAmbassadorLeadProgram(row: AnyRow) {
+  const studentProgram = programDefinitions.find(
+    (program) => program.key === "student-hire",
+  );
+  const communityProgram = programDefinitions.find(
+    (program) => program.key === "community-hire",
+  );
+  const militaryProgram = programDefinitions.find(
+    (program) => program.key === "veterans-hire",
+  );
+
+  if (studentProgram && rowMatchesProgram(row, studentProgram)) return "Student Hire";
+  if (communityProgram && rowMatchesProgram(row, communityProgram)) return "Community Hire";
+  if (militaryProgram && rowMatchesProgram(row, militaryProgram)) return "Military Hire";
+
+  return "Ambassador Program";
+}
+
+function getLeadSource(row: AnyRow) {
+  const explicitSource = getText(row, [
+    "source",
+    "lead_source",
+    "referral_source",
+    "partner_source",
+    "utm_source",
+    "campaign",
+    "campaign_name",
+  ]);
+  const search = `${explicitSource} ${getProgramSourceText(row)}`.toLowerCase();
+
+  if (isCareerLinkRow(row)) return "PA CareerLink";
+  if (search.includes("facebook") || search.includes("meta")) return "Facebook";
+  if (search.includes("instagram") || search.includes("insta")) return "Instagram";
+  if (search.includes("tiktok")) return "TikTok";
+  if (search.includes("twitter") || search.includes("x.com")) return "X";
+  if (search.includes("referral")) return "Referral";
+  if (search.includes("website") || search.includes("sitguru.com")) return "Website";
+
+  return explicitSource || "Manual / Other";
+}
+
+function getLeadEmail(row: AnyRow) {
+  return getText(row, ["email", "applicant_email", "lead_email", "contact_email"], "—");
+}
+
+function getLeadPhone(row: AnyRow) {
+  return getText(row, ["phone", "phone_number", "mobile", "contact_phone"], "—");
 }
 
 async function safeAdminQuery(
@@ -998,6 +1105,67 @@ async function getProgramData() {
     ),
   };
 
+  const ambassadorLeadRows = [
+    ...programApplications,
+    ...partnerApplications,
+    ...partnerLeads,
+    ...networkParticipants,
+    ...ambassadorProfiles,
+  ]
+    .filter(isAmbassadorLeadRow)
+    .sort((a, b) => {
+      const dateA = new Date(getDate(a) || 0).getTime();
+      const dateB = new Date(getDate(b) || 0).getTime();
+      return dateB - dateA;
+    });
+
+  const careerLinkLeadRows = ambassadorLeadRows.filter(isCareerLinkRow);
+  const studentAmbassadorRows = ambassadorLeadRows.filter(
+    (row) => getAmbassadorLeadProgram(row) === "Student Hire",
+  );
+  const communityAmbassadorRows = ambassadorLeadRows.filter(
+    (row) => getAmbassadorLeadProgram(row) === "Community Hire",
+  );
+  const militaryAmbassadorRows = ambassadorLeadRows.filter(
+    (row) => getAmbassadorLeadProgram(row) === "Military Hire",
+  );
+
+  const ambassadorLeadStatusTotals = {
+    new: ambassadorLeadRows.filter((row) =>
+      ["new", "pending", "submitted", "applied"].includes(getStatus(row)),
+    ).length,
+    contacted: ambassadorLeadRows.filter((row) =>
+      ["contacted", "interested", "review", "reviewing", "in_review"].includes(
+        getStatus(row),
+      ),
+    ).length,
+    signedUp: ambassadorLeadRows.filter((row) =>
+      ["signed_up", "converted"].includes(getStatus(row)),
+    ).length,
+    approved: ambassadorLeadRows.filter(isApprovedStatus).length,
+  };
+
+  const recentAmbassadorLeads = ambassadorLeadRows.slice(0, 8).map((row) => ({
+    name: getText(row, ["full_name", "display_name", "name", "applicant_name", "lead_name", "email"], "Ambassador Lead"),
+    email: getLeadEmail(row),
+    phone: getLeadPhone(row),
+    program: getAmbassadorLeadProgram(row),
+    source: getLeadSource(row),
+    status: getReadableStatus(row),
+    date: getDate(row),
+  }));
+
+  const careerLinkPipeline = {
+    total: ambassadorLeadRows.length,
+    careerLink: careerLinkLeadRows.length,
+    student: studentAmbassadorRows.length,
+    community: communityAmbassadorRows.length,
+    military: militaryAmbassadorRows.length,
+    statusTotals: ambassadorLeadStatusTotals,
+    recentLeads: recentAmbassadorLeads,
+    latestActivity: latestDateFromRows(ambassadorLeadRows),
+  };
+
   return {
     programApplications,
     programs,
@@ -1016,6 +1184,7 @@ async function getProgramData() {
     bookings,
     programStats,
     totals,
+    careerLinkPipeline,
   };
 }
 
@@ -1248,11 +1417,11 @@ function ProgramCard({
 
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">
-                Veterans Hire includes Military Hire and SkillBridge interest
+                Military Hire includes veterans, military families, and SkillBridge interest
               </p>
               <p className="mt-1 text-sm font-bold leading-6 text-amber-950">
-                This program now combines the prior Military Hire pathway and
-                SkillBridge Interest List into one Veterans Hire Program.
+                This program tracks Military Hire, veteran-connected applicants, and
+                SkillBridge Interest List signals in one admin pathway.
                 SkillBridge remains an interest-tracking pathway unless SitGuru
                 later creates a formally approved training program.
               </p>
@@ -1302,6 +1471,196 @@ function ProgramCard({
         <Badge>{formatDate(program.latestActivity)} latest activity</Badge>
       </div>
     </div>
+  );
+}
+
+function PipelineMiniCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-green-100 bg-white p-4 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-black text-green-950">{value}</p>
+      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+        {detail}
+      </p>
+    </div>
+  );
+}
+
+function AmbassadorLeadPipeline({
+  pipeline,
+}: {
+  pipeline: Awaited<ReturnType<typeof getProgramData>>["careerLinkPipeline"];
+}) {
+  return (
+    <section className="rounded-[30px] border border-green-200 bg-gradient-to-br from-green-50 via-white to-[#f9faf5] p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white shadow-sm">
+            <HeartHandshake size={24} />
+          </div>
+
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+              PA CareerLink / Ambassador Leads
+            </p>
+            <h2 className="mt-1 text-2xl font-black text-green-950">
+              Track Student, Community, and Military Ambassador applicants.
+            </h2>
+            <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
+              Use this section to monitor applicant and referral signals from PA CareerLink,
+              website forms, partner referrals, and ambassador outreach. Program order stays
+              aligned to SitGuru operations: Student Hire, Community Hire, Military Hire.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link
+            href={`${adminRoutes.programApplications}?source=careerlink`}
+            className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-green-900"
+          >
+            Review CareerLink Leads →
+          </Link>
+
+          <Link
+            href={adminRoutes.ambassadorProgram}
+            className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+          >
+            Ambassador Ops
+          </Link>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <PipelineMiniCard
+          label="Total Leads"
+          value={number(pipeline.total)}
+          detail="All ambassador and program lead signals"
+        />
+        <PipelineMiniCard
+          label="PA CareerLink"
+          value={number(pipeline.careerLink)}
+          detail="Applicants tied to CareerLink sourcing"
+        />
+        <PipelineMiniCard
+          label="Student Hire"
+          value={number(pipeline.student)}
+          detail="Student Ambassador and campus leads"
+        />
+        <PipelineMiniCard
+          label="Community Hire"
+          value={number(pipeline.community)}
+          detail="Community Ambassador and workforce leads"
+        />
+        <PipelineMiniCard
+          label="Military Hire"
+          value={number(pipeline.military)}
+          detail="Military Ambassador and veteran-connected leads"
+        />
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <PipelineMiniCard
+          label="New / Submitted"
+          value={number(pipeline.statusTotals.new)}
+          detail="Needs first review or routing"
+        />
+        <PipelineMiniCard
+          label="Contacted"
+          value={number(pipeline.statusTotals.contacted)}
+          detail="Follow-up or interest stage"
+        />
+        <PipelineMiniCard
+          label="Signed Up"
+          value={number(pipeline.statusTotals.signedUp)}
+          detail="Converted into SitGuru signup"
+        />
+        <PipelineMiniCard
+          label="Approved"
+          value={number(pipeline.statusTotals.approved)}
+          detail={`Latest activity: ${formatDate(pipeline.latestActivity)}`}
+        />
+      </div>
+
+      <div className="mt-5 overflow-hidden rounded-[26px] border border-[#e3ece5] bg-white">
+        <div className="border-b border-[#edf3ee] px-4 py-3">
+          <h3 className="text-base font-black text-slate-950">
+            Recent Ambassador Leads
+          </h3>
+          <p className="text-sm font-semibold text-slate-500">
+            Quick view of candidates to review, contact, or route into signup.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[880px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#edf3ee] bg-[#fbfcf9] text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                <th className="px-4 py-3">Lead</th>
+                <th className="px-4 py-3">Program</th>
+                <th className="px-4 py-3">Source</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Contact</th>
+                <th className="px-4 py-3">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pipeline.recentLeads.length ? (
+                pipeline.recentLeads.map((lead, index) => (
+                  <tr
+                    key={`${lead.name}-${lead.email}-${index}`}
+                    className="border-b border-[#f1f5f2] last:border-0"
+                  >
+                    <td className="px-4 py-3 font-black text-slate-950">
+                      {lead.name}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-slate-600">
+                      {lead.program}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-slate-600">
+                      {lead.source}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800">
+                        {lead.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-bold text-slate-600">
+                      <div>{lead.email}</div>
+                      <div className="text-xs text-slate-400">{lead.phone}</div>
+                    </td>
+                    <td className="px-4 py-3 font-bold text-slate-600">
+                      {formatDate(lead.date)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-8 text-center font-bold text-slate-500"
+                  >
+                    No Ambassador or PA CareerLink leads found yet. New rows will
+                    appear here when application, partner lead, or ambassador
+                    tables include matching program/source data.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1431,7 +1790,7 @@ export default async function AdminProgramsPage() {
                 </h1>
 
                 <p className="mt-1 max-w-5xl text-base font-semibold text-slate-600">
-                  Track Student Hire, Community Hire, Veterans Hire, and
+                  Track Student Hire, Community Hire, Military Hire, and
                   Ambassador Program applications, referrals, onboarding,
                   Checkr / background check readiness, Pack Leader recognition,
                   commission costs, and progress toward bookable Guru status.
@@ -1534,12 +1893,14 @@ export default async function AdminProgramsPage() {
           </div>
         </section>
 
+        <AmbassadorLeadPipeline pipeline={data.careerLinkPipeline} />
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             icon={<BriefcaseBusiness size={22} />}
             label="Programs"
             value={number(programDefinitions.length)}
-            detail="Student, Community, Veterans, Ambassadors"
+            detail="Student, Community, Military, Ambassadors"
             href={adminRoutes.programs}
           />
 
@@ -1791,7 +2152,8 @@ export default async function AdminProgramsPage() {
           <code>network_referrals</code>, <code>network_rewards</code>,{" "}
           <code>network_partner_leads</code>, <code>partner_applications</code>,{" "}
           <code>messages</code>, <code>gurus</code>, and <code>bookings</code>{" "}
-          when those tables exist. Missing tables are skipped safely, so this
+          when those tables exist. Ambassador and PA CareerLink lead cards safely reuse
+          those same rows, so missing future lead tables are skipped safely and this
           page can be deployed before every future tracking table is created.
         </div>
       </div>
