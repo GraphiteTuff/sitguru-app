@@ -58,7 +58,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     pathname === "/customer/pawperks" ||
     pathname.startsWith("/customer/pawperks/");
 
-  const isCustomerPage =
+  const isCustomerAccountPage =
     pathname === "/customer" || pathname.startsWith("/customer/");
 
   const isCustomerMessagesPage =
@@ -71,7 +71,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     pathname === "/bookings" || pathname.startsWith("/bookings/");
 
   const isCustomerPrivatePage =
-    isCustomerPage ||
+    isCustomerAccountPage ||
     isCustomerDashboardPage ||
     isCustomerPawPerksPage ||
     isCustomerMessagesPage ||
@@ -99,7 +99,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
   if (isGuruPrivatePage || isCustomerPrivatePage) {
     return (
       <>
-        <div className="site-main bg-white">{children}</div>
+        <div className="site-main min-h-screen bg-white">{children}</div>
         <Footer />
         <ScrollToTopButton />
       </>
