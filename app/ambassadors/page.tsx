@@ -801,22 +801,30 @@ export default function AmbassadorProgramPage() {
             <p
               className="text-xs font-black uppercase tracking-[0.22em]"
               style={{
-                color: "#dcfce7",
-                WebkitTextFillColor: "#dcfce7",
+                color: "#ffffff",
+                WebkitTextFillColor: "#ffffff",
               }}
             >
               Pack Leader Recognition
             </p>
 
             <h2
-              className="mt-3 text-3xl font-black tracking-tight sm:text-5xl"
+              className="mt-3 text-3xl font-black tracking-tight text-white sm:text-5xl"
               style={{
                 color: "#ffffff",
                 WebkitTextFillColor: "#ffffff",
-                textShadow: "0 2px 10px rgba(0,0,0,0.18)",
+                textShadow: "0 2px 10px rgba(0,0,0,0.22)",
               }}
             >
-              Top Ambassadors should be rewarded, recognized, and celebrated.
+              <span
+                className="text-white"
+                style={{
+                  color: "#ffffff",
+                  WebkitTextFillColor: "#ffffff",
+                }}
+              >
+                Top Ambassadors should be rewarded, recognized, and celebrated.
+              </span>
             </h2>
 
             <p
