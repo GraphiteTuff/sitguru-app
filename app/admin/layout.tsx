@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
   Gauge,
   HandCoins,
+  HeartHandshake,
   Home,
   Landmark,
   LineChart,
@@ -34,6 +35,7 @@ import AdminAccountMenu from "@/components/AdminAccountMenu";
 
 const adminRoutes = {
   dashboard: "/admin",
+  hr: "/admin/hr",
   bookings: "/admin/bookings",
   customers: "/admin/customers",
   gurus: "/admin/gurus",
@@ -73,6 +75,7 @@ const navSections = [
     title: "Operations",
     items: [
       { label: "Dashboard", href: adminRoutes.dashboard, icon: Home },
+      { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
       { label: "Bookings", href: adminRoutes.bookings, icon: CalendarDays },
       { label: "Customers", href: adminRoutes.customers, icon: Users },
       { label: "Gurus", href: adminRoutes.gurus, icon: PawPrint },
@@ -118,6 +121,7 @@ const navSections = [
 const topHeaderLinks = [
   { label: "Homepage", href: "/" },
   { label: "Dashboard", href: adminRoutes.dashboard },
+  { label: "HR", href: adminRoutes.hr },
   { label: "Bookings", href: adminRoutes.bookings },
   { label: "Customers", href: adminRoutes.customers },
   { label: "Gurus", href: adminRoutes.gurus },
@@ -128,11 +132,18 @@ const topHeaderLinks = [
 
 const mobileQuickLinks = [
   {
+    label: "Human Resources",
+    href: adminRoutes.hr,
+    icon: HeartHandshake,
+    description: "Hiring and applicants",
+    featured: true,
+  },
+  {
     label: "Sales & Marketing",
     href: adminRoutes.salesMarketing,
     icon: Megaphone,
     description: "Outreach, signups, campaigns",
-    featured: true,
+    featured: false,
   },
   {
     label: "Growth",
@@ -416,6 +427,7 @@ function AdminFooter() {
       title: "Operations",
       links: [
         { label: "Dashboard", href: adminRoutes.dashboard },
+        { label: "Human Resources", href: adminRoutes.hr },
         { label: "Bookings", href: adminRoutes.bookings },
         { label: "Customers", href: adminRoutes.customers },
         { label: "Gurus", href: adminRoutes.gurus },
