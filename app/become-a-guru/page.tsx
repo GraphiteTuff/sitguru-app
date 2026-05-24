@@ -22,37 +22,37 @@ const benefits = [
     icon: "📣",
     title: "Get discovered by more Pet Parents",
     description:
-      "SitGuru gives you another trusted place where local Pet Parents can find your pet care services.",
+      "Create a friendly Guru profile that gives local Pet Parents another trusted way to find your pet care services.",
   },
   {
     icon: "🐾",
-    title: "Connect with families looking for care",
+    title: "Offer the services you enjoy",
     description:
-      "Pet Parents need sitters, walkers, trainers, boarding, drop-ins, grooming, and reliable help. SitGuru helps them connect with providers like you.",
+      "Show Pet Parents whether you offer walking, drop-ins, sitting, boarding, training, grooming, or other trusted pet care support.",
   },
   {
     icon: "📅",
-    title: "Fill open availability",
+    title: "Choose availability that fits your life",
     description:
-      "Use SitGuru to help fill slower days, open time slots, weekends, holidays, or extra availability.",
+      "Use SitGuru to support open time slots, weekends, holidays, seasonal availability, or flexible local care opportunities.",
   },
   {
-    icon: "⚡",
-    title: "Make it easier for Pet Parents to choose you",
+    icon: "📍",
+    title: "Set your local service area",
     description:
-      "A clear Guru profile helps Pet Parents quickly understand your services, experience, location, and care style.",
+      "Focus on the neighborhoods, towns, or nearby communities that make sense for you and the pet care services you want to provide.",
   },
   {
     icon: "⭐",
-    title: "Build trust faster",
+    title: "Build trust with every great experience",
     description:
-      "Profiles, reviews, badges, and trust signals help Pet Parents feel more confident reaching out and booking care.",
+      "Profiles, reviews, care details, and trust signals help Pet Parents feel more confident choosing a local Guru.",
   },
   {
     icon: "💚",
-    title: "Built for providers already doing pet care",
+    title: "Built for new and experienced providers",
     description:
-      "SitGuru is not just for beginners. It is for sitters, walkers, trainers, groomers, and caregivers who want another way to connect with Pet Parents.",
+      "Whether you already provide pet care or want to start locally, SitGuru helps you present your services in a clear, professional way.",
   },
 ];
 
@@ -61,60 +61,78 @@ const steps = [
     step: "01",
     title: "Join Free",
     description:
-      "Create your free Guru account and tell Pet Parents what services you offer.",
+      "Create your Guru account and share the basic services you want Pet Parents to know about.",
   },
   {
     step: "02",
     title: "Build Your Profile",
     description:
-      "Add your experience, location, services, photos, and details that help Pet Parents feel comfortable choosing you.",
+      "Add your experience, service area, pet care style, photos, and details that help families feel comfortable choosing you.",
   },
   {
     step: "03",
-    title: "Trust & Safety",
+    title: "Complete Trust Steps",
     description:
-      "Complete simple trust and safety steps that help protect pets, families, Gurus, and the SitGuru community.",
+      "Finish simple trust and safety steps designed to help protect pets, families, Gurus, and the SitGuru community.",
   },
   {
     step: "04",
-    title: "Get Connected",
+    title: "Start Getting Discovered",
     description:
-      "Once approved and active, use SitGuru as another way to connect with Pet Parents looking for trusted care.",
+      "Once approved and active, use SitGuru as another trusted way to connect with local Pet Parents looking for care.",
   },
 ];
 
 const trustPoints = [
   "Free to join",
-  "Built for expert pet care providers",
-  "Connect with Pet Parents",
-  "Helpful for filling open availability",
-  "Simple Guru profile setup",
-  "Trust and safety steps help protect the community",
-  "Clear profiles help Pet Parents feel confident",
+  "Choose your services",
+  "Choose your availability",
+  "Choose your local service area",
+  "Helpful profile setup",
+  "Trust and safety steps",
+  "Pet Parent confidence tools",
   "Reviews and badges help approved Gurus stand out",
 ];
 
 const quickBenefits = [
   "More visibility",
-  "More Pet Parent connections",
-  "More booking opportunities",
-  "Easier profile sharing",
-  "Helpful for open availability",
-  "Built around trust",
+  "Local Pet Parent connections",
+  "Flexible availability",
+  "Easy profile sharing",
+  "Trust-focused experience",
+  "Helpful for open time slots",
+];
+
+const launchFit = [
+  {
+    title: "Students",
+    description:
+      "Great for students who love pets and want flexible local opportunities around classes, campus life, or breaks.",
+  },
+  {
+    title: "Community helpers",
+    description:
+      "Ideal for trusted local caregivers, retirees, neighbors, and pet lovers who want to support families nearby.",
+  },
+  {
+    title: "Military & veteran families",
+    description:
+      "A strong fit for veterans, military spouses, and transitioning service members who value flexible, community-based work.",
+  },
 ];
 
 const warmGallery = [
   {
     title: "More ways to be discovered",
     caption:
-      "Give local Pet Parents another trusted place to find your services.",
+      "Give local Pet Parents another trusted place to find your pet care services.",
     image:
       "https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&w=1200&q=80",
   },
   {
-    title: "More flexible booking opportunities",
+    title: "Flexible local opportunities",
     caption:
-      "Use SitGuru to help fill open spots, weekends, holidays, and extra availability.",
+      "Use SitGuru to support open spots, weekends, holidays, and extra availability.",
     image:
       "https://images.unsplash.com/photo-1507146426996-ef05306b995a?auto=format&fit=crop&w=1200&q=80",
   },
@@ -155,13 +173,13 @@ export default function BecomeAGuruPage() {
               </div>
 
               <h1 className="mt-5 max-w-3xl text-4xl font-black leading-[1.03] tracking-[-0.04em] !text-slate-950 sm:text-5xl lg:text-6xl">
-                Get discovered by more Pet Parents with SitGuru.
+                Become a trusted local Pet Guru.
               </h1>
 
               <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 !text-slate-800 sm:text-xl">
-                Already a sitter, walker, trainer, groomer, boarding provider,
-                or trusted caregiver? SitGuru helps you connect with Pet Parents
-                looking for reliable pet care in their area.
+                Join SitGuru free and create a friendly profile that helps Pet
+                Parents find your dog walking, pet sitting, drop-in, boarding,
+                training, grooming, or local pet care services.
               </p>
 
               <div className="mt-6 rounded-[28px] border border-emerald-200 bg-white/95 p-5 shadow-[0_20px_55px_rgba(15,23,42,0.10)] sm:p-6">
@@ -170,13 +188,13 @@ export default function BecomeAGuruPage() {
                 </p>
 
                 <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] !text-slate-950 sm:text-3xl">
-                  Create a profile Pet Parents can find.
+                  Create a profile Pet Parents can trust.
                 </h2>
 
                 <p className="mt-3 text-base font-semibold leading-7 !text-slate-700">
-                  You do not have to start from scratch. Create your free Guru
-                  profile, show what you already offer, and give more Pet
-                  Parents a trusted way to connect with you.
+                  Set up your Guru profile, choose the services you want to
+                  offer, highlight your care style, and help nearby families
+                  understand why you may be the right fit for their pets.
                 </p>
 
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -200,18 +218,18 @@ export default function BecomeAGuruPage() {
                     Free to join
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs font-black !text-slate-700">
-                    More visibility
+                    Choose services
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs font-black !text-slate-700">
-                    Pet Parent connections
+                    Local connections
                   </div>
                 </div>
               </div>
 
               <p className="mt-5 max-w-2xl text-sm font-semibold leading-7 !text-slate-600 sm:text-base">
-                SitGuru uses a simple review process and trust and safety steps
-                to help Pet Parents feel confident and help approved Gurus stand
-                out.
+                SitGuru is designed for independent local Pet Gurus who want a
+                simple, trusted way to present their services and connect with
+                Pet Parents in their community.
               </p>
             </div>
 
@@ -221,34 +239,33 @@ export default function BecomeAGuruPage() {
               </div>
 
               <h2 className="mt-4 text-2xl font-black !text-white sm:text-3xl">
-                An expert pet care provider Pet Parents can trust.
+                A trusted pet care provider Pet Parents can feel good about.
               </h2>
 
               <p className="mt-4 text-base leading-7 !text-slate-200">
-                A Guru is an expert pet care provider. On SitGuru, that can mean
-                a sitter, walker, trainer, groomer, boarding provider, drop-in
-                caregiver, or experienced pet person who helps Pet Parents find
-                trusted care.
+                A Guru is a local pet care provider who helps Pet Parents with
+                services such as walks, sitting, drop-ins, boarding, grooming,
+                training, or reliable everyday pet care support.
               </p>
 
               <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <p className="text-sm font-semibold !text-white">
-                    Connect with Pet Parents
+                    Choose your services
                   </p>
                   <p className="mt-1 text-sm !text-slate-300">
-                    Give local families another trusted way to find your care
-                    services.
+                    Show Pet Parents what care you offer and what types of pets
+                    you enjoy helping.
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <p className="text-sm font-semibold !text-white">
-                    Fill open availability
+                    Choose your availability
                   </p>
                   <p className="mt-1 text-sm !text-slate-300">
-                    Use SitGuru to help fill slower days, weekends, holidays,
-                    and open time slots.
+                    Support care opportunities that fit your life, schedule, and
+                    preferred local area.
                   </p>
                 </div>
 
@@ -257,18 +274,18 @@ export default function BecomeAGuruPage() {
                     Build trust faster
                   </p>
                   <p className="mt-1 text-sm !text-slate-300">
-                    A clear profile helps Pet Parents understand why they should
-                    choose you.
+                    A clear profile helps families understand your experience,
+                    personality, and care style.
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <p className="text-sm font-semibold !text-white">
-                    Keep it convenient
+                    Stay local
                   </p>
                   <p className="mt-1 text-sm !text-slate-300">
-                    Create your profile once and use it to support new booking
-                    opportunities.
+                    Focus on the neighborhoods and communities that make sense
+                    for the way you provide care.
                   </p>
                 </div>
               </div>
@@ -291,11 +308,11 @@ export default function BecomeAGuruPage() {
         <div className="mx-auto max-w-7xl px-4">
           <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-center shadow-sm">
             <h2 className="text-2xl font-black tracking-[-0.03em] !text-slate-950">
-              Want more Pet Parents to find you?
+              Love pets and want to help local families?
             </h2>
             <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-              Join free and create a Guru profile that helps Pet Parents connect
-              with your care services.
+              Join free and create a Guru profile that helps Pet Parents learn
+              about your care services.
             </p>
             <Link
               href={guruApplyLink}
@@ -312,16 +329,16 @@ export default function BecomeAGuruPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold !text-slate-700">
-              Built for busy pet care providers
+              Built for modern pet care providers
             </div>
 
             <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-              More visibility. More convenience. More ways to connect.
+              More visibility. More trust. More ways to connect.
             </h2>
 
             <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-              SitGuru helps you turn your existing experience into a clearer,
-              easier-to-find profile that can connect you with new Pet Parents.
+              SitGuru helps turn your pet care experience into a clear,
+              mobile-friendly profile that Pet Parents can understand quickly.
             </p>
           </div>
 
@@ -356,13 +373,13 @@ export default function BecomeAGuruPage() {
             </div>
 
             <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-              A simple way to connect with more Pet Parents
+              A simple way to grow your local pet care presence
             </h2>
 
             <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-              Whether you are already booked often or just want extra
-              opportunities, SitGuru gives you another trusted place to show
-              your services and reach Pet Parents nearby.
+              Whether you are experienced, just getting started, or looking for
+              another trusted place to share your services, SitGuru makes it
+              easier for Pet Parents to learn about you.
             </p>
           </div>
 
@@ -370,7 +387,7 @@ export default function BecomeAGuruPage() {
             {benefits.map((benefit) => (
               <div
                 key={benefit.title}
-                className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 shadow-sm"
+                className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 shadow-sm transition hover:-translate-y-1 hover:border-emerald-200 hover:bg-white hover:shadow-lg"
               >
                 <div className="text-3xl">{benefit.icon}</div>
                 <h3 className="mt-4 text-xl font-black !text-slate-950">
@@ -401,8 +418,19 @@ export default function BecomeAGuruPage() {
               <p className="mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
                 Join free, build your Guru profile, complete simple trust and
                 safety steps, then use SitGuru as another way to connect with
-                Pet Parents looking for care.
+                Pet Parents looking for local care.
               </p>
+
+              <div className="mt-6 rounded-[28px] border border-emerald-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-black uppercase tracking-[0.16em] !text-emerald-700">
+                  Independent provider friendly
+                </p>
+                <p className="mt-2 text-sm font-semibold leading-7 !text-slate-700 sm:text-base">
+                  Pet Gurus are independent local providers who choose the
+                  services they offer, the availability they share, and the
+                  local areas they want to serve.
+                </p>
+              </div>
 
               <div className="mt-6">
                 <Link
@@ -418,7 +446,7 @@ export default function BecomeAGuruPage() {
               {steps.map((item) => (
                 <div
                   key={item.step}
-                  className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+                  className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-200 hover:shadow-md sm:p-6"
                 >
                   <div className="flex gap-4">
                     <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold !text-white">
@@ -450,12 +478,12 @@ export default function BecomeAGuruPage() {
             </div>
 
             <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-              If you provide pet care, SitGuru can help Pet Parents find you
+              If you love helping pets, SitGuru can help Pet Parents find you
             </h2>
 
             <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
               SitGuru is for experienced providers, new providers, and trusted
-              local caregivers who want another way to be discovered by Pet
+              local caregivers who want a simple way to be discovered by Pet
               Parents.
             </p>
           </div>
@@ -464,7 +492,7 @@ export default function BecomeAGuruPage() {
             {providerTypes.map((type) => (
               <div
                 key={type}
-                className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 shadow-sm"
+                className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-200 hover:bg-white hover:shadow-md"
               >
                 <p className="text-base font-semibold !text-slate-900">
                   {type}
@@ -480,6 +508,42 @@ export default function BecomeAGuruPage() {
             >
               Start Free Guru Profile
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Program fit */}
+      <section className="bg-emerald-50 py-12 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="inline-flex items-center rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-sm font-semibold !text-emerald-800">
+              Local programs
+            </div>
+
+            <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
+              A flexible fit for students, communities, and military families
+            </h2>
+
+            <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
+              SitGuru is building a local-first pet care community with simple
+              pathways for people who want to help pets and families nearby.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            {launchFit.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-[28px] border border-emerald-200 bg-white p-6 shadow-sm"
+              >
+                <h3 className="text-xl font-black !text-slate-950">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-sm leading-7 !text-slate-700">
+                  {item.description}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -506,7 +570,7 @@ export default function BecomeAGuruPage() {
             {warmGallery.map((item) => (
               <div
                 key={item.title}
-                className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
               >
                 <div className="relative h-56 w-full overflow-hidden sm:h-64">
                   <img
@@ -544,9 +608,9 @@ export default function BecomeAGuruPage() {
               </h2>
 
               <p className="mt-5 max-w-2xl text-base leading-7 !text-slate-200 sm:text-lg">
-                SitGuru is built to help expert pet care providers connect with
-                Pet Parents while keeping the experience safe, clear, and
-                trusted for pets, families, and Gurus.
+                SitGuru is built to help local pet care providers connect with
+                Pet Parents while keeping the experience clear, friendly, and
+                trust-focused for pets, families, and Gurus.
               </p>
             </div>
 
@@ -578,8 +642,8 @@ export default function BecomeAGuruPage() {
               </h2>
 
               <p className="mx-auto mt-4 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-                Create your Guru profile, show your services, and give local Pet
-                Parents another trusted place to connect with you.
+                Show your services, choose your local focus, and give nearby Pet
+                Parents another trusted place to learn about you.
               </p>
 
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
