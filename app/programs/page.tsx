@@ -1074,7 +1074,7 @@ export default function ProgramsPage() {
                 Pack Leader Recognition
               </p>
 
-              <h2 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-3xl">
                 Top Ambassadors should be recognized, supported, and celebrated.
               </h2>
 
