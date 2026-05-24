@@ -24,6 +24,7 @@ type ContactTopic =
   | "pet-parent"
   | "guru"
   | "programs"
+  | "ambassadors"
   | "partners"
   | "investors"
   | "press"
@@ -84,6 +85,11 @@ const contactTopics: Array<{
     description: "I am interested in Student, Community, or Military programs.",
   },
   {
+    value: "ambassadors",
+    label: "Ambassadors",
+    description: "I want to help refer, share, or grow SitGuru locally.",
+  },
+  {
     value: "partners",
     label: "Partners",
     description: "I want to partner with SitGuru.",
@@ -132,6 +138,15 @@ const contactCards: ContactCard[] = [
     href: "/programs/apply",
     cta: "Apply to a Program",
     icon: <HeartHandshake size={26} />,
+  },
+  {
+    title: "Ambassadors",
+    eyebrow: "Share SitGuru locally",
+    description:
+      "Help introduce Pet Parents, Pet Gurus, schools, partners, and community groups to SitGuru.",
+    href: "/ambassadors",
+    cta: "Explore Ambassadors",
+    icon: <Sparkles size={26} />,
   },
   {
     title: "Partners",
@@ -184,6 +199,13 @@ const quickPaths = [
     cta: "Send Message",
     icon: <MessageCircle size={20} />,
   },
+  {
+    title: "I want programs",
+    description: "Explore Student Hire, Community Hire, Military Hire, or Ambassadors.",
+    href: "/programs",
+    cta: "View Programs",
+    icon: <HeartHandshake size={20} />,
+  },
 ];
 
 const programOptions = [
@@ -197,6 +219,7 @@ const routingDetails = [
   "Pet Parent questions",
   "Guru support",
   "Program applications",
+  "Ambassador questions",
   "Partnerships",
   "Investor questions",
   "Press inquiries",
@@ -207,6 +230,7 @@ const helpfulDetails = [
   "Your role or topic",
   "Your city, state, or community",
   "Program interest if applicable",
+  "Referral source or organization",
   "A clear message with details",
 ];
 
@@ -411,9 +435,9 @@ export default function ContactPage() {
             </h1>
 
             <p className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-white/90 sm:text-lg">
-              Whether you are a Pet Parent, Guru, program applicant, partner,
-              investor, or press contact, SitGuru is here to help route your
-              message clearly.
+              Whether you are a Pet Parent, Pet Guru, Ambassador, program applicant,
+              workforce partner, investor, or press contact, SitGuru is here to
+              help route your message clearly.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -447,6 +471,7 @@ export default function ContactPage() {
                 "Pet Parent Help",
                 "Guru Support",
                 "Programs",
+                "Ambassadors",
                 "Partners",
                 "Investors",
                 "Press",
@@ -564,8 +589,9 @@ export default function ContactPage() {
               </h2>
 
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                Use this form for general questions, support, program interest,
-                partner inquiries, investor inquiries, and press outreach.
+                Use this form for general questions, support, Ambassador interest,
+                program interest, partner inquiries, investor inquiries, and
+                press outreach.
               </p>
 
               <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
@@ -592,7 +618,7 @@ export default function ContactPage() {
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
                 <InfoList
-                  title="Program links"
+                  title="Program and Ambassador links"
                   items={[
                     "Student Hire Program",
                     "Community Hire Program",
@@ -611,6 +637,14 @@ export default function ContactPage() {
                       className="inline-flex min-h-11 items-center justify-between rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
                     >
                       Apply to Program
+                      <ArrowRight size={15} />
+                    </Link>
+
+                    <Link
+                      href="/ambassadors"
+                      className="inline-flex min-h-11 items-center justify-between rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
+                    >
+                      Ambassador Program
                       <ArrowRight size={15} />
                     </Link>
 
@@ -785,8 +819,8 @@ export default function ContactPage() {
               </h2>
 
               <p className="mt-3 max-w-4xl text-sm font-semibold leading-6 !text-white/85 sm:text-base sm:leading-7">
-                Student Hire, Community Hire, and Military Hire applicants can
-                apply directly and feed into SitGuru program review.
+                Student Hire, Community Hire, Military Hire, and Ambassador applicants
+                can start from the right page and feed into SitGuru review.
               </p>
             </div>
 
