@@ -12,6 +12,13 @@ import {
   Phone,
   ShieldCheck,
   UserCheck,
+  Users,
+  FileText,
+  ArrowRight,
+  BadgeCheck,
+  Home,
+  MessageCircle,
+  Sparkles,
 } from "lucide-react";
 
 const lastUpdated = "May 21, 2026";
@@ -20,13 +27,13 @@ const quickSummary = [
   {
     title: "We collect what helps SitGuru work",
     description:
-      "This can include account details, contact information, pet care details, messages, booking-related information, support requests, and information needed for trust and safety.",
+      "This can include account details, contact information, pet care details, messages, booking-related information, support requests, program applications, and information needed for trust and safety.",
     icon: <UserCheck className="h-5 w-5" />,
   },
   {
     title: "We use information to support care connections",
     description:
-      "SitGuru uses information to help Pet Parents and Gurus connect, manage accounts, support bookings, communicate, improve the platform, and protect the community.",
+      "SitGuru uses information to help Pet Parents and Pet Gurus connect, manage accounts, organize care details, communicate, improve the platform, and protect the community.",
     icon: <PawPrint className="h-5 w-5" />,
   },
   {
@@ -41,17 +48,18 @@ const sections = [
   {
     title: "1. Overview",
     body: [
-      "SitGuru respects your privacy and is committed to protecting the personal information you share with us. This Privacy Policy explains how SitGuru collects, uses, stores, and shares information when you visit our website, create an account, join SitGuru, communicate with us, or use SitGuru services.",
-      "SitGuru is a pet care marketplace for Pet Parents and Gurus. We collect information needed to create accounts, support pet care connections, protect the community, improve the platform, and communicate with users.",
+      "SitGuru respects your privacy and is committed to protecting the personal information you share with us. This Privacy Policy explains how SitGuru collects, uses, stores, and shares information when you visit our website, create an account, join SitGuru, communicate with us, apply to a program, or use SitGuru services.",
+      "SitGuru is a pet care marketplace for Pet Parents and independent Pet Gurus. We collect information needed to create accounts, support pet care connections, organize care details, protect the community, improve the platform, and communicate with users.",
       "By accessing or using SitGuru, you acknowledge that you have read and understand this Privacy Policy.",
     ],
   },
   {
     title: "2. Information We Collect",
     body: [
-      "We may collect information you provide directly to us, including your name, email address, phone number, mailing address, account information, profile details, pet information, booking details, payment-related information, payout-related information, support or dispute records, messages sent through the platform, and any other information you choose to submit.",
+      "We may collect information you provide directly to us, including your name, email address, phone number, mailing address, account information, profile details, pet information, booking details, payment-related information, payout-related information, support or dispute records, messages sent through the platform, program application details, and any other information you choose to submit.",
       "Pet information may include pet names, species, breed, age, size, routines, behavior notes, care instructions, feeding needs, medication or health-related notes you choose to provide, veterinarian details, emergency contact details, and other information needed to support pet care.",
-      "Guru profile information may include services offered, experience, location, availability, rates, photos, profile descriptions, reviews, service preferences, and trust and safety information.",
+      "Pet Guru profile information may include services offered, experience, location, availability, service preferences, photos, profile descriptions, reviews, service areas, program interests, and trust and safety information.",
+      "Program and ambassador information may include school, community, military-connected, referral, partner, resume, document, availability, and interest details that you choose to provide through SitGuru forms.",
       "We may also collect certain information automatically, such as your IP address, browser type, device information, operating system, referring pages, pages viewed, dates and times of access, and interactions with our website.",
       "If you join a waitlist, fill out a contact form, submit support requests, apply to a program, communicate with SitGuru, or interact with our website, we may collect and retain those communications.",
     ],
@@ -60,24 +68,25 @@ const sections = [
     title: "3. Phone Numbers, Login Codes, and SMS Messages",
     body: [
       "SitGuru may use phone numbers to help create accounts, sign users in, send one-time login or verification codes, support account security, communicate about account activity, and send service-related messages.",
-      "Transactional text messages may include login codes, account messages, booking-related updates, safety-related communications, or important service notices. Message and data rates may apply depending on your mobile carrier.",
+      "Transactional text messages may include login codes, account messages, booking-related updates, safety-related communications, support updates, or important service notices. Message and data rates may apply depending on your mobile carrier.",
       "SitGuru does not use phone numbers to send marketing text messages unless permitted by law and, where required, with appropriate consent.",
     ],
   },
   {
     title: "4. How We Use Information",
     body: [
-      "We may use your information to operate, maintain, and improve SitGuru; create and manage accounts; support bookings and related services; communicate with Pet Parents and Gurus; respond to questions and support requests; send transactional messages; improve user experience; protect the safety and integrity of the platform; detect fraud, abuse, or misuse; and comply with legal obligations.",
-      "We may use information to support trust and safety reviews, verification steps, account protection, safety-related records, dispute handling, and community protection.",
-      "We may also use information to send updates, promotional materials, launch announcements, or marketing communications where permitted by law. You may opt out of marketing emails at any time.",
+      "We may use your information to operate, maintain, and improve SitGuru; create and manage accounts; support bookings and related services; communicate with Pet Parents and Pet Gurus; respond to questions and support requests; send transactional messages; improve user experience; protect the safety and integrity of the platform; detect fraud, abuse, or misuse; and comply with legal obligations.",
+      "We may use information to support trust and safety reviews, verification steps, account protection, safety-related records, dispute handling, program routing, partner referrals, and community protection.",
+      "We may also use information to send updates, promotional materials, launch announcements, program information, or marketing communications where permitted by law. You may opt out of marketing emails at any time.",
     ],
   },
   {
     title: "5. How We Share Information",
     body: [
-      "SitGuru may share information with service providers and vendors who help us operate the platform, including hosting providers, analytics tools, customer support tools, email service providers, messaging providers, payment processors, security providers, and similar business partners.",
-      "We may share information between users where necessary to support platform functionality, such as facilitating communication, bookings, account setup, care instructions, or service-related interactions between Pet Parents and Gurus.",
-      "For example, a Pet Parent may share pet care details with a Guru, and a Guru may share profile, service, location, and availability details with Pet Parents.",
+      "SitGuru may share information with service providers and vendors who help us operate the platform, including hosting providers, analytics tools, customer support tools, email service providers, messaging providers, payment processors, security providers, background or trust and safety providers, and similar business partners.",
+      "We may share information between users where necessary to support platform functionality, such as facilitating communication, bookings, account setup, care instructions, or service-related interactions between Pet Parents and Pet Gurus.",
+      "For example, a Pet Parent may share pet care details with a Pet Guru, and a Pet Guru may share profile, service, location, availability, and experience details with Pet Parents.",
+      "We may share limited program or referral information where reasonably needed to support Student Hire, Community Hire, Military Hire, Ambassador activity, partner referrals, or workforce/community outreach.",
       "We may also disclose information if required by law, legal process, court order, government request, or where we believe disclosure is reasonably necessary to protect SitGuru, our users, pets, or the public.",
       "We do not sell personal information in the ordinary meaning of that phrase.",
     ],
@@ -85,7 +94,7 @@ const sections = [
   {
     title: "6. Payments and Payouts",
     body: [
-      "SitGuru may use third-party payment processors to help process payments, payouts, refunds, fees, invoices, or related financial activity.",
+      "SitGuru may use third-party payment processors to help process payments, payouts, refunds, platform charges, invoices, or related financial activity.",
       "Payment processors may collect and process payment details, payout information, identity-related information, tax-related information, or transaction records according to their own terms and privacy policies.",
       "SitGuru generally does not store full payment card numbers on its own servers.",
     ],
@@ -124,7 +133,7 @@ const sections = [
     title: "11. Children’s Privacy",
     body: [
       "SitGuru is not intended for children under the age of 13, and we do not knowingly collect personal information directly from children under 13.",
-      "If we learn that we have collected personal information from a child under 13 without appropriate consent, we will take reasonable steps to delete it.",
+      "Certain SitGuru opportunities may be limited to users who meet applicable age, eligibility, onboarding, or program requirements. If we learn that we have collected personal information from a child under 13 without appropriate consent, we will take reasonable steps to delete it.",
     ],
   },
   {
@@ -138,7 +147,7 @@ const sections = [
     title: "13. State, Local, and Regional Privacy Rights",
     body: [
       "Privacy laws may vary depending on where you live. If you are located in a state or region with specific privacy rights, SitGuru will review and respond to applicable requests as required by law.",
-      "SitGuru supports Pet Parents and Gurus across communities, cities, towns, townships, and states. As we grow, we may update this Privacy Policy to reflect new legal requirements, new features, or new privacy choices.",
+      "SitGuru supports Pet Parents and Pet Gurus across communities, cities, towns, townships, and states. As we grow, we may update this Privacy Policy to reflect new legal requirements, new features, or new privacy choices.",
     ],
   },
   {
@@ -196,19 +205,50 @@ const dataHighlights = [
   },
 ];
 
+const privacyPathways = [
+  {
+    title: "Pet Parents",
+    description:
+      "Pet profiles, care notes, booking details, messages, and support history help make care easier to organize.",
+    icon: <Home className="h-5 w-5" />,
+  },
+  {
+    title: "Pet Gurus",
+    description:
+      "Profile details, service areas, preferences, program applications, and trust and safety steps help support local care connections.",
+    icon: <Users className="h-5 w-5" />,
+  },
+  {
+    title: "Programs and Ambassadors",
+    description:
+      "Student Hire, Community Hire, Military Hire, and Ambassador submissions may include referral, partner, school, or eligibility details.",
+    icon: <Sparkles className="h-5 w-5" />,
+  },
+];
+
 function SectionEyebrow({
   icon,
   children,
+  inverse = false,
 }: {
   icon: ReactNode;
   children: ReactNode;
+  inverse?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+      <span
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${
+          inverse ? "bg-white/15 text-white" : "bg-emerald-100 text-emerald-700"
+        }`}
+      >
         {icon}
       </span>
-      <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700 sm:tracking-[0.28em]">
+      <p
+        className={`text-sm font-black uppercase tracking-[0.22em] sm:tracking-[0.28em] ${
+          inverse ? "text-white" : "text-emerald-700"
+        }`}
+      >
         {children}
       </p>
     </div>
@@ -245,9 +285,10 @@ export default function PrivacyPage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-3xl text-base font-semibold leading-8 text-slate-700 sm:text-lg">
-            SitGuru is a pet care marketplace for Pet Parents and Gurus. This
-            policy explains what information we collect, how we use it, how we
-            share it, and how we work to protect it.
+            SitGuru is a trusted pet care marketplace for Pet Parents, Pet
+            Gurus, Ambassadors, and community programs. This policy explains
+            what information we collect, how we use it, how we share it, and how
+            we work to protect it.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm font-bold text-slate-600">
@@ -258,6 +299,23 @@ export default function PrivacyPage() {
               Human support available for privacy questions
             </span>
           </div>
+
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/contact"
+              className="inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-7 py-4 text-base font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 sm:w-auto"
+            >
+              Contact SitGuru
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+
+            <Link
+              href="/terms"
+              className="inline-flex min-h-[52px] w-full items-center justify-center rounded-full border border-emerald-200 bg-white px-7 py-4 text-base font-black text-emerald-700 transition hover:bg-emerald-50 sm:w-auto"
+            >
+              View Terms
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -266,7 +324,7 @@ export default function PrivacyPage() {
           {quickSummary.map((item) => (
             <div
               key={item.title}
-              className="rounded-[28px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+              className="rounded-[28px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
             >
               <SectionEyebrow icon={item.icon}>{item.title}</SectionEyebrow>
               <p className="mt-4 text-sm font-semibold leading-7 text-slate-600">
@@ -314,15 +372,64 @@ export default function PrivacyPage() {
         </div>
       </section>
 
+      <section className="relative mx-auto max-w-6xl px-4 pb-8 sm:px-6 lg:px-8">
+        <div className="rounded-[30px] border border-emerald-900/20 bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-700 p-5 text-white shadow-[0_20px_60px_rgba(5,95,70,0.22)] sm:rounded-[34px] sm:p-8 lg:p-10">
+          <SectionEyebrow inverse icon={<BadgeCheck className="h-4 w-4" />}>
+            Privacy by pathway
+          </SectionEyebrow>
+
+          <div className="mt-5 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div>
+              <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+                Different users share different details with SitGuru.
+              </h2>
+              <p className="mt-4 text-base font-semibold leading-8 text-white/90">
+                Pet Parents, Pet Gurus, Ambassadors, students, community
+                supporters, and military-connected applicants may use different
+                parts of SitGuru. We use submitted information to route support,
+                organize care, review program interest, and keep the community
+                safer.
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              {privacyPathways.map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-white/15 bg-white/10 p-4 text-white"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-800">
+                      {item.icon}
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-black text-white">
+                        {item.title}
+                      </h3>
+                      <p className="mt-1 text-sm font-semibold leading-6 text-white/85">
+                        {item.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="relative mx-auto max-w-4xl px-4 pb-8 sm:px-6 lg:px-8">
         <div className="rounded-[32px] border border-emerald-100 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-8 lg:p-10">
           <SectionEyebrow icon={<ShieldCheck className="h-4 w-4" />}>
             SitGuru Privacy Policy
           </SectionEyebrow>
 
-          <div className="mt-8 space-y-10">
+          <div className="mt-8 space-y-8 sm:space-y-10">
             {sections.map((section) => (
-              <div key={section.title}>
+              <article
+                key={section.title}
+                className="scroll-mt-28 rounded-3xl border border-slate-100 bg-slate-50/40 p-5 sm:p-6"
+              >
                 <h2 className="text-2xl font-black tracking-tight text-slate-950">
                   {section.title}
                 </h2>
@@ -330,13 +437,13 @@ export default function PrivacyPage() {
                   {section.body.map((paragraph) => (
                     <p
                       key={paragraph}
-                      className="text-base leading-8 text-slate-600"
+                      className="text-base font-medium leading-8 text-slate-600"
                     >
                       {paragraph}
                     </p>
                   ))}
                 </div>
-              </div>
+              </article>
             ))}
           </div>
 
@@ -362,7 +469,7 @@ export default function PrivacyPage() {
         <div className="rounded-[32px] border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_100%)] p-6 text-center shadow-[0_10px_30px_rgba(16,185,129,0.08)] sm:p-10">
           <div className="flex items-center justify-center gap-2">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <Heart className="h-4 w-4" />
+              <MessageCircle className="h-4 w-4" />
             </span>
             <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700 sm:tracking-[0.28em]">
               Questions About Privacy?
@@ -384,9 +491,10 @@ export default function PrivacyPage() {
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="/contact"
-              className="inline-flex min-h-[52px] w-full items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
+              className="inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-7 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
             >
               Contact SitGuru
+              <ArrowRight className="h-5 w-5" />
             </Link>
 
             <Link
@@ -395,6 +503,37 @@ export default function PrivacyPage() {
             >
               View Terms
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-5xl px-4 pb-20 sm:px-6 lg:px-8">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+                <FileText className="h-4 w-4" />
+                Related Policies
+              </div>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                Review the Terms page for platform rules, user responsibilities,
+                and SitGuru marketplace expectations.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/help"
+                className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-emerald-200 px-5 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-50"
+              >
+                Help Center
+              </Link>
+              <Link
+                href="/terms"
+                className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
+              >
+                View Terms
+              </Link>
+            </div>
           </div>
         </div>
       </section>
