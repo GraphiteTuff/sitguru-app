@@ -79,8 +79,11 @@ type NavLink = {
 const publicNavLinks: NavLink[] = [
   { label: "Home", href: "/" },
   { label: "Find Care", href: "/pet-parents" },
-  { label: "My Pets", href: "/pets" },
   { label: "Become a Guru", href: "/become-a-guru" },
+  { label: "Programs", href: "/programs" },
+  { label: "Ambassadors", href: "/ambassadors" },
+  { label: "Help", href: "/help" },
+  { label: "My Pets", href: "/pets" },
 ];
 
 const customerNavLinks: NavLink[] = [
@@ -819,7 +822,7 @@ export default function Header({ user = null }: HeaderProps) {
           />
         </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-4 lg:flex xl:gap-5">
+        <nav className="hidden flex-1 items-center justify-center gap-3 xl:flex 2xl:gap-5">
           {navLinks.map((link) => {
             const active = isActive(link.href);
 
@@ -827,7 +830,7 @@ export default function Header({ user = null }: HeaderProps) {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative pb-5 text-[14px] font-semibold tracking-[-0.015em] transition xl:text-[15px] ${
+                className={`relative pb-5 text-[13px] font-semibold tracking-[-0.015em] transition 2xl:text-[15px] ${
                   active
                     ? "text-slate-950"
                     : "text-slate-700 hover:text-emerald-700"
@@ -843,7 +846,7 @@ export default function Header({ user = null }: HeaderProps) {
           })}
         </nav>
 
-        <div className="hidden items-center gap-3 lg:flex">
+        <div className="hidden items-center gap-3 xl:flex">
           {loadingUser ? (
             <div className="h-11 w-48 animate-pulse rounded-full bg-slate-100" />
           ) : isLoggedIn ? (
@@ -999,7 +1002,7 @@ export default function Header({ user = null }: HeaderProps) {
         <button
           type="button"
           onClick={() => setMobileOpen((value) => !value)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 lg:hidden"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 xl:hidden"
           aria-label="Toggle menu"
           aria-expanded={mobileOpen}
         >
@@ -1008,7 +1011,7 @@ export default function Header({ user = null }: HeaderProps) {
       </div>
 
       {mobileOpen ? (
-        <div className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden">
+        <div className="border-t border-slate-200 bg-white px-4 py-4 xl:hidden">
           <div className="mx-auto grid max-w-[1440px] gap-2">
             {isLoggedIn ? (
               <div className="mb-2 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
@@ -1057,6 +1060,33 @@ export default function Header({ user = null }: HeaderProps) {
                 {item.label}
               </Link>
             ))}
+
+            {!isLoggedIn ? (
+              <div className="my-2 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-slate-50 p-4 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Join SitGuru free
+                </p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                  Find trusted local pet care, become a Pet Guru, or explore Student, Community, and Military programs.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <Link
+                    href="/signup"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-xl bg-emerald-600 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-emerald-700"
+                  >
+                    Sign Up Free
+                  </Link>
+                  <Link
+                    href="/programs"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
+                  >
+                    View Programs
+                  </Link>
+                </div>
+              </div>
+            ) : null}
 
             {isLoggedIn ? (
               <>
