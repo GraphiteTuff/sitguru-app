@@ -53,10 +53,10 @@ const quickHelpCards: HelpCard[] = [
     icon: <PawPrint className="h-6 w-6" />,
   },
   {
-    title: "Guru Help",
-    eyebrow: "Expert pet care providers",
+    title: "Pet Guru Help",
+    eyebrow: "Join as a local provider",
     description:
-      "Get help joining as a Guru, building your profile, connecting with Pet Parents, and using SitGuru as a trusted provider.",
+      "Get help joining as a Pet Guru, building your profile, choosing services, setting your local area, and connecting with Pet Parents.",
     href: "/become-a-guru",
     cta: "Become a Guru",
     icon: <UsersRound className="h-6 w-6" />,
@@ -65,7 +65,7 @@ const quickHelpCards: HelpCard[] = [
     title: "Bookings",
     eyebrow: "Care requests and details",
     description:
-      "Learn how booking requests, communication, care instructions, and service details can work through SitGuru.",
+      "Learn how requests, communication, care instructions, service notes, and booking records can help keep everyone organized.",
     href: "#bookings",
     cta: "Booking Help",
     icon: <CalendarCheck className="h-6 w-6" />,
@@ -80,10 +80,10 @@ const quickHelpCards: HelpCard[] = [
     icon: <Lock className="h-6 w-6" />,
   },
   {
-    title: "Programs",
+    title: "Programs & Ambassadors",
     eyebrow: "Student, Community & Military",
     description:
-      "Learn about SitGuru program pathways, including Student Hire, Community Hire, and Military Hire.",
+      "Learn about Student Hire, Community Hire, Military Hire, and Ambassador pathways that help SitGuru grow locally.",
     href: "/programs",
     cta: "View Programs",
     icon: <HeartHandshake className="h-6 w-6" />,
@@ -103,22 +103,27 @@ const popularQuestions = [
   {
     question: "What is SitGuru?",
     answer:
-      "SitGuru is a pet care marketplace that helps Pet Parents connect with local Gurus — expert pet care providers who offer trusted care services.",
+      "SitGuru is a trusted pet care marketplace that helps Pet Parents connect with local Pet Gurus for walks, sitting, drop-ins, boarding, training support, and other local pet care needs.",
   },
   {
-    question: "What is a Guru?",
+    question: "Is signup free?",
     answer:
-      "A Guru is an expert pet care provider. On SitGuru, that can mean a sitter, walker, trainer, groomer, boarding provider, drop-in caregiver, or experienced pet person who helps Pet Parents care for their pets.",
+      "Yes. Pet Parents can sign up free, and Pet Gurus can start their profile free. SitGuru is designed to make it easy for local families and trusted pet care providers to connect.",
+  },
+  {
+    question: "What is a Pet Guru?",
+    answer:
+      "A Pet Guru is a local pet care provider on SitGuru. That can include dog walkers, sitters, drop-in caregivers, boarding providers, trainers, groomers, and experienced pet people who want to help local families.",
   },
   {
     question: "How do I join as a Pet Parent?",
     answer:
-      "You can create a free SitGuru account, add your basic information, and begin looking for trusted local care options as features become available in your area.",
+      "Create your free SitGuru account, add your basic information, and start looking for trusted local care options as features become available in your area.",
   },
   {
-    question: "How do I join as a Guru?",
+    question: "How do I join as a Pet Guru?",
     answer:
-      "Start on the Become a Guru page. You can create your free Guru profile, share the services you offer, and complete simple trust and safety steps designed to help protect pets, families, Gurus, and the SitGuru community.",
+      "Start on the Become a Guru page. You can create your profile, choose services you are interested in offering, share your local service area, and complete SitGuru trust and safety steps when required.",
   },
 ];
 
@@ -135,9 +140,14 @@ const helpSections: HelpSection[] = [
           "SitGuru helps Pet Parents discover and connect with Gurus who offer trusted local pet care services. Pet Parents can search for care, review profiles, and use SitGuru tools to support communication and booking-related details.",
       },
       {
+        question: "Is SitGuru free to join?",
+        answer:
+          "Yes. SitGuru is designed to keep signup simple for Pet Parents and Pet Gurus. Create an account, build your profile, and use SitGuru to find local pet care connections or local pet care opportunities.",
+      },
+      {
         question: "Who is SitGuru for?",
         answer:
-          "SitGuru is for Pet Parents who need trusted care and for Gurus who provide pet care services such as sitting, walking, boarding, drop-ins, grooming support, training support, and more.",
+          "SitGuru is for Pet Parents who need trusted care and for Pet Gurus who provide pet care services such as sitting, walking, boarding, drop-ins, grooming support, training support, and more.",
       },
       {
         question: "Is SitGuru only for one city or state?",
@@ -165,7 +175,12 @@ const helpSections: HelpSection[] = [
       {
         question: "Can I ask questions before booking?",
         answer:
-          "Yes. Clear communication helps everyone. Pet Parents should ask questions early so they feel comfortable with the Guru, the service, timing, care expectations, and any special instructions.",
+          "Yes. Clear communication helps everyone. Pet Parents should ask questions early so they feel comfortable with the Pet Guru, the service, timing, care expectations, and any special instructions.",
+      },
+      {
+        question: "Why should I keep care details organized through SitGuru?",
+        answer:
+          "Keeping care details organized through SitGuru helps preserve service notes, pet instructions, message history, booking records, and support context if anyone needs to review what was discussed.",
       },
       {
         question: "What if I have an urgent pet safety issue?",
@@ -181,19 +196,29 @@ const helpSections: HelpSection[] = [
     icon: <UsersRound className="h-5 w-5" />,
     items: [
       {
-        question: "How do I become a Guru?",
+        question: "How do I become a Pet Guru?",
         answer:
-          "Visit the Become a Guru page, create your free Guru account, and begin building a profile that helps Pet Parents understand your services, experience, location, and care style.",
+          "Visit the Become a Guru page, create your profile, choose the services you are interested in offering, share your local service area, and begin building a profile that helps Pet Parents understand your care style.",
       },
       {
-        question: "What should I include in my Guru profile?",
+        question: "What should I include in my Pet Guru profile?",
         answer:
-          "Include your services, experience, location, availability, photos, care approach, pet types you support, and anything that helps Pet Parents feel confident choosing you.",
+          "Include your services, experience, general service area, availability preferences, photos, care approach, pet types you support, and anything that helps Pet Parents feel confident choosing you.",
+      },
+      {
+        question: "Do Pet Gurus choose their own services and availability?",
+        answer:
+          "Yes. Pet Gurus can choose the services they are interested in offering, the areas they prefer to serve, and the requests that fit their availability as SitGuru grows.",
       },
       {
         question: "Is SitGuru only for new pet care providers?",
         answer:
           "No. SitGuru is also for existing sitters, walkers, trainers, groomers, boarding providers, and trusted caregivers who want another way to connect with Pet Parents.",
+      },
+      {
+        question: "Are Pet Gurus employees of SitGuru?",
+        answer:
+          "Pet Gurus provide services as independent local providers through the SitGuru marketplace. More detailed onboarding, tax, and provider information is shared during the approval and setup process.",
       },
       {
         question: "What are trust and safety steps?",
@@ -211,7 +236,12 @@ const helpSections: HelpSection[] = [
       {
         question: "How do bookings work on SitGuru?",
         answer:
-          "SitGuru may support booking requests, service details, scheduling, communication, confirmations, and related care information. Exact booking workflows may evolve as SitGuru grows.",
+          "SitGuru may support booking requests, service details, scheduling, communication, confirmations, care notes, and related care information. Exact booking workflows may evolve as SitGuru grows.",
+      },
+      {
+        question: "Why use SitGuru for repeat care?",
+        answer:
+          "Using SitGuru for repeat care helps keep pet instructions, service history, reviews, communication, and support context in one place. That makes future care easier for both Pet Parents and Pet Gurus.",
       },
       {
         question: "What should be confirmed before care starts?",
@@ -267,7 +297,7 @@ const helpSections: HelpSection[] = [
       {
         question: "What programs does SitGuru offer?",
         answer:
-          "SitGuru program pathways include Student Hire, Community Hire, and Military Hire. These programs are designed to help qualified people grow toward trusted Guru opportunities.",
+          "SitGuru program pathways include Student Hire, Community Hire, and Military Hire. These programs help qualified students, local community members, veterans, military spouses, and military-connected applicants explore ways to grow with SitGuru.",
       },
       {
         question: "What order are the programs listed in?",
@@ -275,32 +305,42 @@ const helpSections: HelpSection[] = [
           "SitGuru lists programs in this order: Student Hire, Community Hire, and Military Hire.",
       },
       {
+        question: "What is the Ambassador Program?",
+        answer:
+          "The Ambassador Program is for trusted local supporters, students, pet professionals, community partners, and military-connected advocates who want to help introduce Pet Parents and Pet Gurus to SitGuru.",
+      },
+      {
+        question: "Can PA CareerLink, colleges, or community partners refer applicants?",
+        answer:
+          "Yes. SitGuru welcomes referrals from workforce partners, schools, colleges, community groups, local organizations, veteran representatives, and trusted pet-care networks. Applicants should apply through SitGuru so their information is routed correctly.",
+      },
+      {
         question: "Does applying to a program guarantee approval?",
         answer:
-          "No. Applying to a program does not guarantee acceptance, approval, Guru activation, bookings, or compensation. Applications may be reviewed based on program fit, eligibility, onboarding needs, and trust and safety steps.",
+          "No. Applying to a program does not guarantee acceptance, approval, Guru activation, bookings, rewards, or placement. Applications may be reviewed based on program fit, eligibility, onboarding needs, and trust and safety steps.",
       },
       {
         question: "Where do I apply?",
         answer:
-          "Use the programs application page to apply for Student Hire, Community Hire, or Military Hire consideration.",
+          "Use the programs application page to apply for Student Hire, Community Hire, Military Hire, or Ambassador consideration.",
       },
     ],
   },
   {
-    title: "Payments",
+    title: "Booking Payments",
     description:
-      "General payment, payout, and booking-related finance help.",
+      "General help with payment setup, booking totals, and payout-related questions.",
     icon: <CreditCard className="h-5 w-5" />,
     items: [
       {
         question: "How are payments handled?",
         answer:
-          "SitGuru may use third-party payment providers to support payments, payouts, refunds, fees, or related financial activity. Payment workflows may depend on the service, booking status, and available platform features.",
+          "SitGuru may use trusted third-party payment providers to support booking payments, provider payouts, refunds, tax forms, and related payment activity. Payment workflows may depend on service type, booking status, and available platform features.",
       },
       {
         question: "Where can I see pricing?",
         answer:
-          "Where available, Guru profiles and booking details may display service pricing or related information. Pet Parents and Gurus should review pricing before confirming care.",
+          "Where available, Pet Guru profiles and booking details may display service pricing or related information. Pet Parents and Pet Gurus should review booking details before confirming care.",
       },
       {
         question: "Who do I contact for payment questions?",
@@ -319,6 +359,11 @@ const helpSections: HelpSection[] = [
         question: "How does SitGuru support trust and safety?",
         answer:
           "SitGuru may use profile reviews, trust and safety steps, communication tools, support records, user reports, and platform rules to help protect pets, Pet Parents, Gurus, and the community.",
+      },
+      {
+        question: "Why does SitGuru encourage organized communication and records?",
+        answer:
+          "Organized communication, care details, service notes, and support records help everyone understand what was requested, what was confirmed, and what happened if a question comes up later.",
       },
       {
         question: "Does trust and safety remove all risk?",
@@ -495,9 +540,10 @@ export default function HelpPage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-3xl text-base font-semibold leading-8 text-slate-700 sm:text-lg">
-            Get quick answers for Pet Parents, Gurus, bookings, accounts,
-            programs, payments, and trust and safety. SitGuru is built around
-            trusted local pet care and real human support when you need it.
+            Get quick answers for Pet Parents, Pet Gurus, bookings, accounts,
+            programs, ambassadors, and trust and safety. SitGuru is built to
+            make local pet care feel easier, more trusted, and more community
+            focused.
           </p>
 
           <div className="mx-auto mt-8 max-w-3xl rounded-[26px] border border-emerald-100 bg-white p-4 text-left shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
@@ -527,10 +573,16 @@ export default function HelpPage() {
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm font-bold text-slate-600">
             <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
+              Free Signup
+            </span>
+            <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
               Pet Parent Help
             </span>
             <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
-              Guru Help
+              Pet Guru Help
+            </span>
+            <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
+              Ambassador Support
             </span>
             <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
               Trust & Safety
@@ -604,7 +656,9 @@ export default function HelpPage() {
 
               <p className="mt-3 text-sm font-semibold leading-6 !text-white/85 sm:text-base sm:leading-7">
                 SitGuru program pathways are listed in this order: Student Hire,
-                Community Hire, and Military Hire.
+                Community Hire, and Military Hire. Ambassador opportunities help
+                local supporters spread the word and grow trusted community
+                connections.
               </p>
 
               <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -673,9 +727,9 @@ export default function HelpPage() {
           </h2>
 
           <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-600">
-            Whether you are a Pet Parent, Guru, program applicant, partner, or
-            someone with a support question, SitGuru is built around real
-            communication and trusted local pet care.
+            Whether you are a Pet Parent, Pet Guru, program applicant,
+            Ambassador, partner, or someone with a support question, SitGuru is
+            built around real communication and trusted local pet care.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
