@@ -63,14 +63,15 @@ const statusOrder = [
 
 const sourceOrder = [
   "PA CareerLink",
-  "Website",
-  "Facebook",
-  "Instagram",
-  "TikTok",
-  "X",
+  "Indeed",
+  "Handshake",
+  "LinkedIn",
+  "College / University",
+  "Student Organization",
+  "Military / Veteran Organization",
   "Referral",
-  "Event",
-  "Manual / Other",
+  "Website",
+  "Other",
 ];
 
 function asString(value: unknown) {
@@ -298,15 +299,39 @@ function getSourceLabel(row: AnyRow) {
   if (text.includes("careerlink") || text.includes("career link")) {
     return "PA CareerLink";
   }
-  if (text.includes("facebook") || text.includes("meta")) return "Facebook";
-  if (text.includes("instagram") || text.includes("insta")) return "Instagram";
-  if (text.includes("tiktok")) return "TikTok";
-  if (text.includes("x.com") || text.includes("twitter")) return "X";
-  if (text.includes("event")) return "Event";
+  if (text.includes("indeed")) return "Indeed";
+  if (text.includes("handshake")) return "Handshake";
+  if (text.includes("linkedin") || text.includes("linked in")) return "LinkedIn";
+  if (
+    text.includes("college") ||
+    text.includes("university") ||
+    text.includes("campus")
+  ) {
+    return "College / University";
+  }
+  if (
+    text.includes("student organization") ||
+    text.includes("student org") ||
+    text.includes("club") ||
+    text.includes("fraternity") ||
+    text.includes("sorority")
+  ) {
+    return "Student Organization";
+  }
+  if (
+    text.includes("military") ||
+    text.includes("veteran") ||
+    text.includes("active-duty") ||
+    text.includes("active duty") ||
+    text.includes("guard") ||
+    text.includes("reserve")
+  ) {
+    return "Military / Veteran Organization";
+  }
   if (text.includes("referral")) return "Referral";
   if (text.includes("website") || text.includes("site")) return "Website";
 
-  return source || "Manual / Other";
+  return source || "Other";
 }
 
 function isAmbassadorLead(row: AnyRow) {
@@ -732,8 +757,9 @@ export default async function AmbassadorLeadsPage({
                 Add Ambassador Lead
               </h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                Add PA CareerLink applicants or manual leads from social media,
-                events, referrals, and local outreach.
+                Add hiring-focused ambassador applicants from PA CareerLink, Indeed,
+                Handshake, LinkedIn, schools, military organizations, referrals,
+                and the SitGuru website.
               </p>
             </div>
 
