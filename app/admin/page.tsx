@@ -63,6 +63,7 @@ const adminRoutes = {
   launchSignups: "/admin/launch-signups",
   referrals: "/admin/referrals",
   programs: "/admin/programs",
+  ambassadorLeads: "/admin/partners/ambassadors",
   partners: "/admin/partners",
   partnerApplications: "/admin/partners/applications",
   activePartners: "/admin/partners/active",
@@ -401,6 +402,122 @@ function getMessageSender(message: AnyRow) {
     message,
     ["sender_name", "from_name", "name", "customer_name", "guru_name"],
     "SitGuru User",
+  );
+}
+
+function getCombinedLeadText(row: AnyRow) {
+  return [
+    getText(row, ["program", "program_name", "program_type"]),
+    getText(row, ["participant_type", "partner_type", "type", "role"]),
+    getText(row, ["source", "lead_source", "signup_source", "utm_source"]),
+    getText(row, ["campaign", "campaign_name", "utm_campaign"]),
+    getText(row, ["title", "name", "interest", "notes"]),
+    getText(row, ["position", "job_title", "posting_title"]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function getReadableStatus(row: AnyRow) {
+  const status = getStatus(row);
+
+  if (status === "new") return "New";
+  if (status === "pending") return "Pending";
+  if (status === "submitted") return "Submitted";
+  if (status === "review" || status === "in_review") return "In Review";
+  if (status === "contacted") return "Contacted";
+  if (status === "interested") return "Interested";
+  if (status === "applied") return "Applied";
+  if (status === "signed_up" || status === "signup" || status === "converted") {
+    return "Signed Up";
+  }
+  if (status === "approved" || status === "active") return "Approved";
+  if (status === "not_moving_forward" || status === "declined") {
+    return "Not Moving Forward";
+  }
+
+  return (
+    status
+      .split("_")
+      .filter(Boolean)
+      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+      .join(" ") || "Pending"
+  );
+}
+
+function isAmbassadorLead(row: AnyRow) {
+  const text = getCombinedLeadText(row);
+  const participantType = getParticipantType(row);
+  const role = getRole(row);
+
+  return (
+    text.includes("ambassador") ||
+    text.includes("careerlink") ||
+    text.includes("career link") ||
+    text.includes("student hire") ||
+    text.includes("community hire") ||
+    text.includes("military hire") ||
+    text.includes("veteran") ||
+    participantType.includes("ambassador") ||
+    role.includes("ambassador")
+  );
+}
+
+function getAmbassadorProgramLabel(row: AnyRow) {
+  const text = getCombinedLeadText(row);
+
+  if (text.includes("student")) return "Student Hire";
+  if (text.includes("community")) return "Community Hire";
+  if (
+    text.includes("military") ||
+    text.includes("veteran") ||
+    text.includes("active-duty") ||
+    text.includes("active duty") ||
+    text.includes("guard") ||
+    text.includes("reserve")
+  ) {
+    return "Military Hire";
+  }
+
+  return "Ambassador";
+}
+
+function getAmbassadorSourceLabel(row: AnyRow) {
+  const source = getText(
+    row,
+    ["source", "lead_source", "signup_source", "utm_source", "referral_source"],
+    "",
+  );
+  const text = `${source} ${getCombinedLeadText(row)}`.toLowerCase();
+
+  if (text.includes("careerlink") || text.includes("career link")) {
+    return "PA CareerLink";
+  }
+  if (text.includes("facebook") || text.includes("meta")) return "Facebook";
+  if (text.includes("instagram") || text.includes("insta")) return "Instagram";
+  if (text.includes("tiktok")) return "TikTok";
+  if (text.includes("x.com") || text.includes("twitter")) return "X";
+  if (text.includes("event")) return "Event";
+  if (text.includes("referral")) return "Referral";
+  if (text.includes("website") || text.includes("site")) return "Website";
+
+  return source || "Manual / Other";
+}
+
+function getAmbassadorEmail(row: AnyRow) {
+  return getText(
+    row,
+    ["email", "applicant_email", "lead_email", "contact_email"],
+    "—",
+  );
+}
+
+function getAmbassadorPhone(row: AnyRow) {
+  return getText(
+    row,
+    ["phone", "phone_number", "mobile", "contact_phone"],
+    "—",
   );
 }
 
@@ -982,6 +1099,61 @@ async function getAdminDashboardData() {
     ),
   );
 
+
+  const ambassadorLeadRows = mergeRows(
+    ambassadors,
+    partnerApplications.filter(isAmbassadorLead),
+    networkPartnerLeads.filter(isAmbassadorLead),
+    networkParticipants.filter(isAmbassadorLead),
+    launchSignups.filter(isAmbassadorLead),
+  ).sort((a, b) => {
+    const dateA = new Date(getDate(a) || 0).getTime();
+    const dateB = new Date(getDate(b) || 0).getTime();
+    return dateB - dateA;
+  });
+
+  const recentAmbassadorLeads = ambassadorLeadRows.slice(0, 6).map((lead) => ({
+    name: getDisplayName(lead, "Ambassador Lead"),
+    email: getAmbassadorEmail(lead),
+    phone: getAmbassadorPhone(lead),
+    program: getAmbassadorProgramLabel(lead),
+    source: getAmbassadorSourceLabel(lead),
+    status: getReadableStatus(lead),
+    date: getDate(lead),
+  }));
+
+  const ambassadorLeadMetrics = {
+    total: ambassadorLeadRows.length,
+    student: ambassadorLeadRows.filter(
+      (lead) => getAmbassadorProgramLabel(lead) === "Student Hire",
+    ).length,
+    community: ambassadorLeadRows.filter(
+      (lead) => getAmbassadorProgramLabel(lead) === "Community Hire",
+    ).length,
+    military: ambassadorLeadRows.filter(
+      (lead) => getAmbassadorProgramLabel(lead) === "Military Hire",
+    ).length,
+    careerLink: ambassadorLeadRows.filter(
+      (lead) => getAmbassadorSourceLabel(lead) === "PA CareerLink",
+    ).length,
+    newCount: ambassadorLeadRows.filter((lead) => {
+      const status = getStatus(lead);
+      return status === "new" || status === "pending" || status === "submitted";
+    }).length,
+    contactedCount: ambassadorLeadRows.filter((lead) => {
+      const status = getStatus(lead);
+      return status === "contacted" || status === "interested";
+    }).length,
+    signedUpCount: ambassadorLeadRows.filter((lead) => {
+      const status = getStatus(lead);
+      return status === "signed_up" || status === "converted" || status === "signup";
+    }).length,
+    approvedCount: ambassadorLeadRows.filter((lead) => {
+      const status = getStatus(lead);
+      return status === "approved" || status === "active";
+    }).length,
+  };
+
   const pendingApplications = partnerApplications.filter(isPendingStatus);
   const pendingPartnerLeads = networkPartnerLeads.filter(isPendingStatus);
   const convertedReferrals = networkReferrals.filter(isConvertedStatus);
@@ -1056,6 +1228,8 @@ async function getAdminDashboardData() {
     topGurus,
     topCustomers,
     recentMessages,
+    ambassadorLeadMetrics,
+    recentAmbassadorLeads,
     networkMetrics: {
       activePrograms: activeNetworkPrograms,
       activeParticipants: activeNetworkParticipants.length,
@@ -1199,7 +1373,7 @@ export default async function AdminDashboardPage() {
           </div>
           <p className="text-base font-semibold text-slate-600">
             Real-time SitGuru operations, marketplace activity, Guru earnings,
-            optional tips, network programs, and Supabase activity.
+            optional tips, network programs, ambassador leads, and Supabase activity.
           </p>
         </div>
 
@@ -1222,7 +1396,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-6">
         <DataHealthTile label="Supabase Source" value="Live data" />
         <DataHealthTile
           label="Bookings Loaded"
@@ -1240,7 +1414,83 @@ export default async function AdminDashboardPage() {
               data.networkMetrics.clicks,
           )}
         />
+        <DataHealthTile
+          label="Ambassador Leads"
+          value={number(data.ambassadorLeadMetrics.total)}
+        />
         <DataHealthTile label="Marketplace Mode" value="Free" />
+      </section>
+
+      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-5">
+          <DashboardCard>
+            <TableHeader
+              title="PA CareerLink / Ambassador Leads"
+              subtitle="Track Student Hire, Community Hire, and Military Hire applicants from PA CareerLink, website, referrals, and local outreach."
+              href={adminRoutes.ambassadorLeads}
+            />
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <AmbassadorProgramTile
+                href={adminRoutes.ambassadorLeads}
+                title="Student Hire"
+                value={number(data.ambassadorLeadMetrics.student)}
+                detail="Campus and student outreach"
+              />
+              <AmbassadorProgramTile
+                href={adminRoutes.ambassadorLeads}
+                title="Community Hire"
+                value={number(data.ambassadorLeadMetrics.community)}
+                detail="Neighborhood growth"
+              />
+              <AmbassadorProgramTile
+                href={adminRoutes.ambassadorLeads}
+                title="Military Hire"
+                value={number(data.ambassadorLeadMetrics.military)}
+                detail="Veterans and military families"
+              />
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <AmbassadorStatusTile label="New" value={number(data.ambassadorLeadMetrics.newCount)} />
+              <AmbassadorStatusTile label="Contacted" value={number(data.ambassadorLeadMetrics.contactedCount)} />
+              <AmbassadorStatusTile label="Signed Up" value={number(data.ambassadorLeadMetrics.signedUpCount)} />
+              <AmbassadorStatusTile label="Approved" value={number(data.ambassadorLeadMetrics.approvedCount)} />
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-green-100 bg-green-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-black text-green-950">
+                    PA CareerLink pipeline
+                  </p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-green-900/70">
+                    {number(data.ambassadorLeadMetrics.careerLink)} leads tagged from PA CareerLink or CareerLink-related sources.
+                  </p>
+                </div>
+
+                <Link
+                  href={adminRoutes.ambassadorLeads}
+                  className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white transition hover:bg-green-900"
+                >
+                  Manage Leads
+                </Link>
+              </div>
+            </div>
+          </DashboardCard>
+        </div>
+
+        <div className="min-w-0 xl:col-span-7">
+          <DashboardCard>
+            <TableHeader
+              title="Recent Ambassador Leads"
+              subtitle="Latest ambassador applicants and referral leads ready for follow-up."
+              href={adminRoutes.ambassadorLeads}
+            />
+
+            <AmbassadorLeadTable leads={data.recentAmbassadorLeads} />
+          </DashboardCard>
+        </div>
       </section>
 
       <section className="grid w-full min-w-0 items-start gap-4 lg:grid-cols-2 2xl:grid-cols-5">
@@ -1843,6 +2093,11 @@ export default async function AdminDashboardPage() {
               label="Growth Referrals"
             />
             <QuickAction
+              href={adminRoutes.ambassadorLeads}
+              icon={<UserPlus />}
+              label="Ambassador Leads"
+            />
+            <QuickAction
               href={adminRoutes.partners}
               icon={<BriefcaseBusiness />}
               label="Partner Admin"
@@ -2026,6 +2281,129 @@ function NetworkStatusRow({
 
       <p className="shrink-0 text-sm font-black text-green-800">{value}</p>
     </Link>
+  );
+}
+
+
+function AmbassadorProgramTile({
+  href,
+  title,
+  value,
+  detail,
+}: {
+  href: string;
+  title: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
+    >
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-800 text-white">
+        <Users size={17} />
+      </div>
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        {title}
+      </p>
+      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
+      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+        {detail}
+      </p>
+      <p className="mt-3 text-xs font-black text-green-800">
+        View leads <span className="transition group-hover:translate-x-1">→</span>
+      </p>
+    </Link>
+  );
+}
+
+function AmbassadorStatusTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-green-100 bg-white p-4 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-black text-green-950">{value}</p>
+    </div>
+  );
+}
+
+function AmbassadorLeadTable({
+  leads,
+}: {
+  leads: {
+    name: string;
+    email: string;
+    phone: string;
+    program: string;
+    source: string;
+    status: string;
+    date: string | null;
+  }[];
+}) {
+  if (!leads.length) {
+    return (
+      <div className="rounded-2xl bg-[#f7faf6] p-6 text-center">
+        <Users className="mx-auto mb-2 text-slate-400" />
+        <p className="text-sm font-black text-slate-600">
+          No ambassador leads found yet.
+        </p>
+        <p className="mt-1 text-xs font-semibold text-slate-500">
+          PA CareerLink applicants will appear here once they are added or imported into your existing ambassador, partner, or launch signup tables.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[760px] text-left text-sm">
+        <thead>
+          <tr className="border-b border-[#edf3ee] text-xs font-black text-slate-500">
+            <th className="pb-3">Lead</th>
+            <th className="pb-3">Program</th>
+            <th className="pb-3">Source</th>
+            <th className="pb-3">Status</th>
+            <th className="pb-3">Phone</th>
+            <th className="pb-3">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {leads.map((lead, index) => (
+            <tr
+              key={`${lead.email}-${lead.name}-${index}`}
+              className="border-b border-[#f1f5f2] last:border-0"
+            >
+              <td className="py-3">
+                <div className="flex items-center gap-3">
+                  <Avatar name={lead.name} />
+                  <div className="min-w-0">
+                    <p className="truncate font-black text-slate-950">
+                      {lead.name}
+                    </p>
+                    <p className="truncate text-xs font-bold text-slate-500">
+                      {lead.email}
+                    </p>
+                  </div>
+                </div>
+              </td>
+              <td className="py-3 font-bold text-slate-600">{lead.program}</td>
+              <td className="py-3 font-bold text-slate-600">{lead.source}</td>
+              <td className="py-3">
+                <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800">
+                  {lead.status}
+                </span>
+              </td>
+              <td className="py-3 font-bold text-slate-600">{lead.phone}</td>
+              <td className="py-3 font-bold text-slate-600">
+                {formatDate(lead.date)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
