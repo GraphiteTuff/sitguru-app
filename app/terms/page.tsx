@@ -463,10 +463,10 @@ export default function TermsPage() {
 
           <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_0.9fr] lg:items-center">
             <div>
-              <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+              <h2 className="text-3xl font-black tracking-tight !text-white sm:text-4xl">
                 Keeping care organized through SitGuru helps protect everyone.
               </h2>
-              <p className="mt-4 text-base font-semibold leading-8 text-emerald-50">
+              <p className="mt-4 text-base font-semibold leading-8 !text-white/90">
                 Booking details, care notes, payment records, messages, reviews,
                 and support history are easier to review when they stay connected
                 to the platform.
@@ -482,7 +482,7 @@ export default function TermsPage() {
               ].map((item) => (
                 <div
                   key={item}
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-black text-white"
+                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-black !text-white"
                 >
                   {item}
                 </div>
