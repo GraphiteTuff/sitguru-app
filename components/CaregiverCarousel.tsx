@@ -46,6 +46,20 @@ function getSafeImageForItem(item: CarouselItem) {
   return item.image || "/images/demo/avery-johnson.png";
 }
 
+function getSafeHrefForItem(item: CarouselItem) {
+  const isDemoGuru = approvedGuruNames.has(item.name);
+
+  if (isDemoGuru) {
+    return "/search";
+  }
+
+  if (!item.href || item.href.startsWith("/guru/")) {
+    return "/search";
+  }
+
+  return item.href;
+}
+
 function dedupeAndApproveItems(items: CarouselItem[]) {
   const seenNames = new Set<string>();
 
@@ -61,6 +75,7 @@ function dedupeAndApproveItems(items: CarouselItem[]) {
     })
     .map((item) => ({
       ...item,
+      href: getSafeHrefForItem(item),
       image: getSafeImageForItem(item),
       badge: item.badge || "Verified",
     }));
@@ -190,7 +205,7 @@ export default function CaregiverCarousel({
             </h2>
 
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-              Browse real pet care gurus from SitGuru in a warm, modern,
+              Browse trusted pet care options from SitGuru in a warm, modern,
               easy-to-scan layout.
             </p>
           </div>
@@ -297,14 +312,14 @@ export default function CaregiverCarousel({
                         href={item.href}
                         className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                       >
-                        View Profile
+                        Find Care
                       </Link>
 
                       <Link
                         href="/search"
                         className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
                       >
-                        Find Care
+                        Browse Gurus
                       </Link>
                     </div>
                   </div>
