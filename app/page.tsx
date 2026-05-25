@@ -371,6 +371,14 @@ const popularServices = [
   },
 ];
 
+const petParentSignupHref = "/signup?role=pet_parent&next=/customer/dashboard";
+const petParentPhoneSignupHref =
+  "/signup?role=pet_parent&mode=phone&next=/customer/dashboard";
+const petParentLoginHref = "/login?role=pet_parent&next=/customer/dashboard";
+const guruSignupHref = "/signup?role=guru&next=/guru/dashboard";
+const bothSignupHref = "/signup?role=both&next=/customer/dashboard";
+
+
 function GoogleIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0">
@@ -578,19 +586,24 @@ function HeroSignupCard({
   onTrack: (label: string, destination: string) => void;
 }) {
   return (
-    <aside className="w-full max-w-[340px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[360px]">
-      <h2 className="text-[2.15rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.65rem]">
-        Join SitGuru
+    <aside className="w-full max-w-[360px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[370px]">
+      <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
+        Free account
+      </div>
+
+      <h2 className="mt-3 text-[2.05rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.55rem]">
+        Join SitGuru free
       </h2>
-      <p className="mt-2 text-sm font-semibold text-slate-500">
-        Find trusted local care or apply to become an independent Pet Guru.
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+        Choose Pet Parent, Future Guru, or both. Sign up once and we will route
+        you to the right next step.
       </p>
 
-      <div className="mt-6 grid gap-3">
+      <div className="mt-5 grid gap-3">
         <button
           type="button"
           onClick={onGoogleSignup}
-          className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50"
+          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
           <GoogleIcon />
           Continue with Google
@@ -601,16 +614,16 @@ function HeroSignupCard({
           disabled
           aria-disabled="true"
           title="Apple login is coming soon"
-          className="flex w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-400 shadow-sm"
+          className="flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-400 shadow-sm"
         >
           <AppleIcon />
           Continue with Apple — Coming Soon
         </button>
 
         <Link
-          href="/signup"
-          onClick={() => onTrack("Continue with phone", "/signup")}
-          className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50"
+          href={petParentPhoneSignupHref}
+          onClick={() => onTrack("Continue with phone", petParentPhoneSignupHref)}
+          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
           ☎ Continue with phone
         </Link>
@@ -618,46 +631,64 @@ function HeroSignupCard({
 
       <div className="my-5 flex items-center gap-4">
         <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-bold text-slate-400">or</span>
+        <span className="text-xs font-bold text-slate-400">or choose path</span>
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid gap-2">
         <Link
-          href="/signup"
-          onClick={() => onTrack("Full Name Sign Up", "/signup")}
-          className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50/50"
+          href={petParentSignupHref}
+          onClick={() => onTrack("Pet Parent Signup Hero Card", petParentSignupHref)}
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
-          Full name
+          <span className="block text-sm font-black text-emerald-900">
+            Pet Parent
+          </span>
+          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
+            Sign up free to find trusted local Gurus and book pet care.
+          </span>
         </Link>
+
         <Link
-          href="/signup"
-          onClick={() => onTrack("Email Sign Up", "/signup")}
-          className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50/50"
+          href={guruSignupHref}
+          onClick={() => onTrack("Future Guru Signup Hero Card", guruSignupHref)}
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
-          Email
+          <span className="block text-sm font-black text-slate-950">
+            Future Guru
+          </span>
+          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
+            Create your free Guru profile and go directly to the 5-step setup.
+          </span>
         </Link>
+
         <Link
-          href="/signup"
-          onClick={() => onTrack("Zip Sign Up", "/signup")}
-          className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:border-emerald-200 hover:bg-emerald-50/50"
+          href={bothSignupHref}
+          onClick={() => onTrack("Both Signup Hero Card", bothSignupHref)}
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
-          ZIP code optional
+          <span className="block text-sm font-black text-slate-950">
+            Both
+          </span>
+          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
+            Use SitGuru as a Pet Parent and continue into Guru setup.
+          </span>
         </Link>
+
         <Link
-          href="/signup"
-          onClick={() => onTrack("Sign Up Hero Card", "/signup")}
-          className="mt-1 rounded-xl bg-emerald-700 px-5 py-3 text-center text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
+          href={petParentSignupHref}
+          onClick={() => onTrack("Start Free Signup Hero Card", petParentSignupHref)}
+          className="mt-2 rounded-xl bg-emerald-700 px-5 py-3 text-center text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200"
         >
-          Sign Up
+          Start Free as Pet Parent
         </Link>
       </div>
 
       <p className="mt-4 text-center text-xs font-semibold text-slate-500">
-        Already have an account?{" "}
+        Already have a SitGuru account?{" "}
         <Link
-          href="/login"
-          onClick={() => onTrack("Login From Hero Card", "/login")}
+          href={petParentLoginHref}
+          onClick={() => onTrack("Login From Hero Card", petParentLoginHref)}
           className="font-black text-emerald-700 hover:text-emerald-800 hover:underline"
         >
           Log in
@@ -873,9 +904,9 @@ function HomeVideoSection({
               </Link>
 
               <Link
-                href="/become-a-guru"
+                href={guruSignupHref}
                 onClick={() =>
-                  onTrack("Become a Guru Video Section", "/become-a-guru")
+                  onTrack("Become a Guru Video Section", guruSignupHref)
                 }
                 className="inline-flex min-h-12 w-full items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100 sm:w-auto"
               >
@@ -1079,8 +1110,9 @@ export default function HomePage() {
         : null;
 
     if (callbackUrl) {
-      callbackUrl.searchParams.set("next", "/customer/dashboard/profile");
-      callbackUrl.searchParams.set("type", "customer");
+      callbackUrl.searchParams.set("next", "/customer/dashboard");
+      callbackUrl.searchParams.set("role", "pet_parent");
+      callbackUrl.searchParams.set("source", "homepage");
     }
 
     trackEvent({
@@ -1091,7 +1123,7 @@ export default function HomePage() {
       metadata: {
         provider: "google",
         location: "homepage_launch_signup_card",
-        selected_next_path: "/customer/dashboard/profile",
+        selected_next_path: "/customer/dashboard",
         version: "easy_signup_trusted_local_launch",
       },
     });
@@ -1307,14 +1339,14 @@ export default function HomePage() {
                 {
                   title: "For Pet Parents",
                   body: "Create an account, search local Gurus, keep care details organized, and rebook trusted care with less back-and-forth.",
-                  cta: "Find Pet Care",
-                  href: "/search",
+                  cta: "Create Pet Parent Account",
+                  href: petParentSignupHref,
                 },
                 {
                   title: "For Pet Gurus",
                   body: "Apply as an independent Pet Guru, choose your services and local area, and accept requests that fit your availability.",
-                  cta: "Become a Guru",
-                  href: "/become-a-guru",
+                  cta: "Start Guru Signup",
+                  href: guruSignupHref,
                 },
               ].map((card) => (
                 <Link
@@ -1487,11 +1519,11 @@ export default function HomePage() {
                   </Link>
 
                   <Link
-                    href="/become-a-guru"
+                    href={guruSignupHref}
                     onClick={() =>
                       trackHomepageClick(
                         "Become a Guru Programs Section",
-                        "/become-a-guru",
+                        guruSignupHref,
                       )
                     }
                     className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
@@ -1585,9 +1617,9 @@ export default function HomePage() {
               </div>
 
               <Link
-                href="/signup"
+                href={petParentSignupHref}
                 onClick={() =>
-                  trackHomepageClick("PetPerks Learn More", "/signup")
+                  trackHomepageClick("PetPerks Learn More", petParentSignupHref)
                 }
                 className="mt-6 inline-flex rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
               >
@@ -1643,9 +1675,9 @@ export default function HomePage() {
                 </Link>
 
                 <Link
-                  href="/become-a-guru"
+                  href={guruSignupHref}
                   onClick={() =>
-                    trackHomepageClick("Become a Guru", "/become-a-guru")
+                    trackHomepageClick("Become a Guru", guruSignupHref)
                   }
                   className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
                 >
@@ -1786,9 +1818,9 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="/become-a-guru"
+                href={guruSignupHref}
                 onClick={() =>
-                  trackHomepageClick("Become a Guru Final CTA", "/become-a-guru")
+                  trackHomepageClick("Become a Guru Final CTA", guruSignupHref)
                 }
                 className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
               >
