@@ -92,10 +92,24 @@ function toE164UsPhone(value: string) {
   return `+1${digits}`;
 }
 
-function getRedirectPath(intent: AccountIntent, nextPath: string) {
-  if (nextPath) return nextPath;
-  if (intent === "guru") return "/become-a-guru";
+function getDefaultNextPath(intent: AccountIntent) {
+  if (intent === "guru") return "/guru/dashboard/profile?step=1";
+  if (intent === "both") return "/guru/dashboard/profile?step=1";
+
   return "/customer/dashboard";
+}
+
+function normalizeNextPath(value: string) {
+  const cleanValue = value.trim();
+
+  if (!cleanValue) return "";
+  if (cleanValue.startsWith("/")) return cleanValue;
+
+  return "";
+}
+
+function getRedirectPath(intent: AccountIntent, nextPath: string) {
+  return normalizeNextPath(nextPath) || getDefaultNextPath(intent);
 }
 
 function getIntentLabel(intent: AccountIntent) {
@@ -108,12 +122,99 @@ function getRoleFromIntent(intent: AccountIntent) {
   return intent === "guru" ? "guru" : "customer";
 }
 
+function shouldCreateGuruProfile(intent: AccountIntent) {
+  return intent === "guru" || intent === "both";
+}
+
+function buildStarterGuruName(fullName: string, fallback = "New SitGuru") {
+  const cleanName = fullName.trim();
+
+  return cleanName || fallback;
+}
+
+function buildStarterGuruSlug(userId: string, fullName: string) {
+  const baseSlug = fullName
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return baseSlug || `guru-${userId.slice(0, 8)}`;
+}
+
+async function ensureStarterGuruProfile({
+  userId,
+  fullName,
+  email,
+  phone,
+  zipCode,
+  source,
+}: {
+  userId: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  zipCode?: string;
+  source: string;
+}) {
+  const now = new Date().toISOString();
+  const displayName = buildStarterGuruName(fullName);
+  const slug = buildStarterGuruSlug(userId, displayName);
+
+  await supabase.from("profiles").upsert({
+    id: userId,
+    full_name: displayName,
+    email: email?.trim() || null,
+    phone: phone?.trim() || null,
+    role: "guru",
+    source,
+    zip_code: zipCode?.trim() || null,
+    updated_at: now,
+  });
+
+  const { data: existingGuru } = await supabase
+    .from("gurus")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const starterGuruPayload = {
+    user_id: userId,
+    display_name: displayName,
+    full_name: displayName,
+    slug,
+    zip_code: zipCode?.trim() || null,
+    is_public: false,
+    onboarding_completed: false,
+    profile_completed: false,
+    updated_at: now,
+  };
+
+  if (existingGuru?.id) {
+    await supabase
+      .from("gurus")
+      .update(starterGuruPayload)
+      .eq("user_id", userId);
+    return;
+  }
+
+  await supabase.from("gurus").insert({
+    ...starterGuruPayload,
+    created_at: now,
+  });
+}
+
 function SignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const startingIntent = useMemo<AccountIntent>(() => {
-    const role = searchParams.get("role")?.toLowerCase();
+    const role =
+      searchParams.get("role")?.toLowerCase() ||
+      searchParams.get("type")?.toLowerCase() ||
+      "";
 
     if (role === "guru" || role === "future_guru") return "guru";
     if (role === "both") return "both";
@@ -253,19 +354,31 @@ function SignupPageContent() {
       const userId = data.user?.id;
 
       if (userId) {
-        await supabase.from("profiles").upsert({
-          id: userId,
-          full_name: fullName.trim(),
-          email: email.trim(),
-          role: getRoleFromIntent(intent),
-          source: "sitguru_signup_page",
-          zip_code: zipCode.trim() || null,
-          updated_at: new Date().toISOString(),
-        });
+        if (shouldCreateGuruProfile(intent)) {
+          await ensureStarterGuruProfile({
+            userId,
+            fullName,
+            email,
+            zipCode,
+            source: "sitguru_guru_signup_page",
+          });
+        } else {
+          await supabase.from("profiles").upsert({
+            id: userId,
+            full_name: fullName.trim(),
+            email: email.trim(),
+            role: getRoleFromIntent(intent),
+            source: "sitguru_signup_page",
+            zip_code: zipCode.trim() || null,
+            updated_at: new Date().toISOString(),
+          });
+        }
       }
 
       setMessage(
-        "Account created. Please check your email to confirm your SitGuru account.",
+        shouldCreateGuruProfile(intent)
+          ? "Account created. Please check your email, then continue to your Guru profile setup."
+          : "Account created. Please check your email to confirm your SitGuru account.",
       );
     } catch (caughtError) {
       setError(
@@ -353,15 +466,25 @@ function SignupPageContent() {
       const userId = data.user?.id;
 
       if (userId) {
-        await supabase.from("profiles").upsert({
-          id: userId,
-          full_name: fullName.trim() || null,
-          phone: normalizedPhone,
-          role: getRoleFromIntent(intent),
-          source: "sitguru_phone_signup",
-          zip_code: zipCode.trim() || null,
-          updated_at: new Date().toISOString(),
-        });
+        if (shouldCreateGuruProfile(intent)) {
+          await ensureStarterGuruProfile({
+            userId,
+            fullName,
+            phone: normalizedPhone,
+            zipCode,
+            source: "sitguru_guru_phone_signup",
+          });
+        } else {
+          await supabase.from("profiles").upsert({
+            id: userId,
+            full_name: fullName.trim() || null,
+            phone: normalizedPhone,
+            role: getRoleFromIntent(intent),
+            source: "sitguru_phone_signup",
+            zip_code: zipCode.trim() || null,
+            updated_at: new Date().toISOString(),
+          });
+        }
       }
 
       router.push(redirectPath);
