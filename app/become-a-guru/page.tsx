@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-const guruApplyLink = "/signup?type=guru";
+const guruApplyLink = "/signup?role=guru&next=/guru/dashboard";
+const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
 
 const providerTypes = [
   "Pet sitters",
@@ -206,7 +207,7 @@ export default function BecomeAGuruPage() {
                   </Link>
 
                   <Link
-                    href="/guru/login"
+                    href={guruLoginLink}
                     className="inline-flex min-h-14 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-7 py-4 text-base font-black !text-slate-800 shadow-sm transition hover:bg-slate-50 sm:w-auto"
                   >
                     Guru Login
@@ -655,7 +656,7 @@ export default function BecomeAGuruPage() {
                 </Link>
 
                 <Link
-                  href="/guru/login"
+                  href={guruLoginLink}
                   className="inline-flex min-h-14 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-7 py-4 text-base font-black !text-slate-800 shadow-sm transition hover:bg-slate-50 sm:w-auto"
                 >
                   Guru Login
