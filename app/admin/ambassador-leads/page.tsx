@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Trash2,
   UserCheck,
   Users,
 } from "lucide-react";
@@ -595,6 +596,96 @@ async function createAmbassadorLead(formData: FormData) {
   redirect(`${adminRoutes.ambassadorLeads}?created=success`);
 }
 
+async function updateAmbassadorLead(formData: FormData) {
+  "use server";
+
+  const leadId = asString(formData.get("lead_id"));
+  const fullName = asString(formData.get("full_name"));
+  const email = asString(formData.get("email"));
+  const phone = formatPhoneForStorage(asString(formData.get("phone")));
+  const program = asString(formData.get("program"));
+  const source = asString(formData.get("source"));
+  const status = normalizeStatus(asString(formData.get("status")));
+  const zipCode = asString(formData.get("zip_code"));
+  const city = asString(formData.get("city"));
+  const state = asString(formData.get("state")).toUpperCase();
+  const county = asString(formData.get("county"));
+  const country = asString(formData.get("country")) || "United States";
+  const location = buildLocationDisplay({
+    city,
+    state,
+    zipCode,
+    county,
+    country,
+  });
+  const notes = asString(formData.get("notes"));
+  const resumeFileUrl = asString(formData.get("resume_file_url"));
+  const resumeFileName = asString(formData.get("resume_file_name"));
+  const coverLetterFileUrl = asString(formData.get("cover_letter_file_url"));
+  const coverLetterFileName = asString(formData.get("cover_letter_file_name"));
+  const otherDocumentFileUrl = asString(formData.get("other_document_file_url"));
+  const otherDocumentFileName = asString(formData.get("other_document_file_name"));
+
+  if (!leadId) {
+    redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
+  }
+
+  const { error } = await supabaseAdmin
+    .from("ambassador_leads")
+    .update({
+      full_name: fullName || null,
+      email: email || null,
+      phone: phone || null,
+      program,
+      source,
+      status,
+      location: location === "—" ? null : location,
+      zip_code: zipCode || null,
+      city: city || null,
+      state: state || null,
+      county: county || null,
+      country: country || null,
+      notes: notes || null,
+      resume_file_url: resumeFileUrl || null,
+      resume_file_name: resumeFileName || null,
+      cover_letter_file_url: coverLetterFileUrl || null,
+      cover_letter_file_name: coverLetterFileName || null,
+      other_document_file_url: otherDocumentFileUrl || null,
+      other_document_file_name: otherDocumentFileName || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", leadId);
+
+  if (error) {
+    console.warn("Unable to update ambassador lead:", error);
+    redirect(`${adminRoutes.ambassadorLeads}?updated=error`);
+  }
+
+  redirect(`${adminRoutes.ambassadorLeads}?updated=success`);
+}
+
+async function deleteAmbassadorLead(formData: FormData) {
+  "use server";
+
+  const leadId = asString(formData.get("lead_id"));
+
+  if (!leadId) {
+    redirect(`${adminRoutes.ambassadorLeads}?deleted=missing`);
+  }
+
+  const { error } = await supabaseAdmin
+    .from("ambassador_leads")
+    .delete()
+    .eq("id", leadId);
+
+  if (error) {
+    console.warn("Unable to delete ambassador lead:", error);
+    redirect(`${adminRoutes.ambassadorLeads}?deleted=error`);
+  }
+
+  redirect(`${adminRoutes.ambassadorLeads}?deleted=success`);
+}
+
 async function getAmbassadorLeadData() {
   const [
     ambassadorLeadsResult,
@@ -698,12 +789,18 @@ async function getAmbassadorLeadData() {
 
   const normalizedLeads = allLeads.map((lead) => ({
     raw: lead,
+    id: getText(lead, ["id"]),
     name: getDisplayName(lead),
     email: getEmail(lead),
     phone: getPhone(lead),
     program: getProgramLabel(lead),
     source: getSourceLabel(lead),
     status: getReadableStatus(lead),
+    zipCode: getZipCode(lead),
+    city: getCity(lead),
+    state: getState(lead),
+    county: getCounty(lead),
+    country: getCountry(lead) || "United States",
     location: getLocation(lead),
     notes: getNotes(lead),
     date: getDate(lead),
@@ -768,7 +865,136 @@ function getNotice(
     };
   }
 
+  const updated = searchParams?.updated;
+
+  if (updated === "success") {
+    return {
+      title: "Lead updated",
+      message: "The ambassador lead was updated successfully.",
+      tone: "success" as const,
+    };
+  }
+
+  if (updated === "error") {
+    return {
+      title: "Lead not updated",
+      message:
+        "The lead could not be updated. Confirm the ambassador_leads table has all current HR columns.",
+      tone: "warning" as const,
+    };
+  }
+
+  const deleted = searchParams?.deleted;
+
+  if (deleted === "success") {
+    return {
+      title: "Lead deleted",
+      message: "The ambassador lead was removed from the pipeline.",
+      tone: "success" as const,
+    };
+  }
+
+  if (deleted === "error") {
+    return {
+      title: "Lead not deleted",
+      message: "The lead could not be deleted from Supabase.",
+      tone: "warning" as const,
+    };
+  }
+
   return null;
+}
+
+
+function getSearchParamValue(
+  searchParams: Record<string, string | string[] | undefined> | undefined,
+  key: string,
+) {
+  const value = searchParams?.[key];
+
+  if (Array.isArray(value)) return value[0] || "";
+
+  return value || "";
+}
+
+function normalizeFilterValue(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function applyLeadFilters(
+  leads: Array<{
+    raw: AnyRow;
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    program: string;
+    source: string;
+    status: string;
+    zipCode: string;
+    city: string;
+    state: string;
+    county: string;
+    country: string;
+    location: string;
+    notes: string;
+    date: string | null;
+    lastContacted: string | null;
+    documents: {
+      resumeUrl: string;
+      resumeName: string;
+      coverLetterUrl: string;
+      coverLetterName: string;
+      otherDocumentUrl: string;
+      otherDocumentName: string;
+    };
+  }>,
+  filters: {
+    query: string;
+    program: string;
+    source: string;
+    status: string;
+    documents: string;
+  },
+) {
+  const query = normalizeFilterValue(filters.query);
+  const program = normalizeFilterValue(filters.program);
+  const source = normalizeFilterValue(filters.source);
+  const status = normalizeFilterValue(filters.status);
+  const documents = normalizeFilterValue(filters.documents);
+
+  return leads.filter((lead) => {
+    const searchable = [
+      lead.name,
+      lead.email,
+      lead.phone,
+      lead.program,
+      lead.source,
+      lead.status,
+      lead.city,
+      lead.state,
+      lead.county,
+      lead.country,
+      lead.location,
+      lead.notes,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    const hasDocument =
+      Boolean(lead.documents.resumeUrl) ||
+      Boolean(lead.documents.coverLetterUrl) ||
+      Boolean(lead.documents.otherDocumentUrl);
+
+    if (query && !searchable.includes(query)) return false;
+    if (program && normalizeFilterValue(lead.program) !== program) return false;
+    if (source && normalizeFilterValue(lead.source) !== source) return false;
+    if (status && normalizeFilterValue(lead.status) !== status) return false;
+    if (documents === "with_documents" && !hasDocument) return false;
+    if (documents === "missing_documents" && hasDocument) return false;
+
+    return true;
+  });
 }
 
 export default async function AmbassadorLeadsPage({
@@ -788,6 +1014,20 @@ export default async function AmbassadorLeadsPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const notice = getNotice(resolvedSearchParams);
   const data = await getAmbassadorLeadData();
+  const pipelineFilters = {
+    query: getSearchParamValue(resolvedSearchParams, "q"),
+    program: getSearchParamValue(resolvedSearchParams, "program"),
+    source: getSearchParamValue(resolvedSearchParams, "source"),
+    status: getSearchParamValue(resolvedSearchParams, "status"),
+    documents: getSearchParamValue(resolvedSearchParams, "documents"),
+  };
+  const filteredLeads = applyLeadFilters(data.leads, pipelineFilters);
+  const filteredMetrics = {
+    total: filteredLeads.length,
+    student: filteredLeads.filter((lead) => lead.program === "Student Hire").length,
+    community: filteredLeads.filter((lead) => lead.program === "Community Hire").length,
+    military: filteredLeads.filter((lead) => lead.program === "Military Hire").length,
+  };
 
   return (
     <div className="w-full min-w-0 space-y-5">
@@ -852,15 +1092,15 @@ export default async function AmbassadorLeadsPage({
         />
         <DataHealthTile
           label="Student Hire"
-          value={number(data.metrics.student)}
+          value={number(filteredMetrics.student)}
         />
         <DataHealthTile
           label="Community Hire"
-          value={number(data.metrics.community)}
+          value={number(filteredMetrics.community)}
         />
         <DataHealthTile
           label="Military Hire"
-          value={number(data.metrics.military)}
+          value={number(filteredMetrics.military)}
         />
         <DataHealthTile
           label="Recent 14 Days"
@@ -1143,12 +1383,11 @@ export default async function AmbassadorLeadsPage({
                 Save Lead
               </button>
 
-              <p className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-900">
-                Note: Saving requires a Supabase table named{" "}
-                <span className="font-black">ambassador_leads</span> with the
-                HR lead columns, including phone and location fields. The page
-                still displays existing ambassador data even before those fields
-                are created.
+              <p className="rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900">
+                HR intake is connected to the{" "}
+                <span className="font-black">ambassador_leads</span> table.
+                Save new leads here, then manage edits, documents, filters, and
+                status updates directly from the Lead Pipeline.
               </p>
 
               <AmbassadorLeadFormEnhancementScript />
@@ -1180,25 +1419,31 @@ export default async function AmbassadorLeadsPage({
               <ProgramMiniCard
                 title="Student Hire"
                 detail="Campus, school, and student outreach."
-                value={number(data.metrics.student)}
+                value={number(filteredMetrics.student)}
                 icon={<GraduationCap size={18} />}
               />
               <ProgramMiniCard
                 title="Community Hire"
                 detail="Neighborhood and local outreach."
-                value={number(data.metrics.community)}
+                value={number(filteredMetrics.community)}
                 icon={<Users size={18} />}
               />
               <ProgramMiniCard
                 title="Military Hire"
                 detail="Veterans, spouses, and service families."
-                value={number(data.metrics.military)}
+                value={number(filteredMetrics.military)}
                 icon={<ShieldCheck size={18} />}
               />
             </div>
 
+            <PipelineFilterPanel
+              filters={pipelineFilters}
+              resultCount={filteredMetrics.total}
+              totalCount={data.leads.length}
+            />
+
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1160px] text-left text-sm">
+              <table className="w-full min-w-[1320px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-[#edf3ee] text-xs font-black uppercase tracking-[0.12em] text-slate-500">
                     <th className="pb-3">Lead</th>
@@ -1209,16 +1454,15 @@ export default async function AmbassadorLeadsPage({
                     <th className="pb-3">Documents</th>
                     <th className="pb-3">Location</th>
                     <th className="pb-3">Date</th>
+                    <th className="pb-3">Actions</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {data.leads.length ? (
-                    data.leads.map((lead, index) => (
-                      <tr
-                        key={`${lead.name}-${lead.email}-${lead.date}-${index}`}
-                        className="border-b border-[#f1f5f2] align-top last:border-0"
-                      >
+                  {filteredLeads.length ? (
+                    filteredLeads.map((lead, index) => (
+                      <Fragment key={`${lead.id || lead.name}-${lead.email}-${lead.date}-${index}`}>
+                        <tr className="border-b border-[#f1f5f2] align-top">
                         <td className="py-4">
                           <div className="flex items-start gap-3">
                             <Avatar name={lead.name} />
@@ -1271,19 +1515,46 @@ export default async function AmbassadorLeadsPage({
                             {formatDate(lead.date)}
                           </span>
                         </td>
+
+                        <td className="py-4">
+                          <div className="flex flex-col gap-2">
+                            <a
+                              href={`#edit-lead-${lead.id || index}`}
+                              className="inline-flex items-center justify-center rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-100"
+                            >
+                              Edit
+                            </a>
+                            <form action={deleteAmbassadorLead}>
+                              <input type="hidden" name="lead_id" value={lead.id} />
+                              <button
+                                type="submit"
+                                className="inline-flex items-center justify-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 transition hover:bg-red-100"
+                              >
+                                <Trash2 size={12} />
+                                Delete
+                              </button>
+                            </form>
+                          </div>
+                        </td>
                       </tr>
+
+                      <tr id={`edit-lead-${lead.id || index}`} className="border-b border-[#f1f5f2]">
+                        <td colSpan={9} className="bg-[#fbfcf9] px-4 py-5">
+                          <PipelineEditForm lead={lead} />
+                        </td>
+                      </tr>
+                    </Fragment>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={8} className="py-10">
+                      <td colSpan={9} className="py-10">
                         <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-8 text-center">
                           <Search className="mx-auto mb-3 text-green-700" size={32} />
                           <h3 className="text-lg font-black text-green-950">
-                            No ambassador leads found yet
+                            No matching ambassador leads found
                           </h3>
                           <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-green-900/70">
-                            Once PA CareerLink applicants, ambassador signups, or
-                            manual leads are added, they will appear here.
+                            Adjust the pipeline filters or clear them to view all ambassador leads.
                           </p>
                         </div>
                       </td>
@@ -1615,6 +1886,353 @@ function LeadStatusBadge({ status }: { status: string }) {
   );
 }
 
+
+
+
+function PipelineFilterPanel({
+  filters,
+  resultCount,
+  totalCount,
+}: {
+  filters: {
+    query: string;
+    program: string;
+    source: string;
+    status: string;
+    documents: string;
+  };
+  resultCount: number;
+  totalCount: number;
+}) {
+  const hasFilters =
+    Boolean(filters.query) ||
+    Boolean(filters.program) ||
+    Boolean(filters.source) ||
+    Boolean(filters.status) ||
+    Boolean(filters.documents);
+
+  return (
+    <div className="mb-5 rounded-[24px] border border-green-100 bg-[#fbfcf9] p-4">
+      <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-600">
+            Pipeline filters
+          </h3>
+          <p className="mt-1 text-xs font-bold text-slate-500">
+            Showing {number(resultCount)} of {number(totalCount)} ambassador leads.
+          </p>
+        </div>
+
+        {hasFilters ? (
+          <Link
+            href={adminRoutes.ambassadorLeads}
+            className="inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-xs font-black text-green-800 shadow-sm ring-1 ring-green-100 transition hover:bg-green-50"
+          >
+            Clear filters
+          </Link>
+        ) : null}
+      </div>
+
+      <form action={adminRoutes.ambassadorLeads} className="grid gap-3 lg:grid-cols-6">
+        <label className="lg:col-span-2">
+          <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+            Search
+          </span>
+          <input
+            name="q"
+            defaultValue={filters.query}
+            placeholder="Name, email, phone, city, notes..."
+            className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+          />
+        </label>
+
+        <FilterSelect label="Program" name="program" value={filters.program}>
+          <option value="">All programs</option>
+          {programOrder.map((program) => (
+            <option key={program} value={program}>
+              {program}
+            </option>
+          ))}
+        </FilterSelect>
+
+        <FilterSelect label="Source" name="source" value={filters.source}>
+          <option value="">All sources</option>
+          {sourceOrder.map((source) => (
+            <option key={source} value={source}>
+              {source}
+            </option>
+          ))}
+        </FilterSelect>
+
+        <FilterSelect label="Status" name="status" value={filters.status}>
+          <option value="">All statuses</option>
+          {statusOrder.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </FilterSelect>
+
+        <FilterSelect label="Documents" name="documents" value={filters.documents}>
+          <option value="">All documents</option>
+          <option value="with_documents">With documents</option>
+          <option value="missing_documents">Missing documents</option>
+        </FilterSelect>
+
+        <div className="flex items-end lg:col-span-6">
+          <button
+            type="submit"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900 sm:w-auto"
+          >
+            <Search size={16} />
+            Apply Filters
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  name,
+  value,
+  children,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  children: ReactNode;
+}) {
+  return (
+    <label>
+      <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </span>
+      <select
+        name={name}
+        defaultValue={value}
+        className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+      >
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function PipelineEditForm({ lead }: { lead: any }) {
+  return (
+    <details className="rounded-[24px] border border-green-100 bg-white p-4">
+      <summary className="cursor-pointer text-sm font-black text-green-900">
+        Edit {lead.name}
+      </summary>
+
+      <form action={updateAmbassadorLead} className="mt-4 grid gap-4">
+        <input type="hidden" name="lead_id" value={lead.id} />
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <PipelineEditField label="Lead Name">
+            <input
+              name="full_name"
+              defaultValue={lead.name}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Email">
+            <input
+              name="email"
+              type="email"
+              defaultValue={lead.email}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Phone">
+            <input
+              name="phone"
+              defaultValue={lead.phone}
+              data-phone-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Status">
+            <select
+              name="status"
+              defaultValue={lead.status}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            >
+              {statusOrder.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </PipelineEditField>
+
+          <PipelineEditField label="Program">
+            <select
+              name="program"
+              defaultValue={lead.program}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            >
+              {programOrder.map((program) => (
+                <option key={program} value={program}>
+                  {program}
+                </option>
+              ))}
+            </select>
+          </PipelineEditField>
+
+          <PipelineEditField label="Source">
+            <select
+              name="source"
+              defaultValue={lead.source}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            >
+              {sourceOrder.map((source) => (
+                <option key={source} value={source}>
+                  {source}
+                </option>
+              ))}
+            </select>
+          </PipelineEditField>
+
+          <PipelineEditField label="ZIP Code">
+            <input
+              name="zip_code"
+              defaultValue={lead.zipCode}
+              data-zip-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="City">
+            <input
+              name="city"
+              defaultValue={lead.city}
+              data-city-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="State">
+            <input
+              name="state"
+              defaultValue={lead.state}
+              data-state-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="County">
+            <input
+              name="county"
+              defaultValue={lead.county}
+              data-county-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Country">
+            <input
+              name="country"
+              defaultValue={lead.country}
+              data-country-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+        </div>
+
+        <PipelineEditField label="Notes">
+          <textarea
+            name="notes"
+            defaultValue={lead.notes}
+            rows={3}
+            className="w-full resize-none rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold leading-6 text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+          />
+        </PipelineEditField>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <PipelineEditField label="Resume link">
+            <input
+              name="resume_file_url"
+              defaultValue={lead.documents.resumeUrl}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Cover letter link">
+            <input
+              name="cover_letter_file_url"
+              defaultValue={lead.documents.coverLetterUrl}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Other document link">
+            <input
+              name="other_document_file_url"
+              defaultValue={lead.documents.otherDocumentUrl}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Resume label">
+            <input
+              name="resume_file_name"
+              defaultValue={lead.documents.resumeName}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Cover letter label">
+            <input
+              name="cover_letter_file_name"
+              defaultValue={lead.documents.coverLetterName}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Other document label">
+            <input
+              name="other_document_file_name"
+              defaultValue={lead.documents.otherDocumentName}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
+          >
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </details>
+  );
+}
+
+function PipelineEditField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
 
 function DocumentButtonGroup({
   documents,
