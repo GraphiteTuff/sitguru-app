@@ -294,6 +294,70 @@ function getNotes(row: AnyRow) {
   );
 }
 
+function getDocumentUrl(row: AnyRow, keys: string[]) {
+  const value = getText(row, keys);
+
+  if (!value) return "";
+
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("/")
+  ) {
+    return value;
+  }
+
+  return "";
+}
+
+function getDocumentName(row: AnyRow, keys: string[], fallback: string) {
+  return getText(row, keys, fallback);
+}
+
+function getLeadDocuments(row: AnyRow) {
+  const resumeUrl = getDocumentUrl(row, [
+    "resume_file_url",
+    "resume_url",
+    "resume_link",
+    "resume",
+  ]);
+  const coverLetterUrl = getDocumentUrl(row, [
+    "cover_letter_file_url",
+    "cover_letter_url",
+    "cover_letter_link",
+    "cover_letter",
+  ]);
+  const otherDocumentUrl = getDocumentUrl(row, [
+    "other_document_file_url",
+    "other_document_url",
+    "supporting_document_url",
+    "supporting_documents_url",
+    "document_url",
+    "documents_url",
+  ]);
+
+  return {
+    resumeUrl,
+    resumeName: getDocumentName(
+      row,
+      ["resume_file_name", "resume_name"],
+      "Resume",
+    ),
+    coverLetterUrl,
+    coverLetterName: getDocumentName(
+      row,
+      ["cover_letter_file_name", "cover_letter_name"],
+      "Cover Letter",
+    ),
+    otherDocumentUrl,
+    otherDocumentName: getDocumentName(
+      row,
+      ["other_document_file_name", "other_document_name", "document_name"],
+      "Other Document",
+    ),
+  };
+}
+
 function getCombinedText(row: AnyRow) {
   return [
     getText(row, ["program", "program_name", "program_type"]),
@@ -488,6 +552,12 @@ async function createAmbassadorLead(formData: FormData) {
     country,
   });
   const notes = asString(formData.get("notes"));
+  const resumeFileUrl = asString(formData.get("resume_file_url"));
+  const resumeFileName = asString(formData.get("resume_file_name"));
+  const coverLetterFileUrl = asString(formData.get("cover_letter_file_url"));
+  const coverLetterFileName = asString(formData.get("cover_letter_file_name"));
+  const otherDocumentFileUrl = asString(formData.get("other_document_file_url"));
+  const otherDocumentFileName = asString(formData.get("other_document_file_name"));
 
   if (!fullName && !email && !phone) {
     redirect(`${adminRoutes.ambassadorLeads}?created=missing`);
@@ -507,6 +577,12 @@ async function createAmbassadorLead(formData: FormData) {
     county: county || null,
     country: country || null,
     notes: notes || null,
+    resume_file_url: resumeFileUrl || null,
+    resume_file_name: resumeFileName || null,
+    cover_letter_file_url: coverLetterFileUrl || null,
+    cover_letter_file_name: coverLetterFileName || null,
+    other_document_file_url: otherDocumentFileUrl || null,
+    other_document_file_name: otherDocumentFileName || null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
@@ -636,6 +712,7 @@ async function getAmbassadorLeadData() {
       asString(lead.contacted_at) ||
       asString(lead.updated_at) ||
       null,
+    documents: getLeadDocuments(lead),
   }));
 
   const metrics = {
@@ -991,6 +1068,73 @@ export default async function AmbassadorLeadsPage({
                 />
               </FormField>
 
+              <div className="rounded-[24px] border border-green-100 bg-green-50/70 p-4">
+                <div className="mb-3 flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
+                    <FileText size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-green-950">
+                      Applicant documents
+                    </h3>
+                    <p className="mt-1 text-xs font-bold leading-5 text-green-900/70">
+                      Paste secure resume, cover letter, or supporting document
+                      links now. PDF upload storage can be added next.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <FormField label="Resume link">
+                    <input
+                      name="resume_file_url"
+                      placeholder="https://..."
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Resume label">
+                    <input
+                      name="resume_file_name"
+                      placeholder="Resume"
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Cover letter link">
+                    <input
+                      name="cover_letter_file_url"
+                      placeholder="https://..."
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Cover letter label">
+                    <input
+                      name="cover_letter_file_name"
+                      placeholder="Cover Letter"
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Other document link">
+                    <input
+                      name="other_document_file_url"
+                      placeholder="https://..."
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Other document label">
+                    <input
+                      name="other_document_file_name"
+                      placeholder="References, portfolio, transcript, etc."
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
@@ -1054,7 +1198,7 @@ export default async function AmbassadorLeadsPage({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left text-sm">
+              <table className="w-full min-w-[1160px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-[#edf3ee] text-xs font-black uppercase tracking-[0.12em] text-slate-500">
                     <th className="pb-3">Lead</th>
@@ -1062,6 +1206,7 @@ export default async function AmbassadorLeadsPage({
                     <th className="pb-3">Source</th>
                     <th className="pb-3">Status</th>
                     <th className="pb-3">Contact</th>
+                    <th className="pb-3">Documents</th>
                     <th className="pb-3">Location</th>
                     <th className="pb-3">Date</th>
                   </tr>
@@ -1109,6 +1254,10 @@ export default async function AmbassadorLeadsPage({
                           </div>
                         </td>
 
+                        <td className="py-4">
+                          <DocumentButtonGroup documents={lead.documents} />
+                        </td>
+
                         <td className="py-4 font-bold text-slate-600">
                           <span className="inline-flex items-center gap-1.5">
                             <MapPin size={13} />
@@ -1126,7 +1275,7 @@ export default async function AmbassadorLeadsPage({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="py-10">
+                      <td colSpan={8} className="py-10">
                         <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-8 text-center">
                           <Search className="mx-auto mb-3 text-green-700" size={32} />
                           <h3 className="text-lg font-black text-green-950">
@@ -1463,6 +1612,65 @@ function LeadStatusBadge({ status }: { status: string }) {
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}>
       {status}
     </span>
+  );
+}
+
+
+function DocumentButtonGroup({
+  documents,
+}: {
+  documents: {
+    resumeUrl: string;
+    resumeName: string;
+    coverLetterUrl: string;
+    coverLetterName: string;
+    otherDocumentUrl: string;
+    otherDocumentName: string;
+  };
+}) {
+  const items = [
+    {
+      label: documents.resumeName || "Resume",
+      href: documents.resumeUrl,
+      shortLabel: "Resume",
+    },
+    {
+      label: documents.coverLetterName || "Cover Letter",
+      href: documents.coverLetterUrl,
+      shortLabel: "Cover",
+    },
+    {
+      label: documents.otherDocumentName || "Other Document",
+      href: documents.otherDocumentUrl,
+      shortLabel: "Docs",
+    },
+  ].filter((item) => item.href);
+
+  if (!items.length) {
+    return (
+      <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+        No documents
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex max-w-[260px] flex-wrap gap-2">
+      {items.map((item) => (
+        <Link
+          key={`${item.shortLabel}-${item.href}`}
+          href={item.href}
+          target="_blank"
+          rel="noreferrer"
+          title={item.label}
+          className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-100"
+        >
+          <FileText size={13} />
+          {item.shortLabel}
+          <ExternalLink size={11} />
+        </Link>
+      ))}
+    </div>
   );
 }
 
