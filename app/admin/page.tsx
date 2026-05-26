@@ -64,6 +64,7 @@ const adminRoutes = {
   referrals: "/admin/referrals",
   programs: "/admin/programs",
   hr: "/admin/hr",
+  ambassadorLeads: "/admin/ambassador-leads",
   partners: "/admin/partners",
   partnerApplications: "/admin/partners/applications",
   activePartners: "/admin/partners/active",
@@ -503,6 +504,7 @@ async function getAdminDashboardData() {
     ambassadorsResult,
     affiliatesResult,
     partnerCampaignsResult,
+    ambassadorLeadsResult,
   ] = await Promise.all([
     safeAdminQuery(
       supabaseAdmin.from("bookings").select("*").limit(1000),
@@ -612,6 +614,14 @@ async function getAdminDashboardData() {
       supabaseAdmin.from("partner_campaigns").select("*").limit(1000),
       "partner_campaigns",
     ),
+    safeAdminQuery(
+      supabaseAdmin
+        .from("ambassador_leads")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "ambassador_leads",
+    ),
   ]);
 
   const bookings = ((bookingsResult.data || []) as AnyRow[]).filter(Boolean);
@@ -637,6 +647,7 @@ async function getAdminDashboardData() {
   const ambassadors = ((ambassadorsResult.data || []) as AnyRow[]).filter(Boolean);
   const affiliates = ((affiliatesResult.data || []) as AnyRow[]).filter(Boolean);
   const partnerCampaigns = ((partnerCampaignsResult.data || []) as AnyRow[]).filter(Boolean);
+  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).filter(Boolean);
 
   const launchSignups = mergeRows(
     ((launchSignupsResult.data || []) as AnyRow[]).filter(Boolean),
@@ -970,11 +981,15 @@ async function getAdminDashboardData() {
   );
 
   const ambassadorRows = mergeRows(
+    ambassadorLeads,
     ambassadors,
     networkParticipants.filter((row) =>
       getParticipantType(row).includes("ambassador"),
     ),
   );
+
+  const pendingAmbassadorLeads = ambassadorLeads.filter(isPendingStatus);
+  const activeAmbassadorLeads = ambassadorLeads.filter(isActiveStatus);
 
   const affiliateRows = mergeRows(
     affiliates,
@@ -1058,18 +1073,21 @@ async function getAdminDashboardData() {
     topCustomers,
     recentMessages,
     hrMetrics: {
-      ambassadorLeads: ambassadorRows.length,
+      ambassadorLeads: ambassadorLeads.length,
       guruRecords: gurus.length,
-      pendingApplications: pendingApplications.length + pendingPartnerLeads.length,
+      pendingApplications:
+        pendingAmbassadorLeads.length +
+        pendingApplications.length +
+        pendingPartnerLeads.length,
       recentActivity:
         gurus.filter((row) => isWithinLastDays(getDate(row), 14)).length +
-        ambassadorRows.filter((row) => isWithinLastDays(getDate(row), 14)).length +
+        ambassadorLeads.filter((row) => isWithinLastDays(getDate(row), 14)).length +
         pendingApplications.filter((row) => isWithinLastDays(getDate(row), 14)).length,
     },
     networkMetrics: {
       activePrograms: activeNetworkPrograms,
       activeParticipants: activeNetworkParticipants.length,
-      applications: pendingApplications.length,
+      applications: pendingApplications.length + pendingAmbassadorLeads.length,
       activePartners: activePartnerRows.length,
       ambassadors: ambassadorRows.length,
       affiliates: affiliateRows.length,
@@ -1255,7 +1273,8 @@ export default async function AdminDashboardPage() {
           value={number(
             data.networkMetrics.activeParticipants +
               data.networkMetrics.referrals +
-              data.networkMetrics.clicks,
+              data.networkMetrics.clicks +
+              data.hrMetrics.ambassadorLeads,
           )}
         />
         <DataHealthTile label="Marketplace Mode" value="Free" />
@@ -1330,10 +1349,10 @@ export default async function AdminDashboardPage() {
                 detail="Main hiring command center"
               />
               <HrLinkRow
-                href={adminRoutes.hr}
+                href={adminRoutes.ambassadorLeads}
                 icon={<UserPlus size={18} />}
                 title="Ambassador Leads"
-                detail="PA CareerLink and program applicants"
+                detail="PA CareerLink, Indeed, and program applicants"
               />
               <HrLinkRow
                 href={adminRoutes.gurus}
