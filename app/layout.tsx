@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 import RouteShell from "@/components/RouteShell";
-import TawkToWidget from "@/components/TawkToWidget";
+import CrispWidget from "@/components/CrispWidget";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.sitguru.com"),
@@ -124,7 +124,7 @@ export default function RootLayout({
         />
 
         <RouteShell>{children}</RouteShell>
-        <TawkToWidget />
+        <CrispWidget />
       </body>
     </html>
   );
