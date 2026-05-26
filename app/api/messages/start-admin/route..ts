@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -36,6 +37,46 @@ function buildMessageThreadHref(conversationId: string) {
   return `/messages/${conversationId}`;
 }
 
+function getBaseUrl() {
+  const raw =
+    safeString(process.env.NEXT_PUBLIC_APP_URL) ||
+    safeString(process.env.NEXT_PUBLIC_SITE_URL) ||
+    "https://www.sitguru.com";
+
+  return raw.replace(/\/+$/, "");
+}
+
+function getSupportFromEmail() {
+  return (
+    safeString(process.env.SITGURU_SUPPORT_FROM) ||
+    safeString(process.env.RESEND_FROM_EMAIL) ||
+    "SitGuru <support@sitguru.com>"
+  );
+}
+
+function getSupportReplyToEmail() {
+  return (
+    safeString(process.env.RESEND_REPLY_TO_EMAIL) ||
+    safeString(process.env.SITGURU_SUPPORT_EMAIL) ||
+    "support@sitguru.com"
+  );
+}
+
+function getAdminAlertRecipients() {
+  const envRecipients = safeString(process.env.SITGURU_SUPPORT_EMAIL)
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  const fallbackRecipients = [
+    "jason@sitguru.com",
+    "nette@sitguru.com",
+    "support@sitguru.com",
+  ];
+
+  return Array.from(new Set([...envRecipients, ...fallbackRecipients]));
+}
+
 function buildConversationSubject(params: {
   petName: string | null;
   bookingId: string | null;
@@ -71,6 +112,134 @@ function buildPreviewText(params: {
   }
 
   return "Conversation started.";
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+async function sendAdminNewMessageEmail(params: {
+  conversationId: string;
+  customerDisplayName: string;
+  guruDisplayName: string;
+  customerEmail: string;
+  guruEmail: string;
+  subject: string;
+  messageBody: string;
+}) {
+  const apiKey = safeString(process.env.RESEND_API_KEY);
+
+  if (!apiKey) {
+    console.error("Message email alert skipped: RESEND_API_KEY is missing.");
+    return;
+  }
+
+  const recipients = getAdminAlertRecipients();
+
+  if (recipients.length === 0) {
+    console.error("Message email alert skipped: no admin recipients configured.");
+    return;
+  }
+
+  const resend = new Resend(apiKey);
+  const baseUrl = getBaseUrl();
+  const threadUrl = `${baseUrl}${buildMessageThreadHref(params.conversationId)}`;
+
+  const safeCustomerName = escapeHtml(params.customerDisplayName || "Pet Parent");
+  const safeGuruName = escapeHtml(params.guruDisplayName || "Guru");
+  const safeCustomerEmail = escapeHtml(params.customerEmail || "Not available");
+  const safeGuruEmail = escapeHtml(params.guruEmail || "Not available");
+  const safeSubject = escapeHtml(params.subject || "New SitGuru message");
+  const safeMessage = escapeHtml(params.messageBody || "").replaceAll("\n", "<br />");
+
+  try {
+    const result = await resend.emails.send({
+      from: getSupportFromEmail(),
+      to: recipients,
+      replyTo: getSupportReplyToEmail(),
+      subject: `New SitGuru message: ${params.customerDisplayName || "Pet Parent"}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; background: #f6fbf7; padding: 24px;">
+          <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 18px; overflow: hidden; border: 1px solid #dcefe2;">
+            <div style="background: #0f5132; color: #ffffff; padding: 22px 24px;">
+              <h1 style="margin: 0; font-size: 22px;">New SitGuru Message</h1>
+              <p style="margin: 8px 0 0; font-size: 14px; color: #d9f7e5;">
+                A new message was sent inside SitGuru.
+              </p>
+            </div>
+
+            <div style="padding: 24px;">
+              <p style="margin: 0 0 14px; color: #123524; font-size: 15px;">
+                <strong>Subject:</strong> ${safeSubject}
+              </p>
+
+              <div style="background: #f3faf5; border: 1px solid #dcefe2; border-radius: 14px; padding: 16px; margin: 18px 0;">
+                <p style="margin: 0 0 8px; color: #123524; font-size: 14px;">
+                  <strong>From:</strong> ${safeCustomerName}
+                </p>
+                <p style="margin: 0 0 8px; color: #123524; font-size: 14px;">
+                  <strong>Customer Email:</strong> ${safeCustomerEmail}
+                </p>
+                <p style="margin: 0 0 8px; color: #123524; font-size: 14px;">
+                  <strong>Guru:</strong> ${safeGuruName}
+                </p>
+                <p style="margin: 0; color: #123524; font-size: 14px;">
+                  <strong>Guru Email:</strong> ${safeGuruEmail}
+                </p>
+              </div>
+
+              <div style="margin: 18px 0;">
+                <p style="margin: 0 0 8px; color: #123524; font-size: 14px;">
+                  <strong>Message:</strong>
+                </p>
+                <div style="background: #ffffff; border-left: 4px solid #0f8f4f; padding: 14px 16px; color: #123524; font-size: 15px; line-height: 1.5;">
+                  ${safeMessage || "No message body provided."}
+                </div>
+              </div>
+
+              <p style="margin: 22px 0 0;">
+                <a href="${threadUrl}" style="display: inline-block; background: #0f8f4f; color: #ffffff; text-decoration: none; padding: 12px 18px; border-radius: 999px; font-weight: 700;">
+                  Open SitGuru Message
+                </a>
+              </p>
+
+              <p style="margin: 18px 0 0; color: #5f7468; font-size: 12px;">
+                Conversation ID: ${escapeHtml(params.conversationId)}
+              </p>
+            </div>
+          </div>
+        </div>
+      `,
+      text: [
+        "New SitGuru Message",
+        "",
+        `Subject: ${params.subject}`,
+        `From: ${params.customerDisplayName}`,
+        `Customer Email: ${params.customerEmail || "Not available"}`,
+        `Guru: ${params.guruDisplayName}`,
+        `Guru Email: ${params.guruEmail || "Not available"}`,
+        "",
+        "Message:",
+        params.messageBody,
+        "",
+        `Open message: ${threadUrl}`,
+      ].join("\n"),
+    });
+
+    if (result.error) {
+      console.error("Message email alert failed:", result.error);
+      return;
+    }
+
+    console.log("Message email alert sent:", result.data?.id ?? "sent");
+  } catch (error) {
+    console.error("Message email alert error:", error);
+  }
 }
 
 async function findGuruBySlugOrId(guruSlugOrId: string) {
@@ -259,7 +428,7 @@ async function insertInitialMessage(params: {
   initialMessage: string | null;
 }) {
   const body = safeString(params.initialMessage);
-  if (!body) return;
+  if (!body) return false;
 
   const nowIso = new Date().toISOString();
 
@@ -289,6 +458,8 @@ async function insertInitialMessage(params: {
   if (updateError) {
     console.error("Conversation preview update error:", updateError.message);
   }
+
+  return true;
 }
 
 async function createGuruNotification(params: {
@@ -394,8 +565,10 @@ export async function POST(req: NextRequest) {
 
     await ensureParticipants(conversationId, user.id, guru.user_id);
 
+    let initialMessageInserted = false;
+
     if (initialMessage && (justCreated || !existingConversation)) {
-      await insertInitialMessage({
+      initialMessageInserted = await insertInitialMessage({
         conversationId,
         senderUserId: user.id,
         recipientUserId: guru.user_id,
@@ -403,21 +576,37 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const customerDisplayName =
+      safeString(user.user_metadata?.full_name) ||
+      safeString(user.user_metadata?.name) ||
+      safeString(user.email) ||
+      "Customer";
+
+    const guruDisplayName =
+      safeString(guru.display_name) ||
+      safeString(guru.full_name) ||
+      safeString(guru.email) ||
+      "Guru";
+
     await createGuruNotification({
       guruUserId: guru.user_id,
       conversationId,
-      customerDisplayName:
-        safeString(user.user_metadata?.full_name) ||
-        safeString(user.user_metadata?.name) ||
-        safeString(user.email) ||
-        "Customer",
-      guruDisplayName:
-        safeString(guru.display_name) ||
-        safeString(guru.full_name) ||
-        safeString(guru.email) ||
-        "Guru",
+      customerDisplayName,
+      guruDisplayName,
       subject,
     });
+
+    if (initialMessageInserted) {
+      await sendAdminNewMessageEmail({
+        conversationId,
+        customerDisplayName,
+        guruDisplayName,
+        customerEmail: safeString(user.email),
+        guruEmail: safeString(guru.email),
+        subject,
+        messageBody: initialMessage,
+      });
+    }
 
     return NextResponse.json(
       {
