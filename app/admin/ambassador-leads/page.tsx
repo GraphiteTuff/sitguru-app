@@ -1750,19 +1750,29 @@ function AmbassadorLeadFormEnhancementScript() {
         }
       });
 
-      const zipInput = document.querySelector("[data-zip-input='true']");
-      const cityInput = document.querySelector("[data-city-input='true']");
-      const stateInput = document.querySelector("[data-state-input='true']");
-      const countyInput = document.querySelector("[data-county-input='true']");
-      const countryInput = document.querySelector("[data-country-input='true']");
-      const helper = document.querySelector("[data-location-helper='true']");
+      const findFieldGroup = (input) => {
+        return (
+          input.closest("form") ||
+          input.closest("details") ||
+          input.closest("section") ||
+          document
+        );
+      };
 
-      if (!zipInput) return;
+      const findPairedInput = (zipInput, selector) => {
+        const group = findFieldGroup(zipInput);
+        return group.querySelector(selector) || document.querySelector(selector);
+      };
 
-      let lastLookupZip = "";
-      let lookupTimer;
+      const findLocationHelper = (zipInput) => {
+        const group = findFieldGroup(zipInput);
+        return (
+          group.querySelector("[data-location-helper='true']") ||
+          document.querySelector("[data-location-helper='true']")
+        );
+      };
 
-      const setHelper = (message, tone = "green") => {
+      const setHelper = (helper, message, tone = "green") => {
         if (!helper) return;
 
         helper.textContent = message;
@@ -1774,20 +1784,37 @@ function AmbassadorLeadFormEnhancementScript() {
               : "rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900";
       };
 
-      const lookupZip = async () => {
+      const normalizeStateInput = (stateInput) => {
+        if (!stateInput || stateInput.dataset.stateFormatted === "true") return;
+
+        stateInput.dataset.stateFormatted = "true";
+        stateInput.addEventListener("input", () => {
+          stateInput.value = stateInput.value.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase();
+        });
+      };
+
+      const lookupZip = async (zipInput) => {
         const zip = zipInput.value.replace(/\\D/g, "").slice(0, 5);
         zipInput.value = zip;
 
-        if (zip.length !== 5 || zip === lastLookupZip) return;
+        if (zip.length !== 5) return;
 
-        lastLookupZip = zip;
-        setHelper("Looking up ZIP code details...");
+        const cityInput = findPairedInput(zipInput, "[data-city-input='true']");
+        const stateInput = findPairedInput(zipInput, "[data-state-input='true']");
+        const countyInput = findPairedInput(zipInput, "[data-county-input='true']");
+        const countryInput = findPairedInput(zipInput, "[data-country-input='true']");
+        const helper = findLocationHelper(zipInput);
+
+        if (zipInput.dataset.lastLookupZip === zip) return;
+
+        zipInput.dataset.lastLookupZip = zip;
+        setHelper(helper, "Looking up ZIP code details...");
 
         try {
           const response = await fetch("https://api.zippopotam.us/us/" + zip);
 
           if (!response.ok) {
-            setHelper("ZIP lookup did not find a match. You can enter the location manually.", "amber");
+            setHelper(helper, "ZIP lookup did not find a match. You can enter the location manually.", "amber");
             return;
           }
 
@@ -1795,7 +1822,7 @@ function AmbassadorLeadFormEnhancementScript() {
           const place = data.places?.[0];
 
           if (!place) {
-            setHelper("ZIP lookup did not find a city/state. You can enter the location manually.", "amber");
+            setHelper(helper, "ZIP lookup did not find a city/state. You can enter the location manually.", "amber");
             return;
           }
 
@@ -1805,50 +1832,86 @@ function AmbassadorLeadFormEnhancementScript() {
           const latitude = place.latitude;
           const longitude = place.longitude;
 
-          if (cityInput && !cityInput.value) cityInput.value = city;
-          if (stateInput && !stateInput.value) stateInput.value = state;
-          if (countryInput && !countryInput.value) countryInput.value = country;
+          if (cityInput) cityInput.value = city;
+          if (stateInput) stateInput.value = state;
+          if (countryInput) countryInput.value = country;
 
-          if (countyInput && latitude && longitude) {
-            try {
-              const countyResponse = await fetch(
-                "https://geo.fcc.gov/api/census/block/find?format=json&latitude=" +
-                  encodeURIComponent(latitude) +
-                  "&longitude=" +
-                  encodeURIComponent(longitude)
-              );
+          if (countyInput) {
+            countyInput.value = "";
 
-              if (countyResponse.ok) {
-                const countyData = await countyResponse.json();
-                const countyName = countyData?.County?.name || "";
+            if (latitude && longitude) {
+              try {
+                const countyResponse = await fetch(
+                  "https://geo.fcc.gov/api/census/block/find?format=json&latitude=" +
+                    encodeURIComponent(latitude) +
+                    "&longitude=" +
+                    encodeURIComponent(longitude)
+                );
 
-                if (countyName && !countyInput.value) {
-                  countyInput.value = countyName.replace(/ County$/i, "");
+                if (countyResponse.ok) {
+                  const countyData = await countyResponse.json();
+                  const countyName = countyData?.County?.name || "";
+
+                  if (countyName) {
+                    countyInput.value = countyName.replace(/ County$/i, "");
+                  }
                 }
+              } catch {
+                // County autofill is helpful, but city/state should still work without it.
               }
-            } catch {
-              // County autofill is helpful, but city/state should still work without it.
             }
           }
 
-          setHelper("Location auto-filled from ZIP. Please confirm city, state, county, and country before saving.");
+          setHelper(helper, "Location auto-filled from ZIP. Please confirm city, state, county, and country before saving.");
         } catch {
-          setHelper("ZIP lookup is temporarily unavailable. You can enter the location manually.", "amber");
+          setHelper(helper, "ZIP lookup is temporarily unavailable. You can enter the location manually.", "amber");
         }
       };
 
-      zipInput.addEventListener("input", () => {
-        clearTimeout(lookupTimer);
-        lookupTimer = setTimeout(lookupZip, 350);
-      });
+      const applyZipLookup = (zipInput) => {
+        if (!zipInput || zipInput.dataset.zipLookupBound === "true") return;
 
-      zipInput.addEventListener("blur", lookupZip);
+        zipInput.dataset.zipLookupBound = "true";
+        let lookupTimer;
 
-      if (stateInput) {
-        stateInput.addEventListener("input", () => {
-          stateInput.value = stateInput.value.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase();
+        zipInput.addEventListener("input", () => {
+          zipInput.value = zipInput.value.replace(/\\D/g, "").slice(0, 5);
+          zipInput.dataset.lastLookupZip = "";
+
+          clearTimeout(lookupTimer);
+          lookupTimer = window.setTimeout(() => lookupZip(zipInput), 350);
         });
-      }
+
+        zipInput.addEventListener("paste", () => {
+          window.setTimeout(() => {
+            zipInput.value = zipInput.value.replace(/\\D/g, "").slice(0, 5);
+            zipInput.dataset.lastLookupZip = "";
+            lookupZip(zipInput);
+          }, 0);
+        });
+
+        zipInput.addEventListener("blur", () => lookupZip(zipInput));
+      };
+
+      document
+        .querySelectorAll("[data-zip-input='true']")
+        .forEach(applyZipLookup);
+
+      document
+        .querySelectorAll("[data-state-input='true']")
+        .forEach(normalizeStateInput);
+
+      document.addEventListener("input", (event) => {
+        const input = event.target;
+
+        if (input && input.matches && input.matches("[data-zip-input='true']")) {
+          applyZipLookup(input);
+        }
+
+        if (input && input.matches && input.matches("[data-state-input='true']")) {
+          normalizeStateInput(input);
+        }
+      });
     })();
   `;
 
