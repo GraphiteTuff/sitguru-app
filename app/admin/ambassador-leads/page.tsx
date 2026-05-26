@@ -222,13 +222,68 @@ function getPhone(row: AnyRow) {
   );
 }
 
+function getZipCode(row: AnyRow) {
+  return getText(row, ["zip_code", "postal_code", "zip", "postcode"], "");
+}
+
+function getCity(row: AnyRow) {
+  return getText(row, ["city", "service_city", "location_city"], "");
+}
+
+function getState(row: AnyRow) {
+  return getText(row, ["state", "service_state", "location_state"], "");
+}
+
+function getCounty(row: AnyRow) {
+  return getText(row, ["county", "service_county", "location_county"], "");
+}
+
+function getCountry(row: AnyRow) {
+  return getText(row, ["country", "service_country", "location_country"], "");
+}
+
+function buildLocationDisplay({
+  city,
+  state,
+  zipCode,
+  county,
+  country,
+  fallback,
+}: {
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  county?: string;
+  country?: string;
+  fallback?: string;
+}) {
+  const cityStateZip = [city, state].filter(Boolean).join(", ");
+  const primary = [cityStateZip, zipCode].filter(Boolean).join(" ");
+  const secondary = [county, country].filter(Boolean).join(", ");
+
+  if (primary && secondary) return `${primary} • ${secondary}`;
+  if (primary) return primary;
+  if (secondary) return secondary;
+
+  return fallback || "—";
+}
+
 function getLocation(row: AnyRow) {
-  const city = getText(row, ["city", "service_city", "location_city"]);
-  const state = getText(row, ["state", "service_state", "location_state"]);
+  const city = getCity(row);
+  const state = getState(row);
+  const zipCode = getZipCode(row);
+  const county = getCounty(row);
+  const country = getCountry(row);
   const location = getText(row, ["location", "market", "area"]);
 
-  if (city || state) return [city, state].filter(Boolean).join(", ");
-  return location || "—";
+  return buildLocationDisplay({
+    city,
+    state,
+    zipCode,
+    county,
+    country,
+    fallback: location,
+  });
 }
 
 function getNotes(row: AnyRow) {
@@ -401,16 +456,37 @@ function mergeRows(...groups: AnyRow[][]) {
   return merged;
 }
 
+function formatPhoneForStorage(value: string) {
+  const digits = value.replace(/\D/g, "").slice(-10);
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  return value;
+}
+
 async function createAmbassadorLead(formData: FormData) {
   "use server";
 
   const fullName = asString(formData.get("full_name"));
   const email = asString(formData.get("email"));
-  const phone = asString(formData.get("phone"));
+  const phone = formatPhoneForStorage(asString(formData.get("phone")));
   const program = asString(formData.get("program"));
   const source = asString(formData.get("source"));
   const status = normalizeStatus(asString(formData.get("status")));
-  const location = asString(formData.get("location"));
+  const zipCode = asString(formData.get("zip_code"));
+  const city = asString(formData.get("city"));
+  const state = asString(formData.get("state")).toUpperCase();
+  const county = asString(formData.get("county"));
+  const country = asString(formData.get("country")) || "United States";
+  const location = buildLocationDisplay({
+    city,
+    state,
+    zipCode,
+    county,
+    country,
+  });
   const notes = asString(formData.get("notes"));
 
   if (!fullName && !email && !phone) {
@@ -424,7 +500,12 @@ async function createAmbassadorLead(formData: FormData) {
     program,
     source,
     status,
-    location: location || null,
+    location: location === "—" ? null : location,
+    zip_code: zipCode || null,
+    city: city || null,
+    state: state || null,
+    county: county || null,
+    country: country || null,
     notes: notes || null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -785,7 +866,12 @@ export default async function AmbassadorLeadsPage({
                 <FormField label="Phone">
                   <input
                     name="phone"
-                    placeholder="Phone number"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="(XXX) XXX-XXXX"
+                    data-phone-input="true"
+                    maxLength={14}
                     className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
                   />
                 </FormField>
@@ -830,14 +916,71 @@ export default async function AmbassadorLeadsPage({
                   </select>
                 </FormField>
 
-                <FormField label="Location">
+                <FormField label="ZIP code">
                   <input
-                    name="location"
-                    placeholder="City, state or school"
+                    name="zip_code"
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    placeholder="12345"
+                    data-zip-input="true"
+                    maxLength={10}
                     className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
                   />
                 </FormField>
               </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="City">
+                  <input
+                    name="city"
+                    autoComplete="address-level2"
+                    placeholder="City"
+                    data-city-input="true"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+
+                <FormField label="State">
+                  <input
+                    name="state"
+                    autoComplete="address-level1"
+                    placeholder="State"
+                    data-state-input="true"
+                    maxLength={2}
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold uppercase text-slate-900 outline-none transition placeholder:normal-case placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="County">
+                  <input
+                    name="county"
+                    placeholder="County"
+                    data-county-input="true"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+
+                <FormField label="Country">
+                  <input
+                    name="country"
+                    autoComplete="country-name"
+                    placeholder="United States"
+                    defaultValue="United States"
+                    data-country-input="true"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+              </div>
+
+              <p
+                data-location-helper="true"
+                className="rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900"
+              >
+                Enter a ZIP code to auto-fill city, state, county, and country.
+                You can still edit any location field before saving.
+              </p>
 
               <FormField label="Notes">
                 <textarea
@@ -858,10 +1001,13 @@ export default async function AmbassadorLeadsPage({
 
               <p className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-900">
                 Note: Saving requires a Supabase table named{" "}
-                <span className="font-black">ambassador_leads</span>. The page
-                still displays existing ambassador data even before that table is
-                created.
+                <span className="font-black">ambassador_leads</span> with the
+                HR lead columns, including phone and location fields. The page
+                still displays existing ambassador data even before those fields
+                are created.
               </p>
+
+              <AmbassadorLeadFormEnhancementScript />
             </form>
           </DashboardCard>
         </div>
@@ -1034,6 +1180,135 @@ export default async function AmbassadorLeadsPage({
       </section>
     </div>
   );
+}
+
+function AmbassadorLeadFormEnhancementScript() {
+  const script = `
+    (() => {
+      const formatPhone = (value) => {
+        const digits = value.replace(/\\D/g, "").slice(0, 10);
+
+        if (digits.length <= 3) return digits;
+        if (digits.length <= 6) return "(" + digits.slice(0, 3) + ") " + digits.slice(3);
+
+        return "(" + digits.slice(0, 3) + ") " + digits.slice(3, 6) + "-" + digits.slice(6);
+      };
+
+      const phoneInputs = document.querySelectorAll("[data-phone-input='true']");
+
+      phoneInputs.forEach((input) => {
+        input.addEventListener("input", () => {
+          input.value = formatPhone(input.value);
+        });
+
+        input.addEventListener("blur", () => {
+          input.value = formatPhone(input.value);
+        });
+      });
+
+      const zipInput = document.querySelector("[data-zip-input='true']");
+      const cityInput = document.querySelector("[data-city-input='true']");
+      const stateInput = document.querySelector("[data-state-input='true']");
+      const countyInput = document.querySelector("[data-county-input='true']");
+      const countryInput = document.querySelector("[data-country-input='true']");
+      const helper = document.querySelector("[data-location-helper='true']");
+
+      if (!zipInput) return;
+
+      let lastLookupZip = "";
+      let lookupTimer;
+
+      const setHelper = (message, tone = "green") => {
+        if (!helper) return;
+
+        helper.textContent = message;
+        helper.className =
+          tone === "amber"
+            ? "rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-900"
+            : tone === "red"
+              ? "rounded-2xl bg-red-50 px-4 py-3 text-xs font-bold leading-5 text-red-900"
+              : "rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900";
+      };
+
+      const lookupZip = async () => {
+        const zip = zipInput.value.replace(/\\D/g, "").slice(0, 5);
+        zipInput.value = zip;
+
+        if (zip.length !== 5 || zip === lastLookupZip) return;
+
+        lastLookupZip = zip;
+        setHelper("Looking up ZIP code details...");
+
+        try {
+          const response = await fetch("https://api.zippopotam.us/us/" + zip);
+
+          if (!response.ok) {
+            setHelper("ZIP lookup did not find a match. You can enter the location manually.", "amber");
+            return;
+          }
+
+          const data = await response.json();
+          const place = data.places?.[0];
+
+          if (!place) {
+            setHelper("ZIP lookup did not find a city/state. You can enter the location manually.", "amber");
+            return;
+          }
+
+          const city = place["place name"] || "";
+          const state = place["state abbreviation"] || "";
+          const country = data.country || "United States";
+          const latitude = place.latitude;
+          const longitude = place.longitude;
+
+          if (cityInput && !cityInput.value) cityInput.value = city;
+          if (stateInput && !stateInput.value) stateInput.value = state;
+          if (countryInput && !countryInput.value) countryInput.value = country;
+
+          if (countyInput && latitude && longitude) {
+            try {
+              const countyResponse = await fetch(
+                "https://geo.fcc.gov/api/census/block/find?format=json&latitude=" +
+                  encodeURIComponent(latitude) +
+                  "&longitude=" +
+                  encodeURIComponent(longitude)
+              );
+
+              if (countyResponse.ok) {
+                const countyData = await countyResponse.json();
+                const countyName = countyData?.County?.name || "";
+
+                if (countyName && !countyInput.value) {
+                  countyInput.value = countyName.replace(/ County$/i, "");
+                }
+              }
+            } catch {
+              // County autofill is helpful, but city/state should still work without it.
+            }
+          }
+
+          setHelper("Location auto-filled from ZIP. Please confirm city, state, county, and country before saving.");
+        } catch {
+          setHelper("ZIP lookup is temporarily unavailable. You can enter the location manually.", "amber");
+        }
+      };
+
+      zipInput.addEventListener("input", () => {
+        clearTimeout(lookupTimer);
+        lookupTimer = setTimeout(lookupZip, 350);
+      });
+
+      zipInput.addEventListener("blur", lookupZip);
+
+      if (stateInput) {
+        stateInput.addEventListener("input", () => {
+          stateInput.value = stateInput.value.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase();
+        });
+      }
+    })();
+  `;
+
+  return <script dangerouslySetInnerHTML={{ __html: script }} />;
 }
 
 function NoticeCard({
