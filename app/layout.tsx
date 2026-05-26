@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 import RouteShell from "@/components/RouteShell";
+import TawkToWidget from "@/components/TawkToWidget";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.sitguru.com"),
@@ -33,7 +34,9 @@ export const metadata: Metadata = {
   icons: {
     icon: [{ url: "/favicon.ico", type: "image/x-icon" }],
     shortcut: [{ url: "/favicon.ico", type: "image/x-icon" }],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   openGraph: {
     title: "SitGuru | Trusted Pet Care. Simplified.",
@@ -121,6 +124,7 @@ export default function RootLayout({
         />
 
         <RouteShell>{children}</RouteShell>
+        <TawkToWidget />
       </body>
     </html>
   );
