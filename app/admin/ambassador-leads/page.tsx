@@ -1550,6 +1550,7 @@ export default async function AmbassadorLeadsPage({
                               <p className="mt-1 line-clamp-2 max-w-[260px] text-xs font-semibold leading-5 text-slate-500">
                                 {lead.notes}
                               </p>
+                              <PipelineProgressFlow status={lead.status} />
                             </div>
                           </div>
                         </td>
@@ -2070,6 +2071,64 @@ function LeadStatusBadge({ status }: { status: string }) {
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}>
       {status}
     </span>
+  );
+}
+
+
+
+
+function PipelineProgressFlow({ status }: { status: string }) {
+  const stages = ["New", "Contacted", "Interested", "Signed Up", "Approved"];
+  const currentIndex = stages.indexOf(status);
+  const isClosed = status === "Not Moving Forward";
+
+  if (isClosed) {
+    return (
+      <div className="mt-3 max-w-[360px] rounded-2xl border border-red-100 bg-red-50 p-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {stages.map((stage) => (
+            <span
+              key={stage}
+              className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-400"
+            >
+              {stage}
+            </span>
+          ))}
+          <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">
+            Not Moving
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 max-w-[380px] rounded-2xl border border-green-100 bg-[#fbfcf9] p-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {stages.map((stage, index) => {
+          const isComplete = currentIndex >= 0 && index < currentIndex;
+          const isCurrent = currentIndex === index;
+          const isFuture = currentIndex === -1 || index > currentIndex;
+
+          return (
+            <span
+              key={stage}
+              className={`rounded-full px-2 py-1 text-[10px] font-black ${
+                isComplete
+                  ? "bg-green-600 text-white"
+                  : isCurrent
+                    ? "bg-amber-100 text-amber-900 ring-1 ring-amber-200"
+                    : isFuture
+                      ? "bg-slate-100 text-slate-500"
+                      : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              {stage}
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
