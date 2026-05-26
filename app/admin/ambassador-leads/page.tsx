@@ -322,15 +322,7 @@ function getDocumentUrl(row: AnyRow, keys: string[]) {
 
   if (!value) return "";
 
-  if (
-    value.startsWith("http://") ||
-    value.startsWith("https://") ||
-    value.startsWith("/")
-  ) {
-    return value;
-  }
-
-  return "";
+  return value;
 }
 
 function getDocumentName(row: AnyRow, keys: string[], fallback: string) {
@@ -1403,17 +1395,17 @@ export default async function AmbassadorLeadsPage({
                       Applicant documents
                     </h3>
                     <p className="mt-1 text-xs font-bold leading-5 text-green-900/70">
-                      Paste secure resume, cover letter, or supporting document
-                      links now. PDF upload storage can be added next.
+                      Paste a private Supabase Storage path or secure document
+                      link. Resume buttons open through the admin-only viewer.
                     </p>
                   </div>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
-                  <FormField label="Resume link">
+                  <FormField label="Resume path or link">
                     <input
                       name="resume_file_url"
-                      placeholder="https://..."
+                      placeholder="student-hire/indeed/resume.pdf"
                       className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
                     />
                   </FormField>
@@ -1584,7 +1576,7 @@ export default async function AmbassadorLeadsPage({
                         </td>
 
                         <td className="py-4">
-                          <DocumentButtonGroup documents={lead.documents} />
+                          <DocumentButtonGroup leadId={lead.id} documents={lead.documents} />
                         </td>
 
                         <td className="py-4 font-bold text-slate-600">
@@ -2287,10 +2279,11 @@ function PipelineEditForm({ lead }: { lead: any }) {
         </PipelineEditField>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <PipelineEditField label="Resume link">
+          <PipelineEditField label="Resume path or link">
             <input
               name="resume_file_url"
               defaultValue={lead.documents.resumeUrl}
+              placeholder="student-hire/indeed/resume.pdf"
               className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
             />
           </PipelineEditField>
@@ -2367,8 +2360,10 @@ function PipelineEditField({
 }
 
 function DocumentButtonGroup({
+  leadId,
   documents,
 }: {
+  leadId: string;
   documents: {
     resumeUrl: string;
     resumeName: string;
@@ -2381,18 +2376,24 @@ function DocumentButtonGroup({
   const items = [
     {
       label: documents.resumeName || "Resume",
-      href: documents.resumeUrl,
+      href:
+        documents.resumeUrl && leadId
+          ? `/admin/ambassador-leads/${leadId}/resume`
+          : documents.resumeUrl,
       shortLabel: "Resume",
+      secure: Boolean(documents.resumeUrl && leadId),
     },
     {
       label: documents.coverLetterName || "Cover Letter",
       href: documents.coverLetterUrl,
       shortLabel: "Cover",
+      secure: false,
     },
     {
       label: documents.otherDocumentName || "Other Document",
       href: documents.otherDocumentUrl,
       shortLabel: "Docs",
+      secure: false,
     },
   ].filter((item) => item.href);
 
@@ -2412,7 +2413,7 @@ function DocumentButtonGroup({
           href={item.href}
           target="_blank"
           rel="noreferrer"
-          title={item.label}
+          title={item.secure ? `${item.label} opens through secure admin viewer` : item.label}
           className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-100"
         >
           <FileText size={13} />
