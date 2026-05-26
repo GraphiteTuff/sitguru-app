@@ -60,6 +60,7 @@ function normalizeRole(value?: string | null) {
   const role = String(value || "").trim().toLowerCase();
 
   if (role === "provider" || role === "sitter") return "guru";
+
   if (role === "pet_parent" || role === "pet parent" || role === "client") {
     return "customer";
   }
@@ -500,7 +501,20 @@ async function sendEmailAlert({
     process.env.SITGURU_ALERT_FROM_EMAIL ||
     "SitGuru Alerts <support@sitguru.com>";
 
-  if (!resendApiKey || !to) return;
+  const recipients = to
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  if (!resendApiKey) {
+    console.warn("SitGuru message email alert skipped: RESEND_API_KEY missing.");
+    return;
+  }
+
+  if (recipients.length === 0) {
+    console.warn("SitGuru message email alert skipped: no recipients configured.");
+    return;
+  }
 
   try {
     const response = await fetch("https://api.resend.com/emails", {
@@ -511,15 +525,23 @@ async function sendEmailAlert({
       },
       body: JSON.stringify({
         from,
-        to,
+        to: recipients,
         subject,
         text,
       }),
     });
 
+    const responseText = await response.text();
+
     if (!response.ok) {
-      console.warn("SitGuru message email alert failed:", await response.text());
+      console.warn("SitGuru message email alert failed:", responseText);
+      return;
     }
+
+    console.log("SitGuru message email alert sent:", {
+      recipients,
+      response: responseText,
+    });
   } catch (error) {
     console.warn("SitGuru message email alert error:", error);
   }
@@ -531,7 +553,25 @@ async function sendSmsAlert({ to, body }: { to: string; body: string }) {
   const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
   const fromPhone = process.env.TWILIO_PHONE_NUMBER;
 
-  if (!accountSid || !authToken || !to || (!messagingServiceSid && !fromPhone)) {
+  if (!to) {
+    console.warn("SitGuru message SMS alert skipped: SITGURU_SUPPORT_SMS_TO missing.");
+    return;
+  }
+
+  if (!accountSid) {
+    console.warn("SitGuru message SMS alert skipped: TWILIO_ACCOUNT_SID missing.");
+    return;
+  }
+
+  if (!authToken) {
+    console.warn("SitGuru message SMS alert skipped: TWILIO_AUTH_TOKEN missing.");
+    return;
+  }
+
+  if (!messagingServiceSid && !fromPhone) {
+    console.warn(
+      "SitGuru message SMS alert skipped: TWILIO_MESSAGING_SERVICE_SID or TWILIO_PHONE_NUMBER missing.",
+    );
     return;
   }
 
@@ -559,9 +599,17 @@ async function sendSmsAlert({ to, body }: { to: string; body: string }) {
       },
     );
 
+    const responseText = await response.text();
+
     if (!response.ok) {
-      console.warn("SitGuru message SMS alert failed:", await response.text());
+      console.warn("SitGuru message SMS alert failed:", responseText);
+      return;
     }
+
+    console.log("SitGuru message SMS alert sent:", {
+      to,
+      response: responseText,
+    });
   } catch (error) {
     console.warn("SitGuru message SMS alert error:", error);
   }
@@ -584,10 +632,20 @@ async function notifySupportOfNewMessage({
   body: string;
   conversationId: string;
 }) {
-  if (!shouldAlertSupport({ senderRole, recipientRole })) return;
+  if (!shouldAlertSupport({ senderRole, recipientRole })) {
+    console.log("SitGuru message alert skipped: alert condition not met.", {
+      senderRole,
+      recipientRole,
+      conversationId,
+    });
+    return;
+  }
 
-  const supportEmail = process.env.SITGURU_SUPPORT_EMAIL || "support@sitguru.com";
+  const supportEmail =
+    process.env.SITGURU_SUPPORT_EMAIL ||
+    "jason@sitguru.com,nette@sitguru.com,support@sitguru.com";
   const supportSmsTo = process.env.SITGURU_SUPPORT_SMS_TO || "";
+
   const alert = buildMessageAlertText({
     sender,
     recipient,
@@ -596,7 +654,15 @@ async function notifySupportOfNewMessage({
     conversationId,
   });
 
-  await Promise.allSettled([
+  console.log("SitGuru message alert starting:", {
+    supportEmail,
+    hasSupportSmsTo: Boolean(supportSmsTo),
+    senderRole,
+    recipientRole,
+    conversationId,
+  });
+
+  const results = await Promise.allSettled([
     sendEmailAlert({
       to: supportEmail,
       subject: alert.subject,
@@ -607,6 +673,11 @@ async function notifySupportOfNewMessage({
       body: alert.sms,
     }),
   ]);
+
+  console.log("SitGuru message alert finished:", {
+    conversationId,
+    results: results.map((result) => result.status),
+  });
 }
 
 export async function GET() {
@@ -615,7 +686,7 @@ export async function GET() {
       ok: true,
       route: "/api/messages/send",
       message:
-        "Customer/Guru message send API route is active with snapshot preservation and support alerts.",
+        "Customer/Guru message send API route is active with snapshot preservation, multi-recipient email alerts, SMS alerts, and alert diagnostics.",
     },
     { status: 200 },
   );
