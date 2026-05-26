@@ -179,6 +179,28 @@ function normalizeStatus(status: string) {
   return "new";
 }
 
+const deletableLeadTables = [
+  "ambassador_leads",
+  "ambassadors",
+  "partner_applications",
+  "network_partner_leads",
+  "network_program_participants",
+  "launch_signups",
+  "launch_waitlist",
+  "program_applications",
+] as const;
+
+function isDeletableLeadTable(value: string): value is (typeof deletableLeadTables)[number] {
+  return deletableLeadTables.includes(value as (typeof deletableLeadTables)[number]);
+}
+
+function withSourceTable(row: AnyRow, sourceTable: (typeof deletableLeadTables)[number]) {
+  return {
+    ...row,
+    __source_table: sourceTable,
+  };
+}
+
 function getDisplayName(row: AnyRow, fallback = "Ambassador Lead") {
   const firstName = getText(row, ["first_name", "firstName"]);
   const lastName = getText(row, ["last_name", "lastName"]);
@@ -668,18 +690,57 @@ async function deleteAmbassadorLead(formData: FormData) {
   "use server";
 
   const leadId = asString(formData.get("lead_id"));
+  const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
+  const leadName = asString(formData.get("lead_name"));
 
-  if (!leadId) {
+  if (!leadId || !isDeletableLeadTable(sourceTable)) {
     redirect(`${adminRoutes.ambassadorLeads}?deleted=missing`);
   }
 
-  const { error } = await supabaseAdmin
-    .from("ambassador_leads")
+  const { data: existingLead, error: fetchError } = await supabaseAdmin
+    .from(sourceTable)
+    .select("*")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (fetchError || !existingLead) {
+    console.warn("Unable to find ambassador lead before archive:", fetchError);
+    redirect(`${adminRoutes.ambassadorLeads}?deleted=error`);
+  }
+
+  const archivedAt = new Date().toISOString();
+
+  const { error: archiveError } = await supabaseAdmin
+    .from("ambassador_leads_archive")
+    .insert({
+      source_table: sourceTable,
+      source_id: leadId,
+      full_name: getDisplayName(existingLead as AnyRow, leadName || "Ambassador Lead"),
+      email: getEmail(existingLead as AnyRow),
+      phone: getPhone(existingLead as AnyRow),
+      program: getProgramLabel(existingLead as AnyRow),
+      source: getSourceLabel(existingLead as AnyRow),
+      status: getReadableStatus(existingLead as AnyRow),
+      location: getLocation(existingLead as AnyRow),
+      notes: getNotes(existingLead as AnyRow),
+      archived_payload: existingLead,
+      archived_reason: "Deleted from Ambassador Leads pipeline",
+      archived_at: archivedAt,
+      created_at: archivedAt,
+    });
+
+  if (archiveError) {
+    console.warn("Unable to archive ambassador lead before delete:", archiveError);
+    redirect(`${adminRoutes.ambassadorLeads}?deleted=archive_error`);
+  }
+
+  const { error: deleteError } = await supabaseAdmin
+    .from(sourceTable)
     .delete()
     .eq("id", leadId);
 
-  if (error) {
-    console.warn("Unable to delete ambassador lead:", error);
+  if (deleteError) {
+    console.warn("Unable to delete ambassador lead after archive:", deleteError);
     redirect(`${adminRoutes.ambassadorLeads}?deleted=error`);
   }
 
@@ -773,14 +834,26 @@ async function getAmbassadorLeadData() {
   const programApplications = ((programApplicationsResult.data || []) as AnyRow[]).filter(Boolean);
 
   const allLeads = mergeRows(
-    ambassadorLeads,
-    ambassadors,
-    partnerApplications.filter(isAmbassadorLead),
-    networkPartnerLeads.filter(isAmbassadorLead),
-    networkParticipants.filter(isAmbassadorLead),
-    launchSignups.filter(isAmbassadorLead),
-    launchWaitlist.filter(isAmbassadorLead),
-    programApplications.filter(isAmbassadorLead),
+    ambassadorLeads.map((row) => withSourceTable(row, "ambassador_leads")),
+    ambassadors.map((row) => withSourceTable(row, "ambassadors")),
+    partnerApplications
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "partner_applications")),
+    networkPartnerLeads
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "network_partner_leads")),
+    networkParticipants
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "network_program_participants")),
+    launchSignups
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "launch_signups")),
+    launchWaitlist
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "launch_waitlist")),
+    programApplications
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "program_applications")),
   ).sort((a, b) => {
     const dateA = new Date(getDate(a) || 0).getTime();
     const dateB = new Date(getDate(b) || 0).getTime();
@@ -790,6 +863,7 @@ async function getAmbassadorLeadData() {
   const normalizedLeads = allLeads.map((lead) => ({
     raw: lead,
     id: getText(lead, ["id"]),
+    sourceTable: getText(lead, ["__source_table"], "ambassador_leads"),
     name: getDisplayName(lead),
     email: getEmail(lead),
     phone: getPhone(lead),
@@ -888,9 +962,19 @@ function getNotice(
 
   if (deleted === "success") {
     return {
-      title: "Lead deleted",
-      message: "The ambassador lead was removed from the pipeline.",
+      title: "Lead deleted and archived",
+      message:
+        "The ambassador lead was removed from the active pipeline and copied to the archive for tracking.",
       tone: "success" as const,
+    };
+  }
+
+  if (deleted === "archive_error") {
+    return {
+      title: "Lead not deleted",
+      message:
+        "The lead was not deleted because it could not be archived first. Confirm the ambassador_leads_archive table exists.",
+      tone: "warning" as const,
     };
   }
 
@@ -925,6 +1009,7 @@ function applyLeadFilters(
   leads: Array<{
     raw: AnyRow;
     id: string;
+    sourceTable: string;
     name: string;
     email: string;
     phone: string;
@@ -1524,16 +1609,34 @@ export default async function AmbassadorLeadsPage({
                             >
                               Edit
                             </a>
-                            <form action={deleteAmbassadorLead}>
-                              <input type="hidden" name="lead_id" value={lead.id} />
-                              <button
-                                type="submit"
-                                className="inline-flex items-center justify-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 transition hover:bg-red-100"
-                              >
+                            <details className="group relative">
+                              <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 transition hover:bg-red-100">
                                 <Trash2 size={12} />
                                 Delete
-                              </button>
-                            </form>
+                              </summary>
+
+                              <div className="absolute right-0 z-20 mt-2 w-[280px] rounded-2xl border border-red-100 bg-white p-4 text-left shadow-xl">
+                                <p className="text-sm font-black text-red-800">
+                                  Are you sure you want to delete this lead?
+                                </p>
+                                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                                  This will remove the active pipeline row and
+                                  archive a full copy for HR tracking.
+                                </p>
+
+                                <form action={deleteAmbassadorLead} className="mt-3">
+                                  <input type="hidden" name="lead_id" value={lead.id} />
+                                  <input type="hidden" name="source_table" value={lead.sourceTable} />
+                                  <input type="hidden" name="lead_name" value={lead.name} />
+                                  <button
+                                    type="submit"
+                                    className="inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
+                                  >
+                                    Yes, Delete and Archive
+                                  </button>
+                                </form>
+                              </div>
+                            </details>
                           </div>
                         </td>
                       </tr>
@@ -1606,7 +1709,13 @@ function AmbassadorLeadFormEnhancementScript() {
   const script = `
     (() => {
       const formatPhone = (value) => {
-        const digits = value.replace(/\\D/g, "").slice(0, 10);
+        let digits = value.replace(/\\D/g, "");
+
+        if (digits.length === 11 && digits.startsWith("1")) {
+          digits = digits.slice(1);
+        }
+
+        digits = digits.slice(0, 10);
 
         if (digits.length <= 3) return digits;
         if (digits.length <= 6) return "(" + digits.slice(0, 3) + ") " + digits.slice(3);
@@ -1614,16 +1723,39 @@ function AmbassadorLeadFormEnhancementScript() {
         return "(" + digits.slice(0, 3) + ") " + digits.slice(3, 6) + "-" + digits.slice(6);
       };
 
-      const phoneInputs = document.querySelectorAll("[data-phone-input='true']");
+      const applyPhoneFormat = (input) => {
+        if (!input || input.dataset.phoneFormatted === "true") return;
 
-      phoneInputs.forEach((input) => {
+        input.dataset.phoneFormatted = "true";
+
         input.addEventListener("input", () => {
           input.value = formatPhone(input.value);
+        });
+
+        input.addEventListener("paste", () => {
+          window.setTimeout(() => {
+            input.value = formatPhone(input.value);
+          }, 0);
         });
 
         input.addEventListener("blur", () => {
           input.value = formatPhone(input.value);
         });
+
+        input.value = formatPhone(input.value);
+      };
+
+      document
+        .querySelectorAll("[data-phone-input='true']")
+        .forEach(applyPhoneFormat);
+
+      document.addEventListener("input", (event) => {
+        const input = event.target;
+
+        if (input && input.matches && input.matches("[data-phone-input='true']")) {
+          applyPhoneFormat(input);
+          input.value = formatPhone(input.value);
+        }
       });
 
       const zipInput = document.querySelector("[data-zip-input='true']");
