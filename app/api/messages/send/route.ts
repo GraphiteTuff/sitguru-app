@@ -7,8 +7,24 @@ export const dynamic = "force-dynamic";
 type ProfileRow = {
   id?: string | null;
   email?: string | null;
+  phone?: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   role?: string | null;
   account_type?: string | null;
+  user_role?: string | null;
+  type?: string | null;
+};
+
+type GuruRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  email?: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
+  phone?: string | null;
 };
 
 type ConversationRow = {
@@ -28,6 +44,14 @@ type ConversationParticipantRow = {
   role?: string | null;
 };
 
+type AlertProfileSnapshot = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+};
+
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -36,29 +60,91 @@ function normalizeRole(value?: string | null) {
   const role = String(value || "").trim().toLowerCase();
 
   if (role === "provider" || role === "sitter") return "guru";
+  if (role === "pet_parent" || role === "pet parent" || role === "client") {
+    return "customer";
+  }
+
+  if (
+    role === "super-admin" ||
+    role === "super_admin" ||
+    role === "site-admin" ||
+    role === "site_admin" ||
+    role === "admin_user" ||
+    role === "admin-user" ||
+    role === "founder" ||
+    role === "owner" ||
+    role.includes("admin")
+  ) {
+    return "admin";
+  }
 
   return role;
 }
 
-function isAdminRole(role?: string | null) {
+function roleLabel(role?: string | null) {
   const normalized = normalizeRole(role);
 
-  return (
-    normalized === "admin" ||
-    normalized === "owner" ||
-    normalized === "super_admin"
-  );
+  if (normalized === "guru") return "Guru";
+  if (normalized === "customer") return "Pet Parent";
+  if (normalized === "admin") return "Admin";
+
+  return "SitGuru User";
+}
+
+function isAdminRole(role?: string | null) {
+  return normalizeRole(role) === "admin";
 }
 
 function getMissingColumnFromError(message?: string) {
   if (!message) return "";
 
-  const match = message.match(/Could not find the '([^']+)' column/i);
-  return match?.[1] || "";
+  const patterns = [
+    /Could not find the '([^']+)' column/i,
+    /column "([^"]+)" of relation/i,
+    /column "([^"]+)" does not exist/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+
+  return "";
 }
 
 function getParticipantUserId(participant: ConversationParticipantRow) {
   return safeString(participant.user_id || participant.profile_id || "");
+}
+
+function getProfileName(profile?: ProfileRow | GuruRow | null) {
+  const fullName = safeString(profile?.full_name);
+  const displayName = safeString(profile?.display_name);
+  const firstName =
+    "first_name" in (profile || {})
+      ? safeString((profile as ProfileRow).first_name)
+      : "";
+  const lastName =
+    "last_name" in (profile || {})
+      ? safeString((profile as ProfileRow).last_name)
+      : "";
+  const email = safeString(profile?.email);
+
+  return (
+    displayName ||
+    fullName ||
+    [firstName, lastName].filter(Boolean).join(" ") ||
+    email ||
+    "SitGuru User"
+  );
+}
+
+function getProfileRole(profile?: ProfileRow | null) {
+  return normalizeRole(
+    profile?.role ||
+      profile?.account_type ||
+      profile?.user_role ||
+      profile?.type,
+  );
 }
 
 async function getCurrentProfile({
@@ -68,9 +154,12 @@ async function getCurrentProfile({
   userId: string;
   email?: string | null;
 }) {
+  const profileSelect =
+    "id, email, phone, full_name, display_name, first_name, last_name, role, account_type, user_role, type";
+
   const byId = await supabaseAdmin
     .from("profiles")
-    .select("id, email, role, account_type")
+    .select(profileSelect)
     .eq("id", userId)
     .maybeSingle();
 
@@ -81,7 +170,7 @@ async function getCurrentProfile({
   if (email) {
     const byEmail = await supabaseAdmin
       .from("profiles")
-      .select("id, email, role, account_type")
+      .select(profileSelect)
       .eq("email", email)
       .maybeSingle();
 
@@ -93,11 +182,61 @@ async function getCurrentProfile({
   return null;
 }
 
+async function getGuruByIdOrUserId(value: string) {
+  if (!value) return null;
+
+  const select = "id, user_id, email, phone, full_name, display_name";
+
+  const byUserId = await supabaseAdmin
+    .from("gurus")
+    .select(select)
+    .eq("user_id", value)
+    .maybeSingle();
+
+  if (!byUserId.error && byUserId.data) {
+    return byUserId.data as GuruRow;
+  }
+
+  const byId = await supabaseAdmin
+    .from("gurus")
+    .select(select)
+    .eq("id", value)
+    .maybeSingle();
+
+  if (!byId.error && byId.data) {
+    return byId.data as GuruRow;
+  }
+
+  return null;
+}
+
+async function getSnapshotForUser({
+  userId,
+  roleHint,
+}: {
+  userId: string;
+  roleHint?: string | null;
+}): Promise<AlertProfileSnapshot> {
+  const profile = await getCurrentProfile({ userId });
+  const profileRole = getProfileRole(profile);
+  const normalizedRole = normalizeRole(roleHint) || profileRole;
+  const guru =
+    normalizedRole === "guru" ? await getGuruByIdOrUserId(userId) : null;
+
+  return {
+    id: userId,
+    name: getProfileName(guru || profile) || roleLabel(normalizedRole),
+    email: safeString(guru?.email || profile?.email),
+    phone: safeString(guru?.phone || profile?.phone),
+    role: normalizedRole || "user",
+  };
+}
+
 async function insertMessageWithColumnFallback(payload: Record<string, unknown>) {
   const workingPayload = { ...payload };
   const removedColumns: string[] = [];
 
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
     const { data, error } = await supabaseAdmin
       .from("messages")
       .insert(workingPayload)
@@ -108,7 +247,7 @@ async function insertMessageWithColumnFallback(payload: Record<string, unknown>)
       if (removedColumns.length > 0) {
         console.warn(
           "Message insert succeeded after removing missing optional columns:",
-          removedColumns
+          removedColumns,
         );
       }
 
@@ -132,7 +271,8 @@ async function insertMessageWithColumnFallback(payload: Record<string, unknown>)
   return {
     data: null,
     error: {
-      message: "Unable to insert message after removing optional missing columns.",
+      message:
+        "Unable to insert message after removing optional missing columns.",
     },
   };
 }
@@ -157,7 +297,7 @@ async function updateConversationWithColumnFallback({
       if (removedColumns.length > 0) {
         console.warn(
           "Conversation update succeeded after removing missing optional columns:",
-          removedColumns
+          removedColumns,
         );
       }
 
@@ -179,7 +319,8 @@ async function updateConversationWithColumnFallback({
   }
 
   return {
-    message: "Unable to update conversation after removing optional missing columns.",
+    message:
+      "Unable to update conversation after removing optional missing columns.",
   };
 }
 
@@ -191,7 +332,7 @@ function getParticipantRoleForUser({
   userId: string;
 }) {
   const participant = participants.find(
-    (item) => getParticipantUserId(item) === userId
+    (item) => getParticipantUserId(item) === userId,
   );
 
   return normalizeRole(participant?.role || null);
@@ -215,11 +356,8 @@ function getSenderRole({
 
   if (participantRole) return participantRole;
 
-  const profileRole = normalizeRole(profile?.role);
+  const profileRole = getProfileRole(profile);
   if (profileRole) return profileRole;
-
-  const accountType = normalizeRole(profile?.account_type);
-  if (accountType) return accountType;
 
   if (senderId === safeString(conversation.customer_id)) return "customer";
   if (senderId === safeString(conversation.guru_id)) return "guru";
@@ -244,7 +382,7 @@ function getPrimaryRecipient({
     .filter((participant) => participant.id && participant.id !== senderId);
 
   const adminRecipient = participantRecipients.find((item) =>
-    isAdminRole(item.role)
+    isAdminRole(item.role),
   );
 
   if (adminRecipient?.id) {
@@ -259,7 +397,7 @@ function getPrimaryRecipient({
   if (firstParticipantRecipient?.id) {
     return {
       recipientId: firstParticipantRecipient.id,
-      recipientRole: firstParticipantRecipient.role || "",
+      recipientRole: firstParticipantRecipient.role || "user",
     };
   }
 
@@ -278,8 +416,197 @@ function getPrimaryRecipient({
 
   return {
     recipientId: fallbackRecipient?.id || "",
-    recipientRole: fallbackRecipient?.role || "",
+    recipientRole: fallbackRecipient?.role || "user",
   };
+}
+
+function shouldAlertSupport({
+  senderRole,
+  recipientRole,
+}: {
+  senderRole: string;
+  recipientRole: string;
+}) {
+  const sender = normalizeRole(senderRole);
+  const recipient = normalizeRole(recipientRole);
+
+  if (sender === "admin") return false;
+  if (recipient === "admin") return true;
+
+  return sender === "customer" || sender === "guru";
+}
+
+function buildAdminMessagesUrl() {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITGURU_SITE_URL ||
+    "https://www.sitguru.com";
+
+  return `${baseUrl.replace(/\/$/, "")}/admin/messages`;
+}
+
+function buildMessageAlertText({
+  sender,
+  recipient,
+  topic,
+  body,
+  conversationId,
+}: {
+  sender: AlertProfileSnapshot;
+  recipient: AlertProfileSnapshot;
+  topic: string;
+  body: string;
+  conversationId: string;
+}) {
+  const adminUrl = buildAdminMessagesUrl();
+  const preview = body.length > 220 ? `${body.slice(0, 220)}...` : body;
+
+  return {
+    subject: `New SitGuru message from ${sender.name}`,
+    sms: `SitGuru: New ${roleLabel(sender.role)} message from ${
+      sender.name
+    }. Open Admin Messages: ${adminUrl}`,
+    text: [
+      "New SitGuru Message",
+      "",
+      `From: ${sender.name}`,
+      `From role: ${roleLabel(sender.role)}`,
+      sender.email ? `From email: ${sender.email}` : "From email: not available",
+      sender.phone ? `From phone: ${sender.phone}` : "From phone: not available",
+      `To: ${recipient.name}`,
+      `To role: ${roleLabel(recipient.role)}`,
+      `Topic: ${topic || "General"}`,
+      `Conversation ID: ${conversationId}`,
+      "",
+      "Message preview:",
+      preview,
+      "",
+      `Open Admin Messages: ${adminUrl}`,
+    ].join("\n"),
+  };
+}
+
+async function sendEmailAlert({
+  to,
+  subject,
+  text,
+}: {
+  to: string;
+  subject: string;
+  text: string;
+}) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const from =
+    process.env.SITGURU_ALERT_FROM_EMAIL ||
+    "SitGuru Alerts <support@sitguru.com>";
+
+  if (!resendApiKey || !to) return;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to,
+        subject,
+        text,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("SitGuru message email alert failed:", await response.text());
+    }
+  } catch (error) {
+    console.warn("SitGuru message email alert error:", error);
+  }
+}
+
+async function sendSmsAlert({ to, body }: { to: string; body: string }) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  const fromPhone = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!accountSid || !authToken || !to || (!messagingServiceSid && !fromPhone)) {
+    return;
+  }
+
+  const form = new URLSearchParams();
+  form.set("To", to);
+  form.set("Body", body.slice(0, 1500));
+
+  if (messagingServiceSid) {
+    form.set("MessagingServiceSid", messagingServiceSid);
+  } else if (fromPhone) {
+    form.set("From", fromPhone);
+  }
+
+  try {
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: form.toString(),
+      },
+    );
+
+    if (!response.ok) {
+      console.warn("SitGuru message SMS alert failed:", await response.text());
+    }
+  } catch (error) {
+    console.warn("SitGuru message SMS alert error:", error);
+  }
+}
+
+async function notifySupportOfNewMessage({
+  sender,
+  recipient,
+  senderRole,
+  recipientRole,
+  topic,
+  body,
+  conversationId,
+}: {
+  sender: AlertProfileSnapshot;
+  recipient: AlertProfileSnapshot;
+  senderRole: string;
+  recipientRole: string;
+  topic: string;
+  body: string;
+  conversationId: string;
+}) {
+  if (!shouldAlertSupport({ senderRole, recipientRole })) return;
+
+  const supportEmail = process.env.SITGURU_SUPPORT_EMAIL || "support@sitguru.com";
+  const supportSmsTo = process.env.SITGURU_SUPPORT_SMS_TO || "";
+  const alert = buildMessageAlertText({
+    sender,
+    recipient,
+    topic,
+    body,
+    conversationId,
+  });
+
+  await Promise.allSettled([
+    sendEmailAlert({
+      to: supportEmail,
+      subject: alert.subject,
+      text: alert.text,
+    }),
+    sendSmsAlert({
+      to: supportSmsTo,
+      body: alert.sms,
+    }),
+  ]);
 }
 
 export async function GET() {
@@ -287,9 +614,10 @@ export async function GET() {
     {
       ok: true,
       route: "/api/messages/send",
-      message: "Customer/Guru message send API route is active.",
+      message:
+        "Customer/Guru message send API route is active with snapshot preservation and support alerts.",
     },
-    { status: 200 }
+    { status: 200 },
   );
 }
 
@@ -315,7 +643,7 @@ export async function POST(req: NextRequest) {
     if (!conversationId || !body) {
       return NextResponse.json(
         { error: "Missing required message fields." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -328,7 +656,7 @@ export async function POST(req: NextRequest) {
     if (conversationError || !conversation) {
       return NextResponse.json(
         { error: "Conversation not found." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -344,7 +672,7 @@ export async function POST(req: NextRequest) {
         {
           error: `Unable to load conversation participants: ${participantsError.message}`,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -357,13 +685,13 @@ export async function POST(req: NextRequest) {
       senderId === safeString(safeConversation.customer_id) ||
       senderId === safeString(safeConversation.guru_id) ||
       safeParticipants.some(
-        (participant) => getParticipantUserId(participant) === senderId
+        (participant) => getParticipantUserId(participant) === senderId,
       );
 
     if (!senderIsAllowed) {
       return NextResponse.json(
         { error: "You are not a participant in this conversation." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -384,7 +712,7 @@ export async function POST(req: NextRequest) {
         {
           error: "Admin messages must be sent from /api/admin/messages/send.",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -400,9 +728,19 @@ export async function POST(req: NextRequest) {
           error:
             "Unable to send message. No recipient was found for this conversation.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
+
+    const senderSnapshot = await getSnapshotForUser({
+      userId: senderId,
+      roleHint: senderRole,
+    });
+
+    const recipientSnapshot = await getSnapshotForUser({
+      userId: recipientId,
+      roleHint: recipientRole,
+    });
 
     const topic =
       requestedTopic ||
@@ -418,7 +756,16 @@ export async function POST(req: NextRequest) {
         sender_id: senderId,
         recipient_id: recipientId,
         sender_role: senderRole || "customer",
-        recipient_role: recipientRole || "admin",
+        recipient_role: recipientRole || "user",
+        sender_name_snapshot: senderSnapshot.name,
+        sender_email_snapshot: senderSnapshot.email || null,
+        sender_phone_snapshot: senderSnapshot.phone || null,
+        sender_role_snapshot: senderSnapshot.role || senderRole || "customer",
+        recipient_name_snapshot: recipientSnapshot.name,
+        recipient_email_snapshot: recipientSnapshot.email || null,
+        recipient_phone_snapshot: recipientSnapshot.phone || null,
+        recipient_role_snapshot:
+          recipientSnapshot.role || recipientRole || "user",
         content: body,
         body,
         topic,
@@ -436,7 +783,7 @@ export async function POST(req: NextRequest) {
             insertError.message ||
             "Unable to send message because the database insert failed.",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -455,9 +802,19 @@ export async function POST(req: NextRequest) {
     if (conversationUpdateError) {
       console.error(
         "Conversation update error:",
-        conversationUpdateError.message
+        conversationUpdateError.message,
       );
     }
+
+    await notifySupportOfNewMessage({
+      sender: senderSnapshot,
+      recipient: recipientSnapshot,
+      senderRole,
+      recipientRole,
+      topic,
+      body,
+      conversationId,
+    });
 
     return NextResponse.json(
       {
@@ -466,7 +823,7 @@ export async function POST(req: NextRequest) {
         conversationId,
         topic,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Send message route error:", error);
@@ -476,7 +833,7 @@ export async function POST(req: NextRequest) {
         error:
           error instanceof Error ? error.message : "Unable to send message.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
