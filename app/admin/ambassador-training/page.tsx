@@ -1,4 +1,4 @@
- import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -17,7 +17,6 @@ import {
   Plus,
   Save,
   ShieldCheck,
-  Sparkles,
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
@@ -49,6 +48,8 @@ type TrainingProgressSummary = {
   training_step_id?: string | null;
   status?: string | null;
 };
+
+const superAdminEmails = ["jason@sitguru.com", "nette@sitguru.com"];
 
 const adminRoutes = {
   dashboard: "/admin",
@@ -104,6 +105,27 @@ function formatDate(value?: string | null) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+async function requireSuperAdmin() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    redirect("/admin/login");
+  }
+
+  const email = asString(user.email).toLowerCase();
+
+  if (!superAdminEmails.includes(email)) {
+    redirect("/ambassador/dashboard");
+  }
+
+  return user;
 }
 
 function getContentTypeLabel(value?: string | null) {
@@ -169,6 +191,14 @@ function getNotice(
     };
   }
 
+  if (error === "forbidden") {
+    return {
+      tone: "error" as const,
+      title: "Access denied",
+      message: "Only SitGuru Super Admins can update Ambassador training steps.",
+    };
+  }
+
   if (error) {
     return {
       tone: "error" as const,
@@ -183,6 +213,8 @@ function getNotice(
 
 async function createTrainingStep(formData: FormData) {
   "use server";
+
+  await requireSuperAdmin();
 
   const stepNumber = asNumber(formData.get("step_number"));
   const title = asString(formData.get("title"));
@@ -239,6 +271,8 @@ async function createTrainingStep(formData: FormData) {
 async function updateTrainingStep(formData: FormData) {
   "use server";
 
+  await requireSuperAdmin();
+
   const stepId = asString(formData.get("step_id"));
   const stepNumber = asNumber(formData.get("step_number"));
   const title = asString(formData.get("title"));
@@ -294,6 +328,8 @@ async function updateTrainingStep(formData: FormData) {
 async function toggleTrainingStepStatus(formData: FormData) {
   "use server";
 
+  await requireSuperAdmin();
+
   const stepId = asString(formData.get("step_id"));
   const nextActive = asString(formData.get("next_active")) === "true";
 
@@ -327,16 +363,7 @@ type PageProps = {
 export default async function AdminAmbassadorTrainingPage({
   searchParams,
 }: PageProps) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    redirect("/admin/login");
-  }
+  await requireSuperAdmin();
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const notice = getNotice(resolvedSearchParams);
@@ -417,6 +444,10 @@ export default async function AdminAmbassadorTrainingPage({
                 steps. Changes here control what Ambassadors see on their mobile
                 training checklist.
               </p>
+
+              <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-green-900">
+                Super Admin Only: Jason and Danette can manage this page.
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:w-auto">
@@ -527,7 +558,10 @@ export default async function AdminAmbassadorTrainingPage({
                 ))
               ) : (
                 <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50 p-6 text-center">
-                  <BookOpenCheck className="mx-auto mb-3 text-green-700" size={36} />
+                  <BookOpenCheck
+                    className="mx-auto mb-3 text-green-700"
+                    size={36}
+                  />
                   <h2 className="text-lg font-black text-green-950">
                     No training steps yet
                   </h2>
@@ -586,7 +620,9 @@ function TrainingStepEditor({
               Step {step.step_number}
             </span>
 
-            <StatusPill active={active}>{active ? "Active" : "Inactive"}</StatusPill>
+            <StatusPill active={active}>
+              {active ? "Active" : "Inactive"}
+            </StatusPill>
 
             {step.is_required !== false ? (
               <span className="rounded-full border border-green-100 bg-green-50 px-3 py-1 text-xs font-black text-green-900">
@@ -912,7 +948,9 @@ function MetricCard({
         {label}
       </p>
       <p className="mt-1 text-2xl font-black text-green-950">{value}</p>
-      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">{detail}</p>
+      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+        {detail}
+      </p>
     </div>
   );
 }
