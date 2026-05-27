@@ -4,8 +4,10 @@ import { redirect } from "next/navigation";
 import {
   ArrowRight,
   BadgeCheck,
+  CheckCircle2,
   KeyRound,
   LockKeyhole,
+  Mail,
   PawPrint,
   ShieldCheck,
   UserRoundCheck,
@@ -21,6 +23,20 @@ type SearchParams =
 
 type AmbassadorLoginPageProps = {
   searchParams?: SearchParams;
+};
+
+type AmbassadorLoginRecord = {
+  id: string;
+  full_name?: string | null;
+  email?: string | null;
+  contact_email?: string | null;
+  login_email?: string | null;
+  login_username?: string | null;
+  referral_code?: string | null;
+  dashboard_enabled?: boolean | null;
+  login_enabled?: boolean | null;
+  dashboard_slug?: string | null;
+  status?: string | null;
 };
 
 function asString(value: unknown) {
@@ -40,6 +56,21 @@ function getSearchParam(
 
 function normalizeAmbassadorCode(value: string) {
   return value.trim().toUpperCase();
+}
+
+function getSiteUrl() {
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_VERCEL_URL ||
+    process.env.VERCEL_URL ||
+    "https://www.sitguru.com";
+
+  if (configuredUrl.startsWith("http://") || configuredUrl.startsWith("https://")) {
+    return configuredUrl.replace(/\/+$/, "");
+  }
+
+  return `https://${configuredUrl.replace(/\/+$/, "")}`;
 }
 
 function getLoginErrorMessage(errorCode: string) {
@@ -67,51 +98,106 @@ function getLoginErrorMessage(errorCode: string) {
     return "This login is restricted to the Ambassador portal only.";
   }
 
+  if (errorCode === "reset_missing") {
+    return "Enter your Ambassador Code so we can send your password setup link.";
+  }
+
+  if (errorCode === "reset_failed") {
+    return "We could not send the password setup link. Please contact SitGuru support.";
+  }
+
   return "";
+}
+
+function getSuccessMessage(successCode: string) {
+  if (successCode === "reset_sent") {
+    return "Password setup link sent. Please check the email connected to your Ambassador dashboard.";
+  }
+
+  return "";
+}
+
+async function findAmbassadorByIdentifier(identifier: string) {
+  const rawIdentifier = identifier.trim();
+  const normalizedCode = normalizeAmbassadorCode(rawIdentifier);
+  const normalizedEmail = rawIdentifier.toLowerCase();
+
+  const { data: codeMatch, error: codeError } = await supabaseAdmin
+    .from("ambassadors")
+    .select(
+      "id, full_name, email, contact_email, login_email, login_username, referral_code, dashboard_enabled, login_enabled, dashboard_slug, status",
+    )
+    .or(
+      `login_username.eq.${normalizedCode},referral_code.eq.${normalizedCode}`,
+    )
+    .maybeSingle();
+
+  if (codeError) {
+    console.warn("Ambassador code lookup failed:", codeError);
+  }
+
+  if (codeMatch) return codeMatch as AmbassadorLoginRecord;
+
+  const { data: emailMatch, error: emailError } = await supabaseAdmin
+    .from("ambassadors")
+    .select(
+      "id, full_name, email, contact_email, login_email, login_username, referral_code, dashboard_enabled, login_enabled, dashboard_slug, status",
+    )
+    .or(
+      `login_email.eq.${normalizedEmail},contact_email.eq.${normalizedEmail},email.eq.${normalizedEmail}`,
+    )
+    .maybeSingle();
+
+  if (emailError) {
+    console.warn("Ambassador email lookup failed:", emailError);
+  }
+
+  return (emailMatch || null) as AmbassadorLoginRecord | null;
+}
+
+function getAmbassadorLoginEmail(ambassador: AmbassadorLoginRecord) {
+  return (
+    asString(ambassador.login_email) ||
+    asString(ambassador.email) ||
+    asString(ambassador.contact_email)
+  );
+}
+
+function isAmbassadorAllowedToLogin(ambassador: AmbassadorLoginRecord) {
+  const status = asString(ambassador.status).toLowerCase();
+
+  return Boolean(
+    ambassador.dashboard_enabled === true &&
+      ambassador.login_enabled === true &&
+      status !== "archived",
+  );
 }
 
 async function ambassadorLoginAction(formData: FormData) {
   "use server";
 
-  const ambassadorCode = normalizeAmbassadorCode(
-    asString(formData.get("ambassador_code")),
-  );
+  const ambassadorCode = asString(formData.get("ambassador_code"));
   const password = asString(formData.get("password"));
 
   if (!ambassadorCode || !password) {
     redirect("/ambassador/login?error=missing");
   }
 
-  const { data: ambassador, error: ambassadorError } = await supabaseAdmin
-    .from("ambassadors")
-    .select(
-      "id, full_name, email, contact_email, login_email, login_username, referral_code, dashboard_enabled, login_enabled, dashboard_slug, status",
-    )
-    .or(
-      `login_username.eq.${ambassadorCode},referral_code.eq.${ambassadorCode}`,
-    )
-    .maybeSingle();
+  const ambassador = await findAmbassadorByIdentifier(ambassadorCode);
 
-  if (ambassadorError || !ambassador) {
-    console.warn("Ambassador login lookup failed:", ambassadorError);
+  if (!ambassador) {
     redirect("/ambassador/login?error=not_found");
   }
 
-  const status = asString(ambassador.status).toLowerCase();
-  const dashboardEnabled = ambassador.dashboard_enabled === true;
-  const loginEnabled = ambassador.login_enabled === true;
-  const loginEmail =
-    asString(ambassador.login_email) ||
-    asString(ambassador.email) ||
-    asString(ambassador.contact_email);
-
-  if (!dashboardEnabled || status === "archived") {
+  if (!ambassador.dashboard_enabled || asString(ambassador.status).toLowerCase() === "archived") {
     redirect("/ambassador/login?error=not_found");
   }
 
-  if (!loginEnabled) {
+  if (!ambassador.login_enabled) {
     redirect("/ambassador/login?error=not_enabled");
   }
+
+  const loginEmail = getAmbassadorLoginEmail(ambassador);
 
   if (!loginEmail) {
     redirect("/ambassador/login?error=missing_email");
@@ -168,12 +254,59 @@ async function ambassadorLoginAction(formData: FormData) {
   redirect("/ambassador/dashboard");
 }
 
+async function ambassadorPasswordResetAction(formData: FormData) {
+  "use server";
+
+  const ambassadorCode = asString(formData.get("reset_ambassador_code"));
+
+  if (!ambassadorCode) {
+    redirect("/ambassador/login?error=reset_missing#password-help");
+  }
+
+  const ambassador = await findAmbassadorByIdentifier(ambassadorCode);
+
+  if (!ambassador || !isAmbassadorAllowedToLogin(ambassador)) {
+    redirect("/ambassador/login?error=not_found#password-help");
+  }
+
+  const loginEmail = getAmbassadorLoginEmail(ambassador);
+
+  if (!loginEmail) {
+    redirect("/ambassador/login?error=missing_email#password-help");
+  }
+
+  const supabase = await createClient();
+  const redirectTo = `${getSiteUrl()}/reset-password?type=ambassador`;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+    redirectTo,
+  });
+
+  if (error) {
+    console.warn("Ambassador password reset failed:", error);
+    redirect("/ambassador/login?error=reset_failed#password-help");
+  }
+
+  await supabaseAdmin
+    .from("ambassadors")
+    .update({
+      invited_at: new Date().toISOString(),
+      must_reset_password: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", ambassador.id);
+
+  redirect("/ambassador/login?success=reset_sent#password-help");
+}
+
 export default async function AmbassadorLoginPage({
   searchParams,
 }: AmbassadorLoginPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const errorCode = getSearchParam(resolvedSearchParams, "error");
+  const successCode = getSearchParam(resolvedSearchParams, "success");
   const errorMessage = getLoginErrorMessage(errorCode);
+  const successMessage = getSuccessMessage(successCode);
 
   return (
     <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-6 sm:py-8 lg:px-8">
@@ -247,6 +380,13 @@ export default async function AmbassadorLoginPage({
               </div>
             ) : null}
 
+            {successMessage ? (
+              <div className="mb-5 flex items-start gap-3 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-bold leading-6 text-green-900">
+                <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+                <span>{successMessage}</span>
+              </div>
+            ) : null}
+
             <form action={ambassadorLoginAction} className="grid gap-4">
               <label className="grid gap-2">
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
@@ -289,13 +429,58 @@ export default async function AmbassadorLoginPage({
               </button>
             </form>
 
-            <div className="mt-5 rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900">
-              Need password help? Contact SitGuru support or ask your SitGuru
-              onboarding contact for a password setup link.
-            </div>
+            <section
+              id="password-help"
+              className="mt-6 rounded-[24px] border border-green-100 bg-green-50 p-4"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-green-800 shadow-sm">
+                  <Mail size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-black text-green-950">
+                    Need to set up or reset your password?
+                  </h3>
+                  <p className="mt-1 text-xs font-bold leading-5 text-green-900/80">
+                    Enter your Ambassador Code below and SitGuru will send a
+                    secure password setup link to the email connected to your
+                    Ambassador dashboard.
+                  </p>
+                </div>
+              </div>
+
+              <form action={ambassadorPasswordResetAction} className="mt-4 grid gap-3">
+                <label className="grid gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.16em] text-green-800">
+                    Ambassador Code
+                  </span>
+                  <div className="flex min-h-12 items-center gap-3 rounded-2xl border border-green-200 bg-white px-4 py-3 transition focus-within:border-green-500 focus-within:ring-4 focus-within:ring-green-100">
+                    <KeyRound size={17} className="shrink-0 text-green-700" />
+                    <input
+                      name="reset_ambassador_code"
+                      placeholder="SKYLER-SG2026"
+                      autoCapitalize="characters"
+                      autoComplete="username"
+                      className="w-full bg-transparent text-sm font-black uppercase tracking-wide text-slate-900 outline-none placeholder:text-slate-400"
+                    />
+                  </div>
+                </label>
+
+                <button
+                  type="submit"
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-100 active:scale-[0.99]"
+                >
+                  Send Password Setup Link
+                  <ArrowRight size={17} />
+                </button>
+              </form>
+            </section>
 
             <div className="mt-4 grid gap-2 text-center text-[11px] font-bold leading-5 text-slate-400 sm:text-left">
-              <p>Ambassador portal access is separate from Pet Parent, Guru, and Admin access.</p>
+              <p>
+                Ambassador portal access is separate from Pet Parent, Guru, and
+                Admin access.
+              </p>
               <p>Your session ends when your browser is fully closed.</p>
             </div>
           </section>
