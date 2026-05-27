@@ -146,6 +146,8 @@ function getReadableStatus(row: AnyRow) {
   if (status === "submitted") return "New";
   if (status === "review") return "New";
   if (status === "in_review") return "New";
+  if (status === "conditional_offer_sent") return "Contacted";
+  if (status === "onboarding_sent") return "Contacted";
   if (status === "contacted") return "Contacted";
   if (status === "interested") return "Interested";
   if (status === "signed_up") return "Signed Up";
@@ -154,8 +156,10 @@ function getReadableStatus(row: AnyRow) {
   if (status === "approved") return "Approved";
   if (status === "active") return "Approved";
   if (status === "not_moving_forward") return "Not Moving Forward";
+  if (status === "not_a_fit") return "Not Moving Forward";
   if (status === "declined") return "Not Moving Forward";
   if (status === "rejected") return "Not Moving Forward";
+  if (status === "inactive") return "Not Moving Forward";
 
   return (
     status
@@ -190,11 +194,18 @@ const deletableLeadTables = [
   "program_applications",
 ] as const;
 
-function isDeletableLeadTable(value: string): value is (typeof deletableLeadTables)[number] {
-  return deletableLeadTables.includes(value as (typeof deletableLeadTables)[number]);
+function isDeletableLeadTable(
+  value: string,
+): value is (typeof deletableLeadTables)[number] {
+  return deletableLeadTables.includes(
+    value as (typeof deletableLeadTables)[number],
+  );
 }
 
-function withSourceTable(row: AnyRow, sourceTable: (typeof deletableLeadTables)[number]) {
+function withSourceTable(
+  row: AnyRow,
+  sourceTable: (typeof deletableLeadTables)[number],
+) {
   return {
     ...row,
     __source_table: sourceTable,
@@ -521,9 +532,11 @@ function mergeRows(...groups: AnyRow[][]) {
 
   for (const group of groups) {
     for (const row of group) {
+      const sourceTable = getText(row, ["__source_table"], "unknown");
       const key =
-        getText(row, ["id", "email", "user_id", "created_at"]) ||
-        `${getDisplayName(row)}-${getEmail(row)}-${merged.length}`;
+        `${sourceTable}:${getText(row, ["id"])}` ||
+        `${sourceTable}:${getEmail(row)}:${getDisplayName(row)}:${getDate(row)}` ||
+        `${sourceTable}:${merged.length}`;
 
       if (seen.has(key)) continue;
 
@@ -572,7 +585,9 @@ async function createAmbassadorLead(formData: FormData) {
   const coverLetterFileUrl = asString(formData.get("cover_letter_file_url"));
   const coverLetterFileName = asString(formData.get("cover_letter_file_name"));
   const otherDocumentFileUrl = asString(formData.get("other_document_file_url"));
-  const otherDocumentFileName = asString(formData.get("other_document_file_name"));
+  const otherDocumentFileName = asString(
+    formData.get("other_document_file_name"),
+  );
 
   if (!fullName && !email && !phone) {
     redirect(`${adminRoutes.ambassadorLeads}?created=missing`);
@@ -638,7 +653,9 @@ async function updateAmbassadorLead(formData: FormData) {
   const coverLetterFileUrl = asString(formData.get("cover_letter_file_url"));
   const coverLetterFileName = asString(formData.get("cover_letter_file_name"));
   const otherDocumentFileUrl = asString(formData.get("other_document_file_url"));
-  const otherDocumentFileName = asString(formData.get("other_document_file_name"));
+  const otherDocumentFileName = asString(
+    formData.get("other_document_file_name"),
+  );
 
   if (!leadId) {
     redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
@@ -707,7 +724,10 @@ async function deleteAmbassadorLead(formData: FormData) {
     .insert({
       source_table: sourceTable,
       source_id: leadId,
-      full_name: getDisplayName(existingLead as AnyRow, leadName || "Ambassador Lead"),
+      full_name: getDisplayName(
+        existingLead as AnyRow,
+        leadName || "Ambassador Lead",
+      ),
       email: getEmail(existingLead as AnyRow),
       phone: getPhone(existingLead as AnyRow),
       program: getProgramLabel(existingLead as AnyRow),
@@ -742,7 +762,6 @@ async function deleteAmbassadorLead(formData: FormData) {
 async function getAmbassadorLeadData() {
   const [
     ambassadorLeadsResult,
-    ambassadorsResult,
     partnerApplicationsResult,
     networkPartnerLeadsResult,
     networkParticipantsResult,
@@ -757,14 +776,6 @@ async function getAmbassadorLeadData() {
         .order("created_at", { ascending: false })
         .limit(1000),
       "ambassador_leads",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("ambassadors")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "ambassadors",
     ),
     safeAdminQuery(
       supabaseAdmin
@@ -816,18 +827,30 @@ async function getAmbassadorLeadData() {
     ),
   ]);
 
-  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).filter(Boolean);
-  const ambassadors = ((ambassadorsResult.data || []) as AnyRow[]).filter(Boolean);
-  const partnerApplications = ((partnerApplicationsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkPartnerLeads = ((networkPartnerLeadsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkParticipants = ((networkParticipantsResult.data || []) as AnyRow[]).filter(Boolean);
-  const launchSignups = ((launchSignupsResult.data || []) as AnyRow[]).filter(Boolean);
-  const launchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).filter(Boolean);
-  const programApplications = ((programApplicationsResult.data || []) as AnyRow[]).filter(Boolean);
+  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).filter(
+    Boolean,
+  );
+  const partnerApplications = (
+    (partnerApplicationsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
+  const networkPartnerLeads = (
+    (networkPartnerLeadsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
+  const networkParticipants = (
+    (networkParticipantsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
+  const launchSignups = ((launchSignupsResult.data || []) as AnyRow[]).filter(
+    Boolean,
+  );
+  const launchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).filter(
+    Boolean,
+  );
+  const programApplications = (
+    (programApplicationsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
 
   const allLeads = mergeRows(
     ambassadorLeads.map((row) => withSourceTable(row, "ambassador_leads")),
-    ambassadors.map((row) => withSourceTable(row, "ambassadors")),
     partnerApplications
       .filter(isAmbassadorLead)
       .map((row) => withSourceTable(row, "partner_applications")),
@@ -880,19 +903,27 @@ async function getAmbassadorLeadData() {
 
   const metrics = {
     total: normalizedLeads.length,
-    careerLink: normalizedLeads.filter((lead) => lead.source === "PA CareerLink").length,
-    student: normalizedLeads.filter((lead) => lead.program === "Student Hire").length,
-    community: normalizedLeads.filter((lead) => lead.program === "Community Hire").length,
-    military: normalizedLeads.filter((lead) => lead.program === "Military Hire").length,
+    careerLink: normalizedLeads.filter((lead) => lead.source === "PA CareerLink")
+      .length,
+    student: normalizedLeads.filter((lead) => lead.program === "Student Hire")
+      .length,
+    community: normalizedLeads.filter((lead) => lead.program === "Community Hire")
+      .length,
+    military: normalizedLeads.filter((lead) => lead.program === "Military Hire")
+      .length,
     newCount: normalizedLeads.filter((lead) => lead.status === "New").length,
-    contacted: normalizedLeads.filter((lead) => lead.status === "Contacted").length,
-    interested: normalizedLeads.filter((lead) => lead.status === "Interested").length,
-    signedUp: normalizedLeads.filter((lead) => lead.status === "Signed Up").length,
+    contacted: normalizedLeads.filter((lead) => lead.status === "Contacted")
+      .length,
+    interested: normalizedLeads.filter((lead) => lead.status === "Interested")
+      .length,
+    signedUp: normalizedLeads.filter((lead) => lead.status === "Signed Up")
+      .length,
     approved: normalizedLeads.filter((lead) => lead.status === "Approved").length,
     notMovingForward: normalizedLeads.filter(
       (lead) => lead.status === "Not Moving Forward",
     ).length,
-    recent: normalizedLeads.filter((lead) => isWithinLastDays(lead.date, 14)).length,
+    recent: normalizedLeads.filter((lead) => isWithinLastDays(lead.date, 14))
+      .length,
   };
 
   return {
@@ -980,7 +1011,6 @@ function getNotice(
 
   return null;
 }
-
 
 function getSearchParamValue(
   searchParams: Record<string, string | string[] | undefined> | undefined,
@@ -1101,9 +1131,12 @@ export default async function AmbassadorLeadsPage({
   const filteredLeads = applyLeadFilters(data.leads, pipelineFilters);
   const filteredMetrics = {
     total: filteredLeads.length,
-    student: filteredLeads.filter((lead) => lead.program === "Student Hire").length,
-    community: filteredLeads.filter((lead) => lead.program === "Community Hire").length,
-    military: filteredLeads.filter((lead) => lead.program === "Military Hire").length,
+    student: filteredLeads.filter((lead) => lead.program === "Student Hire")
+      .length,
+    community: filteredLeads.filter((lead) => lead.program === "Community Hire")
+      .length,
+    military: filteredLeads.filter((lead) => lead.program === "Military Hire")
+      .length,
   };
 
   return (
@@ -1123,14 +1156,14 @@ export default async function AmbassadorLeadsPage({
               Ambassador Leads
             </h1>
             <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-green-800">
-              PA CareerLink Ready
+              Hiring Pipeline
             </span>
           </div>
 
           <p className="mt-2 max-w-4xl text-base font-semibold leading-7 text-slate-600">
             Track Student Hire, Community Hire, and Military Hire ambassador
-            applicants from PA CareerLink, social media, referrals, events, and
-            website interest forms.
+            applicants from Indeed, PA CareerLink, social media, referrals,
+            events, and website interest forms.
           </p>
         </div>
 
@@ -1232,9 +1265,9 @@ export default async function AmbassadorLeadsPage({
                 Add Ambassador Lead
               </h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                Add hiring-focused ambassador applicants from PA CareerLink, Indeed,
-                Handshake, LinkedIn, schools, military organizations, referrals,
-                and the SitGuru website.
+                Add hiring-focused ambassador applicants from PA CareerLink,
+                Indeed, Handshake, LinkedIn, schools, military organizations,
+                referrals, and the SitGuru website.
               </p>
             </div>
 
@@ -1287,7 +1320,7 @@ export default async function AmbassadorLeadsPage({
                 <FormField label="Source">
                   <select
                     name="source"
-                    defaultValue="PA CareerLink"
+                    defaultValue="Indeed"
                     className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
                   >
                     {sourceOrder.map((source) => (
@@ -1379,7 +1412,7 @@ export default async function AmbassadorLeadsPage({
               <FormField label="Notes">
                 <textarea
                   name="notes"
-                  placeholder="Example: Applied through PA CareerLink for Student Ambassador posting."
+                  placeholder="Example: Applied through Indeed for Student Ambassador posting."
                   rows={4}
                   className="w-full resize-none rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
                 />
@@ -1405,7 +1438,7 @@ export default async function AmbassadorLeadsPage({
                   <FormField label="Resume path or link">
                     <input
                       name="resume_file_url"
-                      placeholder="student-hire/indeed/resume.pdf"
+                      placeholder="student-hire/resume.pdf"
                       className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
                     />
                   </FormField>
@@ -1463,8 +1496,9 @@ export default async function AmbassadorLeadsPage({
               <p className="rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900">
                 HR intake is connected to the{" "}
                 <span className="font-black">ambassador_leads</span> table.
-                Save new leads here, then manage edits, documents, filters, and
-                status updates directly from the Lead Pipeline.
+                Converted Ambassadors are tracked separately in the{" "}
+                <span className="font-black">ambassadors</span> dashboard to
+                prevent duplicate lead counts.
               </p>
 
               <AmbassadorLeadFormEnhancementScript />
@@ -1538,119 +1572,152 @@ export default async function AmbassadorLeadsPage({
                 <tbody>
                   {filteredLeads.length ? (
                     filteredLeads.map((lead, index) => (
-                      <Fragment key={`${lead.id || lead.name}-${lead.email}-${lead.date}-${index}`}>
+                      <Fragment
+                        key={`${lead.sourceTable}-${lead.id || lead.name}-${lead.email}-${lead.date}-${index}`}
+                      >
                         <tr className="border-b border-[#f1f5f2] align-top">
-                        <td className="py-4">
-                          <div className="flex items-start gap-3">
-                            <Avatar name={lead.name} />
-                            <div className="min-w-0">
-                              <p className="font-black text-slate-950">
-                                {lead.name}
-                              </p>
-                              <p className="mt-1 line-clamp-2 max-w-[260px] text-xs font-semibold leading-5 text-slate-500">
-                                {lead.notes}
-                              </p>
-                              <PipelineProgressFlow status={lead.status} />
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-4">
-                          <ProgramBadge program={lead.program} />
-                        </td>
-
-                        <td className="py-4">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
-                            {lead.source}
-                          </span>
-                        </td>
-
-                        <td className="py-4">
-                          <LeadStatusBadge status={lead.status} />
-                        </td>
-
-                        <td className="py-4">
-                          <div className="space-y-1.5">
-                            <ContactLine icon={<Mail size={13} />} value={lead.email} />
-                            <ContactLine icon={<Phone size={13} />} value={lead.phone} />
-                          </div>
-                        </td>
-
-                        <td className="py-4">
-                          <DocumentButtonGroup leadId={lead.id} documents={lead.documents} />
-                        </td>
-
-                        <td className="py-4 font-bold text-slate-600">
-                          <span className="inline-flex items-center gap-1.5">
-                            <MapPin size={13} />
-                            {lead.location}
-                          </span>
-                        </td>
-
-                        <td className="py-4 font-bold text-slate-600">
-                          <span className="inline-flex items-center gap-1.5">
-                            <CalendarDays size={13} />
-                            {formatDate(lead.date)}
-                          </span>
-                        </td>
-
-                        <td className="py-4">
-                          <div className="flex flex-col gap-2">
-                            <a
-                              href={`#edit-lead-${lead.id || index}`}
-                              className="inline-flex items-center justify-center rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-100"
-                            >
-                              Edit
-                            </a>
-                            <details className="group relative">
-                              <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 transition hover:bg-red-100">
-                                <Trash2 size={12} />
-                                Delete
-                              </summary>
-
-                              <div className="absolute right-0 z-20 mt-2 w-[280px] rounded-2xl border border-red-100 bg-white p-4 text-left shadow-xl">
-                                <p className="text-sm font-black text-red-800">
-                                  Are you sure you want to delete this lead?
+                          <td className="py-4">
+                            <div className="flex items-start gap-3">
+                              <Avatar name={lead.name} />
+                              <div className="min-w-0">
+                                <p className="font-black text-slate-950">
+                                  {lead.name}
                                 </p>
-                                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                                  This will remove the active pipeline row and
-                                  archive a full copy for HR tracking.
+                                <p className="mt-1 line-clamp-2 max-w-[260px] text-xs font-semibold leading-5 text-slate-500">
+                                  {lead.notes}
                                 </p>
-
-                                <form action={deleteAmbassadorLead} className="mt-3">
-                                  <input type="hidden" name="lead_id" value={lead.id} />
-                                  <input type="hidden" name="source_table" value={lead.sourceTable} />
-                                  <input type="hidden" name="lead_name" value={lead.name} />
-                                  <button
-                                    type="submit"
-                                    className="inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
-                                  >
-                                    Yes, Delete and Archive
-                                  </button>
-                                </form>
+                                <PipelineProgressFlow status={lead.status} />
                               </div>
-                            </details>
-                          </div>
-                        </td>
-                      </tr>
+                            </div>
+                          </td>
 
-                      <tr id={`edit-lead-${lead.id || index}`} className="border-b border-[#f1f5f2]">
-                        <td colSpan={9} className="bg-[#fbfcf9] px-4 py-5">
-                          <PipelineEditForm lead={lead} />
-                        </td>
-                      </tr>
-                    </Fragment>
+                          <td className="py-4">
+                            <ProgramBadge program={lead.program} />
+                          </td>
+
+                          <td className="py-4">
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                              {lead.source}
+                            </span>
+                          </td>
+
+                          <td className="py-4">
+                            <LeadStatusBadge status={lead.status} />
+                          </td>
+
+                          <td className="py-4">
+                            <div className="space-y-1.5">
+                              <ContactLine
+                                icon={<Mail size={13} />}
+                                value={lead.email}
+                              />
+                              <ContactLine
+                                icon={<Phone size={13} />}
+                                value={lead.phone}
+                              />
+                            </div>
+                          </td>
+
+                          <td className="py-4">
+                            <DocumentButtonGroup
+                              leadId={lead.id}
+                              documents={lead.documents}
+                            />
+                          </td>
+
+                          <td className="py-4 font-bold text-slate-600">
+                            <span className="inline-flex items-center gap-1.5">
+                              <MapPin size={13} />
+                              {lead.location}
+                            </span>
+                          </td>
+
+                          <td className="py-4 font-bold text-slate-600">
+                            <span className="inline-flex items-center gap-1.5">
+                              <CalendarDays size={13} />
+                              {formatDate(lead.date)}
+                            </span>
+                          </td>
+
+                          <td className="py-4">
+                            <div className="flex flex-col gap-2">
+                              <a
+                                href={`#edit-lead-${lead.id || index}`}
+                                className="inline-flex items-center justify-center rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-100"
+                              >
+                                Edit
+                              </a>
+                              <details className="group relative">
+                                <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 transition hover:bg-red-100">
+                                  <Trash2 size={12} />
+                                  Delete
+                                </summary>
+
+                                <div className="absolute right-0 z-20 mt-2 w-[280px] rounded-2xl border border-red-100 bg-white p-4 text-left shadow-xl">
+                                  <p className="text-sm font-black text-red-800">
+                                    Are you sure you want to delete this lead?
+                                  </p>
+                                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                                    This will remove the active pipeline row and
+                                    archive a full copy for HR tracking.
+                                  </p>
+
+                                  <form
+                                    action={deleteAmbassadorLead}
+                                    className="mt-3"
+                                  >
+                                    <input
+                                      type="hidden"
+                                      name="lead_id"
+                                      value={lead.id}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="source_table"
+                                      value={lead.sourceTable}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="lead_name"
+                                      value={lead.name}
+                                    />
+                                    <button
+                                      type="submit"
+                                      className="inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
+                                    >
+                                      Yes, Delete and Archive
+                                    </button>
+                                  </form>
+                                </div>
+                              </details>
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr
+                          id={`edit-lead-${lead.id || index}`}
+                          className="border-b border-[#f1f5f2]"
+                        >
+                          <td colSpan={9} className="bg-[#fbfcf9] px-4 py-5">
+                            <PipelineEditForm lead={lead} />
+                          </td>
+                        </tr>
+                      </Fragment>
                     ))
                   ) : (
                     <tr>
                       <td colSpan={9} className="py-10">
                         <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-8 text-center">
-                          <Search className="mx-auto mb-3 text-green-700" size={32} />
+                          <Search
+                            className="mx-auto mb-3 text-green-700"
+                            size={32}
+                          />
                           <h3 className="text-lg font-black text-green-950">
                             No matching ambassador leads found
                           </h3>
                           <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-green-900/70">
-                            Adjust the pipeline filters or clear them to view all ambassador leads.
+                            Adjust the pipeline filters or clear them to view all
+                            ambassador leads.
                           </p>
                         </div>
                       </td>
@@ -1667,8 +1734,8 @@ export default async function AmbassadorLeadsPage({
         <DashboardCard>
           <ActionCard
             icon={<BriefcaseBusiness size={20} />}
-            title="PA CareerLink Workflow"
-            detail="Use this page to enter applicants after PA CareerLink referrals come in."
+            title="Indeed / PA CareerLink Workflow"
+            detail="Use this page to enter applicants after Indeed, PA CareerLink, referral, or website leads come in."
             href={adminRoutes.ambassadorLeads}
             action="Stay here"
           />
@@ -2068,14 +2135,13 @@ function LeadStatusBadge({ status }: { status: string }) {
               : "bg-orange-100 text-orange-800";
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}>
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}
+    >
       {status}
     </span>
   );
 }
-
-
-
 
 function PipelineProgressFlow({ status }: { status: string }) {
   const stages = ["New", "Contacted", "Interested", "Signed Up", "Approved"];
@@ -2132,9 +2198,6 @@ function PipelineProgressFlow({ status }: { status: string }) {
   );
 }
 
-
-
-
 function PipelineFilterPanel({
   filters,
   resultCount,
@@ -2165,7 +2228,8 @@ function PipelineFilterPanel({
             Pipeline filters
           </h3>
           <p className="mt-1 text-xs font-bold text-slate-500">
-            Showing {number(resultCount)} of {number(totalCount)} ambassador leads.
+            Showing {number(resultCount)} of {number(totalCount)} ambassador
+            leads.
           </p>
         </div>
 
@@ -2179,7 +2243,10 @@ function PipelineFilterPanel({
         ) : null}
       </div>
 
-      <form action={adminRoutes.ambassadorLeads} className="grid gap-3 lg:grid-cols-6">
+      <form
+        action={adminRoutes.ambassadorLeads}
+        className="grid gap-3 lg:grid-cols-6"
+      >
         <label className="lg:col-span-2">
           <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
             Search
@@ -2219,7 +2286,11 @@ function PipelineFilterPanel({
           ))}
         </FilterSelect>
 
-        <FilterSelect label="Documents" name="documents" value={filters.documents}>
+        <FilterSelect
+          label="Documents"
+          name="documents"
+          value={filters.documents}
+        >
           <option value="">All documents</option>
           <option value="with_documents">With documents</option>
           <option value="missing_documents">Missing documents</option>
@@ -2289,7 +2360,7 @@ function PipelineEditForm({ lead }: { lead: any }) {
             <input
               name="email"
               type="email"
-              defaultValue={lead.email}
+              defaultValue={lead.email === "—" ? "" : lead.email}
               className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
             />
           </PipelineEditField>
@@ -2297,7 +2368,7 @@ function PipelineEditForm({ lead }: { lead: any }) {
           <PipelineEditField label="Phone">
             <input
               name="phone"
-              defaultValue={lead.phone}
+              defaultValue={lead.phone === "—" ? "" : lead.phone}
               data-phone-input="true"
               className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
             />
@@ -2405,7 +2476,7 @@ function PipelineEditForm({ lead }: { lead: any }) {
             <input
               name="resume_file_url"
               defaultValue={lead.documents.resumeUrl}
-              placeholder="student-hire/indeed/resume.pdf"
+              placeholder="student-hire/resume.pdf"
               className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
             />
           </PipelineEditField>
@@ -2535,7 +2606,11 @@ function DocumentButtonGroup({
           href={item.href}
           target="_blank"
           rel="noreferrer"
-          title={item.secure ? `${item.label} opens through secure admin viewer` : item.label}
+          title={
+            item.secure
+              ? `${item.label} opens through secure admin viewer`
+              : item.label
+          }
           className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-100"
         >
           <FileText size={13} />
