@@ -26,6 +26,20 @@ function getFriendlyAuthError(message: string) {
   );
 }
 
+function upsertMetaTag(name: string, content: string) {
+  let tag = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.setAttribute("name", name);
+    document.head.appendChild(tag);
+  }
+
+  tag.setAttribute("content", content);
+
+  return tag;
+}
+
 export default function ResetPasswordPage() {
   const router = useRouter();
 
@@ -46,6 +60,19 @@ export default function ResetPasswordPage() {
       password === confirmPassword
     );
   }, [password, confirmPassword]);
+
+  useEffect(() => {
+    const robotsTag = upsertMetaTag("robots", "noindex,nofollow,noarchive");
+    const googleBotTag = upsertMetaTag(
+      "googlebot",
+      "noindex,nofollow,noarchive",
+    );
+
+    return () => {
+      robotsTag.remove();
+      googleBotTag.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -213,7 +240,10 @@ export default function ResetPasswordPage() {
             ) : null}
 
             {!checkingSession && hasRecoverySession ? (
-              <form onSubmit={handleSubmit} className="mt-6 space-y-4 sm:space-y-5">
+              <form
+                onSubmit={handleSubmit}
+                className="mt-6 space-y-4 sm:space-y-5"
+              >
                 <div>
                   <label
                     htmlFor="password"

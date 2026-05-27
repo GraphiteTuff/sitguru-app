@@ -58,6 +58,16 @@ type MessageRow = {
   conversation_id?: string | null;
   sender_id?: string | null;
   recipient_id?: string | null;
+  sender_role?: string | null;
+  recipient_role?: string | null;
+  sender_name_snapshot?: string | null;
+  sender_email_snapshot?: string | null;
+  sender_phone_snapshot?: string | null;
+  sender_role_snapshot?: string | null;
+  recipient_name_snapshot?: string | null;
+  recipient_email_snapshot?: string | null;
+  recipient_phone_snapshot?: string | null;
+  recipient_role_snapshot?: string | null;
   content?: string | null;
   body?: string | null;
   message_type?: string | null;
@@ -222,6 +232,51 @@ function getProfileAvatar(profile?: ProfileRow | null) {
     profile.headshot_url ||
     profile.image_url ||
     ""
+  );
+}
+
+
+function shortenId(value?: string | null) {
+  const cleanValue = String(value || "").trim();
+  if (!cleanValue) return "";
+  return cleanValue.length > 12
+    ? `${cleanValue.slice(0, 8)}…${cleanValue.slice(-4)}`
+    : cleanValue;
+}
+
+function getSnapshotName({
+  userId,
+  role,
+  messages,
+}: {
+  userId: string;
+  role: string;
+  messages: MessageRow[];
+}) {
+  for (const message of [...messages].reverse()) {
+    if (message.sender_id === userId && message.sender_name_snapshot) {
+      return message.sender_name_snapshot;
+    }
+
+    if (message.recipient_id === userId && message.recipient_name_snapshot) {
+      return message.recipient_name_snapshot;
+    }
+  }
+
+  if (role === "customer") return `Archived Pet Parent ${shortenId(userId)}`;
+  if (role === "guru") return `Archived Guru ${shortenId(userId)}`;
+  if (role === "admin") return `SitGuru Admin ${shortenId(userId)}`;
+
+  return `Archived SitGuru User ${shortenId(userId)}`;
+}
+
+function getMessageSenderRole(message?: MessageRow | null) {
+  return normalizeRole(message?.sender_role || message?.sender_role_snapshot || "");
+}
+
+function getMessageRecipientRole(message?: MessageRow | null) {
+  return normalizeRole(
+    message?.recipient_role || message?.recipient_role_snapshot || "",
   );
 }
 
@@ -953,7 +1008,7 @@ export default async function AdminMessageConversationPage({
   const conversation = conversationResult.data as ConversationRow | null;
 
   let safeMessages = ((routeMessagesResult.data || []) as MessageRow[]).filter(
-    (message) => Boolean(message) && message.is_deleted !== true,
+    (message) => Boolean(message),
   );
 
   if (!conversation && safeMessages.length === 0 && !messageIdFromDirectRoute) {
@@ -963,7 +1018,7 @@ export default async function AdminMessageConversationPage({
     );
 
     safeMessages = ((directMessageResult.data || []) as MessageRow[]).filter(
-      (message) => Boolean(message) && message.is_deleted !== true,
+      (message) => Boolean(message),
     );
   }
 
@@ -1131,6 +1186,11 @@ export default async function AdminMessageConversationPage({
 
   const participants: ParticipantCard[] = participantIds.map((participantId) => {
     const profile = profileMap.get(participantId) || null;
+    const relatedMessage = sortedMessages.find(
+      (message) =>
+        message.sender_id === participantId || message.recipient_id === participantId,
+    );
+
     const role =
       normalizeRole(participantRoleMap.get(participantId)) ||
       getProfileRole(profile) ||
@@ -1138,9 +1198,18 @@ export default async function AdminMessageConversationPage({
         ? "customer"
         : participantId === conversation?.guru_id
           ? "guru"
-          : "user");
+          : relatedMessage?.sender_id === participantId
+            ? getMessageSenderRole(relatedMessage)
+            : relatedMessage?.recipient_id === participantId
+              ? getMessageRecipientRole(relatedMessage)
+              : "user");
 
-    const name = role === "admin" ? "SitGuru Admin" : getProfileName(profile);
+    const name =
+      role === "admin"
+        ? "SitGuru Admin"
+        : profile
+          ? getProfileName(profile)
+          : getSnapshotName({ userId: participantId, role, messages: sortedMessages });
     const label =
       role === "guru" ? `${getFirstName(name)} · Guru` : getReadableRole(role);
     const avatarUrl = getMessageAvatarUrl({
@@ -1194,7 +1263,7 @@ export default async function AdminMessageConversationPage({
                     {subject}
                   </h1>
                   <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
-                    {threadType} · Last activity{" "}
+                    Preserved support history · {threadType} · Last activity{" "}
                     <span className="font-black text-slate-800">
                       {formatLongDateTime(lastActivity)}
                     </span>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  Archive,
   ArrowLeft,
   Award,
   BriefcaseBusiness,
@@ -12,10 +13,14 @@ import {
   ImageOff,
   Mail,
   MapPin,
+  PauseCircle,
   PawPrint,
   Phone,
+  PlayCircle,
   QrCode,
+  RotateCcw,
   Save,
+  Send,
   ShieldCheck,
   Trash2,
   Users,
@@ -54,6 +59,8 @@ type AmbassadorRow = {
   eligibility_review_complete: boolean | null;
   terms_accepted_at: string | null;
   activated_at: string | null;
+  archived_at: string | null;
+  archived_reason: string | null;
   created_at: string | null;
   updated_at: string | null;
   ambassador_photo_url: string | null;
@@ -136,10 +143,50 @@ const AMBASSADOR_STATUSES = [
   { value: "nurture", label: "Nurture" },
   { value: "not_a_fit", label: "Not a Fit" },
   { value: "inactive", label: "Inactive" },
+  { value: "archived", label: "Archived" },
+];
+
+const ambassadorQuickActions = [
+  {
+    label: "Onboarding Sent",
+    value: "onboarding_sent",
+    icon: <Send className="h-3.5 w-3.5" />,
+    className:
+      "bg-blue-50 text-blue-800 ring-blue-100 hover:bg-blue-100 hover:text-blue-900",
+  },
+  {
+    label: "Active",
+    value: "active",
+    icon: <PlayCircle className="h-3.5 w-3.5" />,
+    className:
+      "bg-emerald-50 text-emerald-800 ring-emerald-100 hover:bg-emerald-100 hover:text-emerald-900",
+  },
+  {
+    label: "Pause",
+    value: "paused",
+    icon: <PauseCircle className="h-3.5 w-3.5" />,
+    className:
+      "bg-amber-50 text-amber-800 ring-amber-100 hover:bg-amber-100 hover:text-amber-900",
+  },
+  {
+    label: "Archive",
+    value: "archived",
+    icon: <Archive className="h-3.5 w-3.5" />,
+    className:
+      "bg-red-50 text-red-700 ring-red-100 hover:bg-red-100 hover:text-red-800",
+  },
 ];
 
 function isSuperUserEmail(email: string | null | undefined) {
   return SUPER_USER_EMAILS.has((email || "").toLowerCase());
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isArchivedAmbassador(ambassador: AmbassadorRow) {
+  return ambassador.status === "archived" || Boolean(ambassador.archived_at);
 }
 
 async function updateAmbassadorStatus(
@@ -168,13 +215,24 @@ async function updateAmbassadorStatus(
     throw new Error("Invalid Ambassador status.");
   }
 
-  const updatePayload: Record<string, string> = {
-    status: nextStatus,
-  };
+  const now = new Date().toISOString();
 
-  if (nextStatus === "active") {
-    updatePayload.activated_at = new Date().toISOString();
-  }
+  const updatePayload =
+    nextStatus === "archived"
+      ? {
+          status: "archived",
+          archived_at: now,
+          archived_reason:
+            "Archived from Ambassador detail status control. Retained for applicant and contractor recordkeeping.",
+          updated_at: now,
+        }
+      : {
+          status: nextStatus,
+          archived_at: null,
+          archived_reason: null,
+          updated_at: now,
+          ...(nextStatus === "active" ? { activated_at: now } : {}),
+        };
 
   const { error } = await supabase
     .from("ambassadors")
@@ -188,13 +246,84 @@ async function updateAmbassadorStatus(
   await supabase.from("ambassador_activity_log").insert({
     ambassador_id: ambassadorId,
     activity_type: "status_update",
-    activity_title: `Status updated to ${prettyStatus(nextStatus)}`,
-    activity_notes: `Updated by ${user.email || "Super Admin"}.`,
+    activity_title:
+      nextStatus === "archived"
+        ? "Ambassador archived"
+        : `Status updated to ${prettyStatus(nextStatus)}`,
+    activity_notes: `Updated by ${user.email || "Super Admin"} from the Ambassador detail page.`,
     created_by: user.id,
   });
 
   revalidatePath("/admin/ambassadors");
   revalidatePath(`/admin/ambassadors/${ambassadorId}`);
+  revalidatePath("/admin/hr");
+}
+
+async function updateAmbassadorPipelineStatus(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !isSuperUserEmail(user.email)) {
+    redirect("/admin/login");
+  }
+
+  const ambassadorId = asString(formData.get("ambassador_id"));
+  const nextStatus = asString(formData.get("next_status"));
+  const ambassadorName = asString(formData.get("ambassador_name")) || "Ambassador";
+
+  if (!ambassadorId || !nextStatus) {
+    redirect("/admin/ambassadors");
+  }
+
+  const now = new Date().toISOString();
+
+  const updatePayload =
+    nextStatus === "archived"
+      ? {
+          status: "archived",
+          archived_at: now,
+          archived_reason:
+            "Archived from Ambassador detail quick action. Retained for applicant and contractor recordkeeping.",
+          updated_at: now,
+        }
+      : {
+          status: nextStatus,
+          archived_at: null,
+          archived_reason: null,
+          updated_at: now,
+          ...(nextStatus === "active" ? { activated_at: now } : {}),
+        };
+
+  const { error } = await supabase
+    .from("ambassadors")
+    .update(updatePayload)
+    .eq("id", ambassadorId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await supabase.from("ambassador_activity_log").insert({
+    ambassador_id: ambassadorId,
+    activity_type: "status_update",
+    activity_title:
+      nextStatus === "archived"
+        ? "Ambassador archived"
+        : `Ambassador status updated to ${prettyStatus(nextStatus)}`,
+    activity_notes: `${ambassadorName} was updated by ${
+      user.email || "Super Admin"
+    } from the Ambassador detail quick actions.`,
+    created_by: user.id,
+  });
+
+  revalidatePath("/admin/ambassadors");
+  revalidatePath(`/admin/ambassadors/${ambassadorId}`);
+  revalidatePath("/admin/hr");
 }
 
 async function updateAmbassadorPhoto(
@@ -382,7 +511,11 @@ function statusClass(status: string | null | undefined) {
     case "profile_started":
     case "profile_completed":
     case "in_progress":
+    case "paused":
+    case "nurture":
       return "bg-amber-100 text-amber-800 ring-amber-200";
+    case "archived":
+      return "bg-red-100 text-red-700 ring-red-200";
     case "not_a_fit":
     case "inactive":
     case "not_qualified":
@@ -554,6 +687,50 @@ function buildDetailCards(
   ];
 }
 
+function AmbassadorQuickActions({
+  ambassador,
+  ambassadorName,
+}: {
+  ambassador: AmbassadorRow;
+  ambassadorName: string;
+}) {
+  if (isArchivedAmbassador(ambassador)) {
+    return (
+      <form action={updateAmbassadorPipelineStatus}>
+        <input type="hidden" name="ambassador_id" value={ambassador.id} />
+        <input type="hidden" name="ambassador_name" value={ambassadorName} />
+        <input type="hidden" name="next_status" value="contacted" />
+        <button
+          type="submit"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-green-50 px-5 py-2 text-sm font-extrabold text-green-800 ring-1 ring-green-100 transition hover:bg-green-100 sm:w-auto"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Restore Ambassador
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      {ambassadorQuickActions.map((action) => (
+        <form key={action.value} action={updateAmbassadorPipelineStatus}>
+          <input type="hidden" name="ambassador_id" value={ambassador.id} />
+          <input type="hidden" name="ambassador_name" value={ambassadorName} />
+          <input type="hidden" name="next_status" value={action.value} />
+          <button
+            type="submit"
+            className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-extrabold ring-1 transition ${action.className}`}
+          >
+            {action.icon}
+            {action.label}
+          </button>
+        </form>
+      ))}
+    </div>
+  );
+}
+
 export default async function AdminAmbassadorDetailPage({
   params,
 }: {
@@ -619,6 +796,7 @@ export default async function AdminAmbassadorDetailPage({
   const ambassadorName =
     ambassadorRow.full_name || ambassadorRow.display_name || "Unnamed Ambassador";
   const hasPhoto = Boolean(ambassadorRow.ambassador_photo_url);
+  const isArchived = isArchivedAmbassador(ambassadorRow);
 
   return (
     <main className="min-h-screen bg-[#f5f8f3] px-4 py-6 text-[#17351f] sm:px-6 lg:px-8">
@@ -633,7 +811,11 @@ export default async function AdminAmbassadorDetailPage({
           </Link>
         </div>
 
-        <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-5 shadow-sm sm:p-6">
+        <section
+          className={`rounded-[2rem] border bg-white p-5 shadow-sm sm:p-6 ${
+            isArchived ? "border-red-100" : "border-[#dbe8d5]"
+          }`}
+        >
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
               <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[2rem] bg-[#e8f5e9] text-2xl font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
@@ -666,10 +848,10 @@ export default async function AdminAmbassadorDetailPage({
                 <div className="mt-4 flex flex-wrap gap-2">
                   <span
                     className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
-                      ambassadorRow.status,
+                      isArchived ? "archived" : ambassadorRow.status,
                     )}`}
                   >
-                    {prettyStatus(ambassadorRow.status)}
+                    {isArchived ? "Archived" : prettyStatus(ambassadorRow.status)}
                   </span>
                   <span
                     className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${photoStatusClass(
@@ -686,6 +868,19 @@ export default async function AdminAmbassadorDetailPage({
                     Source: {ambassadorRow.source || "Indeed"}
                   </span>
                 </div>
+
+                {isArchived ? (
+                  <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-800">
+                    <p className="font-black">Archived record</p>
+                    <p className="mt-1">
+                      {ambassadorRow.archived_reason ||
+                        "This Ambassador is retained on file and should not continue onboarding unless restored."}
+                    </p>
+                    <p className="mt-1 text-xs font-black uppercase tracking-[0.12em]">
+                      Archived: {formatDate(ambassadorRow.archived_at)}
+                    </p>
+                  </div>
+                ) : null}
 
                 <div className="mt-5 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
                   <div className="flex items-center gap-2">
@@ -829,15 +1024,13 @@ export default async function AdminAmbassadorDetailPage({
                 />
               </label>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="submit"
-                  className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Photo
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Save Photo
+              </button>
             </form>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -866,7 +1059,7 @@ export default async function AdminAmbassadorDetailPage({
           </section>
 
           <section className="rounded-[2rem] border border-[#cfe4c8] bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-5">
               <div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-[#2f6f3e]" />
@@ -875,15 +1068,24 @@ export default async function AdminAmbassadorDetailPage({
                   </h2>
                 </div>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                  Move this Ambassador through the hiring and onboarding
-                  pipeline. Setting status to Active will mark the Ambassador as
-                  activated.
+                  Move this Ambassador through the onboarding pipeline. Use
+                  Archive for declined or closed records instead of deleting.
                 </p>
+              </div>
+
+              <div className="rounded-3xl border border-[#e2ecd9] bg-[#f8fbf6] p-4">
+                <p className="mb-3 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                  Quick Actions
+                </p>
+                <AmbassadorQuickActions
+                  ambassador={ambassadorRow}
+                  ambassadorName={ambassadorName}
+                />
               </div>
 
               <form
                 action={updateAmbassadorStatus.bind(null, ambassadorRow.id)}
-                className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto"
+                className="flex w-full flex-col gap-3 sm:flex-row"
               >
                 <select
                   name="status"
@@ -1221,6 +1423,24 @@ export default async function AdminAmbassadorDetailPage({
                 </p>
                 <p className="mt-1 font-extrabold text-[#102819]">
                   {formatDate(ambassadorRow.terms_accepted_at)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-[#f8fbf6] p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Archived
+                </p>
+                <p className="mt-1 font-extrabold text-[#102819]">
+                  {formatDate(ambassadorRow.archived_at)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-[#f8fbf6] p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Last Updated
+                </p>
+                <p className="mt-1 font-extrabold text-[#102819]">
+                  {formatDate(ambassadorRow.updated_at)}
                 </p>
               </div>
             </div>

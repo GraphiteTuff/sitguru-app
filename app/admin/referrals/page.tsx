@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Archive,
   ArrowRight,
   BadgeDollarSign,
   BarChart3,
@@ -241,6 +242,23 @@ function getStatus(row: DbRow) {
     ],
     "pending",
   ).toLowerCase();
+}
+
+function isArchivedStatus(row: DbRow) {
+  const status = getStatus(row);
+
+  return (
+    status === "archived" ||
+    status === "archive" ||
+    status.includes("archived") ||
+    status.includes("not_a_fit") ||
+    status.includes("not_moving_forward") ||
+    Boolean(asString(row["archived_at"]))
+  );
+}
+
+function isActiveStatus(row: DbRow) {
+  return !isArchivedStatus(row);
 }
 
 function isCompleted(row: DbRow) {
@@ -1158,6 +1176,10 @@ export default async function AdminReferralsPage() {
     bookingsResult,
     gurusResult,
     programApplicationsResult,
+    ambassadorLeadsResult,
+    ambassadorsResult,
+    ambassadorReferralsResult,
+    ambassadorRewardsResult,
     partnerPayoutsResult,
     referralRewardsResult,
     referralEventsResult,
@@ -1175,6 +1197,22 @@ export default async function AdminReferralsPage() {
     safeRows<DbRow>(
       supabaseAdmin.from("program_applications").select("*").limit(5000),
       "program_applications",
+    ),
+    safeRows<DbRow>(
+      supabaseAdmin.from("ambassador_leads").select("*").limit(5000),
+      "ambassador_leads",
+    ),
+    safeRows<DbRow>(
+      supabaseAdmin.from("ambassadors").select("*").limit(5000),
+      "ambassadors",
+    ),
+    safeRows<DbRow>(
+      supabaseAdmin.from("ambassador_referrals").select("*").limit(5000),
+      "ambassador_referrals",
+    ),
+    safeRows<DbRow>(
+      supabaseAdmin.from("ambassador_rewards").select("*").limit(5000),
+      "ambassador_rewards",
     ),
     safeRows<DbRow>(
       supabaseAdmin.from("partner_payouts").select("*").limit(5000),
@@ -1222,6 +1260,10 @@ export default async function AdminReferralsPage() {
   const bookings = bookingsResult.rows;
   const gurus = gurusResult.rows;
   const programApplications = programApplicationsResult.rows;
+  const ambassadorLeads = ambassadorLeadsResult.rows;
+  const ambassadors = ambassadorsResult.rows;
+  const ambassadorReferrals = ambassadorReferralsResult.rows;
+  const ambassadorRewards = ambassadorRewardsResult.rows;
   const partnerPayouts = partnerPayoutsResult.rows;
   const referralRewards = referralRewardsResult.rows;
   const referralEvents = referralEventsResult.rows;
@@ -1238,6 +1280,10 @@ export default async function AdminReferralsPage() {
     bookingsResult.warning,
     gurusResult.warning,
     programApplicationsResult.warning,
+    ambassadorLeadsResult.warning,
+    ambassadorsResult.warning,
+    ambassadorReferralsResult.warning,
+    ambassadorRewardsResult.warning,
     partnerPayoutsResult.warning,
     referralRewardsResult.warning,
     referralEventsResult.warning,
@@ -1253,6 +1299,24 @@ export default async function AdminReferralsPage() {
   const profilesWithReferralSignal = profiles.filter(hasReferralSignal);
   const customerReferralProfiles = profilesWithReferralSignal.filter(isCustomerProfile);
   const guruReferralProfiles = profilesWithReferralSignal.filter(isGuruProfile);
+
+  const activeAmbassadorLeads = ambassadorLeads.filter(isActiveStatus);
+  const archivedAmbassadorLeads = ambassadorLeads.filter(isArchivedStatus);
+  const activeAmbassadors = ambassadors.filter(isActiveStatus);
+  const archivedAmbassadors = ambassadors.filter(isArchivedStatus);
+  const activeAmbassadorReferrals = ambassadorReferrals.filter(isActiveStatus);
+  const activeAmbassadorRewards = ambassadorRewards.filter(isActiveStatus);
+  const ambassadorPipelineTotal =
+    activeAmbassadorLeads.length +
+    activeAmbassadors.length +
+    activeAmbassadorReferrals.length;
+  const archivedAmbassadorTotal = archivedAmbassadorLeads.length + archivedAmbassadors.length;
+  const ambassadorRewardLiability = activeAmbassadorRewards
+    .filter(isPending)
+    .reduce((sum, row) => sum + getRewardAmount(row), 0);
+  const ambassadorPaidRewards = activeAmbassadorRewards
+    .filter(isCompleted)
+    .reduce((sum, row) => sum + getRewardAmount(row), 0);
 
   const bookingReferralSignals = bookings.filter(hasReferralSignal);
   const completedReferralBookings =
@@ -1276,6 +1340,7 @@ export default async function AdminReferralsPage() {
   const ambassadorApplications = programApplications.filter((application) =>
     getProgram(application).toLowerCase().includes("ambassador"),
   );
+  const activeAmbassadorApplications = ambassadorApplications.filter(isActiveStatus);
 
   const studentApplications = programApplications.filter((application) =>
     getProgram(application).toLowerCase().includes("student"),
@@ -1365,10 +1430,13 @@ export default async function AdminReferralsPage() {
     {
       title: "Ambassador Referrals",
       description:
-        "Track Ambassador-driven Pet Parent and Guru growth, referral activity, and program performance.",
-      count: ambassadorApplications.length,
-      statLabel: "Ambassador applications",
-      href: "/admin/referrals/ambassadors",
+        "Track Ambassador-driven Pet Parent and Guru growth, active Ambassador records, archived records, referral activity, rewards, and program performance.",
+      count:
+        ambassadorPipelineTotal ||
+        activeAmbassadorApplications.length ||
+        activeAmbassadorRewards.length,
+      statLabel: `${formatNumber(activeAmbassadorLeads.length)} active leads • ${formatNumber(archivedAmbassadorTotal)} archived`,
+      href: "/admin/ambassadors",
       icon: Megaphone,
       badgeClassName:
         "mb-4 inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-violet-800 ring-1 ring-violet-100",
@@ -1469,6 +1537,76 @@ export default async function AdminReferralsPage() {
       </section>
 
       <WarningBox warnings={warnings} />
+
+      <section className="grid gap-3 rounded-[28px] border border-green-100 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-4">
+        <Link
+          href="/admin/ambassador-leads"
+          className="group rounded-2xl border border-green-100 bg-[#fbfcf9] p-4 transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-green-50 text-green-800 ring-1 ring-green-100">
+              <Megaphone className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-slate-950">Ambassador Leads</p>
+              <p className="text-xs font-bold text-slate-500">
+                Contacted, Interested, Not Moving, Archive, Restore
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/ambassadors"
+          className="group rounded-2xl border border-green-100 bg-[#fbfcf9] p-4 transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-green-50 text-green-800 ring-1 ring-green-100">
+              <Users className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-slate-950">Ambassador Dashboard</p>
+              <p className="text-xs font-bold text-slate-500">
+                Active, paused, archived, restored, rewards
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/hr"
+          className="group rounded-2xl border border-green-100 bg-[#fbfcf9] p-4 transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-green-50 text-green-800 ring-1 ring-green-100">
+              <ClipboardList className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-slate-950">HR Command Center</p>
+              <p className="text-xs font-bold text-slate-500">
+                Active pipeline and archived applicant counts
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/referrals/payouts"
+          className="group rounded-2xl border border-green-100 bg-[#fbfcf9] p-4 transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-green-50 text-green-800 ring-1 ring-green-100">
+              <HandCoins className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-slate-950">Referral Payouts</p>
+              <p className="text-xs font-bold text-slate-500">
+                Reward liability and payout readiness
+              </p>
+            </div>
+          </div>
+        </Link>
+      </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {insights.map((insight) => (
@@ -1593,6 +1731,27 @@ export default async function AdminReferralsPage() {
           value={formatNumber(studentApplications.length + veteranApplications.length)}
           detail="Student Hire, Veterans Hire, Military, and SkillBridge application signals."
           icon={ClipboardList}
+        />
+
+        <KpiCard
+          label="Active Ambassadors"
+          value={formatNumber(activeAmbassadorLeads.length + activeAmbassadors.length)}
+          detail="Active Ambassador leads and Ambassador records wired from the Ambassador dashboard."
+          icon={Megaphone}
+        />
+
+        <KpiCard
+          label="Archived Ambassadors"
+          value={formatNumber(archivedAmbassadorTotal)}
+          detail="Declined or closed Ambassador records retained on file without staying in the active pipeline."
+          icon={Archive}
+        />
+
+        <KpiCard
+          label="Ambassador reward liability"
+          value={money(ambassadorRewardLiability)}
+          detail="Pending Ambassador rewards from ambassador_rewards when available."
+          icon={HandCoins}
         />
 
         <KpiCard

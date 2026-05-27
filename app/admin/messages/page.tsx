@@ -77,6 +77,16 @@ type MessageRow = {
   conversation_id?: string | null;
   sender_id?: string | null;
   recipient_id?: string | null;
+  sender_role?: string | null;
+  recipient_role?: string | null;
+  sender_name_snapshot?: string | null;
+  sender_email_snapshot?: string | null;
+  sender_phone_snapshot?: string | null;
+  sender_role_snapshot?: string | null;
+  recipient_name_snapshot?: string | null;
+  recipient_email_snapshot?: string | null;
+  recipient_phone_snapshot?: string | null;
+  recipient_role_snapshot?: string | null;
   content?: string | null;
   body?: string | null;
   message_type?: string | null;
@@ -387,6 +397,73 @@ function getProfileAvatar(profile?: ProfileRow | null) {
     profile.image_url ||
     ""
   );
+}
+
+function shortenId(value?: string | null) {
+  const cleanValue = String(value || "").trim();
+  if (!cleanValue) return "";
+  return cleanValue.length > 12
+    ? `${cleanValue.slice(0, 8)}…${cleanValue.slice(-4)}`
+    : cleanValue;
+}
+
+function getMessageSenderRole(message?: MessageRow | null) {
+  return normalizeRole(
+    message?.sender_role ||
+      message?.sender_role_snapshot ||
+      ""
+  );
+}
+
+function getMessageRecipientRole(message?: MessageRow | null) {
+  return normalizeRole(
+    message?.recipient_role ||
+      message?.recipient_role_snapshot ||
+      ""
+  );
+}
+
+function getSnapshotName({
+  userId,
+  role,
+  messages,
+  direction,
+}: {
+  userId: string;
+  role: "customer" | "guru" | "admin" | "user";
+  messages: MessageRow[];
+  direction: "sender" | "recipient" | "either";
+}) {
+  for (const message of [...messages].reverse()) {
+    const senderMatches = message.sender_id === userId;
+    const recipientMatches = message.recipient_id === userId;
+
+    if (
+      (direction === "sender" || direction === "either") &&
+      senderMatches &&
+      message.sender_name_snapshot
+    ) {
+      return message.sender_name_snapshot;
+    }
+
+    if (
+      (direction === "recipient" || direction === "either") &&
+      recipientMatches &&
+      message.recipient_name_snapshot
+    ) {
+      return message.recipient_name_snapshot;
+    }
+  }
+
+  if (role === "customer") return `Archived Pet Parent ${shortenId(userId)}`;
+  if (role === "guru") return `Archived Guru ${shortenId(userId)}`;
+  if (role === "admin") return `SitGuru Admin ${shortenId(userId)}`;
+
+  return `Archived SitGuru User ${shortenId(userId)}`;
+}
+
+function getSnapshotAvatar() {
+  return "";
 }
 
 function getAdminAvatar(profile?: ProfileRow | null) {
@@ -1543,7 +1620,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
   ).filter(Boolean);
 
   const safeMessages = ((messagesResult.data || []) as MessageRow[]).filter(
-    (message) => Boolean(message) && message.is_deleted !== true,
+    (message) => Boolean(message),
   );
 
   const safeParticipants = (
@@ -1652,28 +1729,52 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       participants.find((participant) => normalizeRole(participant.role) === "customer")
         ?.user_id ||
       messages.find((message) => {
-        const senderRole = getProfileRole(profileMap.get(message.sender_id || ""));
+        const senderRole =
+          getProfileRole(profileMap.get(message.sender_id || "")) ||
+          getMessageSenderRole(message);
         return senderRole === "customer";
       })?.sender_id ||
+      messages.find((message) => {
+        const recipientRole =
+          getProfileRole(profileMap.get(message.recipient_id || "")) ||
+          getMessageRecipientRole(message);
+        return recipientRole === "customer";
+      })?.recipient_id ||
       "";
     const guruId =
       conversation?.guru_id ||
       participants.find((participant) => normalizeRole(participant.role) === "guru")
         ?.user_id ||
       messages.find((message) => {
-        const senderRole = getProfileRole(profileMap.get(message.sender_id || ""));
+        const senderRole =
+          getProfileRole(profileMap.get(message.sender_id || "")) ||
+          getMessageSenderRole(message);
         return senderRole === "guru";
       })?.sender_id ||
+      messages.find((message) => {
+        const recipientRole =
+          getProfileRole(profileMap.get(message.recipient_id || "")) ||
+          getMessageRecipientRole(message);
+        return recipientRole === "guru";
+      })?.recipient_id ||
       "";
     const adminId =
       participants.find((participant) => normalizeRole(participant.role) === "admin")
         ?.user_id ||
       messages.find((message) => {
-        const senderRole = getProfileRole(profileMap.get(message.sender_id || ""));
+        const senderRole =
+          getProfileRole(profileMap.get(message.sender_id || "")) ||
+          getMessageSenderRole(message);
         return senderRole === "admin" || message.sender_id === user.id;
       })?.sender_id ||
+      messages.find((message) => {
+        const recipientRole =
+          getProfileRole(profileMap.get(message.recipient_id || "")) ||
+          getMessageRecipientRole(message);
+        return recipientRole === "admin";
+      })?.recipient_id ||
       conversation?.started_by_user_id ||
-      "";
+      ""; 
 
     const customerProfile = customerId ? profileMap.get(customerId) || null : null;
     const guruProfile = guruId ? profileMap.get(guruId) || null : null;
@@ -1717,16 +1818,43 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       inquiryType,
       inquiryLabel: getInquiryLabel(inquiryType),
       lastActivity,
-      customerName: customerProfile ? getProfileName(customerProfile) : null,
-      customerAvatar: getProfileAvatar(customerProfile),
-      guruName: guruProfile ? getProfileName(guruProfile) : null,
-      guruAvatar: getProfileAvatar(guruProfile),
-      adminName: adminProfileForThread
-        ? getProfileName(adminProfileForThread)
-        : adminId
-          ? "SitGuru Admin"
-          : null,
-      adminAvatar: getAdminAvatar(adminProfileForThread),
+      customerName: customerId
+        ? customerProfile
+          ? getProfileName(customerProfile)
+          : getSnapshotName({
+              userId: customerId,
+              role: "customer",
+              messages,
+              direction: "either",
+            })
+        : null,
+      customerAvatar: customerProfile
+        ? getProfileAvatar(customerProfile)
+        : getSnapshotAvatar(),
+      guruName: guruId
+        ? guruProfile
+          ? getProfileName(guruProfile)
+          : getSnapshotName({
+              userId: guruId,
+              role: "guru",
+              messages,
+              direction: "either",
+            })
+        : null,
+      guruAvatar: guruProfile ? getProfileAvatar(guruProfile) : getSnapshotAvatar(),
+      adminName: adminId
+        ? adminProfileForThread
+          ? getProfileName(adminProfileForThread)
+          : getSnapshotName({
+              userId: adminId,
+              role: "admin",
+              messages,
+              direction: "either",
+            })
+        : null,
+      adminAvatar: adminProfileForThread
+        ? getAdminAvatar(adminProfileForThread)
+        : defaultAdminAvatar,
       unreadCount,
       status,
       messageCount: messages.length,
@@ -1820,7 +1948,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
                   </h1>
                   <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
                     Manage customer, Guru, support, safety, payment, technical,
-                    partner, and internal HQ conversations from one Admin inbox.
+                    partner, and internal HQ conversations from one Admin inbox. Message history stays visible even when a Pet Parent or Guru profile is archived, hidden, or no longer available.
                   </p>
                 </div>
               </div>
@@ -2093,7 +2221,8 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
           `conversation_participants`, and `profiles`. Internal HQ messaging is
           created from User Directory or department shortcuts and writes new
           rows back to `conversations`, `conversation_participants`, and
-          `messages`.
+          `messages`. Message rows are treated as permanent support history and
+          should not be deleted during Pet Parent or Guru cleanup.
         </div>
       </div>
     </main>

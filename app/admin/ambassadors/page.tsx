@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import {
+  Archive,
   Award,
   BriefcaseBusiness,
   Camera,
@@ -8,7 +10,11 @@ import {
   ChevronRight,
   GraduationCap,
   HandCoins,
+  PauseCircle,
   PawPrint,
+  PlayCircle,
+  RotateCcw,
+  Send,
   Users,
   Wallet,
 } from "lucide-react";
@@ -47,6 +53,8 @@ type AmbassadorSummaryRow = {
   ambassador_photo_path?: string | null;
   photo_approved?: boolean | null;
   photo_uploaded_at?: string | null;
+  archived_at?: string | null;
+  archived_reason?: string | null;
 };
 
 type AmbassadorPhotoRow = {
@@ -55,9 +63,51 @@ type AmbassadorPhotoRow = {
   ambassador_photo_path: string | null;
   photo_approved: boolean | null;
   photo_uploaded_at: string | null;
+  archived_at: string | null;
+  archived_reason: string | null;
+  status: string | null;
 };
 
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
+
+const ambassadorQuickActions = [
+  {
+    label: "Onboarding Sent",
+    value: "onboarding_sent",
+    icon: <Send className="h-3.5 w-3.5" />,
+    className:
+      "bg-blue-50 text-blue-800 ring-blue-100 hover:bg-blue-100 hover:text-blue-900",
+  },
+  {
+    label: "Active",
+    value: "active",
+    icon: <PlayCircle className="h-3.5 w-3.5" />,
+    className:
+      "bg-emerald-50 text-emerald-800 ring-emerald-100 hover:bg-emerald-100 hover:text-emerald-900",
+  },
+  {
+    label: "Pause",
+    value: "paused",
+    icon: <PauseCircle className="h-3.5 w-3.5" />,
+    className:
+      "bg-amber-50 text-amber-800 ring-amber-100 hover:bg-amber-100 hover:text-amber-900",
+  },
+  {
+    label: "Archive",
+    value: "archived",
+    icon: <Archive className="h-3.5 w-3.5" />,
+    className:
+      "bg-red-50 text-red-700 ring-red-100 hover:bg-red-100 hover:text-red-800",
+  },
+];
+
+function isSuperUserEmail(email: string | null | undefined) {
+  return SUPER_USER_EMAILS.has((email || "").toLowerCase());
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 function currency(value: number | null | undefined) {
   const amount = Number(value || 0);
@@ -81,6 +131,10 @@ function prettyStatus(status: string | null | undefined) {
     .join(" ");
 }
 
+function isArchivedAmbassador(ambassador: AmbassadorSummaryRow) {
+  return ambassador.status === "archived" || Boolean(ambassador.archived_at);
+}
+
 function statusClass(status: string | null | undefined) {
   switch (status) {
     case "active":
@@ -94,6 +148,8 @@ function statusClass(status: string | null | undefined) {
     case "not_a_fit":
     case "inactive":
       return "bg-rose-100 text-rose-800 ring-rose-200";
+    case "archived":
+      return "bg-red-100 text-red-700 ring-red-200";
     default:
       return "bg-slate-100 text-slate-700 ring-slate-200";
   }
@@ -139,12 +195,20 @@ function getInitials(name: string | null | undefined) {
 }
 
 function buildAdminCards(rows: AmbassadorSummaryRow[]) {
+  const activeRows = rows.filter((row) => !isArchivedAmbassador(row));
+
   return [
     {
       label: "Total Ambassadors",
       value: rows.length.toLocaleString(),
-      subtext: "Indeed Student Ambassador pipeline",
+      subtext: "All active and archived Ambassador records",
       icon: GraduationCap,
+    },
+    {
+      label: "Active Pipeline",
+      value: activeRows.length.toLocaleString(),
+      subtext: "Not archived",
+      icon: Users,
     },
     {
       label: "Pet Parent Signups",
@@ -187,14 +251,6 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
       icon: Award,
     },
     {
-      label: "Approved Rewards",
-      value: currency(
-        rows.reduce((sum, row) => sum + numberValue(row.approved_rewards), 0),
-      ),
-      subtext: "Approved unpaid reward liability",
-      icon: HandCoins,
-    },
-    {
       label: "Ready for Payout",
       value: currency(
         rows.reduce(
@@ -206,6 +262,78 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
       icon: Wallet,
     },
   ];
+}
+
+async function updateAmbassadorPipelineStatus(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !isSuperUserEmail(user.email)) {
+    redirect("/admin/login");
+  }
+
+  const ambassadorId = asString(formData.get("ambassador_id"));
+  const nextStatus = asString(formData.get("next_status"));
+  const ambassadorName = asString(formData.get("ambassador_name")) || "Ambassador";
+
+  if (!ambassadorId || !nextStatus) {
+    redirect("/admin/ambassadors?updated=missing");
+  }
+
+  const now = new Date().toISOString();
+
+  const statusPatch =
+    nextStatus === "archived"
+      ? {
+          status: "archived",
+          archived_at: now,
+          archived_reason:
+            "Archived from Ambassador Dashboard quick action. Retained for applicant and contractor recordkeeping.",
+          updated_at: now,
+        }
+      : {
+          status: nextStatus,
+          archived_at: null,
+          archived_reason: null,
+          updated_at: now,
+          ...(nextStatus === "active" ? { activated_at: now } : {}),
+        };
+
+  const { error } = await supabase
+    .from("ambassadors")
+    .update(statusPatch)
+    .eq("id", ambassadorId);
+
+  if (error) {
+    console.warn("Unable to update Ambassador status:", error);
+    redirect("/admin/ambassadors?updated=error");
+  }
+
+  const activityTitle =
+    nextStatus === "archived"
+      ? "Ambassador archived"
+      : `Ambassador status updated to ${prettyStatus(nextStatus)}`;
+
+  await supabase.from("ambassador_activity_log").insert({
+    ambassador_id: ambassadorId,
+    activity_type: "status_update",
+    activity_title: activityTitle,
+    activity_notes: `${ambassadorName} was updated by ${
+      user.email || "Super Admin"
+    } from the Ambassador Dashboard.`,
+    created_by: user.id,
+  });
+
+  revalidatePath("/admin/ambassadors");
+  revalidatePath(`/admin/ambassadors/${ambassadorId}`);
+  revalidatePath("/admin/hr");
+
+  redirect("/admin/ambassadors?updated=success");
 }
 
 function AmbassadorPhoto({
@@ -271,6 +399,64 @@ function RewardLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function AmbassadorQuickActions({
+  ambassador,
+}: {
+  ambassador: AmbassadorSummaryRow;
+}) {
+  if (isArchivedAmbassador(ambassador)) {
+    return (
+      <form action={updateAmbassadorPipelineStatus}>
+        <input
+          type="hidden"
+          name="ambassador_id"
+          value={ambassador.ambassador_id}
+        />
+        <input
+          type="hidden"
+          name="ambassador_name"
+          value={ambassador.full_name || "Ambassador"}
+        />
+        <input type="hidden" name="next_status" value="contacted" />
+        <button
+          type="submit"
+          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl bg-green-50 px-4 py-2 text-xs font-extrabold text-green-800 ring-1 ring-green-100 transition hover:bg-green-100 sm:w-auto"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Restore
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      {ambassadorQuickActions.map((action) => (
+        <form key={action.value} action={updateAmbassadorPipelineStatus}>
+          <input
+            type="hidden"
+            name="ambassador_id"
+            value={ambassador.ambassador_id}
+          />
+          <input
+            type="hidden"
+            name="ambassador_name"
+            value={ambassador.full_name || "Ambassador"}
+          />
+          <input type="hidden" name="next_status" value={action.value} />
+          <button
+            type="submit"
+            className={`inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl px-3 py-2 text-xs font-extrabold ring-1 transition ${action.className}`}
+          >
+            {action.icon}
+            {action.label}
+          </button>
+        </form>
+      ))}
+    </div>
+  );
+}
+
 function AmbassadorCard({
   ambassador,
 }: {
@@ -278,9 +464,16 @@ function AmbassadorCard({
 }) {
   const hasPhoto = Boolean(ambassador.ambassador_photo_url);
   const trainingPercent = numberValue(ambassador.training_percent);
+  const archived = isArchivedAmbassador(ambassador);
 
   return (
-    <article className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#b8d9b2] hover:shadow-md sm:p-5">
+    <article
+      className={`rounded-[2rem] border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5 ${
+        archived
+          ? "border-red-100 bg-red-50/30 hover:border-red-200"
+          : "border-[#dbe8d5] hover:border-[#b8d9b2]"
+      }`}
+    >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 gap-4">
           <AmbassadorPhoto ambassador={ambassador} size="large" />
@@ -312,16 +505,24 @@ function AmbassadorCard({
               {[ambassador.city, ambassador.state].filter(Boolean).join(", ") ||
                 "Location not saved"}
             </p>
+
+            {archived ? (
+              <p className="mt-2 rounded-2xl bg-red-100 px-3 py-2 text-xs font-bold leading-5 text-red-800">
+                Archived:{" "}
+                {ambassador.archived_reason ||
+                  "Retained on file. Not active for onboarding."}
+              </p>
+            ) : null}
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2 sm:justify-end">
           <span
             className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
-              ambassador.status,
+              archived ? "archived" : ambassador.status,
             )}`}
           >
-            {prettyStatus(ambassador.status)}
+            {archived ? "Archived" : prettyStatus(ambassador.status)}
           </span>
           <span className="inline-flex rounded-full bg-[#f0f7ed] px-3 py-1 text-xs font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
             {ambassador.program || "Student Hire"}
@@ -392,6 +593,13 @@ function AmbassadorCard({
         </div>
       </div>
 
+      <div className="mt-5 rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-3">
+        <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+          Quick Actions
+        </p>
+        <AmbassadorQuickActions ambassador={ambassador} />
+      </div>
+
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs font-semibold text-slate-500">
           Source: {ambassador.source || "Indeed"}
@@ -409,7 +617,42 @@ function AmbassadorCard({
   );
 }
 
-export default async function AdminAmbassadorsPage() {
+function getNotice(searchParams?: Record<string, string | string[] | undefined>) {
+  const updated = searchParams?.updated;
+
+  if (updated === "success") {
+    return {
+      title: "Ambassador updated",
+      message: "The Ambassador status was updated successfully.",
+      tone: "success" as const,
+    };
+  }
+
+  if (updated === "missing") {
+    return {
+      title: "Ambassador not updated",
+      message: "The Ambassador ID or next status was missing.",
+      tone: "warning" as const,
+    };
+  }
+
+  if (updated === "error") {
+    return {
+      title: "Ambassador not updated",
+      message:
+        "The Ambassador could not be updated. Confirm archive columns and status constraints exist in Supabase.",
+      tone: "warning" as const,
+    };
+  }
+
+  return null;
+}
+
+export default async function AdminAmbassadorsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const supabase = await createClient();
 
   const {
@@ -421,6 +664,9 @@ export default async function AdminAmbassadorsPage() {
   if (!user || !SUPER_USER_EMAILS.has(email)) {
     redirect("/admin/login");
   }
+
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const notice = getNotice(resolvedSearchParams);
 
   const { data, error } = await supabase
     .from("admin_ambassador_dashboard_summary")
@@ -435,7 +681,7 @@ export default async function AdminAmbassadorsPage() {
     const { data: photoData } = await supabase
       .from("ambassadors")
       .select(
-        "id, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at",
+        "id, status, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at, archived_at, archived_reason",
       )
       .in(
         "id",
@@ -452,10 +698,13 @@ export default async function AdminAmbassadorsPage() {
 
     return {
       ...row,
+      status: photo?.status || row.status,
       ambassador_photo_url: photo?.ambassador_photo_url || null,
       ambassador_photo_path: photo?.ambassador_photo_path || null,
       photo_approved: photo?.photo_approved || false,
       photo_uploaded_at: photo?.photo_uploaded_at || null,
+      archived_at: photo?.archived_at || null,
+      archived_reason: photo?.archived_reason || null,
     };
   });
 
@@ -465,6 +714,7 @@ export default async function AdminAmbassadorsPage() {
   const onboardingCount = ambassadors.filter((row) =>
     ["conditional_offer_sent", "onboarding_sent"].includes(row.status || ""),
   ).length;
+  const archivedCount = ambassadors.filter(isArchivedAmbassador).length;
   const photoPendingCount = ambassadors.filter(
     (row) => row.ambassador_photo_url && !row.photo_approved,
   ).length;
@@ -487,7 +737,8 @@ export default async function AdminAmbassadorsPage() {
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                 Track Student Ambassadors, Pet Parent signups, Guru signups,
                 business signups, completed bookings, rewards, commissions,
-                profile photos, and payout readiness from one admin view.
+                profile photos, archive status, and payout readiness from one
+                admin view.
               </p>
             </div>
 
@@ -508,6 +759,14 @@ export default async function AdminAmbassadorsPage() {
                   {onboardingCount}
                 </p>
               </div>
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-red-700">
+                  Archived
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-red-900">
+                  {archivedCount}
+                </p>
+              </div>
               <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
                   Photos Pending
@@ -516,17 +775,17 @@ export default async function AdminAmbassadorsPage() {
                   {photoPendingCount}
                 </p>
               </div>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
-                  Photos Approved
-                </p>
-                <p className="mt-1 text-2xl font-extrabold text-emerald-900">
-                  {photoApprovedCount}
-                </p>
-              </div>
             </div>
           </div>
         </section>
+
+        {notice ? (
+          <NoticeCard
+            title={notice.title}
+            message={notice.message}
+            tone={notice.tone}
+          />
+        ) : null}
 
         {error ? (
           <section className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-rose-800">
@@ -576,14 +835,18 @@ export default async function AdminAmbassadorsPage() {
                 Student Ambassadors
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                Card-based admin view with no horizontal scrollbars. Open each
-                profile for deeper controls, documents, photo approval, and
-                status changes.
+                Card-based admin view with wired status buttons. Archive
+                declined candidates instead of deleting them.
               </p>
             </div>
 
-            <div className="rounded-2xl bg-[#f0f7ed] px-4 py-3 text-sm font-bold text-[#2f6f3e]">
-              Source: Indeed
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-2xl bg-[#f0f7ed] px-4 py-3 text-sm font-bold text-[#2f6f3e]">
+                Source: Indeed
+              </span>
+              <span className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+                Photos Approved: {photoApprovedCount}
+              </span>
             </div>
           </div>
         </section>
@@ -613,5 +876,28 @@ export default async function AdminAmbassadorsPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function NoticeCard({
+  title,
+  message,
+  tone,
+}: {
+  title: string;
+  message: string;
+  tone: "success" | "warning";
+}) {
+  return (
+    <div
+      className={`rounded-[24px] border p-4 ${
+        tone === "success"
+          ? "border-green-200 bg-green-50 text-green-950"
+          : "border-amber-200 bg-amber-50 text-amber-950"
+      }`}
+    >
+      <p className="text-sm font-black">{title}</p>
+      <p className="mt-1 text-sm font-semibold leading-6">{message}</p>
+    </div>
   );
 }
