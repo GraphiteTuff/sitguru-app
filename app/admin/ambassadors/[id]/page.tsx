@@ -5,9 +5,11 @@ import {
   ArrowLeft,
   Award,
   BriefcaseBusiness,
+  Camera,
   CheckCircle2,
   GraduationCap,
   HandCoins,
+  ImageOff,
   Mail,
   MapPin,
   PawPrint,
@@ -15,6 +17,7 @@ import {
   QrCode,
   Save,
   ShieldCheck,
+  Trash2,
   Users,
   Wallet,
 } from "lucide-react";
@@ -53,6 +56,12 @@ type AmbassadorRow = {
   activated_at: string | null;
   created_at: string | null;
   updated_at: string | null;
+  ambassador_photo_url: string | null;
+  ambassador_photo_path: string | null;
+  photo_approved: boolean | null;
+  photo_uploaded_at: string | null;
+  photo_approved_at: string | null;
+  photo_approved_by: string | null;
 };
 
 type ReferralRow = {
@@ -188,6 +197,139 @@ async function updateAmbassadorStatus(
   revalidatePath(`/admin/ambassadors/${ambassadorId}`);
 }
 
+async function updateAmbassadorPhoto(
+  ambassadorId: string,
+  formData: FormData,
+) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !isSuperUserEmail(user.email)) {
+    redirect("/admin/login");
+  }
+
+  const photoUrl = String(formData.get("ambassador_photo_url") || "").trim();
+  const photoPath = String(formData.get("ambassador_photo_path") || "").trim();
+
+  const hasPhoto = Boolean(photoUrl || photoPath);
+
+  const { error } = await supabase
+    .from("ambassadors")
+    .update({
+      ambassador_photo_url: photoUrl || null,
+      ambassador_photo_path: photoPath || null,
+      photo_uploaded_at: hasPhoto ? new Date().toISOString() : null,
+      photo_approved: false,
+      photo_approved_at: null,
+      photo_approved_by: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", ambassadorId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await supabase.from("ambassador_activity_log").insert({
+    ambassador_id: ambassadorId,
+    activity_type: "photo_update",
+    activity_title: hasPhoto
+      ? "Ambassador photo added or updated"
+      : "Ambassador photo cleared",
+    activity_notes: `Photo record updated by ${user.email || "Super Admin"}.`,
+    created_by: user.id,
+  });
+
+  revalidatePath("/admin/ambassadors");
+  revalidatePath(`/admin/ambassadors/${ambassadorId}`);
+}
+
+async function approveAmbassadorPhoto(ambassadorId: string) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !isSuperUserEmail(user.email)) {
+    redirect("/admin/login");
+  }
+
+  const { error } = await supabase
+    .from("ambassadors")
+    .update({
+      photo_approved: true,
+      photo_approved_at: new Date().toISOString(),
+      photo_approved_by: user.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", ambassadorId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await supabase.from("ambassador_activity_log").insert({
+    ambassador_id: ambassadorId,
+    activity_type: "photo_approval",
+    activity_title: "Ambassador photo approved",
+    activity_notes: `Approved by ${user.email || "Super Admin"}.`,
+    created_by: user.id,
+  });
+
+  revalidatePath("/admin/ambassadors");
+  revalidatePath(`/admin/ambassadors/${ambassadorId}`);
+}
+
+async function clearAmbassadorPhoto(ambassadorId: string) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !isSuperUserEmail(user.email)) {
+    redirect("/admin/login");
+  }
+
+  const { error } = await supabase
+    .from("ambassadors")
+    .update({
+      ambassador_photo_url: null,
+      ambassador_photo_path: null,
+      photo_uploaded_at: null,
+      photo_approved: false,
+      photo_approved_at: null,
+      photo_approved_by: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", ambassadorId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await supabase.from("ambassador_activity_log").insert({
+    ambassador_id: ambassadorId,
+    activity_type: "photo_clear",
+    activity_title: "Ambassador photo removed",
+    activity_notes: `Removed by ${user.email || "Super Admin"}.`,
+    created_by: user.id,
+  });
+
+  revalidatePath("/admin/ambassadors");
+  revalidatePath(`/admin/ambassadors/${ambassadorId}`);
+}
+
 function numberValue(value: number | null | undefined) {
   return Number(value || 0);
 }
@@ -251,6 +393,37 @@ function statusClass(status: string | null | undefined) {
     default:
       return "bg-slate-100 text-slate-700 ring-slate-200";
   }
+}
+
+function photoStatusClass(
+  hasPhoto: boolean,
+  approved: boolean | null | undefined,
+) {
+  if (!hasPhoto) return "bg-slate-100 text-slate-600 ring-slate-200";
+  if (approved) return "bg-emerald-100 text-emerald-800 ring-emerald-200";
+
+  return "bg-amber-100 text-amber-800 ring-amber-200";
+}
+
+function photoStatusLabel(
+  hasPhoto: boolean,
+  approved: boolean | null | undefined,
+) {
+  if (!hasPhoto) return "No Photo Uploaded";
+  if (approved) return "Photo Approved";
+
+  return "Photo Pending Review";
+}
+
+function getInitials(name: string | null | undefined) {
+  const cleanName = name || "SitGuru Ambassador";
+
+  return cleanName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
 function referralTypeLabel(type: string | null | undefined) {
@@ -443,6 +616,9 @@ export default async function AdminAmbassadorDetailPage({
       : "Referral link not generated yet");
 
   const hasQueryError = referralsError || rewardsError || trainingError;
+  const ambassadorName =
+    ambassadorRow.full_name || ambassadorRow.display_name || "Unnamed Ambassador";
+  const hasPhoto = Boolean(ambassadorRow.ambassador_photo_url);
 
   return (
     <main className="min-h-screen bg-[#f5f8f3] px-4 py-6 text-[#17351f] sm:px-6 lg:px-8">
@@ -459,52 +635,81 @@ export default async function AdminAmbassadorDetailPage({
 
         <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-[#2f6f3e]">
-                Student Ambassador
-              </p>
-              <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#102819] sm:text-4xl">
-                {ambassadorRow.full_name ||
-                  ambassadorRow.display_name ||
-                  "Unnamed Ambassador"}
-              </h1>
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+              <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[2rem] bg-[#e8f5e9] text-2xl font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
+                {hasPhoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={ambassadorRow.ambassador_photo_url || ""}
+                    alt={`${ambassadorName} profile photo`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span>{getInitials(ambassadorName) || "SG"}</span>
+                )}
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
-                    ambassadorRow.status,
-                  )}`}
-                >
-                  {prettyStatus(ambassadorRow.status)}
-                </span>
-                <span className="inline-flex rounded-full bg-[#f0f7ed] px-3 py-1 text-xs font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
-                  {ambassadorRow.program || "Student Hire"}
-                </span>
-                <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
-                  Source: {ambassadorRow.source || "Indeed"}
-                </span>
+                {!hasPhoto ? (
+                  <div className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#2f6f3e] shadow-sm">
+                    <Camera className="h-4 w-4" />
+                  </div>
+                ) : null}
               </div>
 
-              <div className="mt-5 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-[#2f6f3e]" />
-                  <span>{ambassadorRow.email || "No email saved"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-[#2f6f3e]" />
-                  <span>{ambassadorRow.phone || "No phone saved"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-[#2f6f3e]" />
-                  <span>
-                    {[ambassadorRow.city, ambassadorRow.state, ambassadorRow.country]
-                      .filter(Boolean)
-                      .join(", ") || "No location saved"}
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-[#2f6f3e]">
+                  Student Ambassador
+                </p>
+                <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#102819] sm:text-4xl">
+                  {ambassadorName}
+                </h1>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
+                      ambassadorRow.status,
+                    )}`}
+                  >
+                    {prettyStatus(ambassadorRow.status)}
+                  </span>
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${photoStatusClass(
+                      hasPhoto,
+                      ambassadorRow.photo_approved,
+                    )}`}
+                  >
+                    {photoStatusLabel(hasPhoto, ambassadorRow.photo_approved)}
+                  </span>
+                  <span className="inline-flex rounded-full bg-[#f0f7ed] px-3 py-1 text-xs font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
+                    {ambassadorRow.program || "Student Hire"}
+                  </span>
+                  <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
+                    Source: {ambassadorRow.source || "Indeed"}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-[#2f6f3e]" />
-                  <span>{ambassadorRow.internal_role || "Student Ambassador"}</span>
+
+                <div className="mt-5 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-[#2f6f3e]" />
+                    <span>{ambassadorRow.email || "No email saved"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-[#2f6f3e]" />
+                    <span>{ambassadorRow.phone || "No phone saved"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-[#2f6f3e]" />
+                    <span>
+                      {[ambassadorRow.city, ambassadorRow.state, ambassadorRow.country]
+                        .filter(Boolean)
+                        .join(", ") || "No location saved"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-[#2f6f3e]" />
+                    <span>
+                      {ambassadorRow.internal_role || "Student Ambassador"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -543,46 +748,165 @@ export default async function AdminAmbassadorDetailPage({
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-[#cfe4c8] bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-[#2f6f3e]" />
-                <h2 className="text-xl font-extrabold text-[#102819]">
-                  Super Admin Controls
-                </h2>
+        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <section className="rounded-[2rem] border border-[#cfe4c8] bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Camera className="h-5 w-5 text-[#2f6f3e]" />
+              <h2 className="text-xl font-extrabold text-[#102819]">
+                Ambassador Photo
+              </h2>
+            </div>
+
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Store the Ambassador profile photo path or URL here. Photos should
+              be reviewed and approved before being shown publicly.
+            </p>
+
+            <div className="mt-5 rounded-3xl border border-[#e2ecd9] bg-[#f8fbf6] p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-white text-xl font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
+                  {hasPhoto ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={ambassadorRow.ambassador_photo_url || ""}
+                      alt={`${ambassadorName} profile photo preview`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <ImageOff className="h-8 w-8 text-slate-400" />
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${photoStatusClass(
+                      hasPhoto,
+                      ambassadorRow.photo_approved,
+                    )}`}
+                  >
+                    {photoStatusLabel(hasPhoto, ambassadorRow.photo_approved)}
+                  </span>
+                  <p className="mt-2 text-sm font-bold text-[#102819]">
+                    Uploaded: {formatDate(ambassadorRow.photo_uploaded_at)}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-[#102819]">
+                    Approved: {formatDate(ambassadorRow.photo_approved_at)}
+                  </p>
+                  <p className="mt-2 break-all text-xs text-slate-500">
+                    {ambassadorRow.ambassador_photo_path ||
+                      ambassadorRow.ambassador_photo_url ||
+                      "No photo path saved yet."}
+                  </p>
+                </div>
               </div>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Move this Ambassador through the hiring and onboarding pipeline.
-                Setting status to Active will mark the Ambassador as activated.
-              </p>
             </div>
 
             <form
-              action={updateAmbassadorStatus.bind(null, ambassadorRow.id)}
-              className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto"
+              action={updateAmbassadorPhoto.bind(null, ambassadorRow.id)}
+              className="mt-5 space-y-4"
             >
-              <select
-                name="status"
-                defaultValue={ambassadorRow.status || "new"}
-                className="min-h-[46px] rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-bold text-[#102819] shadow-sm outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
-              >
-                {AMBASSADOR_STATUSES.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
+              <label className="block">
+                <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                  Photo URL
+                </span>
+                <input
+                  name="ambassador_photo_url"
+                  defaultValue={ambassadorRow.ambassador_photo_url || ""}
+                  placeholder="https://... or signed/private admin photo URL"
+                  className="w-full rounded-2xl border border-[#cfe4c8] bg-white px-4 py-3 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+                />
+              </label>
 
-              <button
-                type="submit"
-                className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
-              >
-                <Save className="mr-2 h-4 w-4" />
-                Save Status
-              </button>
+              <label className="block">
+                <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                  Storage Path
+                </span>
+                <input
+                  name="ambassador_photo_path"
+                  defaultValue={ambassadorRow.ambassador_photo_path || ""}
+                  placeholder="student-hire/brittany-montiel-profile.jpg"
+                  className="w-full rounded-2xl border border-[#cfe4c8] bg-white px-4 py-3 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+                />
+              </label>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="submit"
+                  className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Photo
+                </button>
+              </div>
             </form>
-          </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <form action={approveAmbassadorPhoto.bind(null, ambassadorRow.id)}>
+                <button
+                  type="submit"
+                  disabled={!hasPhoto}
+                  className="inline-flex min-h-[46px] w-full items-center justify-center rounded-2xl bg-emerald-600 px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  Approve Photo
+                </button>
+              </form>
+
+              <form action={clearAmbassadorPhoto.bind(null, ambassadorRow.id)}>
+                <button
+                  type="submit"
+                  disabled={!hasPhoto && !ambassadorRow.ambassador_photo_path}
+                  className="inline-flex min-h-[46px] w-full items-center justify-center rounded-2xl bg-rose-600 px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Clear Photo
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] border border-[#cfe4c8] bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-[#2f6f3e]" />
+                  <h2 className="text-xl font-extrabold text-[#102819]">
+                    Super Admin Controls
+                  </h2>
+                </div>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  Move this Ambassador through the hiring and onboarding
+                  pipeline. Setting status to Active will mark the Ambassador as
+                  activated.
+                </p>
+              </div>
+
+              <form
+                action={updateAmbassadorStatus.bind(null, ambassadorRow.id)}
+                className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto"
+              >
+                <select
+                  name="status"
+                  defaultValue={ambassadorRow.status || "new"}
+                  className="min-h-[46px] rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-bold text-[#102819] shadow-sm outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+                >
+                  {AMBASSADOR_STATUSES.map((status) => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="submit"
+                  className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Status
+                </button>
+              </form>
+            </div>
+          </section>
         </section>
 
         {hasQueryError ? (

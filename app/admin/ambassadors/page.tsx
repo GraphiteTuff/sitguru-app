@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   Award,
   BriefcaseBusiness,
+  Camera,
   CheckCircle2,
   ChevronRight,
   GraduationCap,
@@ -42,6 +43,18 @@ type AmbassadorSummaryRow = {
   paid_rewards: number | null;
   total_earned: number | null;
   total_paid: number | null;
+  ambassador_photo_url?: string | null;
+  ambassador_photo_path?: string | null;
+  photo_approved?: boolean | null;
+  photo_uploaded_at?: string | null;
+};
+
+type AmbassadorPhotoRow = {
+  id: string;
+  ambassador_photo_url: string | null;
+  ambassador_photo_path: string | null;
+  photo_approved: boolean | null;
+  photo_uploaded_at: string | null;
 };
 
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
@@ -86,12 +99,43 @@ function statusClass(status: string | null | undefined) {
   }
 }
 
+function photoStatusClass(
+  hasPhoto: boolean,
+  approved: boolean | null | undefined,
+) {
+  if (!hasPhoto) return "bg-slate-100 text-slate-600 ring-slate-200";
+  if (approved) return "bg-emerald-100 text-emerald-800 ring-emerald-200";
+
+  return "bg-amber-100 text-amber-800 ring-amber-200";
+}
+
+function getPhotoStatusLabel(
+  hasPhoto: boolean,
+  approved: boolean | null | undefined,
+) {
+  if (!hasPhoto) return "No Photo";
+  if (approved) return "Photo Approved";
+
+  return "Photo Pending";
+}
+
 function trainingClass(percent: number | null | undefined) {
   const value = numberValue(percent);
 
   if (value >= 100) return "bg-emerald-500";
   if (value >= 50) return "bg-amber-500";
   return "bg-slate-400";
+}
+
+function getInitials(name: string | null | undefined) {
+  const cleanName = name || "SitGuru Ambassador";
+
+  return cleanName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
 function buildAdminCards(rows: AmbassadorSummaryRow[]) {
@@ -164,6 +208,47 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
   ];
 }
 
+function AmbassadorPhotoBadge({
+  ambassador,
+}: {
+  ambassador: AmbassadorSummaryRow;
+}) {
+  const hasPhoto = Boolean(ambassador.ambassador_photo_url);
+  const statusLabel = getPhotoStatusLabel(hasPhoto, ambassador.photo_approved);
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#e8f5e9] text-sm font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
+        {hasPhoto ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={ambassador.ambassador_photo_url || ""}
+            alt={`${ambassador.full_name || "Ambassador"} profile photo`}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span>{getInitials(ambassador.full_name) || "SG"}</span>
+        )}
+
+        {!hasPhoto ? (
+          <div className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#2f6f3e] shadow-sm">
+            <Camera className="h-3 w-3" />
+          </div>
+        ) : null}
+      </div>
+
+      <span
+        className={`inline-flex rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide ring-1 ${photoStatusClass(
+          hasPhoto,
+          ambassador.photo_approved,
+        )}`}
+      >
+        {statusLabel}
+      </span>
+    </div>
+  );
+}
+
 export default async function AdminAmbassadorsPage() {
   const supabase = await createClient();
 
@@ -182,12 +267,45 @@ export default async function AdminAmbassadorsPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  const ambassadors = (data || []) as AmbassadorSummaryRow[];
+  const summaryRows = (data || []) as AmbassadorSummaryRow[];
+
+  const { data: photoRows } = await supabase
+    .from("ambassadors")
+    .select(
+      "id, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at",
+    )
+    .in(
+      "id",
+      summaryRows.map((row) => row.ambassador_id),
+    );
+
+  const photoMap = new Map(
+    ((photoRows || []) as AmbassadorPhotoRow[]).map((row) => [row.id, row]),
+  );
+
+  const ambassadors = summaryRows.map((row) => {
+    const photo = photoMap.get(row.ambassador_id);
+
+    return {
+      ...row,
+      ambassador_photo_url: photo?.ambassador_photo_url || null,
+      ambassador_photo_path: photo?.ambassador_photo_path || null,
+      photo_approved: photo?.photo_approved || false,
+      photo_uploaded_at: photo?.photo_uploaded_at || null,
+    };
+  });
+
   const cards = buildAdminCards(ambassadors);
 
   const activeCount = ambassadors.filter((row) => row.status === "active").length;
   const onboardingCount = ambassadors.filter((row) =>
     ["conditional_offer_sent", "onboarding_sent"].includes(row.status || ""),
+  ).length;
+  const photoPendingCount = ambassadors.filter(
+    (row) => row.ambassador_photo_url && !row.photo_approved,
+  ).length;
+  const photoApprovedCount = ambassadors.filter(
+    (row) => row.ambassador_photo_url && row.photo_approved,
   ).length;
 
   return (
@@ -204,12 +322,12 @@ export default async function AdminAmbassadorsPage() {
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                 Track Student Ambassadors, Pet Parent signups, Guru signups,
-                business signups, completed bookings, rewards, commissions, and
-                payout readiness from one admin view.
+                business signups, completed bookings, rewards, commissions,
+                profile photos, and payout readiness from one admin view.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
+            <div className="grid grid-cols-2 gap-3 sm:min-w-[420px]">
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
                   Active
@@ -224,6 +342,22 @@ export default async function AdminAmbassadorsPage() {
                 </p>
                 <p className="mt-1 text-2xl font-extrabold text-blue-900">
                   {onboardingCount}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                  Photos Pending
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-amber-900">
+                  {photoPendingCount}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                  Photos Approved
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-emerald-900">
+                  {photoApprovedCount}
                 </p>
               </div>
             </div>
@@ -278,8 +412,8 @@ export default async function AdminAmbassadorsPage() {
                 Student Ambassadors
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                One-level admin view of each Ambassador’s signups, rewards, and
-                training progress.
+                One-level admin view of each Ambassador’s profile photo,
+                signups, rewards, and training progress.
               </p>
             </div>
 
@@ -297,8 +431,8 @@ export default async function AdminAmbassadorsPage() {
                 No Ambassadors yet
               </h3>
               <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-                Your database is ready. Next, we will add the Indeed candidates
-                to the ambassadors table and then wire their dashboard records.
+                Your database is ready. Next, add candidates to the ambassadors
+                table and wire their dashboard records.
               </p>
             </div>
           ) : (
@@ -336,21 +470,30 @@ export default async function AdminAmbassadorsPage() {
                     return (
                       <tr key={ambassador.ambassador_id} className="align-top">
                         <td className="px-5 py-4">
-                          <div className="min-w-[240px]">
-                            <p className="font-extrabold text-[#102819]">
-                              {ambassador.full_name || "Unnamed Ambassador"}
-                            </p>
-                            <p className="mt-1 text-sm text-slate-600">
-                              {ambassador.email || "No email saved"}
-                            </p>
-                            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#2f6f3e]">
-                              {ambassador.referral_code || "No referral code"}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {[ambassador.city, ambassador.state]
-                                .filter(Boolean)
-                                .join(", ") || "Location not saved"}
-                            </p>
+                          <div className="flex min-w-[320px] items-start gap-4">
+                            <AmbassadorPhotoBadge ambassador={ambassador} />
+
+                            <div className="min-w-0">
+                              <p className="font-extrabold text-[#102819]">
+                                {ambassador.full_name || "Unnamed Ambassador"}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-600">
+                                {ambassador.email || "No email saved"}
+                              </p>
+                              <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#2f6f3e]">
+                                {ambassador.referral_code || "No referral code"}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {[ambassador.city, ambassador.state]
+                                  .filter(Boolean)
+                                  .join(", ") || "Location not saved"}
+                              </p>
+                              {ambassador.ambassador_photo_path ? (
+                                <p className="mt-1 max-w-[280px] truncate text-[11px] text-slate-400">
+                                  {ambassador.ambassador_photo_path}
+                                </p>
+                              ) : null}
+                            </div>
                           </div>
                         </td>
 
