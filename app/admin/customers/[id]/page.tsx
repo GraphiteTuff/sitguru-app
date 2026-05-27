@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -112,9 +113,34 @@ function formatDateTime(value: unknown) {
   });
 }
 
-function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
-  if (!row && !authUser) return "Customer";
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
 
+function getAuthMetadata(authUser: AnyRow | null | undefined) {
+  const userMetadata = authUser?.user_metadata;
+  const rawUserMetadata = authUser?.raw_user_meta_data;
+
+  if (userMetadata && typeof userMetadata === "object") {
+    return userMetadata as AnyRow;
+  }
+
+  if (rawUserMetadata && typeof rawUserMetadata === "object") {
+    return rawUserMetadata as AnyRow;
+  }
+
+  return null;
+}
+
+function getAuthName(authUser: AnyRow | null | undefined) {
+  const metadata = getAuthMetadata(authUser);
+
+  return getText(metadata, ["full_name", "name", "display_name"], "");
+}
+
+function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
   const firstName = getText(row, ["first_name", "firstName"]);
   const lastName = getText(row, ["last_name", "lastName"]);
 
@@ -129,15 +155,19 @@ function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null
       "customer_name",
       "pet_parent_name",
       "owner_name",
-      "email",
     ],
     "",
   );
 
   if (profileName) return profileName;
 
+  const authName = getAuthName(authUser);
+  if (authName) return authName;
+
   const authEmail = getText(authUser, ["email"]);
-  return authEmail || "Customer";
+  const profileEmail = getText(row, ["email", "customer_email", "pet_parent_email"]);
+
+  return profileEmail || authEmail || "Pet Parent";
 }
 
 function getEmail(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
@@ -171,7 +201,7 @@ function getInitials(name: string) {
     .map((part) => part.trim())
     .filter(Boolean);
 
-  if (parts.length === 0) return "C";
+  if (parts.length === 0) return "P";
   if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
 
   return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
@@ -216,7 +246,7 @@ function getPetDescription(row: AnyRow) {
 
 function getAuthProvider(authUser: AnyRow | null) {
   const appMetadata = authUser?.app_metadata as AnyRow | undefined;
-  const userMetadata = authUser?.user_metadata as AnyRow | undefined;
+  const userMetadata = getAuthMetadata(authUser) || undefined;
 
   const provider =
     getText(appMetadata, ["provider"]) ||
@@ -231,7 +261,7 @@ function getAuthProvider(authUser: AnyRow | null) {
 }
 
 function getMetadataName(authUser: AnyRow | null) {
-  const userMetadata = authUser?.user_metadata as AnyRow | undefined;
+  const userMetadata = getAuthMetadata(authUser);
 
   return getText(userMetadata, ["full_name", "name", "display_name"], "—");
 }
@@ -256,7 +286,7 @@ function getProfileCompleteness({
     },
     {
       label: "Name",
-      complete: getDisplayName(profile, authUser) !== "Customer",
+      complete: getDisplayName(profile, authUser) !== "Pet Parent",
     },
     {
       label: "Email",
@@ -295,12 +325,6 @@ function getProfileCompleteness({
   };
 }
 
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(
-    value,
-  );
-}
-
 async function safeSelect(
   table: string,
   select: string,
@@ -320,13 +344,76 @@ async function safeSelect(
   }
 }
 
-async function getAuthUser(customerId: string) {
+async function getAuthUserById(userId: string) {
+  if (!isUuid(userId)) return null;
+
   try {
-    const { data, error } = await supabaseAdmin.auth.admin.getUserById(customerId);
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
 
     if (error || !data?.user) return null;
 
     return data.user as unknown as AnyRow;
+  } catch {
+    return null;
+  }
+}
+
+async function getAuthUserByEmail(email: string) {
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (!cleanEmail || !cleanEmail.includes("@")) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    if (error || !data?.users?.length) return null;
+
+    const match = data.users.find(
+      (user) => user.email?.trim().toLowerCase() === cleanEmail,
+    );
+
+    return match ? (match as unknown as AnyRow) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getAuthUserByLookupKey(lookupKey: string) {
+  if (isUuid(lookupKey)) {
+    return getAuthUserById(lookupKey);
+  }
+
+  return getAuthUserByEmail(lookupKey);
+}
+
+async function getProfileByLookupKey(lookupKey: string) {
+  try {
+    if (isUuid(lookupKey)) {
+      const { data, error } = await supabaseAdmin
+        .from("profiles")
+        .select("*")
+        .eq("id", lookupKey)
+        .maybeSingle();
+
+      if (error) return null;
+      return (data ?? null) as AnyRow | null;
+    }
+
+    if (lookupKey.includes("@")) {
+      const { data, error } = await supabaseAdmin
+        .from("profiles")
+        .select("*")
+        .eq("email", lookupKey)
+        .maybeSingle();
+
+      if (error) return null;
+      return (data ?? null) as AnyRow | null;
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -378,7 +465,7 @@ function getVerificationStatus({
     return {
       status: "missing" as VerificationStatus,
       label: "Missing Record",
-      description: "No matching profile or Supabase auth user was found for this ID.",
+      description: "No matching profile or Supabase auth user was found for this ID or email.",
     };
   }
 
@@ -458,6 +545,57 @@ function getStatusStyles(status: VerificationStatus) {
   };
 }
 
+function getRelatedRecordId({
+  lookupKey,
+  profile,
+  authUser,
+}: {
+  lookupKey: string;
+  profile: AnyRow | null;
+  authUser: AnyRow | null;
+}) {
+  return (
+    getText(profile, ["id"]) ||
+    getText(authUser, ["id"]) ||
+    (isUuid(lookupKey) ? lookupKey : "")
+  );
+}
+
+function buildRelatedIdFilters(customerId: string) {
+  return [
+    `customer_id.eq.${customerId}`,
+    `pet_owner_id.eq.${customerId}`,
+    `user_id.eq.${customerId}`,
+    `pet_parent_id.eq.${customerId}`,
+  ].join(",");
+}
+
+function buildPetIdFilters(customerId: string) {
+  return [
+    `owner_profile_id.eq.${customerId}`,
+    `owner_id.eq.${customerId}`,
+    `customer_id.eq.${customerId}`,
+    `pet_parent_id.eq.${customerId}`,
+    `user_id.eq.${customerId}`,
+  ].join(",");
+}
+
+function buildMessageSenderFilters(customerId: string) {
+  return [
+    `sender_id.eq.${customerId}`,
+    `from_user_id.eq.${customerId}`,
+    `customer_id.eq.${customerId}`,
+    `user_id.eq.${customerId}`,
+  ].join(",");
+}
+
+function buildMessageRecipientFilters(customerId: string) {
+  return [
+    `recipient_id.eq.${customerId}`,
+    `to_user_id.eq.${customerId}`,
+  ].join(",");
+}
+
 async function deleteIncompletePetParentAction(formData: FormData) {
   "use server";
 
@@ -467,41 +605,29 @@ async function deleteIncompletePetParentAction(formData: FormData) {
     redirect("/admin/customers?cleanup=invalid-id");
   }
 
-  const [{ data: profile }, authUser, bookings, pets, sentMessages, receivedMessages] = await Promise.all([
-    supabaseAdmin.from("profiles").select("*").eq("id", customerId).maybeSingle(),
-    getAuthUser(customerId),
+  const [profile, authUser, bookings, pets, sentMessages, receivedMessages] = await Promise.all([
+    getProfileByLookupKey(customerId),
+    getAuthUserById(customerId),
     safeSelect("bookings", "id,total_customer_paid,customer_total_amount,total_amount,amount,price,subtotal,service_total,total_paid", (query) =>
-      query.or(
-        [
-          `customer_id.eq.${customerId}`,
-          `pet_owner_id.eq.${customerId}`,
-          `user_id.eq.${customerId}`,
-          `pet_parent_id.eq.${customerId}`,
-        ].join(","),
-      ),
+      query.or(buildRelatedIdFilters(customerId)),
     ),
     safeSelect("pets", "id", (query) =>
-      query.or(
-        [
-          `owner_profile_id.eq.${customerId}`,
-          `owner_id.eq.${customerId}`,
-          `customer_id.eq.${customerId}`,
-          `pet_parent_id.eq.${customerId}`,
-          `user_id.eq.${customerId}`,
-        ].join(","),
-      ),
+      query.or(buildPetIdFilters(customerId)),
     ),
-    safeSelect("messages", "id", (query) => query.eq("sender_id", customerId)),
-    safeSelect("messages", "id", (query) => query.eq("recipient_id", customerId)),
+    safeSelect("messages", "id", (query) =>
+      query.or(buildMessageSenderFilters(customerId)),
+    ),
+    safeSelect("messages", "id", (query) =>
+      query.or(buildMessageRecipientFilters(customerId)),
+    ),
   ]);
 
-  const profileRow = (profile ?? null) as AnyRow | null;
   const paidBookings = bookings.filter((booking) => getBookingAmount(booking) > 0).length;
   const messages = [...sentMessages, ...receivedMessages];
-  const verifiedFields = getVerifiedFields(profileRow, authUser);
+  const verifiedFields = getVerifiedFields(profile, authUser);
 
   const safeToDelete =
-    Boolean(profileRow) &&
+    Boolean(profile) &&
     bookings.length === 0 &&
     pets.length === 0 &&
     messages.length === 0 &&
@@ -533,71 +659,41 @@ async function deleteIncompletePetParentAction(formData: FormData) {
 
 export default async function AdminCustomerDetailPage({ params }: PageProps) {
   const resolvedParams = await params;
-  const customerId = resolvedParams.id;
+  const lookupKey = decodeURIComponent(resolvedParams.id || "").trim();
 
-  if (!isUuid(customerId)) {
-    return (
-      <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
-        <section className="mx-auto max-w-6xl rounded-[2rem] border border-red-100 bg-white p-6 shadow-sm">
-          <Link
-            href="/admin/customer-intelligence"
-            className="inline-flex items-center gap-2 text-sm font-extrabold text-emerald-800 hover:text-emerald-950"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Customer Intelligence
-          </Link>
-
-          <div className="mt-6 rounded-3xl border border-red-100 bg-red-50 p-5">
-            <h1 className="text-3xl font-black">Customer record not available</h1>
-            <p className="mt-2 text-sm font-semibold text-red-800">
-              This customer link is not using a valid Supabase profile ID.
-            </p>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  const [profileResult, authUser] = await Promise.all([
-    supabaseAdmin.from("profiles").select("*").eq("id", customerId).maybeSingle(),
-    getAuthUser(customerId),
+  const [profile, authUserByLookup] = await Promise.all([
+    getProfileByLookupKey(lookupKey),
+    getAuthUserByLookupKey(lookupKey),
   ]);
 
-  const profile = (profileResult.data ?? null) as AnyRow | null;
+  const authUser =
+    authUserByLookup ||
+    (profile?.id ? await getAuthUserById(String(profile.id)) : null);
 
-  const [bookings, pets, sentMessages, receivedMessages] = await Promise.all([
-    safeSelect("bookings", "*", (query) =>
-      query
-        .or(
-          [
-            `customer_id.eq.${customerId}`,
-            `pet_owner_id.eq.${customerId}`,
-            `user_id.eq.${customerId}`,
-            `pet_parent_id.eq.${customerId}`,
-          ].join(","),
-        )
-        .order("created_at", { ascending: false }),
-    ),
-    safeSelect("pets", "*", (query) =>
-      query
-        .or(
-          [
-            `owner_profile_id.eq.${customerId}`,
-            `owner_id.eq.${customerId}`,
-            `customer_id.eq.${customerId}`,
-            `pet_parent_id.eq.${customerId}`,
-            `user_id.eq.${customerId}`,
-          ].join(","),
-        )
-        .order("created_at", { ascending: false }),
-    ),
-    safeSelect("messages", "*", (query) =>
-      query.eq("sender_id", customerId).order("created_at", { ascending: false }),
-    ),
-    safeSelect("messages", "*", (query) =>
-      query.eq("recipient_id", customerId).order("created_at", { ascending: false }),
-    ),
-  ]);
+  const relatedCustomerId = getRelatedRecordId({
+    lookupKey,
+    profile,
+    authUser,
+  });
+
+  const canLoadRelatedRows = Boolean(relatedCustomerId && isUuid(relatedCustomerId));
+
+  const [bookings, pets, sentMessages, receivedMessages] = canLoadRelatedRows
+    ? await Promise.all([
+        safeSelect("bookings", "*", (query) =>
+          query.or(buildRelatedIdFilters(relatedCustomerId)).order("created_at", { ascending: false }),
+        ),
+        safeSelect("pets", "*", (query) =>
+          query.or(buildPetIdFilters(relatedCustomerId)).order("created_at", { ascending: false }),
+        ),
+        safeSelect("messages", "*", (query) =>
+          query.or(buildMessageSenderFilters(relatedCustomerId)).order("created_at", { ascending: false }),
+        ),
+        safeSelect("messages", "*", (query) =>
+          query.or(buildMessageRecipientFilters(relatedCustomerId)).order("created_at", { ascending: false }),
+        ),
+      ])
+    : [[], [], [], []];
 
   const messages = [...sentMessages, ...receivedMessages].sort((a, b) => {
     const aTime = new Date(getText(a, ["created_at"])).getTime() || 0;
@@ -621,7 +717,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
       "acquisition_source",
       "utm_source",
     ],
-    "sitguru",
+    getAuthProvider(authUser) === "Unknown" ? "sitguru" : getAuthProvider(authUser),
   );
 
   const totalSpend = bookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
@@ -668,24 +764,50 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
     !verifiedFields.hasConfirmedEmail &&
     !verifiedFields.hasConfirmedPhone;
 
+  if (!profile && !authUser) {
+    return (
+      <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
+        <section className="mx-auto max-w-6xl rounded-[2rem] border border-red-100 bg-white p-6 shadow-sm">
+          <Link
+            href="/admin/customers"
+            className="inline-flex items-center gap-2 text-sm font-extrabold text-emerald-800 hover:text-emerald-950"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Pet Parents
+          </Link>
+
+          <div className="mt-6 rounded-3xl border border-red-100 bg-red-50 p-5">
+            <h1 className="text-3xl font-black">Pet Parent record not available</h1>
+            <p className="mt-2 text-sm font-semibold text-red-800">
+              No matching Supabase Auth user or profile row was found for this ID or email.
+            </p>
+            <p className="mt-3 break-all text-xs font-black text-red-900">
+              Lookup: {lookupKey || "Missing route value"}
+            </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
       <section className="mx-auto max-w-7xl">
         <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/admin/customer-intelligence"
+              href="/admin/customers"
               className="inline-flex items-center gap-2 text-sm font-extrabold text-emerald-800 hover:text-emerald-950"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Customer Intelligence
+              Back to Pet Parents
             </Link>
 
             <Link
-              href="/admin/customers"
+              href="/admin/customer-intelligence"
               className="inline-flex items-center gap-2 text-sm font-extrabold text-slate-600 hover:text-slate-950"
             >
-              Back to Customers
+              Back to Customer Intelligence
             </Link>
           </div>
 
@@ -703,7 +825,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                   {name}
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm font-semibold text-slate-700">
-                  Full SitGuru Pet Parent profile with Supabase auth identity,
+                  Full SitGuru Pet Parent profile with Supabase Auth identity,
                   customer profile data, verification status, pets, bookings,
                   message activity, and protected cleanup controls.
                 </p>
@@ -716,7 +838,13 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                     Source: {source}
                   </span>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
-                    ID: {customerId}
+                    Auth: {authUser ? "Found" : "Missing"}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                    Profile: {profile ? "Found" : "Missing"}
+                  </span>
+                  <span className="break-all rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                    ID: {relatedCustomerId || lookupKey}
                   </span>
                 </div>
               </div>
@@ -742,14 +870,14 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {!profile ? (
+        {!profile && authUser ? (
           <div className="mt-5 rounded-[2rem] border border-amber-100 bg-amber-50 p-5 shadow-sm">
-            <h2 className="text-2xl font-black">Pet Parent profile not found</h2>
+            <h2 className="text-2xl font-black">Profile row is missing or incomplete</h2>
             <p className="mt-2 text-sm font-semibold text-amber-900">
-              This route is working, so it will not 404 anymore. However, the profile ID does
-              not currently exist in the live Supabase `profiles` table. If a Supabase Auth
-              identity is still found below, the signup likely needs the profile repair/upsert
-              flow from the auth callback.
+              The Supabase Auth user was found, so this is a real signup record.
+              However, there is no matching `profiles` row yet. The page is
+              showing the Auth name, email, provider, created date, confirmation,
+              and sign-in details so Super Admin can still review the Pet Parent.
             </p>
           </div>
         ) : null}
@@ -796,14 +924,14 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                 Admin cleanup controls
               </p>
               <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
-                Hard delete is only enabled for records with no contact info, no pets, no
-                bookings, no messages, and no verified auth contact. Real Pet Parents should
-                be kept or reviewed manually.
+                Hard delete is only enabled for records with no contact info, no
+                pets, no bookings, no messages, and no verified auth contact.
+                Real Pet Parents should be kept or reviewed manually.
               </p>
 
-              {safeToDelete ? (
+              {safeToDelete && relatedCustomerId ? (
                 <form action={deleteIncompletePetParentAction} className="mt-4">
-                  <input type="hidden" name="customerId" value={customerId} />
+                  <input type="hidden" name="customerId" value={relatedCustomerId} />
                   <button
                     type="submit"
                     className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-800"
@@ -816,8 +944,9 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="flex items-start gap-2 text-xs font-bold leading-5 text-slate-700">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                    Delete is locked because this record has contact data, auth data, or
-                    activity. Keep it for review unless you add a separate archive workflow.
+                    Delete is locked because this record has contact data, auth
+                    data, or activity. Keep it for review unless you add a
+                    separate archive workflow.
                   </p>
                 </div>
               )}
@@ -826,57 +955,33 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
         </section>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
-              <CircleDollarSign className="h-5 w-5" />
-            </div>
-            <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-              Lifetime Spend
-            </p>
-            <p className="mt-1 text-3xl font-black">{formatMoney(totalSpend)}</p>
-            <p className="mt-1 text-xs font-bold text-slate-600">
-              {paidBookings} paid bookings
-            </p>
-          </div>
+          <SummaryCard
+            icon={<CircleDollarSign className="h-5 w-5" />}
+            label="Lifetime Spend"
+            value={formatMoney(totalSpend)}
+            detail={`${paidBookings} paid bookings`}
+          />
 
-          <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
-              <CalendarDays className="h-5 w-5" />
-            </div>
-            <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-              Bookings
-            </p>
-            <p className="mt-1 text-3xl font-black">{bookings.length}</p>
-            <p className="mt-1 text-xs font-bold text-slate-600">
-              Avg. {formatMoney(averageBookingValue)}
-            </p>
-          </div>
+          <SummaryCard
+            icon={<CalendarDays className="h-5 w-5" />}
+            label="Bookings"
+            value={String(bookings.length)}
+            detail={`Avg. ${formatMoney(averageBookingValue)}`}
+          />
 
-          <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
-              <PawPrint className="h-5 w-5" />
-            </div>
-            <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-              Pets
-            </p>
-            <p className="mt-1 text-3xl font-black">{pets.length}</p>
-            <p className="mt-1 text-xs font-bold text-slate-600">
-              Live pet profile records
-            </p>
-          </div>
+          <SummaryCard
+            icon={<PawPrint className="h-5 w-5" />}
+            label="Pets"
+            value={String(pets.length)}
+            detail="Live pet profile records"
+          />
 
-          <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
-              <MessageSquare className="h-5 w-5" />
-            </div>
-            <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-              Messages
-            </p>
-            <p className="mt-1 text-3xl font-black">{messages.length}</p>
-            <p className="mt-1 text-xs font-bold text-slate-600">
-              Sent and received messages
-            </p>
-          </div>
+          <SummaryCard
+            icon={<MessageSquare className="h-5 w-5" />}
+            label="Messages"
+            value={String(messages.length)}
+            detail="Sent and received messages"
+          />
         </div>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
@@ -913,10 +1018,10 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
               <div className="grid gap-3 sm:grid-cols-2">
                 <ProfileMiniBox label="Role" value={role} />
                 <ProfileMiniBox label="Source" value={source} />
-                <ProfileMiniBox label="Created" value={formatDate(profile?.created_at || authUser?.created_at)} />
-                <ProfileMiniBox label="Updated" value={formatDate(profile?.updated_at)} />
+                <ProfileMiniBox label="Auth Created" value={formatDate(authUser?.created_at)} />
+                <ProfileMiniBox label="Profile Created" value={formatDate(profile?.created_at)} />
+                <ProfileMiniBox label="Profile Updated" value={formatDate(profile?.updated_at)} />
                 <ProfileMiniBox label="Last Sign In" value={formatDateTime(verifiedFields.lastSignInAt)} />
-                <ProfileMiniBox label="Last Booking" value={formatDate(lastBooking ? getBookingDate(lastBooking) : null)} />
                 <ProfileMiniBox label="Auth Identity" value={verifiedFields.hasAuthUser ? "Found" : "Not found"} />
                 <ProfileMiniBox label="Auth Provider" value={getAuthProvider(authUser)} />
               </div>
@@ -1108,11 +1213,15 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
           </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <ProfileMiniBox label="Profile ID" value={customerId} />
+            <ProfileMiniBox label="Lookup Value" value={lookupKey} />
+            <ProfileMiniBox label="Resolved ID" value={relatedCustomerId || "—"} />
+            <ProfileMiniBox label="Profile row found" value={profile ? "Yes" : "No"} />
             <ProfileMiniBox label="Auth user found" value={authUser ? "Yes" : "No"} />
+            <ProfileMiniBox label="Auth email" value={getText(authUser, ["email"], "—")} />
             <ProfileMiniBox label="Email confirmed" value={verifiedFields.emailConfirmedAt ? formatDateTime(verifiedFields.emailConfirmedAt) : "No"} />
             <ProfileMiniBox label="Phone confirmed" value={verifiedFields.phoneConfirmedAt ? formatDateTime(verifiedFields.phoneConfirmedAt) : "No"} />
             <ProfileMiniBox label="Provider" value={getAuthProvider(authUser)} />
+            <ProfileMiniBox label="Auth created" value={formatDateTime(authUser?.created_at)} />
             <ProfileMiniBox label="Profile created" value={formatDateTime(profile?.created_at)} />
             <ProfileMiniBox label="Profile updated" value={formatDateTime(profile?.updated_at)} />
             <ProfileMiniBox label="Last sign in" value={formatDateTime(verifiedFields.lastSignInAt)} />
@@ -1123,13 +1232,38 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
   );
 }
 
+function SummaryCard({
+  icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
+        {icon}
+      </div>
+      <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-3xl font-black">{value}</p>
+      <p className="mt-1 text-xs font-bold text-slate-600">{detail}</p>
+    </div>
+  );
+}
+
 function ProfileInfoRow({
   icon,
   label,
   value,
   detail,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   detail?: string;
