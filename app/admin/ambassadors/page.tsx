@@ -10,6 +10,7 @@ import {
   ChevronRight,
   GraduationCap,
   HandCoins,
+  MessageCircle,
   PauseCircle,
   PawPrint,
   PlayCircle,
@@ -279,7 +280,8 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
 
   const ambassadorId = asString(formData.get("ambassador_id"));
   const nextStatus = asString(formData.get("next_status"));
-  const ambassadorName = asString(formData.get("ambassador_name")) || "Ambassador";
+  const ambassadorName =
+    asString(formData.get("ambassador_name")) || "Ambassador";
 
   if (!ambassadorId || !nextStatus) {
     redirect("/admin/ambassadors?updated=missing");
@@ -457,11 +459,7 @@ function AmbassadorQuickActions({
   );
 }
 
-function AmbassadorCard({
-  ambassador,
-}: {
-  ambassador: AmbassadorSummaryRow;
-}) {
+function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
   const hasPhoto = Boolean(ambassador.ambassador_photo_url);
   const trainingPercent = numberValue(ambassador.training_percent);
   const archived = isArchivedAmbassador(ambassador);
@@ -535,7 +533,10 @@ function AmbassadorCard({
           label="Parents"
           value={numberValue(ambassador.pet_parent_signups)}
         />
-        <CompactMetric label="Gurus" value={numberValue(ambassador.guru_signups)} />
+        <CompactMetric
+          label="Gurus"
+          value={numberValue(ambassador.guru_signups)}
+        />
         <CompactMetric
           label="Business"
           value={numberValue(ambassador.business_signups)}
@@ -560,7 +561,10 @@ function AmbassadorCard({
               label="Ready"
               value={currency(ambassador.ready_for_payout_rewards)}
             />
-            <RewardLine label="Paid" value={currency(ambassador.paid_rewards)} />
+            <RewardLine
+              label="Paid"
+              value={currency(ambassador.paid_rewards)}
+            />
           </div>
         </div>
 
@@ -593,6 +597,34 @@ function AmbassadorCard({
         </div>
       </div>
 
+      <div className="mt-5 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-green-50 p-4 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#2f6f3e] text-white shadow-sm">
+              <MessageCircle className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold text-[#102819]">
+                SitGuru Messenger
+              </p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                Open the SitGuru message center for onboarding questions,
+                referral-code support, Pet Parent signups, Guru signups, and
+                referral credit follow-up for this Ambassador.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/admin/messages"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#2f6f3e] px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+          >
+            Open Messenger
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+
       <div className="mt-5 rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-3">
         <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
           Quick Actions
@@ -617,7 +649,9 @@ function AmbassadorCard({
   );
 }
 
-function getNotice(searchParams?: Record<string, string | string[] | undefined>) {
+function getNotice(
+  searchParams?: Record<string, string | string[] | undefined>,
+) {
   const updated = searchParams?.updated;
 
   if (updated === "success") {
@@ -710,7 +744,9 @@ export default async function AdminAmbassadorsPage({
 
   const cards = buildAdminCards(ambassadors);
 
-  const activeCount = ambassadors.filter((row) => row.status === "active").length;
+  const activeCount = ambassadors.filter(
+    (row) => row.status === "active",
+  ).length;
   const onboardingCount = ambassadors.filter((row) =>
     ["conditional_offer_sent", "onboarding_sent"].includes(row.status || ""),
   ).length;
