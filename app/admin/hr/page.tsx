@@ -55,6 +55,19 @@ function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function asBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes";
+  }
+
+  if (typeof value === "number") return value === 1;
+
+  return false;
+}
+
 function number(value: number) {
   return new Intl.NumberFormat("en-US").format(
     Number.isFinite(value) ? value : 0,
@@ -152,6 +165,10 @@ function isApprovedStatus(row: AnyRow) {
     status === "complete" ||
     status === "completed"
   );
+}
+
+function isDashboardEnabled(row: AnyRow) {
+  return asBoolean(row.dashboard_enabled);
 }
 
 function getRole(row: AnyRow) {
@@ -587,16 +604,13 @@ async function getHrData() {
     (backgroundChecksResult.data || []) as AnyRow[]
   ).map((row) => withSourceTable(row, "background_checks"));
 
-  const allAmbassadorRows = mergeRows(
-    ambassadorLeads,
-    ambassadors,
-    partnerApplications.filter(isAmbassadorLead),
-    networkPartnerLeads.filter(isAmbassadorLead),
-    networkParticipants.filter(isAmbassadorLead),
-    launchSignups.filter(isAmbassadorLead),
-    launchWaitlist.filter(isAmbassadorLead),
-    programApplications.filter(isAmbassadorLead),
-  ).sort((a, b) => {
+  const allAmbassadorRows = mergeRows(ambassadorLeads).sort((a, b) => {
+    const dateA = new Date(getDate(a) || 0).getTime();
+    const dateB = new Date(getDate(b) || 0).getTime();
+    return dateB - dateA;
+  });
+
+  const allAmbassadorDashboardRows = mergeRows(ambassadors).sort((a, b) => {
     const dateA = new Date(getDate(a) || 0).getTime();
     const dateB = new Date(getDate(b) || 0).getTime();
     return dateB - dateA;
@@ -616,6 +630,7 @@ async function getHrData() {
   });
 
   const ambassadorRecords = allAmbassadorRows.map(normalizeLead);
+  const ambassadorDashboardRecords = allAmbassadorDashboardRows.map(normalizeLead);
   const guruRecords = allGuruRows.map(normalizeLead);
   const backgroundCheckRecords = backgroundChecks.map(normalizeLead);
 
@@ -624,6 +639,9 @@ async function getHrData() {
   );
   const archivedAmbassadorRecords = ambassadorRecords.filter(
     (record) => record.archived,
+  );
+  const activeAmbassadorDashboardRecords = ambassadorDashboardRecords.filter(
+    (record) => !record.archived && isDashboardEnabled(record.raw),
   );
   const pendingGuruRecords = guruRecords.filter((record) =>
     isPendingStatus(record.raw),
@@ -642,6 +660,7 @@ async function getHrData() {
     ambassadorLeads: ambassadorRecords.length,
     activeAmbassadorLeads: activeAmbassadorRecords.length,
     archivedAmbassadorLeads: archivedAmbassadorRecords.length,
+    activeAmbassadorDashboards: activeAmbassadorDashboardRecords.length,
     studentHire: ambassadorRecords.filter(
       (record) => record.program === "Student Hire",
     ).length,
@@ -750,7 +769,7 @@ export default async function AdminHrPage() {
         </div>
       </section>
 
-      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-white p-3 shadow-sm sm:grid-cols-2 sm:p-4 lg:grid-cols-3 2xl:grid-cols-7">
+      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-white p-3 shadow-sm sm:grid-cols-2 sm:p-4 lg:grid-cols-3 2xl:grid-cols-8">
         <DataHealthTile
           label="Ambassador Leads"
           value={number(data.metrics.ambassadorLeads)}
@@ -758,6 +777,10 @@ export default async function AdminHrPage() {
         <DataHealthTile
           label="Active Leads"
           value={number(data.metrics.activeAmbassadorLeads)}
+        />
+        <DataHealthTile
+          label="Dashboards"
+          value={number(data.metrics.activeAmbassadorDashboards)}
         />
         <DataHealthTile
           label="Archived"
@@ -802,7 +825,7 @@ export default async function AdminHrPage() {
           href={adminRoutes.ambassadors}
           icon={<ClipboardCheck size={22} />}
           title="Ambassador Dashboards"
-          value={number(data.metrics.activeAmbassadorLeads)}
+          value={number(data.metrics.activeAmbassadorDashboards)}
           detail="Open Student Ambassador dashboard records, referral codes, referral links, and early referral tracking."
           action="Open Dashboards"
           tone="emerald"
