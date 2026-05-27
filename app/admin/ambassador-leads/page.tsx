@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  Archive,
   ArrowLeft,
   BriefcaseBusiness,
   CalendarDays,
@@ -15,6 +16,7 @@ import {
   MessageCircle,
   Phone,
   Plus,
+  RotateCcw,
   Search,
   ShieldCheck,
   Sparkles,
@@ -43,6 +45,35 @@ type AmbassadorLeadsPageProps = {
   searchParams?: SearchParams;
 };
 
+type NormalizedLead = {
+  raw: AnyRow;
+  id: string;
+  sourceTable: string;
+  name: string;
+  email: string;
+  phone: string;
+  program: string;
+  source: string;
+  status: string;
+  zipCode: string;
+  city: string;
+  state: string;
+  county: string;
+  country: string;
+  location: string;
+  notes: string;
+  date: string | null;
+  lastContacted: string | null;
+  documents: {
+    resumeUrl: string;
+    resumeName: string;
+    coverLetterUrl: string;
+    coverLetterName: string;
+    otherDocumentUrl: string;
+    otherDocumentName: string;
+  };
+};
+
 const adminRoutes = {
   dashboard: "/admin",
   programs: "/admin/programs",
@@ -60,6 +91,7 @@ const statusOrder = [
   "Signed Up",
   "Approved",
   "Not Moving Forward",
+  "Archived",
 ];
 
 const sourceOrder = [
@@ -73,6 +105,37 @@ const sourceOrder = [
   "Referral",
   "Website",
   "Other",
+];
+
+const quickStatusActions = [
+  {
+    label: "Contacted",
+    value: "contacted",
+    tone:
+      "bg-blue-50 text-blue-800 ring-blue-100 hover:bg-blue-100 hover:text-blue-900",
+    icon: <MessageCircle size={13} />,
+  },
+  {
+    label: "Interested",
+    value: "interested",
+    tone:
+      "bg-amber-50 text-amber-800 ring-amber-100 hover:bg-amber-100 hover:text-amber-900",
+    icon: <Star size={13} />,
+  },
+  {
+    label: "Not Moving",
+    value: "not_moving_forward",
+    tone:
+      "bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200 hover:text-slate-900",
+    icon: <FileText size={13} />,
+  },
+  {
+    label: "Archive",
+    value: "archived",
+    tone:
+      "bg-red-50 text-red-700 ring-red-100 hover:bg-red-100 hover:text-red-800",
+    icon: <Archive size={13} />,
+  },
 ];
 
 function asString(value: unknown) {
@@ -157,9 +220,11 @@ function getReadableStatus(row: AnyRow) {
   if (status === "active") return "Approved";
   if (status === "not_moving_forward") return "Not Moving Forward";
   if (status === "not_a_fit") return "Not Moving Forward";
+  if (status === "not_moving") return "Not Moving Forward";
   if (status === "declined") return "Not Moving Forward";
   if (status === "rejected") return "Not Moving Forward";
   if (status === "inactive") return "Not Moving Forward";
+  if (status === "archived") return "Archived";
 
   return (
     status
@@ -171,16 +236,48 @@ function getReadableStatus(row: AnyRow) {
 }
 
 function normalizeStatus(status: string) {
-  const value = status.toLowerCase();
+  const value = status.toLowerCase().trim().replace(/\s+/g, "_");
 
   if (value === "new") return "new";
   if (value === "contacted") return "contacted";
   if (value === "interested") return "interested";
-  if (value === "signed up") return "signed_up";
+  if (value === "signed_up") return "signed_up";
   if (value === "approved") return "approved";
-  if (value === "not moving forward") return "not_moving_forward";
+  if (value === "not_moving_forward") return "not_moving_forward";
+  if (value === "not_moving") return "not_moving_forward";
+  if (value === "declined") return "not_moving_forward";
+  if (value === "archived") return "archived";
 
   return "new";
+}
+
+function mapLeadStatusToAmbassadorStatus(status: string) {
+  if (status === "not_moving_forward") return "not_a_fit";
+  if (status === "signed_up") return "onboarding_sent";
+  if (status === "approved") return "active";
+  if (status === "archived") return "archived";
+
+  return status;
+}
+
+function getPipelineActionNote(status: string, leadName: string) {
+  if (status === "contacted") {
+    return `Pipeline update: ${leadName} was marked contacted from the Ambassador Leads page.`;
+  }
+
+  if (status === "interested") {
+    return `Pipeline update: ${leadName} was marked interested from the Ambassador Leads page.`;
+  }
+
+  if (status === "not_moving_forward") {
+    return `Pipeline update: ${leadName} was marked not moving forward from the Ambassador Leads page. Retain applicant record for recordkeeping.`;
+  }
+
+  if (status === "archived") {
+    return `Archive update: ${leadName} was archived from the Ambassador Leads page. Retained for applicant recordkeeping. Do not continue outreach or onboarding unless restored.`;
+  }
+
+  return `Pipeline update: ${leadName} status changed to ${status}.`;
 }
 
 const deletableLeadTables = [
@@ -533,10 +630,11 @@ function mergeRows(...groups: AnyRow[][]) {
   for (const group of groups) {
     for (const row of group) {
       const sourceTable = getText(row, ["__source_table"], "unknown");
-      const key =
-        `${sourceTable}:${getText(row, ["id"])}` ||
-        `${sourceTable}:${getEmail(row)}:${getDisplayName(row)}:${getDate(row)}` ||
-        `${sourceTable}:${merged.length}`;
+      const id = getText(row, ["id"]);
+      const fallbackKey = `${sourceTable}:${getEmail(row)}:${getDisplayName(
+        row,
+      )}:${getDate(row)}:${merged.length}`;
+      const key = id ? `${sourceTable}:${id}` : fallbackKey;
 
       if (seen.has(key)) continue;
 
@@ -613,6 +711,11 @@ async function createAmbassadorLead(formData: FormData) {
     cover_letter_file_name: coverLetterFileName || null,
     other_document_file_url: otherDocumentFileUrl || null,
     other_document_file_name: otherDocumentFileName || null,
+    archived_at: status === "archived" ? new Date().toISOString() : null,
+    archived_reason:
+      status === "archived"
+        ? "Lead was created directly into archived status."
+        : null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
@@ -661,6 +764,18 @@ async function updateAmbassadorLead(formData: FormData) {
     redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
   }
 
+  const statusPatch =
+    status === "archived"
+      ? {
+          archived_at: new Date().toISOString(),
+          archived_reason:
+            "Lead archived from the Ambassador Leads edit form.",
+        }
+      : {
+          archived_at: null,
+          archived_reason: null,
+        };
+
   const { error } = await supabaseAdmin
     .from("ambassador_leads")
     .update({
@@ -683,6 +798,7 @@ async function updateAmbassadorLead(formData: FormData) {
       cover_letter_file_name: coverLetterFileName || null,
       other_document_file_url: otherDocumentFileUrl || null,
       other_document_file_name: otherDocumentFileName || null,
+      ...statusPatch,
       updated_at: new Date().toISOString(),
     })
     .eq("id", leadId);
@@ -693,6 +809,114 @@ async function updateAmbassadorLead(formData: FormData) {
   }
 
   redirect(`${adminRoutes.ambassadorLeads}?updated=success`);
+}
+
+async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
+  "use server";
+
+  const leadId = asString(formData.get("lead_id"));
+  const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
+  const nextStatus = normalizeStatus(asString(formData.get("next_status")));
+
+  if (!leadId || !isDeletableLeadTable(sourceTable)) {
+    redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
+  }
+
+  const { data: existingLead, error: fetchError } = await supabaseAdmin
+    .from(sourceTable)
+    .select("*")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (fetchError || !existingLead) {
+    console.warn("Unable to find ambassador lead for status update:", fetchError);
+    redirect(`${adminRoutes.ambassadorLeads}?updated=error`);
+  }
+
+  const leadRow = existingLead as AnyRow;
+  const leadName = getDisplayName(leadRow, "Ambassador Lead");
+  const email = getEmail(leadRow);
+  const referralCode = getText(leadRow, ["referral_code"]);
+  const now = new Date().toISOString();
+  const actionNote = getPipelineActionNote(nextStatus, leadName);
+
+  const leadPatch =
+    nextStatus === "archived"
+      ? {
+          status: nextStatus,
+          notes: concatNote(getNotes(leadRow), actionNote),
+          archived_at: now,
+          archived_reason:
+            "Archived from Ambassador Leads quick action. Retained for applicant recordkeeping.",
+          updated_at: now,
+        }
+      : {
+          status: nextStatus,
+          notes: concatNote(getNotes(leadRow), actionNote),
+          archived_at: null,
+          archived_reason: null,
+          updated_at: now,
+        };
+
+  const { error: leadUpdateError } = await supabaseAdmin
+    .from(sourceTable)
+    .update(leadPatch)
+    .eq("id", leadId);
+
+  if (leadUpdateError) {
+    console.warn("Unable to update ambassador lead status:", leadUpdateError);
+    redirect(`${adminRoutes.ambassadorLeads}?updated=error`);
+  }
+
+  const ambassadorStatus = mapLeadStatusToAmbassadorStatus(nextStatus);
+  const ambassadorPatch =
+    ambassadorStatus === "archived"
+      ? {
+          status: ambassadorStatus,
+          notes: concatNote(getNotes(leadRow), actionNote),
+          archived_at: now,
+          archived_reason:
+            "Archived from Ambassador Leads quick action. Retained for applicant recordkeeping.",
+          updated_at: now,
+        }
+      : {
+          status: ambassadorStatus,
+          notes: concatNote(getNotes(leadRow), actionNote),
+          archived_at: null,
+          archived_reason: null,
+          updated_at: now,
+        };
+
+  const orFilters = [
+    `lead_id.eq.${leadId}`,
+    referralCode ? `referral_code.eq.${referralCode}` : "",
+    email && email !== "—" ? `email.eq.${email}` : "",
+    leadName ? `full_name.eq.${leadName}` : "",
+  ]
+    .filter(Boolean)
+    .join(",");
+
+  if (orFilters) {
+    const { error: ambassadorUpdateError } = await supabaseAdmin
+      .from("ambassadors")
+      .update(ambassadorPatch)
+      .or(orFilters);
+
+    if (ambassadorUpdateError) {
+      console.warn(
+        "Ambassador status mirror update skipped:",
+        ambassadorUpdateError,
+      );
+    }
+  }
+
+  redirect(`${adminRoutes.ambassadorLeads}?updated=success`);
+}
+
+function concatNote(existingNotes: string, note: string) {
+  const cleanExisting = existingNotes === "No notes yet." ? "" : existingNotes;
+
+  return [cleanExisting, note].filter(Boolean).join("\n\n");
 }
 
 async function deleteAmbassadorLead(formData: FormData) {
@@ -922,6 +1146,7 @@ async function getAmbassadorLeadData() {
     notMovingForward: normalizedLeads.filter(
       (lead) => lead.status === "Not Moving Forward",
     ).length,
+    archived: normalizedLeads.filter((lead) => lead.status === "Archived").length,
     recent: normalizedLeads.filter((lead) => isWithinLastDays(lead.date, 14))
       .length,
   };
@@ -957,7 +1182,7 @@ function getNotice(
     return {
       title: "Lead not saved",
       message:
-        "The page is ready, but the ambassador_leads table may not exist yet in Supabase.",
+        "The page is ready, but the ambassador_leads table may not have all required columns yet.",
       tone: "warning" as const,
     };
   }
@@ -972,11 +1197,19 @@ function getNotice(
     };
   }
 
+  if (updated === "missing") {
+    return {
+      title: "Lead not updated",
+      message: "The lead ID or source table was missing.",
+      tone: "warning" as const,
+    };
+  }
+
   if (updated === "error") {
     return {
       title: "Lead not updated",
       message:
-        "The lead could not be updated. Confirm the ambassador_leads table has all current HR columns.",
+        "The lead could not be updated. Confirm the status constraint and archive columns exist in Supabase.",
       tone: "warning" as const,
     };
   }
@@ -1028,34 +1261,7 @@ function normalizeFilterValue(value: string) {
 }
 
 function applyLeadFilters(
-  leads: Array<{
-    raw: AnyRow;
-    id: string;
-    sourceTable: string;
-    name: string;
-    email: string;
-    phone: string;
-    program: string;
-    source: string;
-    status: string;
-    zipCode: string;
-    city: string;
-    state: string;
-    county: string;
-    country: string;
-    location: string;
-    notes: string;
-    date: string | null;
-    lastContacted: string | null;
-    documents: {
-      resumeUrl: string;
-      resumeName: string;
-      coverLetterUrl: string;
-      coverLetterName: string;
-      otherDocumentUrl: string;
-      otherDocumentName: string;
-    };
-  }>,
+  leads: NormalizedLead[],
   filters: {
     query: string;
     program: string;
@@ -1218,7 +1424,7 @@ export default async function AmbassadorLeadsPage({
         />
       </section>
 
-      <section className="grid w-full min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-6">
+      <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-7">
         <MetricCard
           title="New"
           value={number(data.metrics.newCount)}
@@ -1254,6 +1460,12 @@ export default async function AmbassadorLeadsPage({
           value={number(data.metrics.notMovingForward)}
           detail="Closed or declined"
           icon={<FileText size={20} />}
+        />
+        <MetricCard
+          title="Archived"
+          value={number(data.metrics.archived)}
+          detail="Retained on file"
+          icon={<Archive size={20} />}
         />
       </section>
 
@@ -1496,9 +1708,9 @@ export default async function AmbassadorLeadsPage({
               <p className="rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900">
                 HR intake is connected to the{" "}
                 <span className="font-black">ambassador_leads</span> table.
-                Converted Ambassadors are tracked separately in the{" "}
-                <span className="font-black">ambassadors</span> dashboard to
-                prevent duplicate lead counts.
+                Use quick buttons in the pipeline to move candidates to
+                Contacted, Interested, Not Moving, Archived, or Restored without
+                running SQL.
               </p>
 
               <AmbassadorLeadFormEnhancementScript />
@@ -1554,7 +1766,7 @@ export default async function AmbassadorLeadsPage({
             />
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1320px] text-left text-sm">
+              <table className="w-full min-w-[1380px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-[#edf3ee] text-xs font-black uppercase tracking-[0.12em] text-slate-500">
                     <th className="pb-3">Lead</th>
@@ -1640,13 +1852,16 @@ export default async function AmbassadorLeadsPage({
                           </td>
 
                           <td className="py-4">
-                            <div className="flex flex-col gap-2">
+                            <div className="flex min-w-[170px] flex-col gap-2">
                               <a
                                 href={`#edit-lead-${lead.id || index}`}
                                 className="inline-flex items-center justify-center rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-100"
                               >
                                 Edit
                               </a>
+
+                              <LeadQuickStatusButtons lead={lead} />
+
                               <details className="group relative">
                                 <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 transition hover:bg-red-100">
                                   <Trash2 size={12} />
@@ -1658,8 +1873,9 @@ export default async function AmbassadorLeadsPage({
                                     Are you sure you want to delete this lead?
                                   </p>
                                   <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                                    This will remove the active pipeline row and
-                                    archive a full copy for HR tracking.
+                                    For normal declined candidates, use Archive
+                                    instead. Delete should only be used for fake,
+                                    duplicate, or mistake records.
                                   </p>
 
                                   <form
@@ -1685,7 +1901,7 @@ export default async function AmbassadorLeadsPage({
                                       type="submit"
                                       className="inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
                                     >
-                                      Yes, Delete and Archive
+                                      Yes, Delete and Archive Copy
                                     </button>
                                   </form>
                                 </div>
@@ -1768,8 +1984,37 @@ export default async function AmbassadorLeadsPage({
 function AmbassadorLeadFormEnhancementScript() {
   const script = `
     (() => {
+      if (window.__sitguruAmbassadorLeadEnhancementsLoaded === true) {
+        return;
+      }
+
+      window.__sitguruAmbassadorLeadEnhancementsLoaded = true;
+
+      const zipFallbacks = {
+        "81643": {
+          city: "Mesa",
+          state: "CO",
+          county: "Mesa",
+          country: "United States",
+        },
+        "93535": {
+          city: "Lancaster",
+          state: "CA",
+          county: "Los Angeles",
+          country: "United States",
+        },
+        "18951": {
+          city: "Quakertown",
+          state: "PA",
+          county: "Bucks",
+          country: "United States",
+        },
+      };
+
+      const zipTimers = new WeakMap();
+
       const formatPhone = (value) => {
-        let digits = value.replace(/\\D/g, "");
+        let digits = String(value || "").replace(/\\D/g, "");
 
         if (digits.length === 11 && digits.startsWith("1")) {
           digits = digits.slice(1);
@@ -1778,64 +2023,35 @@ function AmbassadorLeadFormEnhancementScript() {
         digits = digits.slice(0, 10);
 
         if (digits.length <= 3) return digits;
-        if (digits.length <= 6) return "(" + digits.slice(0, 3) + ") " + digits.slice(3);
 
-        return "(" + digits.slice(0, 3) + ") " + digits.slice(3, 6) + "-" + digits.slice(6);
-      };
-
-      const applyPhoneFormat = (input) => {
-        if (!input || input.dataset.phoneFormatted === "true") return;
-
-        input.dataset.phoneFormatted = "true";
-
-        input.addEventListener("input", () => {
-          input.value = formatPhone(input.value);
-        });
-
-        input.addEventListener("paste", () => {
-          window.setTimeout(() => {
-            input.value = formatPhone(input.value);
-          }, 0);
-        });
-
-        input.addEventListener("blur", () => {
-          input.value = formatPhone(input.value);
-        });
-
-        input.value = formatPhone(input.value);
-      };
-
-      document
-        .querySelectorAll("[data-phone-input='true']")
-        .forEach(applyPhoneFormat);
-
-      document.addEventListener("input", (event) => {
-        const input = event.target;
-
-        if (input && input.matches && input.matches("[data-phone-input='true']")) {
-          applyPhoneFormat(input);
-          input.value = formatPhone(input.value);
+        if (digits.length <= 6) {
+          return "(" + digits.slice(0, 3) + ") " + digits.slice(3);
         }
-      });
 
-      const findFieldGroup = (input) => {
         return (
-          input.closest("form") ||
-          input.closest("details") ||
-          input.closest("section") ||
-          document
+          "(" +
+          digits.slice(0, 3) +
+          ") " +
+          digits.slice(3, 6) +
+          "-" +
+          digits.slice(6)
         );
       };
 
-      const findPairedInput = (zipInput, selector) => {
-        const group = findFieldGroup(zipInput);
-        return group.querySelector(selector) || document.querySelector(selector);
+      const getFormScope = (input) => {
+        return input?.closest?.("form") || document;
       };
 
-      const findLocationHelper = (zipInput) => {
-        const group = findFieldGroup(zipInput);
+      const getPairedInput = (zipInput, selector) => {
+        const scope = getFormScope(zipInput);
+        return scope.querySelector(selector);
+      };
+
+      const getLocationHelper = (zipInput) => {
+        const scope = getFormScope(zipInput);
+
         return (
-          group.querySelector("[data-location-helper='true']") ||
+          scope.querySelector("[data-location-helper='true']") ||
           document.querySelector("[data-location-helper='true']")
         );
       };
@@ -1844,142 +2060,262 @@ function AmbassadorLeadFormEnhancementScript() {
         if (!helper) return;
 
         helper.textContent = message;
+
+        if (tone === "amber") {
+          helper.className =
+            "rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-900";
+          return;
+        }
+
+        if (tone === "red") {
+          helper.className =
+            "rounded-2xl bg-red-50 px-4 py-3 text-xs font-bold leading-5 text-red-900";
+          return;
+        }
+
         helper.className =
-          tone === "amber"
-            ? "rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-900"
-            : tone === "red"
-              ? "rounded-2xl bg-red-50 px-4 py-3 text-xs font-bold leading-5 text-red-900"
-              : "rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900";
+          "rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900";
       };
 
-      const normalizeStateInput = (stateInput) => {
-        if (!stateInput || stateInput.dataset.stateFormatted === "true") return;
+      const setLocationValues = (zipInput, location, message) => {
+        const cityInput = getPairedInput(zipInput, "[data-city-input='true']");
+        const stateInput = getPairedInput(zipInput, "[data-state-input='true']");
+        const countyInput = getPairedInput(zipInput, "[data-county-input='true']");
+        const countryInput = getPairedInput(zipInput, "[data-country-input='true']");
+        const helper = getLocationHelper(zipInput);
 
-        stateInput.dataset.stateFormatted = "true";
-        stateInput.addEventListener("input", () => {
-          stateInput.value = stateInput.value.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase();
-        });
+        if (cityInput && location.city) cityInput.value = location.city;
+        if (stateInput && location.state) stateInput.value = location.state;
+        if (countyInput && location.county) countyInput.value = location.county;
+        if (countryInput && location.country) countryInput.value = location.country;
+
+        setHelper(
+          helper,
+          message ||
+            "Location auto-filled from ZIP. Please confirm city, state, county, and country before saving.",
+        );
+      };
+
+      const lookupCounty = async ({ latitude, longitude }) => {
+        if (!latitude || !longitude) return "";
+
+        try {
+          const countyResponse = await fetch(
+            "https://geo.fcc.gov/api/census/block/find?format=json&latitude=" +
+              encodeURIComponent(latitude) +
+              "&longitude=" +
+              encodeURIComponent(longitude),
+          );
+
+          if (!countyResponse.ok) return "";
+
+          const countyData = await countyResponse.json();
+          const countyName = countyData?.County?.name || "";
+
+          return countyName.replace(/ County$/i, "");
+        } catch {
+          return "";
+        }
       };
 
       const lookupZip = async (zipInput) => {
-        const zip = zipInput.value.replace(/\\D/g, "").slice(0, 5);
+        if (!zipInput) return;
+
+        const zip = String(zipInput.value || "").replace(/\\D/g, "").slice(0, 5);
         zipInput.value = zip;
 
         if (zip.length !== 5) return;
 
-        const cityInput = findPairedInput(zipInput, "[data-city-input='true']");
-        const stateInput = findPairedInput(zipInput, "[data-state-input='true']");
-        const countyInput = findPairedInput(zipInput, "[data-county-input='true']");
-        const countryInput = findPairedInput(zipInput, "[data-country-input='true']");
-        const helper = findLocationHelper(zipInput);
+        const helper = getLocationHelper(zipInput);
+
+        if (zipFallbacks[zip]) {
+          setLocationValues(
+            zipInput,
+            zipFallbacks[zip],
+            "Location auto-filled from SitGuru ZIP fallback. Please confirm before saving.",
+          );
+          zipInput.dataset.lastLookupZip = zip;
+          return;
+        }
 
         if (zipInput.dataset.lastLookupZip === zip) return;
 
         zipInput.dataset.lastLookupZip = zip;
+
         setHelper(helper, "Looking up ZIP code details...");
 
         try {
           const response = await fetch("https://api.zippopotam.us/us/" + zip);
 
           if (!response.ok) {
-            setHelper(helper, "ZIP lookup did not find a match. You can enter the location manually.", "amber");
+            setHelper(
+              helper,
+              "ZIP lookup did not find a match. You can enter the location manually.",
+              "amber",
+            );
             return;
           }
 
           const data = await response.json();
-          const place = data.places?.[0];
+          const place = data?.places?.[0];
 
           if (!place) {
-            setHelper(helper, "ZIP lookup did not find a city/state. You can enter the location manually.", "amber");
+            setHelper(
+              helper,
+              "ZIP lookup did not find a city/state. You can enter the location manually.",
+              "amber",
+            );
             return;
           }
 
-          const city = place["place name"] || "";
-          const state = place["state abbreviation"] || "";
-          const country = data.country || "United States";
-          const latitude = place.latitude;
-          const longitude = place.longitude;
+          const latitude = place.latitude || "";
+          const longitude = place.longitude || "";
+          const county = await lookupCounty({ latitude, longitude });
 
-          if (cityInput) cityInput.value = city;
-          if (stateInput) stateInput.value = state;
-          if (countryInput) countryInput.value = country;
-
-          if (countyInput) {
-            countyInput.value = "";
-
-            if (latitude && longitude) {
-              try {
-                const countyResponse = await fetch(
-                  "https://geo.fcc.gov/api/census/block/find?format=json&latitude=" +
-                    encodeURIComponent(latitude) +
-                    "&longitude=" +
-                    encodeURIComponent(longitude)
-                );
-
-                if (countyResponse.ok) {
-                  const countyData = await countyResponse.json();
-                  const countyName = countyData?.County?.name || "";
-
-                  if (countyName) {
-                    countyInput.value = countyName.replace(/ County$/i, "");
-                  }
-                }
-              } catch {
-                // County autofill is helpful, but city/state should still work without it.
-              }
-            }
-          }
-
-          setHelper(helper, "Location auto-filled from ZIP. Please confirm city, state, county, and country before saving.");
+          setLocationValues(zipInput, {
+            city: place["place name"] || "",
+            state: place["state abbreviation"] || "",
+            county,
+            country: data.country || "United States",
+          });
         } catch {
-          setHelper(helper, "ZIP lookup is temporarily unavailable. You can enter the location manually.", "amber");
+          setHelper(
+            helper,
+            "ZIP lookup is temporarily unavailable. You can enter the location manually.",
+            "amber",
+          );
         }
       };
 
-      const applyZipLookup = (zipInput) => {
-        if (!zipInput || zipInput.dataset.zipLookupBound === "true") return;
+      const scheduleZipLookup = (zipInput) => {
+        if (!zipInput) return;
 
-        zipInput.dataset.zipLookupBound = "true";
-        let lookupTimer;
+        zipInput.value = String(zipInput.value || "")
+          .replace(/\\D/g, "")
+          .slice(0, 5);
 
-        zipInput.addEventListener("input", () => {
-          zipInput.value = zipInput.value.replace(/\\D/g, "").slice(0, 5);
-          zipInput.dataset.lastLookupZip = "";
+        zipInput.dataset.lastLookupZip = "";
 
-          clearTimeout(lookupTimer);
-          lookupTimer = window.setTimeout(() => lookupZip(zipInput), 350);
-        });
+        const existingTimer = zipTimers.get(zipInput);
 
-        zipInput.addEventListener("paste", () => {
-          window.setTimeout(() => {
-            zipInput.value = zipInput.value.replace(/\\D/g, "").slice(0, 5);
-            zipInput.dataset.lastLookupZip = "";
-            lookupZip(zipInput);
-          }, 0);
-        });
+        if (existingTimer) {
+          window.clearTimeout(existingTimer);
+        }
 
-        zipInput.addEventListener("blur", () => lookupZip(zipInput));
+        const timer = window.setTimeout(() => {
+          lookupZip(zipInput);
+        }, 300);
+
+        zipTimers.set(zipInput, timer);
       };
 
-      document
-        .querySelectorAll("[data-zip-input='true']")
-        .forEach(applyZipLookup);
+      const normalizeStateInput = (stateInput) => {
+        if (!stateInput) return;
 
-      document
-        .querySelectorAll("[data-state-input='true']")
-        .forEach(normalizeStateInput);
+        stateInput.value = String(stateInput.value || "")
+          .replace(/[^a-z]/gi, "")
+          .slice(0, 2)
+          .toUpperCase();
+      };
+
+      const applyInitialEnhancements = () => {
+        document
+          .querySelectorAll("[data-phone-input='true']")
+          .forEach((input) => {
+            input.value = formatPhone(input.value);
+          });
+
+        document
+          .querySelectorAll("[data-state-input='true']")
+          .forEach((input) => {
+            normalizeStateInput(input);
+          });
+
+        document
+          .querySelectorAll("[data-zip-input='true']")
+          .forEach((input) => {
+            const zip = String(input.value || "").replace(/\\D/g, "").slice(0, 5);
+            input.value = zip;
+
+            if (zip.length === 5) {
+              lookupZip(input);
+            }
+          });
+      };
 
       document.addEventListener("input", (event) => {
         const input = event.target;
 
-        if (input && input.matches && input.matches("[data-zip-input='true']")) {
-          applyZipLookup(input);
+        if (!input || !input.matches) return;
+
+        if (input.matches("[data-phone-input='true']")) {
+          input.value = formatPhone(input.value);
+          return;
         }
 
-        if (input && input.matches && input.matches("[data-state-input='true']")) {
+        if (input.matches("[data-state-input='true']")) {
           normalizeStateInput(input);
+          return;
+        }
+
+        if (input.matches("[data-zip-input='true']")) {
+          scheduleZipLookup(input);
         }
       });
+
+      document.addEventListener("paste", (event) => {
+        const input = event.target;
+
+        if (!input || !input.matches) return;
+
+        if (
+          input.matches("[data-phone-input='true']") ||
+          input.matches("[data-zip-input='true']") ||
+          input.matches("[data-state-input='true']")
+        ) {
+          window.setTimeout(() => {
+            if (input.matches("[data-phone-input='true']")) {
+              input.value = formatPhone(input.value);
+            }
+
+            if (input.matches("[data-state-input='true']")) {
+              normalizeStateInput(input);
+            }
+
+            if (input.matches("[data-zip-input='true']")) {
+              scheduleZipLookup(input);
+            }
+          }, 0);
+        }
+      });
+
+      document.addEventListener(
+        "blur",
+        (event) => {
+          const input = event.target;
+
+          if (!input || !input.matches) return;
+
+          if (input.matches("[data-phone-input='true']")) {
+            input.value = formatPhone(input.value);
+          }
+
+          if (input.matches("[data-state-input='true']")) {
+            normalizeStateInput(input);
+          }
+
+          if (input.matches("[data-zip-input='true']")) {
+            lookupZip(input);
+          }
+        },
+        true,
+      );
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", applyInitialEnhancements);
+      } else {
+        applyInitialEnhancements();
+      }
     })();
   `;
 
@@ -2132,7 +2468,9 @@ function LeadStatusBadge({ status }: { status: string }) {
             ? "bg-amber-100 text-amber-800"
             : status === "Not Moving Forward"
               ? "bg-slate-100 text-slate-600"
-              : "bg-orange-100 text-orange-800";
+              : status === "Archived"
+                ? "bg-red-100 text-red-700"
+                : "bg-orange-100 text-orange-800";
 
   return (
     <span
@@ -2147,8 +2485,9 @@ function PipelineProgressFlow({ status }: { status: string }) {
   const stages = ["New", "Contacted", "Interested", "Signed Up", "Approved"];
   const currentIndex = stages.indexOf(status);
   const isClosed = status === "Not Moving Forward";
+  const isArchived = status === "Archived";
 
-  if (isClosed) {
+  if (isArchived) {
     return (
       <div className="mt-3 max-w-[360px] rounded-2xl border border-red-100 bg-red-50 p-2">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -2160,7 +2499,27 @@ function PipelineProgressFlow({ status }: { status: string }) {
               {stage}
             </span>
           ))}
-          <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">
+          <span className="rounded-full bg-red-700 px-2 py-1 text-[10px] font-black text-white">
+            Archived
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isClosed) {
+    return (
+      <div className="mt-3 max-w-[360px] rounded-2xl border border-slate-200 bg-slate-50 p-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {stages.map((stage) => (
+            <span
+              key={stage}
+              className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-400"
+            >
+              {stage}
+            </span>
+          ))}
+          <span className="rounded-full bg-slate-700 px-2 py-1 text-[10px] font-black text-white">
             Not Moving
           </span>
         </div>
@@ -2194,6 +2553,52 @@ function PipelineProgressFlow({ status }: { status: string }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function LeadQuickStatusButtons({ lead }: { lead: NormalizedLead }) {
+  if (!lead.id) {
+    return (
+      <span className="rounded-full bg-slate-100 px-3 py-1 text-center text-xs font-black text-slate-500">
+        No actions
+      </span>
+    );
+  }
+
+  if (lead.status === "Archived") {
+    return (
+      <form action={updateAmbassadorLeadPipelineStatus}>
+        <input type="hidden" name="lead_id" value={lead.id} />
+        <input type="hidden" name="source_table" value={lead.sourceTable} />
+        <input type="hidden" name="next_status" value="contacted" />
+        <button
+          type="submit"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 ring-1 ring-green-100 transition hover:bg-green-100"
+        >
+          <RotateCcw size={13} />
+          Restore
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="grid gap-1.5">
+      {quickStatusActions.map((action) => (
+        <form key={action.value} action={updateAmbassadorLeadPipelineStatus}>
+          <input type="hidden" name="lead_id" value={lead.id} />
+          <input type="hidden" name="source_table" value={lead.sourceTable} />
+          <input type="hidden" name="next_status" value={action.value} />
+          <button
+            type="submit"
+            className={`inline-flex w-full items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-black ring-1 transition ${action.tone}`}
+          >
+            {action.icon}
+            {action.label}
+          </button>
+        </form>
+      ))}
     </div>
   );
 }
@@ -2337,7 +2742,7 @@ function FilterSelect({
   );
 }
 
-function PipelineEditForm({ lead }: { lead: any }) {
+function PipelineEditForm({ lead }: { lead: NormalizedLead }) {
   return (
     <details className="rounded-[24px] border border-green-100 bg-white p-4">
       <summary className="cursor-pointer text-sm font-black text-green-900">
