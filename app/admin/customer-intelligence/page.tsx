@@ -83,47 +83,34 @@ type BookingRow = {
   updated_at?: string | null;
   city?: string | null;
   state?: string | null;
-  country?: string | null;
   zip?: string | null;
   zipcode?: string | null;
   zip_code?: string | null;
   postal_code?: string | null;
-  service_city?: string | null;
-  service_state?: string | null;
-  service_country?: string | null;
-  service_zip?: string | null;
-  service_zip_code?: string | null;
-  customer_city?: string | null;
-  customer_state?: string | null;
-  customer_country?: string | null;
-  customer_zip?: string | null;
-  customer_zip_code?: string | null;
-  customer_postal_code?: string | null;
   source?: string | null;
   signup_source?: string | null;
   referral_source?: string | null;
   lead_source?: string | null;
   acquisition_source?: string | null;
   utm_source?: string | null;
-  utm_medium?: string | null;
-  utm_campaign?: string | null;
-  campaign?: string | null;
-  campaign_name?: string | null;
+  total_amount?: number | string | null;
   amount?: number | string | null;
   price?: number | string | null;
-  total_amount?: number | string | null;
-  booking_total?: number | string | null;
-  total_customer_paid?: number | string | null;
+  subtotal?: number | string | null;
+  service_total?: number | string | null;
+  grand_total?: number | string | null;
 };
 
 type PetRow = {
   id: string;
   owner_id?: string | null;
   customer_id?: string | null;
+  pet_parent_id?: string | null;
   user_id?: string | null;
-  pet_owner_id?: string | null;
   name?: string | null;
   pet_name?: string | null;
+  type?: string | null;
+  breed?: string | null;
   created_at?: string | null;
 };
 
@@ -230,7 +217,7 @@ function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
 
   if (typeof value === "string") {
-    const parsed = Number(value.replace(/[$,]/g, ""));
+    const parsed = Number(value.replace(/[^0-9.-]/g, ""));
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
@@ -238,9 +225,7 @@ function asNumber(value: unknown) {
 }
 
 function number(value: number) {
-  return new Intl.NumberFormat("en-US").format(
-    Number.isFinite(value) ? value : 0,
-  );
+  return new Intl.NumberFormat("en-US").format(value);
 }
 
 function money(value: number) {
@@ -248,20 +233,21 @@ function money(value: number) {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0);
+  }).format(value);
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return "—";
+  if (!value) return "Not available";
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
-
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(value));
+  } catch {
+    return "Not available";
+  }
 }
 
 function getText(row: AnyRow, keys: string[], fallback = "") {
@@ -283,32 +269,26 @@ function getAmount(row: AnyRow, keys: string[]) {
 }
 
 function getDisplayName(row: AnyRow, fallback = "Customer") {
-  const firstName = getText(row, ["first_name", "firstName"]);
-  const lastName = getText(row, ["last_name", "lastName"]);
+  const fullName = getText(row, [
+    "full_name",
+    "display_name",
+    "name",
+    "customer_name",
+    "pet_parent_name",
+    "owner_name",
+  ]);
 
-  if (firstName || lastName) return `${firstName} ${lastName}`.trim();
+  if (fullName) return fullName;
 
-  return getText(
-    row,
-    [
-      "full_name",
-      "display_name",
-      "name",
-      "customer_name",
-      "pet_parent_name",
-      "owner_name",
-      "email",
-    ],
-    fallback,
-  );
+  const firstName = getText(row, ["first_name"]);
+  const lastName = getText(row, ["last_name"]);
+  const combinedName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  return combinedName || fallback;
 }
 
 function getRole(row: AnyRow) {
-  return getText(
-    row,
-    ["role", "user_role", "account_type", "type", "segment"],
-    "",
-  ).toLowerCase();
+  return getText(row, ["role", "user_role", "account_type", "type"]).toLowerCase();
 }
 
 function isCustomerProfile(profile: ProfileRow) {
@@ -316,29 +296,30 @@ function isCustomerProfile(profile: ProfileRow) {
 
   if (!role) return true;
 
-  return (
-    role.includes("customer") ||
-    role.includes("parent") ||
-    role.includes("client") ||
-    role.includes("owner")
-  );
+  return [
+    "customer",
+    "pet_parent",
+    "pet-parent",
+    "pet parent",
+    "parent",
+    "client",
+    "both",
+  ].includes(role);
 }
 
 function getRowBoolean(row: AnyRow, keys: string[]) {
-  return keys.some((key) => {
+  for (const key of keys) {
     const value = row[key];
 
     if (typeof value === "boolean") return value;
 
-    if (typeof value === "number") return value === 1;
-
     if (typeof value === "string") {
       const normalized = value.trim().toLowerCase();
-      return ["true", "yes", "y", "1"].includes(normalized);
+      if (["true", "yes", "1"].includes(normalized)) return true;
     }
+  }
 
-    return false;
-  });
+  return false;
 }
 
 function getRowSearchText(row: AnyRow, keys: string[]) {
@@ -353,139 +334,100 @@ function hasDemoKeyword(value: string) {
   const normalized = value.toLowerCase();
 
   return [
-    /\bdemo\b/,
-    /\bfake\b/,
-    /\btest\b/,
-    /\btester\b/,
-    /\bsample\b/,
-    /\bseed\b/,
-    /\bseeded\b/,
-    /\bdummy\b/,
-    /\bmock\b/,
-    /\bsandbox\b/,
-    /\bplaceholder\b/,
-    /\blorem\b/,
-  ].some((pattern) => pattern.test(normalized));
+    "demo",
+    "fake",
+    "test",
+    "sample",
+    "sandbox",
+    "dummy",
+    "placeholder",
+    "delete",
+    "remove",
+  ].some((keyword) => normalized.includes(keyword));
 }
 
 function isDemoEmail(value: string) {
-  const email = value.trim().toLowerCase();
-
-  if (!email) return false;
-
-  const domain = email.includes("@") ? email.split("@").pop() || "" : "";
+  const normalized = value.toLowerCase();
 
   return (
-    email.includes("+test@") ||
-    email.includes("+demo@") ||
-    email.includes("+fake@") ||
-    email.includes("demo+") ||
-    email.includes("test+") ||
-    [
-      "example.com",
-      "example.org",
-      "example.net",
-      "test.com",
-      "demo.com",
-      "fake.com",
-      "mailinator.com",
-      "localhost",
-    ].includes(domain)
+    hasDemoKeyword(normalized) ||
+    normalized.endsWith("@example.com") ||
+    normalized.endsWith("@test.com") ||
+    normalized.endsWith("@demo.com") ||
+    normalized.includes("+test") ||
+    normalized.includes("+demo") ||
+    normalized.includes("+fake")
   );
 }
 
 function isDemoLikeRow(row: AnyRow) {
-  const deletedAt = asString(row.deleted_at || row.archived_at || row.removed_at);
-  if (deletedAt) return true;
-
-  if (
+  const explicitDemo =
     getRowBoolean(row, [
       "is_demo",
       "demo",
       "is_test",
-      "test_account",
-      "is_fake",
-      "fake",
-      "sandbox",
-      "seeded",
-      "is_seed",
+      "test",
+      "is_sample",
       "sample",
+      "sandbox",
       "archived",
       "is_archived",
-    ])
-  ) {
-    return true;
-  }
+      "deleted",
+      "is_deleted",
+    ]) ||
+    ["demo", "test", "sample", "sandbox", "archived", "deleted"].includes(
+      getText(row, ["status", "record_status", "visibility"]).toLowerCase(),
+    );
 
-  const emailText = getRowSearchText(row, [
+  if (explicitDemo) return true;
+
+  const email = getText(row, [
     "email",
     "customer_email",
     "pet_parent_email",
     "owner_email",
-    "sender_email",
-    "recipient_email",
+    "referred_email",
   ]);
 
-  if (emailText.split(/\s+/).some(isDemoEmail)) return true;
+  if (email && isDemoEmail(email)) return true;
 
-  const identifierText = getRowSearchText(row, [
-    "id",
-    "user_id",
-    "customer_id",
-    "pet_owner_id",
-    "client_id",
-    "owner_id",
-    "sender_id",
-    "recipient_id",
-    "from_user_id",
-    "to_user_id",
-  ]);
-
-  if (hasDemoKeyword(identifierText)) return true;
-
-  const visibleText = getRowSearchText(row, [
+  const searchText = getRowSearchText(row, [
     "full_name",
     "display_name",
-    "first_name",
-    "last_name",
     "name",
     "customer_name",
     "pet_parent_name",
     "owner_name",
     "pet_name",
+    "campaign",
+    "campaign_name",
     "source",
     "signup_source",
     "referral_source",
     "lead_source",
     "acquisition_source",
-    "utm_source",
-    "utm_medium",
-    "utm_campaign",
-    "campaign",
-    "campaign_name",
     "notes",
-    "description",
+    "internal_notes",
   ]);
 
-  return hasDemoKeyword(visibleText);
+  return hasDemoKeyword(searchText);
 }
 
 function hasHiddenCustomerReference(row: AnyRow, hiddenCustomerIds: Set<string>) {
-  if (!hiddenCustomerIds.size) return false;
-
   const possibleIds = [
-    row.id,
-    row.user_id,
-    row.customer_id,
-    row.pet_owner_id,
-    row.client_id,
-    row.owner_id,
-    row.sender_id,
-    row.recipient_id,
-    row.from_user_id,
-    row.to_user_id,
+    "customer_id",
+    "pet_owner_id",
+    "owner_id",
+    "client_id",
+    "user_id",
+    "profile_id",
+    "pet_parent_id",
+    "sender_id",
+    "recipient_id",
+    "from_user_id",
+    "to_user_id",
   ]
-    .map((value) => asString(value))
+    .map((key) => asString(row[key]))
     .filter(Boolean);
 
   return possibleIds.some((id) => hiddenCustomerIds.has(id));
@@ -497,12 +439,12 @@ function getCustomerId(booking: BookingRow) {
     booking.pet_owner_id ||
     booking.client_id ||
     booking.user_id ||
-    null
+    ""
   );
 }
 
 function getPetOwnerId(pet: PetRow) {
-  return pet.owner_id || pet.customer_id || pet.user_id || pet.pet_owner_id || null;
+  return pet.owner_id || pet.customer_id || pet.pet_parent_id || pet.user_id || "";
 }
 
 function getBookingDate(booking: BookingRow) {
@@ -517,55 +459,52 @@ function getBookingDate(booking: BookingRow) {
 
 function getBookingAmount(booking: BookingRow) {
   return getAmount(booking as AnyRow, [
-    "total_customer_paid",
     "total_amount",
-    "booking_total",
+    "grand_total",
+    "service_total",
+    "subtotal",
     "amount",
     "price",
   ]);
 }
 
 function getBookingStatus(booking: BookingRow) {
-  return asString(booking.status || booking.booking_status).toLowerCase();
+  return getText(booking as AnyRow, ["status", "booking_status"]).toLowerCase();
 }
 
 function getPaymentStatus(booking: BookingRow) {
-  return asString(booking.payment_status).toLowerCase();
+  return getText(booking as AnyRow, ["payment_status"]).toLowerCase();
 }
 
 function isPaidBooking(booking: BookingRow) {
-  const paymentStatus = getPaymentStatus(booking);
-  const bookingStatus = getBookingStatus(booking);
+  const status = getPaymentStatus(booking);
 
-  return (
-    paymentStatus === "paid" ||
-    paymentStatus === "succeeded" ||
-    bookingStatus.includes("paid") ||
-    bookingStatus.includes("complete")
+  return ["paid", "succeeded", "complete", "completed", "captured"].includes(
+    status,
   );
 }
 
 function isCompletedBooking(booking: BookingRow) {
   const status = getBookingStatus(booking);
-  return status.includes("complete") || status.includes("paid");
+
+  return ["completed", "complete", "finished", "closed"].includes(status);
 }
 
 function isUnreadMessage(message: MessageRow) {
-  const readAt = asString(message.read_at);
-  const status = asString(message.status).toLowerCase();
+  if (typeof message.is_read === "boolean") return !message.is_read;
+  if (message.read_at) return false;
 
-  if (message.is_read === false) return true;
-  if (!readAt && status !== "read" && status !== "archived") return true;
+  const status = getText(message as AnyRow, ["status"]).toLowerCase();
 
-  return false;
+  return status === "unread" || status === "new";
 }
 
 function getMessageParticipantIds(message: MessageRow) {
   return [
-    message.sender_id,
-    message.recipient_id,
     message.customer_id,
     message.user_id,
+    message.sender_id,
+    message.recipient_id,
     message.from_user_id,
     message.to_user_id,
   ].filter(Boolean) as string[];
@@ -574,174 +513,166 @@ function getMessageParticipantIds(message: MessageRow) {
 function isWithinLastDays(value: string | null, days: number) {
   if (!value) return false;
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return false;
+  const timestamp = new Date(value).getTime();
 
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
+  if (!Number.isFinite(timestamp)) return false;
 
-  return parsed >= cutoff;
+  return Date.now() - timestamp <= days * 24 * 60 * 60 * 1000;
 }
 
 function getMostRecentDate(values: Array<string | null>) {
   const validDates = values
     .filter(Boolean)
     .map((value) => new Date(value as string))
-    .filter((date) => !Number.isNaN(date.getTime()))
-    .sort((a, b) => b.getTime() - a.getTime());
+    .filter((date) => Number.isFinite(date.getTime()));
 
-  return validDates[0]?.toISOString() || null;
+  if (!validDates.length) return null;
+
+  return validDates
+    .sort((a, b) => b.getTime() - a.getTime())[0]
+    .toISOString();
 }
 
 function getOldestDate(values: Array<string | null>) {
   const validDates = values
     .filter(Boolean)
     .map((value) => new Date(value as string))
-    .filter((date) => !Number.isNaN(date.getTime()))
-    .sort((a, b) => a.getTime() - b.getTime());
+    .filter((date) => Number.isFinite(date.getTime()));
 
-  return validDates[0]?.toISOString() || null;
+  if (!validDates.length) return null;
+
+  return validDates
+    .sort((a, b) => a.getTime() - b.getTime())[0]
+    .toISOString();
 }
 
 function getCustomerSegment(customer: CustomerInsight) {
-  if (customer.totalSpend >= 1000 || customer.bookingCount >= 8) {
-    return "VIP";
-  }
-
-  if (customer.bookingCount >= 3) {
-    return "Repeat";
-  }
-
-  if (customer.bookingCount === 1) {
-    return "New";
-  }
+  if (customer.totalSpend >= 1000 || customer.bookingCount >= 8) return "VIP";
+  if (customer.bookingCount >= 3) return "Repeat";
+  if (customer.bookingCount >= 1) return "New";
 
   return "Lead";
 }
 
 function getCity(row: AnyRow) {
-  return getText(row, ["city", "service_city", "customer_city"], "");
+  return getText(row, ["city", "customer_city", "location_city"]);
 }
 
 function getState(row: AnyRow) {
-  return getText(row, ["state", "service_state", "customer_state"], "");
+  return getText(row, ["state", "State", "state_code", "customer_state"]);
 }
 
 function getCountry(row: AnyRow) {
-  return getText(row, ["country", "service_country", "customer_country"], "");
+  return getText(row, ["country", "customer_country"], "US");
 }
 
 function getZipCode(row: AnyRow) {
-  return getText(
-    row,
-    [
-      "zip_code",
-      "zipcode",
-      "zip",
-      "postal_code",
-      "service_zip_code",
-      "service_zip",
-      "customer_zip_code",
-      "customer_zip",
-      "customer_postal_code",
-    ],
-    "",
-  );
+  return getText(row, [
+    "zip",
+    "zipcode",
+    "zip_code",
+    "postal_code",
+    "customer_zip",
+    "customer_zip_code",
+  ]);
 }
 
 function getSource(row: AnyRow) {
-  return getText(
-    row,
-    [
-      "utm_source",
-      "source",
-      "signup_source",
-      "referral_source",
-      "lead_source",
-      "acquisition_source",
-    ],
-    "Direct",
-  );
+  return getText(row, [
+    "source",
+    "signup_source",
+    "referral_source",
+    "lead_source",
+    "acquisition_source",
+    "utm_source",
+    "platform",
+  ]);
 }
 
 function getCampaign(row: AnyRow) {
-  return getText(
-    row,
-    [
-      "utm_campaign",
-      "campaign",
-      "campaign_name",
-      "source_campaign",
-      "referral_campaign",
-    ],
-    "",
-  );
+  return getText(row, [
+    "campaign",
+    "campaign_name",
+    "utm_campaign",
+    "ad_campaign",
+    "partner_campaign",
+  ]);
 }
 
 function normalizeSource(value: string) {
-  const source = value.toLowerCase();
+  const normalized = value.trim();
 
-  if (source.includes("instagram") || source === "ig") return "Instagram";
-  if (source.includes("facebook") || source.includes("meta")) return "Facebook";
-  if (source.includes("tiktok") || source.includes("tik tok")) return "TikTok";
-  if (source.includes("youtube")) return "YouTube";
-  if (source.includes("linkedin")) return "LinkedIn";
-  if (source === "x" || source.includes("twitter")) return "X / Twitter";
-  if (source.includes("google")) return "Google";
-  if (source.includes("referral") || source.includes("refer")) return "Referral";
-  if (source.includes("partner") || source.includes("affiliate")) return "Partner";
-  if (source.includes("email")) return "Email";
-  if (source.includes("direct") || !source) return "Direct";
+  if (!normalized) return "Direct";
 
-  return value;
+  const lower = normalized.toLowerCase();
+
+  if (lower.includes("facebook") || lower === "fb") return "Facebook";
+  if (lower.includes("instagram") || lower === "ig") return "Instagram";
+  if (lower.includes("tiktok")) return "TikTok";
+  if (lower.includes("youtube")) return "YouTube";
+  if (lower.includes("linkedin")) return "LinkedIn";
+  if (lower.includes("twitter") || lower === "x") return "X / Twitter";
+  if (lower.includes("google")) return "Google";
+  if (lower.includes("ambassador")) return "Ambassador";
+  if (lower.includes("referral")) return "Referral";
+  if (lower.includes("partner")) return "Partner";
+  if (lower.includes("nextdoor")) return "Nextdoor";
+  if (lower.includes("email")) return "Email";
+  if (lower.includes("organic")) return "Organic";
+
+  return normalized;
 }
 
 function isSocialSource(value: string) {
-  return socialPlatforms.includes(normalizeSource(value));
+  const normalized = value.toLowerCase();
+
+  return socialPlatforms.some((platform) =>
+    normalized.includes(platform.toLowerCase().split(" ")[0]),
+  );
 }
 
 function buildLocationInsights(
   customers: CustomerInsight[],
   key: "zipCode" | "city" | "state" | "country",
-) {
-  const locationMap = new Map<string, LocationInsight>();
+): LocationInsight[] {
+  const map = new Map<string, LocationInsight>();
 
   for (const customer of customers) {
     const label = customer[key] || "Unknown";
 
     const existing =
-      locationMap.get(label) ||
-      {
+      map.get(label) ||
+      ({
         label,
         customers: 0,
         bookings: 0,
         revenue: 0,
-      };
+      } satisfies LocationInsight);
 
     existing.customers += 1;
     existing.bookings += customer.bookingCount;
     existing.revenue += customer.totalSpend;
 
-    locationMap.set(label, existing);
+    map.set(label, existing);
   }
 
-  return Array.from(locationMap.values())
+  return Array.from(map.values())
     .sort((a, b) => b.revenue - a.revenue || b.customers - a.customers)
-    .slice(0, 5);
+    .slice(0, 8);
 }
 
 function buildSourceInsights(
   customers: CustomerInsight[],
   signupRows: AnyRow[],
   conversionRows: AnyRow[],
-) {
-  const sourceMap = new Map<string, SourceInsight>();
+): SourceInsight[] {
+  const map = new Map<string, SourceInsight>();
 
   function ensure(label: string) {
-    const normalized = normalizeSource(label || "Direct");
+    const normalized = normalizeSource(label);
 
-    if (!sourceMap.has(normalized)) {
-      sourceMap.set(normalized, {
+    if (!map.has(normalized)) {
+      map.set(normalized, {
         label: normalized,
         signups: 0,
         customers: 0,
@@ -750,49 +681,47 @@ function buildSourceInsights(
       });
     }
 
-    return sourceMap.get(normalized)!;
+    return map.get(normalized) as SourceInsight;
   }
 
-  for (const signup of signupRows) {
-    const row = ensure(getSource(signup));
-    row.signups += 1;
+  for (const row of signupRows) {
+    ensure(getSource(row)).signups += 1;
+  }
+
+  for (const row of conversionRows) {
+    ensure(getSource(row)).signups += 1;
   }
 
   for (const customer of customers) {
-    const row = ensure(customer.source);
-    row.customers += 1;
-    row.bookings += customer.bookingCount;
-    row.revenue += customer.totalSpend;
+    const source = ensure(customer.source);
+    source.customers += 1;
+    source.bookings += customer.bookingCount;
+    source.revenue += customer.totalSpend;
   }
 
-  for (const conversion of conversionRows) {
-    const row = ensure(getSource(conversion));
-    row.customers += 1;
-  }
-
-  return Array.from(sourceMap.values())
+  return Array.from(map.values())
     .sort((a, b) => b.revenue - a.revenue || b.customers - a.customers)
-    .slice(0, 8);
+    .slice(0, 10);
 }
 
 function buildCampaignInsights(rows: AnyRow[]) {
-  const campaignMap = new Map<string, CampaignInsight>();
+  const map = new Map<string, CampaignInsight>();
 
   for (const row of rows) {
-    const label = getCampaign(row) || "Untracked Campaign";
+    const label = getCampaign(row) || "Unassigned";
 
     const existing =
-      campaignMap.get(label) ||
-      {
+      map.get(label) ||
+      ({
         label,
         count: 0,
-      };
+      } satisfies CampaignInsight);
 
     existing.count += 1;
-    campaignMap.set(label, existing);
+    map.set(label, existing);
   }
 
-  return Array.from(campaignMap.values())
+  return Array.from(map.values())
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 }
@@ -1285,6 +1214,149 @@ async function getCustomerIntelligenceData() {
   };
 }
 
+function getCustomerProfileHref(customerId: string) {
+  return `/admin/customers/${encodeURIComponent(customerId)}`;
+}
+
+function getCustomerStatus(customer: CustomerInsight) {
+  if (customer.completedBookingCount > 0) return "Active Pet Parent";
+  if (customer.bookingCount > 0) return "Booking Started";
+  if (customer.petCount > 0) return "Pet Profile Added";
+  if (customer.messageCount > 0) return "Messaging";
+  return "Registered";
+}
+
+function getCustomerLocationLabel(customer: CustomerInsight) {
+  const cityState = [customer.city, customer.state].filter(Boolean).join(", ");
+
+  if (cityState && customer.zipCode) {
+    return `${cityState} ${customer.zipCode}`;
+  }
+
+  return cityState || customer.zipCode || "Location not added yet";
+}
+
+function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) {
+  const recentCustomers = [...customers]
+    .sort((a, b) => {
+      const aTime = a.firstSeenDate ? new Date(a.firstSeenDate).getTime() : 0;
+      const bTime = b.firstSeenDate ? new Date(b.firstSeenDate).getTime() : 0;
+
+      return bTime - aTime;
+    })
+    .slice(0, 12);
+
+  return (
+    <DashboardCard>
+      <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+            Super Admin Pet Parent Registry
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-slate-950">
+            Click a Pet Parent to open the full profile
+          </h2>
+          <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
+            This gives Super Admin a simple front-door list of real customer /
+            Pet Parent records before the deeper charts and reporting sections.
+          </p>
+        </div>
+
+        <Link
+          href={adminRoutes.customers}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+        >
+          <Users size={17} />
+          Open Customers
+        </Link>
+      </div>
+
+      {recentCustomers.length ? (
+        <div className="overflow-hidden rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9]">
+          <div className="hidden grid-cols-[1.45fr_1fr_0.8fr_0.8fr_0.8fr_0.75fr] gap-3 border-b border-[#e3ece5] bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400 lg:grid">
+            <span>Pet Parent</span>
+            <span>Location</span>
+            <span>Status</span>
+            <span>Bookings</span>
+            <span>Spend</span>
+            <span className="text-right">Profile</span>
+          </div>
+
+          <div className="divide-y divide-[#e3ece5]">
+            {recentCustomers.map((customer) => (
+              <Link
+                key={customer.id}
+                href={getCustomerProfileHref(customer.id)}
+                className="grid gap-3 bg-white px-4 py-4 transition hover:bg-green-50/60 lg:grid-cols-[1.45fr_1fr_0.8fr_0.8fr_0.8fr_0.75fr] lg:items-center"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-green-800 text-sm font-black text-white">
+                      {customer.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={customer.avatarUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        customer.name.slice(0, 1).toUpperCase()
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-slate-950">
+                        {customer.name}
+                      </p>
+                      <p className="truncate text-xs font-bold text-slate-500">
+                        {customer.email || "No email on profile yet"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-sm font-bold text-slate-600">
+                  {getCustomerLocationLabel(customer)}
+                </p>
+
+                <div>
+                  <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-800">
+                    {getCustomerStatus(customer)}
+                  </span>
+                </div>
+
+                <p className="text-sm font-black text-slate-950">
+                  {number(customer.bookingCount)}
+                  <span className="ml-1 text-xs font-bold text-slate-400">
+                    total
+                  </span>
+                </p>
+
+                <p className="text-sm font-black text-green-800">
+                  {money(customer.totalSpend)}
+                </p>
+
+                <div className="flex justify-start lg:justify-end">
+                  <span className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-2 text-xs font-black text-white shadow-sm">
+                    View Profile
+                    <MousePointerClick size={14} />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-6 text-sm font-bold leading-6 text-green-900">
+          No visible Pet Parent profiles were found yet. New Google/email/phone
+          signups should appear here once their `profiles` row is created with
+          the customer/Pet Parent role.
+        </div>
+      )}
+    </DashboardCard>
+  );
+}
+
 export default async function AdminCustomerIntelligencePage() {
   const data = await getCustomerIntelligenceData();
 
@@ -1423,6 +1495,10 @@ export default async function AdminCustomerIntelligencePage() {
             value={number(data.metrics.socialClicks)}
             detail={`Top platform: ${data.metrics.topSocialPlatform}`}
           />
+        </section>
+
+        <section>
+          <CustomerRegistryPanel customers={data.customers} />
         </section>
 
         <section className="grid items-start gap-5 xl:grid-cols-12">
@@ -1692,16 +1768,19 @@ function StatCard({
 }) {
   return (
     <div className="rounded-[26px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-green-800 text-white">
         {icon}
       </div>
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+
+      <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
         {label}
       </p>
-      <p className="mt-1 text-3xl font-black tracking-tight text-slate-950">
+      <p className="mt-2 text-2xl font-black tracking-tight text-slate-950">
         {value}
       </p>
-      <p className="mt-2 text-sm font-semibold text-slate-500">{detail}</p>
+      <p className="mt-2 text-sm font-semibold leading-5 text-slate-500">
+        {detail}
+      </p>
     </div>
   );
 }
@@ -1718,21 +1797,21 @@ function SegmentRow({
   tone: "green" | "blue" | "orange" | "slate";
 }) {
   const toneClasses = {
-    green: "bg-emerald-100 text-emerald-900",
-    blue: "bg-sky-100 text-sky-900",
-    orange: "bg-amber-100 text-amber-900",
-    slate: "bg-slate-100 text-slate-800",
+    green: "bg-green-100 text-green-800",
+    blue: "bg-sky-100 text-sky-800",
+    orange: "bg-amber-100 text-amber-800",
+    slate: "bg-slate-100 text-slate-700",
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-3">
       <div>
         <p className="text-sm font-black text-slate-950">{label}</p>
-        <p className="mt-1 text-xs font-semibold text-slate-500">{detail}</p>
+        <p className="text-xs font-bold text-slate-500">{detail}</p>
       </div>
 
       <span
-        className={`rounded-full px-4 py-2 text-sm font-black ${toneClasses[tone]}`}
+        className={`rounded-full px-3 py-1 text-sm font-black ${toneClasses[tone]}`}
       >
         {number(value)}
       </span>
@@ -1750,14 +1829,15 @@ function MiniMetric({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#edf3ee] bg-white p-4">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-green-800">
         {icon}
       </div>
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
         {label}
       </p>
-      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
+      <p className="mt-2 text-xl font-black text-slate-950">{value}</p>
     </div>
   );
 }
@@ -1771,55 +1851,73 @@ function DonutChart({
   total: number;
   items: ChartItem[];
 }) {
-  const safeTotal = items.reduce((sum, item) => sum + item.value, 0);
-  let start = 0;
+  const activeItems = items.filter((item) => item.value > 0);
+  const activeTotal = activeItems.reduce((sum, item) => sum + item.value, 0);
 
-  const gradient =
-    safeTotal > 0
-      ? items
-          .map((item, index) => {
-            const size = (item.value / safeTotal) * 360;
-            const end = start + size;
-            const segment = `${chartColors[index % chartColors.length]} ${start}deg ${end}deg`;
-            start = end;
-            return segment;
-          })
-          .join(", ")
-      : "#e5e7eb 0deg 360deg";
+  let currentOffset = 0;
+  const segments = activeItems.map((item, index) => {
+    const percent = activeTotal > 0 ? (item.value / activeTotal) * 100 : 0;
+    const segment = `${chartColors[index % chartColors.length]} ${currentOffset}% ${
+      currentOffset + percent
+    }%`;
+
+    currentOffset += percent;
+    return segment;
+  });
+
+  const background =
+    segments.length > 0
+      ? `conic-gradient(${segments.join(", ")})`
+      : "conic-gradient(#e2e8f0 0% 100%)";
 
   return (
-    <div className="grid items-center gap-5 sm:grid-cols-[180px_1fr] xl:grid-cols-1 2xl:grid-cols-[180px_1fr]">
-      <div className="relative mx-auto h-[180px] w-[180px]">
+    <div className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-5">
+      <div className="flex flex-col items-center gap-5 md:flex-row">
         <div
-          className="h-full w-full rounded-full"
-          style={{ background: `conic-gradient(${gradient})` }}
-        />
-        <div className="absolute inset-[34px] flex flex-col items-center justify-center rounded-full bg-white shadow-inner">
-          <span className="text-3xl font-black text-slate-950">
-            {number(total)}
-          </span>
-          <span className="text-xs font-bold text-slate-500">{title}</span>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {items.map((item, index) => (
-          <div
-            key={item.label}
-            className="flex items-center justify-between gap-3 text-sm font-bold"
-          >
-            <div className="flex items-center gap-3">
-              <span
-                className="h-3 w-3 rounded-full"
-                style={{
-                  backgroundColor: chartColors[index % chartColors.length],
-                }}
-              />
-              <span className="text-slate-700">{item.label}</span>
-            </div>
-            <span className="text-slate-950">{number(item.value)}</span>
+          className="relative h-52 w-52 shrink-0 rounded-full"
+          style={{ background }}
+        >
+          <div className="absolute inset-7 flex flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+              {title}
+            </p>
+            <p className="mt-1 text-3xl font-black text-slate-950">
+              {number(total)}
+            </p>
           </div>
-        ))}
+        </div>
+
+        <div className="w-full space-y-3">
+          {items.map((item, index) => (
+            <div
+              key={item.label}
+              className="flex items-center justify-between gap-3 rounded-2xl bg-white p-3"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  className="h-3 w-3 rounded-full"
+                  style={{
+                    backgroundColor: chartColors[index % chartColors.length],
+                  }}
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-slate-950">
+                    {item.label}
+                  </p>
+                  {item.helper ? (
+                    <p className="truncate text-xs font-bold text-slate-500">
+                      {item.helper}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <p className="text-sm font-black text-green-800">
+                {number(item.value)}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

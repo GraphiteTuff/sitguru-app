@@ -20,6 +20,8 @@ type PetPerksSignupSelection =
   | "pet-parent"
   | "pet_parent";
 
+type CallbackIntent = "pet_parent" | "guru" | "both" | "customer" | null;
+
 function getSafeNextPath(nextParam: string | null, type: string | null) {
   if (type === "recovery") {
     return fallbackRoutes.resetPassword;
@@ -104,6 +106,71 @@ function getRoleRedirectPath(role: string | null, accountType?: string | null) {
   }
 
   return null;
+}
+
+function normalizeCallbackIntent(value: string | null): CallbackIntent {
+  const normalized = value?.trim().toLowerCase() || "";
+
+  if (
+    normalized === "customer" ||
+    normalized === "pet_parent" ||
+    normalized === "pet-parent" ||
+    normalized === "parent" ||
+    normalized === "pet parent"
+  ) {
+    return "pet_parent";
+  }
+
+  if (
+    normalized === "guru" ||
+    normalized === "future_guru" ||
+    normalized === "future-guru" ||
+    normalized === "provider" ||
+    normalized === "sitter"
+  ) {
+    return "guru";
+  }
+
+  if (
+    normalized === "both" ||
+    normalized === "pet-parent-and-guru" ||
+    normalized === "pet_parent_and_guru" ||
+    normalized === "customer-guru" ||
+    normalized === "customer_guru"
+  ) {
+    return "both";
+  }
+
+  return null;
+}
+
+function getProfileRoleFromIntent(intent: CallbackIntent) {
+  if (intent === "guru") {
+    return "guru";
+  }
+
+  if (intent === "both") {
+    return "both";
+  }
+
+  return "customer";
+}
+
+function getNameParts(fullName: string | null) {
+  const cleanName = fullName?.trim() || "";
+  const parts = cleanName.split(/\s+/).filter(Boolean);
+
+  if (!parts.length) {
+    return {
+      firstName: null,
+      lastName: null,
+    };
+  }
+
+  return {
+    firstName: parts[0] || null,
+    lastName: parts.length > 1 ? parts.slice(1).join(" ") : null,
+  };
 }
 
 function normalizePetPerksSignupSelection(
@@ -203,6 +270,88 @@ function getSignupRule(referralType: PetPerksReferralType) {
   }
 
   return "community_signup_capture";
+}
+
+async function upsertPetParentProfileFromCallback({
+  userId,
+  userEmail,
+  userName,
+  intent,
+}: {
+  userId: string;
+  userEmail: string | null;
+  userName: string | null;
+  intent: CallbackIntent;
+}) {
+  const supabaseAdmin = createSupabaseAdminClient();
+
+  const { data: existingProfile, error: existingProfileError } =
+    await supabaseAdmin
+      .from("profiles")
+      .select("id, role, full_name, email, first_name, last_name")
+      .eq("id", userId)
+      .maybeSingle();
+
+  if (existingProfileError) {
+    console.error(
+      "Profile lookup during auth callback failed:",
+      existingProfileError.message,
+    );
+    return;
+  }
+
+  const existingRole =
+    typeof existingProfile?.role === "string" ? existingProfile.role : null;
+
+  const shouldPreserveExistingRole =
+    isAdminRole(existingRole) ||
+    (isGuruRole(existingRole) && intent !== "guru" && intent !== "both");
+
+  const profileRole = shouldPreserveExistingRole
+    ? existingRole
+    : getProfileRoleFromIntent(intent);
+
+  const preferredName =
+    userName?.trim() ||
+    (typeof existingProfile?.full_name === "string"
+      ? existingProfile.full_name.trim()
+      : "") ||
+    null;
+
+  const { firstName, lastName } = getNameParts(preferredName);
+
+  const { error: upsertError } = await supabaseAdmin.from("profiles").upsert(
+    {
+      id: userId,
+      email:
+        userEmail ||
+        (typeof existingProfile?.email === "string"
+          ? existingProfile.email
+          : null),
+      full_name: preferredName,
+      first_name:
+        firstName ||
+        (typeof existingProfile?.first_name === "string"
+          ? existingProfile.first_name
+          : null),
+      last_name:
+        lastName ||
+        (typeof existingProfile?.last_name === "string"
+          ? existingProfile.last_name
+          : null),
+      role: profileRole,
+    },
+    {
+      onConflict: "id",
+    },
+  );
+
+  if (upsertError) {
+    console.error(
+      "Profile upsert during auth callback failed:",
+      upsertError.message,
+    );
+  }
 }
 
 async function upsertPetPerksReferralTrack({
@@ -450,6 +599,7 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const type = requestUrl.searchParams.get("type");
   const nextParam = requestUrl.searchParams.get("next");
+  const intent = normalizeCallbackIntent(requestUrl.searchParams.get("intent"));
 
   const supabase = await createClient();
 
@@ -487,6 +637,13 @@ export async function GET(request: Request) {
       : typeof user.user_metadata?.name === "string"
         ? user.user_metadata.name
         : null;
+
+  await upsertPetParentProfileFromCallback({
+    userId: user.id,
+    userEmail,
+    userName,
+    intent,
+  });
 
   await upsertPetPerksSignupReferral({
     requestUrl,
