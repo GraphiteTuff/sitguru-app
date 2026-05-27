@@ -208,44 +208,204 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
   ];
 }
 
-function AmbassadorPhotoBadge({
+function AmbassadorPhoto({
+  ambassador,
+  size = "normal",
+}: {
+  ambassador: AmbassadorSummaryRow;
+  size?: "normal" | "large";
+}) {
+  const hasPhoto = Boolean(ambassador.ambassador_photo_url);
+  const dimensionClass = size === "large" ? "h-20 w-20" : "h-14 w-14";
+  const initialsClass = size === "large" ? "text-xl" : "text-sm";
+
+  return (
+    <div
+      className={`relative flex ${dimensionClass} shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#e8f5e9] ${initialsClass} font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]`}
+    >
+      {hasPhoto ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={ambassador.ambassador_photo_url || ""}
+          alt={`${ambassador.full_name || "Ambassador"} profile photo`}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span>{getInitials(ambassador.full_name) || "SG"}</span>
+      )}
+
+      {!hasPhoto ? (
+        <div className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#2f6f3e] shadow-sm">
+          <Camera className="h-3 w-3" />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CompactMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-2xl bg-[#f5f8f3] p-3 text-center ring-1 ring-[#edf3e8]">
+      <p className="text-lg font-extrabold leading-none text-[#102819]">
+        {value}
+      </p>
+      <p className="mt-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function RewardLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-extrabold text-[#102819]">{value}</span>
+    </div>
+  );
+}
+
+function AmbassadorCard({
   ambassador,
 }: {
   ambassador: AmbassadorSummaryRow;
 }) {
   const hasPhoto = Boolean(ambassador.ambassador_photo_url);
-  const statusLabel = getPhotoStatusLabel(hasPhoto, ambassador.photo_approved);
+  const trainingPercent = numberValue(ambassador.training_percent);
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#e8f5e9] text-sm font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
-        {hasPhoto ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={ambassador.ambassador_photo_url || ""}
-            alt={`${ambassador.full_name || "Ambassador"} profile photo`}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <span>{getInitials(ambassador.full_name) || "SG"}</span>
-        )}
+    <article className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#b8d9b2] hover:shadow-md sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 gap-4">
+          <AmbassadorPhoto ambassador={ambassador} size="large" />
 
-        {!hasPhoto ? (
-          <div className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#2f6f3e] shadow-sm">
-            <Camera className="h-3 w-3" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-lg font-extrabold text-[#102819]">
+                {ambassador.full_name || "Unnamed Ambassador"}
+              </h3>
+              <span
+                className={`inline-flex rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide ring-1 ${photoStatusClass(
+                  hasPhoto,
+                  ambassador.photo_approved,
+                )}`}
+              >
+                {getPhotoStatusLabel(hasPhoto, ambassador.photo_approved)}
+              </span>
+            </div>
+
+            <p className="mt-1 truncate text-sm font-semibold text-slate-600">
+              {ambassador.email || "No email saved"}
+            </p>
+
+            <p className="mt-1 text-xs font-extrabold uppercase tracking-wide text-[#2f6f3e]">
+              {ambassador.referral_code || "No referral code"}
+            </p>
+
+            <p className="mt-1 text-xs text-slate-500">
+              {[ambassador.city, ambassador.state].filter(Boolean).join(", ") ||
+                "Location not saved"}
+            </p>
           </div>
-        ) : null}
+        </div>
+
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <span
+            className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
+              ambassador.status,
+            )}`}
+          >
+            {prettyStatus(ambassador.status)}
+          </span>
+          <span className="inline-flex rounded-full bg-[#f0f7ed] px-3 py-1 text-xs font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
+            {ambassador.program || "Student Hire"}
+          </span>
+        </div>
       </div>
 
-      <span
-        className={`inline-flex rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide ring-1 ${photoStatusClass(
-          hasPhoto,
-          ambassador.photo_approved,
-        )}`}
-      >
-        {statusLabel}
-      </span>
-    </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <CompactMetric
+          label="Parents"
+          value={numberValue(ambassador.pet_parent_signups)}
+        />
+        <CompactMetric label="Gurus" value={numberValue(ambassador.guru_signups)} />
+        <CompactMetric
+          label="Business"
+          value={numberValue(ambassador.business_signups)}
+        />
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
+          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+            Rewards
+          </p>
+          <div className="mt-3 space-y-2">
+            <RewardLine
+              label="Pending"
+              value={currency(ambassador.pending_rewards)}
+            />
+            <RewardLine
+              label="Approved"
+              value={currency(ambassador.approved_rewards)}
+            />
+            <RewardLine
+              label="Ready"
+              value={currency(ambassador.ready_for_payout_rewards)}
+            />
+            <RewardLine label="Paid" value={currency(ambassador.paid_rewards)} />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+              Training
+            </p>
+            <p className="text-sm font-extrabold text-[#102819]">
+              {trainingPercent}%
+            </p>
+          </div>
+
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={`h-full rounded-full ${trainingClass(trainingPercent)}`}
+              style={{ width: `${trainingPercent}%` }}
+            />
+          </div>
+
+          <p className="mt-3 text-xs font-semibold text-slate-500">
+            {prettyStatus(ambassador.training_status)}
+          </p>
+
+          {ambassador.ambassador_photo_path ? (
+            <p className="mt-3 truncate text-[11px] text-slate-400">
+              {ambassador.ambassador_photo_path}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs font-semibold text-slate-500">
+          Source: {ambassador.source || "Indeed"}
+        </p>
+
+        <Link
+          href={`/admin/ambassadors/${ambassador.ambassador_id}`}
+          className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+        >
+          View Ambassador
+          <ChevronRight className="ml-1 h-4 w-4" />
+        </Link>
+      </div>
+    </article>
   );
 }
 
@@ -269,19 +429,23 @@ export default async function AdminAmbassadorsPage() {
 
   const summaryRows = (data || []) as AmbassadorSummaryRow[];
 
-  const { data: photoRows } = await supabase
-    .from("ambassadors")
-    .select(
-      "id, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at",
-    )
-    .in(
-      "id",
-      summaryRows.map((row) => row.ambassador_id),
-    );
+  let photoRows: AmbassadorPhotoRow[] = [];
 
-  const photoMap = new Map(
-    ((photoRows || []) as AmbassadorPhotoRow[]).map((row) => [row.id, row]),
-  );
+  if (summaryRows.length > 0) {
+    const { data: photoData } = await supabase
+      .from("ambassadors")
+      .select(
+        "id, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at",
+      )
+      .in(
+        "id",
+        summaryRows.map((row) => row.ambassador_id),
+      );
+
+    photoRows = (photoData || []) as AmbassadorPhotoRow[];
+  }
+
+  const photoMap = new Map(photoRows.map((row) => [row.id, row]));
 
   const ambassadors = summaryRows.map((row) => {
     const photo = photoMap.get(row.ambassador_id);
@@ -309,11 +473,11 @@ export default async function AdminAmbassadorsPage() {
   ).length;
 
   return (
-    <main className="min-h-screen bg-[#f5f8f3] px-4 py-6 text-[#17351f] sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+    <main className="min-h-screen overflow-x-hidden bg-[#f5f8f3] px-3 py-5 text-[#17351f] sm:px-5 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
         <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
               <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-[#2f6f3e]">
                 SitGuru Growth
               </p>
@@ -405,15 +569,16 @@ export default async function AdminAmbassadorsPage() {
           })}
         </section>
 
-        <section className="rounded-[2rem] border border-[#dbe8d5] bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-[#e2ecd9] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-extrabold text-[#102819]">
                 Student Ambassadors
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                One-level admin view of each Ambassador’s profile photo,
-                signups, rewards, and training progress.
+                Card-based admin view with no horizontal scrollbars. Open each
+                profile for deeper controls, documents, photo approval, and
+                status changes.
               </p>
             </div>
 
@@ -421,191 +586,31 @@ export default async function AdminAmbassadorsPage() {
               Source: Indeed
             </div>
           </div>
-
-          {ambassadors.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#e8f5e9] text-[#2f6f3e]">
-                <GraduationCap className="h-7 w-7" />
-              </div>
-              <h3 className="mt-4 text-xl font-extrabold text-[#102819]">
-                No Ambassadors yet
-              </h3>
-              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-                Your database is ready. Next, add candidates to the ambassadors
-                table and wire their dashboard records.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[#e2ecd9]">
-                <thead className="bg-[#f8fbf6]">
-                  <tr>
-                    <th className="px-5 py-4 text-left text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                      Ambassador
-                    </th>
-                    <th className="px-5 py-4 text-left text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                      Status
-                    </th>
-                    <th className="px-5 py-4 text-left text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                      Signups
-                    </th>
-                    <th className="px-5 py-4 text-left text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                      Rewards
-                    </th>
-                    <th className="px-5 py-4 text-left text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                      Training
-                    </th>
-                    <th className="px-5 py-4 text-right text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                      View
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-[#edf3e8] bg-white">
-                  {ambassadors.map((ambassador) => {
-                    const trainingPercent = numberValue(
-                      ambassador.training_percent,
-                    );
-
-                    return (
-                      <tr key={ambassador.ambassador_id} className="align-top">
-                        <td className="px-5 py-4">
-                          <div className="flex min-w-[320px] items-start gap-4">
-                            <AmbassadorPhotoBadge ambassador={ambassador} />
-
-                            <div className="min-w-0">
-                              <p className="font-extrabold text-[#102819]">
-                                {ambassador.full_name || "Unnamed Ambassador"}
-                              </p>
-                              <p className="mt-1 text-sm text-slate-600">
-                                {ambassador.email || "No email saved"}
-                              </p>
-                              <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#2f6f3e]">
-                                {ambassador.referral_code || "No referral code"}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {[ambassador.city, ambassador.state]
-                                  .filter(Boolean)
-                                  .join(", ") || "Location not saved"}
-                              </p>
-                              {ambassador.ambassador_photo_path ? (
-                                <p className="mt-1 max-w-[280px] truncate text-[11px] text-slate-400">
-                                  {ambassador.ambassador_photo_path}
-                                </p>
-                              ) : null}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
-                              ambassador.status,
-                            )}`}
-                          >
-                            {prettyStatus(ambassador.status)}
-                          </span>
-                          <p className="mt-2 text-xs text-slate-500">
-                            {ambassador.program || "Student Hire"}
-                          </p>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="grid min-w-[220px] grid-cols-3 gap-2 text-center">
-                            <div className="rounded-2xl bg-[#f5f8f3] p-3">
-                              <p className="text-lg font-extrabold text-[#102819]">
-                                {numberValue(ambassador.pet_parent_signups)}
-                              </p>
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                                Parents
-                              </p>
-                            </div>
-                            <div className="rounded-2xl bg-[#f5f8f3] p-3">
-                              <p className="text-lg font-extrabold text-[#102819]">
-                                {numberValue(ambassador.guru_signups)}
-                              </p>
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                                Gurus
-                              </p>
-                            </div>
-                            <div className="rounded-2xl bg-[#f5f8f3] p-3">
-                              <p className="text-lg font-extrabold text-[#102819]">
-                                {numberValue(ambassador.business_signups)}
-                              </p>
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                                Business
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="min-w-[210px] space-y-1 text-sm">
-                            <div className="flex justify-between gap-4">
-                              <span className="text-slate-500">Pending</span>
-                              <span className="font-bold text-[#102819]">
-                                {currency(ambassador.pending_rewards)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-slate-500">Approved</span>
-                              <span className="font-bold text-[#102819]">
-                                {currency(ambassador.approved_rewards)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-slate-500">Ready</span>
-                              <span className="font-bold text-[#102819]">
-                                {currency(ambassador.ready_for_payout_rewards)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-slate-500">Paid</span>
-                              <span className="font-bold text-[#102819]">
-                                {currency(ambassador.paid_rewards)}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="min-w-[160px]">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="font-bold text-[#102819]">
-                                {trainingPercent}%
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                {prettyStatus(ambassador.training_status)}
-                              </span>
-                            </div>
-                            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                              <div
-                                className={`h-full rounded-full ${trainingClass(
-                                  trainingPercent,
-                                )}`}
-                                style={{ width: `${trainingPercent}%` }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4 text-right">
-                          <Link
-                            href={`/admin/ambassadors/${ambassador.ambassador_id}`}
-                            className="inline-flex items-center justify-center rounded-full bg-[#2f6f3e] px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
-                          >
-                            View
-                            <ChevronRight className="ml-1 h-4 w-4" />
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
         </section>
+
+        {ambassadors.length === 0 ? (
+          <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#e8f5e9] text-[#2f6f3e]">
+              <GraduationCap className="h-7 w-7" />
+            </div>
+            <h3 className="mt-4 text-xl font-extrabold text-[#102819]">
+              No Ambassadors yet
+            </h3>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+              Your database is ready. Next, add candidates to the ambassadors
+              table and wire their dashboard records.
+            </p>
+          </section>
+        ) : (
+          <section className="grid gap-4 xl:grid-cols-2">
+            {ambassadors.map((ambassador) => (
+              <AmbassadorCard
+                key={ambassador.ambassador_id}
+                ambassador={ambassador}
+              />
+            ))}
+          </section>
+        )}
       </div>
     </main>
   );
