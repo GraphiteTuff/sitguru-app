@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CalendarDays,
+  CheckCircle2,
   CircleDollarSign,
   Download,
   Globe2,
@@ -18,11 +19,11 @@ import {
   ShieldCheck,
   Trash2,
   TrendingUp,
+  UserCheck,
   UserRound,
   Users,
 } from "lucide-react";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import CustomerInsightsTable from "./CustomerInsightsTable";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +135,7 @@ type PetRow = {
   customer_id?: string | null;
   user_id?: string | null;
   pet_owner_id?: string | null;
+  pet_parent_id?: string | null;
   name?: string | null;
   pet_name?: string | null;
   created_at?: string | null;
@@ -151,6 +153,11 @@ type MessageRow = {
   read_at?: string | null;
   is_read?: boolean | null;
   status?: string | null;
+};
+
+type SetupStep = {
+  label: string;
+  complete: boolean;
 };
 
 type CustomerInsight = {
@@ -175,6 +182,18 @@ type CustomerInsight = {
   lastBookingDate: string | null;
   firstSeenDate: string | null;
   segment: string;
+  hasVerifiedContact: boolean;
+  hasProfileInfo: boolean;
+  hasPhone: boolean;
+  hasLocation: boolean;
+  hasPet: boolean;
+  hasStartedBooking: boolean;
+  hasCompletedBooking: boolean;
+  setupSteps: SetupStep[];
+  setupPercent: number;
+  currentStep: string;
+  setupStatus: string;
+  needsReview: boolean;
 };
 
 type CleanupCustomerRecord = {
@@ -311,7 +330,7 @@ function getAmount(row: AnyRow, keys: string[]) {
   return 0;
 }
 
-function getDisplayName(row: AnyRow, fallback = "Customer") {
+function getDisplayName(row: AnyRow, fallback = "Pet Parent") {
   const firstName = getText(row, ["first_name", "firstName"]);
   const lastName = getText(row, ["last_name", "lastName"]);
 
@@ -349,7 +368,8 @@ function isCustomerProfile(profile: ProfileRow) {
     role.includes("customer") ||
     role.includes("parent") ||
     role.includes("client") ||
-    role.includes("owner")
+    role.includes("owner") ||
+    role.includes("both")
   );
 }
 
@@ -370,33 +390,6 @@ function hasProfileLocation(profile: ProfileRow) {
     getCity(profile as AnyRow) ||
       getState(profile as AnyRow) ||
       getZipCode(profile as AnyRow),
-  );
-}
-
-function hasUsablePetParentSignal({
-  profile,
-  bookingCount,
-  petCount,
-  messageCount,
-  totalSpend,
-}: {
-  profile: ProfileRow;
-  bookingCount: number;
-  petCount: number;
-  messageCount: number;
-  totalSpend: number;
-}) {
-  const email = asString(profile.email);
-  const phone = getPhone(profile as AnyRow);
-
-  return Boolean(
-    email ||
-      phone ||
-      hasVerifiedContact(profile as AnyRow) ||
-      bookingCount > 0 ||
-      petCount > 0 ||
-      messageCount > 0 ||
-      totalSpend > 0,
   );
 }
 
@@ -616,6 +609,7 @@ function getPetOwnerId(pet: PetRow) {
     pet.owner_profile_id ||
     pet.owner_id ||
     pet.customer_id ||
+    pet.pet_parent_id ||
     pet.user_id ||
     pet.pet_owner_id ||
     null
@@ -818,6 +812,109 @@ function isSocialSource(value: string) {
   return socialPlatforms.includes(normalizeSource(value));
 }
 
+function getPetParentSetup({
+  profile,
+  petCount,
+  bookingCount,
+  completedBookingCount,
+}: {
+  profile: ProfileRow;
+  petCount: number;
+  bookingCount: number;
+  completedBookingCount: number;
+}) {
+  const email = asString(profile.email);
+  const phone = getPhone(profile as AnyRow);
+  const hasName = getDisplayName(profile as AnyRow, "") !== "";
+  const hasEmail = Boolean(email);
+  const hasPhone = Boolean(phone);
+  const hasLocation = hasProfileLocation(profile);
+  const verified = hasVerifiedContact(profile as AnyRow);
+  const hasPet = petCount > 0;
+  const hasStartedBooking = bookingCount > 0;
+  const hasCompletedBooking = completedBookingCount > 0;
+  const hasProfileInfo = hasName && hasEmail;
+
+  const steps: SetupStep[] = [
+    {
+      label: "Account Created",
+      complete: Boolean(profile.id),
+    },
+    {
+      label: "Email / Google Verified",
+      complete: verified || hasEmail,
+    },
+    {
+      label: "Profile Info Added",
+      complete: hasProfileInfo,
+    },
+    {
+      label: "Phone Added",
+      complete: hasPhone,
+    },
+    {
+      label: "Location Added",
+      complete: hasLocation,
+    },
+    {
+      label: "Pet Added",
+      complete: hasPet,
+    },
+    {
+      label: "First Booking Started",
+      complete: hasStartedBooking,
+    },
+    {
+      label: "First Booking Completed",
+      complete: hasCompletedBooking,
+    },
+  ];
+
+  const completedSteps = steps.filter((step) => step.complete).length;
+  const setupPercent = Math.round((completedSteps / steps.length) * 100);
+  const nextStep = steps.find((step) => !step.complete);
+
+  let setupStatus = "New Signup";
+
+  if (hasCompletedBooking) {
+    setupStatus = "Active Pet Parent";
+  } else if (hasStartedBooking) {
+    setupStatus = "Booking Started";
+  } else if (hasProfileInfo && hasPhone && hasLocation && hasPet) {
+    setupStatus = "Ready to Book";
+  } else if (!hasProfileInfo) {
+    setupStatus = "Needs Profile Info";
+  } else if (!hasPhone) {
+    setupStatus = "Needs Phone";
+  } else if (!hasLocation) {
+    setupStatus = "Needs Location";
+  } else if (!hasPet) {
+    setupStatus = "Needs Pet Added";
+  }
+
+  const needsReview =
+    !hasEmail ||
+    !hasProfileInfo ||
+    !hasPhone ||
+    !hasLocation ||
+    !hasPet;
+
+  return {
+    hasVerifiedContact: verified,
+    hasProfileInfo,
+    hasPhone,
+    hasLocation,
+    hasPet,
+    hasStartedBooking,
+    hasCompletedBooking,
+    setupSteps: steps,
+    setupPercent,
+    currentStep: nextStep?.label || "Complete",
+    setupStatus,
+    needsReview,
+  };
+}
+
 function buildLocationInsights(
   customers: CustomerInsight[],
   key: "zipCode" | "city" | "state" | "country",
@@ -919,7 +1016,7 @@ function toChartItemsFromLocations(rows: LocationInsight[]) {
   return rows.map((row) => ({
     label: row.label,
     value: row.revenue,
-    helper: `${number(row.customers)} customers · ${number(row.bookings)} bookings`,
+    helper: `${number(row.customers)} Pet Parents · ${number(row.bookings)} bookings`,
   }));
 }
 
@@ -927,7 +1024,7 @@ function toChartItemsFromSources(rows: SourceInsight[]) {
   return rows.map((row) => ({
     label: row.label,
     value: row.revenue,
-    helper: `${number(row.customers)} customers · ${number(row.signups)} signups`,
+    helper: `${number(row.customers)} Pet Parents · ${number(row.signups)} signups`,
   }));
 }
 
@@ -940,7 +1037,7 @@ async function safeAdminQuery(
 
     if (result.error) {
       console.warn(
-        `Admin customer intelligence query skipped for ${label}:`,
+        `Admin Pet Parents query skipped for ${label}:`,
         result.error,
       );
       return { data: [], error: null };
@@ -948,15 +1045,12 @@ async function safeAdminQuery(
 
     return result;
   } catch (error) {
-    console.warn(
-      `Admin customer intelligence query skipped for ${label}:`,
-      error,
-    );
+    console.warn(`Admin Pet Parents query skipped for ${label}:`, error);
     return { data: [], error: null };
   }
 }
 
-async function getCustomerIntelligenceData() {
+async function getPetParentsData() {
   const [
     profilesResult,
     bookingsResult,
@@ -1069,7 +1163,7 @@ async function getCustomerIntelligenceData() {
       .filter(Boolean),
   );
 
-  const customerProfileCandidates = rawProfiles.filter(
+  const profiles = rawProfiles.filter(
     (profile) =>
       Boolean(profile.id) &&
       isCustomerProfile(profile) &&
@@ -1077,20 +1171,15 @@ async function getCustomerIntelligenceData() {
       !demoProfileIds.has(profile.id),
   );
 
-  const candidateCustomerIds = new Set(
-    customerProfileCandidates.map((profile) => profile.id).filter(Boolean),
-  );
+  const profileIds = new Set(profiles.map((profile) => profile.id).filter(Boolean));
 
-  const customerIdsByEmail = new Map(
-    customerProfileCandidates
-      .map((profile) => [
-        asString(profile.email).toLowerCase(),
-        profile.id,
-      ] as const)
+  const profileIdsByEmail = new Map(
+    profiles
+      .map((profile) => [asString(profile.email).toLowerCase(), profile.id] as const)
       .filter(([email, id]) => Boolean(email) && Boolean(id)),
   );
 
-  function getCandidateBookingCustomerId(booking: BookingRow) {
+  function getProfileBookingCustomerId(booking: BookingRow) {
     const possibleIds = [
       booking.customer_id,
       booking.pet_owner_id,
@@ -1101,34 +1190,33 @@ async function getCustomerIntelligenceData() {
       .map((value) => asString(value))
       .filter(Boolean);
 
-    const matchedId = possibleIds.find((id) => candidateCustomerIds.has(id));
+    const matchedId = possibleIds.find((id) => profileIds.has(id));
     if (matchedId) return matchedId;
 
-    const matchedEmail = customerIdsByEmail.get(
+    const matchedEmail = profileIdsByEmail.get(
       asString(booking.customer_email).toLowerCase(),
     );
 
     return matchedEmail || null;
   }
 
-  function getCandidatePetOwnerId(pet: PetRow) {
+  function getProfilePetOwnerId(pet: PetRow) {
     const possibleIds = [
       pet.owner_profile_id,
       pet.owner_id,
       pet.customer_id,
+      pet.pet_parent_id,
       pet.user_id,
       pet.pet_owner_id,
     ]
       .map((value) => asString(value))
       .filter(Boolean);
 
-    return possibleIds.find((id) => candidateCustomerIds.has(id)) || null;
+    return possibleIds.find((id) => profileIds.has(id)) || null;
   }
 
-  function hasCandidateCustomerMessageParticipant(message: MessageRow) {
-    return getMessageParticipantIds(message).some((id) =>
-      candidateCustomerIds.has(id),
-    );
+  function hasProfileMessageParticipant(message: MessageRow) {
+    return getMessageParticipantIds(message).some((id) => profileIds.has(id));
   }
 
   const nonDemoBookings = rawBookings.filter(
@@ -1147,17 +1235,15 @@ async function getCustomerIntelligenceData() {
       !hasHiddenCustomerReference(message as AnyRow, demoProfileIds),
   );
 
-  const candidateBookings = nonDemoBookings.filter((booking) =>
-    Boolean(getCandidateBookingCustomerId(booking)),
+  const bookings = nonDemoBookings.filter((booking) =>
+    Boolean(getProfileBookingCustomerId(booking)),
   );
-  const candidatePets = nonDemoPets.filter((pet) =>
-    Boolean(getCandidatePetOwnerId(pet)),
-  );
-  const candidateMessages = nonDemoMessages.filter((message) =>
-    hasCandidateCustomerMessageParticipant(message),
+  const pets = nonDemoPets.filter((pet) => Boolean(getProfilePetOwnerId(pet)));
+  const messages = nonDemoMessages.filter((message) =>
+    hasProfileMessageParticipant(message),
   );
 
-  const bookingStatsByCustomerId = new Map<
+  const bookingStatsByProfileId = new Map<
     string,
     {
       bookingCount: number;
@@ -1169,12 +1255,12 @@ async function getCustomerIntelligenceData() {
     }
   >();
 
-  for (const booking of candidateBookings) {
-    const customerId = getCandidateBookingCustomerId(booking);
+  for (const booking of bookings) {
+    const customerId = getProfileBookingCustomerId(booking);
     if (!customerId) continue;
 
     const current =
-      bookingStatsByCustomerId.get(customerId) || {
+      bookingStatsByProfileId.get(customerId) || {
         bookingCount: 0,
         paidBookingCount: 0,
         completedBookingCount: 0,
@@ -1199,105 +1285,30 @@ async function getCustomerIntelligenceData() {
       bookingDate,
     ]);
 
-    bookingStatsByCustomerId.set(customerId, current);
+    bookingStatsByProfileId.set(customerId, current);
   }
 
-  const petOwnerCountMap = new Map<string, number>();
+  const petCountByProfileId = new Map<string, number>();
 
-  for (const pet of candidatePets) {
-    const ownerId = getCandidatePetOwnerId(pet);
+  for (const pet of pets) {
+    const ownerId = getProfilePetOwnerId(pet);
     if (!ownerId) continue;
 
-    petOwnerCountMap.set(ownerId, (petOwnerCountMap.get(ownerId) || 0) + 1);
+    petCountByProfileId.set(ownerId, (petCountByProfileId.get(ownerId) || 0) + 1);
   }
 
-  const messageCountMap = new Map<string, number>();
+  const messageCountByProfileId = new Map<string, number>();
 
-  for (const message of candidateMessages) {
+  for (const message of messages) {
     for (const participantId of getMessageParticipantIds(message)) {
-      if (!candidateCustomerIds.has(participantId)) continue;
+      if (!profileIds.has(participantId)) continue;
 
-      messageCountMap.set(
+      messageCountByProfileId.set(
         participantId,
-        (messageCountMap.get(participantId) || 0) + 1,
+        (messageCountByProfileId.get(participantId) || 0) + 1,
       );
     }
   }
-
-  const visibleProfiles = customerProfileCandidates.filter((profile) => {
-    const bookingStats = bookingStatsByCustomerId.get(profile.id);
-
-    return hasUsablePetParentSignal({
-      profile,
-      bookingCount: bookingStats?.bookingCount || 0,
-      petCount: petOwnerCountMap.get(profile.id) || 0,
-      messageCount: messageCountMap.get(profile.id) || 0,
-      totalSpend: bookingStats?.totalSpend || 0,
-    });
-  });
-
-  const visibleCustomerIds = new Set(
-    visibleProfiles.map((profile) => profile.id).filter(Boolean),
-  );
-
-  const liveCustomerIdsByEmail = new Map(
-    visibleProfiles
-      .map((profile) => [
-        asString(profile.email).toLowerCase(),
-        profile.id,
-      ] as const)
-      .filter(([email, id]) => Boolean(email) && Boolean(id)),
-  );
-
-  function getLiveBookingCustomerId(booking: BookingRow) {
-    const possibleIds = [
-      booking.customer_id,
-      booking.pet_owner_id,
-      booking.pet_parent_id,
-      booking.client_id,
-      booking.user_id,
-    ]
-      .map((value) => asString(value))
-      .filter(Boolean);
-
-    const matchedId = possibleIds.find((id) => visibleCustomerIds.has(id));
-    if (matchedId) return matchedId;
-
-    const matchedEmail = liveCustomerIdsByEmail.get(
-      asString(booking.customer_email).toLowerCase(),
-    );
-
-    return matchedEmail || null;
-  }
-
-  function getLivePetOwnerId(pet: PetRow) {
-    const possibleIds = [
-      pet.owner_profile_id,
-      pet.owner_id,
-      pet.customer_id,
-      pet.user_id,
-      pet.pet_owner_id,
-    ]
-      .map((value) => asString(value))
-      .filter(Boolean);
-
-    return possibleIds.find((id) => visibleCustomerIds.has(id)) || null;
-  }
-
-  function hasLiveCustomerMessageParticipant(message: MessageRow) {
-    return getMessageParticipantIds(message).some((id) =>
-      visibleCustomerIds.has(id),
-    );
-  }
-
-  const profiles = visibleProfiles;
-  const bookings = candidateBookings.filter((booking) =>
-    Boolean(getLiveBookingCustomerId(booking)),
-  );
-  const pets = candidatePets.filter((pet) => Boolean(getLivePetOwnerId(pet)));
-  const messages = candidateMessages.filter((message) =>
-    hasLiveCustomerMessageParticipant(message),
-  );
 
   const launchSignups = rawLaunchSignups.filter((row) => !isDemoLikeRow(row));
   const launchWaitlist = rawLaunchWaitlist.filter((row) => !isDemoLikeRow(row));
@@ -1312,7 +1323,7 @@ async function getCustomerIntelligenceData() {
 
   const hiddenDemoRows =
     rawProfiles.length -
-    customerProfileCandidates.length +
+    profiles.length +
     rawBookings.length -
     nonDemoBookings.length +
     rawPets.length -
@@ -1332,45 +1343,72 @@ async function getCustomerIntelligenceData() {
     rawPartnerCampaigns.length -
     partnerCampaigns.length;
 
-  const cleanupRecords: CleanupCustomerRecord[] = customerProfileCandidates
-    .filter((profile) => !visibleCustomerIds.has(profile.id))
-    .map((profile) => {
-      const bookingStats = bookingStatsByCustomerId.get(profile.id);
-      const bookingCount = bookingStats?.bookingCount || 0;
-      const petCount = petOwnerCountMap.get(profile.id) || 0;
-      const messageCount = messageCountMap.get(profile.id) || 0;
-      const totalSpend = bookingStats?.totalSpend || 0;
-      const email = asString(profile.email);
-      const phone = getPhone(profile as AnyRow);
-      const hasContact = Boolean(email || phone || hasVerifiedContact(profile as AnyRow));
-      const hasActivity =
-        bookingCount > 0 || petCount > 0 || messageCount > 0 || totalSpend > 0;
+  const customerMap = new Map<string, CustomerInsight>();
 
-      return {
-        id: profile.id,
-        name: getDisplayName(profile as AnyRow, "Incomplete Pet Parent"),
-        email,
-        phone,
-        sourceTable: "profiles",
-        issue: hasActivity
-          ? "Needs verification review"
-          : "Incomplete / empty profile",
-        reason: getCleanupReason({
-          profile,
-          bookingCount,
-          petCount,
-          messageCount,
-          totalSpend,
-        }),
-        bookingCount,
-        petCount,
-        messageCount,
-        totalSpend,
-        createdAt: profile.created_at || profile.updated_at || null,
-        safeToDelete: !hasContact && !hasActivity,
-      };
+  for (const profile of profiles) {
+    if (!profile.id) continue;
+
+    const bookingStats = bookingStatsByProfileId.get(profile.id);
+    const bookingCount = bookingStats?.bookingCount || 0;
+    const paidBookingCount = bookingStats?.paidBookingCount || 0;
+    const completedBookingCount = bookingStats?.completedBookingCount || 0;
+    const totalSpend = bookingStats?.totalSpend || 0;
+    const petCount = petCountByProfileId.get(profile.id) || 0;
+    const messageCount = messageCountByProfileId.get(profile.id) || 0;
+
+    const setup = getPetParentSetup({
+      profile,
+      petCount,
+      bookingCount,
+      completedBookingCount,
     });
 
+    const averageBookingValue = bookingCount > 0 ? totalSpend / bookingCount : 0;
+    const source = normalizeSource(getSource(profile as AnyRow));
+
+    const customer: CustomerInsight = {
+      id: profile.id,
+      name: getDisplayName(profile as AnyRow, "Pet Parent"),
+      email: profile.email || "",
+      avatarUrl: profile.avatar_url || "",
+      city: getCity(profile as AnyRow),
+      state: getState(profile as AnyRow),
+      country: getCountry(profile as AnyRow),
+      zipCode: getZipCode(profile as AnyRow),
+      phone: getPhone(profile as AnyRow),
+      source,
+      campaign: getCampaign(profile as AnyRow),
+      bookingCount,
+      paidBookingCount,
+      completedBookingCount,
+      totalSpend,
+      averageBookingValue,
+      petCount,
+      messageCount,
+      lastBookingDate: bookingStats?.lastBookingDate || null,
+      firstSeenDate: profile.created_at || profile.updated_at || null,
+      segment: "Lead",
+      ...setup,
+    };
+
+    customerMap.set(profile.id, {
+      ...customer,
+      segment: getCustomerSegment(customer),
+    });
+  }
+
+  const customers = Array.from(customerMap.values()).sort((a, b) => {
+    const aTime = new Date(a.firstSeenDate || 0).getTime();
+    const bTime = new Date(b.firstSeenDate || 0).getTime();
+
+    return bTime - aTime || b.setupPercent - a.setupPercent;
+  });
+
+  const customersBySpend = [...customers].sort(
+    (a, b) => b.totalSpend - a.totalSpend,
+  );
+
+  const cleanupRecords: CleanupCustomerRecord[] = [];
   const orphanCustomerMap = new Map<string, CleanupCustomerRecord>();
 
   function upsertOrphanRecord({
@@ -1394,18 +1432,18 @@ async function getCustomerIntelligenceData() {
     petCount?: number;
     messageCount?: number;
   }) {
-    if (!id || candidateCustomerIds.has(id) || visibleCustomerIds.has(id)) return;
+    if (!id || profileIds.has(id)) return;
     if (demoProfileIds.has(id)) return;
 
     const current =
       orphanCustomerMap.get(id) ||
       {
         id,
-        name: name || "Orphaned customer ID",
+        name: name || "Orphaned Pet Parent ID",
         email: email || "",
         phone: "",
         sourceTable,
-        issue: "Orphaned customer reference",
+        issue: "Orphaned Pet Parent reference",
         reason: "No matching profile row",
         bookingCount: 0,
         petCount: 0,
@@ -1419,7 +1457,7 @@ async function getCustomerIntelligenceData() {
       ? current.sourceTable
       : `${current.sourceTable}, ${sourceTable}`;
     current.name =
-      current.name === "Orphaned customer ID" && name ? name : current.name;
+      current.name === "Orphaned Pet Parent ID" && name ? name : current.name;
     current.email = current.email || email || "";
     current.bookingCount += bookingCount;
     current.petCount += petCount;
@@ -1458,7 +1496,7 @@ async function getCustomerIntelligenceData() {
       upsertOrphanRecord({
         id,
         sourceTable: "bookings",
-        name: getDisplayName(booking as AnyRow, "Orphaned booking customer"),
+        name: getDisplayName(booking as AnyRow, "Orphaned booking Pet Parent"),
         email: asString(booking.customer_email),
         createdAt: booking.created_at || getBookingDate(booking),
         bookingAmount: getBookingAmount(booking),
@@ -1472,6 +1510,7 @@ async function getCustomerIntelligenceData() {
       pet.owner_profile_id,
       pet.owner_id,
       pet.customer_id,
+      pet.pet_parent_id,
       pet.user_id,
       pet.pet_owner_id,
     ]
@@ -1500,145 +1539,27 @@ async function getCustomerIntelligenceData() {
     }
   }
 
-  const orphanCleanupRecords = Array.from(orphanCustomerMap.values()).filter(
-    (record) => !visibleCustomerIds.has(record.id),
+  cleanupRecords.push(
+    ...Array.from(orphanCustomerMap.values())
+      .sort((a, b) => {
+        if (a.safeToDelete !== b.safeToDelete) return a.safeToDelete ? -1 : 1;
+        return (
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime()
+        );
+      })
+      .slice(0, 25),
   );
-
-  const allCleanupRecords = [...cleanupRecords, ...orphanCleanupRecords]
-    .sort((a, b) => {
-      if (a.safeToDelete !== b.safeToDelete) return a.safeToDelete ? -1 : 1;
-      return (
-        new Date(b.createdAt || 0).getTime() -
-        new Date(a.createdAt || 0).getTime()
-      );
-    })
-    .slice(0, 25);
 
   const signupRows = [...launchSignups, ...launchWaitlist];
   const clickRows = [...referralClicks, ...networkClicks];
   const conversionRows = referralConversions;
-  const campaignRows = [...signupRows, ...clickRows, ...conversionRows, ...partnerCampaigns];
-
-  const customerMap = new Map<string, CustomerInsight>();
-
-  for (const profile of profiles) {
-    if (!profile.id) continue;
-
-    const source = normalizeSource(getSource(profile as AnyRow));
-
-    customerMap.set(profile.id, {
-      id: profile.id,
-      name: getDisplayName(profile as AnyRow, "Pet Parent"),
-      email: profile.email || "",
-      avatarUrl: profile.avatar_url || "",
-      city: getCity(profile as AnyRow),
-      state: getState(profile as AnyRow),
-      country: getCountry(profile as AnyRow),
-      zipCode: getZipCode(profile as AnyRow),
-      phone: getPhone(profile as AnyRow),
-      source,
-      campaign: getCampaign(profile as AnyRow),
-      bookingCount: 0,
-      paidBookingCount: 0,
-      completedBookingCount: 0,
-      totalSpend: 0,
-      averageBookingValue: 0,
-      petCount: 0,
-      messageCount: 0,
-      lastBookingDate: null,
-      firstSeenDate: profile.created_at || profile.updated_at || null,
-      segment: "Lead",
-    });
-  }
-
-  for (const booking of bookings) {
-    const customerId = getLiveBookingCustomerId(booking);
-    if (!customerId) continue;
-
-    const existing = customerMap.get(customerId);
-    if (!existing) continue;
-
-    const bookingSource = normalizeSource(getSource(booking as AnyRow));
-
-    const bookingDate = getBookingDate(booking);
-
-    existing.city = existing.city || getCity(booking as AnyRow);
-    existing.state = existing.state || getState(booking as AnyRow);
-    existing.country = existing.country || getCountry(booking as AnyRow);
-    existing.zipCode = existing.zipCode || getZipCode(booking as AnyRow);
-    existing.source =
-      existing.source && existing.source !== "Direct"
-        ? existing.source
-        : bookingSource;
-    existing.campaign = existing.campaign || getCampaign(booking as AnyRow);
-    existing.bookingCount += 1;
-    existing.totalSpend += getBookingAmount(booking);
-    existing.paidBookingCount += isPaidBooking(booking) ? 1 : 0;
-    existing.completedBookingCount += isCompletedBooking(booking) ? 1 : 0;
-    existing.lastBookingDate = getMostRecentDate([
-      existing.lastBookingDate,
-      bookingDate,
-    ]);
-    existing.firstSeenDate = getOldestDate([
-      existing.firstSeenDate,
-      booking.created_at || null,
-      bookingDate,
-    ]);
-
-    customerMap.set(customerId, existing);
-  }
-
-  const visiblePetOwnerCountMap = new Map<string, number>();
-
-  for (const pet of pets) {
-    const ownerId = getLivePetOwnerId(pet);
-    if (!ownerId) continue;
-
-    visiblePetOwnerCountMap.set(
-      ownerId,
-      (visiblePetOwnerCountMap.get(ownerId) || 0) + 1,
-    );
-  }
-
-  for (const [customerId, petCount] of visiblePetOwnerCountMap.entries()) {
-    const existing = customerMap.get(customerId);
-    if (existing) existing.petCount = petCount;
-  }
-
-  const visibleMessageCountMap = new Map<string, number>();
-
-  for (const message of messages) {
-    for (const participantId of getMessageParticipantIds(message)) {
-      if (!visibleCustomerIds.has(participantId)) continue;
-
-      visibleMessageCountMap.set(
-        participantId,
-        (visibleMessageCountMap.get(participantId) || 0) + 1,
-      );
-    }
-  }
-
-  for (const [customerId, messageCount] of visibleMessageCountMap.entries()) {
-    const existing = customerMap.get(customerId);
-    if (existing) existing.messageCount = messageCount;
-  }
-
-  const customers = Array.from(customerMap.values()).map((customer) => {
-    const averageBookingValue =
-      customer.bookingCount > 0 ? customer.totalSpend / customer.bookingCount : 0;
-
-    const enriched = {
-      ...customer,
-      averageBookingValue,
-    };
-
-    return {
-      ...enriched,
-      segment: getCustomerSegment(enriched),
-    };
-  });
-
-  const sortedCustomers = customers.sort((a, b) => b.totalSpend - a.totalSpend);
+  const campaignRows = [
+    ...signupRows,
+    ...clickRows,
+    ...conversionRows,
+    ...partnerCampaigns,
+  ];
 
   const totalCustomers = customers.length;
   const totalRevenue = customers.reduce(
@@ -1688,15 +1609,34 @@ async function getCustomerIntelligenceData() {
     lead: customers.filter((customer) => customer.segment === "Lead").length,
   };
 
+  const setupMetrics = {
+    newSignups: customers.filter((customer) =>
+      isWithinLastDays(customer.firstSeenDate, 30),
+    ).length,
+    profileStarted: customers.filter((customer) => customer.hasProfileInfo).length,
+    contactVerified: customers.filter((customer) => customer.hasVerifiedContact).length,
+    phoneAdded: customers.filter((customer) => customer.hasPhone).length,
+    locationAdded: customers.filter((customer) => customer.hasLocation).length,
+    petsAdded: customers.filter((customer) => customer.hasPet).length,
+    readyToBook: customers.filter(
+      (customer) => customer.setupStatus === "Ready to Book",
+    ).length,
+    bookingsStarted: customers.filter((customer) => customer.hasStartedBooking)
+      .length,
+    bookingsCompleted: customers.filter((customer) => customer.hasCompletedBooking)
+      .length,
+    needsReview: customers.filter((customer) => customer.needsReview).length,
+  };
+
   const locationInsights = {
-    zipCodes: buildLocationInsights(sortedCustomers, "zipCode"),
-    cities: buildLocationInsights(sortedCustomers, "city"),
-    states: buildLocationInsights(sortedCustomers, "state"),
-    countries: buildLocationInsights(sortedCustomers, "country"),
+    zipCodes: buildLocationInsights(customersBySpend, "zipCode"),
+    cities: buildLocationInsights(customersBySpend, "city"),
+    states: buildLocationInsights(customersBySpend, "state"),
+    countries: buildLocationInsights(customersBySpend, "country"),
   };
 
   const sourceInsights = buildSourceInsights(
-    sortedCustomers,
+    customersBySpend,
     signupRows,
     conversionRows,
   );
@@ -1727,7 +1667,39 @@ async function getCustomerIntelligenceData() {
       {
         label: "Lead",
         value: segments.lead,
-        helper: "Verified contact, location, or activity but no booking yet",
+        helper: "Signup/profile created but no completed booking yet",
+      },
+    ],
+    setup: [
+      {
+        label: "Profile Started",
+        value: setupMetrics.profileStarted,
+        helper: "Name and email found",
+      },
+      {
+        label: "Phone Added",
+        value: setupMetrics.phoneAdded,
+        helper: "Phone number available",
+      },
+      {
+        label: "Location Added",
+        value: setupMetrics.locationAdded,
+        helper: "City, state, or ZIP found",
+      },
+      {
+        label: "Pet Added",
+        value: setupMetrics.petsAdded,
+        helper: "At least one pet profile",
+      },
+      {
+        label: "Booking Started",
+        value: setupMetrics.bookingsStarted,
+        helper: "At least one booking record",
+      },
+      {
+        label: "Booking Completed",
+        value: setupMetrics.bookingsCompleted,
+        helper: "Completed or paid booking",
       },
     ],
     topCities: toChartItemsFromLocations(locationInsights.cities),
@@ -1741,8 +1713,9 @@ async function getCustomerIntelligenceData() {
     bookings,
     pets,
     messages,
-    customers: sortedCustomers,
-    cleanupRecords: allCleanupRecords,
+    customers,
+    customersBySpend,
+    cleanupRecords,
     locationInsights,
     sourceInsights,
     socialSourceInsights,
@@ -1760,6 +1733,7 @@ async function getCustomerIntelligenceData() {
       averageBookingsPerCustomer,
       repeatRate,
       segments,
+      setupMetrics,
       socialSignups: socialSignupRows.length,
       socialCustomers: socialCustomers.length,
       socialBookings,
@@ -1767,18 +1741,19 @@ async function getCustomerIntelligenceData() {
       socialClicks,
       topSocialPlatform: socialSourceInsights[0]?.label || "None yet",
       hiddenDemoRows,
-      cleanupRecords: allCleanupRecords.length,
-      safeDeleteCandidates: allCleanupRecords.filter((record) => record.safeToDelete).length,
+      cleanupRecords: cleanupRecords.length,
+      safeDeleteCandidates: cleanupRecords.filter((record) => record.safeToDelete)
+        .length,
     },
   };
 }
 
-export default async function AdminCustomerIntelligencePage() {
-  const data = await getCustomerIntelligenceData();
+export default async function AdminPetParentsPage() {
+  const data = await getPetParentsData();
 
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1600px] space-y-5">
+      <div className="mx-auto max-w-[1700px] space-y-5">
         <div className="flex flex-col justify-between gap-4 rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm lg:flex-row lg:items-end">
           <div>
             <Link
@@ -1796,15 +1771,15 @@ export default async function AdminCustomerIntelligencePage() {
 
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
-                  Admin / Customer Intelligence
+                  Admin / Pet Parents
                 </p>
                 <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                  Customer Intelligence
+                  Pet Parents
                 </h1>
-                <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
-                  Live Supabase insights for real Pet Parent value, repeat
-                  behavior, location demand, source attribution, social growth,
-                  and exportable reporting with demo/test rows filtered out.
+                <p className="mt-1 max-w-5xl text-base font-semibold text-slate-600">
+                  All-in-one Super Admin view for Pet Parent signups, profile
+                  setup progress, contact status, pets, bookings, spend, source
+                  attribution, messages, and records that need review.
                 </p>
               </div>
             </div>
@@ -1840,23 +1815,30 @@ export default async function AdminCustomerIntelligencePage() {
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             icon={<Users size={22} />}
-            label="Pet Parents"
+            label="Total Pet Parents"
             value={number(data.metrics.totalCustomers)}
-            detail="Visible records with contact, verification, location, pets, bookings, messages, or spend"
+            detail="All real Pet Parent profile rows found in Supabase"
           />
 
           <StatCard
-            icon={<CircleDollarSign size={22} />}
-            label="Lifetime Value"
-            value={money(data.metrics.averageLifetimeValue)}
-            detail={`${money(data.metrics.totalRevenue)} total customer spend`}
+            icon={<UserCheck size={22} />}
+            label="New Signups"
+            value={number(data.metrics.setupMetrics.newSignups)}
+            detail="Pet Parents created within the last 30 days"
           />
 
           <StatCard
-            icon={<Repeat2 size={22} />}
-            label="Repeat Rate"
-            value={`${data.metrics.repeatRate.toFixed(1)}%`}
-            detail={`${number(data.metrics.repeatCustomers)} repeat customers`}
+            icon={<ShieldCheck size={22} />}
+            label="Ready to Book"
+            value={number(data.metrics.setupMetrics.readyToBook)}
+            detail="Profile, phone, location, and pet are completed"
+          />
+
+          <StatCard
+            icon={<AlertTriangle size={22} />}
+            label="Needs Review"
+            value={number(data.metrics.setupMetrics.needsReview)}
+            detail="Missing profile, phone, location, or pet setup"
           />
 
           <StatCard
@@ -1865,18 +1847,64 @@ export default async function AdminCustomerIntelligencePage() {
             value={number(data.metrics.activeCustomersLast30)}
             detail={`${data.metrics.averageBookingsPerCustomer.toFixed(
               1,
-            )} avg bookings per customer`}
-          />
-
-          <StatCard
-            icon={<AlertTriangle size={22} />}
-            label="Cleanup Review"
-            value={number(data.metrics.cleanupRecords)}
-            detail={`${number(data.metrics.safeDeleteCandidates)} safe-delete candidates · ${number(data.metrics.hiddenDemoRows)} demo/test rows hidden`}
+            )} avg bookings per Pet Parent`}
           />
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard
+            icon={<Mail size={22} />}
+            label="Profile Started"
+            value={number(data.metrics.setupMetrics.profileStarted)}
+            detail="Name and email information found"
+          />
+
+          <StatCard
+            icon={<UserRound size={22} />}
+            label="Phone Added"
+            value={number(data.metrics.setupMetrics.phoneAdded)}
+            detail="Phone number is available on profile"
+          />
+
+          <StatCard
+            icon={<MapPin size={22} />}
+            label="Location Added"
+            value={number(data.metrics.setupMetrics.locationAdded)}
+            detail="City, state, or ZIP is available"
+          />
+
+          <StatCard
+            icon={<PawPrint size={22} />}
+            label="Pets Added"
+            value={number(data.metrics.setupMetrics.petsAdded)}
+            detail="At least one pet profile is attached"
+          />
+
+          <StatCard
+            icon={<CalendarDays size={22} />}
+            label="Bookings Started"
+            value={number(data.metrics.setupMetrics.bookingsStarted)}
+            detail={`${number(
+              data.metrics.setupMetrics.bookingsCompleted,
+            )} completed or paid`}
+          />
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard
+            icon={<CircleDollarSign size={22} />}
+            label="Lifetime Value"
+            value={money(data.metrics.averageLifetimeValue)}
+            detail={`${money(data.metrics.totalRevenue)} total Pet Parent spend`}
+          />
+
+          <StatCard
+            icon={<Repeat2 size={22} />}
+            label="Repeat Rate"
+            value={`${data.metrics.repeatRate.toFixed(1)}%`}
+            detail={`${number(data.metrics.repeatCustomers)} repeat Pet Parents`}
+          />
+
           <StatCard
             icon={<Share2 size={22} />}
             label="Social Signups"
@@ -1885,45 +1913,52 @@ export default async function AdminCustomerIntelligencePage() {
           />
 
           <StatCard
-            icon={<Users size={22} />}
-            label="Social Customers"
-            value={number(data.metrics.socialCustomers)}
-            detail="Customers attributed to social sources"
-          />
-
-          <StatCard
-            icon={<CalendarDays size={22} />}
-            label="Social Bookings"
-            value={number(data.metrics.socialBookings)}
-            detail="Bookings from social-attributed customers"
-          />
-
-          <StatCard
-            icon={<CircleDollarSign size={22} />}
-            label="Social Revenue"
-            value={money(data.metrics.socialRevenue)}
-            detail="Customer spend attributed to social"
-          />
-
-          <StatCard
             icon={<MousePointerClick size={22} />}
             label="Social Clicks"
             value={number(data.metrics.socialClicks)}
             detail={`Top platform: ${data.metrics.topSocialPlatform}`}
           />
+
+          <StatCard
+            icon={<Trash2 size={22} />}
+            label="Cleanup Review"
+            value={number(data.metrics.cleanupRecords)}
+            detail={`${number(
+              data.metrics.safeDeleteCandidates,
+            )} safe-delete candidates · ${number(
+              data.metrics.hiddenDemoRows,
+            )} demo/test rows hidden`}
+          />
         </section>
 
-
-        {data.cleanupRecords.length ? (
-          <CleanupReviewPanel records={data.cleanupRecords} />
-        ) : null}
+        <PetParentRegistryPanel customers={data.customers} />
 
         <section className="grid items-start gap-5 xl:grid-cols-12">
-          <div className="xl:col-span-4">
+          <div className="xl:col-span-5">
             <DashboardCard>
               <div className="mb-5">
                 <h2 className="text-xl font-black text-slate-950">
-                  Customer Segment Chart
+                  Setup Progress
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Step-by-step view of where Pet Parents are in signup and
+                  profile setup.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {data.chartData.setup.map((item) => (
+                  <SetupMetricRow key={item.label} item={item} />
+                ))}
+              </div>
+            </DashboardCard>
+          </div>
+
+          <div className="xl:col-span-3">
+            <DashboardCard>
+              <div className="mb-5">
+                <h2 className="text-xl font-black text-slate-950">
+                  Pet Parent Segments
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
                   Segments are calculated from booking count and lifetime spend.
@@ -1931,26 +1966,26 @@ export default async function AdminCustomerIntelligencePage() {
               </div>
 
               <DonutChart
-                title="Customers"
+                title="Pet Parents"
                 total={data.metrics.totalCustomers}
                 items={data.chartData.segments}
               />
 
               <div className="mt-5 space-y-3">
                 <SegmentRow
-                  label="VIP Customers"
+                  label="VIP Pet Parents"
                   value={data.metrics.segments.vip}
                   detail="$1,000+ spend or 8+ bookings"
                   tone="green"
                 />
                 <SegmentRow
-                  label="Repeat Customers"
+                  label="Repeat Pet Parents"
                   value={data.metrics.segments.repeat}
                   detail="3+ bookings"
                   tone="blue"
                 />
                 <SegmentRow
-                  label="New Customers"
+                  label="New Pet Parents"
                   value={data.metrics.segments.new}
                   detail="1 booking"
                   tone="orange"
@@ -1958,56 +1993,32 @@ export default async function AdminCustomerIntelligencePage() {
                 <SegmentRow
                   label="Leads"
                   value={data.metrics.segments.lead}
-                  detail="Profile or customer record without booking"
+                  detail="Signup/profile created but no booking yet"
                   tone="slate"
-                />
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                <MiniMetric
-                  icon={<PawPrint size={18} />}
-                  label="Customers with pets"
-                  value={number(data.metrics.customersWithPets)}
-                />
-                <MiniMetric
-                  icon={<Mail size={18} />}
-                  label="Unread messages"
-                  value={number(data.metrics.unreadMessages)}
                 />
               </div>
             </DashboardCard>
           </div>
 
-          <div className="xl:col-span-8">
+          <div className="xl:col-span-4">
             <DashboardCard>
-              <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <div>
-                  <h2 className="text-xl font-black text-slate-950">
-                    Acquisition Source Charts
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Revenue, customers, and signups grouped by source and social
-                    platform.
-                  </p>
-                </div>
-
-                <Link
-                  href={adminRoutes.customerExport}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white transition hover:bg-green-900"
-                >
-                  <Download size={16} />
-                  Export
-                </Link>
+              <div className="mb-5">
+                <h2 className="text-xl font-black text-slate-950">
+                  Acquisition Sources
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Revenue, Pet Parents, and signups grouped by source.
+                </p>
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-2">
-                <HorizontalBarChart
-                  title="Top Acquisition Sources"
-                  valueLabel="Revenue"
-                  items={data.chartData.topSources}
-                  valueFormatter={money}
-                />
+              <HorizontalBarChart
+                title="Top Acquisition Sources"
+                valueLabel="Revenue"
+                items={data.chartData.topSources}
+                valueFormatter={money}
+              />
 
+              <div className="mt-5">
                 <HorizontalBarChart
                   title="Top Social Platforms"
                   valueLabel="Revenue"
@@ -2025,11 +2036,11 @@ export default async function AdminCustomerIntelligencePage() {
             <DashboardCard>
               <div className="mb-5">
                 <h2 className="text-xl font-black text-slate-950">
-                  Top Customer Locations
+                  Pet Parent Locations
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Ranked by real customer spend from profile and booking
-                  location fields.
+                  Ranked by Pet Parent spend from profile and booking location
+                  fields.
                 </p>
               </div>
 
@@ -2065,10 +2076,10 @@ export default async function AdminCustomerIntelligencePage() {
             <DashboardCard>
               <div className="mb-5">
                 <h2 className="text-xl font-black text-slate-950">
-                  Location Revenue Charts
+                  Location Revenue
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Visual view of your strongest local customer markets.
+                  Visual view of your strongest local Pet Parent markets.
                 </p>
               </div>
 
@@ -2091,19 +2102,23 @@ export default async function AdminCustomerIntelligencePage() {
           </div>
         </section>
 
+        {data.cleanupRecords.length ? (
+          <CleanupReviewPanel records={data.cleanupRecords} />
+        ) : null}
+
         <section className="grid gap-5 lg:grid-cols-3">
           <QuickLinkCard
             href={adminRoutes.launchSignups}
             icon={<Megaphone size={22} />}
             title="Launch Signups"
-            description="Review waitlist, launch, and acquisition-source rows that feed social signup reporting."
+            description="Review waitlist, launch, and acquisition-source rows that feed Pet Parent reporting."
           />
 
           <QuickLinkCard
             href={adminRoutes.referrals}
             icon={<Share2 size={22} />}
             title="Referral Tracking"
-            description="Review referral clicks, conversions, source behavior, and customer acquisition quality."
+            description="Review referral clicks, conversions, source behavior, and Pet Parent acquisition quality."
           />
 
           <QuickLinkCard
@@ -2114,36 +2129,26 @@ export default async function AdminCustomerIntelligencePage() {
           />
         </section>
 
-        <section>
-          <DashboardCard>
-            <CustomerInsightsTable
-              customers={data.customers}
-              exportHref={adminRoutes.customerExport}
-              usersHref={adminRoutes.customers}
-            />
-          </DashboardCard>
-        </section>
-
         <section className="grid gap-5 lg:grid-cols-3">
           <QuickLinkCard
             href={adminRoutes.bookings}
             icon={<CalendarDays size={22} />}
             title="Review Bookings"
-            description="Open the admin booking manager to review the customer booking history behind these numbers."
+            description="Open the admin booking manager to review Pet Parent booking history behind these numbers."
           />
 
           <QuickLinkCard
             href={adminRoutes.petAnalytics}
             icon={<PawPrint size={22} />}
             title="Pet Analytics"
-            description="Review pet-related behavior, pet profiles, and demand signals from customer accounts."
+            description="Review pet-related behavior, pet profiles, and demand signals from Pet Parent accounts."
           />
 
           <QuickLinkCard
             href={adminRoutes.messages}
             icon={<Mail size={22} />}
-            title="Customer Messages"
-            description="Jump into customer and guru conversations that may need admin attention."
+            title="Pet Parent Messages"
+            description="Jump into Pet Parent and Guru conversations that may need admin attention."
           />
         </section>
 
@@ -2155,12 +2160,217 @@ export default async function AdminCustomerIntelligencePage() {
           `launch_signups`, `launch_waitlist`, `referral_clicks`,
           `referral_conversions`, `network_click_events`, and
           `partner_campaigns`. Demo, fake, test, sample, sandbox, archived, and
-          deleted rows are filtered in-memory before Customer KPIs, social
-          attribution, source charts, location charts, and exportable report
-          data are calculated from live rows.
+          deleted rows are filtered in-memory before Pet Parent KPIs, setup
+          progress, source charts, location charts, and review queues are
+          calculated from live rows.
         </div>
       </div>
     </main>
+  );
+}
+
+function getCustomerProfileHref(customerId: string) {
+  return `/admin/customers/${encodeURIComponent(customerId)}`;
+}
+
+function getLocationLabel(customer: CustomerInsight) {
+  const cityState = [customer.city, customer.state].filter(Boolean).join(", ");
+
+  if (cityState && customer.zipCode) return `${cityState} ${customer.zipCode}`;
+  return cityState || customer.zipCode || "Location not added";
+}
+
+function getLastActivity(customer: CustomerInsight) {
+  return getMostRecentDate([customer.lastBookingDate, customer.firstSeenDate]);
+}
+
+function PetParentRegistryPanel({ customers }: { customers: CustomerInsight[] }) {
+  return (
+    <DashboardCard>
+      <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+            Super Admin Pet Parent Registry
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-slate-950">
+            Pet Parent signup and profile setup tracker
+          </h2>
+          <p className="mt-1 max-w-5xl text-sm font-semibold leading-6 text-slate-500">
+            Click any Pet Parent to open the full Super Admin profile. This
+            table shows where each person is in the signup process, what is
+            complete, and what still needs attention.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={adminRoutes.customerExport}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+          >
+            <Download size={16} />
+            Export
+          </Link>
+
+          <Link
+            href={adminRoutes.messages}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-green-900"
+          >
+            <Mail size={16} />
+            Messages
+          </Link>
+        </div>
+      </div>
+
+      {customers.length ? (
+        <div className="overflow-hidden rounded-[26px] border border-[#e3ece5] bg-white">
+          <div className="hidden grid-cols-[1.35fr_0.85fr_0.9fr_1.35fr_0.75fr_0.75fr_0.8fr_0.75fr] gap-3 border-b border-[#e3ece5] bg-[#fbfcf9] px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400 xl:grid">
+            <span>Pet Parent</span>
+            <span>Contact</span>
+            <span>Location</span>
+            <span>Setup Progress</span>
+            <span>Pets</span>
+            <span>Bookings</span>
+            <span>Spend</span>
+            <span className="text-right">Action</span>
+          </div>
+
+          <div className="divide-y divide-[#e3ece5]">
+            {customers.map((customer) => (
+              <Link
+                key={customer.id}
+                href={getCustomerProfileHref(customer.id)}
+                className="grid gap-4 px-4 py-4 transition hover:bg-green-50/70 xl:grid-cols-[1.35fr_0.85fr_0.9fr_1.35fr_0.75fr_0.75fr_0.8fr_0.75fr] xl:items-center"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-green-800 text-sm font-black text-white">
+                      {customer.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={customer.avatarUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        customer.name.slice(0, 1).toUpperCase()
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-slate-950">
+                        {customer.name}
+                      </p>
+                      <p className="truncate text-xs font-bold text-slate-500">
+                        Signed up {formatDate(customer.firstSeenDate)}
+                      </p>
+                      <p className="mt-1 truncate text-xs font-bold text-green-700">
+                        Source: {customer.source}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="truncate text-xs font-black text-slate-950">
+                    {customer.email || "No email"}
+                  </p>
+                  <p className="truncate text-xs font-bold text-slate-500">
+                    {customer.phone || "No phone"}
+                  </p>
+                </div>
+
+                <p className="text-sm font-bold text-slate-600">
+                  {getLocationLabel(customer)}
+                </p>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span
+                      className={[
+                        "rounded-full px-3 py-1 text-xs font-black",
+                        customer.needsReview
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-green-100 text-green-800",
+                      ].join(" ")}
+                    >
+                      {customer.setupStatus}
+                    </span>
+                    <span className="text-xs font-black text-slate-500">
+                      {customer.setupPercent}%
+                    </span>
+                  </div>
+
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-green-800"
+                      style={{ width: `${customer.setupPercent}%` }}
+                    />
+                  </div>
+
+                  <p className="mt-2 text-xs font-bold text-slate-500">
+                    Current step: {customer.currentStep}
+                  </p>
+
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {customer.setupSteps.slice(0, 6).map((step) => (
+                      <span
+                        key={step.label}
+                        title={step.label}
+                        className={[
+                          "h-2.5 w-2.5 rounded-full",
+                          step.complete ? "bg-green-700" : "bg-slate-200",
+                        ].join(" ")}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <p className="text-sm font-black text-slate-950">
+                  {number(customer.petCount)}
+                </p>
+
+                <div>
+                  <p className="text-sm font-black text-slate-950">
+                    {number(customer.bookingCount)}
+                  </p>
+                  <p className="text-xs font-bold text-slate-500">
+                    {number(customer.completedBookingCount)} completed
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-black text-green-800">
+                    {money(customer.totalSpend)}
+                  </p>
+                  <p className="text-xs font-bold text-slate-500">
+                    Last: {formatDate(getLastActivity(customer))}
+                  </p>
+                </div>
+
+                <div className="flex justify-start xl:justify-end">
+                  <span className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-2 text-xs font-black text-white shadow-sm">
+                    View
+                    <MousePointerClick size={14} />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-8 text-center">
+          <Search className="mx-auto h-8 w-8 text-green-800" />
+          <h3 className="mt-3 text-xl font-black text-slate-950">
+            No Pet Parent profiles found yet
+          </h3>
+          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+            New Pet Parent signups should appear here once the signup flow
+            creates a `profiles` row with customer, Pet Parent, or both role
+            mapping.
+          </p>
+        </div>
+      )}
+    </DashboardCard>
   );
 }
 
@@ -2183,11 +2393,12 @@ function buildCleanupReviewSql(record: CleanupCustomerRecord) {
     `where id = '${id}';`,
     "",
     "-- 3) Check related pet records",
-    "select id, name, owner_id, owner_profile_id, customer_id, user_id, pet_owner_id, created_at",
+    "select id, name, owner_id, owner_profile_id, customer_id, pet_parent_id, user_id, pet_owner_id, created_at",
     "from pets",
     `where owner_id = '${id}'`,
     `   or owner_profile_id = '${id}'`,
     `   or customer_id = '${id}'`,
+    `   or pet_parent_id = '${id}'`,
     `   or user_id = '${id}'`,
     `   or pet_owner_id = '${id}'`,
     "order by created_at desc;",
@@ -2222,7 +2433,7 @@ function buildCleanupDeleteSql(record: CleanupCustomerRecord) {
     return [
       "-- This record is protected because it still has related activity.",
       "-- Review attached pets, messages, bookings, and auth/profile rows first.",
-      "-- Do not hard-delete protected customer activity from a live system until confirmed fake/test.",
+      "-- Do not hard-delete protected Pet Parent activity from a live system until confirmed fake/test.",
     ].join("\n");
   }
 
@@ -2243,6 +2454,7 @@ function buildCleanupDeleteSql(record: CleanupCustomerRecord) {
     `where owner_id = '${id}'`,
     `   or owner_profile_id = '${id}'`,
     `   or customer_id = '${id}'`,
+    `   or pet_parent_id = '${id}'`,
     `   or user_id = '${id}'`,
     `   or pet_owner_id = '${id}';`,
     "",
@@ -2288,7 +2500,6 @@ function DashboardCard({ children }: { children: ReactNode }) {
   );
 }
 
-
 function CleanupReviewPanel({ records }: { records: CleanupCustomerRecord[] }) {
   const safeDeleteCount = records.filter((record) => record.safeToDelete).length;
   const protectedCount = records.length - safeDeleteCount;
@@ -2303,7 +2514,7 @@ function CleanupReviewPanel({ records }: { records: CleanupCustomerRecord[] }) {
           </div>
 
           <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
-            Incomplete or orphaned records are hidden from visible Pet Parents.
+            Orphaned records are hidden from visible Pet Parents.
           </h2>
 
           <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-700">
@@ -2313,38 +2524,6 @@ function CleanupReviewPanel({ records }: { records: CleanupCustomerRecord[] }) {
             Protected records should not be hard-deleted until the attached
             activity is reviewed.
           </p>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-amber-200 bg-white p-4">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-900">
-                Review First
-              </p>
-              <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
-                Expand a row, run the review SQL in Supabase, and confirm what
-                table is keeping the record protected.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-900">
-                Protected
-              </p>
-              <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
-                Messages, pets, bookings, or spend exist. Review or archive
-                instead of deleting blindly.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-rose-900">
-                Safe Delete
-              </p>
-              <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
-                Only empty records with no contact and no activity get a
-                delete-ready SQL block.
-              </p>
-            </div>
-          </div>
         </div>
 
         <div className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-black text-amber-900">
@@ -2500,19 +2679,6 @@ function CleanupReviewPanel({ records }: { records: CleanupCustomerRecord[] }) {
                           </div>
                         </dl>
                       </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                          What to do
-                        </p>
-
-                        <ul className="mt-3 space-y-2 text-sm font-bold leading-6 text-slate-700">
-                          <li>1. Run the review SQL in Supabase SQL Editor.</li>
-                          <li>2. If messages or pets are real, keep/protect the record.</li>
-                          <li>3. If they are old fake/test rows, remove the fake child rows first.</li>
-                          <li>4. After related activity is gone, the record becomes safe-delete eligible.</li>
-                        </ul>
-                      </div>
                     </div>
 
                     <div className="space-y-4">
@@ -2586,6 +2752,27 @@ function StatCard({
   );
 }
 
+function SetupMetricRow({ item }: { item: ChartItem }) {
+  return (
+    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-black text-slate-950">{item.label}</p>
+          {item.helper ? (
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              {item.helper}
+            </p>
+          ) : null}
+        </div>
+
+        <span className="rounded-full bg-green-100 px-4 py-2 text-sm font-black text-green-800">
+          {number(item.value)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function SegmentRow({
   label,
   value,
@@ -2620,28 +2807,6 @@ function SegmentRow({
   );
 }
 
-function MiniMetric({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#edf3ee] bg-white p-4">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-        {icon}
-      </div>
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
-    </div>
-  );
-}
-
 function DonutChart({
   title,
   total,
@@ -2668,7 +2833,7 @@ function DonutChart({
       : "#e5e7eb 0deg 360deg";
 
   return (
-    <div className="grid items-center gap-5 sm:grid-cols-[180px_1fr] xl:grid-cols-1 2xl:grid-cols-[180px_1fr]">
+    <div className="grid items-center gap-5">
       <div className="relative mx-auto h-[180px] w-[180px]">
         <div
           className="h-full w-full rounded-full"
@@ -2803,7 +2968,7 @@ function LocationInsightCard({
                     {row.label}
                   </p>
                   <p className="mt-1 text-xs font-bold text-slate-500">
-                    {number(row.customers)} customers · {number(row.bookings)}{" "}
+                    {number(row.customers)} Pet Parents · {number(row.bookings)}{" "}
                     bookings
                   </p>
                 </div>
