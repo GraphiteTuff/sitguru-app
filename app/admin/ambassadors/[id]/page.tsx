@@ -56,6 +56,13 @@ type AmbassadorRow = {
   other_document_url: string | null;
   training_status: string | null;
   training_percent: number | null;
+  onboarding_step?: number | null;
+  onboarding_percent?: number | null;
+  training_completed_at?: string | null;
+  onboarding_completed_at?: string | null;
+  documents_completed_at?: string | null;
+  certification_signed_at?: string | null;
+  certification_name?: string | null;
   eligibility_review_required: boolean | null;
   eligibility_review_complete: boolean | null;
   terms_accepted_at: string | null;
@@ -128,6 +135,82 @@ type TrainingRow = {
   completed_at: string | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+
+type TrainingStepRow = {
+  id: string;
+  step_number: number | null;
+  title: string | null;
+  description: string | null;
+  content_type: string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  external_url: string | null;
+  video_url: string | null;
+  estimated_minutes: number | null;
+  is_required: boolean | null;
+  is_active: boolean | null;
+  requires_acknowledgment: boolean | null;
+  requires_signature: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type TrainingProgressRow = {
+  id: string;
+  ambassador_id: string | null;
+  training_step_id: string | null;
+  status: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  acknowledged_at: string | null;
+  signed_at: string | null;
+  signature_name: string | null;
+  signature_ip: string | null;
+  certification_text: string | null;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type AdminTrainingStep = TrainingStepRow & {
+  progress: TrainingProgressRow | null;
+};
+
+type RequiredDocumentRow = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  document_type: string | null;
+  is_required: boolean | null;
+  is_active: boolean | null;
+  sort_order: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type DocumentSubmissionRow = {
+  id: string;
+  ambassador_id: string | null;
+  required_document_id: string | null;
+  document_type: string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  status: string | null;
+  admin_notes: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type AdminRequiredDocument = RequiredDocumentRow & {
+  submissions: DocumentSubmissionRow[];
 };
 
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
@@ -761,6 +844,121 @@ function AmbassadorQuickActions({
   );
 }
 
+
+function isAdminTrainingComplete(step: AdminTrainingStep) {
+  const status = (step.progress?.status || "").toLowerCase();
+
+  return Boolean(
+    status === "completed" ||
+      status === "complete" ||
+      step.progress?.completed_at,
+  );
+}
+
+function buildAdminTrainingSteps(
+  steps: TrainingStepRow[],
+  progressRows: TrainingProgressRow[],
+) {
+  const progressMap = new Map(
+    progressRows.map((row) => [row.training_step_id || "", row]),
+  );
+
+  return steps.map((step) => ({
+    ...step,
+    progress: progressMap.get(step.id) || null,
+  }));
+}
+
+function getAdminTrainingPercent(steps: AdminTrainingStep[]) {
+  const requiredSteps = steps.filter((step) => step.is_required !== false);
+
+  if (!requiredSteps.length) return 0;
+
+  const completedSteps = requiredSteps.filter(isAdminTrainingComplete).length;
+
+  return Math.round((completedSteps / requiredSteps.length) * 100);
+}
+
+function getRequiredTrainingCounts(steps: AdminTrainingStep[]) {
+  const requiredSteps = steps.filter((step) => step.is_required !== false);
+  const completedSteps = requiredSteps.filter(isAdminTrainingComplete);
+
+  return {
+    required: requiredSteps.length,
+    completed: completedSteps.length,
+  };
+}
+
+function buildAdminRequiredDocuments(
+  requiredDocuments: RequiredDocumentRow[],
+  submissions: DocumentSubmissionRow[],
+) {
+  return requiredDocuments.map((document) => ({
+    ...document,
+    submissions: submissions.filter(
+      (submission) =>
+        submission.required_document_id === document.id ||
+        (document.document_type &&
+          submission.document_type === document.document_type),
+    ),
+  }));
+}
+
+function getDocumentCompletionCounts(documents: AdminRequiredDocument[]) {
+  const requiredDocuments = documents.filter(
+    (document) => document.is_required !== false,
+  );
+  const submittedRequiredDocuments = requiredDocuments.filter((document) =>
+    document.submissions.some((submission) =>
+      ["submitted", "approved", "reviewed"].includes(
+        (submission.status || "").toLowerCase(),
+      ),
+    ),
+  );
+  const approvedRequiredDocuments = requiredDocuments.filter((document) =>
+    document.submissions.some((submission) =>
+      ["approved", "reviewed"].includes((submission.status || "").toLowerCase()),
+    ),
+  );
+
+  return {
+    required: requiredDocuments.length,
+    submitted: submittedRequiredDocuments.length,
+    approved: approvedRequiredDocuments.length,
+  };
+}
+
+function getTrainingMaterialLabel(step: TrainingStepRow) {
+  const type = (step.content_type || "training").toLowerCase();
+
+  if (type === "video") return "Video";
+  if (type === "ppt" || type === "powerpoint") return "PowerPoint";
+  if (type === "pdf") return "PDF";
+  if (type === "document") return "Document";
+  if (type === "link") return "Link";
+
+  return prettyStatus(type);
+}
+
+function getTrainingMaterialUrl(step: TrainingStepRow) {
+  const videoUrl = step.video_url || "";
+  const externalUrl = step.external_url || "";
+
+  if (videoUrl) return videoUrl;
+  if (externalUrl) return externalUrl;
+
+  return "";
+}
+
+function getSubmissionLabel(submission: DocumentSubmissionRow) {
+  return (
+    submission.file_name ||
+    submission.storage_path ||
+    submission.document_type ||
+    "Uploaded document"
+  );
+}
+
 export default async function AdminAmbassadorDetailPage({
   params,
 }: {
@@ -790,7 +988,11 @@ export default async function AdminAmbassadorDetailPage({
   const [
     { data: referralsData, error: referralsError },
     { data: rewardsData, error: rewardsError },
-    { data: trainingData, error: trainingError },
+    { data: legacyTrainingData, error: legacyTrainingError },
+    { data: trainingStepsData, error: trainingStepsError },
+    { data: trainingProgressData, error: trainingProgressError },
+    { data: requiredDocumentsData, error: requiredDocumentsError },
+    { data: documentSubmissionsData, error: documentSubmissionsError },
   ] = await Promise.all([
     supabase
       .from("ambassador_referrals")
@@ -807,13 +1009,46 @@ export default async function AdminAmbassadorDetailPage({
       .select("*")
       .eq("ambassador_id", id)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("ambassador_training_steps")
+      .select("*")
+      .eq("is_active", true)
+      .order("step_number", { ascending: true }),
+    supabase
+      .from("ambassador_training_progress")
+      .select("*")
+      .eq("ambassador_id", id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("ambassador_required_documents")
+      .select("*")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("ambassador_document_submissions")
+      .select("*")
+      .eq("ambassador_id", id)
+      .order("submitted_at", { ascending: false }),
   ]);
 
   const ambassadorRow = ambassador as AmbassadorRow;
   const referrals = (referralsData || []) as ReferralRow[];
   const rewards = (rewardsData || []) as RewardRow[];
-  const training = (trainingData || []) as TrainingRow[];
-  const trainingPercent = numberValue(ambassadorRow.training_percent);
+  const training = (legacyTrainingData || []) as TrainingRow[];
+  const trainingSteps = buildAdminTrainingSteps(
+    (trainingStepsData || []) as TrainingStepRow[],
+    (trainingProgressData || []) as TrainingProgressRow[],
+  );
+  const trainingCounts = getRequiredTrainingCounts(trainingSteps);
+  const trainingPercent =
+    getAdminTrainingPercent(trainingSteps) ||
+    numberValue(ambassadorRow.onboarding_percent) ||
+    numberValue(ambassadorRow.training_percent);
+  const requiredDocuments = buildAdminRequiredDocuments(
+    (requiredDocumentsData || []) as RequiredDocumentRow[],
+    (documentSubmissionsData || []) as DocumentSubmissionRow[],
+  );
+  const documentCounts = getDocumentCompletionCounts(requiredDocuments);
   const cards = buildDetailCards(referrals, rewards, trainingPercent);
 
   const referralLink =
@@ -822,7 +1057,14 @@ export default async function AdminAmbassadorDetailPage({
       ? `https://www.sitguru.com/sign-up?ref=${ambassadorRow.referral_code}`
       : "Referral link not generated yet");
 
-  const hasQueryError = referralsError || rewardsError || trainingError;
+  const hasQueryError =
+    referralsError ||
+    rewardsError ||
+    legacyTrainingError ||
+    trainingStepsError ||
+    trainingProgressError ||
+    requiredDocumentsError ||
+    documentSubmissionsError;
   const ambassadorName =
     ambassadorRow.full_name || ambassadorRow.display_name || "Unnamed Ambassador";
   const hasPhoto = Boolean(ambassadorRow.ambassador_photo_url);
@@ -1242,7 +1484,15 @@ export default async function AdminAmbassadorDetailPage({
               tables returned an error.
             </p>
             <pre className="mt-3 overflow-auto rounded-2xl bg-white p-4 text-xs">
-              {[referralsError?.message, rewardsError?.message, trainingError?.message]
+              {[
+                referralsError?.message,
+                rewardsError?.message,
+                legacyTrainingError?.message,
+                trainingStepsError?.message,
+                trainingProgressError?.message,
+                requiredDocumentsError?.message,
+                documentSubmissionsError?.message,
+              ]
                 .filter(Boolean)
                 .join("\n")}
             </pre>
@@ -1420,59 +1670,152 @@ export default async function AdminAmbassadorDetailPage({
 
             <section className="rounded-[2rem] border border-[#dbe8d5] bg-white shadow-sm">
               <div className="border-b border-[#e2ecd9] p-5">
-                <h2 className="text-xl font-extrabold text-[#102819]">
-                  Training Status
-                </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Ambassador onboarding and training progress.
-                </p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-extrabold text-[#102819]">
+                      Training & Onboarding Progress
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Admin view of required training, certifications, signatures,
+                      and mobile onboarding progress.
+                    </p>
+                  </div>
+
+                  <Link
+                    href="/admin/ambassador-training"
+                    className="inline-flex items-center justify-center rounded-2xl border border-[#dbe8d5] bg-white px-4 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+                  >
+                    Manage Training
+                  </Link>
+                </div>
               </div>
 
               <div className="p-5">
-                <div className="flex items-center justify-between">
-                  <p className="font-extrabold text-[#102819]">
-                    {prettyStatus(ambassadorRow.training_status)}
-                  </p>
-                  <p className="text-lg font-extrabold text-[#2f6f3e]">
-                    {trainingPercent}%
-                  </p>
-                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-[#f8fbf6] p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Overall Training
+                    </p>
+                    <p className="mt-1 text-2xl font-extrabold text-[#2f6f3e]">
+                      {trainingPercent}%
+                    </p>
+                    <div className="mt-3 h-3 overflow-hidden rounded-full bg-white">
+                      <div
+                        className="h-full rounded-full bg-[#2f6f3e]"
+                        style={{ width: `${trainingPercent}%` }}
+                      />
+                    </div>
+                  </div>
 
-                <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-[#2f6f3e]"
-                    style={{ width: `${trainingPercent}%` }}
-                  />
+                  <div className="rounded-2xl bg-[#f8fbf6] p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Required Steps
+                    </p>
+                    <p className="mt-1 text-2xl font-extrabold text-[#102819]">
+                      {trainingCounts.completed} / {trainingCounts.required}
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-slate-500">
+                      Complete before active Ambassador status.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#f8fbf6] p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Certification
+                    </p>
+                    <p className="mt-1 text-2xl font-extrabold text-[#102819]">
+                      {ambassadorRow.certification_signed_at ||
+                      trainingSteps.some((step) => step.progress?.signed_at)
+                        ? "Signed"
+                        : "Not Signed"}
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-slate-500">
+                      {ambassadorRow.certification_signed_at
+                        ? formatDate(ambassadorRow.certification_signed_at)
+                        : "Final certification not saved yet."}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mt-5 space-y-3">
-                  {training.length === 0 ? (
-                    <p className="text-sm text-slate-600">
-                      No training items saved yet.
-                    </p>
+                  {trainingSteps.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-[#dbe8d5] bg-[#f8fbf6] p-4 text-sm text-slate-600">
+                      No active Ambassador training steps are published yet.
+                    </div>
                   ) : (
-                    training.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between rounded-2xl bg-[#f8fbf6] p-3"
-                      >
-                        <div>
-                          <p className="text-sm font-bold text-[#102819]">
-                            {item.training_item || "Training item"}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Completed: {formatDate(item.completed_at)}
-                          </p>
-                        </div>
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
-                            item.status,
-                          )}`}
+                    trainingSteps.map((step) => {
+                      const complete = isAdminTrainingComplete(step);
+                      const materialUrl = getTrainingMaterialUrl(step);
+
+                      return (
+                        <div
+                          key={step.id}
+                          className="rounded-2xl border border-[#e2ecd9] bg-[#f8fbf6] p-4"
                         >
-                          {prettyStatus(item.status)}
-                        </span>
-                      </div>
-                    ))
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="mb-2 flex flex-wrap gap-2">
+                                <span className="inline-flex rounded-full bg-[#2f6f3e] px-3 py-1 text-xs font-extrabold text-white">
+                                  Step {step.step_number || "—"}
+                                </span>
+                                <span
+                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
+                                    complete
+                                      ? "complete"
+                                      : step.progress?.status || "pending",
+                                  )}`}
+                                >
+                                  {complete
+                                    ? "Complete"
+                                    : prettyStatus(step.progress?.status)}
+                                </span>
+                                <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-600 ring-1 ring-[#dbe8d5]">
+                                  {getTrainingMaterialLabel(step)}
+                                </span>
+                                {step.is_required !== false ? (
+                                  <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-extrabold text-amber-800 ring-1 ring-amber-100">
+                                    Required
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <p className="text-sm font-extrabold text-[#102819]">
+                                {step.title || "Training step"}
+                              </p>
+                              {step.description ? (
+                                <p className="mt-1 text-sm leading-6 text-slate-600">
+                                  {step.description}
+                                </p>
+                              ) : null}
+
+                              <div className="mt-3 grid gap-2 text-xs font-bold text-slate-500 sm:grid-cols-2">
+                                <p>Started: {formatDate(step.progress?.started_at)}</p>
+                                <p>Completed: {formatDate(step.progress?.completed_at)}</p>
+                                <p>Acknowledged: {formatDate(step.progress?.acknowledged_at)}</p>
+                                <p>Signed: {formatDate(step.progress?.signed_at)}</p>
+                              </div>
+
+                              {step.progress?.signature_name ? (
+                                <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#102819] ring-1 ring-[#dbe8d5]">
+                                  Signature: {step.progress.signature_name}
+                                </p>
+                              ) : null}
+                            </div>
+
+                            {materialUrl ? (
+                              <a
+                                href={materialUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-[#dbe8d5] bg-white px-4 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+                              >
+                                Open Material
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -1482,9 +1825,51 @@ export default async function AdminAmbassadorDetailPage({
 
         <section className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-[2rem] border border-[#dbe8d5] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-extrabold text-[#102819]">
-              Documents
-            </h2>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-xl font-extrabold text-[#102819]">
+                  Documents & Onboarding Uploads
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Admin review of required Ambassador documents and existing
+                  application files.
+                </p>
+              </div>
+
+              <Link
+                href="/admin/ambassador-documents"
+                className="inline-flex items-center justify-center rounded-2xl border border-[#dbe8d5] bg-white px-4 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+              >
+                Review Documents
+              </Link>
+            </div>
+
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+              <div className="rounded-2xl bg-[#f8fbf6] p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Required
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-[#102819]">
+                  {documentCounts.required}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-[#f8fbf6] p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Submitted
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-[#102819]">
+                  {documentCounts.submitted}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-[#f8fbf6] p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Approved
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-[#102819]">
+                  {documentCounts.approved}
+                </p>
+              </div>
+            </div>
 
             <div className="mt-4 space-y-3 text-sm">
               <div className="rounded-2xl bg-[#f8fbf6] p-4">
@@ -1515,6 +1900,112 @@ export default async function AdminAmbassadorDetailPage({
                     "No other document link saved"}
                 </p>
               </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {requiredDocuments.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#dbe8d5] bg-[#f8fbf6] p-4 text-sm text-slate-600">
+                  No required onboarding documents are configured yet.
+                </div>
+              ) : (
+                requiredDocuments.map((document) => (
+                  <div
+                    key={document.id}
+                    className="rounded-2xl border border-[#e2ecd9] bg-[#f8fbf6] p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="mb-2 flex flex-wrap gap-2">
+                          <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
+                            {document.document_type || "document"}
+                          </span>
+                          {document.is_required !== false ? (
+                            <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-extrabold text-amber-800 ring-1 ring-amber-100">
+                              Required
+                            </span>
+                          ) : (
+                            <span className="inline-flex rounded-full bg-slate-50 px-3 py-1 text-xs font-extrabold text-slate-600 ring-1 ring-slate-100">
+                              Optional
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="font-extrabold text-[#102819]">
+                          {document.title || "Onboarding Document"}
+                        </p>
+                        {document.description ? (
+                          <p className="mt-1 text-sm leading-6 text-slate-600">
+                            {document.description}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <span
+                        className={`inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
+                          document.submissions.some((submission) =>
+                            ["approved", "reviewed"].includes(
+                              (submission.status || "").toLowerCase(),
+                            ),
+                          )
+                            ? "approved"
+                            : document.submissions.length
+                              ? "pending"
+                              : "not_started",
+                        )}`}
+                      >
+                        {document.submissions.some((submission) =>
+                          ["approved", "reviewed"].includes(
+                            (submission.status || "").toLowerCase(),
+                          ),
+                        )
+                          ? "Approved"
+                          : document.submissions.length
+                            ? "Submitted"
+                            : "Missing"}
+                      </span>
+                    </div>
+
+                    {document.submissions.length ? (
+                      <div className="mt-3 space-y-2">
+                        {document.submissions.map((submission) => (
+                          <div
+                            key={submission.id}
+                            className="rounded-xl bg-white p-3 text-xs font-bold text-slate-600 ring-1 ring-[#dbe8d5]"
+                          >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="break-all text-[#102819]">
+                                  {getSubmissionLabel(submission)}
+                                </p>
+                                <p className="mt-1">
+                                  Submitted: {formatDate(submission.submitted_at)}
+                                </p>
+                                {submission.storage_path ? (
+                                  <p className="mt-1 break-all">
+                                    Path: {submission.storage_path}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <span
+                                className={`inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${statusClass(
+                                  submission.status,
+                                )}`}
+                              >
+                                {prettyStatus(submission.status)}
+                              </span>
+                            </div>
+                            {submission.admin_notes ? (
+                              <p className="mt-2 rounded-lg bg-[#f8fbf6] p-2">
+                                {submission.admin_notes}
+                              </p>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
