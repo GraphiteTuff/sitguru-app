@@ -12,6 +12,7 @@ import {
   HandCoins,
   ImageOff,
   Mail,
+  MessageCircle,
   MapPin,
   PauseCircle,
   PawPrint,
@@ -590,6 +591,35 @@ function getReferralSubtext(referral: ReferralRow) {
   return location || referral.email || "Location not saved";
 }
 
+function buildAmbassadorMessageHref({
+  ambassador,
+  ambassadorName,
+  threadType,
+}: {
+  ambassador: AmbassadorRow;
+  ambassadorName: string;
+  threadType: "ambassador_support" | "ambassador_guru_followup" | "ambassador_admin_note";
+}) {
+  const params = new URLSearchParams({
+    threadType,
+    inquiry: "partner",
+    source: "admin_ambassador_dashboard",
+    ambassadorId: ambassador.id,
+    ambassadorName,
+    referralCode: ambassador.referral_code || "",
+    recipientRole: "ambassador",
+  });
+
+  if (ambassador.email) {
+    params.set("recipientEmail", ambassador.email);
+    params.set("ambassadorEmail", ambassador.email);
+  }
+
+  params.set("recipientName", ambassadorName);
+
+  return `/admin/messages?${params.toString()}`;
+}
+
 function buildDetailCards(
   referrals: ReferralRow[],
   rewards: RewardRow[],
@@ -1109,6 +1139,99 @@ export default async function AdminAmbassadorDetailPage({
               </form>
             </div>
           </section>
+        </section>
+
+        <section className="rounded-[2rem] border border-[#cfe4c8] bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-[#2f6f3e]" />
+                <h2 className="text-xl font-extrabold text-[#102819]">
+                  SitGuru Messenger
+                </h2>
+              </div>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+                Create a tracked admin message thread for this Ambassador,
+                follow up about referral credits, or open Messenger to coordinate
+                with Gurus connected to this Ambassador's outreach.
+              </p>
+
+              <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                <div className="rounded-2xl bg-[#f8fbf6] p-3 ring-1 ring-[#e2ecd9]">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Ambassador
+                  </p>
+                  <p className="mt-1 truncate font-extrabold text-[#102819]">
+                    {ambassadorName}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-[#f8fbf6] p-3 ring-1 ring-[#e2ecd9]">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Email
+                  </p>
+                  <p className="mt-1 truncate font-extrabold text-[#102819]">
+                    {ambassadorRow.email || "No email saved"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-[#f8fbf6] p-3 ring-1 ring-[#e2ecd9]">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Referral Code
+                  </p>
+                  <p className="mt-1 truncate font-extrabold text-[#102819]">
+                    {ambassadorRow.referral_code || "Not saved"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-[430px]">
+              <Link
+                href={buildAmbassadorMessageHref({
+                  ambassador: ambassadorRow,
+                  ambassadorName,
+                  threadType: "ambassador_support",
+                })}
+                className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Message Admin
+              </Link>
+
+              <Link
+                href={buildAmbassadorMessageHref({
+                  ambassador: ambassadorRow,
+                  ambassadorName,
+                  threadType: "ambassador_guru_followup",
+                })}
+                className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-5 py-3 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Message Gurus
+              </Link>
+
+              <Link
+                href={buildAmbassadorMessageHref({
+                  ambassador: ambassadorRow,
+                  ambassadorName,
+                  threadType: "ambassador_admin_note",
+                })}
+                className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-5 py-3 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Admin Note
+              </Link>
+
+              <Link
+                href={`/admin/messages?inquiry=partner&q=${encodeURIComponent(
+                  ambassadorRow.referral_code || ambassadorName,
+                )}`}
+                className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-[#cfe4c8] bg-[#f8fbf6] px-5 py-3 text-sm font-extrabold text-[#102819] shadow-sm transition hover:bg-[#eef7ea]"
+              >
+                <MessageCircle className="mr-2 h-4 w-4" />
+                Open Messenger
+              </Link>
+            </div>
+          </div>
         </section>
 
         {hasQueryError ? (

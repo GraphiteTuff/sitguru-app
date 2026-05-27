@@ -49,6 +49,10 @@ type SearchParams = {
   department?: string;
   departmentLabel?: string;
   source?: string;
+  ambassadorId?: string;
+  ambassadorName?: string;
+  ambassadorEmail?: string;
+  referralCode?: string;
 };
 
 type PageProps = {
@@ -896,21 +900,45 @@ function getIntentFromParams(params: SearchParams) {
   const department = asString(params.department);
   const departmentLabel = asString(params.departmentLabel);
   const source = asString(params.source);
+  const ambassadorId = asString(params.ambassadorId);
+  const ambassadorName = asString(params.ambassadorName);
+  const ambassadorEmail = asString(params.ambassadorEmail);
+  const referralCode = asString(params.referralCode);
 
-  if (!threadType && !recipientId && !recipientEmail && !department) {
+  if (
+    !threadType &&
+    !recipientId &&
+    !recipientEmail &&
+    !department &&
+    !ambassadorId &&
+    !ambassadorEmail
+  ) {
     return null;
   }
 
+  const isAmbassadorContext = Boolean(ambassadorId || ambassadorEmail || referralCode);
+
   return {
-    threadType: threadType || (department ? "internal_department" : "internal"),
+    threadType:
+      threadType ||
+      (department
+        ? "internal_department"
+        : isAmbassadorContext
+          ? "ambassador_support"
+          : "internal"),
     recipientId,
-    recipientEmail,
-    recipientName,
-    recipientRole,
+    recipientEmail: recipientEmail || ambassadorEmail,
+    recipientName: recipientName || ambassadorName,
+    recipientRole: recipientRole || (isAmbassadorContext ? "ambassador" : ""),
     department,
     departmentLabel,
     source,
+    ambassadorId,
+    ambassadorName,
+    ambassadorEmail,
+    referralCode,
     isDepartment: Boolean(department),
+    isAmbassadorContext,
   };
 }
 
@@ -977,19 +1005,32 @@ async function createInternalThread(formData: FormData) {
   const department = String(formData.get("department") || "").trim();
   const departmentLabel = String(formData.get("departmentLabel") || "").trim();
   const source = String(formData.get("source") || "").trim();
+  const ambassadorId = String(formData.get("ambassadorId") || "").trim();
+  const ambassadorName = String(formData.get("ambassadorName") || "").trim();
+  const ambassadorEmail = String(formData.get("ambassadorEmail") || "").trim();
+  const referralCode = String(formData.get("referralCode") || "").trim();
+  const isAmbassadorThread =
+    threadType.startsWith("ambassador") ||
+    Boolean(ambassadorId || ambassadorEmail || referralCode);
   const subject =
     String(formData.get("subject") || "").trim() ||
     (departmentLabel
       ? `Internal message: ${departmentLabel}`
-      : recipientName
-        ? `Internal message: ${recipientName}`
-        : "Internal SitGuru HQ message");
+      : isAmbassadorThread
+        ? `Ambassador support: ${ambassadorName || recipientName || referralCode || "SitGuru Ambassador"}`
+        : recipientName
+          ? `Internal message: ${recipientName}`
+          : "Internal SitGuru HQ message");
   const body =
     String(formData.get("body") || "").trim() ||
     "Starting an internal SitGuru HQ conversation.";
 
   const now = new Date().toISOString();
-  const topic = department ? "internal_department" : "internal";
+  const topic = isAmbassadorThread
+    ? "ambassador_support"
+    : department
+      ? "internal_department"
+      : "internal";
   const preview = body.slice(0, 240);
 
   const { data: conversation, error: conversationError } = await supabaseAdmin
@@ -1105,6 +1146,10 @@ async function createInternalThread(formData: FormData) {
       department: department || null,
       department_label: departmentLabel || null,
       source: source || null,
+      ambassador_id: ambassadorId || null,
+      ambassador_name: ambassadorName || null,
+      ambassador_email: ambassadorEmail || null,
+      referral_code: referralCode || null,
     },
     created_at: now,
   });
@@ -1313,16 +1358,22 @@ function InternalComposer({
   const recipientLabel =
     intent.departmentLabel ||
     intent.recipientName ||
+    intent.ambassadorName ||
     intent.recipientEmail ||
+    intent.ambassadorEmail ||
     "SitGuru HQ";
 
-  const defaultSubject = intent.isDepartment
-    ? `Internal message: ${recipientLabel}`
-    : `Internal message: ${recipientLabel}`;
+  const defaultSubject = intent.isAmbassadorContext
+    ? `Ambassador support: ${recipientLabel}`
+    : intent.isDepartment
+      ? `Internal message: ${recipientLabel}`
+      : `Internal message: ${recipientLabel}`;
 
-  const defaultBody = intent.isDepartment
-    ? `Hi ${recipientLabel},\n\n`
-    : `Hi ${recipientLabel},\n\n`;
+  const defaultBody = intent.isAmbassadorContext
+    ? `Hi SitGuru Team,\n\nAmbassador: ${intent.ambassadorName || intent.recipientName || recipientLabel}\nEmail: ${intent.ambassadorEmail || intent.recipientEmail || "Not saved"}\nReferral code: ${intent.referralCode || "Not saved"}\n\n`
+    : intent.isDepartment
+      ? `Hi ${recipientLabel},\n\n`
+      : `Hi ${recipientLabel},\n\n`;
 
   return (
     <section className="rounded-[30px] border border-green-200 bg-green-50 p-5 shadow-sm">
@@ -1335,9 +1386,9 @@ function InternalComposer({
             Message {recipientLabel}
           </h2>
           <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-green-900">
-            This composer was opened from the User Directory or a department
-            shortcut. Sending creates an internal SitGuru HQ thread and logs the
-            first message in the Message Center.
+            This composer was opened from the User Directory, a department
+            shortcut, or an Ambassador dashboard. Sending creates a tracked
+            SitGuru HQ thread and logs the first message in the Message Center.
           </p>
         </div>
 
@@ -1359,6 +1410,10 @@ function InternalComposer({
         <input type="hidden" name="department" value={intent.department} />
         <input type="hidden" name="departmentLabel" value={intent.departmentLabel} />
         <input type="hidden" name="source" value={intent.source} />
+        <input type="hidden" name="ambassadorId" value={intent.ambassadorId} />
+        <input type="hidden" name="ambassadorName" value={intent.ambassadorName} />
+        <input type="hidden" name="ambassadorEmail" value={intent.ambassadorEmail} />
+        <input type="hidden" name="referralCode" value={intent.referralCode} />
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
           <div className="grid gap-4">
@@ -1398,6 +1453,9 @@ function InternalComposer({
               {intent.recipientRole ? <p>Role: {intent.recipientRole}</p> : null}
               {intent.department ? <p>Department: {intent.department}</p> : null}
               {intent.source ? <p>Source: {intent.source}</p> : null}
+              {intent.ambassadorName ? <p>Ambassador: {intent.ambassadorName}</p> : null}
+              {intent.ambassadorEmail ? <p>Ambassador Email: {intent.ambassadorEmail}</p> : null}
+              {intent.referralCode ? <p>Referral Code: {intent.referralCode}</p> : null}
             </div>
 
             <button
