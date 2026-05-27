@@ -118,7 +118,9 @@ function isPendingStatus(row: AnyRow) {
     status === "in_review" ||
     status === "contacted" ||
     status === "interested" ||
-    status === "applied"
+    status === "applied" ||
+    status === "conditional_offer_sent" ||
+    status === "onboarding_sent"
   );
 }
 
@@ -249,6 +251,9 @@ function getSourceLabel(row: AnyRow) {
   if (text.includes("careerlink") || text.includes("career link")) {
     return "PA CareerLink";
   }
+  if (text.includes("indeed")) return "Indeed";
+  if (text.includes("handshake")) return "Handshake";
+  if (text.includes("linkedin") || text.includes("linked in")) return "LinkedIn";
   if (text.includes("facebook") || text.includes("meta")) return "Facebook";
   if (text.includes("instagram") || text.includes("insta")) return "Instagram";
   if (text.includes("tiktok")) return "TikTok";
@@ -268,6 +273,7 @@ function isAmbassadorLead(row: AnyRow) {
     text.includes("ambassador") ||
     text.includes("careerlink") ||
     text.includes("career link") ||
+    text.includes("indeed") ||
     text.includes("student hire") ||
     text.includes("community hire") ||
     text.includes("military hire") ||
@@ -331,9 +337,15 @@ function mergeRows(...groups: AnyRow[][]) {
 
   for (const group of groups) {
     for (const row of group) {
-      const key =
-        getText(row, ["id", "email", "user_id", "created_at"]) ||
-        `${getDisplayName(row)}-${getEmail(row)}-${merged.length}`;
+      const sourceTable = getText(row, ["__source_table"], "unknown");
+      const rowId = getText(row, ["id"]);
+      const email = getEmail(row);
+      const name = getDisplayName(row);
+      const createdAt = getDate(row);
+
+      const key = rowId
+        ? `${sourceTable}:${rowId}`
+        : `${sourceTable}:${email}:${name}:${createdAt}:${merged.length}`;
 
       if (seen.has(key)) continue;
 
@@ -345,10 +357,16 @@ function mergeRows(...groups: AnyRow[][]) {
   return merged;
 }
 
+function withSourceTable(row: AnyRow, sourceTable: string) {
+  return {
+    ...row,
+    __source_table: sourceTable,
+  };
+}
+
 async function getHumanResourcesData() {
   const [
     ambassadorLeadsResult,
-    ambassadorsResult,
     partnerApplicationsResult,
     networkPartnerLeadsResult,
     networkParticipantsResult,
@@ -366,14 +384,6 @@ async function getHumanResourcesData() {
         .order("created_at", { ascending: false })
         .limit(1000),
       "ambassador_leads",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("ambassadors")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "ambassadors",
     ),
     safeAdminQuery(
       supabaseAdmin
@@ -450,7 +460,6 @@ async function getHumanResourcesData() {
   ]);
 
   const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).filter(Boolean);
-  const ambassadors = ((ambassadorsResult.data || []) as AnyRow[]).filter(Boolean);
   const partnerApplications = ((partnerApplicationsResult.data || []) as AnyRow[]).filter(Boolean);
   const networkPartnerLeads = ((networkPartnerLeadsResult.data || []) as AnyRow[]).filter(Boolean);
   const networkParticipants = ((networkParticipantsResult.data || []) as AnyRow[]).filter(Boolean);
@@ -462,14 +471,25 @@ async function getHumanResourcesData() {
   const backgroundChecks = ((backgroundChecksResult.data || []) as AnyRow[]).filter(Boolean);
 
   const ambassadorRows = mergeRows(
-    ambassadorLeads,
-    ambassadors,
-    partnerApplications.filter(isAmbassadorLead),
-    networkPartnerLeads.filter(isAmbassadorLead),
-    networkParticipants.filter(isAmbassadorLead),
-    launchSignups.filter(isAmbassadorLead),
-    launchWaitlist.filter(isAmbassadorLead),
-    programApplications.filter(isAmbassadorLead),
+    ambassadorLeads.map((row) => withSourceTable(row, "ambassador_leads")),
+    partnerApplications
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "partner_applications")),
+    networkPartnerLeads
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "network_partner_leads")),
+    networkParticipants
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "network_program_participants")),
+    launchSignups
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "launch_signups")),
+    launchWaitlist
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "launch_waitlist")),
+    programApplications
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "program_applications")),
   ).sort((a, b) => {
     const dateA = new Date(getDate(a) || 0).getTime();
     const dateB = new Date(getDate(b) || 0).getTime();
@@ -479,11 +499,17 @@ async function getHumanResourcesData() {
   const guruProfileRows = profiles.filter(isGuruApplicant);
 
   const guruApplicantRows = mergeRows(
-    gurus,
-    guruProfileRows,
-    programApplications.filter(isGuruApplicant),
-    launchSignups.filter(isGuruApplicant),
-    launchWaitlist.filter(isGuruApplicant),
+    gurus.map((row) => withSourceTable(row, "gurus")),
+    guruProfileRows.map((row) => withSourceTable(row, "profiles")),
+    programApplications
+      .filter(isGuruApplicant)
+      .map((row) => withSourceTable(row, "program_applications")),
+    launchSignups
+      .filter(isGuruApplicant)
+      .map((row) => withSourceTable(row, "launch_signups")),
+    launchWaitlist
+      .filter(isGuruApplicant)
+      .map((row) => withSourceTable(row, "launch_waitlist")),
   ).sort((a, b) => {
     const dateA = new Date(getDate(a) || 0).getTime();
     const dateB = new Date(getDate(b) || 0).getTime();
@@ -580,9 +606,10 @@ export default async function HumanResourcesPage() {
             </div>
 
             <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-              Manage SitGuru hiring, ambassador recruiting, PA CareerLink leads,
-              Guru applicants, onboarding, trust and safety checks, and future
-              contractor documentation in one mobile-friendly workspace.
+              Manage SitGuru hiring, ambassador recruiting, Indeed and PA
+              CareerLink leads, Guru applicants, onboarding, trust and safety
+              checks, and future contractor documentation in one mobile-friendly
+              workspace.
             </p>
           </div>
 
@@ -645,7 +672,7 @@ export default async function HumanResourcesPage() {
           icon={<HeartHandshake size={22} />}
           title="Ambassador Leads"
           value={number(data.metrics.ambassadorLeads)}
-          detail="Track PA CareerLink, social, referral, event, and website ambassador applicants."
+          detail="Track Indeed, PA CareerLink, social, referral, event, and website ambassador applicants."
           action="Open Ambassador Leads"
           tone="green"
         />
@@ -733,12 +760,14 @@ export default async function HumanResourcesPage() {
                 <Sparkles className="mt-0.5 shrink-0 text-green-800" size={20} />
                 <div>
                   <p className="text-sm font-black text-green-950">
-                    PA CareerLink workflow
+                    Lead pipeline workflow
                   </p>
                   <p className="mt-1 text-sm font-semibold leading-6 text-green-900/75">
-                    Add applicants from your Student, Community, and Military
+                    Add applicants from Student, Community, and Military
                     Ambassador postings to Ambassador Leads so you can track
-                    contact status and next steps inside SitGuru.
+                    contact status and next steps inside SitGuru. Converted
+                    Ambassadors are tracked separately in the Ambassador
+                    dashboard to avoid double-counting.
                   </p>
                 </div>
               </div>
@@ -750,14 +779,14 @@ export default async function HumanResourcesPage() {
           <DashboardCard>
             <TableHeader
               title="Recent Ambassador Leads"
-              subtitle="Latest ambassador leads from PA CareerLink and other recruiting sources."
+              subtitle="Latest ambassador leads from Indeed, PA CareerLink, and other recruiting sources."
               href={adminRoutes.ambassadorLeads}
             />
 
             <MobileLeadList
               leads={data.recentAmbassadorLeads}
               emptyTitle="No ambassador leads yet"
-              emptyDetail="PA CareerLink and ambassador applicants will show here once added."
+              emptyDetail="Indeed, PA CareerLink, and ambassador applicants will show here once added."
               type="ambassador"
             />
 
@@ -819,7 +848,7 @@ export default async function HumanResourcesPage() {
                     <EmptyTableRow
                       colSpan={6}
                       title="No ambassador leads yet"
-                      detail="PA CareerLink and ambassador applicants will show here once added."
+                      detail="Indeed, PA CareerLink, and ambassador applicants will show here once added."
                     />
                   )}
                 </tbody>
@@ -919,7 +948,7 @@ export default async function HumanResourcesPage() {
                 href={adminRoutes.ambassadorLeads}
                 icon={<UserPlus size={18} />}
                 title="Add or review ambassador leads"
-                detail="PA CareerLink, Student Hire, Community Hire, and Military Hire."
+                detail="Indeed, PA CareerLink, Student Hire, Community Hire, and Military Hire."
               />
               <QuickAction
                 href={adminRoutes.gurus}
@@ -1196,13 +1225,17 @@ function StatusBadge({ status }: { status: string }) {
       ? "Approved"
       : value === "converted" || value === "signed_up" || value === "signup"
         ? "Signed Up"
-        : value === "contacted"
+        : value === "conditional_offer_sent" ||
+            value === "onboarding_sent" ||
+            value === "contacted"
           ? "Contacted"
           : value === "interested"
             ? "Interested"
             : value === "declined" ||
                 value === "rejected" ||
-                value === "not_moving_forward"
+                value === "not_moving_forward" ||
+                value === "not_a_fit" ||
+                value === "inactive"
               ? "Not Moving"
               : "New";
 
