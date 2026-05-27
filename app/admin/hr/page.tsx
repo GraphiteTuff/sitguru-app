@@ -36,6 +36,7 @@ type SafeAdminQueryResponse = {
 const adminRoutes = {
   dashboard: "/admin",
   hr: "/admin/hr",
+  ambassadors: "/admin/ambassadors",
   ambassadorLeads: "/admin/ambassador-leads",
   programs: "/admin/programs",
   gurus: "/admin/gurus",
@@ -268,17 +269,38 @@ function getSourceLabel(row: AnyRow) {
     return "PA CareerLink";
   }
   if (text.includes("indeed")) return "Indeed";
-  if (text.includes("facebook") || text.includes("meta")) return "Facebook";
-  if (text.includes("instagram") || text.includes("insta")) return "Instagram";
-  if (text.includes("tiktok")) return "TikTok";
-  if (text.includes("x.com") || text.includes("twitter")) return "X";
   if (text.includes("handshake")) return "Handshake";
   if (text.includes("linkedin") || text.includes("linked in")) return "LinkedIn";
-  if (text.includes("event")) return "Event";
+  if (
+    text.includes("college") ||
+    text.includes("university") ||
+    text.includes("campus")
+  ) {
+    return "College / University";
+  }
+  if (
+    text.includes("student organization") ||
+    text.includes("student org") ||
+    text.includes("club") ||
+    text.includes("fraternity") ||
+    text.includes("sorority")
+  ) {
+    return "Student Organization";
+  }
+  if (
+    text.includes("military") ||
+    text.includes("veteran") ||
+    text.includes("active-duty") ||
+    text.includes("active duty") ||
+    text.includes("guard") ||
+    text.includes("reserve")
+  ) {
+    return "Military / Veteran Organization";
+  }
   if (text.includes("referral")) return "Referral";
   if (text.includes("website") || text.includes("site")) return "Website";
 
-  return source || "Manual / Other";
+  return source || "Other";
 }
 
 function isAmbassadorLead(row: AnyRow) {
@@ -300,18 +322,15 @@ function isAmbassadorLead(row: AnyRow) {
 function isGuruApplicant(row: AnyRow) {
   const text = getCombinedText(row);
   const role = getRole(row);
+  const participantType = getParticipantType(row);
 
   return (
-    role.includes("guru") ||
-    role.includes("sitter") ||
-    role.includes("provider") ||
     text.includes("guru") ||
     text.includes("pet care") ||
     text.includes("sitter") ||
     text.includes("walker") ||
-    text.includes("boarding") ||
-    text.includes("drop-in") ||
-    text.includes("training")
+    role.includes("guru") ||
+    participantType.includes("guru")
   );
 }
 
@@ -352,9 +371,13 @@ function mergeRows(...groups: AnyRow[][]) {
 
   for (const group of groups) {
     for (const row of group) {
-      const key =
-        getText(row, ["id", "email", "user_id", "created_at"]) ||
-        `${getDisplayName(row)}-${getEmail(row)}-${merged.length}`;
+      const sourceTable = getText(row, ["__source_table"], "unknown");
+      const id = getText(row, ["id"]);
+      const email = getEmail(row).toLowerCase();
+      const name = getDisplayName(row).toLowerCase();
+      const date = getDate(row);
+      const fallbackKey = `${sourceTable}:${email}:${name}:${date}:${merged.length}`;
+      const key = id ? `${sourceTable}:${id}` : fallbackKey;
 
       if (seen.has(key)) continue;
 
@@ -366,18 +389,78 @@ function mergeRows(...groups: AnyRow[][]) {
   return merged;
 }
 
-async function getHumanResourcesData() {
+function withSourceTable(row: AnyRow, sourceTable: string) {
+  return {
+    ...row,
+    __source_table: sourceTable,
+  };
+}
+
+function normalizeLead(row: AnyRow) {
+  return {
+    raw: row,
+    name: getDisplayName(row),
+    email: getEmail(row),
+    program: getProgramLabel(row),
+    source: getSourceLabel(row),
+    status: getReadableStatus(row),
+    location: getLocation(row),
+    date: getDate(row),
+    archived: isArchivedStatus(row),
+  };
+}
+
+function getReadableStatus(row: AnyRow) {
+  const status = getStatus(row);
+
+  if (status === "new") return "New";
+  if (status === "pending") return "New";
+  if (status === "submitted") return "New";
+  if (status === "review") return "New";
+  if (status === "in_review") return "New";
+  if (status === "applied") return "New";
+  if (status === "conditional_offer_sent") return "Contacted";
+  if (status === "onboarding_sent") return "Contacted";
+  if (status === "contacted") return "Contacted";
+  if (status === "interested") return "Interested";
+  if (status === "signed_up") return "Signed Up";
+  if (status === "signup") return "Signed Up";
+  if (status === "converted") return "Signed Up";
+  if (status === "approved") return "Approved";
+  if (status === "active") return "Approved";
+  if (status === "enabled") return "Approved";
+  if (status === "live") return "Approved";
+  if (status === "complete") return "Approved";
+  if (status === "completed") return "Approved";
+  if (status === "not_moving_forward") return "Not Moving Forward";
+  if (status === "not_a_fit") return "Not Moving Forward";
+  if (status === "not_moving") return "Not Moving Forward";
+  if (status === "declined") return "Not Moving Forward";
+  if (status === "rejected") return "Not Moving Forward";
+  if (status === "inactive") return "Not Moving Forward";
+  if (status === "archived") return "Archived";
+
+  return (
+    status
+      .split("_")
+      .filter(Boolean)
+      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+      .join(" ") || "New"
+  );
+}
+
+async function getHrData() {
   const [
     ambassadorLeadsResult,
     ambassadorsResult,
+    guruApplicationsResult,
+    gurusResult,
     partnerApplicationsResult,
     networkPartnerLeadsResult,
     networkParticipantsResult,
     launchSignupsResult,
     launchWaitlistResult,
     programApplicationsResult,
-    gurusResult,
-    profilesResult,
     backgroundChecksResult,
   ] = await Promise.all([
     safeAdminQuery(
@@ -395,6 +478,22 @@ async function getHumanResourcesData() {
         .order("created_at", { ascending: false })
         .limit(1000),
       "ambassadors",
+    ),
+    safeAdminQuery(
+      supabaseAdmin
+        .from("guru_applications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "guru_applications",
+    ),
+    safeAdminQuery(
+      supabaseAdmin
+        .from("gurus")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "gurus",
     ),
     safeAdminQuery(
       supabaseAdmin
@@ -446,22 +545,6 @@ async function getHumanResourcesData() {
     ),
     safeAdminQuery(
       supabaseAdmin
-        .from("gurus")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "gurus",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "profiles",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
         .from("background_checks")
         .select("*")
         .order("created_at", { ascending: false })
@@ -470,19 +553,41 @@ async function getHumanResourcesData() {
     ),
   ]);
 
-  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).filter(Boolean);
-  const ambassadors = ((ambassadorsResult.data || []) as AnyRow[]).filter(Boolean);
-  const partnerApplications = ((partnerApplicationsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkPartnerLeads = ((networkPartnerLeadsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkParticipants = ((networkParticipantsResult.data || []) as AnyRow[]).filter(Boolean);
-  const launchSignups = ((launchSignupsResult.data || []) as AnyRow[]).filter(Boolean);
-  const launchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).filter(Boolean);
-  const programApplications = ((programApplicationsResult.data || []) as AnyRow[]).filter(Boolean);
-  const gurus = ((gurusResult.data || []) as AnyRow[]).filter(Boolean);
-  const profiles = ((profilesResult.data || []) as AnyRow[]).filter(Boolean);
-  const backgroundChecks = ((backgroundChecksResult.data || []) as AnyRow[]).filter(Boolean);
+  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).map(
+    (row) => withSourceTable(row, "ambassador_leads"),
+  );
+  const ambassadors = ((ambassadorsResult.data || []) as AnyRow[]).map((row) =>
+    withSourceTable(row, "ambassadors"),
+  );
+  const guruApplications = ((guruApplicationsResult.data || []) as AnyRow[]).map(
+    (row) => withSourceTable(row, "guru_applications"),
+  );
+  const gurus = ((gurusResult.data || []) as AnyRow[]).map((row) =>
+    withSourceTable(row, "gurus"),
+  );
+  const partnerApplications = (
+    (partnerApplicationsResult.data || []) as AnyRow[]
+  ).map((row) => withSourceTable(row, "partner_applications"));
+  const networkPartnerLeads = (
+    (networkPartnerLeadsResult.data || []) as AnyRow[]
+  ).map((row) => withSourceTable(row, "network_partner_leads"));
+  const networkParticipants = (
+    (networkParticipantsResult.data || []) as AnyRow[]
+  ).map((row) => withSourceTable(row, "network_program_participants"));
+  const launchSignups = ((launchSignupsResult.data || []) as AnyRow[]).map(
+    (row) => withSourceTable(row, "launch_signups"),
+  );
+  const launchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).map(
+    (row) => withSourceTable(row, "launch_waitlist"),
+  );
+  const programApplications = (
+    (programApplicationsResult.data || []) as AnyRow[]
+  ).map((row) => withSourceTable(row, "program_applications"));
+  const backgroundChecks = (
+    (backgroundChecksResult.data || []) as AnyRow[]
+  ).map((row) => withSourceTable(row, "background_checks"));
 
-  const ambassadorRows = mergeRows(
+  const allAmbassadorRows = mergeRows(
     ambassadorLeads,
     ambassadors,
     partnerApplications.filter(isAmbassadorLead),
@@ -497,101 +602,83 @@ async function getHumanResourcesData() {
     return dateB - dateA;
   });
 
-  const activeAmbassadorRows = ambassadorRows.filter(
-    (lead) => !isArchivedStatus(lead),
-  );
-  const archivedAmbassadorRows = ambassadorRows.filter(isArchivedStatus);
-
-  const guruProfileRows = profiles.filter(isGuruApplicant);
-
-  const guruApplicantRows = mergeRows(
+  const allGuruRows = mergeRows(
+    guruApplications,
     gurus,
-    guruProfileRows,
-    programApplications.filter(isGuruApplicant),
+    partnerApplications.filter(isGuruApplicant),
     launchSignups.filter(isGuruApplicant),
     launchWaitlist.filter(isGuruApplicant),
+    programApplications.filter(isGuruApplicant),
   ).sort((a, b) => {
     const dateA = new Date(getDate(a) || 0).getTime();
     const dateB = new Date(getDate(b) || 0).getTime();
     return dateB - dateA;
   });
 
-  const activeGuruApplicantRows = guruApplicantRows.filter(
-    (applicant) => !isArchivedStatus(applicant),
+  const ambassadorRecords = allAmbassadorRows.map(normalizeLead);
+  const guruRecords = allGuruRows.map(normalizeLead);
+  const backgroundCheckRecords = backgroundChecks.map(normalizeLead);
+
+  const activeAmbassadorRecords = ambassadorRecords.filter(
+    (record) => !record.archived,
+  );
+  const archivedAmbassadorRecords = ambassadorRecords.filter(
+    (record) => record.archived,
+  );
+  const pendingGuruRecords = guruRecords.filter((record) =>
+    isPendingStatus(record.raw),
+  );
+  const approvedGuruRecords = guruRecords.filter((record) =>
+    isApprovedStatus(record.raw),
+  );
+  const pendingBackgroundCheckRecords = backgroundCheckRecords.filter((record) =>
+    isPendingStatus(record.raw),
+  );
+  const approvedBackgroundCheckRecords = backgroundCheckRecords.filter((record) =>
+    isApprovedStatus(record.raw),
   );
 
-  const recentAmbassadorLeads = activeAmbassadorRows.slice(0, 5).map((lead) => ({
-    name: getDisplayName(lead, "Ambassador Lead"),
-    email: getEmail(lead),
-    program: getProgramLabel(lead),
-    source: getSourceLabel(lead),
-    status: getStatus(lead),
-    location: getLocation(lead),
-    date: getDate(lead),
-  }));
-
-  const recentGuruApplicants = activeGuruApplicantRows.slice(0, 5).map((applicant) => ({
-    name: getDisplayName(applicant, "Guru Applicant"),
-    email: getEmail(applicant),
-    status: getStatus(applicant),
-    location: getLocation(applicant),
-    date: getDate(applicant),
-  }));
-
-  const pendingBackgroundChecks = backgroundChecks.filter(isPendingStatus);
-  const approvedBackgroundChecks = backgroundChecks.filter(isApprovedStatus);
+  const metrics = {
+    ambassadorLeads: ambassadorRecords.length,
+    activeAmbassadorLeads: activeAmbassadorRecords.length,
+    archivedAmbassadorLeads: archivedAmbassadorRecords.length,
+    studentHire: ambassadorRecords.filter(
+      (record) => record.program === "Student Hire",
+    ).length,
+    communityHire: ambassadorRecords.filter(
+      (record) => record.program === "Community Hire",
+    ).length,
+    militaryHire: ambassadorRecords.filter(
+      (record) => record.program === "Military Hire",
+    ).length,
+    activeStudentHire: activeAmbassadorRecords.filter(
+      (record) => record.program === "Student Hire",
+    ).length,
+    activeCommunityHire: activeAmbassadorRecords.filter(
+      (record) => record.program === "Community Hire",
+    ).length,
+    activeMilitaryHire: activeAmbassadorRecords.filter(
+      (record) => record.program === "Military Hire",
+    ).length,
+    activeGuruApplicants: guruRecords.filter((record) => !record.archived).length,
+    pendingGuruApplicants: pendingGuruRecords.length,
+    approvedGuruApplicants: approvedGuruRecords.length,
+    pendingBackgroundChecks: pendingBackgroundCheckRecords.length,
+    approvedBackgroundChecks: approvedBackgroundCheckRecords.length,
+    recentApplicants: [...ambassadorRecords, ...guruRecords].filter((record) =>
+      isWithinLastDays(record.date, 14),
+    ).length,
+  };
 
   return {
-    ambassadorRows,
-    activeAmbassadorRows,
-    archivedAmbassadorRows,
-    guruApplicantRows,
-    activeGuruApplicantRows,
-    backgroundChecks,
-    recentAmbassadorLeads,
-    recentGuruApplicants,
-    metrics: {
-      ambassadorLeads: ambassadorRows.length,
-      activeAmbassadorLeads: activeAmbassadorRows.length,
-      archivedAmbassadorLeads: archivedAmbassadorRows.length,
-      careerLinkLeads: ambassadorRows.filter(
-        (lead) => getSourceLabel(lead) === "PA CareerLink",
-      ).length,
-      indeedLeads: ambassadorRows.filter(
-        (lead) => getSourceLabel(lead) === "Indeed",
-      ).length,
-      studentHire: ambassadorRows.filter(
-        (lead) => getProgramLabel(lead) === "Student Hire",
-      ).length,
-      communityHire: ambassadorRows.filter(
-        (lead) => getProgramLabel(lead) === "Community Hire",
-      ).length,
-      militaryHire: ambassadorRows.filter(
-        (lead) => getProgramLabel(lead) === "Military Hire",
-      ).length,
-      activeStudentHire: activeAmbassadorRows.filter(
-        (lead) => getProgramLabel(lead) === "Student Hire",
-      ).length,
-      activeCommunityHire: activeAmbassadorRows.filter(
-        (lead) => getProgramLabel(lead) === "Community Hire",
-      ).length,
-      activeMilitaryHire: activeAmbassadorRows.filter(
-        (lead) => getProgramLabel(lead) === "Military Hire",
-      ).length,
-      guruApplicants: guruApplicantRows.length,
-      activeGuruApplicants: activeGuruApplicantRows.length,
-      pendingGuruApplicants: activeGuruApplicantRows.filter(isPendingStatus).length,
-      approvedGuruApplicants: activeGuruApplicantRows.filter(isApprovedStatus).length,
-      recentApplicants:
-        activeAmbassadorRows.filter((lead) => isWithinLastDays(getDate(lead), 14)).length +
-        activeGuruApplicantRows.filter((lead) => isWithinLastDays(getDate(lead), 14)).length,
-      pendingBackgroundChecks: pendingBackgroundChecks.length,
-      approvedBackgroundChecks: approvedBackgroundChecks.length,
-    },
+    metrics,
+    recentAmbassadorLeads: activeAmbassadorRecords.slice(0, 8),
+    recentGuruApplicants: guruRecords.filter((record) => !record.archived).slice(0, 8),
+    pendingBackgroundChecks: pendingBackgroundCheckRecords.slice(0, 8),
   };
 }
 
-export default async function HumanResourcesPage() {
+export default async function AdminHrPage() {
   const supabase = await createClient();
 
   const {
@@ -603,12 +690,12 @@ export default async function HumanResourcesPage() {
     return null;
   }
 
-  const data = await getHumanResourcesData();
+  const data = await getHrData();
 
   return (
-    <main className="w-full min-w-0 space-y-4 sm:space-y-5">
-      <section className="overflow-hidden rounded-[28px] border border-green-100 bg-gradient-to-br from-[#f7fbf4] via-white to-[#eef8ef] p-4 shadow-sm sm:p-6 lg:p-7">
-        <div className="flex min-w-0 flex-col justify-between gap-5 xl:flex-row xl:items-end">
+    <main className="w-full min-w-0 space-y-5">
+      <section className="rounded-[28px] border border-green-100 bg-gradient-to-br from-white via-[#f7fbf4] to-white p-4 shadow-sm sm:p-6">
+        <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
           <div className="min-w-0">
             <Link
               href={adminRoutes.dashboard}
@@ -635,13 +722,21 @@ export default async function HumanResourcesPage() {
             </p>
           </div>
 
-          <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto">
+          <div className="grid w-full shrink-0 gap-3 sm:grid-cols-3 xl:w-auto">
             <Link
               href={adminRoutes.ambassadorLeads}
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
             >
-              <UserPlus size={17} />
+              <Plus size={17} />
               Add Lead
+            </Link>
+
+            <Link
+              href={adminRoutes.ambassadors}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+            >
+              <HeartHandshake size={17} />
+              Dashboards
             </Link>
 
             <Link
@@ -692,7 +787,7 @@ export default async function HumanResourcesPage() {
         />
       </section>
 
-      <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+      <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-5">
         <HrFeatureCard
           href={adminRoutes.ambassadorLeads}
           icon={<HeartHandshake size={22} />}
@@ -701,6 +796,16 @@ export default async function HumanResourcesPage() {
           detail="Track active Indeed, PA CareerLink, social, referral, event, and website ambassador applicants."
           action="Open Ambassador Leads"
           tone="green"
+        />
+
+        <HrFeatureCard
+          href={adminRoutes.ambassadors}
+          icon={<ClipboardCheck size={22} />}
+          title="Ambassador Dashboards"
+          value={number(data.metrics.activeAmbassadorLeads)}
+          detail="Open Student Ambassador dashboard records, referral codes, referral links, and early referral tracking."
+          action="Open Dashboards"
+          tone="emerald"
         />
 
         <HrFeatureCard
@@ -964,12 +1069,98 @@ export default async function HumanResourcesPage() {
 
         <div className="min-w-0 xl:col-span-5">
           <DashboardCard>
+            <TableHeader
+              title="Trust & Safety Watchlist"
+              subtitle="Pending checks and onboarding review items."
+              href={adminRoutes.backgroundChecks}
+            />
+
+            <div className="grid gap-3">
+              {data.pendingBackgroundChecks.length ? (
+                data.pendingBackgroundChecks.map((check, index) => (
+                  <div
+                    key={`${check.name}-${check.email}-${check.date}-${index}`}
+                    className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-800">
+                        <ShieldCheck size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-black text-slate-950">
+                          {check.name}
+                        </p>
+                        <p className="truncate text-xs font-bold text-slate-500">
+                          {check.email}
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <StatusBadge status={check.status} />
+                          <span className="text-xs font-bold text-slate-500">
+                            {formatDate(check.date)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState
+                  title="No pending checks"
+                  detail="Pending Guru trust and safety checks will show here."
+                />
+              )}
+            </div>
+          </DashboardCard>
+        </div>
+      </section>
+
+      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-7">
+          <DashboardCard>
             <div className="mb-5">
               <h2 className="text-lg font-black text-slate-950">
-                HR Quick Actions
+                Hiring Command Notes
               </h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                Keep hiring-related work out of the main dashboard and manage it
+                Use HR as the main command center for applicant intake,
+                ambassador recruiting, contractor readiness, Guru onboarding,
+                and retained records.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <InfoTile
+                icon={<ClipboardList size={18} />}
+                title="Ambassador intake"
+                detail="Use Ambassador Leads for applications and use Ambassador Dashboards for referral codes, tracking, and individual dashboard access."
+              />
+              <InfoTile
+                icon={<BriefcaseBusiness size={18} />}
+                title="Contractor records"
+                detail="Keep early referral candidates separate from fully approved active Ambassadors until terms and training are complete."
+              />
+              <InfoTile
+                icon={<ShieldCheck size={18} />}
+                title="Trust & Safety"
+                detail="Screening and compliance records should stay visible here before any Guru activation."
+              />
+              <InfoTile
+                icon={<Archive size={18} />}
+                title="Retention"
+                detail="Use archive for declined or closed applicants so records are retained without cluttering active recruiting."
+              />
+            </div>
+          </DashboardCard>
+        </div>
+
+        <div className="min-w-0 xl:col-span-5">
+          <DashboardCard>
+            <div className="mb-5">
+              <h2 className="text-lg font-black text-slate-950">
+                Quick Actions
+              </h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                Jump to the most common HR and onboarding workflows directly
                 from this Human Resources area.
               </p>
             </div>
@@ -980,6 +1171,12 @@ export default async function HumanResourcesPage() {
                 icon={<UserPlus size={18} />}
                 title="Add or review ambassador leads"
                 detail="Indeed, PA CareerLink, Student Hire, Community Hire, and Military Hire."
+              />
+              <QuickAction
+                href={adminRoutes.ambassadors}
+                icon={<ClipboardCheck size={18} />}
+                title="Open Student Ambassador dashboards"
+                detail="View referral codes, dashboard records, signup links, and early referral tracking."
               />
               <QuickAction
                 href={adminRoutes.ambassadorLeads}
@@ -1079,15 +1276,14 @@ function HrFeatureCard({
         <span className="text-3xl font-black text-green-950">{value}</span>
       </div>
 
-      <h2 className="text-base font-black text-slate-950 sm:text-lg">
+      <h2 className="text-2xl font-black tracking-tight text-slate-950">
         {title}
       </h2>
-      <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
         {detail}
       </p>
-
-      <p className="mt-4 text-sm font-black text-green-800">
-        {action} <span className="transition group-hover:translate-x-1">→</span>
+      <p className="mt-3 text-sm font-black text-green-900 group-hover:text-green-700">
+        {action} →
       </p>
     </Link>
   );
@@ -1104,32 +1300,29 @@ function ProgramRow({
   title: string;
   detail: string;
   value: string;
-  subvalue?: string;
+  subvalue: string;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
-          {icon}
+    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <p className="font-black text-slate-950">{title}</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              {detail}
+            </p>
+          </div>
         </div>
 
-        <div className="min-w-0">
-          <p className="text-sm font-black text-slate-950">{title}</p>
-          <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-            {detail}
+        <div className="text-right">
+          <p className="text-2xl font-black text-green-950">{value}</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+            {subvalue}
           </p>
         </div>
-      </div>
-
-      <div className="shrink-0 text-right">
-        <span className="block text-xl font-black text-green-950">
-          {value}
-        </span>
-        {subvalue ? (
-          <span className="mt-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-            {subvalue}
-          </span>
-        ) : null}
       </div>
     </div>
   );
@@ -1264,47 +1457,26 @@ function ProgramBadge({ program }: { program: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const value = status.toLowerCase();
-
-  const label =
-    value === "archived" || value === "archive"
-      ? "Archived"
-      : value === "approved" || value === "active"
-        ? "Approved"
-        : value === "converted" ||
-            value === "signed_up" ||
-            value === "signup" ||
-            value === "onboarding_sent"
-          ? "Signed Up"
-          : value === "contacted" || value === "conditional_offer_sent"
-            ? "Contacted"
-            : value === "interested"
-              ? "Interested"
-              : value === "declined" ||
-                  value === "rejected" ||
-                  value === "not_a_fit" ||
-                  value === "not_moving_forward"
-                ? "Not Moving"
-                : "New";
-
   const styles =
-    label === "Archived"
-      ? "bg-red-100 text-red-700"
-      : label === "Approved"
-        ? "bg-green-100 text-green-800"
-        : label === "Signed Up"
-          ? "bg-emerald-100 text-emerald-800"
-          : label === "Contacted"
-            ? "bg-blue-100 text-blue-800"
-            : label === "Interested"
-              ? "bg-amber-100 text-amber-800"
-              : label === "Not Moving"
-                ? "bg-slate-100 text-slate-600"
+    status === "Approved"
+      ? "bg-green-100 text-green-800"
+      : status === "Signed Up"
+        ? "bg-emerald-100 text-emerald-800"
+        : status === "Contacted"
+          ? "bg-blue-100 text-blue-800"
+          : status === "Interested"
+            ? "bg-amber-100 text-amber-800"
+            : status === "Not Moving Forward"
+              ? "bg-slate-100 text-slate-600"
+              : status === "Archived"
+                ? "bg-red-100 text-red-700"
                 : "bg-orange-100 text-orange-800";
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}>
-      {label}
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}
+    >
+      {status}
     </span>
   );
 }
@@ -1335,7 +1507,7 @@ function EmptyTableRow({
 }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="py-10">
+      <td colSpan={colSpan} className="py-8">
         <EmptyState title={title} detail={detail} />
       </td>
     </tr>
@@ -1344,10 +1516,31 @@ function EmptyTableRow({
 
 function EmptyState({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-6 text-center sm:p-8">
-      <ClipboardCheck className="mx-auto mb-3 text-green-700" size={32} />
-      <h3 className="text-lg font-black text-green-950">{title}</h3>
-      <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-green-900/70">
+    <div className="rounded-2xl border border-dashed border-green-200 bg-green-50/60 p-6 text-center">
+      <p className="font-black text-green-950">{title}</p>
+      <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-green-900/70">
+        {detail}
+      </p>
+    </div>
+  );
+}
+
+function InfoTile({
+  icon,
+  title,
+  detail,
+}: {
+  icon: ReactNode;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+        {icon}
+      </div>
+      <p className="font-black text-slate-950">{title}</p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
         {detail}
       </p>
     </div>
@@ -1368,17 +1561,20 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="group flex min-w-0 items-start gap-3 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
+      className="group rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 transition hover:border-green-200 hover:bg-green-50"
     >
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800 transition group-hover:bg-green-800 group-hover:text-white">
-        {icon}
-      </div>
-
-      <div className="min-w-0">
-        <p className="text-sm font-black text-slate-950">{title}</p>
-        <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-          {detail}
-        </p>
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-green-800 shadow-sm">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="font-black text-slate-950 group-hover:text-green-950">
+            {title}
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+            {detail}
+          </p>
+        </div>
       </div>
     </Link>
   );
