@@ -104,6 +104,7 @@ const statusOrder = [
 const sourceOrder = [
   "PA CareerLink",
   "Indeed",
+  "ZipRecruiter",
   "Handshake",
   "LinkedIn",
   "College / University",
@@ -648,6 +649,9 @@ function getSourceLabel(row: AnyRow) {
     return "PA CareerLink";
   }
   if (text.includes("indeed")) return "Indeed";
+  if (text.includes("ziprecruiter") || text.includes("zip recruiter")) {
+    return "ZipRecruiter";
+  }
   if (text.includes("handshake")) return "Handshake";
   if (text.includes("linkedin") || text.includes("linked in")) return "LinkedIn";
   if (
@@ -1495,7 +1499,7 @@ export default async function AmbassadorLeadsPage({
 
           <p className="mt-2 max-w-4xl text-base font-semibold leading-7 text-slate-600">
             Track Student Hire, Community Hire, and Military Hire ambassador
-            applicants from Indeed, PA CareerLink, social media, referrals,
+            applicants from Indeed, ZipRecruiter, PA CareerLink, social media, referrals,
             events, and website interest forms.
           </p>
         </div>
@@ -1605,7 +1609,7 @@ export default async function AmbassadorLeadsPage({
               </h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
                 Add hiring-focused ambassador applicants from PA CareerLink,
-                Indeed, Handshake, LinkedIn, schools, military organizations,
+                Indeed, ZipRecruiter, Handshake, LinkedIn, schools, military organizations,
                 referrals, and the SitGuru website.
               </p>
             </div>
@@ -1751,7 +1755,7 @@ export default async function AmbassadorLeadsPage({
               <FormField label="Notes">
                 <textarea
                   name="notes"
-                  placeholder="Example: Applied through Indeed for Student Ambassador posting."
+                  placeholder="Example: Applied through ZipRecruiter for Student Ambassador posting."
                   rows={4}
                   className="w-full resize-none rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
                 />
@@ -2077,8 +2081,8 @@ export default async function AmbassadorLeadsPage({
         <DashboardCard>
           <ActionCard
             icon={<BriefcaseBusiness size={20} />}
-            title="Indeed / PA CareerLink Workflow"
-            detail="Use this page to enter applicants after Indeed, PA CareerLink, referral, or website leads come in."
+            title="Indeed / ZipRecruiter / PA CareerLink Workflow"
+            detail="Use this page to enter applicants after Indeed, ZipRecruiter, PA CareerLink, referral, or website leads come in."
             href={adminRoutes.ambassadorLeads}
             action="Stay here"
           />
