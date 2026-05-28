@@ -1,29 +1,32 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
-  AlertTriangle,
+  Archive,
   ArrowLeft,
+  BriefcaseBusiness,
   CalendarDays,
   CheckCircle2,
-  CircleDollarSign,
-  Download,
-  Globe2,
+  ClipboardList,
+  ExternalLink,
+  FileText,
+  GraduationCap,
   Mail,
   MapPin,
-  Megaphone,
-  MousePointerClick,
-  PawPrint,
-  Repeat2,
+  MessageCircle,
+  Phone,
+  Plus,
+  RotateCcw,
   Search,
-  Share2,
   ShieldCheck,
+  Sparkles,
+  Star,
   Trash2,
-  TrendingUp,
   UserCheck,
-  UserRound,
   Users,
 } from "lucide-react";
-import { supabaseAdmin } from "@/utils/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -34,244 +37,238 @@ type SafeAdminQueryResponse = {
   error: unknown;
 };
 
-type ProfileRow = {
-  id: string;
+type AuthUserRow = {
+  id?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  email_confirmed_at?: string | null;
+  phone_confirmed_at?: string | null;
+  confirmed_at?: string | null;
+  created_at?: string | null;
+  last_sign_in_at?: string | null;
+  user_metadata?: AnyRow | null;
+  raw_user_meta_data?: AnyRow | null;
+};
+
+type AmbassadorRow = {
+  id?: string | null;
+  user_id?: string | null;
   full_name?: string | null;
   display_name?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
+  contact_email?: string | null;
+  login_email?: string | null;
   phone?: string | null;
-  phone_number?: string | null;
-  mobile_phone?: string | null;
-  email_confirmed_at?: string | null;
-  phone_confirmed_at?: string | null;
-  confirmed_at?: string | null;
-  role?: string | null;
-  user_role?: string | null;
-  account_type?: string | null;
-  type?: string | null;
-  avatar_url?: string | null;
-  city?: string | null;
-  state?: string | null;
-  country?: string | null;
-  zip?: string | null;
-  zipcode?: string | null;
-  zip_code?: string | null;
-  postal_code?: string | null;
-  source?: string | null;
-  signup_source?: string | null;
-  referral_source?: string | null;
-  lead_source?: string | null;
-  acquisition_source?: string | null;
-  utm_source?: string | null;
-  utm_medium?: string | null;
-  utm_campaign?: string | null;
-  campaign?: string | null;
-  campaign_name?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
-type BookingRow = {
-  id: string;
-  customer_id?: string | null;
-  pet_owner_id?: string | null;
-  client_id?: string | null;
-  user_id?: string | null;
-  pet_parent_id?: string | null;
-  customer_name?: string | null;
-  pet_parent_name?: string | null;
-  owner_name?: string | null;
-  customer_email?: string | null;
-  pet_name?: string | null;
-  status?: string | null;
-  booking_status?: string | null;
-  payment_status?: string | null;
-  booking_date?: string | null;
-  start_time?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  city?: string | null;
-  state?: string | null;
-  country?: string | null;
-  zip?: string | null;
-  zipcode?: string | null;
-  zip_code?: string | null;
-  postal_code?: string | null;
-  service_city?: string | null;
-  service_state?: string | null;
-  service_country?: string | null;
-  service_zip?: string | null;
-  service_zip_code?: string | null;
-  customer_city?: string | null;
-  customer_state?: string | null;
-  customer_country?: string | null;
-  customer_zip?: string | null;
-  customer_zip_code?: string | null;
-  customer_postal_code?: string | null;
-  source?: string | null;
-  signup_source?: string | null;
-  referral_source?: string | null;
-  lead_source?: string | null;
-  acquisition_source?: string | null;
-  utm_source?: string | null;
-  utm_medium?: string | null;
-  utm_campaign?: string | null;
-  campaign?: string | null;
-  campaign_name?: string | null;
-  amount?: number | string | null;
-  price?: number | string | null;
-  total_amount?: number | string | null;
-  booking_total?: number | string | null;
-  total_customer_paid?: number | string | null;
-  customer_total_amount?: number | string | null;
-};
-
-type PetRow = {
-  id: string;
-  owner_id?: string | null;
-  owner_profile_id?: string | null;
-  customer_id?: string | null;
-  user_id?: string | null;
-  pet_owner_id?: string | null;
-  pet_parent_id?: string | null;
-  name?: string | null;
-  pet_name?: string | null;
-  created_at?: string | null;
-};
-
-type MessageRow = {
-  id: string;
-  sender_id?: string | null;
-  recipient_id?: string | null;
-  customer_id?: string | null;
-  user_id?: string | null;
-  from_user_id?: string | null;
-  to_user_id?: string | null;
-  created_at?: string | null;
-  read_at?: string | null;
-  is_read?: boolean | null;
+  referral_code?: string | null;
   status?: string | null;
 };
 
-type SetupStep = {
-  label: string;
-  complete: boolean;
+type SearchParams =
+  | Promise<Record<string, string | string[] | undefined>>
+  | Record<string, string | string[] | undefined>;
+
+type AmbassadorLeadsPageProps = {
+  searchParams?: SearchParams;
 };
 
-type CustomerInsight = {
+type NormalizedLead = {
+  raw: AnyRow;
   id: string;
+  sourceTable: string;
   name: string;
   email: string;
-  avatarUrl: string;
+  phone: string;
+  program: string;
+  source: string;
+  status: string;
+  zipCode: string;
   city: string;
   state: string;
+  county: string;
   country: string;
-  zipCode: string;
-  phone: string;
-  source: string;
-  campaign: string;
-  bookingCount: number;
-  paidBookingCount: number;
-  completedBookingCount: number;
-  totalSpend: number;
-  averageBookingValue: number;
-  petCount: number;
-  messageCount: number;
-  lastBookingDate: string | null;
-  firstSeenDate: string | null;
-  segment: string;
-  hasVerifiedContact: boolean;
-  hasProfileInfo: boolean;
-  hasPhone: boolean;
-  hasLocation: boolean;
-  hasPet: boolean;
-  hasStartedBooking: boolean;
-  hasCompletedBooking: boolean;
-  setupSteps: SetupStep[];
-  setupPercent: number;
-  currentStep: string;
-  setupStatus: string;
-  needsReview: boolean;
-};
-
-type CleanupCustomerRecord = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  sourceTable: string;
-  issue: string;
-  reason: string;
-  bookingCount: number;
-  petCount: number;
-  messageCount: number;
-  totalSpend: number;
-  createdAt: string | null;
-  safeToDelete: boolean;
-};
-
-type LocationInsight = {
-  label: string;
-  customers: number;
-  bookings: number;
-  revenue: number;
-};
-
-type SourceInsight = {
-  label: string;
-  signups: number;
-  customers: number;
-  bookings: number;
-  revenue: number;
-};
-
-type CampaignInsight = {
-  label: string;
-  count: number;
-};
-
-type ChartItem = {
-  label: string;
-  value: number;
-  helper?: string;
+  location: string;
+  notes: string;
+  date: string | null;
+  lastContacted: string | null;
+  documents: {
+    resumeUrl: string;
+    resumeName: string;
+    coverLetterUrl: string;
+    coverLetterName: string;
+    otherDocumentUrl: string;
+    otherDocumentName: string;
+  };
 };
 
 const adminRoutes = {
   dashboard: "/admin",
-  bookings: "/admin/bookings",
-  customers: "/admin/customers",
-  customerIntelligence: "/admin/customer-intelligence",
-  customerExport: "/admin/customer-intelligence/export",
-  messages: "/admin/messages",
-  petAnalytics: "/admin/pet-analytics",
-  users: "/admin/users",
-  launchSignups: "/admin/launch-signups",
+  programs: "/admin/programs",
   referrals: "/admin/referrals",
   partners: "/admin/partners",
+  ambassadorLeads: "/admin/ambassador-leads",
 };
 
-const socialPlatforms = [
-  "Instagram",
-  "Facebook",
-  "TikTok",
-  "YouTube",
-  "LinkedIn",
-  "X / Twitter",
+const programOrder = ["Student Hire", "Community Hire", "Military Hire"];
+
+const statusOrder = [
+  "New",
+  "Contacted",
+  "Interested",
+  "Signed Up",
+  "Approved",
+  "Not Moving Forward",
+  "Archived",
 ];
 
-const chartColors = [
-  "#166534",
-  "#16a34a",
-  "#22c55e",
-  "#84cc16",
-  "#0f766e",
-  "#0ea5e9",
+const sourceOrder = [
+  "PA CareerLink",
+  "Indeed",
+  "Handshake",
+  "LinkedIn",
+  "College / University",
+  "Student Organization",
+  "Military / Veteran Organization",
+  "Referral",
+  "Website",
+  "Other",
+];
+
+const quickStatusActions = [
+  {
+    label: "Contacted",
+    value: "contacted",
+    tone:
+      "bg-blue-50 text-blue-800 ring-blue-100 hover:bg-blue-100 hover:text-blue-900",
+    icon: <MessageCircle size={13} />,
+  },
+  {
+    label: "Interested",
+    value: "interested",
+    tone:
+      "bg-amber-50 text-amber-800 ring-amber-100 hover:bg-amber-100 hover:text-amber-900",
+    icon: <Star size={13} />,
+  },
+  {
+    label: "Not Moving",
+    value: "not_moving_forward",
+    tone:
+      "bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200 hover:text-slate-900",
+    icon: <FileText size={13} />,
+  },
+  {
+    label: "Archive",
+    value: "archived",
+    tone:
+      "bg-red-50 text-red-700 ring-red-100 hover:bg-red-100 hover:text-red-800",
+    icon: <Archive size={13} />,
+  },
 ];
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getMetadataValue(metadata: unknown, keys: string[]) {
+  if (!metadata || typeof metadata !== "object") return "";
+
+  const row = metadata as AnyRow;
+
+  return getText(row, keys);
+}
+
+function getAuthMetadata(authUser?: AuthUserRow | null) {
+  return (
+    (authUser?.user_metadata as AnyRow | null | undefined) ||
+    (authUser?.raw_user_meta_data as AnyRow | null | undefined) ||
+    null
+  );
+}
+
+function getAuthDisplayName(authUser?: AuthUserRow | null) {
+  const metadata = getAuthMetadata(authUser);
+
+  const firstName = getMetadataValue(metadata, [
+    "first_name",
+    "firstName",
+    "given_name",
+    "givenName",
+  ]);
+  const lastName = getMetadataValue(metadata, [
+    "last_name",
+    "lastName",
+    "family_name",
+    "familyName",
+  ]);
+
+  if (firstName || lastName) return `${firstName} ${lastName}`.trim();
+
+  return getMetadataValue(metadata, [
+    "full_name",
+    "fullName",
+    "name",
+    "display_name",
+    "displayName",
+  ]);
+}
+
+function splitName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || "";
+  const lastName = parts.slice(1).join(" ");
+
+  return { firstName, lastName };
+}
+
+function isEmailLike(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function cleanEmailUsername(email: string) {
+  const username = email.split("@")[0] || "";
+  const cleaned = username
+    .replace(/[._+-]+/g, " ")
+    .replace(/\d+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) return "";
+
+  return cleaned
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function getAmbassadorDisplayName(ambassador?: AmbassadorRow | null) {
+  if (!ambassador) return "";
+
+  const firstName = asString(ambassador.first_name);
+  const lastName = asString(ambassador.last_name);
+
+  if (firstName || lastName) return `${firstName} ${lastName}`.trim();
+
+  return getText(ambassador as AnyRow, [
+    "full_name",
+    "display_name",
+    "name",
+  ]);
+}
+
+function formatPhoneForDisplay(value: string) {
+  let digits = value.replace(/\D/g, "");
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    digits = digits.slice(1);
+  }
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  return value.trim();
 }
 
 function asNumber(value: unknown) {
@@ -289,14 +286,6 @@ function number(value: number) {
   return new Intl.NumberFormat("en-US").format(
     Number.isFinite(value) ? value : 0,
   );
-}
-
-function money(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0);
 }
 
 function formatDate(value?: string | null) {
@@ -321,16 +310,135 @@ function getText(row: AnyRow, keys: string[], fallback = "") {
   return fallback;
 }
 
-function getAmount(row: AnyRow, keys: string[]) {
-  for (const key of keys) {
-    const value = asNumber(row[key]);
-    if (value > 0) return value;
-  }
-
-  return 0;
+function getDate(row: AnyRow) {
+  return (
+    asString(row.created_at) ||
+    asString(row.updated_at) ||
+    asString(row.applied_at) ||
+    asString(row.submitted_at) ||
+    asString(row.last_contacted_at) ||
+    asString(row.date) ||
+    null
+  );
 }
 
-function getDisplayName(row: AnyRow, fallback = "Pet Parent") {
+function getStatus(row: AnyRow) {
+  return getText(
+    row,
+    ["status", "lead_status", "application_status", "approval_status"],
+    "new",
+  ).toLowerCase();
+}
+
+function getReadableStatus(row: AnyRow) {
+  const status = getStatus(row);
+
+  if (status === "new") return "New";
+  if (status === "pending") return "New";
+  if (status === "submitted") return "New";
+  if (status === "review") return "New";
+  if (status === "in_review") return "New";
+  if (status === "conditional_offer_sent") return "Contacted";
+  if (status === "onboarding_sent") return "Contacted";
+  if (status === "contacted") return "Contacted";
+  if (status === "interested") return "Interested";
+  if (status === "signed_up") return "Signed Up";
+  if (status === "signup") return "Signed Up";
+  if (status === "converted") return "Signed Up";
+  if (status === "approved") return "Approved";
+  if (status === "active") return "Approved";
+  if (status === "not_moving_forward") return "Not Moving Forward";
+  if (status === "not_a_fit") return "Not Moving Forward";
+  if (status === "not_moving") return "Not Moving Forward";
+  if (status === "declined") return "Not Moving Forward";
+  if (status === "rejected") return "Not Moving Forward";
+  if (status === "inactive") return "Not Moving Forward";
+  if (status === "archived") return "Archived";
+
+  return (
+    status
+      .split("_")
+      .filter(Boolean)
+      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+      .join(" ") || "New"
+  );
+}
+
+function normalizeStatus(status: string) {
+  const value = status.toLowerCase().trim().replace(/\s+/g, "_");
+
+  if (value === "new") return "new";
+  if (value === "contacted") return "contacted";
+  if (value === "interested") return "interested";
+  if (value === "signed_up") return "signed_up";
+  if (value === "approved") return "approved";
+  if (value === "not_moving_forward") return "not_moving_forward";
+  if (value === "not_moving") return "not_moving_forward";
+  if (value === "declined") return "not_moving_forward";
+  if (value === "archived") return "archived";
+
+  return "new";
+}
+
+function mapLeadStatusToAmbassadorStatus(status: string) {
+  if (status === "not_moving_forward") return "not_a_fit";
+  if (status === "signed_up") return "onboarding_sent";
+  if (status === "approved") return "active";
+  if (status === "archived") return "archived";
+
+  return status;
+}
+
+function getPipelineActionNote(status: string, leadName: string) {
+  if (status === "contacted") {
+    return `Pipeline update: ${leadName} was marked contacted from the Ambassador Leads page.`;
+  }
+
+  if (status === "interested") {
+    return `Pipeline update: ${leadName} was marked interested from the Ambassador Leads page.`;
+  }
+
+  if (status === "not_moving_forward") {
+    return `Pipeline update: ${leadName} was marked not moving forward from the Ambassador Leads page. Retain applicant record for recordkeeping.`;
+  }
+
+  if (status === "archived") {
+    return `Archive update: ${leadName} was archived from the Ambassador Leads page. Retained for applicant recordkeeping. Do not continue outreach or onboarding unless restored.`;
+  }
+
+  return `Pipeline update: ${leadName} status changed to ${status}.`;
+}
+
+const deletableLeadTables = [
+  "ambassador_leads",
+  "ambassadors",
+  "partner_applications",
+  "network_partner_leads",
+  "network_program_participants",
+  "launch_signups",
+  "launch_waitlist",
+  "program_applications",
+] as const;
+
+function isDeletableLeadTable(
+  value: string,
+): value is (typeof deletableLeadTables)[number] {
+  return deletableLeadTables.includes(
+    value as (typeof deletableLeadTables)[number],
+  );
+}
+
+function withSourceTable(
+  row: AnyRow,
+  sourceTable: (typeof deletableLeadTables)[number],
+) {
+  return {
+    ...row,
+    __source_table: sourceTable,
+  };
+}
+
+function getDisplayName(row: AnyRow, fallback = "Ambassador Lead") {
   const firstName = getText(row, ["first_name", "firstName"]);
   const lastName = getText(row, ["last_name", "lastName"]);
 
@@ -342,345 +450,275 @@ function getDisplayName(row: AnyRow, fallback = "Pet Parent") {
       "full_name",
       "display_name",
       "name",
-      "customer_name",
-      "pet_parent_name",
-      "owner_name",
+      "lead_name",
+      "applicant_name",
+      "candidate_name",
+      "contact_name",
       "email",
     ],
     fallback,
   );
 }
 
-function getRole(row: AnyRow) {
+function getEmail(row: AnyRow) {
   return getText(
     row,
-    ["role", "user_role", "account_type", "type", "segment"],
-    "",
-  ).toLowerCase();
-}
-
-function isCustomerProfile(profile: ProfileRow) {
-  const role = getRole(profile as AnyRow);
-
-  if (!role) return true;
-
-  return (
-    role.includes("customer") ||
-    role.includes("parent") ||
-    role.includes("client") ||
-    role.includes("owner") ||
-    role.includes("both")
+    [
+      "email",
+      "lead_email",
+      "applicant_email",
+      "candidate_email",
+      "contact_email",
+    ],
+    "—",
   );
 }
 
 function getPhone(row: AnyRow) {
-  return getText(row, ["phone", "phone_number", "mobile_phone", "mobile"], "");
-}
-
-function hasVerifiedContact(row: AnyRow) {
-  return Boolean(
-    asString(row.email_confirmed_at) ||
-      asString(row.phone_confirmed_at) ||
-      asString(row.confirmed_at),
+  return getText(
+    row,
+    ["phone", "phone_number", "mobile", "lead_phone", "applicant_phone"],
+    "—",
   );
 }
 
-function hasProfileLocation(profile: ProfileRow) {
-  return Boolean(
-    getCity(profile as AnyRow) ||
-      getState(profile as AnyRow) ||
-      getZipCode(profile as AnyRow),
-  );
+function getZipCode(row: AnyRow) {
+  return getText(row, ["zip_code", "postal_code", "zip", "postcode"], "");
 }
 
-function getCleanupReason({
-  profile,
-  bookingCount,
-  petCount,
-  messageCount,
-  totalSpend,
+function getCity(row: AnyRow) {
+  return getText(row, ["city", "service_city", "location_city"], "");
+}
+
+function getState(row: AnyRow) {
+  return getText(row, ["state", "service_state", "location_state"], "");
+}
+
+function getCounty(row: AnyRow) {
+  return getText(row, ["county", "service_county", "location_county"], "");
+}
+
+function getCountry(row: AnyRow) {
+  return getText(row, ["country", "service_country", "location_country"], "");
+}
+
+function buildLocationDisplay({
+  city,
+  state,
+  zipCode,
+  county,
+  country,
+  fallback,
 }: {
-  profile?: ProfileRow | null;
-  bookingCount: number;
-  petCount: number;
-  messageCount: number;
-  totalSpend: number;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  county?: string;
+  country?: string;
+  fallback?: string;
 }) {
-  const reasons: string[] = [];
+  const cityStateZip = [city, state].filter(Boolean).join(", ");
+  const primary = [cityStateZip, zipCode].filter(Boolean).join(" ");
+  const secondary = [county, country].filter(Boolean).join(", ");
 
-  if (!profile) {
-    reasons.push("No matching profile row");
-  } else {
-    if (!asString(profile.email)) reasons.push("No email");
-    if (!getPhone(profile as AnyRow)) reasons.push("No phone");
-    if (!hasVerifiedContact(profile as AnyRow)) reasons.push("No verified contact");
-  }
+  if (primary && secondary) return `${primary} • ${secondary}`;
+  if (primary) return primary;
+  if (secondary) return secondary;
 
-  if (bookingCount === 0) reasons.push("0 bookings");
-  if (petCount === 0) reasons.push("0 pets");
-  if (messageCount === 0) reasons.push("0 messages");
-  if (totalSpend === 0) reasons.push("$0 spend");
-
-  return reasons.join(" · ");
+  return fallback || "—";
 }
 
-function getRowBoolean(row: AnyRow, keys: string[]) {
-  return keys.some((key) => {
-    const value = row[key];
+function getLocation(row: AnyRow) {
+  const city = getCity(row);
+  const state = getState(row);
+  const zipCode = getZipCode(row);
+  const county = getCounty(row);
+  const country = getCountry(row);
+  const location = getText(row, ["location", "market", "area"]);
 
-    if (typeof value === "boolean") return value;
-
-    if (typeof value === "number") return value === 1;
-
-    if (typeof value === "string") {
-      const normalized = value.trim().toLowerCase();
-      return ["true", "yes", "y", "1"].includes(normalized);
-    }
-
-    return false;
+  return buildLocationDisplay({
+    city,
+    state,
+    zipCode,
+    county,
+    country,
+    fallback: location,
   });
 }
 
-function getRowSearchText(row: AnyRow, keys: string[]) {
-  return keys
-    .map((key) => asString(row[key]))
+function getNotes(row: AnyRow) {
+  return getText(
+    row,
+    ["notes", "message", "interest", "comments", "description"],
+    "No notes yet.",
+  );
+}
+
+function getDocumentUrl(row: AnyRow, keys: string[]) {
+  const value = getText(row, keys);
+
+  if (!value) return "";
+
+  return value;
+}
+
+function getDocumentName(row: AnyRow, keys: string[], fallback: string) {
+  return getText(row, keys, fallback);
+}
+
+function getLeadDocuments(row: AnyRow) {
+  const resumeUrl = getDocumentUrl(row, [
+    "resume_file_url",
+    "resume_url",
+    "resume_link",
+    "resume",
+  ]);
+  const coverLetterUrl = getDocumentUrl(row, [
+    "cover_letter_file_url",
+    "cover_letter_url",
+    "cover_letter_link",
+    "cover_letter",
+  ]);
+  const otherDocumentUrl = getDocumentUrl(row, [
+    "other_document_file_url",
+    "other_document_url",
+    "supporting_document_url",
+    "supporting_documents_url",
+    "document_url",
+    "documents_url",
+  ]);
+
+  return {
+    resumeUrl,
+    resumeName: getDocumentName(
+      row,
+      ["resume_file_name", "resume_name"],
+      "Resume",
+    ),
+    coverLetterUrl,
+    coverLetterName: getDocumentName(
+      row,
+      ["cover_letter_file_name", "cover_letter_name"],
+      "Cover Letter",
+    ),
+    otherDocumentUrl,
+    otherDocumentName: getDocumentName(
+      row,
+      ["other_document_file_name", "other_document_name", "document_name"],
+      "Other Document",
+    ),
+  };
+}
+
+function getCombinedText(row: AnyRow) {
+  return [
+    getText(row, ["program", "program_name", "program_type"]),
+    getText(row, ["participant_type", "partner_type", "type", "role"]),
+    getText(row, ["source", "lead_source", "signup_source", "utm_source"]),
+    getText(row, ["campaign", "campaign_name", "utm_campaign"]),
+    getText(row, ["title", "name", "interest", "notes", "message"]),
+    getText(row, ["position", "job_title", "posting_title"]),
+  ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
 }
 
-function hasDemoKeyword(value: string) {
-  const normalized = value.toLowerCase();
-
-  return [
-    /\bdemo\b/,
-    /\bfake\b/,
-    /\btest\b/,
-    /\btester\b/,
-    /\bsample\b/,
-    /\bseed\b/,
-    /\bseeded\b/,
-    /\bdummy\b/,
-    /\bmock\b/,
-    /\bsandbox\b/,
-    /\bplaceholder\b/,
-    /\blorem\b/,
-  ].some((pattern) => pattern.test(normalized));
+function getParticipantType(row: AnyRow) {
+  return getText(
+    row,
+    ["participant_type", "partner_type", "program_type", "type", "role"],
+    "",
+  ).toLowerCase();
 }
 
-function isDemoEmail(value: string) {
-  const email = value.trim().toLowerCase();
-
-  if (!email) return false;
-
-  const domain = email.includes("@") ? email.split("@").pop() || "" : "";
-
-  return (
-    email.includes("+test@") ||
-    email.includes("+demo@") ||
-    email.includes("+fake@") ||
-    email.includes("demo+") ||
-    email.includes("test+") ||
-    [
-      "example.com",
-      "example.org",
-      "example.net",
-      "test.com",
-      "demo.com",
-      "fake.com",
-      "mailinator.com",
-      "localhost",
-    ].includes(domain)
+function getProgramLabel(row: AnyRow) {
+  const text = getCombinedText(row);
+  const explicitProgram = getText(
+    row,
+    ["program", "program_name", "program_type", "lead_program"],
+    "",
   );
-}
 
-function isDemoLikeRow(row: AnyRow) {
-  const deletedAt = asString(row.deleted_at || row.archived_at || row.removed_at);
-  if (deletedAt) return true;
+  if (programOrder.includes(explicitProgram)) return explicitProgram;
+
+  if (text.includes("student")) return "Student Hire";
+  if (text.includes("community")) return "Community Hire";
 
   if (
-    getRowBoolean(row, [
-      "is_demo",
-      "demo",
-      "is_test",
-      "test_account",
-      "is_fake",
-      "fake",
-      "sandbox",
-      "seeded",
-      "is_seed",
-      "sample",
-      "archived",
-      "is_archived",
-    ])
+    text.includes("military") ||
+    text.includes("veteran") ||
+    text.includes("active-duty") ||
+    text.includes("active duty") ||
+    text.includes("guard") ||
+    text.includes("reserve")
   ) {
-    return true;
+    return "Military Hire";
   }
 
-  const emailText = getRowSearchText(row, [
-    "email",
-    "customer_email",
-    "pet_parent_email",
-    "owner_email",
-    "sender_email",
-    "recipient_email",
-  ]);
-
-  if (emailText.split(/\s+/).some(isDemoEmail)) return true;
-
-  const identifierText = getRowSearchText(row, [
-    "id",
-    "user_id",
-    "customer_id",
-    "pet_owner_id",
-    "client_id",
-    "owner_id",
-    "sender_id",
-    "recipient_id",
-    "from_user_id",
-    "to_user_id",
-  ]);
-
-  if (hasDemoKeyword(identifierText)) return true;
-
-  const visibleText = getRowSearchText(row, [
-    "full_name",
-    "display_name",
-    "first_name",
-    "last_name",
-    "name",
-    "customer_name",
-    "pet_parent_name",
-    "owner_name",
-    "pet_name",
-    "source",
-    "signup_source",
-    "referral_source",
-    "lead_source",
-    "acquisition_source",
-    "utm_source",
-    "utm_medium",
-    "utm_campaign",
-    "campaign",
-    "campaign_name",
-    "notes",
-    "description",
-  ]);
-
-  return hasDemoKeyword(visibleText);
+  return "Community Hire";
 }
 
-function hasHiddenCustomerReference(row: AnyRow, hiddenCustomerIds: Set<string>) {
-  if (!hiddenCustomerIds.size) return false;
-
-  const possibleIds = [
-    row.id,
-    row.user_id,
-    row.customer_id,
-    row.pet_owner_id,
-    row.client_id,
-    row.pet_parent_id,
-    row.owner_id,
-    row.owner_profile_id,
-    row.sender_id,
-    row.recipient_id,
-    row.from_user_id,
-    row.to_user_id,
-  ]
-    .map((value) => asString(value))
-    .filter(Boolean);
-
-  return possibleIds.some((id) => hiddenCustomerIds.has(id));
-}
-
-function getCustomerId(booking: BookingRow) {
-  return (
-    booking.customer_id ||
-    booking.pet_owner_id ||
-    booking.pet_parent_id ||
-    booking.client_id ||
-    booking.user_id ||
-    null
+function getSourceLabel(row: AnyRow) {
+  const source = getText(
+    row,
+    ["source", "lead_source", "signup_source", "utm_source", "referral_source"],
+    "",
   );
+  const text = `${source} ${getCombinedText(row)}`.toLowerCase();
+
+  if (text.includes("careerlink") || text.includes("career link")) {
+    return "PA CareerLink";
+  }
+  if (text.includes("indeed")) return "Indeed";
+  if (text.includes("handshake")) return "Handshake";
+  if (text.includes("linkedin") || text.includes("linked in")) return "LinkedIn";
+  if (
+    text.includes("college") ||
+    text.includes("university") ||
+    text.includes("campus")
+  ) {
+    return "College / University";
+  }
+  if (
+    text.includes("student organization") ||
+    text.includes("student org") ||
+    text.includes("club") ||
+    text.includes("fraternity") ||
+    text.includes("sorority")
+  ) {
+    return "Student Organization";
+  }
+  if (
+    text.includes("military") ||
+    text.includes("veteran") ||
+    text.includes("active-duty") ||
+    text.includes("active duty") ||
+    text.includes("guard") ||
+    text.includes("reserve")
+  ) {
+    return "Military / Veteran Organization";
+  }
+  if (text.includes("referral")) return "Referral";
+  if (text.includes("website") || text.includes("site")) return "Website";
+
+  return source || "Other";
 }
 
-function getPetOwnerId(pet: PetRow) {
-  return (
-    pet.owner_profile_id ||
-    pet.owner_id ||
-    pet.customer_id ||
-    pet.pet_parent_id ||
-    pet.user_id ||
-    pet.pet_owner_id ||
-    null
-  );
-}
-
-function getBookingDate(booking: BookingRow) {
-  return (
-    booking.booking_date ||
-    booking.start_time ||
-    booking.created_at ||
-    booking.updated_at ||
-    null
-  );
-}
-
-function getBookingAmount(booking: BookingRow) {
-  return getAmount(booking as AnyRow, [
-    "total_customer_paid",
-    "customer_total_amount",
-    "total_amount",
-    "booking_total",
-    "amount",
-    "price",
-  ]);
-}
-
-function getBookingStatus(booking: BookingRow) {
-  return asString(booking.status || booking.booking_status).toLowerCase();
-}
-
-function getPaymentStatus(booking: BookingRow) {
-  return asString(booking.payment_status).toLowerCase();
-}
-
-function isPaidBooking(booking: BookingRow) {
-  const paymentStatus = getPaymentStatus(booking);
-  const bookingStatus = getBookingStatus(booking);
+function isAmbassadorLead(row: AnyRow) {
+  const text = getCombinedText(row);
+  const participantType = getParticipantType(row);
 
   return (
-    paymentStatus === "paid" ||
-    paymentStatus === "succeeded" ||
-    bookingStatus.includes("paid") ||
-    bookingStatus.includes("complete")
+    text.includes("ambassador") ||
+    text.includes("careerlink") ||
+    text.includes("career link") ||
+    text.includes("student hire") ||
+    text.includes("community hire") ||
+    text.includes("military hire") ||
+    text.includes("veteran") ||
+    participantType.includes("ambassador")
   );
-}
-
-function isCompletedBooking(booking: BookingRow) {
-  const status = getBookingStatus(booking);
-  return status.includes("complete") || status.includes("paid");
-}
-
-function isUnreadMessage(message: MessageRow) {
-  const readAt = asString(message.read_at);
-  const status = asString(message.status).toLowerCase();
-
-  if (message.is_read === false) return true;
-  if (!readAt && status !== "read" && status !== "archived") return true;
-
-  return false;
-}
-
-function getMessageParticipantIds(message: MessageRow) {
-  return [
-    message.sender_id,
-    message.recipient_id,
-    message.customer_id,
-    message.user_id,
-    message.from_user_id,
-    message.to_user_id,
-  ].filter(Boolean) as string[];
 }
 
 function isWithinLastDays(value: string | null, days: number) {
@@ -695,339 +733,6 @@ function isWithinLastDays(value: string | null, days: number) {
   return parsed >= cutoff;
 }
 
-function getMostRecentDate(values: Array<string | null>) {
-  const validDates = values
-    .filter(Boolean)
-    .map((value) => new Date(value as string))
-    .filter((date) => !Number.isNaN(date.getTime()))
-    .sort((a, b) => b.getTime() - a.getTime());
-
-  return validDates[0]?.toISOString() || null;
-}
-
-function getOldestDate(values: Array<string | null>) {
-  const validDates = values
-    .filter(Boolean)
-    .map((value) => new Date(value as string))
-    .filter((date) => !Number.isNaN(date.getTime()))
-    .sort((a, b) => a.getTime() - b.getTime());
-
-  return validDates[0]?.toISOString() || null;
-}
-
-function getCustomerSegment(customer: CustomerInsight) {
-  if (customer.totalSpend >= 1000 || customer.bookingCount >= 8) {
-    return "VIP";
-  }
-
-  if (customer.bookingCount >= 3) {
-    return "Repeat";
-  }
-
-  if (customer.bookingCount === 1) {
-    return "New";
-  }
-
-  return "Lead";
-}
-
-function getCity(row: AnyRow) {
-  return getText(row, ["city", "service_city", "customer_city"], "");
-}
-
-function getState(row: AnyRow) {
-  return getText(row, ["state", "service_state", "customer_state"], "");
-}
-
-function getCountry(row: AnyRow) {
-  return getText(row, ["country", "service_country", "customer_country"], "");
-}
-
-function getZipCode(row: AnyRow) {
-  return getText(
-    row,
-    [
-      "zip_code",
-      "zipcode",
-      "zip",
-      "postal_code",
-      "service_zip_code",
-      "service_zip",
-      "customer_zip_code",
-      "customer_zip",
-      "customer_postal_code",
-    ],
-    "",
-  );
-}
-
-function getSource(row: AnyRow) {
-  return getText(
-    row,
-    [
-      "utm_source",
-      "source",
-      "signup_source",
-      "referral_source",
-      "lead_source",
-      "acquisition_source",
-    ],
-    "Direct",
-  );
-}
-
-function getCampaign(row: AnyRow) {
-  return getText(
-    row,
-    [
-      "utm_campaign",
-      "campaign",
-      "campaign_name",
-      "source_campaign",
-      "referral_campaign",
-    ],
-    "",
-  );
-}
-
-function normalizeSource(value: string) {
-  const source = value.toLowerCase();
-
-  if (source.includes("instagram") || source === "ig") return "Instagram";
-  if (source.includes("facebook") || source.includes("meta")) return "Facebook";
-  if (source.includes("tiktok") || source.includes("tik tok")) return "TikTok";
-  if (source.includes("youtube")) return "YouTube";
-  if (source.includes("linkedin")) return "LinkedIn";
-  if (source === "x" || source.includes("twitter")) return "X / Twitter";
-  if (source.includes("google")) return "Google";
-  if (source.includes("referral") || source.includes("refer")) return "Referral";
-  if (source.includes("partner") || source.includes("affiliate")) return "Partner";
-  if (source.includes("email")) return "Email";
-  if (source.includes("direct") || !source) return "Direct";
-
-  return value;
-}
-
-function isSocialSource(value: string) {
-  return socialPlatforms.includes(normalizeSource(value));
-}
-
-function getPetParentSetup({
-  profile,
-  petCount,
-  bookingCount,
-  completedBookingCount,
-}: {
-  profile: ProfileRow;
-  petCount: number;
-  bookingCount: number;
-  completedBookingCount: number;
-}) {
-  const email = asString(profile.email);
-  const phone = getPhone(profile as AnyRow);
-  const hasName = getDisplayName(profile as AnyRow, "") !== "";
-  const hasEmail = Boolean(email);
-  const hasPhone = Boolean(phone);
-  const hasLocation = hasProfileLocation(profile);
-  const verified = hasVerifiedContact(profile as AnyRow);
-  const hasPet = petCount > 0;
-  const hasStartedBooking = bookingCount > 0;
-  const hasCompletedBooking = completedBookingCount > 0;
-  const hasProfileInfo = hasName && hasEmail;
-
-  const steps: SetupStep[] = [
-    {
-      label: "Account Created",
-      complete: Boolean(profile.id),
-    },
-    {
-      label: "Email / Google Verified",
-      complete: verified || hasEmail,
-    },
-    {
-      label: "Profile Info Added",
-      complete: hasProfileInfo,
-    },
-    {
-      label: "Phone Added",
-      complete: hasPhone,
-    },
-    {
-      label: "Location Added",
-      complete: hasLocation,
-    },
-    {
-      label: "Pet Added",
-      complete: hasPet,
-    },
-    {
-      label: "First Booking Started",
-      complete: hasStartedBooking,
-    },
-    {
-      label: "First Booking Completed",
-      complete: hasCompletedBooking,
-    },
-  ];
-
-  const completedSteps = steps.filter((step) => step.complete).length;
-  const setupPercent = Math.round((completedSteps / steps.length) * 100);
-  const nextStep = steps.find((step) => !step.complete);
-
-  let setupStatus = "New Signup";
-
-  if (hasCompletedBooking) {
-    setupStatus = "Active Pet Parent";
-  } else if (hasStartedBooking) {
-    setupStatus = "Booking Started";
-  } else if (hasProfileInfo && hasPhone && hasLocation && hasPet) {
-    setupStatus = "Ready to Book";
-  } else if (!hasProfileInfo) {
-    setupStatus = "Needs Profile Info";
-  } else if (!hasPhone) {
-    setupStatus = "Needs Phone";
-  } else if (!hasLocation) {
-    setupStatus = "Needs Location";
-  } else if (!hasPet) {
-    setupStatus = "Needs Pet Added";
-  }
-
-  const needsReview =
-    !hasEmail ||
-    !hasProfileInfo ||
-    !hasPhone ||
-    !hasLocation ||
-    !hasPet;
-
-  return {
-    hasVerifiedContact: verified,
-    hasProfileInfo,
-    hasPhone,
-    hasLocation,
-    hasPet,
-    hasStartedBooking,
-    hasCompletedBooking,
-    setupSteps: steps,
-    setupPercent,
-    currentStep: nextStep?.label || "Complete",
-    setupStatus,
-    needsReview,
-  };
-}
-
-function buildLocationInsights(
-  customers: CustomerInsight[],
-  key: "zipCode" | "city" | "state" | "country",
-) {
-  const locationMap = new Map<string, LocationInsight>();
-
-  for (const customer of customers) {
-    const label = customer[key] || "Unknown";
-
-    const existing =
-      locationMap.get(label) ||
-      {
-        label,
-        customers: 0,
-        bookings: 0,
-        revenue: 0,
-      };
-
-    existing.customers += 1;
-    existing.bookings += customer.bookingCount;
-    existing.revenue += customer.totalSpend;
-
-    locationMap.set(label, existing);
-  }
-
-  return Array.from(locationMap.values())
-    .sort((a, b) => b.revenue - a.revenue || b.customers - a.customers)
-    .slice(0, 5);
-}
-
-function buildSourceInsights(
-  customers: CustomerInsight[],
-  signupRows: AnyRow[],
-  conversionRows: AnyRow[],
-) {
-  const sourceMap = new Map<string, SourceInsight>();
-
-  function ensure(label: string) {
-    const normalized = normalizeSource(label || "Direct");
-
-    if (!sourceMap.has(normalized)) {
-      sourceMap.set(normalized, {
-        label: normalized,
-        signups: 0,
-        customers: 0,
-        bookings: 0,
-        revenue: 0,
-      });
-    }
-
-    return sourceMap.get(normalized)!;
-  }
-
-  for (const signup of signupRows) {
-    const row = ensure(getSource(signup));
-    row.signups += 1;
-  }
-
-  for (const customer of customers) {
-    const row = ensure(customer.source);
-    row.customers += 1;
-    row.bookings += customer.bookingCount;
-    row.revenue += customer.totalSpend;
-  }
-
-  for (const conversion of conversionRows) {
-    const row = ensure(getSource(conversion));
-    row.customers += 1;
-  }
-
-  return Array.from(sourceMap.values())
-    .sort((a, b) => b.revenue - a.revenue || b.customers - a.customers)
-    .slice(0, 8);
-}
-
-function buildCampaignInsights(rows: AnyRow[]) {
-  const campaignMap = new Map<string, CampaignInsight>();
-
-  for (const row of rows) {
-    const label = getCampaign(row) || "Untracked Campaign";
-
-    const existing =
-      campaignMap.get(label) ||
-      {
-        label,
-        count: 0,
-      };
-
-    existing.count += 1;
-    campaignMap.set(label, existing);
-  }
-
-  return Array.from(campaignMap.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-}
-
-function toChartItemsFromLocations(rows: LocationInsight[]) {
-  return rows.map((row) => ({
-    label: row.label,
-    value: row.revenue,
-    helper: `${number(row.customers)} Pet Parents · ${number(row.bookings)} bookings`,
-  }));
-}
-
-function toChartItemsFromSources(rows: SourceInsight[]) {
-  return rows.map((row) => ({
-    label: row.label,
-    value: row.revenue,
-    helper: `${number(row.customers)} Pet Parents · ${number(row.signups)} signups`,
-  }));
-}
-
 async function safeAdminQuery(
   query: PromiseLike<SafeAdminQueryResponse>,
   label: string,
@@ -1036,64 +741,418 @@ async function safeAdminQuery(
     const result = await query;
 
     if (result.error) {
-      console.warn(
-        `Admin Pet Parents query skipped for ${label}:`,
-        result.error,
-      );
+      console.warn(`Ambassador leads query skipped for ${label}:`, result.error);
       return { data: [], error: null };
     }
 
     return result;
   } catch (error) {
-    console.warn(`Admin Pet Parents query skipped for ${label}:`, error);
+    console.warn(`Ambassador leads query skipped for ${label}:`, error);
     return { data: [], error: null };
   }
 }
 
-async function getPetParentsData() {
+function mergeRows(...groups: AnyRow[][]) {
+  const merged: AnyRow[] = [];
+  const seen = new Set<string>();
+
+  for (const group of groups) {
+    for (const row of group) {
+      const sourceTable = getText(row, ["__source_table"], "unknown");
+      const id = getText(row, ["id"]);
+      const fallbackKey = `${sourceTable}:${getEmail(row)}:${getDisplayName(
+        row,
+      )}:${getDate(row)}:${merged.length}`;
+      const key = id ? `${sourceTable}:${id}` : fallbackKey;
+
+      if (seen.has(key)) continue;
+
+      seen.add(key);
+      merged.push(row);
+    }
+  }
+
+  return merged;
+}
+
+function formatPhoneForStorage(value: string) {
+  const digits = value.replace(/\D/g, "").slice(-10);
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  return value;
+}
+
+async function createAmbassadorLead(formData: FormData) {
+  "use server";
+
+  const fullName = asString(formData.get("full_name"));
+  const email = asString(formData.get("email"));
+  const phone = formatPhoneForStorage(asString(formData.get("phone")));
+  const program = asString(formData.get("program"));
+  const source = asString(formData.get("source"));
+  const status = normalizeStatus(asString(formData.get("status")));
+  const zipCode = asString(formData.get("zip_code"));
+  const city = asString(formData.get("city"));
+  const state = asString(formData.get("state")).toUpperCase();
+  const county = asString(formData.get("county"));
+  const country = asString(formData.get("country")) || "United States";
+  const location = buildLocationDisplay({
+    city,
+    state,
+    zipCode,
+    county,
+    country,
+  });
+  const notes = asString(formData.get("notes"));
+  const resumeFileUrl = asString(formData.get("resume_file_url"));
+  const resumeFileName = asString(formData.get("resume_file_name"));
+  const coverLetterFileUrl = asString(formData.get("cover_letter_file_url"));
+  const coverLetterFileName = asString(formData.get("cover_letter_file_name"));
+  const otherDocumentFileUrl = asString(formData.get("other_document_file_url"));
+  const otherDocumentFileName = asString(
+    formData.get("other_document_file_name"),
+  );
+
+  if (!fullName && !email && !phone) {
+    redirect(`${adminRoutes.ambassadorLeads}?created=missing`);
+  }
+
+  const { error } = await supabaseAdmin.from("ambassador_leads").insert({
+    full_name: fullName || null,
+    email: email || null,
+    phone: phone || null,
+    program,
+    source,
+    status,
+    location: location === "—" ? null : location,
+    zip_code: zipCode || null,
+    city: city || null,
+    state: state || null,
+    county: county || null,
+    country: country || null,
+    notes: notes || null,
+    resume_file_url: resumeFileUrl || null,
+    resume_file_name: resumeFileName || null,
+    cover_letter_file_url: coverLetterFileUrl || null,
+    cover_letter_file_name: coverLetterFileName || null,
+    other_document_file_url: otherDocumentFileUrl || null,
+    other_document_file_name: otherDocumentFileName || null,
+    archived_at: status === "archived" ? new Date().toISOString() : null,
+    archived_reason:
+      status === "archived"
+        ? "Lead was created directly into archived status."
+        : null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    console.warn("Unable to create ambassador lead:", error);
+    redirect(`${adminRoutes.ambassadorLeads}?created=error`);
+  }
+
+  redirect(`${adminRoutes.ambassadorLeads}?created=success`);
+}
+
+async function updateAmbassadorLead(formData: FormData) {
+  "use server";
+
+  const leadId = asString(formData.get("lead_id"));
+  const fullName = asString(formData.get("full_name"));
+  const email = asString(formData.get("email"));
+  const phone = formatPhoneForStorage(asString(formData.get("phone")));
+  const program = asString(formData.get("program"));
+  const source = asString(formData.get("source"));
+  const status = normalizeStatus(asString(formData.get("status")));
+  const zipCode = asString(formData.get("zip_code"));
+  const city = asString(formData.get("city"));
+  const state = asString(formData.get("state")).toUpperCase();
+  const county = asString(formData.get("county"));
+  const country = asString(formData.get("country")) || "United States";
+  const location = buildLocationDisplay({
+    city,
+    state,
+    zipCode,
+    county,
+    country,
+  });
+  const notes = asString(formData.get("notes"));
+  const resumeFileUrl = asString(formData.get("resume_file_url"));
+  const resumeFileName = asString(formData.get("resume_file_name"));
+  const coverLetterFileUrl = asString(formData.get("cover_letter_file_url"));
+  const coverLetterFileName = asString(formData.get("cover_letter_file_name"));
+  const otherDocumentFileUrl = asString(formData.get("other_document_file_url"));
+  const otherDocumentFileName = asString(
+    formData.get("other_document_file_name"),
+  );
+
+  if (!leadId) {
+    redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
+  }
+
+  const statusPatch =
+    status === "archived"
+      ? {
+          archived_at: new Date().toISOString(),
+          archived_reason:
+            "Lead archived from the Ambassador Leads edit form.",
+        }
+      : {
+          archived_at: null,
+          archived_reason: null,
+        };
+
+  const { error } = await supabaseAdmin
+    .from("ambassador_leads")
+    .update({
+      full_name: fullName || null,
+      email: email || null,
+      phone: phone || null,
+      program,
+      source,
+      status,
+      location: location === "—" ? null : location,
+      zip_code: zipCode || null,
+      city: city || null,
+      state: state || null,
+      county: county || null,
+      country: country || null,
+      notes: notes || null,
+      resume_file_url: resumeFileUrl || null,
+      resume_file_name: resumeFileName || null,
+      cover_letter_file_url: coverLetterFileUrl || null,
+      cover_letter_file_name: coverLetterFileName || null,
+      other_document_file_url: otherDocumentFileUrl || null,
+      other_document_file_name: otherDocumentFileName || null,
+      ...statusPatch,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", leadId);
+
+  if (error) {
+    console.warn("Unable to update ambassador lead:", error);
+    redirect(`${adminRoutes.ambassadorLeads}?updated=error`);
+  }
+
+  redirect(`${adminRoutes.ambassadorLeads}?updated=success`);
+}
+
+async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
+  "use server";
+
+  const leadId = asString(formData.get("lead_id"));
+  const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
+  const nextStatus = normalizeStatus(asString(formData.get("next_status")));
+
+  if (!leadId || !isDeletableLeadTable(sourceTable)) {
+    redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
+  }
+
+  const { data: existingLead, error: fetchError } = await supabaseAdmin
+    .from(sourceTable)
+    .select("*")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (fetchError || !existingLead) {
+    console.warn("Unable to find ambassador lead for status update:", fetchError);
+    redirect(`${adminRoutes.ambassadorLeads}?updated=error`);
+  }
+
+  const leadRow = existingLead as AnyRow;
+  const leadName = getDisplayName(leadRow, "Ambassador Lead");
+  const email = getEmail(leadRow);
+  const referralCode = getText(leadRow, ["referral_code"]);
+  const now = new Date().toISOString();
+  const actionNote = getPipelineActionNote(nextStatus, leadName);
+
+  const leadPatch =
+    nextStatus === "archived"
+      ? {
+          status: nextStatus,
+          notes: concatNote(getNotes(leadRow), actionNote),
+          archived_at: now,
+          archived_reason:
+            "Archived from Ambassador Leads quick action. Retained for applicant recordkeeping.",
+          updated_at: now,
+        }
+      : {
+          status: nextStatus,
+          notes: concatNote(getNotes(leadRow), actionNote),
+          archived_at: null,
+          archived_reason: null,
+          updated_at: now,
+        };
+
+  const { error: leadUpdateError } = await supabaseAdmin
+    .from(sourceTable)
+    .update(leadPatch)
+    .eq("id", leadId);
+
+  if (leadUpdateError) {
+    console.warn("Unable to update ambassador lead status:", leadUpdateError);
+    redirect(`${adminRoutes.ambassadorLeads}?updated=error`);
+  }
+
+  const ambassadorStatus = mapLeadStatusToAmbassadorStatus(nextStatus);
+  const ambassadorPatch =
+    ambassadorStatus === "archived"
+      ? {
+          status: ambassadorStatus,
+          notes: concatNote(getNotes(leadRow), actionNote),
+          archived_at: now,
+          archived_reason:
+            "Archived from Ambassador Leads quick action. Retained for applicant recordkeeping.",
+          updated_at: now,
+        }
+      : {
+          status: ambassadorStatus,
+          notes: concatNote(getNotes(leadRow), actionNote),
+          archived_at: null,
+          archived_reason: null,
+          updated_at: now,
+        };
+
+  const orFilters = [
+    `lead_id.eq.${leadId}`,
+    referralCode ? `referral_code.eq.${referralCode}` : "",
+    email && email !== "—" ? `email.eq.${email}` : "",
+    leadName ? `full_name.eq.${leadName}` : "",
+  ]
+    .filter(Boolean)
+    .join(",");
+
+  if (orFilters) {
+    const { error: ambassadorUpdateError } = await supabaseAdmin
+      .from("ambassadors")
+      .update(ambassadorPatch)
+      .or(orFilters);
+
+    if (ambassadorUpdateError) {
+      console.warn(
+        "Ambassador status mirror update skipped:",
+        ambassadorUpdateError,
+      );
+    }
+  }
+
+  redirect(`${adminRoutes.ambassadorLeads}?updated=success`);
+}
+
+function concatNote(existingNotes: string, note: string) {
+  const cleanExisting = existingNotes === "No notes yet." ? "" : existingNotes;
+
+  return [cleanExisting, note].filter(Boolean).join("\n\n");
+}
+
+async function deleteAmbassadorLead(formData: FormData) {
+  "use server";
+
+  const leadId = asString(formData.get("lead_id"));
+  const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
+  const leadName = asString(formData.get("lead_name"));
+
+  if (!leadId || !isDeletableLeadTable(sourceTable)) {
+    redirect(`${adminRoutes.ambassadorLeads}?deleted=missing`);
+  }
+
+  const { data: existingLead, error: fetchError } = await supabaseAdmin
+    .from(sourceTable)
+    .select("*")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (fetchError || !existingLead) {
+    console.warn("Unable to find ambassador lead before archive:", fetchError);
+    redirect(`${adminRoutes.ambassadorLeads}?deleted=error`);
+  }
+
+  const archivedAt = new Date().toISOString();
+
+  const { error: archiveError } = await supabaseAdmin
+    .from("ambassador_leads_archive")
+    .insert({
+      source_table: sourceTable,
+      source_id: leadId,
+      full_name: getDisplayName(
+        existingLead as AnyRow,
+        leadName || "Ambassador Lead",
+      ),
+      email: getEmail(existingLead as AnyRow),
+      phone: getPhone(existingLead as AnyRow),
+      program: getProgramLabel(existingLead as AnyRow),
+      source: getSourceLabel(existingLead as AnyRow),
+      status: getReadableStatus(existingLead as AnyRow),
+      location: getLocation(existingLead as AnyRow),
+      notes: getNotes(existingLead as AnyRow),
+      archived_payload: existingLead,
+      archived_reason: "Deleted from Ambassador Leads pipeline",
+      archived_at: archivedAt,
+      created_at: archivedAt,
+    });
+
+  if (archiveError) {
+    console.warn("Unable to archive ambassador lead before delete:", archiveError);
+    redirect(`${adminRoutes.ambassadorLeads}?deleted=archive_error`);
+  }
+
+  const { error: deleteError } = await supabaseAdmin
+    .from(sourceTable)
+    .delete()
+    .eq("id", leadId);
+
+  if (deleteError) {
+    console.warn("Unable to delete ambassador lead after archive:", deleteError);
+    redirect(`${adminRoutes.ambassadorLeads}?deleted=error`);
+  }
+
+  redirect(`${adminRoutes.ambassadorLeads}?deleted=success`);
+}
+
+async function getAmbassadorLeadData() {
   const [
-    profilesResult,
-    bookingsResult,
-    petsResult,
-    messagesResult,
+    ambassadorLeadsResult,
+    partnerApplicationsResult,
+    networkPartnerLeadsResult,
+    networkParticipantsResult,
     launchSignupsResult,
     launchWaitlistResult,
-    referralClicksResult,
-    referralConversionsResult,
-    networkClicksResult,
-    partnerCampaignsResult,
+    programApplicationsResult,
   ] = await Promise.all([
     safeAdminQuery(
       supabaseAdmin
-        .from("profiles")
+        .from("ambassador_leads")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "profiles",
+      "ambassador_leads",
     ),
     safeAdminQuery(
       supabaseAdmin
-        .from("bookings")
+        .from("partner_applications")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "bookings",
+      "partner_applications",
     ),
     safeAdminQuery(
       supabaseAdmin
-        .from("pets")
+        .from("network_partner_leads")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "pets",
+      "network_partner_leads",
     ),
     safeAdminQuery(
       supabaseAdmin
-        .from("messages")
+        .from("network_program_participants")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "messages",
+      "network_program_participants",
     ),
     safeAdminQuery(
       supabaseAdmin
@@ -1113,1910 +1172,2043 @@ async function getPetParentsData() {
     ),
     safeAdminQuery(
       supabaseAdmin
-        .from("referral_clicks")
+        .from("program_applications")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
-      "referral_clicks",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("referral_conversions")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "referral_conversions",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("network_click_events")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "network_click_events",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("partner_campaigns")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "partner_campaigns",
+      "program_applications",
     ),
   ]);
 
-  const rawProfiles = ((profilesResult.data || []) as ProfileRow[]).filter(Boolean);
-  const rawBookings = ((bookingsResult.data || []) as BookingRow[]).filter(Boolean);
-  const rawPets = ((petsResult.data || []) as PetRow[]).filter(Boolean);
-  const rawMessages = ((messagesResult.data || []) as MessageRow[]).filter(Boolean);
-  const rawLaunchSignups = ((launchSignupsResult.data || []) as AnyRow[]).filter(Boolean);
-  const rawLaunchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).filter(Boolean);
-  const rawReferralClicks = ((referralClicksResult.data || []) as AnyRow[]).filter(Boolean);
-  const rawReferralConversions = ((referralConversionsResult.data || []) as AnyRow[]).filter(Boolean);
-  const rawNetworkClicks = ((networkClicksResult.data || []) as AnyRow[]).filter(Boolean);
-  const rawPartnerCampaigns = ((partnerCampaignsResult.data || []) as AnyRow[]).filter(Boolean);
-
-  const demoProfileIds = new Set(
-    rawProfiles
-      .filter((profile) => isDemoLikeRow(profile as AnyRow))
-      .map((profile) => profile.id)
-      .filter(Boolean),
+  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).filter(
+    Boolean,
   );
-
-  const profiles = rawProfiles.filter(
-    (profile) =>
-      Boolean(profile.id) &&
-      isCustomerProfile(profile) &&
-      !isDemoLikeRow(profile as AnyRow) &&
-      !demoProfileIds.has(profile.id),
+  const partnerApplications = (
+    (partnerApplicationsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
+  const networkPartnerLeads = (
+    (networkPartnerLeadsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
+  const networkParticipants = (
+    (networkParticipantsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
+  const launchSignups = ((launchSignupsResult.data || []) as AnyRow[]).filter(
+    Boolean,
   );
-
-  const profileIds = new Set(profiles.map((profile) => profile.id).filter(Boolean));
-
-  const profileIdsByEmail = new Map(
-    profiles
-      .map((profile) => [asString(profile.email).toLowerCase(), profile.id] as const)
-      .filter(([email, id]) => Boolean(email) && Boolean(id)),
+  const launchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).filter(
+    Boolean,
   );
+  const programApplications = (
+    (programApplicationsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
 
-  function getProfileBookingCustomerId(booking: BookingRow) {
-    const possibleIds = [
-      booking.customer_id,
-      booking.pet_owner_id,
-      booking.pet_parent_id,
-      booking.client_id,
-      booking.user_id,
-    ]
-      .map((value) => asString(value))
-      .filter(Boolean);
-
-    const matchedId = possibleIds.find((id) => profileIds.has(id));
-    if (matchedId) return matchedId;
-
-    const matchedEmail = profileIdsByEmail.get(
-      asString(booking.customer_email).toLowerCase(),
-    );
-
-    return matchedEmail || null;
-  }
-
-  function getProfilePetOwnerId(pet: PetRow) {
-    const possibleIds = [
-      pet.owner_profile_id,
-      pet.owner_id,
-      pet.customer_id,
-      pet.pet_parent_id,
-      pet.user_id,
-      pet.pet_owner_id,
-    ]
-      .map((value) => asString(value))
-      .filter(Boolean);
-
-    return possibleIds.find((id) => profileIds.has(id)) || null;
-  }
-
-  function hasProfileMessageParticipant(message: MessageRow) {
-    return getMessageParticipantIds(message).some((id) => profileIds.has(id));
-  }
-
-  const nonDemoBookings = rawBookings.filter(
-    (booking) =>
-      !isDemoLikeRow(booking as AnyRow) &&
-      !hasHiddenCustomerReference(booking as AnyRow, demoProfileIds),
-  );
-  const nonDemoPets = rawPets.filter(
-    (pet) =>
-      !isDemoLikeRow(pet as AnyRow) &&
-      !hasHiddenCustomerReference(pet as AnyRow, demoProfileIds),
-  );
-  const nonDemoMessages = rawMessages.filter(
-    (message) =>
-      !isDemoLikeRow(message as AnyRow) &&
-      !hasHiddenCustomerReference(message as AnyRow, demoProfileIds),
-  );
-
-  const bookings = nonDemoBookings.filter((booking) =>
-    Boolean(getProfileBookingCustomerId(booking)),
-  );
-  const pets = nonDemoPets.filter((pet) => Boolean(getProfilePetOwnerId(pet)));
-  const messages = nonDemoMessages.filter((message) =>
-    hasProfileMessageParticipant(message),
-  );
-
-  const bookingStatsByProfileId = new Map<
-    string,
-    {
-      bookingCount: number;
-      paidBookingCount: number;
-      completedBookingCount: number;
-      totalSpend: number;
-      lastBookingDate: string | null;
-      firstBookingDate: string | null;
-    }
-  >();
-
-  for (const booking of bookings) {
-    const customerId = getProfileBookingCustomerId(booking);
-    if (!customerId) continue;
-
-    const current =
-      bookingStatsByProfileId.get(customerId) || {
-        bookingCount: 0,
-        paidBookingCount: 0,
-        completedBookingCount: 0,
-        totalSpend: 0,
-        lastBookingDate: null,
-        firstBookingDate: null,
-      };
-
-    const bookingDate = getBookingDate(booking);
-
-    current.bookingCount += 1;
-    current.paidBookingCount += isPaidBooking(booking) ? 1 : 0;
-    current.completedBookingCount += isCompletedBooking(booking) ? 1 : 0;
-    current.totalSpend += getBookingAmount(booking);
-    current.lastBookingDate = getMostRecentDate([
-      current.lastBookingDate,
-      bookingDate,
-    ]);
-    current.firstBookingDate = getOldestDate([
-      current.firstBookingDate,
-      booking.created_at || null,
-      bookingDate,
-    ]);
-
-    bookingStatsByProfileId.set(customerId, current);
-  }
-
-  const petCountByProfileId = new Map<string, number>();
-
-  for (const pet of pets) {
-    const ownerId = getProfilePetOwnerId(pet);
-    if (!ownerId) continue;
-
-    petCountByProfileId.set(ownerId, (petCountByProfileId.get(ownerId) || 0) + 1);
-  }
-
-  const messageCountByProfileId = new Map<string, number>();
-
-  for (const message of messages) {
-    for (const participantId of getMessageParticipantIds(message)) {
-      if (!profileIds.has(participantId)) continue;
-
-      messageCountByProfileId.set(
-        participantId,
-        (messageCountByProfileId.get(participantId) || 0) + 1,
-      );
-    }
-  }
-
-  const launchSignups = rawLaunchSignups.filter((row) => !isDemoLikeRow(row));
-  const launchWaitlist = rawLaunchWaitlist.filter((row) => !isDemoLikeRow(row));
-  const referralClicks = rawReferralClicks.filter((row) => !isDemoLikeRow(row));
-  const referralConversions = rawReferralConversions.filter(
-    (row) => !isDemoLikeRow(row),
-  );
-  const networkClicks = rawNetworkClicks.filter((row) => !isDemoLikeRow(row));
-  const partnerCampaigns = rawPartnerCampaigns.filter(
-    (row) => !isDemoLikeRow(row),
-  );
-
-  const hiddenDemoRows =
-    rawProfiles.length -
-    profiles.length +
-    rawBookings.length -
-    nonDemoBookings.length +
-    rawPets.length -
-    nonDemoPets.length +
-    rawMessages.length -
-    nonDemoMessages.length +
-    rawLaunchSignups.length -
-    launchSignups.length +
-    rawLaunchWaitlist.length -
-    launchWaitlist.length +
-    rawReferralClicks.length -
-    referralClicks.length +
-    rawReferralConversions.length -
-    referralConversions.length +
-    rawNetworkClicks.length -
-    networkClicks.length +
-    rawPartnerCampaigns.length -
-    partnerCampaigns.length;
-
-  const customerMap = new Map<string, CustomerInsight>();
-
-  for (const profile of profiles) {
-    if (!profile.id) continue;
-
-    const bookingStats = bookingStatsByProfileId.get(profile.id);
-    const bookingCount = bookingStats?.bookingCount || 0;
-    const paidBookingCount = bookingStats?.paidBookingCount || 0;
-    const completedBookingCount = bookingStats?.completedBookingCount || 0;
-    const totalSpend = bookingStats?.totalSpend || 0;
-    const petCount = petCountByProfileId.get(profile.id) || 0;
-    const messageCount = messageCountByProfileId.get(profile.id) || 0;
-
-    const setup = getPetParentSetup({
-      profile,
-      petCount,
-      bookingCount,
-      completedBookingCount,
-    });
-
-    const averageBookingValue = bookingCount > 0 ? totalSpend / bookingCount : 0;
-    const source = normalizeSource(getSource(profile as AnyRow));
-
-    const customer: CustomerInsight = {
-      id: profile.id,
-      name: getDisplayName(profile as AnyRow, "Pet Parent"),
-      email: profile.email || "",
-      avatarUrl: profile.avatar_url || "",
-      city: getCity(profile as AnyRow),
-      state: getState(profile as AnyRow),
-      country: getCountry(profile as AnyRow),
-      zipCode: getZipCode(profile as AnyRow),
-      phone: getPhone(profile as AnyRow),
-      source,
-      campaign: getCampaign(profile as AnyRow),
-      bookingCount,
-      paidBookingCount,
-      completedBookingCount,
-      totalSpend,
-      averageBookingValue,
-      petCount,
-      messageCount,
-      lastBookingDate: bookingStats?.lastBookingDate || null,
-      firstSeenDate: profile.created_at || profile.updated_at || null,
-      segment: "Lead",
-      ...setup,
-    };
-
-    customerMap.set(profile.id, {
-      ...customer,
-      segment: getCustomerSegment(customer),
-    });
-  }
-
-  const customers = Array.from(customerMap.values()).sort((a, b) => {
-    const aTime = new Date(a.firstSeenDate || 0).getTime();
-    const bTime = new Date(b.firstSeenDate || 0).getTime();
-
-    return bTime - aTime || b.setupPercent - a.setupPercent;
+  const allLeads = mergeRows(
+    ambassadorLeads.map((row) => withSourceTable(row, "ambassador_leads")),
+    partnerApplications
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "partner_applications")),
+    networkPartnerLeads
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "network_partner_leads")),
+    networkParticipants
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "network_program_participants")),
+    launchSignups
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "launch_signups")),
+    launchWaitlist
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "launch_waitlist")),
+    programApplications
+      .filter(isAmbassadorLead)
+      .map((row) => withSourceTable(row, "program_applications")),
+  ).sort((a, b) => {
+    const dateA = new Date(getDate(a) || 0).getTime();
+    const dateB = new Date(getDate(b) || 0).getTime();
+    return dateB - dateA;
   });
 
-  const customersBySpend = [...customers].sort(
-    (a, b) => b.totalSpend - a.totalSpend,
-  );
+  const normalizedLeads = allLeads.map((lead) => ({
+    raw: lead,
+    id: getText(lead, ["id"]),
+    sourceTable: getText(lead, ["__source_table"], "ambassador_leads"),
+    name: getDisplayName(lead),
+    email: getEmail(lead),
+    phone: getPhone(lead),
+    program: getProgramLabel(lead),
+    source: getSourceLabel(lead),
+    status: getReadableStatus(lead),
+    zipCode: getZipCode(lead),
+    city: getCity(lead),
+    state: getState(lead),
+    county: getCounty(lead),
+    country: getCountry(lead) || "United States",
+    location: getLocation(lead),
+    notes: getNotes(lead),
+    date: getDate(lead),
+    lastContacted:
+      asString(lead.last_contacted_at) ||
+      asString(lead.contacted_at) ||
+      asString(lead.updated_at) ||
+      null,
+    documents: getLeadDocuments(lead),
+  }));
 
-  const cleanupRecords: CleanupCustomerRecord[] = [];
-  const orphanCustomerMap = new Map<string, CleanupCustomerRecord>();
-
-  function upsertOrphanRecord({
-    id,
-    sourceTable,
-    name,
-    email,
-    createdAt,
-    bookingAmount = 0,
-    bookingCount = 0,
-    petCount = 0,
-    messageCount = 0,
-  }: {
-    id: string;
-    sourceTable: string;
-    name?: string;
-    email?: string;
-    createdAt?: string | null;
-    bookingAmount?: number;
-    bookingCount?: number;
-    petCount?: number;
-    messageCount?: number;
-  }) {
-    if (!id || profileIds.has(id)) return;
-    if (demoProfileIds.has(id)) return;
-
-    const current =
-      orphanCustomerMap.get(id) ||
-      {
-        id,
-        name: name || "Orphaned Pet Parent ID",
-        email: email || "",
-        phone: "",
-        sourceTable,
-        issue: "Orphaned Pet Parent reference",
-        reason: "No matching profile row",
-        bookingCount: 0,
-        petCount: 0,
-        messageCount: 0,
-        totalSpend: 0,
-        createdAt: createdAt || null,
-        safeToDelete: false,
-      };
-
-    current.sourceTable = current.sourceTable.includes(sourceTable)
-      ? current.sourceTable
-      : `${current.sourceTable}, ${sourceTable}`;
-    current.name =
-      current.name === "Orphaned Pet Parent ID" && name ? name : current.name;
-    current.email = current.email || email || "";
-    current.bookingCount += bookingCount;
-    current.petCount += petCount;
-    current.messageCount += messageCount;
-    current.totalSpend += bookingAmount;
-    current.createdAt = getOldestDate([current.createdAt, createdAt || null]);
-    current.reason = getCleanupReason({
-      profile: null,
-      bookingCount: current.bookingCount,
-      petCount: current.petCount,
-      messageCount: current.messageCount,
-      totalSpend: current.totalSpend,
-    });
-    current.safeToDelete =
-      !current.email &&
-      current.bookingCount === 0 &&
-      current.petCount === 0 &&
-      current.messageCount === 0 &&
-      current.totalSpend === 0;
-
-    orphanCustomerMap.set(id, current);
-  }
-
-  for (const booking of nonDemoBookings) {
-    const directIds = [
-      booking.customer_id,
-      booking.pet_owner_id,
-      booking.pet_parent_id,
-      booking.client_id,
-      booking.user_id,
-    ]
-      .map((value) => asString(value))
-      .filter(Boolean);
-
-    for (const id of directIds) {
-      upsertOrphanRecord({
-        id,
-        sourceTable: "bookings",
-        name: getDisplayName(booking as AnyRow, "Orphaned booking Pet Parent"),
-        email: asString(booking.customer_email),
-        createdAt: booking.created_at || getBookingDate(booking),
-        bookingAmount: getBookingAmount(booking),
-        bookingCount: 1,
-      });
-    }
-  }
-
-  for (const pet of nonDemoPets) {
-    const directIds = [
-      pet.owner_profile_id,
-      pet.owner_id,
-      pet.customer_id,
-      pet.pet_parent_id,
-      pet.user_id,
-      pet.pet_owner_id,
-    ]
-      .map((value) => asString(value))
-      .filter(Boolean);
-
-    for (const id of directIds) {
-      upsertOrphanRecord({
-        id,
-        sourceTable: "pets",
-        name: getDisplayName(pet as AnyRow, "Orphaned pet owner"),
-        createdAt: pet.created_at || null,
-        petCount: 1,
-      });
-    }
-  }
-
-  for (const message of nonDemoMessages) {
-    for (const id of getMessageParticipantIds(message)) {
-      upsertOrphanRecord({
-        id,
-        sourceTable: "messages",
-        createdAt: message.created_at || null,
-        messageCount: 1,
-      });
-    }
-  }
-
-  cleanupRecords.push(
-    ...Array.from(orphanCustomerMap.values())
-      .sort((a, b) => {
-        if (a.safeToDelete !== b.safeToDelete) return a.safeToDelete ? -1 : 1;
-        return (
-          new Date(b.createdAt || 0).getTime() -
-          new Date(a.createdAt || 0).getTime()
-        );
-      })
-      .slice(0, 25),
-  );
-
-  const signupRows = [...launchSignups, ...launchWaitlist];
-  const clickRows = [...referralClicks, ...networkClicks];
-  const conversionRows = referralConversions;
-  const campaignRows = [
-    ...signupRows,
-    ...clickRows,
-    ...conversionRows,
-    ...partnerCampaigns,
-  ];
-
-  const totalCustomers = customers.length;
-  const totalRevenue = customers.reduce(
-    (sum, customer) => sum + customer.totalSpend,
-    0,
-  );
-  const totalBookings = customers.reduce(
-    (sum, customer) => sum + customer.bookingCount,
-    0,
-  );
-  const repeatCustomers = customers.filter(
-    (customer) => customer.bookingCount >= 2,
-  ).length;
-  const activeCustomersLast30 = customers.filter((customer) =>
-    isWithinLastDays(customer.lastBookingDate, 30),
-  ).length;
-  const customersWithPets = customers.filter(
-    (customer) => customer.petCount > 0,
-  ).length;
-  const unreadMessages = messages.filter(isUnreadMessage).length;
-
-  const socialSignupRows = signupRows.filter((row) => isSocialSource(getSource(row)));
-  const socialCustomers = customers.filter((customer) =>
-    isSocialSource(customer.source),
-  );
-  const socialRevenue = socialCustomers.reduce(
-    (sum, customer) => sum + customer.totalSpend,
-    0,
-  );
-  const socialBookings = socialCustomers.reduce(
-    (sum, customer) => sum + customer.bookingCount,
-    0,
-  );
-  const socialClicks = clickRows.filter((row) => isSocialSource(getSource(row))).length;
-
-  const averageLifetimeValue =
-    totalCustomers > 0 ? totalRevenue / totalCustomers : 0;
-  const averageBookingsPerCustomer =
-    totalCustomers > 0 ? totalBookings / totalCustomers : 0;
-  const repeatRate =
-    totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
-
-  const segments = {
-    vip: customers.filter((customer) => customer.segment === "VIP").length,
-    repeat: customers.filter((customer) => customer.segment === "Repeat").length,
-    new: customers.filter((customer) => customer.segment === "New").length,
-    lead: customers.filter((customer) => customer.segment === "Lead").length,
-  };
-
-  const setupMetrics = {
-    newSignups: customers.filter((customer) =>
-      isWithinLastDays(customer.firstSeenDate, 30),
-    ).length,
-    profileStarted: customers.filter((customer) => customer.hasProfileInfo).length,
-    contactVerified: customers.filter((customer) => customer.hasVerifiedContact).length,
-    phoneAdded: customers.filter((customer) => customer.hasPhone).length,
-    locationAdded: customers.filter((customer) => customer.hasLocation).length,
-    petsAdded: customers.filter((customer) => customer.hasPet).length,
-    readyToBook: customers.filter(
-      (customer) => customer.setupStatus === "Ready to Book",
-    ).length,
-    bookingsStarted: customers.filter((customer) => customer.hasStartedBooking)
+  const metrics = {
+    total: normalizedLeads.length,
+    careerLink: normalizedLeads.filter((lead) => lead.source === "PA CareerLink")
       .length,
-    bookingsCompleted: customers.filter((customer) => customer.hasCompletedBooking)
+    student: normalizedLeads.filter((lead) => lead.program === "Student Hire")
       .length,
-    needsReview: customers.filter((customer) => customer.needsReview).length,
-  };
-
-  const locationInsights = {
-    zipCodes: buildLocationInsights(customersBySpend, "zipCode"),
-    cities: buildLocationInsights(customersBySpend, "city"),
-    states: buildLocationInsights(customersBySpend, "state"),
-    countries: buildLocationInsights(customersBySpend, "country"),
-  };
-
-  const sourceInsights = buildSourceInsights(
-    customersBySpend,
-    signupRows,
-    conversionRows,
-  );
-
-  const socialSourceInsights = sourceInsights.filter((source) =>
-    isSocialSource(source.label),
-  );
-
-  const campaignInsights = buildCampaignInsights(campaignRows);
-
-  const chartData = {
-    segments: [
-      {
-        label: "VIP",
-        value: segments.vip,
-        helper: "$1,000+ spend or 8+ bookings",
-      },
-      {
-        label: "Repeat",
-        value: segments.repeat,
-        helper: "3+ bookings",
-      },
-      {
-        label: "New",
-        value: segments.new,
-        helper: "1 booking",
-      },
-      {
-        label: "Lead",
-        value: segments.lead,
-        helper: "Signup/profile created but no completed booking yet",
-      },
-    ],
-    setup: [
-      {
-        label: "Profile Started",
-        value: setupMetrics.profileStarted,
-        helper: "Name and email found",
-      },
-      {
-        label: "Phone Added",
-        value: setupMetrics.phoneAdded,
-        helper: "Phone number available",
-      },
-      {
-        label: "Location Added",
-        value: setupMetrics.locationAdded,
-        helper: "City, state, or ZIP found",
-      },
-      {
-        label: "Pet Added",
-        value: setupMetrics.petsAdded,
-        helper: "At least one pet profile",
-      },
-      {
-        label: "Booking Started",
-        value: setupMetrics.bookingsStarted,
-        helper: "At least one booking record",
-      },
-      {
-        label: "Booking Completed",
-        value: setupMetrics.bookingsCompleted,
-        helper: "Completed or paid booking",
-      },
-    ],
-    topCities: toChartItemsFromLocations(locationInsights.cities),
-    topZipCodes: toChartItemsFromLocations(locationInsights.zipCodes),
-    topSources: toChartItemsFromSources(sourceInsights),
-    socialSources: toChartItemsFromSources(socialSourceInsights),
+    community: normalizedLeads.filter((lead) => lead.program === "Community Hire")
+      .length,
+    military: normalizedLeads.filter((lead) => lead.program === "Military Hire")
+      .length,
+    newCount: normalizedLeads.filter((lead) => lead.status === "New").length,
+    contacted: normalizedLeads.filter((lead) => lead.status === "Contacted")
+      .length,
+    interested: normalizedLeads.filter((lead) => lead.status === "Interested")
+      .length,
+    signedUp: normalizedLeads.filter((lead) => lead.status === "Signed Up")
+      .length,
+    approved: normalizedLeads.filter((lead) => lead.status === "Approved").length,
+    notMovingForward: normalizedLeads.filter(
+      (lead) => lead.status === "Not Moving Forward",
+    ).length,
+    archived: normalizedLeads.filter((lead) => lead.status === "Archived").length,
+    recent: normalizedLeads.filter((lead) => isWithinLastDays(lead.date, 14))
+      .length,
   };
 
   return {
-    profiles,
-    bookings,
-    pets,
-    messages,
-    customers,
-    customersBySpend,
-    cleanupRecords,
-    locationInsights,
-    sourceInsights,
-    socialSourceInsights,
-    campaignInsights,
-    chartData,
-    metrics: {
-      totalCustomers,
-      totalRevenue,
-      totalBookings,
-      repeatCustomers,
-      activeCustomersLast30,
-      customersWithPets,
-      unreadMessages,
-      averageLifetimeValue,
-      averageBookingsPerCustomer,
-      repeatRate,
-      segments,
-      setupMetrics,
-      socialSignups: socialSignupRows.length,
-      socialCustomers: socialCustomers.length,
-      socialBookings,
-      socialRevenue,
-      socialClicks,
-      topSocialPlatform: socialSourceInsights[0]?.label || "None yet",
-      hiddenDemoRows,
-      cleanupRecords: cleanupRecords.length,
-      safeDeleteCandidates: cleanupRecords.filter((record) => record.safeToDelete)
-        .length,
-    },
+    leads: normalizedLeads,
+    metrics,
   };
 }
 
-export default async function AdminPetParentsPage() {
-  const data = await getPetParentsData();
+function getNotice(
+  searchParams?: Record<string, string | string[] | undefined>,
+) {
+  const created = searchParams?.created;
+
+  if (created === "success") {
+    return {
+      title: "Lead added",
+      message: "The ambassador lead was saved successfully.",
+      tone: "success" as const,
+    };
+  }
+
+  if (created === "missing") {
+    return {
+      title: "Lead not added",
+      message: "Add at least a name, email, or phone number before saving.",
+      tone: "warning" as const,
+    };
+  }
+
+  if (created === "error") {
+    return {
+      title: "Lead not saved",
+      message:
+        "The page is ready, but the ambassador_leads table may not have all required columns yet.",
+      tone: "warning" as const,
+    };
+  }
+
+  const updated = searchParams?.updated;
+
+  if (updated === "success") {
+    return {
+      title: "Lead updated",
+      message: "The ambassador lead was updated successfully.",
+      tone: "success" as const,
+    };
+  }
+
+  if (updated === "missing") {
+    return {
+      title: "Lead not updated",
+      message: "The lead ID or source table was missing.",
+      tone: "warning" as const,
+    };
+  }
+
+  if (updated === "error") {
+    return {
+      title: "Lead not updated",
+      message:
+        "The lead could not be updated. Confirm the status constraint and archive columns exist in Supabase.",
+      tone: "warning" as const,
+    };
+  }
+
+  const deleted = searchParams?.deleted;
+
+  if (deleted === "success") {
+    return {
+      title: "Lead deleted and archived",
+      message:
+        "The ambassador lead was removed from the active pipeline and copied to the archive for tracking.",
+      tone: "success" as const,
+    };
+  }
+
+  if (deleted === "archive_error") {
+    return {
+      title: "Lead not deleted",
+      message:
+        "The lead was not deleted because it could not be archived first. Confirm the ambassador_leads_archive table exists.",
+      tone: "warning" as const,
+    };
+  }
+
+  if (deleted === "error") {
+    return {
+      title: "Lead not deleted",
+      message: "The lead could not be deleted from Supabase.",
+      tone: "warning" as const,
+    };
+  }
+
+  return null;
+}
+
+function getSearchParamValue(
+  searchParams: Record<string, string | string[] | undefined> | undefined,
+  key: string,
+) {
+  const value = searchParams?.[key];
+
+  if (Array.isArray(value)) return value[0] || "";
+
+  return value || "";
+}
+
+function normalizeFilterValue(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function applyLeadFilters(
+  leads: NormalizedLead[],
+  filters: {
+    query: string;
+    program: string;
+    source: string;
+    status: string;
+    documents: string;
+  },
+) {
+  const query = normalizeFilterValue(filters.query);
+  const program = normalizeFilterValue(filters.program);
+  const source = normalizeFilterValue(filters.source);
+  const status = normalizeFilterValue(filters.status);
+  const documents = normalizeFilterValue(filters.documents);
+
+  return leads.filter((lead) => {
+    const searchable = [
+      lead.name,
+      lead.email,
+      lead.phone,
+      lead.program,
+      lead.source,
+      lead.status,
+      lead.city,
+      lead.state,
+      lead.county,
+      lead.country,
+      lead.location,
+      lead.notes,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    const hasDocument =
+      Boolean(lead.documents.resumeUrl) ||
+      Boolean(lead.documents.coverLetterUrl) ||
+      Boolean(lead.documents.otherDocumentUrl);
+
+    if (query && !searchable.includes(query)) return false;
+    if (program && normalizeFilterValue(lead.program) !== program) return false;
+    if (source && normalizeFilterValue(lead.source) !== source) return false;
+    if (status && normalizeFilterValue(lead.status) !== status) return false;
+    if (documents === "with_documents" && !hasDocument) return false;
+    if (documents === "missing_documents" && hasDocument) return false;
+
+    return true;
+  });
+}
+
+export default async function AmbassadorLeadsPage({
+  searchParams,
+}: AmbassadorLeadsPageProps) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    return null;
+  }
+
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const notice = getNotice(resolvedSearchParams);
+  const data = await getAmbassadorLeadData();
+  const pipelineFilters = {
+    query: getSearchParamValue(resolvedSearchParams, "q"),
+    program: getSearchParamValue(resolvedSearchParams, "program"),
+    source: getSearchParamValue(resolvedSearchParams, "source"),
+    status: getSearchParamValue(resolvedSearchParams, "status"),
+    documents: getSearchParamValue(resolvedSearchParams, "documents"),
+  };
+  const filteredLeads = applyLeadFilters(data.leads, pipelineFilters);
+  const filteredMetrics = {
+    total: filteredLeads.length,
+    student: filteredLeads.filter((lead) => lead.program === "Student Hire")
+      .length,
+    community: filteredLeads.filter((lead) => lead.program === "Community Hire")
+      .length,
+    military: filteredLeads.filter((lead) => lead.program === "Military Hire")
+      .length,
+  };
 
   return (
-    <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1700px] space-y-5">
-        <div className="flex flex-col justify-between gap-4 rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm lg:flex-row lg:items-end">
-          <div>
-            <Link
-              href={adminRoutes.dashboard}
-              className="mb-4 inline-flex items-center gap-2 text-sm font-black text-green-800 transition hover:text-green-950"
-            >
-              <ArrowLeft size={17} />
-              Back to Admin Dashboard
-            </Link>
+    <div className="w-full min-w-0 space-y-5">
+      <div className="flex w-full min-w-0 flex-col justify-between gap-4 xl:flex-row xl:items-end">
+        <div className="min-w-0">
+          <Link
+            href={adminRoutes.dashboard}
+            className="mb-3 inline-flex items-center gap-2 text-sm font-black text-green-800 transition hover:text-green-950"
+          >
+            <ArrowLeft size={16} />
+            Back to Admin Dashboard
+          </Link>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-green-800 text-white">
-                <Users size={26} />
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl 2xl:text-[3.25rem] 2xl:leading-none">
+              Ambassador Leads
+            </h1>
+            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-green-800">
+              Hiring Pipeline
+            </span>
+          </div>
+
+          <p className="mt-2 max-w-4xl text-base font-semibold leading-7 text-slate-600">
+            Track Student Hire, Community Hire, and Military Hire ambassador
+            applicants from Indeed, PA CareerLink, social media, referrals,
+            events, and website interest forms.
+          </p>
+        </div>
+
+        <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+          <Link
+            href={adminRoutes.programs}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+          >
+            <ClipboardList size={17} />
+            Programs
+          </Link>
+
+          <Link
+            href={adminRoutes.referrals}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-green-800 to-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:brightness-105"
+          >
+            <Sparkles size={17} />
+            Referrals
+          </Link>
+        </div>
+      </div>
+
+      {notice ? (
+        <NoticeCard
+          title={notice.title}
+          message={notice.message}
+          tone={notice.tone}
+        />
+      ) : null}
+
+      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-6">
+        <DataHealthTile label="Total Leads" value={number(data.metrics.total)} />
+        <DataHealthTile
+          label="PA CareerLink"
+          value={number(data.metrics.careerLink)}
+        />
+        <DataHealthTile
+          label="Student Hire"
+          value={number(filteredMetrics.student)}
+        />
+        <DataHealthTile
+          label="Community Hire"
+          value={number(filteredMetrics.community)}
+        />
+        <DataHealthTile
+          label="Military Hire"
+          value={number(filteredMetrics.military)}
+        />
+        <DataHealthTile
+          label="Recent 14 Days"
+          value={number(data.metrics.recent)}
+        />
+      </section>
+
+      <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-7">
+        <MetricCard
+          title="New"
+          value={number(data.metrics.newCount)}
+          detail="Needs first review"
+          icon={<Plus size={20} />}
+        />
+        <MetricCard
+          title="Contacted"
+          value={number(data.metrics.contacted)}
+          detail="Outreach started"
+          icon={<MessageCircle size={20} />}
+        />
+        <MetricCard
+          title="Interested"
+          value={number(data.metrics.interested)}
+          detail="Warm candidate"
+          icon={<Star size={20} />}
+        />
+        <MetricCard
+          title="Signed Up"
+          value={number(data.metrics.signedUp)}
+          detail="Created SitGuru interest"
+          icon={<UserCheck size={20} />}
+        />
+        <MetricCard
+          title="Approved"
+          value={number(data.metrics.approved)}
+          detail="Ready to activate"
+          icon={<CheckCircle2 size={20} />}
+        />
+        <MetricCard
+          title="Not Moving"
+          value={number(data.metrics.notMovingForward)}
+          detail="Closed or declined"
+          icon={<FileText size={20} />}
+        />
+        <MetricCard
+          title="Archived"
+          value={number(data.metrics.archived)}
+          detail="Retained on file"
+          icon={<Archive size={20} />}
+        />
+      </section>
+
+      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-4">
+          <DashboardCard>
+            <div className="mb-5">
+              <h2 className="text-lg font-black text-slate-950">
+                Add Ambassador Lead
+              </h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                Add hiring-focused ambassador applicants from PA CareerLink,
+                Indeed, Handshake, LinkedIn, schools, military organizations,
+                referrals, and the SitGuru website.
+              </p>
+            </div>
+
+            <form action={createAmbassadorLead} className="space-y-4">
+              <FormField label="Lead name">
+                <input
+                  name="full_name"
+                  placeholder="Full name"
+                  className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                />
+              </FormField>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="Email">
+                  <input
+                    name="email"
+                    type="email"
+                    placeholder="name@email.com"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+
+                <FormField label="Phone">
+                  <input
+                    name="phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="(XXX) XXX-XXXX"
+                    data-phone-input="true"
+                    maxLength={14}
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
               </div>
 
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="Program">
+                  <select
+                    name="program"
+                    defaultValue="Student Hire"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  >
+                    {programOrder.map((program) => (
+                      <option key={program}>{program}</option>
+                    ))}
+                  </select>
+                </FormField>
+
+                <FormField label="Source">
+                  <select
+                    name="source"
+                    defaultValue="Indeed"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  >
+                    {sourceOrder.map((source) => (
+                      <option key={source}>{source}</option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="Status">
+                  <select
+                    name="status"
+                    defaultValue="New"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  >
+                    {statusOrder.map((status) => (
+                      <option key={status}>{status}</option>
+                    ))}
+                  </select>
+                </FormField>
+
+                <FormField label="ZIP code">
+                  <input
+                    name="zip_code"
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    placeholder="12345"
+                    data-zip-input="true"
+                    maxLength={10}
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="City">
+                  <input
+                    name="city"
+                    autoComplete="address-level2"
+                    placeholder="City"
+                    data-city-input="true"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+
+                <FormField label="State">
+                  <input
+                    name="state"
+                    autoComplete="address-level1"
+                    placeholder="State"
+                    data-state-input="true"
+                    maxLength={2}
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold uppercase text-slate-900 outline-none transition placeholder:normal-case placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="County">
+                  <input
+                    name="county"
+                    placeholder="County"
+                    data-county-input="true"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+
+                <FormField label="Country">
+                  <input
+                    name="country"
+                    autoComplete="country-name"
+                    placeholder="United States"
+                    defaultValue="United States"
+                    data-country-input="true"
+                    className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                  />
+                </FormField>
+              </div>
+
+              <p
+                data-location-helper="true"
+                className="rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900"
+              >
+                Enter a ZIP code to auto-fill city, state, county, and country.
+                You can still edit any location field before saving.
+              </p>
+
+              <FormField label="Notes">
+                <textarea
+                  name="notes"
+                  placeholder="Example: Applied through Indeed for Student Ambassador posting."
+                  rows={4}
+                  className="w-full resize-none rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                />
+              </FormField>
+
+              <div className="rounded-[24px] border border-green-100 bg-green-50/70 p-4">
+                <div className="mb-3 flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
+                    <FileText size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-green-950">
+                      Applicant documents
+                    </h3>
+                    <p className="mt-1 text-xs font-bold leading-5 text-green-900/70">
+                      Paste a private Supabase Storage path or secure document
+                      link. Resume buttons open through the admin-only viewer.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <FormField label="Resume path or link">
+                    <input
+                      name="resume_file_url"
+                      placeholder="student-hire/resume.pdf"
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Resume label">
+                    <input
+                      name="resume_file_name"
+                      placeholder="Resume"
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Cover letter link">
+                    <input
+                      name="cover_letter_file_url"
+                      placeholder="https://..."
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Cover letter label">
+                    <input
+                      name="cover_letter_file_name"
+                      placeholder="Cover Letter"
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Other document link">
+                    <input
+                      name="other_document_file_url"
+                      placeholder="https://..."
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+
+                  <FormField label="Other document label">
+                    <input
+                      name="other_document_file_name"
+                      placeholder="References, portfolio, transcript, etc."
+                      className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                    />
+                  </FormField>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+              >
+                <Plus size={18} />
+                Save Lead
+              </button>
+
+              <p className="rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900">
+                HR intake is connected to the{" "}
+                <span className="font-black">ambassador_leads</span> table.
+                Use quick buttons in the pipeline to move candidates to
+                Contacted, Interested, Not Moving, Archived, or Restored without
+                running SQL.
+              </p>
+
+              <AmbassadorLeadFormEnhancementScript />
+            </form>
+          </DashboardCard>
+        </div>
+
+        <div className="min-w-0 xl:col-span-8">
+          <DashboardCard>
+            <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
-                  Admin / Pet Parents
+                <h2 className="text-lg font-black text-slate-950">
+                  Lead Pipeline
+                </h2>
+                <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                  Current ambassador leads grouped by program, source, status,
+                  and last known contact information.
                 </p>
-                <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                  Pet Parents
-                </h1>
-                <p className="mt-1 max-w-5xl text-base font-semibold text-slate-600">
-                  All-in-one Super Admin view for Pet Parent signups, profile
-                  setup progress, contact status, pets, bookings, spend, source
-                  attribution, messages, and records that need review.
-                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <StatusPill label="Student Hire" />
+                <StatusPill label="Community Hire" />
+                <StatusPill label="Military Hire" />
               </div>
             </div>
-          </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href={adminRoutes.customerExport}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-            >
-              <Download size={17} />
-              Export CSV Report
-            </Link>
+            <div className="mb-5 grid gap-3 md:grid-cols-3">
+              <ProgramMiniCard
+                title="Student Hire"
+                detail="Campus, school, and student outreach."
+                value={number(filteredMetrics.student)}
+                icon={<GraduationCap size={18} />}
+              />
+              <ProgramMiniCard
+                title="Community Hire"
+                detail="Neighborhood and local outreach."
+                value={number(filteredMetrics.community)}
+                icon={<Users size={18} />}
+              />
+              <ProgramMiniCard
+                title="Military Hire"
+                detail="Veterans, spouses, and service families."
+                value={number(filteredMetrics.military)}
+                icon={<ShieldCheck size={18} />}
+              />
+            </div>
 
-            <Link
-              href={adminRoutes.bookings}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-            >
-              <CalendarDays size={17} />
-              View Bookings
-            </Link>
+            <PipelineFilterPanel
+              filters={pipelineFilters}
+              resultCount={filteredMetrics.total}
+              totalCount={data.leads.length}
+            />
 
-            <Link
-              href={adminRoutes.users}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-            >
-              <UserRound size={18} />
-              View Users
-            </Link>
-          </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1380px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#edf3ee] text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                    <th className="pb-3">Lead</th>
+                    <th className="pb-3">Program</th>
+                    <th className="pb-3">Source</th>
+                    <th className="pb-3">Status</th>
+                    <th className="pb-3">Contact</th>
+                    <th className="pb-3">Documents</th>
+                    <th className="pb-3">Location</th>
+                    <th className="pb-3">Date</th>
+                    <th className="pb-3">Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredLeads.length ? (
+                    filteredLeads.map((lead, index) => (
+                      <Fragment
+                        key={`${lead.sourceTable}-${lead.id || lead.name}-${lead.email}-${lead.date}-${index}`}
+                      >
+                        <tr className="border-b border-[#f1f5f2] align-top">
+                          <td className="py-4">
+                            <div className="flex items-start gap-3">
+                              <Avatar name={lead.name} />
+                              <div className="min-w-0">
+                                <p className="font-black text-slate-950">
+                                  {lead.name}
+                                </p>
+                                <p className="mt-1 line-clamp-2 max-w-[260px] text-xs font-semibold leading-5 text-slate-500">
+                                  {lead.notes}
+                                </p>
+                                <PipelineProgressFlow status={lead.status} />
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-4">
+                            <ProgramBadge program={lead.program} />
+                          </td>
+
+                          <td className="py-4">
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                              {lead.source}
+                            </span>
+                          </td>
+
+                          <td className="py-4">
+                            <LeadStatusBadge status={lead.status} />
+                          </td>
+
+                          <td className="py-4">
+                            <div className="space-y-1.5">
+                              <ContactLine
+                                icon={<Mail size={13} />}
+                                value={lead.email}
+                              />
+                              <ContactLine
+                                icon={<Phone size={13} />}
+                                value={lead.phone}
+                              />
+                            </div>
+                          </td>
+
+                          <td className="py-4">
+                            <DocumentButtonGroup
+                              leadId={lead.id}
+                              documents={lead.documents}
+                            />
+                          </td>
+
+                          <td className="py-4 font-bold text-slate-600">
+                            <span className="inline-flex items-center gap-1.5">
+                              <MapPin size={13} />
+                              {lead.location}
+                            </span>
+                          </td>
+
+                          <td className="py-4 font-bold text-slate-600">
+                            <span className="inline-flex items-center gap-1.5">
+                              <CalendarDays size={13} />
+                              {formatDate(lead.date)}
+                            </span>
+                          </td>
+
+                          <td className="py-4">
+                            <div className="flex min-w-[170px] flex-col gap-2">
+                              <a
+                                href={`#edit-lead-${lead.id || index}`}
+                                className="inline-flex items-center justify-center rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-100"
+                              >
+                                Edit
+                              </a>
+
+                              <LeadQuickStatusButtons lead={lead} />
+
+                              <details className="group relative">
+                                <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 transition hover:bg-red-100">
+                                  <Trash2 size={12} />
+                                  Delete
+                                </summary>
+
+                                <div className="absolute right-0 z-20 mt-2 w-[280px] rounded-2xl border border-red-100 bg-white p-4 text-left shadow-xl">
+                                  <p className="text-sm font-black text-red-800">
+                                    Are you sure you want to delete this lead?
+                                  </p>
+                                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                                    For normal declined candidates, use Archive
+                                    instead. Delete should only be used for fake,
+                                    duplicate, or mistake records.
+                                  </p>
+
+                                  <form
+                                    action={deleteAmbassadorLead}
+                                    className="mt-3"
+                                  >
+                                    <input
+                                      type="hidden"
+                                      name="lead_id"
+                                      value={lead.id}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="source_table"
+                                      value={lead.sourceTable}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="lead_name"
+                                      value={lead.name}
+                                    />
+                                    <button
+                                      type="submit"
+                                      className="inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
+                                    >
+                                      Yes, Delete and Archive Copy
+                                    </button>
+                                  </form>
+                                </div>
+                              </details>
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr
+                          id={`edit-lead-${lead.id || index}`}
+                          className="border-b border-[#f1f5f2]"
+                        >
+                          <td colSpan={9} className="bg-[#fbfcf9] px-4 py-5">
+                            <PipelineEditForm lead={lead} />
+                          </td>
+                        </tr>
+                      </Fragment>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={9} className="py-10">
+                        <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-8 text-center">
+                          <Search
+                            className="mx-auto mb-3 text-green-700"
+                            size={32}
+                          />
+                          <h3 className="text-lg font-black text-green-950">
+                            No matching ambassador leads found
+                          </h3>
+                          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-green-900/70">
+                            Adjust the pipeline filters or clear them to view all
+                            ambassador leads.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </DashboardCard>
         </div>
+      </section>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCard
-            icon={<Users size={22} />}
-            label="Total Pet Parents"
-            value={number(data.metrics.totalCustomers)}
-            detail="All real Pet Parent profile rows found in Supabase"
+      <section className="grid w-full min-w-0 gap-4 lg:grid-cols-3">
+        <DashboardCard>
+          <ActionCard
+            icon={<BriefcaseBusiness size={20} />}
+            title="Indeed / PA CareerLink Workflow"
+            detail="Use this page to enter applicants after Indeed, PA CareerLink, referral, or website leads come in."
+            href={adminRoutes.ambassadorLeads}
+            action="Stay here"
           />
+        </DashboardCard>
 
-          <StatCard
-            icon={<UserCheck size={22} />}
-            label="New Signups"
-            value={number(data.metrics.setupMetrics.newSignups)}
-            detail="Pet Parents created within the last 30 days"
+        <DashboardCard>
+          <ActionCard
+            icon={<ClipboardList size={20} />}
+            title="Program Command Center"
+            detail="Review Student Hire, Community Hire, Military Hire, PawPerks, referrals, and growth programs."
+            href={adminRoutes.programs}
+            action="Open Programs"
           />
+        </DashboardCard>
 
-          <StatCard
-            icon={<ShieldCheck size={22} />}
-            label="Ready to Book"
-            value={number(data.metrics.setupMetrics.readyToBook)}
-            detail="Profile, phone, location, and pet are completed"
-          />
-
-          <StatCard
-            icon={<AlertTriangle size={22} />}
-            label="Needs Review"
-            value={number(data.metrics.setupMetrics.needsReview)}
-            detail="Missing profile, phone, location, or pet setup"
-          />
-
-          <StatCard
-            icon={<TrendingUp size={22} />}
-            label="Active Last 30 Days"
-            value={number(data.metrics.activeCustomersLast30)}
-            detail={`${data.metrics.averageBookingsPerCustomer.toFixed(
-              1,
-            )} avg bookings per Pet Parent`}
-          />
-        </section>
-
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCard
-            icon={<Mail size={22} />}
-            label="Profile Started"
-            value={number(data.metrics.setupMetrics.profileStarted)}
-            detail="Name and email information found"
-          />
-
-          <StatCard
-            icon={<UserRound size={22} />}
-            label="Phone Added"
-            value={number(data.metrics.setupMetrics.phoneAdded)}
-            detail="Phone number is available on profile"
-          />
-
-          <StatCard
-            icon={<MapPin size={22} />}
-            label="Location Added"
-            value={number(data.metrics.setupMetrics.locationAdded)}
-            detail="City, state, or ZIP is available"
-          />
-
-          <StatCard
-            icon={<PawPrint size={22} />}
-            label="Pets Added"
-            value={number(data.metrics.setupMetrics.petsAdded)}
-            detail="At least one pet profile is attached"
-          />
-
-          <StatCard
-            icon={<CalendarDays size={22} />}
-            label="Bookings Started"
-            value={number(data.metrics.setupMetrics.bookingsStarted)}
-            detail={`${number(
-              data.metrics.setupMetrics.bookingsCompleted,
-            )} completed or paid`}
-          />
-        </section>
-
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCard
-            icon={<CircleDollarSign size={22} />}
-            label="Lifetime Value"
-            value={money(data.metrics.averageLifetimeValue)}
-            detail={`${money(data.metrics.totalRevenue)} total Pet Parent spend`}
-          />
-
-          <StatCard
-            icon={<Repeat2 size={22} />}
-            label="Repeat Rate"
-            value={`${data.metrics.repeatRate.toFixed(1)}%`}
-            detail={`${number(data.metrics.repeatCustomers)} repeat Pet Parents`}
-          />
-
-          <StatCard
-            icon={<Share2 size={22} />}
-            label="Social Signups"
-            value={number(data.metrics.socialSignups)}
-            detail="Launch signups or waitlist rows from social"
-          />
-
-          <StatCard
-            icon={<MousePointerClick size={22} />}
-            label="Social Clicks"
-            value={number(data.metrics.socialClicks)}
-            detail={`Top platform: ${data.metrics.topSocialPlatform}`}
-          />
-
-          <StatCard
-            icon={<Trash2 size={22} />}
-            label="Cleanup Review"
-            value={number(data.metrics.cleanupRecords)}
-            detail={`${number(
-              data.metrics.safeDeleteCandidates,
-            )} safe-delete candidates · ${number(
-              data.metrics.hiddenDemoRows,
-            )} demo/test rows hidden`}
-          />
-        </section>
-
-        <PetParentRegistryPanel customers={data.customers} />
-
-        <section className="grid items-start gap-5 xl:grid-cols-12">
-          <div className="xl:col-span-5">
-            <DashboardCard>
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Setup Progress
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Step-by-step view of where Pet Parents are in signup and
-                  profile setup.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                {data.chartData.setup.map((item) => (
-                  <SetupMetricRow key={item.label} item={item} />
-                ))}
-              </div>
-            </DashboardCard>
-          </div>
-
-          <div className="xl:col-span-3">
-            <DashboardCard>
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Pet Parent Segments
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Segments are calculated from booking count and lifetime spend.
-                </p>
-              </div>
-
-              <DonutChart
-                title="Pet Parents"
-                total={data.metrics.totalCustomers}
-                items={data.chartData.segments}
-              />
-
-              <div className="mt-5 space-y-3">
-                <SegmentRow
-                  label="VIP Pet Parents"
-                  value={data.metrics.segments.vip}
-                  detail="$1,000+ spend or 8+ bookings"
-                  tone="green"
-                />
-                <SegmentRow
-                  label="Repeat Pet Parents"
-                  value={data.metrics.segments.repeat}
-                  detail="3+ bookings"
-                  tone="blue"
-                />
-                <SegmentRow
-                  label="New Pet Parents"
-                  value={data.metrics.segments.new}
-                  detail="1 booking"
-                  tone="orange"
-                />
-                <SegmentRow
-                  label="Leads"
-                  value={data.metrics.segments.lead}
-                  detail="Signup/profile created but no booking yet"
-                  tone="slate"
-                />
-              </div>
-            </DashboardCard>
-          </div>
-
-          <div className="xl:col-span-4">
-            <DashboardCard>
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Acquisition Sources
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Revenue, Pet Parents, and signups grouped by source.
-                </p>
-              </div>
-
-              <HorizontalBarChart
-                title="Top Acquisition Sources"
-                valueLabel="Revenue"
-                items={data.chartData.topSources}
-                valueFormatter={money}
-              />
-
-              <div className="mt-5">
-                <HorizontalBarChart
-                  title="Top Social Platforms"
-                  valueLabel="Revenue"
-                  items={data.chartData.socialSources}
-                  valueFormatter={money}
-                  emptyLabel="No social attribution data found yet."
-                />
-              </div>
-            </DashboardCard>
-          </div>
-        </section>
-
-        <section className="grid items-start gap-5 xl:grid-cols-12">
-          <div className="xl:col-span-7">
-            <DashboardCard>
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Pet Parent Locations
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Ranked by Pet Parent spend from profile and booking location
-                  fields.
-                </p>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <LocationInsightCard
-                  icon={<MapPin size={18} />}
-                  title="Top ZIP Codes"
-                  rows={data.locationInsights.zipCodes}
-                />
-
-                <LocationInsightCard
-                  icon={<MapPin size={18} />}
-                  title="Top Cities"
-                  rows={data.locationInsights.cities}
-                />
-
-                <LocationInsightCard
-                  icon={<MapPin size={18} />}
-                  title="Top States"
-                  rows={data.locationInsights.states}
-                />
-
-                <LocationInsightCard
-                  icon={<Globe2 size={18} />}
-                  title="Top Countries"
-                  rows={data.locationInsights.countries}
-                />
-              </div>
-            </DashboardCard>
-          </div>
-
-          <div className="xl:col-span-5">
-            <DashboardCard>
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Location Revenue
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Visual view of your strongest local Pet Parent markets.
-                </p>
-              </div>
-
-              <div className="space-y-5">
-                <HorizontalBarChart
-                  title="Top Cities by Revenue"
-                  valueLabel="Revenue"
-                  items={data.chartData.topCities}
-                  valueFormatter={money}
-                />
-
-                <HorizontalBarChart
-                  title="Top ZIP Codes by Revenue"
-                  valueLabel="Revenue"
-                  items={data.chartData.topZipCodes}
-                  valueFormatter={money}
-                />
-              </div>
-            </DashboardCard>
-          </div>
-        </section>
-
-        {data.cleanupRecords.length ? (
-          <CleanupReviewPanel records={data.cleanupRecords} />
-        ) : null}
-
-        <section className="grid gap-5 lg:grid-cols-3">
-          <QuickLinkCard
-            href={adminRoutes.launchSignups}
-            icon={<Megaphone size={22} />}
-            title="Launch Signups"
-            description="Review waitlist, launch, and acquisition-source rows that feed Pet Parent reporting."
-          />
-
-          <QuickLinkCard
-            href={adminRoutes.referrals}
-            icon={<Share2 size={22} />}
-            title="Referral Tracking"
-            description="Review referral clicks, conversions, source behavior, and Pet Parent acquisition quality."
-          />
-
-          <QuickLinkCard
+        <DashboardCard>
+          <ActionCard
+            icon={<ExternalLink size={20} />}
+            title="Partner & Referral Admin"
+            detail="Track broader partners, affiliates, referrals, rewards, and campaigns."
             href={adminRoutes.partners}
-            icon={<Globe2 size={22} />}
-            title="Partner Campaigns"
-            description="Review partner, affiliate, and campaign activity connected to growth reporting."
+            action="Open Partners"
           />
-        </section>
-
-        <section className="grid gap-5 lg:grid-cols-3">
-          <QuickLinkCard
-            href={adminRoutes.bookings}
-            icon={<CalendarDays size={22} />}
-            title="Review Bookings"
-            description="Open the admin booking manager to review Pet Parent booking history behind these numbers."
-          />
-
-          <QuickLinkCard
-            href={adminRoutes.petAnalytics}
-            icon={<PawPrint size={22} />}
-            title="Pet Analytics"
-            description="Review pet-related behavior, pet profiles, and demand signals from Pet Parent accounts."
-          />
-
-          <QuickLinkCard
-            href={adminRoutes.messages}
-            icon={<Mail size={22} />}
-            title="Pet Parent Messages"
-            description="Jump into Pet Parent and Guru conversations that may need admin attention."
-          />
-        </section>
-
-        <div className="rounded-[26px] border border-green-100 bg-white p-4 text-sm font-semibold text-slate-500 shadow-sm">
-          <span className="font-black text-green-900">
-            Supabase coordination:
-          </span>{" "}
-          this page reads `profiles`, `bookings`, `pets`, `messages`,
-          `launch_signups`, `launch_waitlist`, `referral_clicks`,
-          `referral_conversions`, `network_click_events`, and
-          `partner_campaigns`. Demo, fake, test, sample, sandbox, archived, and
-          deleted rows are filtered in-memory before Pet Parent KPIs, setup
-          progress, source charts, location charts, and review queues are
-          calculated from live rows.
-        </div>
-      </div>
-    </main>
+        </DashboardCard>
+      </section>
+    </div>
   );
 }
 
-function getCustomerProfileHref(customerId: string) {
-  return `/admin/customers/${encodeURIComponent(customerId)}`;
+function AmbassadorLeadFormEnhancementScript() {
+  const script = `
+    (() => {
+      if (window.__sitguruAmbassadorLeadEnhancementsLoaded === true) {
+        return;
+      }
+
+      window.__sitguruAmbassadorLeadEnhancementsLoaded = true;
+
+      const zipFallbacks = {
+        "81643": {
+          city: "Mesa",
+          state: "CO",
+          county: "Mesa",
+          country: "United States",
+        },
+        "93535": {
+          city: "Lancaster",
+          state: "CA",
+          county: "Los Angeles",
+          country: "United States",
+        },
+        "18951": {
+          city: "Quakertown",
+          state: "PA",
+          county: "Bucks",
+          country: "United States",
+        },
+      };
+
+      const zipTimers = new WeakMap();
+
+      const formatPhone = (value) => {
+        let digits = String(value || "").replace(/\\D/g, "");
+
+        if (digits.length === 11 && digits.startsWith("1")) {
+          digits = digits.slice(1);
+        }
+
+        digits = digits.slice(0, 10);
+
+        if (digits.length <= 3) return digits;
+
+        if (digits.length <= 6) {
+          return "(" + digits.slice(0, 3) + ") " + digits.slice(3);
+        }
+
+        return (
+          "(" +
+          digits.slice(0, 3) +
+          ") " +
+          digits.slice(3, 6) +
+          "-" +
+          digits.slice(6)
+        );
+      };
+
+      const getFormScope = (input) => {
+        return input?.closest?.("form") || document;
+      };
+
+      const getPairedInput = (zipInput, selector) => {
+        const scope = getFormScope(zipInput);
+        return scope.querySelector(selector);
+      };
+
+      const getLocationHelper = (zipInput) => {
+        const scope = getFormScope(zipInput);
+
+        return (
+          scope.querySelector("[data-location-helper='true']") ||
+          document.querySelector("[data-location-helper='true']")
+        );
+      };
+
+      const setHelper = (helper, message, tone = "green") => {
+        if (!helper) return;
+
+        helper.textContent = message;
+
+        if (tone === "amber") {
+          helper.className =
+            "rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-900";
+          return;
+        }
+
+        if (tone === "red") {
+          helper.className =
+            "rounded-2xl bg-red-50 px-4 py-3 text-xs font-bold leading-5 text-red-900";
+          return;
+        }
+
+        helper.className =
+          "rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900";
+      };
+
+      const setLocationValues = (zipInput, location, message) => {
+        const cityInput = getPairedInput(zipInput, "[data-city-input='true']");
+        const stateInput = getPairedInput(zipInput, "[data-state-input='true']");
+        const countyInput = getPairedInput(zipInput, "[data-county-input='true']");
+        const countryInput = getPairedInput(zipInput, "[data-country-input='true']");
+        const helper = getLocationHelper(zipInput);
+
+        if (cityInput && location.city) cityInput.value = location.city;
+        if (stateInput && location.state) stateInput.value = location.state;
+        if (countyInput && location.county) countyInput.value = location.county;
+        if (countryInput && location.country) countryInput.value = location.country;
+
+        setHelper(
+          helper,
+          message ||
+            "Location auto-filled from ZIP. Please confirm city, state, county, and country before saving.",
+        );
+      };
+
+      const lookupCounty = async ({ latitude, longitude }) => {
+        if (!latitude || !longitude) return "";
+
+        try {
+          const countyResponse = await fetch(
+            "https://geo.fcc.gov/api/census/block/find?format=json&latitude=" +
+              encodeURIComponent(latitude) +
+              "&longitude=" +
+              encodeURIComponent(longitude),
+          );
+
+          if (!countyResponse.ok) return "";
+
+          const countyData = await countyResponse.json();
+          const countyName = countyData?.County?.name || "";
+
+          return countyName.replace(/ County$/i, "");
+        } catch {
+          return "";
+        }
+      };
+
+      const lookupZip = async (zipInput) => {
+        if (!zipInput) return;
+
+        const zip = String(zipInput.value || "").replace(/\\D/g, "").slice(0, 5);
+        zipInput.value = zip;
+
+        if (zip.length !== 5) return;
+
+        const helper = getLocationHelper(zipInput);
+
+        if (zipFallbacks[zip]) {
+          setLocationValues(
+            zipInput,
+            zipFallbacks[zip],
+            "Location auto-filled from SitGuru ZIP fallback. Please confirm before saving.",
+          );
+          zipInput.dataset.lastLookupZip = zip;
+          return;
+        }
+
+        if (zipInput.dataset.lastLookupZip === zip) return;
+
+        zipInput.dataset.lastLookupZip = zip;
+
+        setHelper(helper, "Looking up ZIP code details...");
+
+        try {
+          const response = await fetch("https://api.zippopotam.us/us/" + zip);
+
+          if (!response.ok) {
+            setHelper(
+              helper,
+              "ZIP lookup did not find a match. You can enter the location manually.",
+              "amber",
+            );
+            return;
+          }
+
+          const data = await response.json();
+          const place = data?.places?.[0];
+
+          if (!place) {
+            setHelper(
+              helper,
+              "ZIP lookup did not find a city/state. You can enter the location manually.",
+              "amber",
+            );
+            return;
+          }
+
+          const latitude = place.latitude || "";
+          const longitude = place.longitude || "";
+          const county = await lookupCounty({ latitude, longitude });
+
+          setLocationValues(zipInput, {
+            city: place["place name"] || "",
+            state: place["state abbreviation"] || "",
+            county,
+            country: data.country || "United States",
+          });
+        } catch {
+          setHelper(
+            helper,
+            "ZIP lookup is temporarily unavailable. You can enter the location manually.",
+            "amber",
+          );
+        }
+      };
+
+      const scheduleZipLookup = (zipInput) => {
+        if (!zipInput) return;
+
+        zipInput.value = String(zipInput.value || "")
+          .replace(/\\D/g, "")
+          .slice(0, 5);
+
+        zipInput.dataset.lastLookupZip = "";
+
+        const existingTimer = zipTimers.get(zipInput);
+
+        if (existingTimer) {
+          window.clearTimeout(existingTimer);
+        }
+
+        const timer = window.setTimeout(() => {
+          lookupZip(zipInput);
+        }, 300);
+
+        zipTimers.set(zipInput, timer);
+      };
+
+      const normalizeStateInput = (stateInput) => {
+        if (!stateInput) return;
+
+        stateInput.value = String(stateInput.value || "")
+          .replace(/[^a-z]/gi, "")
+          .slice(0, 2)
+          .toUpperCase();
+      };
+
+      const applyInitialEnhancements = () => {
+        document
+          .querySelectorAll("[data-phone-input='true']")
+          .forEach((input) => {
+            input.value = formatPhone(input.value);
+          });
+
+        document
+          .querySelectorAll("[data-state-input='true']")
+          .forEach((input) => {
+            normalizeStateInput(input);
+          });
+
+        document
+          .querySelectorAll("[data-zip-input='true']")
+          .forEach((input) => {
+            const zip = String(input.value || "").replace(/\\D/g, "").slice(0, 5);
+            input.value = zip;
+
+            if (zip.length === 5) {
+              lookupZip(input);
+            }
+          });
+      };
+
+      document.addEventListener("input", (event) => {
+        const input = event.target;
+
+        if (!input || !input.matches) return;
+
+        if (input.matches("[data-phone-input='true']")) {
+          input.value = formatPhone(input.value);
+          return;
+        }
+
+        if (input.matches("[data-state-input='true']")) {
+          normalizeStateInput(input);
+          return;
+        }
+
+        if (input.matches("[data-zip-input='true']")) {
+          scheduleZipLookup(input);
+        }
+      });
+
+      document.addEventListener("paste", (event) => {
+        const input = event.target;
+
+        if (!input || !input.matches) return;
+
+        if (
+          input.matches("[data-phone-input='true']") ||
+          input.matches("[data-zip-input='true']") ||
+          input.matches("[data-state-input='true']")
+        ) {
+          window.setTimeout(() => {
+            if (input.matches("[data-phone-input='true']")) {
+              input.value = formatPhone(input.value);
+            }
+
+            if (input.matches("[data-state-input='true']")) {
+              normalizeStateInput(input);
+            }
+
+            if (input.matches("[data-zip-input='true']")) {
+              scheduleZipLookup(input);
+            }
+          }, 0);
+        }
+      });
+
+      document.addEventListener(
+        "blur",
+        (event) => {
+          const input = event.target;
+
+          if (!input || !input.matches) return;
+
+          if (input.matches("[data-phone-input='true']")) {
+            input.value = formatPhone(input.value);
+          }
+
+          if (input.matches("[data-state-input='true']")) {
+            normalizeStateInput(input);
+          }
+
+          if (input.matches("[data-zip-input='true']")) {
+            lookupZip(input);
+          }
+        },
+        true,
+      );
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", applyInitialEnhancements);
+      } else {
+        applyInitialEnhancements();
+      }
+    })();
+  `;
+
+  return <script dangerouslySetInnerHTML={{ __html: script }} />;
 }
 
-function getLocationLabel(customer: CustomerInsight) {
-  const cityState = [customer.city, customer.state].filter(Boolean).join(", ");
-
-  if (cityState && customer.zipCode) return `${cityState} ${customer.zipCode}`;
-  return cityState || customer.zipCode || "Location not added";
-}
-
-function getLastActivity(customer: CustomerInsight) {
-  return getMostRecentDate([customer.lastBookingDate, customer.firstSeenDate]);
-}
-
-function PetParentRegistryPanel({ customers }: { customers: CustomerInsight[] }) {
+function NoticeCard({
+  title,
+  message,
+  tone,
+}: {
+  title: string;
+  message: string;
+  tone: "success" | "warning";
+}) {
   return (
-    <DashboardCard>
-      <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
-            Super Admin Pet Parent Registry
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-slate-950">
-            Pet Parent signup and profile setup tracker
-          </h2>
-          <p className="mt-1 max-w-5xl text-sm font-semibold leading-6 text-slate-500">
-            Click any Pet Parent to open the full Super Admin profile. This
-            table shows where each person is in the signup process, what is
-            complete, and what still needs attention.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={adminRoutes.customerExport}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-          >
-            <Download size={16} />
-            Export
-          </Link>
-
-          <Link
-            href={adminRoutes.messages}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-green-900"
-          >
-            <Mail size={16} />
-            Messages
-          </Link>
-        </div>
-      </div>
-
-      {customers.length ? (
-        <div className="overflow-hidden rounded-[26px] border border-[#e3ece5] bg-white">
-          <div className="hidden grid-cols-[1.35fr_0.85fr_0.9fr_1.35fr_0.75fr_0.75fr_0.8fr_0.75fr] gap-3 border-b border-[#e3ece5] bg-[#fbfcf9] px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400 xl:grid">
-            <span>Pet Parent</span>
-            <span>Contact</span>
-            <span>Location</span>
-            <span>Setup Progress</span>
-            <span>Pets</span>
-            <span>Bookings</span>
-            <span>Spend</span>
-            <span className="text-right">Action</span>
-          </div>
-
-          <div className="divide-y divide-[#e3ece5]">
-            {customers.map((customer) => (
-              <Link
-                key={customer.id}
-                href={getCustomerProfileHref(customer.id)}
-                className="grid gap-4 px-4 py-4 transition hover:bg-green-50/70 xl:grid-cols-[1.35fr_0.85fr_0.9fr_1.35fr_0.75fr_0.75fr_0.8fr_0.75fr] xl:items-center"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-green-800 text-sm font-black text-white">
-                      {customer.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={customer.avatarUrl}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        customer.name.slice(0, 1).toUpperCase()
-                      )}
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-slate-950">
-                        {customer.name}
-                      </p>
-                      <p className="truncate text-xs font-bold text-slate-500">
-                        Signed up {formatDate(customer.firstSeenDate)}
-                      </p>
-                      <p className="mt-1 truncate text-xs font-bold text-green-700">
-                        Source: {customer.source}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="truncate text-xs font-black text-slate-950">
-                    {customer.email || "No email"}
-                  </p>
-                  <p className="truncate text-xs font-bold text-slate-500">
-                    {customer.phone || "No phone"}
-                  </p>
-                </div>
-
-                <p className="text-sm font-bold text-slate-600">
-                  {getLocationLabel(customer)}
-                </p>
-
-                <div>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <span
-                      className={[
-                        "rounded-full px-3 py-1 text-xs font-black",
-                        customer.needsReview
-                          ? "bg-amber-100 text-amber-900"
-                          : "bg-green-100 text-green-800",
-                      ].join(" ")}
-                    >
-                      {customer.setupStatus}
-                    </span>
-                    <span className="text-xs font-black text-slate-500">
-                      {customer.setupPercent}%
-                    </span>
-                  </div>
-
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-green-800"
-                      style={{ width: `${customer.setupPercent}%` }}
-                    />
-                  </div>
-
-                  <p className="mt-2 text-xs font-bold text-slate-500">
-                    Current step: {customer.currentStep}
-                  </p>
-
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {customer.setupSteps.slice(0, 6).map((step) => (
-                      <span
-                        key={step.label}
-                        title={step.label}
-                        className={[
-                          "h-2.5 w-2.5 rounded-full",
-                          step.complete ? "bg-green-700" : "bg-slate-200",
-                        ].join(" ")}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <p className="text-sm font-black text-slate-950">
-                  {number(customer.petCount)}
-                </p>
-
-                <div>
-                  <p className="text-sm font-black text-slate-950">
-                    {number(customer.bookingCount)}
-                  </p>
-                  <p className="text-xs font-bold text-slate-500">
-                    {number(customer.completedBookingCount)} completed
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-black text-green-800">
-                    {money(customer.totalSpend)}
-                  </p>
-                  <p className="text-xs font-bold text-slate-500">
-                    Last: {formatDate(getLastActivity(customer))}
-                  </p>
-                </div>
-
-                <div className="flex justify-start xl:justify-end">
-                  <span className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-2 text-xs font-black text-white shadow-sm">
-                    View
-                    <MousePointerClick size={14} />
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-8 text-center">
-          <Search className="mx-auto h-8 w-8 text-green-800" />
-          <h3 className="mt-3 text-xl font-black text-slate-950">
-            No Pet Parent profiles found yet
-          </h3>
-          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-            New Pet Parent signups should appear here once the signup flow
-            creates a `profiles` row with customer, Pet Parent, or both role
-            mapping.
-          </p>
-        </div>
-      )}
-    </DashboardCard>
+    <div
+      className={`rounded-[24px] border p-4 ${
+        tone === "success"
+          ? "border-green-200 bg-green-50 text-green-950"
+          : "border-amber-200 bg-amber-50 text-amber-950"
+      }`}
+    >
+      <p className="text-sm font-black">{title}</p>
+      <p className="mt-1 text-sm font-semibold leading-6">{message}</p>
+    </div>
   );
-}
-
-function escapeSqlValue(value: string) {
-  return value.replace(/'/g, "''");
-}
-
-function buildCleanupReviewSql(record: CleanupCustomerRecord) {
-  const id = escapeSqlValue(record.id);
-
-  return [
-    "-- 1) Check whether this ID exists as a Pet Parent profile",
-    "select id, email, phone, full_name, role, created_at, updated_at",
-    "from profiles",
-    `where id = '${id}';`,
-    "",
-    "-- 2) Check whether this ID exists as a Supabase Auth user",
-    "select id, email, phone, email_confirmed_at, phone_confirmed_at, created_at, last_sign_in_at",
-    "from auth.users",
-    `where id = '${id}';`,
-    "",
-    "-- 3) Check related pet records",
-    "select id, name, owner_id, owner_profile_id, customer_id, pet_parent_id, user_id, pet_owner_id, created_at",
-    "from pets",
-    `where owner_id = '${id}'`,
-    `   or owner_profile_id = '${id}'`,
-    `   or customer_id = '${id}'`,
-    `   or pet_parent_id = '${id}'`,
-    `   or user_id = '${id}'`,
-    `   or pet_owner_id = '${id}'`,
-    "order by created_at desc;",
-    "",
-    "-- 4) Check related booking/payment records",
-    "select id, customer_id, pet_owner_id, pet_parent_id, client_id, user_id, customer_email, status, payment_status, total_amount, customer_total_amount, created_at",
-    "from bookings",
-    `where customer_id = '${id}'`,
-    `   or pet_owner_id = '${id}'`,
-    `   or pet_parent_id = '${id}'`,
-    `   or client_id = '${id}'`,
-    `   or user_id = '${id}'`,
-    "order by created_at desc;",
-    "",
-    "-- 5) Check related message records",
-    "select id, sender_id, recipient_id, customer_id, user_id, from_user_id, to_user_id, status, is_read, created_at",
-    "from messages",
-    `where sender_id = '${id}'`,
-    `   or recipient_id = '${id}'`,
-    `   or customer_id = '${id}'`,
-    `   or user_id = '${id}'`,
-    `   or from_user_id = '${id}'`,
-    `   or to_user_id = '${id}'`,
-    "order by created_at desc;",
-  ].join("\n");
-}
-
-function buildCleanupDeleteSql(record: CleanupCustomerRecord) {
-  const id = escapeSqlValue(record.id);
-
-  if (!record.safeToDelete) {
-    return [
-      "-- This record is protected because it still has related activity.",
-      "-- Review attached pets, messages, bookings, and auth/profile rows first.",
-      "-- Do not hard-delete protected Pet Parent activity from a live system until confirmed fake/test.",
-    ].join("\n");
-  }
-
-  return [
-    "-- Safe-delete candidate cleanup SQL.",
-    "-- Run the review SQL first. Only run this if the review confirms it is fake/test/empty.",
-    "begin;",
-    "",
-    "delete from messages",
-    `where sender_id = '${id}'`,
-    `   or recipient_id = '${id}'`,
-    `   or customer_id = '${id}'`,
-    `   or user_id = '${id}'`,
-    `   or from_user_id = '${id}'`,
-    `   or to_user_id = '${id}';`,
-    "",
-    "delete from pets",
-    `where owner_id = '${id}'`,
-    `   or owner_profile_id = '${id}'`,
-    `   or customer_id = '${id}'`,
-    `   or pet_parent_id = '${id}'`,
-    `   or user_id = '${id}'`,
-    `   or pet_owner_id = '${id}';`,
-    "",
-    "delete from bookings",
-    `where customer_id = '${id}'`,
-    `   or pet_owner_id = '${id}'`,
-    `   or pet_parent_id = '${id}'`,
-    `   or client_id = '${id}'`,
-    `   or user_id = '${id}';`,
-    "",
-    "delete from profiles",
-    `where id = '${id}';`,
-    "",
-    "commit;",
-  ].join("\n");
-}
-
-function getCleanupDecision(record: CleanupCustomerRecord) {
-  if (record.safeToDelete) {
-    return "Safe-delete candidate because there is no contact information, no pets, no bookings, no messages, and no spend.";
-  }
-
-  if (record.bookingCount > 0 || record.totalSpend > 0) {
-    return "Protected. This record has booking or payment activity. Archive/reconcile only after confirming it is fake or test data.";
-  }
-
-  if (record.petCount > 0) {
-    return "Protected. This record has pet records attached. Review pet names and owner references before deleting.";
-  }
-
-  if (record.messageCount > 0) {
-    return "Protected. This record has messages attached. Review the message thread before deleting.";
-  }
-
-  return "Protected for review. Confirm whether this is a partial signup, orphan reference, or test data before deleting.";
 }
 
 function DashboardCard({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
+    <div className="w-full min-w-0 rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
       {children}
     </div>
   );
 }
 
-function CleanupReviewPanel({ records }: { records: CleanupCustomerRecord[] }) {
-  const safeDeleteCount = records.filter((record) => record.safeToDelete).length;
-  const protectedCount = records.length - safeDeleteCount;
-
+function DataHealthTile({ label, value }: { label: string; value: string }) {
   return (
-    <section className="rounded-[30px] border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-amber-800">
-            <AlertTriangle size={15} />
-            Pet Parent Cleanup Queue
-          </div>
-
-          <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
-            Orphaned records are hidden from visible Pet Parents.
-          </h2>
-
-          <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-700">
-            These records do not count as live Pet Parents. Use the review panel
-            on each row to confirm whether it is a real partial signup, an old
-            test record, or an orphaned reference from pets/messages/bookings.
-            Protected records should not be hard-deleted until the attached
-            activity is reviewed.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-black text-amber-900">
-          {number(safeDeleteCount)} safe to delete · {number(protectedCount)} protected · {number(records.length)} total review records
-        </div>
-      </div>
-
-      <div className="mt-5 overflow-hidden rounded-3xl border border-amber-200 bg-white">
-        <div className="grid gap-3 border-b border-amber-100 bg-amber-100/70 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-amber-900 md:grid-cols-[1.25fr_0.85fr_1.3fr_0.7fr]">
-          <div>Record</div>
-          <div>Status</div>
-          <div>Reason</div>
-          <div>Action</div>
-        </div>
-
-        <div className="divide-y divide-amber-100">
-          {records.map((record) => {
-            const reviewSql = buildCleanupReviewSql(record);
-            const deleteSql = buildCleanupDeleteSql(record);
-            const decision = getCleanupDecision(record);
-
-            return (
-              <details
-                key={`${record.sourceTable}-${record.id}`}
-                className="group"
-              >
-                <summary className="grid cursor-pointer list-none gap-3 px-4 py-4 text-sm transition hover:bg-amber-50 md:grid-cols-[1.25fr_0.85fr_1.3fr_0.7fr] md:items-center">
-                  <div className="min-w-0">
-                    <p className="truncate font-black text-slate-950">
-                      {record.name}
-                    </p>
-                    <p className="mt-1 truncate text-xs font-bold text-slate-500">
-                      {record.email || record.phone || record.id}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-400">
-                      Source: {record.sourceTable} · Created {formatDate(record.createdAt)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span
-                      className={[
-                        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black",
-                        record.safeToDelete
-                          ? "border-rose-200 bg-rose-50 text-rose-800"
-                          : "border-sky-200 bg-sky-50 text-sky-800",
-                      ].join(" ")}
-                    >
-                      {record.safeToDelete ? (
-                        <Trash2 size={14} />
-                      ) : (
-                        <ShieldCheck size={14} />
-                      )}
-                      {record.safeToDelete ? "Safe Delete Candidate" : "Review / Protect"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <p className="font-bold leading-6 text-slate-700">
-                      {record.reason}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">
-                      {number(record.bookingCount)} bookings · {number(record.petCount)} pets · {number(record.messageCount)} messages · {money(record.totalSpend)}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <span
-                      className={[
-                        "inline-flex items-center justify-center rounded-2xl border px-3 py-2 text-xs font-black transition",
-                        record.safeToDelete
-                          ? "border-rose-200 bg-rose-50 text-rose-800 group-open:bg-rose-100"
-                          : "border-sky-200 bg-sky-50 text-sky-800 group-open:bg-sky-100",
-                      ].join(" ")}
-                    >
-                      Review Details
-                    </span>
-                  </div>
-                </summary>
-
-                <div className="border-t border-amber-100 bg-[#fffaf0] px-4 py-5">
-                  <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                    <div className="space-y-4">
-                      <div className="rounded-2xl border border-amber-200 bg-white p-4">
-                        <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-900">
-                          Admin Decision Guide
-                        </p>
-                        <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
-                          {decision}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                          Record Signals
-                        </p>
-
-                        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-                          <div>
-                            <dt className="font-black text-slate-500">ID</dt>
-                            <dd className="mt-1 break-all font-bold text-slate-900">
-                              {record.id}
-                            </dd>
-                          </div>
-
-                          <div>
-                            <dt className="font-black text-slate-500">Source Table</dt>
-                            <dd className="mt-1 font-bold text-slate-900">
-                              {record.sourceTable}
-                            </dd>
-                          </div>
-
-                          <div>
-                            <dt className="font-black text-slate-500">Email</dt>
-                            <dd className="mt-1 font-bold text-slate-900">
-                              {record.email || "None found"}
-                            </dd>
-                          </div>
-
-                          <div>
-                            <dt className="font-black text-slate-500">Phone</dt>
-                            <dd className="mt-1 font-bold text-slate-900">
-                              {record.phone || "None found"}
-                            </dd>
-                          </div>
-
-                          <div>
-                            <dt className="font-black text-slate-500">Bookings</dt>
-                            <dd className="mt-1 font-bold text-slate-900">
-                              {number(record.bookingCount)}
-                            </dd>
-                          </div>
-
-                          <div>
-                            <dt className="font-black text-slate-500">Pets</dt>
-                            <dd className="mt-1 font-bold text-slate-900">
-                              {number(record.petCount)}
-                            </dd>
-                          </div>
-
-                          <div>
-                            <dt className="font-black text-slate-500">Messages</dt>
-                            <dd className="mt-1 font-bold text-slate-900">
-                              {number(record.messageCount)}
-                            </dd>
-                          </div>
-
-                          <div>
-                            <dt className="font-black text-slate-500">Spend</dt>
-                            <dd className="mt-1 font-bold text-slate-900">
-                              {money(record.totalSpend)}
-                            </dd>
-                          </div>
-                        </dl>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                          Supabase Review SQL
-                        </p>
-                        <pre className="mt-3 max-h-[420px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs font-semibold leading-6 text-slate-100">
-                          <code>{reviewSql}</code>
-                        </pre>
-                      </div>
-
-                      <div
-                        className={[
-                          "rounded-2xl border bg-white p-4",
-                          record.safeToDelete
-                            ? "border-rose-200"
-                            : "border-sky-200",
-                        ].join(" ")}
-                      >
-                        <p
-                          className={[
-                            "text-xs font-black uppercase tracking-[0.12em]",
-                            record.safeToDelete
-                              ? "text-rose-900"
-                              : "text-sky-900",
-                          ].join(" ")}
-                        >
-                          {record.safeToDelete ? "Safe Delete SQL" : "Protected Delete Block"}
-                        </p>
-                        <pre className="mt-3 max-h-[300px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs font-semibold leading-6 text-slate-100">
-                          <code>{deleteSql}</code>
-                        </pre>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </details>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  detail,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-[26px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-        {icon}
-      </div>
+    <div className="rounded-2xl border border-green-100 bg-white px-4 py-3 shadow-sm">
       <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
         {label}
       </p>
-      <p className="mt-1 text-3xl font-black tracking-tight text-slate-950">
-        {value}
-      </p>
-      <p className="mt-2 text-sm font-semibold text-slate-500">{detail}</p>
+      <p className="mt-1 text-xl font-black text-green-950">{value}</p>
     </div>
   );
 }
 
-function SetupMetricRow({ item }: { item: ChartItem }) {
-  return (
-    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-black text-slate-950">{item.label}</p>
-          {item.helper ? (
-            <p className="mt-1 text-xs font-semibold text-slate-500">
-              {item.helper}
-            </p>
-          ) : null}
-        </div>
-
-        <span className="rounded-full bg-green-100 px-4 py-2 text-sm font-black text-green-800">
-          {number(item.value)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function SegmentRow({
-  label,
+function MetricCard({
+  title,
   value,
   detail,
-  tone,
-}: {
-  label: string;
-  value: number;
-  detail: string;
-  tone: "green" | "blue" | "orange" | "slate";
-}) {
-  const toneClasses = {
-    green: "bg-emerald-100 text-emerald-900",
-    blue: "bg-sky-100 text-sky-900",
-    orange: "bg-amber-100 text-amber-900",
-    slate: "bg-slate-100 text-slate-800",
-  };
-
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
-      <div>
-        <p className="text-sm font-black text-slate-950">{label}</p>
-        <p className="mt-1 text-xs font-semibold text-slate-500">{detail}</p>
-      </div>
-
-      <span
-        className={`rounded-full px-4 py-2 text-sm font-black ${toneClasses[tone]}`}
-      >
-        {number(value)}
-      </span>
-    </div>
-  );
-}
-
-function DonutChart({
-  title,
-  total,
-  items,
-}: {
-  title: string;
-  total: number;
-  items: ChartItem[];
-}) {
-  const safeTotal = items.reduce((sum, item) => sum + item.value, 0);
-  let start = 0;
-
-  const gradient =
-    safeTotal > 0
-      ? items
-          .map((item, index) => {
-            const size = (item.value / safeTotal) * 360;
-            const end = start + size;
-            const segment = `${chartColors[index % chartColors.length]} ${start}deg ${end}deg`;
-            start = end;
-            return segment;
-          })
-          .join(", ")
-      : "#e5e7eb 0deg 360deg";
-
-  return (
-    <div className="grid items-center gap-5">
-      <div className="relative mx-auto h-[180px] w-[180px]">
-        <div
-          className="h-full w-full rounded-full"
-          style={{ background: `conic-gradient(${gradient})` }}
-        />
-        <div className="absolute inset-[34px] flex flex-col items-center justify-center rounded-full bg-white shadow-inner">
-          <span className="text-3xl font-black text-slate-950">
-            {number(total)}
-          </span>
-          <span className="text-xs font-bold text-slate-500">{title}</span>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {items.map((item, index) => (
-          <div
-            key={item.label}
-            className="flex items-center justify-between gap-3 text-sm font-bold"
-          >
-            <div className="flex items-center gap-3">
-              <span
-                className="h-3 w-3 rounded-full"
-                style={{
-                  backgroundColor: chartColors[index % chartColors.length],
-                }}
-              />
-              <span className="text-slate-700">{item.label}</span>
-            </div>
-            <span className="text-slate-950">{number(item.value)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HorizontalBarChart({
-  title,
-  valueLabel,
-  items,
-  valueFormatter,
-  emptyLabel = "No chart data found yet.",
-}: {
-  title: string;
-  valueLabel: string;
-  items: ChartItem[];
-  valueFormatter: (value: number) => string;
-  emptyLabel?: string;
-}) {
-  const maxValue = Math.max(...items.map((item) => item.value), 0);
-
-  return (
-    <div className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-4">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <h3 className="text-base font-black text-slate-950">{title}</h3>
-        <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-          {valueLabel}
-        </span>
-      </div>
-
-      <div className="space-y-4">
-        {items.length ? (
-          items.map((item, index) => {
-            const width = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
-
-            return (
-              <div key={`${item.label}-${index}`}>
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-slate-950">
-                      {item.label}
-                    </p>
-                    {item.helper ? (
-                      <p className="truncate text-xs font-bold text-slate-500">
-                        {item.helper}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <p className="shrink-0 text-sm font-black text-green-800">
-                    {valueFormatter(item.value)}
-                  </p>
-                </div>
-
-                <div className="h-3 overflow-hidden rounded-full bg-white">
-                  <div
-                    className="h-full rounded-full bg-green-800"
-                    style={{ width: `${Math.max(3, width)}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="rounded-2xl border border-white bg-white p-4 text-sm font-bold text-slate-500">
-            {emptyLabel}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function LocationInsightCard({
   icon,
-  title,
-  rows,
 }: {
-  icon: ReactNode;
   title: string;
-  rows: LocationInsight[];
+  value: string;
+  detail: string;
+  icon: ReactNode;
 }) {
   return (
-    <div className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-4">
-      <div className="mb-4 flex items-center gap-3">
+    <div className="rounded-[24px] border border-[#e3ece5] bg-white p-5 shadow-sm">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+        {icon}
+      </div>
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        {title}
+      </p>
+      <p className="mt-1 text-3xl font-black text-slate-950">{value}</p>
+      <p className="mt-2 text-sm font-bold text-slate-500">{detail}</p>
+    </div>
+  );
+}
+
+function ProgramMiniCard({
+  title,
+  detail,
+  value,
+  icon,
+}: {
+  title: string;
+  detail: string;
+  value: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-green-100 bg-[#fbfcf9] p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-green-800 text-white">
           {icon}
         </div>
-        <h3 className="text-base font-black text-slate-950">{title}</h3>
+        <span className="text-xl font-black text-green-950">{value}</span>
       </div>
+      <p className="text-sm font-black text-slate-950">{title}</p>
+      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">{detail}</p>
+    </div>
+  );
+}
 
-      <div className="space-y-2.5">
-        {rows.length ? (
-          rows.map((row) => (
-            <div
-              key={row.label}
-              className="rounded-2xl border border-white bg-white p-3 shadow-sm"
+function FormField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function StatusPill({ label }: { label: string }) {
+  return (
+    <span className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-black text-green-800">
+      {label}
+    </span>
+  );
+}
+
+function ProgramBadge({ program }: { program: string }) {
+  const styles =
+    program === "Student Hire"
+      ? "bg-blue-50 text-blue-800 border-blue-100"
+      : program === "Military Hire"
+        ? "bg-emerald-50 text-emerald-800 border-emerald-100"
+        : "bg-green-50 text-green-800 border-green-100";
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${styles}`}
+    >
+      {program}
+    </span>
+  );
+}
+
+function LeadStatusBadge({ status }: { status: string }) {
+  const styles =
+    status === "Approved"
+      ? "bg-green-100 text-green-800"
+      : status === "Signed Up"
+        ? "bg-emerald-100 text-emerald-800"
+        : status === "Contacted"
+          ? "bg-blue-100 text-blue-800"
+          : status === "Interested"
+            ? "bg-amber-100 text-amber-800"
+            : status === "Not Moving Forward"
+              ? "bg-slate-100 text-slate-600"
+              : status === "Archived"
+                ? "bg-red-100 text-red-700"
+                : "bg-orange-100 text-orange-800";
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function PipelineProgressFlow({ status }: { status: string }) {
+  const stages = ["New", "Contacted", "Interested", "Signed Up", "Approved"];
+  const currentIndex = stages.indexOf(status);
+  const isClosed = status === "Not Moving Forward";
+  const isArchived = status === "Archived";
+
+  if (isArchived) {
+    return (
+      <div className="mt-3 max-w-[360px] rounded-2xl border border-red-100 bg-red-50 p-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {stages.map((stage) => (
+            <span
+              key={stage}
+              className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-400"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-black text-slate-950">
-                    {row.label}
-                  </p>
-                  <p className="mt-1 text-xs font-bold text-slate-500">
-                    {number(row.customers)} Pet Parents · {number(row.bookings)}{" "}
-                    bookings
-                  </p>
-                </div>
+              {stage}
+            </span>
+          ))}
+          <span className="rounded-full bg-red-700 px-2 py-1 text-[10px] font-black text-white">
+            Archived
+          </span>
+        </div>
+      </div>
+    );
+  }
 
-                <p className="shrink-0 text-sm font-black text-green-800">
-                  {money(row.revenue)}
-                </p>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="rounded-2xl border border-white bg-white p-4 text-sm font-bold text-slate-500">
-            No location data found yet.
-          </div>
-        )}
+  if (isClosed) {
+    return (
+      <div className="mt-3 max-w-[360px] rounded-2xl border border-slate-200 bg-slate-50 p-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {stages.map((stage) => (
+            <span
+              key={stage}
+              className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-400"
+            >
+              {stage}
+            </span>
+          ))}
+          <span className="rounded-full bg-slate-700 px-2 py-1 text-[10px] font-black text-white">
+            Not Moving
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 max-w-[380px] rounded-2xl border border-green-100 bg-[#fbfcf9] p-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {stages.map((stage, index) => {
+          const isComplete = currentIndex >= 0 && index < currentIndex;
+          const isCurrent = currentIndex === index;
+          const isFuture = currentIndex === -1 || index > currentIndex;
+
+          return (
+            <span
+              key={stage}
+              className={`rounded-full px-2 py-1 text-[10px] font-black ${
+                isComplete
+                  ? "bg-green-600 text-white"
+                  : isCurrent
+                    ? "bg-amber-100 text-amber-900 ring-1 ring-amber-200"
+                    : isFuture
+                      ? "bg-slate-100 text-slate-500"
+                      : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              {stage}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function QuickLinkCard({
-  href,
-  icon,
-  title,
-  description,
-}: {
-  href: string;
-  icon: ReactNode;
-  title: string;
-  description: string;
-}) {
+function LeadQuickStatusButtons({ lead }: { lead: NormalizedLead }) {
+  if (!lead.id) {
+    return (
+      <span className="rounded-full bg-slate-100 px-3 py-1 text-center text-xs font-black text-slate-500">
+        No actions
+      </span>
+    );
+  }
+
+  if (lead.status === "Archived") {
+    return (
+      <form action={updateAmbassadorLeadPipelineStatus}>
+        <input type="hidden" name="lead_id" value={lead.id} />
+        <input type="hidden" name="source_table" value={lead.sourceTable} />
+        <input type="hidden" name="next_status" value="contacted" />
+        <button
+          type="submit"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 ring-1 ring-green-100 transition hover:bg-green-100"
+        >
+          <RotateCcw size={13} />
+          Restore
+        </button>
+      </form>
+    );
+  }
+
   return (
-    <Link
-      href={href}
-      className="group rounded-[26px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md"
-    >
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-800 text-white">
-        {icon}
+    <div className="grid gap-1.5">
+      {quickStatusActions.map((action) => (
+        <form key={action.value} action={updateAmbassadorLeadPipelineStatus}>
+          <input type="hidden" name="lead_id" value={lead.id} />
+          <input type="hidden" name="source_table" value={lead.sourceTable} />
+          <input type="hidden" name="next_status" value={action.value} />
+          <button
+            type="submit"
+            className={`inline-flex w-full items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-black ring-1 transition ${action.tone}`}
+          >
+            {action.icon}
+            {action.label}
+          </button>
+        </form>
+      ))}
+    </div>
+  );
+}
+
+function PipelineFilterPanel({
+  filters,
+  resultCount,
+  totalCount,
+}: {
+  filters: {
+    query: string;
+    program: string;
+    source: string;
+    status: string;
+    documents: string;
+  };
+  resultCount: number;
+  totalCount: number;
+}) {
+  const hasFilters =
+    Boolean(filters.query) ||
+    Boolean(filters.program) ||
+    Boolean(filters.source) ||
+    Boolean(filters.status) ||
+    Boolean(filters.documents);
+
+  return (
+    <div className="mb-5 rounded-[24px] border border-green-100 bg-[#fbfcf9] p-4">
+      <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-600">
+            Pipeline filters
+          </h3>
+          <p className="mt-1 text-xs font-bold text-slate-500">
+            Showing {number(resultCount)} of {number(totalCount)} ambassador
+            leads.
+          </p>
+        </div>
+
+        {hasFilters ? (
+          <Link
+            href={adminRoutes.ambassadorLeads}
+            className="inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-xs font-black text-green-800 shadow-sm ring-1 ring-green-100 transition hover:bg-green-50"
+          >
+            Clear filters
+          </Link>
+        ) : null}
       </div>
 
-      <h3 className="text-lg font-black text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-        {description}
-      </p>
+      <form
+        action={adminRoutes.ambassadorLeads}
+        className="grid gap-3 lg:grid-cols-6"
+      >
+        <label className="lg:col-span-2">
+          <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+            Search
+          </span>
+          <input
+            name="q"
+            defaultValue={filters.query}
+            placeholder="Name, email, phone, city, notes..."
+            className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+          />
+        </label>
 
-      <p className="mt-4 text-sm font-black text-green-800">
-        Open page <span className="transition group-hover:translate-x-1">→</span>
+        <FilterSelect label="Program" name="program" value={filters.program}>
+          <option value="">All programs</option>
+          {programOrder.map((program) => (
+            <option key={program} value={program}>
+              {program}
+            </option>
+          ))}
+        </FilterSelect>
+
+        <FilterSelect label="Source" name="source" value={filters.source}>
+          <option value="">All sources</option>
+          {sourceOrder.map((source) => (
+            <option key={source} value={source}>
+              {source}
+            </option>
+          ))}
+        </FilterSelect>
+
+        <FilterSelect label="Status" name="status" value={filters.status}>
+          <option value="">All statuses</option>
+          {statusOrder.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </FilterSelect>
+
+        <FilterSelect
+          label="Documents"
+          name="documents"
+          value={filters.documents}
+        >
+          <option value="">All documents</option>
+          <option value="with_documents">With documents</option>
+          <option value="missing_documents">Missing documents</option>
+        </FilterSelect>
+
+        <div className="flex items-end lg:col-span-6">
+          <button
+            type="submit"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900 sm:w-auto"
+          >
+            <Search size={16} />
+            Apply Filters
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  name,
+  value,
+  children,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  children: ReactNode;
+}) {
+  return (
+    <label>
+      <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </span>
+      <select
+        name={name}
+        defaultValue={value}
+        className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100"
+      >
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function PipelineEditForm({ lead }: { lead: NormalizedLead }) {
+  return (
+    <details className="rounded-[24px] border border-green-100 bg-white p-4">
+      <summary className="cursor-pointer text-sm font-black text-green-900">
+        Edit {lead.name}
+      </summary>
+
+      <form action={updateAmbassadorLead} className="mt-4 grid gap-4">
+        <input type="hidden" name="lead_id" value={lead.id} />
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <PipelineEditField label="Lead Name">
+            <input
+              name="full_name"
+              defaultValue={lead.name}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Email">
+            <input
+              name="email"
+              type="email"
+              defaultValue={lead.email === "—" ? "" : lead.email}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Phone">
+            <input
+              name="phone"
+              defaultValue={lead.phone === "—" ? "" : lead.phone}
+              data-phone-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Status">
+            <select
+              name="status"
+              defaultValue={lead.status}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            >
+              {statusOrder.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </PipelineEditField>
+
+          <PipelineEditField label="Program">
+            <select
+              name="program"
+              defaultValue={lead.program}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            >
+              {programOrder.map((program) => (
+                <option key={program} value={program}>
+                  {program}
+                </option>
+              ))}
+            </select>
+          </PipelineEditField>
+
+          <PipelineEditField label="Source">
+            <select
+              name="source"
+              defaultValue={lead.source}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            >
+              {sourceOrder.map((source) => (
+                <option key={source} value={source}>
+                  {source}
+                </option>
+              ))}
+            </select>
+          </PipelineEditField>
+
+          <PipelineEditField label="ZIP Code">
+            <input
+              name="zip_code"
+              defaultValue={lead.zipCode}
+              data-zip-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="City">
+            <input
+              name="city"
+              defaultValue={lead.city}
+              data-city-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="State">
+            <input
+              name="state"
+              defaultValue={lead.state}
+              data-state-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="County">
+            <input
+              name="county"
+              defaultValue={lead.county}
+              data-county-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Country">
+            <input
+              name="country"
+              defaultValue={lead.country}
+              data-country-input="true"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+        </div>
+
+        <PipelineEditField label="Notes">
+          <textarea
+            name="notes"
+            defaultValue={lead.notes}
+            rows={3}
+            className="w-full resize-none rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold leading-6 text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+          />
+        </PipelineEditField>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <PipelineEditField label="Resume path or link">
+            <input
+              name="resume_file_url"
+              defaultValue={lead.documents.resumeUrl}
+              placeholder="student-hire/resume.pdf"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Cover letter link">
+            <input
+              name="cover_letter_file_url"
+              defaultValue={lead.documents.coverLetterUrl}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Other document link">
+            <input
+              name="other_document_file_url"
+              defaultValue={lead.documents.otherDocumentUrl}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Resume label">
+            <input
+              name="resume_file_name"
+              defaultValue={lead.documents.resumeName}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Cover letter label">
+            <input
+              name="cover_letter_file_name"
+              defaultValue={lead.documents.coverLetterName}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+
+          <PipelineEditField label="Other document label">
+            <input
+              name="other_document_file_name"
+              defaultValue={lead.documents.otherDocumentName}
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+            />
+          </PipelineEditField>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
+          >
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </details>
+  );
+}
+
+function PipelineEditField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function DocumentButtonGroup({
+  leadId,
+  documents,
+}: {
+  leadId: string;
+  documents: {
+    resumeUrl: string;
+    resumeName: string;
+    coverLetterUrl: string;
+    coverLetterName: string;
+    otherDocumentUrl: string;
+    otherDocumentName: string;
+  };
+}) {
+  const items = [
+    {
+      label: documents.resumeName || "Resume",
+      href:
+        documents.resumeUrl && leadId
+          ? `/admin/ambassador-leads/${leadId}/resume`
+          : documents.resumeUrl,
+      shortLabel: "Resume",
+      secure: Boolean(documents.resumeUrl && leadId),
+    },
+    {
+      label: documents.coverLetterName || "Cover Letter",
+      href: documents.coverLetterUrl,
+      shortLabel: "Cover",
+      secure: false,
+    },
+    {
+      label: documents.otherDocumentName || "Other Document",
+      href: documents.otherDocumentUrl,
+      shortLabel: "Docs",
+      secure: false,
+    },
+  ].filter((item) => item.href);
+
+  if (!items.length) {
+    return (
+      <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+        No documents
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex max-w-[260px] flex-wrap gap-2">
+      {items.map((item) => (
+        <Link
+          key={`${item.shortLabel}-${item.href}`}
+          href={item.href}
+          target="_blank"
+          rel="noreferrer"
+          title={
+            item.secure
+              ? `${item.label} opens through secure admin viewer`
+              : item.label
+          }
+          className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-100"
+        >
+          <FileText size={13} />
+          {item.shortLabel}
+          <ExternalLink size={11} />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function ContactLine({ icon, value }: { icon: ReactNode; value: string }) {
+  return (
+    <span className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+      {icon}
+      <span className="max-w-[190px] truncate">{value}</span>
+    </span>
+  );
+}
+
+function Avatar({ name }: { name: string }) {
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-black text-green-800">
+      {initials || "SG"}
+    </div>
+  );
+}
+
+function ActionCard({
+  icon,
+  title,
+  detail,
+  href,
+  action,
+}: {
+  icon: ReactNode;
+  title: string;
+  detail: string;
+  href: string;
+  action: string;
+}) {
+  return (
+    <div>
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+        {icon}
+      </div>
+      <h2 className="text-lg font-black text-slate-950">{title}</h2>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+        {detail}
       </p>
-    </Link>
+      <Link
+        href={href}
+        className="mt-5 inline-flex items-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 transition hover:bg-green-50"
+      >
+        {action}
+        <span>→</span>
+      </Link>
+    </div>
   );
 }
