@@ -16,6 +16,8 @@ import {
   PlayCircle,
   RotateCcw,
   Send,
+  ShieldCheck,
+  Sparkles,
   Users,
   Wallet,
 } from "lucide-react";
@@ -56,17 +58,26 @@ type AmbassadorSummaryRow = {
   photo_uploaded_at?: string | null;
   archived_at?: string | null;
   archived_reason?: string | null;
+  ambassador_type?: string | null;
+  display_name?: string | null;
+  tier?: string | null;
+  guru_referral_url?: string | null;
 };
 
-type AmbassadorPhotoRow = {
+type AmbassadorDetailRow = {
   id: string;
+  display_name: string | null;
+  ambassador_type: string | null;
+  tier: string | null;
+  status: string | null;
+  referral_code: string | null;
+  guru_referral_url: string | null;
   ambassador_photo_url: string | null;
   ambassador_photo_path: string | null;
   photo_approved: boolean | null;
   photo_uploaded_at: string | null;
   archived_at: string | null;
   archived_reason: string | null;
-  status: string | null;
 };
 
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
@@ -102,7 +113,7 @@ const ambassadorQuickActions = [
   },
 ];
 
-function isSuperUserEmail(email: string | null | undefined) {
+function isSuperUserEmail(email?: string | null) {
   return SUPER_USER_EMAILS.has((email || "").toLowerCase());
 }
 
@@ -111,81 +122,94 @@ function asString(value: unknown) {
 }
 
 function currency(value: number | null | undefined) {
-  const amount = Number(value || 0);
-
-  return amount.toLocaleString("en-US", {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-  });
+  }).format(Number.isFinite(Number(value)) ? Number(value) : 0);
 }
 
 function numberValue(value: number | null | undefined) {
-  return Number(value || 0);
+  return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
-function prettyStatus(status: string | null | undefined) {
-  if (!status) return "New";
+function prettyStatus(status?: string | null) {
+  const clean = asString(status);
 
-  return status
+  if (!clean) return "Not Started";
+
+  return clean
     .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ");
 }
 
-function isArchivedAmbassador(ambassador: AmbassadorSummaryRow) {
-  return ambassador.status === "archived" || Boolean(ambassador.archived_at);
+function isArchivedAmbassador(row: AmbassadorSummaryRow) {
+  return Boolean(row.archived_at) || row.status === "archived";
 }
 
-function statusClass(status: string | null | undefined) {
-  switch (status) {
-    case "active":
-      return "bg-emerald-100 text-emerald-800 ring-emerald-200";
-    case "conditional_offer_sent":
-    case "onboarding_sent":
-      return "bg-blue-100 text-blue-800 ring-blue-200";
-    case "paused":
-    case "nurture":
-      return "bg-amber-100 text-amber-800 ring-amber-200";
-    case "not_a_fit":
-    case "inactive":
-      return "bg-rose-100 text-rose-800 ring-rose-200";
-    case "archived":
-      return "bg-red-100 text-red-700 ring-red-200";
-    default:
-      return "bg-slate-100 text-slate-700 ring-slate-200";
+function statusClass(status?: string | null) {
+  const cleanStatus = status || "";
+
+  if (cleanStatus === "active") {
+    return "bg-emerald-100 text-emerald-800 ring-emerald-200";
   }
+
+  if (
+    cleanStatus === "conditional_offer_sent" ||
+    cleanStatus === "onboarding_sent"
+  ) {
+    return "bg-blue-100 text-blue-800 ring-blue-200";
+  }
+
+  if (cleanStatus === "paused") {
+    return "bg-amber-100 text-amber-800 ring-amber-200";
+  }
+
+  if (cleanStatus === "archived") {
+    return "bg-red-100 text-red-700 ring-red-200";
+  }
+
+  return "bg-slate-100 text-slate-700 ring-slate-200";
 }
 
-function photoStatusClass(
-  hasPhoto: boolean,
-  approved: boolean | null | undefined,
-) {
-  if (!hasPhoto) return "bg-slate-100 text-slate-600 ring-slate-200";
-  if (approved) return "bg-emerald-100 text-emerald-800 ring-emerald-200";
+function photoStatusClass(hasPhoto: boolean, approved?: boolean | null) {
+  if (!hasPhoto) {
+    return "bg-slate-100 text-slate-600 ring-slate-200";
+  }
+
+  if (approved) {
+    return "bg-emerald-100 text-emerald-800 ring-emerald-200";
+  }
 
   return "bg-amber-100 text-amber-800 ring-amber-200";
 }
 
-function getPhotoStatusLabel(
-  hasPhoto: boolean,
-  approved: boolean | null | undefined,
-) {
+function getPhotoStatusLabel(hasPhoto: boolean, approved?: boolean | null) {
   if (!hasPhoto) return "No Photo";
   if (approved) return "Photo Approved";
-
   return "Photo Pending";
 }
 
-function trainingClass(percent: number | null | undefined) {
-  const value = numberValue(percent);
+function trainingClass(percent: number) {
+  if (percent >= 100) return "bg-emerald-600";
+  if (percent >= 50) return "bg-blue-500";
+  if (percent > 0) return "bg-amber-500";
 
-  if (value >= 100) return "bg-emerald-500";
-  if (value >= 50) return "bg-amber-500";
-  return "bg-slate-400";
+  return "bg-slate-200";
 }
 
-function getInitials(name: string | null | undefined) {
-  const cleanName = name || "SitGuru Ambassador";
+function getAmbassadorName(ambassador: AmbassadorSummaryRow) {
+  return (
+    asString(ambassador.display_name) ||
+    asString(ambassador.full_name) ||
+    asString(ambassador.email) ||
+    "Unnamed Ambassador"
+  );
+}
+
+function getInitials(name?: string | null) {
+  const cleanName = asString(name) || "SitGuru Ambassador";
 
   return cleanName
     .split(" ")
@@ -193,6 +217,99 @@ function getInitials(name: string | null | undefined) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+}
+
+function normalizeText(value?: string | null) {
+  return asString(value).toLowerCase();
+}
+
+function getAmbassadorTypeLabel(ambassador: AmbassadorSummaryRow) {
+  const type = normalizeText(ambassador.ambassador_type);
+  const program = normalizeText(ambassador.program);
+  const source = normalizeText(ambassador.source);
+  const role = normalizeText(ambassador.internal_role);
+  const combined = `${type} ${program} ${source} ${role}`;
+
+  if (combined.includes("careerlink") || combined.includes("career link")) {
+    return "Community Ambassador";
+  }
+
+  if (combined.includes("student")) {
+    return "Student Ambassador";
+  }
+
+  if (combined.includes("veteran")) {
+    return "Veteran Ambassador";
+  }
+
+  if (combined.includes("military")) {
+    return "Military Ambassador";
+  }
+
+  if (combined.includes("vet tech") || combined.includes("veterinary")) {
+    return "Vet Tech Ambassador";
+  }
+
+  if (combined.includes("trainer")) {
+    return "Trainer Ambassador";
+  }
+
+  if (combined.includes("groomer")) {
+    return "Groomer Ambassador";
+  }
+
+  if (combined.includes("pet care") || combined.includes("pet professional")) {
+    return "Pet Care Professional Ambassador";
+  }
+
+  if (combined.includes("business") || combined.includes("partner")) {
+    return "Business Ambassador";
+  }
+
+  if (combined.includes("community")) {
+    return "Community Ambassador";
+  }
+
+  return "Ambassador";
+}
+
+function getSourceLabel(ambassador: AmbassadorSummaryRow) {
+  const source = asString(ambassador.source);
+
+  if (!source) return "Source not saved";
+
+  const lowerSource = source.toLowerCase();
+
+  if (lowerSource.includes("careerlink") || lowerSource.includes("career link")) {
+    return "PA CareerLink";
+  }
+
+  return source;
+}
+
+function getAmbassadorCategory(ambassador: AmbassadorSummaryRow) {
+  const typeLabel = getAmbassadorTypeLabel(ambassador);
+  const sourceLabel = getSourceLabel(ambassador);
+
+  if (sourceLabel === "PA CareerLink") return "PA CareerLink";
+  if (typeLabel.includes("Student")) return "Student";
+  if (typeLabel.includes("Community")) return "Community";
+  if (typeLabel.includes("Veteran")) return "Veteran";
+  if (typeLabel.includes("Military")) return "Military";
+  if (typeLabel.includes("Vet Tech")) return "Vet Tech";
+  if (typeLabel.includes("Trainer")) return "Trainer";
+  if (typeLabel.includes("Groomer")) return "Groomer";
+  if (typeLabel.includes("Pet Care Professional")) return "Pet Care Pro";
+  if (typeLabel.includes("Business")) return "Business";
+
+  return "Other";
+}
+
+function getLocationLabel(ambassador: AmbassadorSummaryRow) {
+  return (
+    [ambassador.city, ambassador.state].filter(Boolean).join(", ") ||
+    "Location not saved"
+  );
 }
 
 function buildAdminCards(rows: AmbassadorSummaryRow[]) {
@@ -204,12 +321,14 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
       value: rows.length.toLocaleString(),
       subtext: "All active and archived Ambassador records",
       icon: GraduationCap,
+      group: "Pipeline",
     },
     {
       label: "Active Pipeline",
       value: activeRows.length.toLocaleString(),
       subtext: "Not archived",
       icon: Users,
+      group: "Pipeline",
     },
     {
       label: "Pet Parent Signups",
@@ -218,6 +337,7 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
         .toLocaleString(),
       subtext: "Referred Pet Parent accounts",
       icon: PawPrint,
+      group: "Performance",
     },
     {
       label: "Guru Signups",
@@ -226,6 +346,7 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
         .toLocaleString(),
       subtext: "Referred Guru applicants/accounts",
       icon: Users,
+      group: "Performance",
     },
     {
       label: "Business Signups",
@@ -234,6 +355,7 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
         .toLocaleString(),
       subtext: "Local business/community leads",
       icon: BriefcaseBusiness,
+      group: "Performance",
     },
     {
       label: "Completed Bookings",
@@ -242,6 +364,7 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
         .toLocaleString(),
       subtext: "Referral-linked completed bookings",
       icon: CheckCircle2,
+      group: "Performance",
     },
     {
       label: "Pending Rewards",
@@ -250,6 +373,7 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
       ),
       subtext: "Possible future reward review",
       icon: Award,
+      group: "Rewards",
     },
     {
       label: "Ready for Payout",
@@ -261,6 +385,7 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
       ),
       subtext: "Queued for payout processing",
       icon: Wallet,
+      group: "Rewards",
     },
   ];
 }
@@ -345,46 +470,37 @@ function AmbassadorPhoto({
   ambassador: AmbassadorSummaryRow;
   size?: "normal" | "large";
 }) {
+  const name = getAmbassadorName(ambassador);
   const hasPhoto = Boolean(ambassador.ambassador_photo_url);
   const dimensionClass = size === "large" ? "h-20 w-20" : "h-14 w-14";
   const initialsClass = size === "large" ? "text-xl" : "text-sm";
 
   return (
     <div
-      className={`relative flex ${dimensionClass} shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#e8f5e9] ${initialsClass} font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]`}
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-[#dbe8d5] bg-[#e8f5e9] font-extrabold text-[#2f6f3e] ${dimensionClass} ${initialsClass}`}
     >
       {hasPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={ambassador.ambassador_photo_url || ""}
-          alt={`${ambassador.full_name || "Ambassador"} profile photo`}
+          alt={`${name} Ambassador profile`}
           className="h-full w-full object-cover"
         />
       ) : (
-        <span>{getInitials(ambassador.full_name) || "SG"}</span>
+        getInitials(name)
       )}
 
-      {!hasPhoto ? (
-        <div className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#2f6f3e] shadow-sm">
-          <Camera className="h-3 w-3" />
-        </div>
-      ) : null}
+      <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white text-[#2f6f3e] shadow-sm">
+        <Camera className="h-3 w-3" />
+      </span>
     </div>
   );
 }
 
-function CompactMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
+function CompactMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-[#f5f8f3] p-3 text-center ring-1 ring-[#edf3e8]">
-      <p className="text-lg font-extrabold leading-none text-[#102819]">
-        {value}
-      </p>
+    <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] px-4 py-3 text-center">
+      <p className="text-xl font-black leading-none text-[#102819]">{value}</p>
       <p className="mt-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
         {label}
       </p>
@@ -406,6 +522,8 @@ function AmbassadorQuickActions({
 }: {
   ambassador: AmbassadorSummaryRow;
 }) {
+  const ambassadorName = getAmbassadorName(ambassador);
+
   if (isArchivedAmbassador(ambassador)) {
     return (
       <form action={updateAmbassadorPipelineStatus}>
@@ -414,11 +532,7 @@ function AmbassadorQuickActions({
           name="ambassador_id"
           value={ambassador.ambassador_id}
         />
-        <input
-          type="hidden"
-          name="ambassador_name"
-          value={ambassador.full_name || "Ambassador"}
-        />
+        <input type="hidden" name="ambassador_name" value={ambassadorName} />
         <input type="hidden" name="next_status" value="contacted" />
         <button
           type="submit"
@@ -440,11 +554,7 @@ function AmbassadorQuickActions({
             name="ambassador_id"
             value={ambassador.ambassador_id}
           />
-          <input
-            type="hidden"
-            name="ambassador_name"
-            value={ambassador.full_name || "Ambassador"}
-          />
+          <input type="hidden" name="ambassador_name" value={ambassadorName} />
           <input type="hidden" name="next_status" value={action.value} />
           <button
             type="submit"
@@ -460,6 +570,11 @@ function AmbassadorQuickActions({
 }
 
 function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
+  const ambassadorName = getAmbassadorName(ambassador);
+  const ambassadorTypeLabel = getAmbassadorTypeLabel(ambassador);
+  const sourceLabel = getSourceLabel(ambassador);
+  const locationLabel = getLocationLabel(ambassador);
+  const category = getAmbassadorCategory(ambassador);
   const hasPhoto = Boolean(ambassador.ambassador_photo_url);
   const trainingPercent = numberValue(ambassador.training_percent);
   const archived = isArchivedAmbassador(ambassador);
@@ -479,7 +594,7 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="truncate text-lg font-extrabold text-[#102819]">
-                {ambassador.full_name || "Unnamed Ambassador"}
+                {ambassadorName}
               </h3>
               <span
                 className={`inline-flex rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide ring-1 ${photoStatusClass(
@@ -491,7 +606,16 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
               </span>
             </div>
 
-            <p className="mt-1 truncate text-sm font-semibold text-slate-600">
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className="inline-flex rounded-full bg-[#f0f7ed] px-3 py-1 text-xs font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
+                {ambassadorTypeLabel}
+              </span>
+              <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
+                {category}
+              </span>
+            </div>
+
+            <p className="mt-2 truncate text-sm font-semibold text-slate-600">
               {ambassador.email || "No email saved"}
             </p>
 
@@ -499,10 +623,7 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
               {ambassador.referral_code || "No referral code"}
             </p>
 
-            <p className="mt-1 text-xs text-slate-500">
-              {[ambassador.city, ambassador.state].filter(Boolean).join(", ") ||
-                "Location not saved"}
-            </p>
+            <p className="mt-1 text-xs text-slate-500">{locationLabel}</p>
 
             {archived ? (
               <p className="mt-2 rounded-2xl bg-red-100 px-3 py-2 text-xs font-bold leading-5 text-red-800">
@@ -522,8 +643,8 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
           >
             {archived ? "Archived" : prettyStatus(ambassador.status)}
           </span>
-          <span className="inline-flex rounded-full bg-[#f0f7ed] px-3 py-1 text-xs font-extrabold text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
-            {ambassador.program || "Student Hire"}
+          <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-extrabold text-blue-800 ring-1 ring-blue-100">
+            {sourceLabel}
           </span>
         </div>
       </div>
@@ -634,7 +755,7 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs font-semibold text-slate-500">
-          Source: {ambassador.source || "Indeed"}
+          Source: {sourceLabel}
         </p>
 
         <Link
@@ -682,6 +803,84 @@ function getNotice(
   return null;
 }
 
+function DashboardStatCard({
+  label,
+  value,
+  detail,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  icon: typeof GraduationCap;
+}) {
+  return (
+    <div className="rounded-3xl border border-[#dbe8d5] bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
+            {label}
+          </p>
+          <p className="mt-3 text-3xl font-extrabold text-[#102819]">{value}</p>
+        </div>
+        <div className="rounded-2xl bg-[#e8f5e9] p-3 text-[#2f6f3e]">
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+      <p className="mt-3 text-sm text-slate-600">{detail}</p>
+    </div>
+  );
+}
+
+function AmbassadorGroupSection({
+  title,
+  description,
+  ambassadors,
+  icon: Icon,
+}: {
+  title: string;
+  description: string;
+  ambassadors: AmbassadorSummaryRow[];
+  icon: typeof GraduationCap;
+}) {
+  if (ambassadors.length === 0) return null;
+
+  return (
+    <section className="space-y-4">
+      <div className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f5e9] text-[#2f6f3e]">
+              <Icon className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-extrabold text-[#102819]">
+                {title}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                {description}
+              </p>
+            </div>
+          </div>
+
+          <span className="rounded-2xl bg-[#f0f7ed] px-4 py-3 text-sm font-bold text-[#2f6f3e]">
+            {ambassadors.length} records
+          </span>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {ambassadors.map((ambassador) => (
+          <AmbassadorCard
+            key={ambassador.ambassador_id}
+            ambassador={ambassador}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default async function AdminAmbassadorsPage({
   searchParams,
 }: {
@@ -709,40 +908,48 @@ export default async function AdminAmbassadorsPage({
 
   const summaryRows = (data || []) as AmbassadorSummaryRow[];
 
-  let photoRows: AmbassadorPhotoRow[] = [];
+  let detailRows: AmbassadorDetailRow[] = [];
 
   if (summaryRows.length > 0) {
-    const { data: photoData } = await supabase
+    const { data: detailData } = await supabase
       .from("ambassadors")
       .select(
-        "id, status, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at, archived_at, archived_reason",
+        "id, display_name, ambassador_type, tier, status, referral_code, guru_referral_url, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at, archived_at, archived_reason",
       )
       .in(
         "id",
         summaryRows.map((row) => row.ambassador_id),
       );
 
-    photoRows = (photoData || []) as AmbassadorPhotoRow[];
+    detailRows = (detailData || []) as AmbassadorDetailRow[];
   }
 
-  const photoMap = new Map(photoRows.map((row) => [row.id, row]));
+  const detailMap = new Map(detailRows.map((row) => [row.id, row]));
 
   const ambassadors = summaryRows.map((row) => {
-    const photo = photoMap.get(row.ambassador_id);
+    const detail = detailMap.get(row.ambassador_id);
 
     return {
       ...row,
-      status: photo?.status || row.status,
-      ambassador_photo_url: photo?.ambassador_photo_url || null,
-      ambassador_photo_path: photo?.ambassador_photo_path || null,
-      photo_approved: photo?.photo_approved || false,
-      photo_uploaded_at: photo?.photo_uploaded_at || null,
-      archived_at: photo?.archived_at || null,
-      archived_reason: photo?.archived_reason || null,
+      display_name: detail?.display_name || null,
+      ambassador_type: detail?.ambassador_type || null,
+      tier: detail?.tier || null,
+      status: detail?.status || row.status,
+      referral_code: detail?.referral_code || row.referral_code,
+      guru_referral_url: detail?.guru_referral_url || null,
+      ambassador_photo_url: detail?.ambassador_photo_url || null,
+      ambassador_photo_path: detail?.ambassador_photo_path || null,
+      photo_approved: detail?.photo_approved || false,
+      photo_uploaded_at: detail?.photo_uploaded_at || null,
+      archived_at: detail?.archived_at || null,
+      archived_reason: detail?.archived_reason || null,
     };
   });
 
   const cards = buildAdminCards(ambassadors);
+  const pipelineCards = cards.filter((card) => card.group === "Pipeline");
+  const performanceCards = cards.filter((card) => card.group === "Performance");
+  const rewardCards = cards.filter((card) => card.group === "Rewards");
 
   const activeCount = ambassadors.filter(
     (row) => row.status === "active",
@@ -758,6 +965,36 @@ export default async function AdminAmbassadorsPage({
     (row) => row.ambassador_photo_url && row.photo_approved,
   ).length;
 
+  const activeAmbassadors = ambassadors.filter(
+    (row) => row.status === "active" && !isArchivedAmbassador(row),
+  );
+  const onboardingAmbassadors = ambassadors.filter(
+    (row) =>
+      ["conditional_offer_sent", "onboarding_sent", "new"].includes(
+        row.status || "",
+      ) && !isArchivedAmbassador(row),
+  );
+  const paCareerLinkAmbassadors = ambassadors.filter(
+    (row) => getAmbassadorCategory(row) === "PA CareerLink",
+  );
+  const studentAmbassadors = ambassadors.filter(
+    (row) => getAmbassadorCategory(row) === "Student",
+  );
+  const otherAmbassadors = ambassadors.filter((row) => {
+    const category = getAmbassadorCategory(row);
+
+    return (
+      !isArchivedAmbassador(row) &&
+      category !== "PA CareerLink" &&
+      category !== "Student" &&
+      row.status !== "active" &&
+      !["conditional_offer_sent", "onboarding_sent", "new"].includes(
+        row.status || "",
+      )
+    );
+  });
+  const archivedAmbassadors = ambassadors.filter(isArchivedAmbassador);
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5f8f3] px-3 py-5 text-[#17351f] sm:px-5 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
@@ -770,11 +1007,11 @@ export default async function AdminAmbassadorsPage({
               <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#102819] sm:text-4xl">
                 Ambassador Dashboard
               </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Track Student Ambassadors, Pet Parent signups, Guru signups,
-                business signups, completed bookings, rewards, commissions,
-                profile photos, archive status, and payout readiness from one
-                admin view.
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+                Track all SitGuru Ambassadors, including Student, Community, PA
+                CareerLink, Veteran, Military, Vet Tech, Trainer, Groomer, Pet
+                Care Professional, and business referral partners from one admin
+                view.
               </p>
             </div>
 
@@ -836,49 +1073,87 @@ export default async function AdminAmbassadorsPage({
           </section>
         ) : null}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {cards.map((card) => {
-            const Icon = card.icon;
+        <section className="grid gap-4 xl:grid-cols-3">
+          <div className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-[#2f6f3e]" />
+              <h2 className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#102819]">
+                Pipeline
+              </h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {pipelineCards.map((card) => (
+                <DashboardStatCard
+                  key={card.label}
+                  label={card.label}
+                  value={card.value}
+                  detail={card.subtext}
+                  icon={card.icon}
+                />
+              ))}
+            </div>
+          </div>
 
-            return (
-              <div
-                key={card.label}
-                className="rounded-3xl border border-[#dbe8d5] bg-white p-5 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
-                      {card.label}
-                    </p>
-                    <p className="mt-3 text-3xl font-extrabold text-[#102819]">
-                      {card.value}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-[#e8f5e9] p-3 text-[#2f6f3e]">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                </div>
-                <p className="mt-3 text-sm text-slate-600">{card.subtext}</p>
-              </div>
-            );
-          })}
+          <div className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-[#2f6f3e]" />
+              <h2 className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#102819]">
+                Performance
+              </h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {performanceCards.map((card) => (
+                <DashboardStatCard
+                  key={card.label}
+                  label={card.label}
+                  value={card.value}
+                  detail={card.subtext}
+                  icon={card.icon}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <HandCoins className="h-5 w-5 text-[#2f6f3e]" />
+              <h2 className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#102819]">
+                Rewards & Payouts
+              </h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {rewardCards.map((card) => (
+                <DashboardStatCard
+                  key={card.label}
+                  label={card.label}
+                  value={card.value}
+                  detail={card.subtext}
+                  icon={card.icon}
+                />
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-xl font-extrabold text-[#102819]">
-                Student Ambassadors
+                Ambassador Pipeline
               </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Card-based admin view with wired status buttons. Archive
-                declined candidates instead of deleting them.
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                Organized card-based admin view for all Ambassador types.
+                Existing status buttons, archive controls, rewards, training,
+                photos, messenger access, and detail links remain wired.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <span className="rounded-2xl bg-[#f0f7ed] px-4 py-3 text-sm font-bold text-[#2f6f3e]">
-                Source: Indeed
+                All Types: {ambassadors.length}
+              </span>
+              <span className="rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">
+                PA CareerLink: {paCareerLinkAmbassadors.length}
               </span>
               <span className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
                 Photos Approved: {photoApprovedCount}
@@ -901,14 +1176,49 @@ export default async function AdminAmbassadorsPage({
             </p>
           </section>
         ) : (
-          <section className="grid gap-4 xl:grid-cols-2">
-            {ambassadors.map((ambassador) => (
-              <AmbassadorCard
-                key={ambassador.ambassador_id}
-                ambassador={ambassador}
-              />
-            ))}
-          </section>
+          <div className="space-y-6">
+            <AmbassadorGroupSection
+              title="Active Ambassadors"
+              description="Ambassadors currently active in referral and growth activity."
+              ambassadors={activeAmbassadors}
+              icon={PlayCircle}
+            />
+
+            <AmbassadorGroupSection
+              title="Onboarding"
+              description="New and onboarding Ambassadors who need setup, follow-up, training, or first outreach."
+              ambassadors={onboardingAmbassadors}
+              icon={Send}
+            />
+
+            <AmbassadorGroupSection
+              title="PA CareerLink / Community Hire"
+              description="Community Ambassador and future Guru candidates sourced from PA CareerLink."
+              ambassadors={paCareerLinkAmbassadors}
+              icon={Users}
+            />
+
+            <AmbassadorGroupSection
+              title="Student Ambassadors"
+              description="Student Ambassador candidates and approved student referral partners."
+              ambassadors={studentAmbassadors}
+              icon={GraduationCap}
+            />
+
+            <AmbassadorGroupSection
+              title="Other Ambassadors"
+              description="Veteran, Military, Vet Tech, Trainer, Groomer, Pet Care Professional, business, and general Ambassador records."
+              ambassadors={otherAmbassadors}
+              icon={BriefcaseBusiness}
+            />
+
+            <AmbassadorGroupSection
+              title="Archived Ambassadors"
+              description="Retained applicant and Ambassador records that are no longer active."
+              ambassadors={archivedAmbassadors}
+              icon={Archive}
+            />
+          </div>
         )}
       </div>
     </main>
