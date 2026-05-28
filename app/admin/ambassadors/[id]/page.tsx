@@ -1024,7 +1024,7 @@ function AmbassadorQuickActions({
               disabled={disabled}
               title={
                 disabled
-                  ? "Profile must meet all required activation items first."
+                  ? "Basic referral setup must be complete before this Ambassador can start referring."
                   : undefined
               }
               className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-extrabold ring-1 transition ${
@@ -1173,7 +1173,9 @@ function buildProfileCompletionSummary({
   );
   const hasEmail = Boolean(asString(ambassador.email));
   const hasPhone = Boolean(asString(ambassador.phone));
-  const hasLocation = Boolean(asString(ambassador.city) && asString(ambassador.state));
+  const hasLocation = Boolean(
+    asString(ambassador.city) && asString(ambassador.state),
+  );
   const hasReferralCode = Boolean(asString(ambassador.referral_code));
   const hasPhoto = Boolean(
     asString(ambassador.ambassador_photo_url) ||
@@ -1185,9 +1187,11 @@ function buildProfileCompletionSummary({
     !ambassador.eligibility_review_required ||
     ambassador.eligibility_review_complete === true;
   const trainingComplete =
-    trainingCounts.required === 0 || trainingCounts.completed >= trainingCounts.required;
+    trainingCounts.required === 0 ||
+    trainingCounts.completed >= trainingCounts.required;
   const documentsComplete =
-    documentCounts.required === 0 || documentCounts.approved >= documentCounts.required;
+    documentCounts.required === 0 ||
+    documentCounts.approved >= documentCounts.required;
 
   const items: CompletionItem[] = [
     {
@@ -1229,54 +1233,58 @@ function buildProfileCompletionSummary({
       key: "photo_uploaded",
       label: "Profile photo uploaded",
       complete: hasPhoto,
-      required: true,
-      detail: hasPhoto ? "Photo is uploaded." : "Upload profile photo.",
+      required: false,
+      detail: hasPhoto
+        ? "Photo is uploaded."
+        : "Recommended before public promotion, but not required to start referring.",
     },
     {
       key: "photo_approved",
       label: "Profile photo approved",
       complete: photoApproved,
-      required: true,
-      detail: photoApproved ? "Photo is approved." : "Approve profile photo.",
+      required: false,
+      detail: photoApproved
+        ? "Photo is approved."
+        : "Recommended before public promotion, but not required to start referring.",
     },
     {
       key: "terms",
       label: "Terms accepted",
       complete: termsAccepted,
-      required: true,
+      required: false,
       detail: termsAccepted
         ? `Accepted ${formatDate(ambassador.terms_accepted_at)}.`
-        : "Terms are not accepted yet.",
+        : "Required before payout, but not required to start referring.",
     },
     {
       key: "eligibility",
       label: "Eligibility review complete",
       complete: eligibilityComplete,
-      required: Boolean(ambassador.eligibility_review_required),
+      required: false,
       detail: ambassador.eligibility_review_required
         ? eligibilityComplete
           ? "Eligibility review is complete."
-          : "Eligibility review is required."
+          : "Required before payout or public promotion."
         : "Eligibility review is not required.",
     },
     {
       key: "training",
       label: "Required training complete",
       complete: trainingComplete,
-      required: trainingCounts.required > 0,
+      required: false,
       detail:
         trainingCounts.required > 0
-          ? `${trainingCounts.completed}/${trainingCounts.required} required training steps complete.`
+          ? `${trainingCounts.completed}/${trainingCounts.required} required training steps complete. Required before payout/public promotion, but not required to start referring.`
           : `No required training steps configured. Current training score: ${trainingPercent}%.`,
     },
     {
       key: "documents",
       label: "Required documents approved",
       complete: documentsComplete,
-      required: documentCounts.required > 0,
+      required: false,
       detail:
         documentCounts.required > 0
-          ? `${documentCounts.approved}/${documentCounts.required} required documents approved.`
+          ? `${documentCounts.approved}/${documentCounts.required} required documents approved. Required before payout/public promotion, but not required to start referring.`
           : "No required documents configured.",
     },
   ];
@@ -1319,18 +1327,28 @@ function getPayoutReadiness({
     asString(ambassador.tax_info_status) !== "" &&
     ambassador.tax_info_status !== "not_started";
   const payoutMethodSaved = Boolean(asString(ambassador.payout_method));
+  const termsAccepted = Boolean(ambassador.terms_accepted_at);
 
   const items: CompletionItem[] = [
     {
       key: "profile",
-      label: "Profile activation requirements complete",
+      label: "Basic referral setup complete",
       complete: completion.completeRequired,
       required: true,
       detail: completion.completeRequired
-        ? "Profile is activation-ready."
+        ? "Ambassador can be active and start referring."
         : `Missing: ${completion.missingRequiredItems
             .map((item) => item.label)
             .join(", ")}.`,
+    },
+    {
+      key: "terms",
+      label: "Terms accepted",
+      complete: termsAccepted,
+      required: true,
+      detail: termsAccepted
+        ? `Accepted ${formatDate(ambassador.terms_accepted_at)}.`
+        : "Terms must be accepted before commissions or rewards are paid.",
     },
     {
       key: "stripe_account",
@@ -1451,12 +1469,13 @@ function ProfileCompletionPanel({
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-[#2f6f3e]" />
             <h2 className="text-xl font-extrabold text-[#102819]">
-              Profile Completion Meter
+              Activation Readiness Meter
             </h2>
           </div>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            Ambassadors cannot be marked Active until all required profile,
-            photo, terms, training, document, and review items are complete.
+            Ambassadors can be marked Active once basic referral setup is
+            complete. Photo, terms, training, documents, Stripe, and tax setup
+            are tracked separately for public promotion and payout readiness.
           </p>
         </div>
 
@@ -1477,7 +1496,7 @@ function ProfileCompletionPanel({
                   : "bg-rose-100 text-rose-800 ring-rose-200"
               }`}
             >
-              {completion.completeRequired ? "Ready to Activate" : "Not Ready"}
+              {completion.completeRequired ? "Can Start Referring" : "Not Ready"}
             </span>
           </div>
 
@@ -1491,8 +1510,8 @@ function ProfileCompletionPanel({
           </div>
 
           <p className="mt-3 text-xs font-bold leading-5 text-slate-600">
-            {completion.completedRequiredCount}/{completion.requiredCount} required
-            items complete.
+            {completion.completedRequiredCount}/{completion.requiredCount} basic
+            activation items complete.
           </p>
         </div>
       </div>
@@ -1503,7 +1522,7 @@ function ProfileCompletionPanel({
             <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-rose-700" />
             <div>
               <p className="font-extrabold text-rose-900">
-                This Ambassador is not ready to activate yet.
+                This Ambassador is not ready to start referring yet.
               </p>
               <p className="mt-1 text-sm font-semibold leading-6 text-rose-800">
                 Missing:{" "}
@@ -1543,9 +1562,9 @@ function PayoutReadinessPanel({
             </h2>
           </div>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            Ambassadors should not receive commissions or rewards until profile
-            requirements, terms, tax setup, and Stripe Connect payout readiness
-            are complete.
+            Ambassadors may be Active and start referring before Stripe is
+            complete. Commissions and rewards remain blocked until terms, tax
+            setup, Stripe Connect, and payout readiness are complete.
           </p>
         </div>
 
@@ -1639,9 +1658,9 @@ function AdminNotice({
           <div>
             <p className="font-black">Active status blocked</p>
             <p className="mt-1 text-sm font-semibold leading-6">
-              This Ambassador cannot be marked Active until all required profile,
-              onboarding, photo, terms, training, document, and review items are
-              complete.
+              This Ambassador cannot be marked Active until basic referral setup
+              is complete: name, email, phone, city/state, and referral code.
+              Stripe setup is only required before payout.
             </p>
           </div>
         </div>
@@ -2070,9 +2089,9 @@ export default async function AdminAmbassadorDetailPage({
                   </h2>
                 </div>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                  Move this Ambassador through the onboarding pipeline. Active
-                  status is blocked until all required completion items are
-                  finished.
+                  Active status is allowed once basic referral setup is complete.
+                  Payouts remain blocked until Stripe Connect, tax setup, terms,
+                  and payout readiness are complete.
                 </p>
               </div>
 
@@ -2080,16 +2099,18 @@ export default async function AdminAmbassadorDetailPage({
                 <div className="rounded-3xl border border-rose-100 bg-rose-50 p-4 text-sm font-semibold leading-6 text-rose-800">
                   <p className="font-black">Activation locked</p>
                   <p className="mt-1">
-                    Complete the missing profile, photo, terms, training,
-                    document, or review items before marking this Ambassador
-                    Active.
+                    Complete the missing basic referral setup items before
+                    marking this Ambassador Active. Photo, terms, training,
+                    documents, and Stripe are still tracked for payout readiness.
                   </p>
                 </div>
               ) : (
                 <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold leading-6 text-emerald-800">
-                  <p className="font-black">Ready to activate</p>
+                  <p className="font-black">Ready to start referring</p>
                   <p className="mt-1">
-                    Required Ambassador profile and onboarding items are complete.
+                    Basic Ambassador referral setup is complete. This person can
+                    be Active and begin referring Pet Parents, Gurus, and
+                    business/community leads. Payout readiness remains separate.
                   </p>
                 </div>
               )}
@@ -2481,7 +2502,8 @@ export default async function AdminAmbassadorDetailPage({
                       {trainingCounts.completed} / {trainingCounts.required}
                     </p>
                     <p className="mt-2 text-xs font-bold text-slate-500">
-                      Complete before active Ambassador status.
+                      Complete before payout/public promotion, not before basic
+                      referral activity.
                     </p>
                   </div>
 
