@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{
-    conversationid: string;
+    conversationId: string;
   }>;
   searchParams?: Promise<{
     sent?: string;
@@ -89,6 +89,9 @@ type ProfileRow = {
   last_name?: string | null;
   email?: string | null;
   phone?: string | null;
+  phone_number?: string | null;
+  mobile_phone?: string | null;
+  cell_phone?: string | null;
   role?: string | null;
   avatar_url?: string | null;
   profile_photo_url?: string | null;
@@ -103,6 +106,9 @@ type GuruRow = {
   full_name?: string | null;
   email?: string | null;
   phone?: string | null;
+  phone_number?: string | null;
+  mobile_phone?: string | null;
+  cell_phone?: string | null;
   avatar_url?: string | null;
   profile_photo_url?: string | null;
 };
@@ -191,6 +197,17 @@ function getProfileAvatar(profile?: ProfileRow | null) {
   );
 }
 
+function getProfilePhone(profile?: ProfileRow | null) {
+  if (!profile) return "";
+
+  return (
+    safeString(profile.phone) ||
+    safeString(profile.phone_number) ||
+    safeString(profile.mobile_phone) ||
+    safeString(profile.cell_phone)
+  );
+}
+
 function getGuruName(guru?: GuruRow | null) {
   if (!guru) return "";
 
@@ -205,6 +222,17 @@ function getGuruAvatar(guru?: GuruRow | null) {
   if (!guru) return "";
 
   return safeString(guru.avatar_url) || safeString(guru.profile_photo_url);
+}
+
+function getGuruPhone(guru?: GuruRow | null) {
+  if (!guru) return "";
+
+  return (
+    safeString(guru.phone) ||
+    safeString(guru.phone_number) ||
+    safeString(guru.mobile_phone) ||
+    safeString(guru.cell_phone)
+  );
 }
 
 function getInitials(name: string) {
@@ -271,127 +299,133 @@ function buildThreadUrl(conversationId: string) {
   return `${getBaseUrl()}/messages/${conversationId}`;
 }
 
-function buildAdminThreadUrl(conversationId: string) {
-  return `${getBaseUrl()}/admin/messages/${conversationId}`;
-}
-
 async function sendRecipientEmail(params: {
   toEmail: string;
   recipientName: string;
   senderName: string;
   conversationId: string;
 }) {
-  const apiKey = safeString(process.env.RESEND_API_KEY);
-  const toEmail = safeString(params.toEmail);
+  try {
+    const apiKey = safeString(process.env.RESEND_API_KEY);
+    const toEmail = safeString(params.toEmail);
 
-  if (!apiKey || !toEmail) {
-    return false;
-  }
+    if (!apiKey || !toEmail) {
+      return false;
+    }
 
-  const resend = new Resend(apiKey);
-  const threadUrl = buildThreadUrl(params.conversationId);
-  const safeRecipientName = escapeHtml(params.recipientName || "there");
-  const safeSenderName = escapeHtml(params.senderName || "SitGuru Admin");
+    const resend = new Resend(apiKey);
+    const threadUrl = buildThreadUrl(params.conversationId);
+    const safeRecipientName = escapeHtml(params.recipientName || "there");
+    const safeSenderName = escapeHtml(params.senderName || "SitGuru Admin");
 
-  const result = await resend.emails.send({
-    from: getSupportFromEmail(),
-    to: [toEmail],
-    replyTo: getSupportReplyToEmail(),
-    subject: "New SitGuru Message",
-    html: `
-      <div style="font-family: Arial, sans-serif; background: #f6fbf7; padding: 24px;">
-        <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #dcefe2; border-radius: 18px; overflow: hidden;">
-          <div style="background: #0f5132; color: #ffffff; padding: 24px;">
-            <h1 style="margin: 0; font-size: 24px;">New SitGuru Message</h1>
-            <p style="margin: 8px 0 0; color: #d9f7e5;">Trusted Pet Care. Simplified.</p>
-          </div>
-          <div style="padding: 24px; color: #123524;">
-            <p style="font-size: 16px; line-height: 1.6;">Hi ${safeRecipientName},</p>
-            <p style="font-size: 16px; line-height: 1.6;">
-              You have a new message from ${safeSenderName} in your SitGuru account.
-            </p>
-            <p style="margin: 24px 0;">
-              <a href="${threadUrl}" style="display: inline-block; background: #0f8f4f; color: #ffffff; text-decoration: none; padding: 13px 20px; border-radius: 999px; font-weight: 700;">
-                Open SitGuru Message
-              </a>
-            </p>
-            <p style="font-size: 13px; color: #607568; line-height: 1.6;">
-              Please log in to SitGuru to read and reply to this message.
-            </p>
+    const result = await resend.emails.send({
+      from: getSupportFromEmail(),
+      to: [toEmail],
+      replyTo: getSupportReplyToEmail(),
+      subject: "New SitGuru Message",
+      html: `
+        <div style="font-family: Arial, sans-serif; background: #f6fbf7; padding: 24px;">
+          <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #dcefe2; border-radius: 18px; overflow: hidden;">
+            <div style="background: #0f5132; color: #ffffff; padding: 24px;">
+              <h1 style="margin: 0; font-size: 24px;">New SitGuru Message</h1>
+              <p style="margin: 8px 0 0; color: #d9f7e5;">Trusted Pet Care. Simplified.</p>
+            </div>
+            <div style="padding: 24px; color: #123524;">
+              <p style="font-size: 16px; line-height: 1.6;">Hi ${safeRecipientName},</p>
+              <p style="font-size: 16px; line-height: 1.6;">
+                You have a new message from ${safeSenderName} in your SitGuru account.
+              </p>
+              <p style="margin: 24px 0;">
+                <a href="${threadUrl}" style="display: inline-block; background: #0f8f4f; color: #ffffff; text-decoration: none; padding: 13px 20px; border-radius: 999px; font-weight: 700;">
+                  Open SitGuru Message
+                </a>
+              </p>
+              <p style="font-size: 13px; color: #607568; line-height: 1.6;">
+                Please log in to SitGuru to read and reply to this message.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-    `,
-    text: [
-      `Hi ${params.recipientName || "there"},`,
-      "",
-      `You have a new message from ${params.senderName || "SitGuru Admin"} in your SitGuru account.`,
-      "",
-      `Open your message here: ${threadUrl}`,
-      "",
-      "Thank you,",
-      "SitGuru",
-      "Trusted Pet Care. Simplified.",
-    ].join("\n"),
-  });
+      `,
+      text: [
+        `Hi ${params.recipientName || "there"},`,
+        "",
+        `You have a new message from ${params.senderName || "SitGuru Admin"} in your SitGuru account.`,
+        "",
+        `Open your message here: ${threadUrl}`,
+        "",
+        "Thank you,",
+        "SitGuru",
+        "Trusted Pet Care. Simplified.",
+      ].join("\n"),
+    });
 
-  if (result.error) {
-    console.error("Recipient email delivery failed:", result.error);
+    if (result.error) {
+      console.error("Recipient email delivery failed:", result.error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Recipient email delivery error:", error);
     return false;
   }
-
-  return true;
 }
 
 async function sendRecipientSms(params: {
   toPhone: string;
   conversationId: string;
 }) {
-  const accountSid = safeString(process.env.TWILIO_ACCOUNT_SID);
-  const authToken = safeString(process.env.TWILIO_AUTH_TOKEN);
-  const messagingServiceSid = safeString(process.env.TWILIO_MESSAGING_SERVICE_SID);
-  const fromPhone = safeString(process.env.TWILIO_PHONE_NUMBER);
-  const toPhone = normalizeUsPhone(params.toPhone);
+  try {
+    const accountSid = safeString(process.env.TWILIO_ACCOUNT_SID);
+    const authToken = safeString(process.env.TWILIO_AUTH_TOKEN);
+    const messagingServiceSid = safeString(process.env.TWILIO_MESSAGING_SERVICE_SID);
+    const fromPhone = safeString(process.env.TWILIO_PHONE_NUMBER);
+    const toPhone = normalizeUsPhone(params.toPhone);
 
-  if (!accountSid || !authToken || !toPhone || (!messagingServiceSid && !fromPhone)) {
-    return false;
-  }
+    if (!accountSid || !authToken || !toPhone || (!messagingServiceSid && !fromPhone)) {
+      return false;
+    }
 
-  const threadUrl = buildThreadUrl(params.conversationId);
-  const messageBody = `SitGuru: You have a new message from SitGuru Admin. Log in to view and reply: ${threadUrl}`;
+    const threadUrl = buildThreadUrl(params.conversationId);
+    const messageBody = `SitGuru: You have a new message from SitGuru Admin. Log in to view and reply: ${threadUrl}`;
 
-  const body = new URLSearchParams({
-    To: toPhone,
-    Body: messageBody,
-  });
+    const body = new URLSearchParams({
+      To: toPhone,
+      Body: messageBody,
+    });
 
-  if (messagingServiceSid) {
-    body.set("MessagingServiceSid", messagingServiceSid);
-  } else {
-    body.set("From", fromPhone);
-  }
+    if (messagingServiceSid) {
+      body.set("MessagingServiceSid", messagingServiceSid);
+    } else {
+      body.set("From", fromPhone);
+    }
 
-  const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString(
-          "base64",
-        )}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString(
+            "base64",
+          )}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
       },
-      body,
-    },
-  );
+    );
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    console.error("Recipient SMS delivery failed:", response.status, text);
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.error("Recipient SMS delivery failed:", response.status, text);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Recipient SMS delivery error:", error);
     return false;
   }
-
-  return true;
 }
 
 async function createRecipientNotification(params: {
@@ -399,27 +433,32 @@ async function createRecipientNotification(params: {
   conversationId: string;
   preview: string;
 }) {
-  const now = new Date().toISOString();
-  const threadHref = `/messages/${params.conversationId}`;
+  try {
+    const now = new Date().toISOString();
+    const threadHref = `/messages/${params.conversationId}`;
 
-  const { error } = await supabaseAdmin.from("notifications").insert({
-    user_id: params.userId,
-    title: "New SitGuru Message",
-    body: params.preview || "You have a new message from SitGuru Admin.",
-    type: "message",
-    href: threadHref,
-    link: threadHref,
-    is_read: false,
-    created_at: now,
-    updated_at: now,
-  });
+    const { error } = await supabaseAdmin.from("notifications").insert({
+      user_id: params.userId,
+      title: "New SitGuru Message",
+      body: params.preview || "You have a new message from SitGuru Admin.",
+      type: "message",
+      href: threadHref,
+      link: threadHref,
+      is_read: false,
+      created_at: now,
+      updated_at: now,
+    });
 
-  if (error) {
-    console.error("Recipient notification insert failed:", error.message);
+    if (error) {
+      console.error("Recipient notification insert failed:", error.message);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Recipient notification insert error:", error);
     return false;
   }
-
-  return true;
 }
 
 async function getConversationRecipient({
@@ -429,10 +468,7 @@ async function getConversationRecipient({
   conversationId: string;
   currentUserId: string;
 }) {
-  const [
-    { data: conversation },
-    { data: participants },
-  ] = await Promise.all([
+  const [{ data: conversation }, { data: participants }] = await Promise.all([
     supabaseAdmin
       .from("conversations")
       .select("*")
@@ -451,16 +487,13 @@ async function getConversationRecipient({
       (participant) =>
         participant.user_id !== currentUserId &&
         normalizeRole(participant.role) !== "admin",
-    ) ||
-    participantRows.find((participant) => participant.user_id !== currentUserId);
+    ) || participantRows.find((participant) => participant.user_id !== currentUserId);
 
   const recipientUserId =
     preferredRecipient?.user_id ||
     conversation?.guru_id ||
     conversation?.customer_id ||
     "";
-
-  const recipientRole = normalizeRole(preferredRecipient?.role || "");
 
   if (!recipientUserId) {
     return null;
@@ -479,18 +512,25 @@ async function getConversationRecipient({
       .maybeSingle<GuruRow>(),
   ]);
 
+  const profileRow = profile as ProfileRow | null;
+  const guruRow = guru as GuruRow | null;
+
+  const recipientRole = normalizeRole(
+    preferredRecipient?.role || profileRow?.role || (guruRow?.user_id ? "guru" : "user"),
+  );
+
   const recipientName =
-    getGuruName(guru as GuruRow | null) ||
-    getProfileName(profile as ProfileRow | null) ||
+    getGuruName(guruRow) ||
+    getProfileName(profileRow) ||
     "SitGuru User";
 
   const recipientEmail =
-    safeString((profile as ProfileRow | null)?.email) ||
-    safeString((guru as GuruRow | null)?.email);
+    safeString(profileRow?.email) ||
+    safeString(guruRow?.email);
 
   const recipientPhone =
-    safeString((profile as ProfileRow | null)?.phone) ||
-    safeString((guru as GuruRow | null)?.phone);
+    getProfilePhone(profileRow) ||
+    getGuruPhone(guruRow);
 
   return {
     userId: recipientUserId,
@@ -499,6 +539,43 @@ async function getConversationRecipient({
     email: recipientEmail,
     phone: recipientPhone,
   } satisfies RecipientContact;
+}
+
+async function writeAdminAuditLog(params: {
+  actorId: string;
+  actorEmail: string | null;
+  conversationId: string;
+  recipient: RecipientContact;
+  notificationSent: boolean;
+  emailSent: boolean;
+  smsSent: boolean;
+}) {
+  try {
+    const { error } = await supabaseAdmin.from("admin_audit_logs").insert({
+      actor_id: params.actorId,
+      actor_email: params.actorEmail || null,
+      action: "admin_message_sent",
+      area: "admin.messages",
+      target_type: "conversation",
+      target_id: params.conversationId,
+      metadata: {
+        recipient_user_id: params.recipient.userId,
+        recipient_role: params.recipient.role,
+        recipient_email_available: Boolean(params.recipient.email),
+        recipient_phone_available: Boolean(params.recipient.phone),
+        notification_sent: params.notificationSent,
+        email_sent: params.emailSent,
+        sms_sent: params.smsSent,
+      },
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error("Admin audit log insert failed:", error.message);
+    }
+  } catch (error) {
+    console.error("Admin audit log insert error:", error);
+  }
 }
 
 async function sendAdminMessage(conversationId: string, formData: FormData) {
@@ -616,23 +693,14 @@ async function sendAdminMessage(conversationId: string, formData: FormData) {
     conversationId,
   });
 
-  await supabaseAdmin.from("admin_audit_logs").insert({
-    actor_id: user.id,
-    actor_email: user.email || null,
-    action: "admin_message_sent",
-    area: "admin.messages",
-    target_type: "conversation",
-    target_id: conversationId,
-    metadata: {
-      recipient_user_id: recipient.userId,
-      recipient_role: recipient.role,
-      recipient_email_available: Boolean(recipient.email),
-      recipient_phone_available: Boolean(recipient.phone),
-      notification_sent: notificationSent,
-      email_sent: emailSent,
-      sms_sent: smsSent,
-    },
-    created_at: now,
+  await writeAdminAuditLog({
+    actorId: user.id,
+    actorEmail: user.email || null,
+    conversationId,
+    recipient,
+    notificationSent,
+    emailSent,
+    smsSent,
   });
 
   revalidatePath("/admin/messages");
@@ -647,7 +715,7 @@ async function sendAdminMessage(conversationId: string, formData: FormData) {
     .filter(Boolean)
     .join("_");
 
-  redirect(`/admin/messages/${conversationId}?sent=1&delivery=${delivery || "app"}`);
+  redirect(`/admin/messages/${conversationId}?sent=1&delivery=${delivery || "none"}`);
 }
 
 function Avatar({
@@ -708,7 +776,7 @@ function DeliveryBanner({
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-black text-green-900 ring-1 ring-green-100">
                 <Bell className="h-3.5 w-3.5" />
-                In-app notification {parts.includes("app") ? "sent" : "attempted"}
+                In-app notification {parts.includes("app") ? "sent" : "not sent"}
               </span>
               <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-black text-green-900 ring-1 ring-green-100">
                 <Mail className="h-3.5 w-3.5" />
@@ -768,7 +836,7 @@ export default async function AdminMessageThreadPage({
   params,
   searchParams,
 }: PageProps) {
-  const { conversationid } = await params;
+  const { conversationId } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
 
   const supabase = await createClient();
@@ -794,17 +862,17 @@ export default async function AdminMessageThreadPage({
     supabaseAdmin
       .from("conversations")
       .select("*")
-      .eq("id", conversationid)
+      .eq("id", conversationId)
       .maybeSingle<ConversationRow>(),
     supabaseAdmin
       .from("conversation_participants")
       .select("*")
-      .eq("conversation_id", conversationid)
+      .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true }),
     supabaseAdmin
       .from("messages")
       .select("*")
-      .eq("conversation_id", conversationid)
+      .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true }),
   ]);
 
@@ -875,7 +943,7 @@ export default async function AdminMessageThreadPage({
       name,
       avatar,
       email: profile?.email || guru?.email || "",
-      phone: profile?.phone || guru?.phone || "",
+      phone: getProfilePhone(profile) || getGuruPhone(guru),
     };
   });
 
