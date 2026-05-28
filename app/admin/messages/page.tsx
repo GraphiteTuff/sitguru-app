@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  AlertTriangle,
   BadgeHelp,
   CalendarCheck,
   CheckCircle2,
@@ -55,13 +56,14 @@ type SearchParams = {
   ambassadorName?: string;
   ambassadorEmail?: string;
   referralCode?: string;
+  compose_error?: string;
+  compose_success?: string;
+  conversationId?: string;
 };
 
 type PageProps = {
   searchParams?: Promise<SearchParams>;
 };
-
-type AnyRow = Record<string, unknown>;
 
 type ConversationRow = {
   id: string;
@@ -130,6 +132,8 @@ type ConversationParticipantRow = {
   conversation_id: string;
   user_id: string;
   role?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type AdminAccessRow = {
@@ -353,6 +357,9 @@ function normalizeRole(role?: string | null) {
   if (value === "pet_parent" || value === "pet parent" || value === "client") {
     return "customer";
   }
+  if (value === "student_ambassador" || value === "community_ambassador") {
+    return "ambassador";
+  }
   if (
     value === "admin" ||
     value === "super_admin" ||
@@ -421,18 +428,12 @@ function shortenId(value?: string | null) {
 }
 
 function getMessageSenderRole(message?: MessageRow | null) {
-  return normalizeRole(
-    message?.sender_role ||
-      message?.sender_role_snapshot ||
-      ""
-  );
+  return normalizeRole(message?.sender_role || message?.sender_role_snapshot || "");
 }
 
 function getMessageRecipientRole(message?: MessageRow | null) {
   return normalizeRole(
-    message?.recipient_role ||
-      message?.recipient_role_snapshot ||
-      ""
+    message?.recipient_role || message?.recipient_role_snapshot || "",
   );
 }
 
@@ -443,7 +444,7 @@ function getSnapshotName({
   direction,
 }: {
   userId: string;
-  role: "customer" | "guru" | "admin" | "user";
+  role: "customer" | "guru" | "admin" | "ambassador" | "user";
   messages: MessageRow[];
   direction: "sender" | "recipient" | "either";
 }) {
@@ -471,6 +472,7 @@ function getSnapshotName({
   if (role === "customer") return `Archived Pet Parent ${shortenId(userId)}`;
   if (role === "guru") return `Archived Guru ${shortenId(userId)}`;
   if (role === "admin") return `SitGuru Admin ${shortenId(userId)}`;
+  if (role === "ambassador") return `Archived Ambassador ${shortenId(userId)}`;
 
   return `Archived SitGuru User ${shortenId(userId)}`;
 }
@@ -809,7 +811,7 @@ function getThreadTypeLabel(type: AdminThreadCard["type"]) {
   if (type === "internal") return "Internal HQ";
   if (type === "guru-admin") return "Guru ↔ Admin";
   if (type === "guru-customer") return "Guru ↔ Customer";
-  if (type === "customer-admin") return "Customer ↔ Admin";
+  if (type === "customer-admin") return "Pet Parent ↔ Admin";
   return "General";
 }
 
@@ -987,6 +989,16 @@ function getDepartmentMessageHref(params: {
   return `/admin/messages?${query.toString()}`;
 }
 
+function buildComposeErrorRedirect(reason: string) {
+  return `/admin/messages?compose_error=${encodeURIComponent(reason)}`;
+}
+
+function buildComposeSuccessRedirect(conversationId: string) {
+  return `/admin/messages?compose_success=sent&conversationId=${encodeURIComponent(
+    conversationId,
+  )}`;
+}
+
 async function safeAdminQuery(
   query: PromiseLike<SafeAdminQueryResponse>,
   label: string,
@@ -1070,9 +1082,21 @@ async function createInternalThread(formData: FormData) {
     : `${categoryLabel}: SitGuru Admin ↔ ${recipientLabel}`;
 
   const subject = String(formData.get("subject") || "").trim() || defaultSubject;
-  const body =
-    String(formData.get("body") || "").trim() ||
-    `Hi ${recipientLabel},\n\n`;
+  const body = String(formData.get("body") || "").trim();
+
+  if (!body || body.length < 3) {
+    redirect(buildComposeErrorRedirect("empty_message"));
+  }
+
+  if (
+    isDirectThread &&
+    !recipientId &&
+    !recipientEmail &&
+    !ambassadorEmail &&
+    !department
+  ) {
+    redirect(buildComposeErrorRedirect("missing_recipient"));
+  }
 
   const now = new Date().toISOString();
   const topic = isDirectThread
@@ -1112,11 +1136,8 @@ async function createInternalThread(formData: FormData) {
 
   if (conversationError || !conversation?.id) {
     console.error("Message thread create failed:", conversationError);
-    redirect(
-      `/admin/messages?compose_error=${encodeURIComponent(
-        conversationError?.message || "Could not create message thread.",
-      )}`,
-    );
+
+    redirect(buildComposeErrorRedirect("thread_create_failed"));
   }
 
   const conversationId = String(conversation.id);
@@ -1125,9 +1146,9 @@ async function createInternalThread(formData: FormData) {
     {
       conversation_id: conversationId,
       user_id: user.id,
-      role: superAdminEmails.has(String(user.email || "").toLowerCase())
-        ? "admin"
-        : "admin",
+      role: "admin",
+      created_at: now,
+      updated_at: now,
     },
   ];
 
@@ -1136,6 +1157,8 @@ async function createInternalThread(formData: FormData) {
       conversation_id: conversationId,
       user_id: recipientId,
       role: recipientRole || "user",
+      created_at: now,
+      updated_at: now,
     });
   }
 
@@ -1160,6 +1183,8 @@ async function createInternalThread(formData: FormData) {
         conversation_id: conversationId,
         user_id: memberId,
         role: normalizeRole(member.role_key) || "admin",
+        created_at: now,
+        updated_at: now,
       });
     }
   }
@@ -1171,7 +1196,10 @@ async function createInternalThread(formData: FormData) {
   if (uniqueParticipants.length > 0) {
     const { error: participantError } = await supabaseAdmin
       .from("conversation_participants")
-      .insert(uniqueParticipants);
+      .upsert(uniqueParticipants, {
+        onConflict: "conversation_id,user_id",
+        ignoreDuplicates: false,
+      });
 
     if (participantError) {
       console.warn("Message conversation participants skipped:", participantError);
@@ -1201,6 +1229,8 @@ async function createInternalThread(formData: FormData) {
 
   if (messageError) {
     console.error("Message create failed:", messageError);
+
+    redirect(buildComposeErrorRedirect("message_create_failed"));
   }
 
   if (recipientId && recipientId !== user.id) {
@@ -1213,8 +1243,10 @@ async function createInternalThread(formData: FormData) {
           body: preview || "You have a new message from SitGuru.",
           type: "message",
           href: `/messages/${conversationId}`,
+          link: `/messages/${conversationId}`,
           is_read: false,
           created_at: now,
+          updated_at: now,
         });
 
       if (notificationError) {
@@ -1257,7 +1289,9 @@ async function createInternalThread(formData: FormData) {
 
   revalidatePath("/admin/messages");
   revalidatePath(`/admin/messages/${conversationId}`);
-  redirect(`/admin/messages/${conversationId}`);
+  revalidatePath(`/messages/${conversationId}`);
+
+  redirect(buildComposeSuccessRedirect(conversationId));
 }
 
 function Avatar({
@@ -1287,6 +1321,72 @@ function Avatar({
     >
       {icon || getInitials(name) || "SG"}
     </div>
+  );
+}
+
+function AdminComposeNotice({
+  composeError,
+  composeSuccess,
+  conversationId,
+}: {
+  composeError?: string;
+  composeSuccess?: string;
+  conversationId?: string;
+}) {
+  if (composeSuccess === "sent") {
+    return (
+      <section className="rounded-[26px] border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex gap-3">
+            <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-700" />
+            <div>
+              <h2 className="text-lg font-black">Message sent successfully</h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-emerald-900">
+                The conversation thread was created, the first message was saved,
+                and the recipient was marked with an unread SitGuru message.
+              </p>
+            </div>
+          </div>
+
+          {conversationId ? (
+            <Link
+              href={`/admin/messages/${conversationId}`}
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
+            >
+              Open Thread
+            </Link>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
+  if (!composeError) return null;
+
+  const friendlyMessages: Record<string, string> = {
+    empty_message:
+      "Please enter a message before starting the conversation thread.",
+    missing_recipient:
+      "The recipient could not be confirmed. Please return to the user profile and start the message again.",
+    thread_create_failed:
+      "The message thread could not be created. If this was an Admin-to-Guru or Admin-to-Ambassador message, confirm the conversations table allows customer_id and guru_id to be blank when started_by_user_id is present.",
+    message_create_failed:
+      "The conversation was created, but the first message could not be saved. Please try again or check the messages table requirements.",
+  };
+
+  return (
+    <section className="rounded-[26px] border border-rose-200 bg-rose-50 p-5 text-rose-950 shadow-sm">
+      <div className="flex gap-3">
+        <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-rose-700" />
+        <div>
+          <h2 className="text-lg font-black">Message was not sent</h2>
+          <p className="mt-1 text-sm font-semibold leading-6 text-rose-900">
+            {friendlyMessages[composeError] ||
+              "The message could not be sent. Please check the recipient and try again."}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1710,7 +1810,7 @@ function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
           <div className="mt-5 flex flex-wrap gap-3">
             {thread.customerName ? (
               <ParticipantPill
-                label="Customer"
+                label="Pet Parent"
                 name={thread.customerName}
                 avatar={thread.customerAvatar}
                 icon={<UserRound size={16} />}
@@ -1948,12 +2048,6 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       conversation?.created_at ||
       null;
     const participants = participantMap.get(threadKey) || [];
-    const participantRoleMap = new Map(
-      participants.map((participant) => [
-        participant.user_id,
-        normalizeRole(participant.role),
-      ]),
-    );
 
     const customerId =
       conversation?.customer_id ||
@@ -2005,12 +2099,13 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
         return recipientRole === "admin";
       })?.recipient_id ||
       conversation?.started_by_user_id ||
-      ""; 
+      "";
 
     const customerProfile = customerId ? profileMap.get(customerId) || null : null;
     const guruProfile = guruId ? profileMap.get(guruId) || null : null;
     const adminProfileForThread = adminId ? profileMap.get(adminId) || null : null;
-    const topic = conversation?.topic || latestMessage?.topic || latestMessage?.message_type || "";
+    const topic =
+      conversation?.topic || latestMessage?.topic || latestMessage?.message_type || "";
     const normalizedTopic = topic.toLowerCase();
     const subject = conversation?.subject || "SitGuru Message Thread";
 
@@ -2032,7 +2127,6 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
     }
 
     const inquiryType = classifyInquiryType(conversation, latestMessage, preview);
-
     const unreadCount = messages.filter(isUnreadMessage).length;
 
     const status =
@@ -2178,8 +2272,10 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
                     SitGuru Message Center
                   </h1>
                   <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
-                    Manage customer, Guru, support, safety, payment, technical,
-                    partner, and internal HQ conversations from one Admin inbox. Message history stays visible even when a Pet Parent or Guru profile is archived, hidden, or no longer available.
+                    Manage Pet Parent, Guru, Ambassador, support, safety,
+                    payment, technical, partner, and internal HQ conversations
+                    from one Admin inbox. Message history stays visible even
+                    when a profile is archived, hidden, or no longer available.
                   </p>
                 </div>
               </div>
@@ -2212,6 +2308,12 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
             </div>
           </div>
         </section>
+
+        <AdminComposeNotice
+          composeError={params.compose_error}
+          composeSuccess={params.compose_success}
+          conversationId={params.conversationId}
+        />
 
         {composeIntent ? <InternalComposer intent={composeIntent} /> : null}
 
@@ -2449,11 +2551,10 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
             Supabase coordination:
           </span>{" "}
           this page reads `conversations`, `messages`,
-          `conversation_participants`, and `profiles`. Internal HQ messaging is
-          created from User Directory or department shortcuts and writes new
-          rows back to `conversations`, `conversation_participants`, and
-          `messages`. Message rows are treated as permanent support history and
-          should not be deleted during Pet Parent or Guru cleanup.
+          `conversation_participants`, and `profiles`. Admin messaging writes
+          clean message threads for Gurus, Pet Parents, Ambassadors, departments,
+          and staff. Message rows are treated as permanent support history and
+          should not be deleted during Pet Parent, Guru, or Ambassador cleanup.
         </div>
       </div>
     </main>
