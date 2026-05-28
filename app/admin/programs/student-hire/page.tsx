@@ -523,26 +523,351 @@ function completeRequirement(application: StudentApplication, key: string) {
   return false;
 }
 
-async function getStudentApplications() {
-  const { data, error } = await supabaseAdmin
-    .from("program_applications")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(5000);
+type SafeQueryResult = {
+  data: AnyRow[];
+  error: string;
+};
 
-  if (error) {
-    console.error("Student Hire ops load error:", error.message);
+async function safeStudentHireQuery(
+  query: PromiseLike<{ data: unknown; error: { message?: string } | null }>,
+  label: string,
+): Promise<SafeQueryResult> {
+  try {
+    const result = await query;
+
+    if (result.error) {
+      const message = result.error.message || `${label} query failed`;
+      console.warn(`Student Hire query skipped for ${label}:`, message);
+      return { data: [], error: message };
+    }
+
     return {
-      applications: [] as StudentApplication[],
-      error: error.message,
+      data: ((result.data || []) as AnyRow[]).filter(Boolean),
+      error: "",
     };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Student Hire query skipped for ${label}:`, message);
+    return { data: [], error: message };
+  }
+}
+
+function normalizeLeadStatus(value: string) {
+  const normalized = normalizeStatus(value);
+
+  if (normalized === "conditional_offer_sent") return "contacted";
+  if (normalized === "active") return "approved";
+  if (normalized === "not_a_fit") return "not_approved";
+  if (normalized === "not_moving_forward") return "not_approved";
+  if (normalized === "signed_up") return "onboarding";
+  if (normalized === "interested") return "reviewing";
+
+  return normalized;
+}
+
+function getLeadProgram(row: AnyRow) {
+  const directProgram = getText(row, ["program", "program_name", "program_type"]);
+
+  if (directProgram) return directProgram;
+
+  const search = JSON.stringify(row).toLowerCase();
+
+  if (search.includes("student")) return "student-hire";
+  if (search.includes("military") || search.includes("veteran")) {
+    return "veterans-hire";
   }
 
-  const applications = ((data || []) as AnyRow[])
+  return "student-hire";
+}
+
+function buildStudentLeadApplication(row: AnyRow): StudentApplication {
+  const id = getText(row, ["id", "lead_id", "uuid"]);
+  const resumeUrl = getText(row, [
+    "resume_file_url",
+    "resume_url",
+    "resume_link",
+    "resume_path",
+  ]);
+  const coverLetterUrl = getText(row, [
+    "cover_letter_file_url",
+    "cover_letter_url",
+    "cover_letter_link",
+  ]);
+  const otherDocumentUrl = getText(row, [
+    "other_document_file_url",
+    "other_document_url",
+    "supporting_document_url",
+    "document_url",
+  ]);
+  const source = getText(row, [
+    "source",
+    "lead_source",
+    "signup_source",
+    "referral_source",
+    "program_source",
+  ]);
+  const city = getText(row, ["city", "location_city"]);
+  const state = getText(row, ["state", "location_state"]);
+  const zipCode = getText(row, ["zip_code", "zipcode", "zip", "postal_code"]);
+  const notes = getText(row, ["notes", "message", "comments", "description"]);
+  const status = normalizeLeadStatus(getText(row, ["status"], "new"));
+
+  return {
+    id: id ? `lead-${id}` : `lead-${getText(row, ["email", "phone"], Math.random().toString(36).slice(2))}`,
+    program: normalizeProgram(getLeadProgram(row)) || "student-hire",
+    status,
+    checkr_status: normalizeStatus(getText(row, ["checkr_status"], "not_started")),
+    full_name: getText(row, [
+      "full_name",
+      "name",
+      "lead_name",
+      "applicant_name",
+      "candidate_name",
+    ]),
+    email: getText(row, [
+      "email",
+      "lead_email",
+      "applicant_email",
+      "candidate_email",
+      "contact_email",
+    ]),
+    phone: getText(row, [
+      "phone",
+      "phone_number",
+      "mobile",
+      "lead_phone",
+      "applicant_phone",
+    ]),
+    zip_code: zipCode,
+    city,
+    state,
+    availability: getText(row, ["availability", "availability_window"]),
+    services_interested: asArray(
+      row.services_interested ||
+        row.servicesInterested ||
+        row.services ||
+        row.service_interest,
+    ),
+    referral_source: source || "Ambassador Leads / HR",
+    resume_link: resumeUrl,
+    resume_url: resumeUrl,
+    additional_documents: [coverLetterUrl, otherDocumentUrl].filter(Boolean),
+    background_check_consent: asBoolean(
+      row.background_check_consent || row.backgroundCheckConsent,
+    ),
+    experience: getText(row, [
+      "experience",
+      "work_experience",
+      "why",
+      "reason",
+      "summary",
+    ]),
+    school_name: getText(row, ["school_name", "schoolName", "school"]),
+    student_status: getText(row, ["student_status", "studentStatus"]),
+    graduation_year_or_availability: getText(row, [
+      "graduation_year_or_availability",
+      "graduationYearOrAvailability",
+      "availability",
+    ]),
+    student_background: getText(row, [
+      "student_background",
+      "studentBackground",
+      "background",
+    ]),
+    notes,
+    admin_notes: getText(row, ["admin_notes", "adminNotes"]),
+    next_step:
+      getText(row, ["next_step", "nextStep"]) ||
+      (status === "reviewing" || status === "contacted"
+        ? "Confirm preferred portal email, then create/link Ambassador dashboard access."
+        : ""),
+    created_at: getText(row, ["created_at", "submitted_at", "application_date"]),
+    updated_at: getText(row, ["updated_at"]),
+  };
+}
+
+function buildStudentAmbassadorApplication(row: AnyRow): StudentApplication {
+  const referralCode = getText(row, ["referral_code"]);
+  const loginUsername = getText(row, ["login_username"]);
+  const loginEmail = getText(row, ["login_email", "email", "contact_email"]);
+  const dashboardEnabled = asBoolean(row.dashboard_enabled);
+  const loginEnabled = asBoolean(row.login_enabled);
+  const userId = getText(row, ["user_id"]);
+  const status = normalizeLeadStatus(getText(row, ["status"], "new"));
+  const readiness = [
+    referralCode ? `Referral code: ${referralCode}` : "",
+    loginUsername ? `Login username: ${loginUsername}` : "",
+    dashboardEnabled ? "Dashboard enabled" : "Dashboard not enabled",
+    loginEnabled ? "Login enabled" : "Login not enabled",
+    userId ? "Linked to Auth" : "Missing Auth link",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return {
+    id: `ambassador-${getText(row, ["id"], referralCode || loginEmail || Math.random().toString(36).slice(2))}`,
+    program: "student-hire",
+    status,
+    checkr_status: normalizeStatus(getText(row, ["checkr_status"], "not_started")),
+    full_name: getText(row, ["full_name", "display_name", "name"]),
+    email: loginEmail,
+    phone: getText(row, ["phone", "phone_number", "mobile"]),
+    zip_code: getText(row, ["zip_code", "zipcode", "zip", "postal_code"]),
+    city: getText(row, ["city"]),
+    state: getText(row, ["state"]),
+    availability: getText(row, ["availability"]),
+    services_interested: asArray(row.services_interested || row.services),
+    referral_source:
+      getText(row, ["source", "lead_source", "referral_source"]) ||
+      "Ambassador dashboard record",
+    resume_link: getText(row, ["resume_link", "resume_url", "resume_file_url"]),
+    resume_url: getText(row, ["resume_url", "resume_file_url", "resume_path"]),
+    additional_documents: asArray(
+      row.additional_documents || row.documents || row.document_urls,
+    ),
+    background_check_consent: asBoolean(
+      row.background_check_consent || row.backgroundCheckConsent,
+    ),
+    experience: getText(row, ["experience", "bio", "summary"]),
+    school_name: getText(row, ["school_name", "schoolName", "school"]),
+    student_status: getText(row, ["student_status", "studentStatus"]),
+    graduation_year_or_availability: getText(row, [
+      "graduation_year_or_availability",
+      "graduationYearOrAvailability",
+    ]),
+    student_background: readiness,
+    notes: [getText(row, ["notes"]), readiness].filter(Boolean).join("\n\n"),
+    admin_notes: getText(row, ["admin_notes", "adminNotes"]),
+    next_step:
+      getText(row, ["next_step", "nextStep"]) ||
+      (userId
+        ? "Confirm training, documents, and final certification progress."
+        : "Create or link Supabase Auth user so Ambassador can log in."),
+    created_at: getText(row, ["created_at", "submitted_at", "application_date"]),
+    updated_at: getText(row, ["updated_at"]),
+  };
+}
+
+function isActiveStudentAmbassador(row: AnyRow) {
+  if (normalizeStatus(getText(row, ["status"])) === "archived") return false;
+
+  const search = JSON.stringify(row).toLowerCase();
+
+  return (
+    search.includes("student") ||
+    search.includes("sg2026") ||
+    Boolean(getText(row, ["referral_code", "login_username"]))
+  );
+}
+
+function dedupeApplications(applications: StudentApplication[]) {
+  const byKey = new Map<string, StudentApplication>();
+
+  for (const application of applications) {
+    const normalizedEmail = application.email.trim().toLowerCase();
+    const normalizedName = application.full_name.trim().toLowerCase();
+    const key =
+      normalizedEmail ||
+      `${normalizedName}:${application.phone.trim()}` ||
+      application.id;
+
+    const existing = byKey.get(key);
+
+    if (!existing) {
+      byKey.set(key, application);
+      continue;
+    }
+
+    const existingScore =
+      Number(Boolean(existing.resume_link || existing.resume_url)) +
+      Number(Boolean(existing.phone)) +
+      Number(Boolean(existing.next_step)) +
+      Number(Boolean(existing.student_background));
+    const nextScore =
+      Number(Boolean(application.resume_link || application.resume_url)) +
+      Number(Boolean(application.phone)) +
+      Number(Boolean(application.next_step)) +
+      Number(Boolean(application.student_background));
+
+    if (nextScore >= existingScore) {
+      byKey.set(key, {
+        ...existing,
+        ...application,
+        id: existing.id,
+        notes: [existing.notes, application.notes].filter(Boolean).join("\n\n"),
+      });
+    }
+  }
+
+  return Array.from(byKey.values());
+}
+
+async function getStudentApplications() {
+  const [
+    programApplicationsResult,
+    ambassadorLeadsResult,
+    ambassadorsResult,
+  ] = await Promise.all([
+    safeStudentHireQuery(
+      supabaseAdmin
+        .from("program_applications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "program_applications",
+    ),
+    safeStudentHireQuery(
+      supabaseAdmin
+        .from("ambassador_leads")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "ambassador_leads",
+    ),
+    safeStudentHireQuery(
+      supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "ambassadors",
+    ),
+  ]);
+
+  const programApplications = programApplicationsResult.data
     .filter(isStudentHire)
     .map(buildStudentApplication);
 
-  return { applications, error: "" };
+  const ambassadorLeadApplications = ambassadorLeadsResult.data
+    .filter(isStudentHire)
+    .map(buildStudentLeadApplication);
+
+  const ambassadorApplications = ambassadorsResult.data
+    .filter(isActiveStudentAmbassador)
+    .map(buildStudentAmbassadorApplication);
+
+  const applications = dedupeApplications([
+    ...programApplications,
+    ...ambassadorLeadApplications,
+    ...ambassadorApplications,
+  ]).sort((a, b) => {
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
+
+  const errors = [
+    programApplicationsResult.error
+      ? `program_applications: ${programApplicationsResult.error}`
+      : "",
+    ambassadorLeadsResult.error
+      ? `ambassador_leads: ${ambassadorLeadsResult.error}`
+      : "",
+    ambassadorsResult.error ? `ambassadors: ${ambassadorsResult.error}` : "",
+  ].filter(Boolean);
+
+  return {
+    applications,
+    error: errors.join(" | "),
+  };
 }
 
 function StatCard({
