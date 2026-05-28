@@ -10,6 +10,7 @@ import {
   ArrowUpWideNarrow,
   Download,
   Eye,
+  MessageCircle,
   Search,
   SlidersHorizontal,
   X,
@@ -28,6 +29,8 @@ type ApplicationStatus =
 
 type GuruDisplayRow = {
   id: string;
+  userId?: string;
+  guruUserId?: string;
   name: string;
   email: string;
   avatarUrl: string;
@@ -49,6 +52,7 @@ type GuruDisplayRow = {
   joined: string;
   href: string;
   publicHref: string;
+  messageHref?: string;
 };
 
 type SortKey =
@@ -121,6 +125,32 @@ function getInitials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+}
+
+function getGuruMessageHref(guru: GuruDisplayRow) {
+  if (guru.messageHref) return guru.messageHref;
+
+  const params = new URLSearchParams();
+
+  const guruUserId = String(guru.guruUserId || guru.userId || "").trim();
+  const guruId = String(guru.id || "").trim();
+  const email = String(guru.email || "").trim().toLowerCase();
+
+  if (guruUserId) {
+    params.set("guruUserId", guruUserId);
+  }
+
+  if (guruId) {
+    params.set("guruId", guruId);
+  }
+
+  if (email) {
+    params.set("email", email);
+  }
+
+  params.set("source", "admin-gurus");
+
+  return `/messages/admin?${params.toString()}`;
 }
 
 function Avatar({ name, src }: { name: string; src?: string }) {
@@ -369,6 +399,8 @@ function searchMatches(guru: GuruDisplayRow, query: string) {
 
   const searchableText = [
     guru.id,
+    guru.userId || "",
+    guru.guruUserId || "",
     guru.name,
     guru.email,
     guru.services,
@@ -414,6 +446,7 @@ function GuruRecordCard({ guru }: { guru: GuruDisplayRow }) {
     guru.setupStepLabel ||
     (guru.setupStep ? `Step ${guru.setupStep}` : "Not Started");
   const nextAction = getNextNeededAction(guru);
+  const messageHref = getGuruMessageHref(guru);
 
   return (
     <article className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
@@ -452,7 +485,9 @@ function GuruRecordCard({ guru }: { guru: GuruDisplayRow }) {
               {guru.bookable ? "Bookable" : "Not Bookable"}
             </Pill>
 
-            <Pill className={setupStepClasses(guru.setupStep)}>{setupLabel}</Pill>
+            <Pill className={setupStepClasses(guru.setupStep)}>
+              {setupLabel}
+            </Pill>
           </div>
         </div>
       </div>
@@ -504,13 +539,21 @@ function GuruRecordCard({ guru }: { guru: GuruDisplayRow }) {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <Link
               href={guru.href}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
             >
               <Eye size={16} />
               Review Guru
+            </Link>
+
+            <Link
+              href={messageHref}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-900 transition hover:border-emerald-300 hover:bg-emerald-100"
+            >
+              <MessageCircle size={16} />
+              Message Guru
             </Link>
 
             <Link
