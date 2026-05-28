@@ -25,6 +25,7 @@ import MessageAutoRefresh from "@/components/MessageAutoRefresh";
 export const dynamic = "force-dynamic";
 
 const SITGURU_MESSAGE_AVATAR_URL = "/images/sitguru-message-avatar.jpg";
+const SUPER_ADMIN_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
 
 type InquiryKey =
   | "booking"
@@ -165,7 +166,15 @@ function normalizeRole(role?: string | null) {
 
   if (!value) return "";
   if (value === "provider" || value === "sitter") return "guru";
-  if (value === "pet_parent" || value === "pet parent" || value === "client") {
+  if (
+    value === "pet_parent" ||
+    value === "pet-parent" ||
+    value === "pet parent" ||
+    value === "client" ||
+    value === "owner" ||
+    value === "pet_owner" ||
+    value === "pet-owner"
+  ) {
     return "customer";
   }
   if (
@@ -175,7 +184,10 @@ function normalizeRole(role?: string | null) {
     value === "site_admin" ||
     value === "site-admin" ||
     value === "admin_user" ||
-    value === "admin-user"
+    value === "admin-user" ||
+    value === "founder" ||
+    value === "owner" ||
+    value.includes("admin")
   ) {
     return "admin";
   }
@@ -186,19 +198,27 @@ function normalizeRole(role?: string | null) {
 function getReadableRole(role?: string | null) {
   const normalized = normalizeRole(role);
 
-  if (normalized === "admin") return "Admin";
+  if (normalized === "admin") return "SitGuru Admin";
   if (normalized === "guru") return "Guru";
-  if (normalized === "customer") return "Customer";
+  if (normalized === "customer") return "Pet Parent";
+  if (normalized === "ambassador") return "Ambassador";
 
-  return "User";
+  return "SitGuru User";
 }
 
 function getProfileRole(profile?: ProfileRow | null) {
   if (!profile) return "";
 
-  return normalizeRole(
+  const normalized = normalizeRole(
     profile.role || profile.user_role || profile.account_type || profile.type,
   );
+
+  if (normalized) return normalized;
+
+  const email = String(profile.email || "").trim().toLowerCase();
+  if (SUPER_ADMIN_EMAILS.has(email)) return "admin";
+
+  return "";
 }
 
 function getProfileName(profile?: ProfileRow | null) {
@@ -265,7 +285,7 @@ function getSnapshotName({
 
   if (role === "customer") return `Archived Pet Parent ${shortenId(userId)}`;
   if (role === "guru") return `Archived Guru ${shortenId(userId)}`;
-  if (role === "admin") return `SitGuru Admin ${shortenId(userId)}`;
+  if (role === "admin") return "SitGuru Admin";
 
   return `Archived SitGuru User ${shortenId(userId)}`;
 }
@@ -676,9 +696,9 @@ function getThreadType({
   const hasGuru = roles.has("guru");
   const hasCustomer = roles.has("customer");
 
-  if (hasGuru && hasCustomer && !hasAdmin) return "Guru ↔ Customer";
+  if (hasGuru && hasCustomer && !hasAdmin) return "Guru ↔ Pet Parent";
   if (hasGuru && hasAdmin) return "Guru ↔ Admin";
-  if (hasCustomer && hasAdmin) return "Customer ↔ Admin";
+  if (hasCustomer && hasAdmin) return "Pet Parent ↔ Admin";
   if (hasAdmin) return "Admin Conversation";
 
   return "General Conversation";
@@ -852,7 +872,9 @@ function MessageBubble({
   const roleLabel =
     normalizedRole === "guru"
       ? `${getFirstName(senderName)} · Guru`
-      : getReadableRole(senderRole);
+      : normalizedRole === "customer"
+        ? `${getFirstName(senderName)} · Pet Parent`
+        : getReadableRole(senderRole);
 
   const topic = asString(message.topic) || asString(message.message_type);
   const content = getMessageContent(message) || "Message content unavailable.";
@@ -868,7 +890,7 @@ function MessageBubble({
       ) : null}
 
       <div
-        className={`max-w-[88%] rounded-[26px] border px-5 py-4 shadow-sm sm:max-w-[78%] ${
+        className={`max-w-[90%] rounded-[26px] border px-5 py-4 shadow-sm sm:max-w-[78%] ${
           isAdminMessage
             ? "rounded-br-md border-green-200 bg-green-800 text-white"
             : normalizedRole === "guru"
@@ -1042,6 +1064,48 @@ export default async function AdminMessageConversationPage({
   const safeParticipants = (
     (participantsResult.data || []) as ConversationParticipantRow[]
   ).filter(Boolean);
+
+  const unreadMessageIdsForAdmin = safeMessages
+    .filter((message) => {
+      const senderId = String(message.sender_id || "").trim();
+      const recipientId = String(message.recipient_id || "").trim();
+      const status = asString(message.status).toLowerCase();
+
+      if (!message.id || senderId === user.id) return false;
+      if (recipientId && recipientId !== user.id) return false;
+      if (message.is_read === false) return true;
+      if (!message.read_at && status !== "read" && status !== "archived") {
+        return true;
+      }
+
+      return false;
+    })
+    .map((message) => message.id);
+
+  if (unreadMessageIdsForAdmin.length > 0) {
+    await safeAdminQuery(
+      supabaseAdmin
+        .from("messages")
+        .update({
+          is_read: true,
+          status: "read",
+          read_at: new Date().toISOString(),
+        })
+        .in("id", unreadMessageIdsForAdmin),
+      "mark admin thread messages read",
+    );
+
+    safeMessages = safeMessages.map((message) =>
+      unreadMessageIdsForAdmin.includes(message.id)
+        ? {
+            ...message,
+            is_read: true,
+            status: "read",
+            read_at: message.read_at || new Date().toISOString(),
+          }
+        : message,
+    );
+  }
 
   const participantRoleMap = new Map<string, string>();
 
@@ -1263,7 +1327,7 @@ export default async function AdminMessageConversationPage({
                     {subject}
                   </h1>
                   <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
-                    Preserved support history · {threadType} · Last activity{" "}
+                    Clean SitGuru message history · {threadType} · Last activity{" "}
                     <span className="font-black text-slate-800">
                       {formatLongDateTime(lastActivity)}
                     </span>
@@ -1319,8 +1383,8 @@ export default async function AdminMessageConversationPage({
               Thread Participants
             </h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">
-              People connected to this conversation from messages, participants,
-              profiles, and conversation metadata.
+              People connected to this conversation. Avatars and role labels are
+              kept clear for Admin, Gurus, and Pet Parents.
             </p>
           </div>
 
@@ -1357,8 +1421,8 @@ export default async function AdminMessageConversationPage({
                 Message History
               </h2>
               <p className="mt-1 text-sm font-semibold text-slate-500">
-                Bubble view using the same Message Center intelligence and avatar
-                rules.
+                Mobile-friendly bubble view with avatars, party labels, timestamps,
+                and preserved message history.
               </p>
             </div>
 
@@ -1415,11 +1479,8 @@ export default async function AdminMessageConversationPage({
               Send Admin Message
             </h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">
-              Reply as SitGuru Admin. The admin avatar uses{" "}
-              <span className="font-black text-green-900">
-                sitguru-message-avatar.jpg
-              </span>
-              .
+              Reply as SitGuru Admin. Replies stay in this clean thread and are
+              picked up by SitGuru message alerts for the other party.
             </p>
           </div>
 
@@ -1442,8 +1503,8 @@ export default async function AdminMessageConversationPage({
           </span>{" "}
           this thread page reads directly from `messages`, connects
           `conversations`, `conversation_participants`, `profiles`, and `gurus`
-          when available, and supports both normal conversation threads and
-          direct message rows.
+          when available, marks opened admin messages as read, and keeps the
+          bubble view ready for global in-app, email, and SMS message alerts.
         </div>
       </div>
     </main>

@@ -28,6 +28,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 type InquiryKey =
+  | "direct"
   | "booking"
   | "payment"
   | "guru-support"
@@ -46,6 +47,7 @@ type SearchParams = {
   recipientEmail?: string;
   recipientName?: string;
   recipientRole?: string;
+  messageCategory?: string;
   department?: string;
   departmentLabel?: string;
   source?: string;
@@ -219,6 +221,12 @@ const inquiryTypes: Array<{
   href: string;
 }> = [
   {
+    key: "direct",
+    label: "Direct Message",
+    description: "Clean one-to-one outreach between SitGuru and a specific person",
+    href: "/admin/messages?inquiry=direct",
+  },
+  {
     key: "booking",
     label: "Booking Help",
     description: "Scheduling, confirmations, changes, and booking questions",
@@ -313,6 +321,7 @@ const chartColors = [
 ];
 
 const defaultAdminAvatar = "/images/sitguru-message-avatar.jpg";
+const superAdminEmails = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -556,6 +565,14 @@ function getStoredInquiryType(
   if (!raw) return "";
 
   if (
+    raw.includes("direct") ||
+    raw.includes("direct_message") ||
+    raw.includes("direct message")
+  ) {
+    return "direct";
+  }
+
+  if (
     raw.includes("booking") ||
     raw.includes("schedule") ||
     raw.includes("application question")
@@ -642,6 +659,17 @@ function classifyInquiryType(
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
+
+  if (
+    search.includes("direct message") ||
+    search.includes("direct_guru") ||
+    search.includes("direct_customer") ||
+    search.includes("direct_ambassador") ||
+    search.includes("direct_admin") ||
+    search.includes("direct_staff")
+  ) {
+    return "direct";
+  }
 
   if (
     search.includes("refund") ||
@@ -749,6 +777,7 @@ function getInquiryLabel(key: InquiryKey) {
 }
 
 function getInquiryIcon(key: InquiryKey) {
+  if (key === "direct") return <MessageCircle size={22} />;
   if (key === "booking") return <CalendarCheck size={22} />;
   if (key === "payment") return <CreditCard size={22} />;
   if (key === "guru-support") return <UsersRound size={22} />;
@@ -805,6 +834,7 @@ function getThreadTypeClasses(type: AdminThreadCard["type"]) {
 }
 
 function getInquiryClasses(type: InquiryKey) {
+  if (type === "direct") return "border-green-200 bg-green-100 text-green-900";
   if (type === "payment") return "border-orange-200 bg-orange-100 text-orange-900";
   if (type === "safety") return "border-rose-200 bg-rose-100 text-rose-900";
   if (type === "technical") return "border-violet-200 bg-violet-100 text-violet-900";
@@ -897,6 +927,7 @@ function getIntentFromParams(params: SearchParams) {
   const recipientEmail = asString(params.recipientEmail);
   const recipientName = asString(params.recipientName);
   const recipientRole = asString(params.recipientRole);
+  const messageCategory = asString(params.messageCategory);
   const department = asString(params.department);
   const departmentLabel = asString(params.departmentLabel);
   const source = asString(params.source);
@@ -930,6 +961,7 @@ function getIntentFromParams(params: SearchParams) {
     recipientEmail: recipientEmail || ambassadorEmail,
     recipientName: recipientName || ambassadorName,
     recipientRole: recipientRole || (isAmbassadorContext ? "ambassador" : ""),
+    messageCategory,
     department,
     departmentLabel,
     source,
@@ -1001,7 +1033,11 @@ async function createInternalThread(formData: FormData) {
   const recipientId = String(formData.get("recipientId") || "").trim();
   const recipientEmail = String(formData.get("recipientEmail") || "").trim();
   const recipientName = String(formData.get("recipientName") || "").trim();
-  const recipientRole = String(formData.get("recipientRole") || "").trim();
+  const recipientRole = normalizeRole(
+    String(formData.get("recipientRole") || "").trim(),
+  );
+  const messageCategory =
+    String(formData.get("messageCategory") || "direct").trim() || "direct";
   const department = String(formData.get("department") || "").trim();
   const departmentLabel = String(formData.get("departmentLabel") || "").trim();
   const source = String(formData.get("source") || "").trim();
@@ -1009,50 +1045,76 @@ async function createInternalThread(formData: FormData) {
   const ambassadorName = String(formData.get("ambassadorName") || "").trim();
   const ambassadorEmail = String(formData.get("ambassadorEmail") || "").trim();
   const referralCode = String(formData.get("referralCode") || "").trim();
+
+  const isDirectThread = threadType.startsWith("direct");
+  const isGuruThread = recipientRole === "guru" || threadType === "direct_guru";
+  const isCustomerThread =
+    recipientRole === "customer" || threadType === "direct_customer";
   const isAmbassadorThread =
     threadType.startsWith("ambassador") ||
+    threadType === "direct_ambassador" ||
+    recipientRole === "ambassador" ||
     Boolean(ambassadorId || ambassadorEmail || referralCode);
-  const subject =
-    String(formData.get("subject") || "").trim() ||
-    (departmentLabel
-      ? `Internal message: ${departmentLabel}`
-      : isAmbassadorThread
-        ? `Ambassador support: ${ambassadorName || recipientName || referralCode || "SitGuru Ambassador"}`
-        : recipientName
-          ? `Internal message: ${recipientName}`
-          : "Internal SitGuru HQ message");
+
+  const recipientLabel =
+    departmentLabel ||
+    recipientName ||
+    ambassadorName ||
+    recipientEmail ||
+    ambassadorEmail ||
+    "SitGuru User";
+
+  const categoryLabel = getInquiryLabel((messageCategory || "direct") as InquiryKey);
+  const defaultSubject = departmentLabel
+    ? `Internal Message: ${departmentLabel}`
+    : `${categoryLabel}: SitGuru Admin ↔ ${recipientLabel}`;
+
+  const subject = String(formData.get("subject") || "").trim() || defaultSubject;
   const body =
     String(formData.get("body") || "").trim() ||
-    "Starting an internal SitGuru HQ conversation.";
+    `Hi ${recipientLabel},\n\n`;
 
   const now = new Date().toISOString();
-  const topic = isAmbassadorThread
-    ? "ambassador_support"
-    : department
-      ? "internal_department"
-      : "internal";
+  const topic = isDirectThread
+    ? "direct_message"
+    : isAmbassadorThread
+      ? "ambassador_support"
+      : department
+        ? "internal_department"
+        : messageCategory || "internal";
+
   const preview = body.slice(0, 240);
+
+  const conversationPayload: Record<string, unknown> = {
+    subject,
+    status: "open",
+    topic,
+    started_by_user_id: user.id,
+    last_message_at: now,
+    last_message_preview: preview,
+    created_at: now,
+    updated_at: now,
+  };
+
+  if (isGuruThread && recipientId) {
+    conversationPayload.guru_id = recipientId;
+  }
+
+  if (isCustomerThread && recipientId) {
+    conversationPayload.customer_id = recipientId;
+  }
 
   const { data: conversation, error: conversationError } = await supabaseAdmin
     .from("conversations")
-    .insert({
-      subject,
-      status: "open",
-      topic,
-      started_by_user_id: user.id,
-      last_message_at: now,
-      last_message_preview: preview,
-      created_at: now,
-      updated_at: now,
-    })
+    .insert(conversationPayload)
     .select("id")
     .single();
 
   if (conversationError || !conversation?.id) {
-    console.error("Internal conversation create failed:", conversationError);
+    console.error("Message thread create failed:", conversationError);
     redirect(
       `/admin/messages?compose_error=${encodeURIComponent(
-        conversationError?.message || "Could not create internal message thread.",
+        conversationError?.message || "Could not create message thread.",
       )}`,
     );
   }
@@ -1063,7 +1125,9 @@ async function createInternalThread(formData: FormData) {
     {
       conversation_id: conversationId,
       user_id: user.id,
-      role: "admin",
+      role: superAdminEmails.has(String(user.email || "").toLowerCase())
+        ? "admin"
+        : "admin",
     },
   ];
 
@@ -1071,7 +1135,7 @@ async function createInternalThread(formData: FormData) {
     participantRows.push({
       conversation_id: conversationId,
       user_id: recipientId,
-      role: normalizeRole(recipientRole) || "user",
+      role: recipientRole || "user",
     });
   }
 
@@ -1087,7 +1151,8 @@ async function createInternalThread(formData: FormData) {
 
     for (const member of departmentMembers) {
       const memberId = asString(member.user_id);
-      const active = member.is_active === undefined ? true : getOptionalBoolean(member.is_active);
+      const active =
+        member.is_active === undefined ? true : getOptionalBoolean(member.is_active);
 
       if (!active || !memberId || memberId === user.id) continue;
 
@@ -1109,7 +1174,7 @@ async function createInternalThread(formData: FormData) {
       .insert(uniqueParticipants);
 
     if (participantError) {
-      console.warn("Internal conversation participants skipped:", participantError);
+      console.warn("Message conversation participants skipped:", participantError);
     }
   }
 
@@ -1117,6 +1182,14 @@ async function createInternalThread(formData: FormData) {
     conversation_id: conversationId,
     sender_id: user.id,
     recipient_id: recipientId || null,
+    sender_role: "admin",
+    recipient_role: recipientRole || null,
+    sender_name_snapshot: user.email || "SitGuru Admin",
+    sender_email_snapshot: user.email || null,
+    sender_role_snapshot: "admin",
+    recipient_name_snapshot: recipientLabel,
+    recipient_email_snapshot: recipientEmail || ambassadorEmail || null,
+    recipient_role_snapshot: recipientRole || null,
     content: body,
     body,
     message_type: threadType,
@@ -1127,18 +1200,43 @@ async function createInternalThread(formData: FormData) {
   });
 
   if (messageError) {
-    console.error("Internal message create failed:", messageError);
+    console.error("Message create failed:", messageError);
+  }
+
+  if (recipientId && recipientId !== user.id) {
+    try {
+      const { error: notificationError } = await supabaseAdmin
+        .from("notifications")
+        .insert({
+          user_id: recipientId,
+          title: "New SitGuru Message",
+          body: preview || "You have a new message from SitGuru.",
+          type: "message",
+          href: `/messages/${conversationId}`,
+          is_read: false,
+          created_at: now,
+        });
+
+      if (notificationError) {
+        console.warn("Message notification skipped:", notificationError);
+      }
+    } catch (notificationError) {
+      console.warn("Message notification skipped:", notificationError);
+    }
   }
 
   await supabaseAdmin.from("admin_audit_logs").insert({
     actor_id: user.id,
     actor_email: user.email || null,
-    action: "internal_message_thread_created",
+    action: isDirectThread
+      ? "direct_message_thread_created"
+      : "message_thread_created",
     area: "admin.messages",
     target_type: "conversation",
     target_id: conversationId,
     metadata: {
       thread_type: threadType,
+      message_category: messageCategory || null,
       recipient_id: recipientId || null,
       recipient_email: recipientEmail || null,
       recipient_name: recipientName || null,
@@ -1150,11 +1248,15 @@ async function createInternalThread(formData: FormData) {
       ambassador_name: ambassadorName || null,
       ambassador_email: ambassadorEmail || null,
       referral_code: referralCode || null,
+      super_admin_actor: superAdminEmails.has(
+        String(user.email || "").toLowerCase(),
+      ),
     },
     created_at: now,
   });
 
   revalidatePath("/admin/messages");
+  revalidatePath(`/admin/messages/${conversationId}`);
   redirect(`/admin/messages/${conversationId}`);
 }
 
@@ -1361,40 +1463,48 @@ function InternalComposer({
     intent.ambassadorName ||
     intent.recipientEmail ||
     intent.ambassadorEmail ||
-    "SitGuru HQ";
+    "SitGuru User";
+
+  const normalizedRole = normalizeRole(intent.recipientRole);
+  const defaultCategory = (intent.messageCategory || "direct") as InquiryKey;
+  const categoryLabel = getInquiryLabel(defaultCategory);
+  const isDirectThread = intent.threadType.startsWith("direct");
+  const composerLabel = isDirectThread ? "Direct Message Draft" : "Message Draft";
+  const submitLabel = isDirectThread ? "Start Direct Message" : "Start Message";
 
   const defaultSubject = intent.isAmbassadorContext
-    ? `Ambassador support: ${recipientLabel}`
+    ? `${categoryLabel}: SitGuru Admin ↔ ${recipientLabel}`
     : intent.isDepartment
-      ? `Internal message: ${recipientLabel}`
-      : `Internal message: ${recipientLabel}`;
+      ? `Internal Message: ${recipientLabel}`
+      : `${categoryLabel}: SitGuru Admin ↔ ${recipientLabel}`;
 
   const defaultBody = intent.isAmbassadorContext
-    ? `Hi SitGuru Team,\n\nAmbassador: ${intent.ambassadorName || intent.recipientName || recipientLabel}\nEmail: ${intent.ambassadorEmail || intent.recipientEmail || "Not saved"}\nReferral code: ${intent.referralCode || "Not saved"}\n\n`
+    ? `Hi ${recipientLabel},\n\n`
     : intent.isDepartment
       ? `Hi ${recipientLabel},\n\n`
       : `Hi ${recipientLabel},\n\n`;
 
   return (
-    <section className="rounded-[30px] border border-green-200 bg-green-50 p-5 shadow-sm">
+    <section className="rounded-[30px] border border-green-200 bg-green-50 p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
-            Internal Message Draft
+            {composerLabel}
           </p>
           <h2 className="mt-2 text-2xl font-black tracking-tight text-green-950">
             Message {recipientLabel}
           </h2>
           <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-green-900">
-            This composer was opened from the User Directory, a department
-            shortcut, or an Ambassador dashboard. Sending creates a tracked
-            SitGuru HQ thread and logs the first message in the Message Center.
+            Choose a category, confirm the recipient, write the first message,
+            and SitGuru will create a clean thread with unread status for the
+            recipient. Direct messages start fresh and do not route into old
+            support threads.
           </p>
         </div>
 
         <Link
           href="/admin/messages"
-          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-100"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-100"
         >
           <X size={16} />
           Clear draft
@@ -1402,7 +1512,6 @@ function InternalComposer({
       </div>
 
       <form action={createInternalThread} className="mt-5 grid gap-4">
-        <input type="hidden" name="threadType" value={intent.threadType} />
         <input type="hidden" name="recipientId" value={intent.recipientId} />
         <input type="hidden" name="recipientEmail" value={intent.recipientEmail} />
         <input type="hidden" name="recipientName" value={intent.recipientName} />
@@ -1415,8 +1524,44 @@ function InternalComposer({
         <input type="hidden" name="ambassadorEmail" value={intent.ambassadorEmail} />
         <input type="hidden" name="referralCode" value={intent.referralCode} />
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
           <div className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
+                  Who are you messaging?
+                </span>
+                <select
+                  name="threadType"
+                  defaultValue={intent.threadType || "internal"}
+                  className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                >
+                  <option value="direct_guru">Guru</option>
+                  <option value="direct_customer">Pet Parent</option>
+                  <option value="direct_ambassador">Ambassador</option>
+                  <option value="internal_department">Internal Department</option>
+                  <option value="internal">SitGuru Admin / Staff</option>
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
+                  Message category
+                </span>
+                <select
+                  name="messageCategory"
+                  defaultValue={defaultCategory}
+                  className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                >
+                  {inquiryTypes.map((inquiry) => (
+                    <option key={inquiry.key} value={inquiry.key}>
+                      {inquiry.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
             <label className="grid gap-2">
               <span className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
                 Subject
@@ -1424,7 +1569,7 @@ function InternalComposer({
               <input
                 name="subject"
                 defaultValue={defaultSubject}
-                className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
               />
             </label>
 
@@ -1435,8 +1580,8 @@ function InternalComposer({
               <textarea
                 name="body"
                 defaultValue={defaultBody}
-                rows={6}
-                className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                rows={7}
+                className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-base font-semibold leading-7 text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
               />
             </label>
           </div>
@@ -1445,10 +1590,33 @@ function InternalComposer({
             <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
               Recipient
             </p>
-            <p className="mt-2 text-xl font-black text-slate-950">
-              {recipientLabel}
-            </p>
-            <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
+
+            <div className="mt-3 flex items-center gap-3">
+              <Avatar
+                name={recipientLabel}
+                src=""
+                icon={
+                  normalizedRole === "guru" ? (
+                    <UsersRound size={18} />
+                  ) : normalizedRole === "customer" ? (
+                    <UserRound size={18} />
+                  ) : (
+                    <ShieldAlert size={18} />
+                  )
+                }
+                className="h-12 w-12"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-xl font-black text-slate-950">
+                  {recipientLabel}
+                </p>
+                <p className="truncate text-sm font-bold text-slate-500">
+                  {normalizedRole || intent.departmentLabel || "SitGuru"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2 rounded-2xl bg-[#f8fbf6] p-4 text-sm font-semibold text-slate-600">
               {intent.recipientEmail ? <p>Email: {intent.recipientEmail}</p> : null}
               {intent.recipientRole ? <p>Role: {intent.recipientRole}</p> : null}
               {intent.department ? <p>Department: {intent.department}</p> : null}
@@ -1458,12 +1626,17 @@ function InternalComposer({
               {intent.referralCode ? <p>Referral Code: {intent.referralCode}</p> : null}
             </div>
 
+            <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 p-4 text-xs font-bold leading-5 text-green-900">
+              The first message will be saved as unread for the recipient and
+              routed through SitGuru Messages with avatars and chat bubbles.
+            </div>
+
             <button
               type="submit"
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
             >
               <Send size={17} />
-              Create Internal Thread
+              {submitLabel}
             </button>
           </div>
         </div>
@@ -2030,11 +2203,11 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
               </Link>
 
               <Link
-                href="/admin/messages?threadType=internal"
+                href="/admin/messages?threadType=internal&messageCategory=direct"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
               >
                 <Send size={17} />
-                New Internal Thread
+                Start Message
               </Link>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
+import GlobalMessageNotifier from "@/components/GlobalMessageNotifier";
 
 export default function RouteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -20,6 +21,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
   const isAuthPage =
     pathname === "/login" ||
     pathname === "/signup" ||
+    pathname === "/sign-up" ||
     pathname === "/guru/login" ||
     pathname === "/guru/signup" ||
     pathname === "/admin/login" ||
@@ -39,16 +41,25 @@ export default function RouteShell({ children }: { children: ReactNode }) {
   const isGuruResourcesPage =
     pathname === "/guru/resources" || pathname.startsWith("/guru/resources/");
 
+  const isGuruSuccessCenterPage =
+    pathname === "/guru/success-center" ||
+    pathname.startsWith("/guru/success-center/");
+
   const isGuruPetFamiliesPage =
     pathname === "/guru/pet-families" ||
     pathname.startsWith("/guru/pet-families/");
+
+  const isGuruMessagesPage =
+    pathname === "/guru/messages" || pathname.startsWith("/guru/messages/");
 
   const isGuruPrivatePage =
     isGuruDashboardPage ||
     isGuruBookingsPage ||
     isGuruAvailabilityPage ||
     isGuruResourcesPage ||
-    isGuruPetFamiliesPage;
+    isGuruSuccessCenterPage ||
+    isGuruPetFamiliesPage ||
+    isGuruMessagesPage;
 
   const isCustomerDashboardPage =
     pathname === "/customer/dashboard" ||
@@ -56,7 +67,9 @@ export default function RouteShell({ children }: { children: ReactNode }) {
 
   const isCustomerPawPerksPage =
     pathname === "/customer/pawperks" ||
-    pathname.startsWith("/customer/pawperks/");
+    pathname.startsWith("/customer/pawperks/") ||
+    pathname === "/customer/dashboard/pawperks" ||
+    pathname.startsWith("/customer/dashboard/pawperks/");
 
   const isCustomerAccountPage =
     pathname === "/customer" || pathname.startsWith("/customer/");
@@ -78,10 +91,13 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     isCustomerPetsPage ||
     isCustomerBookingsPage;
 
+  const shouldShowGlobalMessageNotifier = !isAuthPage;
+
   if (isAdminPage) {
     return (
       <>
         <main className="admin-theme site-main min-h-screen">{children}</main>
+        {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
         <ScrollToTopButton />
       </>
     );
@@ -101,6 +117,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
       <>
         <div className="site-main min-h-screen bg-white">{children}</div>
         <Footer />
+        {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
         <ScrollToTopButton />
       </>
     );
@@ -111,6 +128,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
       <Header />
       <main className="site-main min-h-[70vh]">{children}</main>
       <Footer />
+      {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
       <ScrollToTopButton />
     </>
   );

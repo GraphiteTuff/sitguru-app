@@ -55,6 +55,9 @@ type ApplicationStatus =
 
 type GuruDisplayRow = {
   id: string;
+  userId: string;
+  guruUserId: string;
+  messageHref: string;
   name: string;
   email: string;
   avatarUrl: string;
@@ -333,6 +336,57 @@ function getGuruProfileKey(guru: GuruRow) {
     asTrimmedString(guru.id) ||
     asTrimmedString(guru.email).toLowerCase()
   );
+}
+
+function getGuruUserId(guru: GuruRow, profile?: ProfileRow) {
+  return (
+    asTrimmedString(guru.user_id) ||
+    asTrimmedString(guru.profile_id) ||
+    asTrimmedString(profile?.id) ||
+    asTrimmedString(profile?.user_id) ||
+    asTrimmedString(profile?.profile_id)
+  );
+}
+
+function getGuruAdminMessageHref({
+  guru,
+  profile,
+  guruId,
+  name,
+  email,
+}: {
+  guru: GuruRow;
+  profile?: ProfileRow;
+  guruId: string;
+  name: string;
+  email: string;
+}) {
+  const params = new URLSearchParams();
+  const recipientId = getGuruUserId(guru, profile);
+  const cleanName = asTrimmedString(name);
+  const cleanEmail = asTrimmedString(email).toLowerCase();
+
+  params.set("threadType", "direct_guru");
+  params.set("recipientRole", "guru");
+  params.set("source", "admin-gurus");
+
+  if (recipientId) {
+    params.set("recipientId", recipientId);
+  }
+
+  if (cleanName) {
+    params.set("recipientName", cleanName);
+  }
+
+  if (cleanEmail && cleanEmail !== "—") {
+    params.set("recipientEmail", cleanEmail);
+  }
+
+  if (guruId) {
+    params.set("guruId", guruId);
+  }
+
+  return `/admin/messages?${params.toString()}`;
 }
 
 function getGuruName(guru: GuruRow, profile?: ProfileRow) {
@@ -1082,10 +1136,23 @@ async function getGuruManagementData(searchParams: SearchParams) {
       isRiskTrustStatus(safetyStatus) ||
       isGuruFlagged(guru);
 
+    const name = getGuruName(guru, profile);
+    const email = getGuruEmail(guru, profile);
+    const guruUserId = getGuruUserId(guru, profile);
+
     return {
       id,
-      name: getGuruName(guru, profile),
-      email: getGuruEmail(guru, profile),
+      userId: guruUserId,
+      guruUserId,
+      messageHref: getGuruAdminMessageHref({
+        guru,
+        profile,
+        guruId: id,
+        name,
+        email,
+      }),
+      name,
+      email,
       avatarUrl: getGuruAvatarUrl(guru, profile),
       slug,
       services: getGuruServices(guru),
