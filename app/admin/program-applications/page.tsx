@@ -59,6 +59,14 @@ type AnyRow = Record<string, unknown>;
 
 type ProgramApplication = {
   id: string;
+  source_table: "program_applications" | "ambassador_leads" | "ambassadors";
+  source_id: string;
+  referral_code: string;
+  login_username: string;
+  dashboard_slug: string;
+  dashboard_enabled: boolean;
+  login_enabled: boolean;
+  user_id: string;
   program: string;
   status: string;
   checkr_status: string;
@@ -99,6 +107,8 @@ const adminRoutes = {
   dashboard: "/admin",
   programs: "/admin/programs",
   programApplications: "/admin/program-applications",
+  ambassadorLeads: "/admin/ambassador-leads",
+  ambassadors: "/admin/ambassadors",
   studentApplications: "/admin/program-applications?program=student-hire",
   veteransApplications: "/admin/program-applications?program=veterans-hire",
   ambassadorApplications:
@@ -382,6 +392,12 @@ function normalizeStatus(value: string): StatusKey {
   }
 
   if (normalized === "pending") return "new";
+  if (normalized === "interested") return "reviewing";
+  if (normalized === "conditional_offer_sent") return "contacted";
+  if (normalized === "onboarding_sent") return "onboarding";
+  if (normalized === "active") return "approved";
+  if (normalized === "not_a_fit") return "not_approved";
+  if (normalized === "not_moving_forward") return "not_approved";
   if (normalized === "in_review") return "reviewing";
   if (
     normalized === "checkr" ||
@@ -455,6 +471,48 @@ function normalizeProgram(value: string): ProgramKey | "" {
   if (normalized.includes("skillbridge")) return "skillbridge-interest";
 
   return "";
+}
+
+function mapStatusToAmbassadorStatus(status: StatusKey) {
+  if (status === "new") return "interested";
+  if (status === "reviewing") return "interested";
+  if (status === "contacted") return "conditional_offer_sent";
+  if (status === "missing_info") return "interested";
+  if (status === "onboarding") return "onboarding_sent";
+  if (status === "checkr_pending") return "onboarding_sent";
+  if (status === "approved") return "active";
+  if (status === "not_approved") return "not_a_fit";
+  if (status === "archived") return "archived";
+
+  return "interested";
+}
+
+function mapStatusToLeadStatus(status: StatusKey) {
+  if (status === "new") return "new";
+  if (status === "reviewing") return "interested";
+  if (status === "contacted") return "contacted";
+  if (status === "missing_info") return "contacted";
+  if (status === "onboarding") return "signed_up";
+  if (status === "checkr_pending") return "signed_up";
+  if (status === "approved") return "approved";
+  if (status === "not_approved") return "not_moving_forward";
+  if (status === "archived") return "archived";
+
+  return "new";
+}
+
+function formatPhoneNumber(value: string) {
+  let digits = value.replace(/\D/g, "");
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    digits = digits.slice(1);
+  }
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  return value;
 }
 
 function getProgramLabel(value: string) {
@@ -592,8 +650,18 @@ function buildApplication(row: AnyRow): ProgramApplication {
     "program",
   );
 
+  const id = getText(row, ["id", "application_id", "uuid"]);
+
   return {
-    id: getText(row, ["id", "application_id", "uuid"]),
+    id,
+    source_table: "program_applications",
+    source_id: id,
+    referral_code: getText(row, ["referral_code", "ambassador_code"]),
+    login_username: getText(row, ["login_username"]),
+    dashboard_slug: getText(row, ["dashboard_slug"]),
+    dashboard_enabled: asBoolean(row.dashboard_enabled),
+    login_enabled: asBoolean(row.login_enabled),
+    user_id: getText(row, ["user_id"]),
     program,
     status: normalizeStatus(getText(row, ["status"], "new")),
     checkr_status: normalizeCheckrStatus(
@@ -601,7 +669,7 @@ function buildApplication(row: AnyRow): ProgramApplication {
     ),
     full_name: getText(row, ["full_name", "name", "applicant_name"]),
     email: getText(row, ["email", "applicant_email"]),
-    phone: getText(row, ["phone", "phone_number", "applicant_phone"]),
+    phone: formatPhoneNumber(getText(row, ["phone", "phone_number", "applicant_phone"])),
     zip_code: getText(row, ["zip_code", "zipcode", "zip"]),
     city: getText(row, ["city"]),
     state: getText(row, ["state"]),
@@ -949,24 +1017,220 @@ function buildHref(
     : adminRoutes.programApplications;
 }
 
-async function getProgramApplications() {
-  const { data, error } = await supabaseAdmin
-    .from("program_applications")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(5000);
-
-  if (error) {
-    console.error("Admin program applications load error:", error.message);
-    return {
-      applications: [] as ProgramApplication[],
-      error: error.message,
-    };
-  }
+function buildAmbassadorLeadApplication(row: AnyRow): ProgramApplication {
+  const id = getText(row, ["id"]);
+  const fullName = getText(row, ["full_name", "name", "lead_name"], "Unnamed applicant");
+  const program = getText(row, ["program", "program_name", "lead_program"], "Student Hire");
+  const status = normalizeStatus(getText(row, ["status"], "new"));
+  const source = getText(row, ["source", "lead_source", "signup_source"], "Indeed");
+  const resumeUrl = getText(row, ["resume_file_url", "resume_url", "resume_link"]);
+  const coverLetterUrl = getText(row, ["cover_letter_file_url", "cover_letter_url", "cover_letter_link"]);
+  const otherDocumentUrl = getText(row, ["other_document_file_url", "other_document_url", "document_url"]);
+  const notes = getText(row, ["notes", "message", "comments"]);
 
   return {
-    applications: ((data || []) as AnyRow[]).map(buildApplication),
-    error: "",
+    id,
+    source_table: "ambassador_leads",
+    source_id: id,
+    referral_code: getText(row, ["referral_code", "login_username"]),
+    login_username: getText(row, ["login_username", "referral_code"]),
+    dashboard_slug: getText(row, ["dashboard_slug"]),
+    dashboard_enabled: asBoolean(row.dashboard_enabled),
+    login_enabled: asBoolean(row.login_enabled),
+    user_id: getText(row, ["user_id"]),
+    program,
+    status,
+    checkr_status: "not_started",
+    full_name: fullName,
+    email: getText(row, ["email", "contact_email", "login_email"]),
+    phone: formatPhoneNumber(getText(row, ["phone", "phone_number", "mobile"])),
+    zip_code: getText(row, ["zip_code", "zipcode", "zip", "postal_code"]),
+    city: getText(row, ["city"]),
+    state: getText(row, ["state"]),
+    availability: getText(row, ["availability"]),
+    services_interested: asArray(row.services_interested || row.services || row.program_interests),
+    referral_source: source,
+    resume_link: "",
+    resume_url: resumeUrl,
+    additional_documents: [coverLetterUrl, otherDocumentUrl].filter(Boolean),
+    background_check_consent: asBoolean(row.background_check_consent),
+    experience: notes,
+    military_connected_background: "",
+    school_name: getText(row, ["school_name", "school"]),
+    student_status: getText(row, ["student_status"]),
+    graduation_year_or_availability: getText(row, ["graduation_year_or_availability", "availability"]),
+    student_background: notes,
+    notes,
+    admin_notes: getText(row, ["admin_notes"]),
+    next_step: getText(row, ["next_step"], "Set up Ambassador portal access, training, documents, and final certification."),
+    created_at: getText(row, ["created_at", "submitted_at"]),
+    updated_at: getText(row, ["updated_at"]),
+    reviewed_at: getText(row, ["reviewed_at"]),
+    reviewed_by: getText(row, ["reviewed_by"]),
+    contacted_at: getText(row, ["contacted_at"]),
+    onboarding_started_at: getText(row, ["onboarding_started_at"]),
+    approved_at: getText(row, ["approved_at"]),
+    rejected_at: getText(row, ["rejected_at"]),
+    raw: row,
+  };
+}
+
+function buildAmbassadorApplication(row: AnyRow): ProgramApplication {
+  const id = getText(row, ["id"]);
+  const fullName = getText(row, ["full_name", "display_name", "name"], "Unnamed applicant");
+  const status = normalizeStatus(getText(row, ["status"], "interested"));
+  const referralCode = getText(row, ["referral_code", "login_username"]);
+  const notes = getText(row, ["notes", "bio", "admin_notes"]);
+  const resumeUrl = getText(row, ["resume_file_url", "resume_url", "resume_link"]);
+
+  return {
+    id,
+    source_table: "ambassadors",
+    source_id: id,
+    referral_code: referralCode,
+    login_username: getText(row, ["login_username"], referralCode),
+    dashboard_slug: getText(row, ["dashboard_slug"]),
+    dashboard_enabled: asBoolean(row.dashboard_enabled),
+    login_enabled: asBoolean(row.login_enabled),
+    user_id: getText(row, ["user_id"]),
+    program: getText(row, ["program", "program_name"], "Student Hire"),
+    status,
+    checkr_status: "not_started",
+    full_name: fullName,
+    email: getText(row, ["login_email", "email", "contact_email"]),
+    phone: formatPhoneNumber(getText(row, ["phone", "phone_number", "mobile"])),
+    zip_code: getText(row, ["zip_code", "zipcode", "zip", "postal_code"]),
+    city: getText(row, ["city"]),
+    state: getText(row, ["state"]),
+    availability: getText(row, ["availability"]),
+    services_interested: asArray(row.services_interested || row.services || row.program_interests),
+    referral_source: getText(row, ["source", "lead_source", "signup_source"], "Ambassador dashboard"),
+    resume_link: "",
+    resume_url: resumeUrl,
+    additional_documents: [],
+    background_check_consent: asBoolean(row.background_check_consent),
+    experience: notes,
+    military_connected_background: "",
+    school_name: getText(row, ["school_name", "school"]),
+    student_status: getText(row, ["student_status"]),
+    graduation_year_or_availability: getText(row, ["graduation_year_or_availability", "availability"]),
+    student_background: notes,
+    notes,
+    admin_notes: getText(row, ["admin_notes"]),
+    next_step: getText(row, ["next_step"], "Confirm login readiness, training completion, onboarding documents, and certification."),
+    created_at: getText(row, ["created_at", "submitted_at"]),
+    updated_at: getText(row, ["updated_at"]),
+    reviewed_at: getText(row, ["reviewed_at"]),
+    reviewed_by: getText(row, ["reviewed_by"]),
+    contacted_at: getText(row, ["contacted_at"]),
+    onboarding_started_at: getText(row, ["onboarding_started_at"]),
+    approved_at: getText(row, ["approved_at"]),
+    rejected_at: getText(row, ["rejected_at"]),
+    raw: row,
+  };
+}
+
+function getApplicationDedupeKey(application: ProgramApplication) {
+  const email = application.email.toLowerCase();
+  const referralCode = application.referral_code.toLowerCase();
+  const name = application.full_name.toLowerCase();
+
+  if (referralCode) return `code:${referralCode}`;
+  if (email) return `email:${email}`;
+  return `name:${name}:${application.source_table}:${application.source_id}`;
+}
+
+function mergeProgramApplicationSources(...groups: ProgramApplication[][]) {
+  const merged = new Map<string, ProgramApplication>();
+
+  for (const group of groups) {
+    for (const application of group) {
+      const key = getApplicationDedupeKey(application);
+      const existing = merged.get(key);
+
+      if (!existing) {
+        merged.set(key, application);
+        continue;
+      }
+
+      if (existing.source_table !== "ambassadors" && application.source_table === "ambassadors") {
+        merged.set(key, application);
+      }
+    }
+  }
+
+  return Array.from(merged.values()).sort((a, b) => {
+    const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
+    const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
+async function getProgramApplications() {
+  const [programApplicationsResult, ambassadorLeadsResult, ambassadorsResult] =
+    await Promise.all([
+      supabaseAdmin
+        .from("program_applications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      supabaseAdmin
+        .from("ambassador_leads")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .neq("status", "archived")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+    ]);
+
+  const errors = [
+    programApplicationsResult.error?.message,
+    ambassadorLeadsResult.error?.message,
+    ambassadorsResult.error?.message,
+  ].filter(Boolean);
+
+  if (programApplicationsResult.error) {
+    console.error(
+      "Admin program applications load error:",
+      programApplicationsResult.error.message,
+    );
+  }
+
+  if (ambassadorLeadsResult.error) {
+    console.error(
+      "Admin ambassador leads load error:",
+      ambassadorLeadsResult.error.message,
+    );
+  }
+
+  if (ambassadorsResult.error) {
+    console.error(
+      "Admin ambassadors load error:",
+      ambassadorsResult.error.message,
+    );
+  }
+
+  const programApplications = ((programApplicationsResult.data || []) as AnyRow[])
+    .filter(Boolean)
+    .map(buildApplication);
+  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[])
+    .filter(Boolean)
+    .map(buildAmbassadorLeadApplication);
+  const ambassadors = ((ambassadorsResult.data || []) as AnyRow[])
+    .filter(Boolean)
+    .map(buildAmbassadorApplication);
+
+  return {
+    applications: mergeProgramApplicationSources(
+      programApplications,
+      ambassadorLeads,
+      ambassadors,
+    ),
+    error: errors.join(" | "),
   };
 }
 
@@ -974,6 +1238,7 @@ async function updateProgramApplicationAction(formData: FormData) {
   "use server";
 
   const id = String(formData.get("id") || "").trim();
+  const sourceTable = String(formData.get("source_table") || "program_applications").trim();
   const status = normalizeStatus(String(formData.get("status") || "new"));
   const checkrStatus = normalizeCheckrStatus(
     String(formData.get("checkr_status") || "not_started"),
@@ -988,81 +1253,152 @@ async function updateProgramApplicationAction(formData: FormData) {
     redirect(returnTo);
   }
 
-  const existingResult = await supabaseAdmin
-    .from("program_applications")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  const existingApplication = existingResult.data
-    ? buildApplication(existingResult.data as AnyRow)
-    : null;
-
-  const oldStatus = normalizeStatus(existingApplication?.status || "new");
   const timestamp = new Date().toISOString();
+  let savedApplication: ProgramApplication | null = null;
+  let oldStatus: StatusKey = "new";
 
-  const primaryPayload: AnyRow = {
-    status,
-    checkr_status: checkrStatus,
-    admin_notes: adminNotes,
-    next_step: nextStep,
-    reviewed_at: timestamp,
-    updated_at: timestamp,
-  };
+  if (sourceTable === "ambassador_leads") {
+    const existingResult = await supabaseAdmin
+      .from("ambassador_leads")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-  if (status === "contacted") {
-    primaryPayload.contacted_at = timestamp;
-  }
+    const existingApplication = existingResult.data
+      ? buildAmbassadorLeadApplication(existingResult.data as AnyRow)
+      : null;
 
-  if (status === "onboarding") {
-    primaryPayload.onboarding_started_at = timestamp;
-  }
+    oldStatus = normalizeStatus(existingApplication?.status || "new");
 
-  if (status === "approved") {
-    primaryPayload.approved_at = timestamp;
-  }
-
-  if (status === "not_approved") {
-    primaryPayload.rejected_at = timestamp;
-  }
-
-  const primaryUpdate = await supabaseAdmin
-    .from("program_applications")
-    .update(primaryPayload)
-    .eq("id", id)
-    .select("*")
-    .single();
-
-  let savedApplication: ProgramApplication | null = primaryUpdate.data
-    ? buildApplication(primaryUpdate.data as AnyRow)
-    : null;
-
-  if (primaryUpdate.error) {
-    console.error(
-      "Program application full update error:",
-      primaryUpdate.error.message,
-    );
-
-    const fallbackPayload: AnyRow = {
-      status,
-      admin_notes: adminNotes,
-      next_step: nextStep,
+    const leadPayload: AnyRow = {
+      status: mapStatusToLeadStatus(status),
+      notes: [existingApplication?.notes, adminNotes, nextStep]
+        .filter(Boolean)
+        .join("\n\n"),
+      updated_at: timestamp,
     };
 
-    const fallbackUpdate = await supabaseAdmin
-      .from("program_applications")
-      .update(fallbackPayload)
+    const leadUpdate = await supabaseAdmin
+      .from("ambassador_leads")
+      .update(leadPayload)
       .eq("id", id)
       .select("*")
       .single();
 
-    if (fallbackUpdate.error) {
+    if (leadUpdate.error) {
+      console.error("Ambassador lead update error:", leadUpdate.error.message);
+    } else if (leadUpdate.data) {
+      savedApplication = buildAmbassadorLeadApplication(leadUpdate.data as AnyRow);
+    }
+  } else if (sourceTable === "ambassadors") {
+    const existingResult = await supabaseAdmin
+      .from("ambassadors")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    const existingApplication = existingResult.data
+      ? buildAmbassadorApplication(existingResult.data as AnyRow)
+      : null;
+
+    oldStatus = normalizeStatus(existingApplication?.status || "new");
+
+    const ambassadorPayload: AnyRow = {
+      status: mapStatusToAmbassadorStatus(status),
+      notes: [existingApplication?.notes, adminNotes, nextStep]
+        .filter(Boolean)
+        .join("\n\n"),
+      updated_at: timestamp,
+    };
+
+    const ambassadorUpdate = await supabaseAdmin
+      .from("ambassadors")
+      .update(ambassadorPayload)
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (ambassadorUpdate.error) {
+      console.error("Ambassador update error:", ambassadorUpdate.error.message);
+    } else if (ambassadorUpdate.data) {
+      savedApplication = buildAmbassadorApplication(ambassadorUpdate.data as AnyRow);
+    }
+  } else {
+    const existingResult = await supabaseAdmin
+      .from("program_applications")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    const existingApplication = existingResult.data
+      ? buildApplication(existingResult.data as AnyRow)
+      : null;
+
+    oldStatus = normalizeStatus(existingApplication?.status || "new");
+
+    const primaryPayload: AnyRow = {
+      status,
+      checkr_status: checkrStatus,
+      admin_notes: adminNotes,
+      next_step: nextStep,
+      reviewed_at: timestamp,
+      updated_at: timestamp,
+    };
+
+    if (status === "contacted") {
+      primaryPayload.contacted_at = timestamp;
+    }
+
+    if (status === "onboarding") {
+      primaryPayload.onboarding_started_at = timestamp;
+    }
+
+    if (status === "approved") {
+      primaryPayload.approved_at = timestamp;
+    }
+
+    if (status === "not_approved") {
+      primaryPayload.rejected_at = timestamp;
+    }
+
+    const primaryUpdate = await supabaseAdmin
+      .from("program_applications")
+      .update(primaryPayload)
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    savedApplication = primaryUpdate.data
+      ? buildApplication(primaryUpdate.data as AnyRow)
+      : null;
+
+    if (primaryUpdate.error) {
       console.error(
-        "Program application fallback update error:",
-        fallbackUpdate.error.message,
+        "Program application full update error:",
+        primaryUpdate.error.message,
       );
-    } else if (fallbackUpdate.data) {
-      savedApplication = buildApplication(fallbackUpdate.data as AnyRow);
+
+      const fallbackPayload: AnyRow = {
+        status,
+        admin_notes: adminNotes,
+        next_step: nextStep,
+      };
+
+      const fallbackUpdate = await supabaseAdmin
+        .from("program_applications")
+        .update(fallbackPayload)
+        .eq("id", id)
+        .select("*")
+        .single();
+
+      if (fallbackUpdate.error) {
+        console.error(
+          "Program application fallback update error:",
+          fallbackUpdate.error.message,
+        );
+      } else if (fallbackUpdate.data) {
+        savedApplication = buildApplication(fallbackUpdate.data as AnyRow);
+      }
     }
   }
 
@@ -1076,6 +1412,7 @@ async function updateProgramApplicationAction(formData: FormData) {
 
   revalidatePath(adminRoutes.programApplications);
   revalidatePath(adminRoutes.programs);
+  revalidatePath(adminRoutes.ambassadorLeads);
 
   redirect(returnTo);
 }
@@ -1276,10 +1613,43 @@ function ApplicationCard({
           <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
             Application ID:{" "}
             <span className="font-black text-slate-900">{application.id}</span>
+            {application.source_table !== "program_applications" ? (
+              <span className="ml-2 rounded-full bg-green-50 px-2 py-1 text-xs font-black text-green-800">
+                {application.source_table === "ambassadors"
+                  ? "Ambassador Dashboard"
+                  : "Ambassador Lead"}
+              </span>
+            ) : null}
           </p>
+
+          {application.referral_code || application.login_username ? (
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              Ambassador code:{" "}
+              <span className="font-black text-green-900">
+                {application.referral_code || application.login_username}
+              </span>
+              <span className="ml-2 text-xs font-black text-slate-500">
+                {application.user_id ? "Auth linked" : "Auth not linked yet"}
+              </span>
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row xl:flex-col">
+          {application.source_table !== "program_applications" ? (
+            <Link
+              href={
+                application.source_table === "ambassadors"
+                  ? `${adminRoutes.ambassadors}/${encodeURIComponent(application.source_id)}`
+                  : adminRoutes.ambassadorLeads
+              }
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 transition hover:bg-green-50"
+            >
+              <ExternalLink size={16} />
+              Open Source Record
+            </Link>
+          ) : null}
+
           {application.email ? (
             <a
               href={`mailto:${application.email}?subject=SitGuru Program Application - ${encodeURIComponent(
@@ -1502,7 +1872,8 @@ function ApplicationCard({
         action={updateProgramApplicationAction}
         className="mt-5 rounded-[24px] border border-green-100 bg-green-50 p-4"
       >
-        <input type="hidden" name="id" value={application.id} />
+        <input type="hidden" name="id" value={application.source_id || application.id} />
+        <input type="hidden" name="source_table" value={application.source_table} />
         <input
           type="hidden"
           name="return_to"
@@ -1601,13 +1972,13 @@ function EmptyState({ tableError }: { tableError?: string }) {
       </div>
 
       <h2 className="text-2xl font-black text-green-950">
-        No program applications found.
+        No matching program applications or Ambassador leads found.
       </h2>
 
       <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
         {tableError
           ? `Supabase returned: ${tableError}`
-          : "Try clearing filters, or submit a test application from the public program application page."}
+          : "Try clearing filters, or confirm the applicant exists in program_applications, ambassador_leads, or active ambassadors."}
       </p>
 
       <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
@@ -1722,9 +2093,10 @@ export default async function AdminProgramApplicationsPage({
 
                 <p className="mt-1 max-w-5xl text-base font-semibold text-slate-600">
                   Review and action Student Hire, Veterans Hire, Ambassador
-                  Program, and SkillBridge Interest applicants. Update status,
-                  trust and safety stage, notes, and next steps. Status changes
-                  send an applicant email update.
+                  Program, and SkillBridge Interest applicants. Student Hire
+                  now includes program applications, Ambassador Leads, and
+                  active Ambassador dashboard records so the Indeed/HR pipeline
+                  is visible from this page.
                 </p>
               </div>
             </div>
