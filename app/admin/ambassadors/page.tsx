@@ -365,6 +365,77 @@ function isZipRecruiterLead(row: AmbassadorLeadRow) {
   return source.includes("ziprecruiter") || source.includes("zip recruiter");
 }
 
+function mapLeadStatusToAmbassadorStatus(status?: string | null) {
+  const cleanStatus = normalizeText(status);
+
+  if (cleanStatus === "archived") return "archived";
+  if (cleanStatus === "approved" || cleanStatus === "active") return "active";
+  if (cleanStatus === "interested") return "active";
+  if (cleanStatus === "signed_up" || cleanStatus === "signup") {
+    return "onboarding_sent";
+  }
+  if (cleanStatus === "contacted") return "contacted";
+
+  return "contacted";
+}
+
+function buildAmbassadorReferralLink(referralCode?: string | null) {
+  const code = asString(referralCode);
+
+  if (!code) return null;
+
+  return `https://www.sitguru.com/sign-up?ref=${encodeURIComponent(code)}`;
+}
+
+function buildAmbassadorMessageHref(ambassador: AmbassadorSummaryRow) {
+  const ambassadorName = getAmbassadorName(ambassador);
+  const params = new URLSearchParams({
+    threadType: "ambassador_support",
+    inquiry: "partner",
+    source: "admin_ambassador_dashboard",
+    recipientRole: "ambassador",
+    recipientName: ambassadorName,
+    ambassadorName,
+  });
+
+  if (ambassador.source_record_type === "lead") {
+    params.set("ambassadorLeadId", ambassador.lead_id || ambassador.ambassador_id);
+    params.set("leadId", ambassador.lead_id || ambassador.ambassador_id);
+  } else {
+    params.set("ambassadorId", ambassador.ambassador_id);
+  }
+
+  if (ambassador.email) {
+    params.set("recipientEmail", ambassador.email);
+    params.set("ambassadorEmail", ambassador.email);
+    params.set("q", ambassador.email);
+  } else if (ambassador.referral_code) {
+    params.set("q", ambassador.referral_code);
+  } else {
+    params.set("q", ambassadorName);
+  }
+
+  if (ambassador.referral_code) {
+    params.set("referralCode", ambassador.referral_code);
+  }
+
+  return `/admin/messages?${params.toString()}`;
+}
+
+function buildAmbassadorLeadPipelineHref(ambassador: AmbassadorSummaryRow) {
+  const params = new URLSearchParams({
+    source: "ZipRecruiter",
+  });
+
+  if (ambassador.email) {
+    params.set("q", ambassador.email);
+  } else if (ambassador.lead_id || ambassador.ambassador_id) {
+    params.set("q", ambassador.lead_id || ambassador.ambassador_id);
+  }
+
+  return `/admin/ambassador-leads?${params.toString()}`;
+}
+
 function leadToAmbassadorSummaryRow(row: AmbassadorLeadRow): AmbassadorSummaryRow {
   return {
     ambassador_id: row.id,
@@ -377,9 +448,7 @@ function leadToAmbassadorSummaryRow(row: AmbassadorLeadRow): AmbassadorSummaryRo
     source: "ZipRecruiter",
     status: normalizeLeadStatusForDashboard(row.status),
     referral_code: row.referral_code,
-    referral_link: row.referral_code
-      ? `https://www.sitguru.com?ref=${encodeURIComponent(row.referral_code)}`
-      : null,
+    referral_link: buildAmbassadorReferralLink(row.referral_code),
     city: row.city,
     state: row.state,
     county: row.county,
@@ -574,6 +643,154 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
   redirect("/admin/ambassadors?updated=success");
 }
 
+
+async function createAmbassadorFromLead(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !isSuperUserEmail(user.email)) {
+    redirect("/admin/login");
+  }
+
+  const leadId = asString(formData.get("lead_id"));
+
+  if (!leadId) {
+    redirect("/admin/ambassadors?updated=missing");
+  }
+
+  const { data: lead, error: leadError } = await supabaseAdmin
+    .from("ambassador_leads")
+    .select("*")
+    .eq("id", leadId)
+    .maybeSingle<AmbassadorLeadRow>();
+
+  if (leadError || !lead) {
+    console.warn("Unable to find ZipRecruiter lead before Ambassador creation:", leadError);
+    redirect("/admin/ambassadors?updated=error");
+  }
+
+  const email = asString(lead.email);
+  const now = new Date().toISOString();
+
+  if (email) {
+    const { data: existingByEmail } = await supabaseAdmin
+      .from("ambassadors")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle<{ id: string }>();
+
+    if (existingByEmail?.id) {
+      redirect(`/admin/ambassadors/${existingByEmail.id}`);
+    }
+  }
+
+  const { data: existingByLeadId } = await supabaseAdmin
+    .from("ambassadors")
+    .select("id")
+    .eq("lead_id", leadId)
+    .maybeSingle<{ id: string }>();
+
+  if (existingByLeadId?.id) {
+    redirect(`/admin/ambassadors/${existingByLeadId.id}`);
+  }
+
+  const leadName =
+    asString(lead.full_name) || asString(lead.email) || "ZipRecruiter Ambassador";
+  const source = getSourceLabel({
+    ...leadToAmbassadorSummaryRow(lead),
+    source: lead.source || "ZipRecruiter",
+  });
+  const referralCode = asString(lead.referral_code);
+
+  const { data: insertedAmbassador, error: insertError } = await supabaseAdmin
+    .from("ambassadors")
+    .insert({
+      lead_id: lead.id,
+      full_name: leadName,
+      display_name: leadName,
+      email: email || null,
+      phone: asString(lead.phone) || null,
+      program: asString(lead.program) || "Community Hire",
+      internal_role:
+        asString(lead.candidate_path) ||
+        asString(lead.lead_stage) ||
+        "ZipRecruiter Ambassador",
+      ambassador_type:
+        asString(lead.candidate_path) ||
+        asString(lead.program) ||
+        "ZipRecruiter Ambassador",
+      tier: "Lead",
+      source,
+      status: mapLeadStatusToAmbassadorStatus(lead.status),
+      referral_code: referralCode || null,
+      referral_link: buildAmbassadorReferralLink(referralCode),
+      city: asString(lead.city) || null,
+      state: asString(lead.state) || null,
+      county: asString(lead.county) || null,
+      country: asString(lead.country) || "United States",
+      notes: [
+        asString(lead.notes),
+        `Converted from ZipRecruiter Ambassador Lead on ${now} by ${
+          user.email || "Super Admin"
+        }.`,
+        lead.candidate_path ? `Candidate path: ${lead.candidate_path}` : "",
+        lead.next_step ? `Next step from lead: ${lead.next_step}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+      training_status: asString(lead.lead_stage) || "Ambassador Path Confirmed",
+      training_percent: 0,
+      onboarding_percent: 0,
+      eligibility_review_required: false,
+      eligibility_review_complete: true,
+      stripe_onboarding_complete: false,
+      stripe_charges_enabled: false,
+      stripe_payouts_enabled: false,
+      payout_status: "not_ready",
+      tax_info_status: "not_started",
+      created_at: now,
+      updated_at: now,
+    })
+    .select("id")
+    .single<{ id: string }>();
+
+  if (insertError || !insertedAmbassador) {
+    console.warn("Unable to create Ambassador from ZipRecruiter lead:", insertError);
+    redirect("/admin/ambassadors?updated=error");
+  }
+
+  await supabaseAdmin
+    .from("ambassador_leads")
+    .update({
+      lead_stage: "Ambassador Record Created",
+      next_step:
+        "Ambassador dashboard record has been created. Continue onboarding, messaging, referral tracking, training, and payout setup from the Ambassador dashboard.",
+      updated_at: now,
+    })
+    .eq("id", lead.id);
+
+  await supabaseAdmin.from("ambassador_activity_log").insert({
+    ambassador_id: insertedAmbassador.id,
+    activity_type: "lead_conversion",
+    activity_title: "ZipRecruiter lead converted to Ambassador",
+    activity_notes: `${leadName} was converted from a ZipRecruiter Ambassador Lead by ${
+      user.email || "Super Admin"
+    }.`,
+    created_by: user.id,
+  });
+
+  revalidatePath("/admin/ambassadors");
+  revalidatePath(`/admin/ambassadors/${insertedAmbassador.id}`);
+  revalidatePath("/admin/ambassador-leads");
+
+  redirect(`/admin/ambassadors/${insertedAmbassador.id}?updated=success`);
+}
+
 function AmbassadorPhoto({
   ambassador,
   size = "normal",
@@ -638,14 +855,31 @@ function AmbassadorQuickActions({
   if (ambassador.source_record_type === "lead") {
     return (
       <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-xs font-bold leading-5 text-blue-900">
-        This ZipRecruiter record is still an Ambassador Lead. Update its source,
-        status, referral code, or next step from the Ambassador Leads pipeline.
-        <Link
-          href="/admin/ambassador-leads?source=ZipRecruiter"
-          className="mt-2 inline-flex min-h-10 items-center justify-center rounded-2xl bg-blue-700 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-blue-800"
-        >
-          Open ZipRecruiter Leads
-        </Link>
+        This ZipRecruiter record is still an Ambassador Lead. Create the full
+        Ambassador dashboard record when they are ready to move forward, or open
+        the lead pipeline to update source, status, referral code, and next step.
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <form action={createAmbassadorFromLead}>
+            <input
+              type="hidden"
+              name="lead_id"
+              value={ambassador.lead_id || ambassador.ambassador_id}
+            />
+            <button
+              type="submit"
+              className="inline-flex min-h-10 w-full items-center justify-center rounded-2xl bg-[#2f6f3e] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-[#255b33]"
+            >
+              Create / View Ambassador
+            </button>
+          </form>
+
+          <Link
+            href={buildAmbassadorLeadPipelineHref(ambassador)}
+            className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-blue-700 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-blue-800"
+          >
+            Open Lead Pipeline
+          </Link>
+        </div>
       </div>
     );
   }
@@ -875,7 +1109,7 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
           </div>
 
           <Link
-            href="/admin/messages"
+            href={buildAmbassadorMessageHref(ambassador)}
             className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#2f6f3e] px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
           >
             Open Messenger
@@ -896,19 +1130,40 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
           Source: {sourceLabel}
         </p>
 
-        <Link
-          href={
-            ambassador.source_record_type === "lead"
-              ? "/admin/ambassador-leads?source=ZipRecruiter"
-              : `/admin/ambassadors/${ambassador.ambassador_id}`
-          }
-          className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
-        >
-          {ambassador.source_record_type === "lead"
-            ? "Open Lead Pipeline"
-            : "View Ambassador"}
-          <ChevronRight className="ml-1 h-4 w-4" />
-        </Link>
+        {ambassador.source_record_type === "lead" ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <form action={createAmbassadorFromLead}>
+              <input
+                type="hidden"
+                name="lead_id"
+                value={ambassador.lead_id || ambassador.ambassador_id}
+              />
+              <button
+                type="submit"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+              >
+                Create / View Ambassador
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </button>
+            </form>
+
+            <Link
+              href={buildAmbassadorLeadPipelineHref(ambassador)}
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-5 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+            >
+              Open Lead Pipeline
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Link>
+          </div>
+        ) : (
+          <Link
+            href={`/admin/ambassadors/${ambassador.ambassador_id}`}
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+          >
+            View Ambassador
+            <ChevronRight className="ml-1 h-4 w-4" />
+          </Link>
+        )}
       </div>
     </article>
   );
