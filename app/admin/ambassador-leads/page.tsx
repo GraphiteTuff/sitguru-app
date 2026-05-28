@@ -45,6 +45,13 @@ type AmbassadorLeadsPageProps = {
   searchParams?: SearchParams;
 };
 
+type ZipLocation = {
+  city: string;
+  state: string;
+  county: string;
+  country: string;
+};
+
 type NormalizedLead = {
   raw: AnyRow;
   id: string;
@@ -138,6 +145,69 @@ const quickStatusActions = [
   },
 ];
 
+const zipLocationFallbacks: Record<string, ZipLocation> = {
+  "01085": {
+    city: "Westfield",
+    state: "MA",
+    county: "Hampden",
+    country: "United States",
+  },
+  "14476": {
+    city: "Kendall",
+    state: "NY",
+    county: "Orleans",
+    country: "United States",
+  },
+  "18951": {
+    city: "Quakertown",
+    state: "PA",
+    county: "Bucks",
+    country: "United States",
+  },
+  "27217": {
+    city: "Burlington",
+    state: "NC",
+    county: "Alamance",
+    country: "United States",
+  },
+  "38242": {
+    city: "Paris",
+    state: "TN",
+    county: "Henry",
+    country: "United States",
+  },
+  "46001": {
+    city: "Alexandria",
+    state: "IN",
+    county: "Madison",
+    country: "United States",
+  },
+  "64850": {
+    city: "Neosho",
+    state: "MO",
+    county: "Newton",
+    country: "United States",
+  },
+  "77494": {
+    city: "Katy",
+    state: "TX",
+    county: "Fort Bend",
+    country: "United States",
+  },
+  "81643": {
+    city: "Mesa",
+    state: "CO",
+    county: "Mesa",
+    country: "United States",
+  },
+  "93535": {
+    city: "Lancaster",
+    state: "CA",
+    county: "Los Angeles",
+    country: "United States",
+  },
+};
+
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -170,6 +240,39 @@ function formatDate(value?: string | null) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function normalizeZipCode(value: string) {
+  return value.replace(/\D/g, "").slice(0, 5);
+}
+
+function normalizeStateCode(value: string) {
+  return value.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase();
+}
+
+function resolveLeadLocation({
+  zipCode,
+  city,
+  state,
+  county,
+  country,
+}: {
+  zipCode: string;
+  city: string;
+  state: string;
+  county: string;
+  country: string;
+}) {
+  const cleanZip = normalizeZipCode(zipCode);
+  const fallback = cleanZip ? zipLocationFallbacks[cleanZip] : undefined;
+
+  return {
+    zipCode: cleanZip || zipCode,
+    city: city || fallback?.city || "",
+    state: normalizeStateCode(state || fallback?.state || ""),
+    county: county || fallback?.county || "",
+    country: country || fallback?.country || "United States",
+  };
 }
 
 function getText(row: AnyRow, keys: string[], fallback = "") {
@@ -400,19 +503,22 @@ function buildLocationDisplay({
 }
 
 function getLocation(row: AnyRow) {
-  const city = getCity(row);
-  const state = getState(row);
   const zipCode = getZipCode(row);
-  const county = getCounty(row);
-  const country = getCountry(row);
+  const resolvedLocation = resolveLeadLocation({
+    zipCode,
+    city: getCity(row),
+    state: getState(row),
+    county: getCounty(row),
+    country: getCountry(row),
+  });
   const location = getText(row, ["location", "market", "area"]);
 
   return buildLocationDisplay({
-    city,
-    state,
-    zipCode,
-    county,
-    country,
+    city: resolvedLocation.city,
+    state: resolvedLocation.state,
+    zipCode: resolvedLocation.zipCode,
+    county: resolvedLocation.county,
+    country: resolvedLocation.country,
     fallback: location,
   });
 }
@@ -647,13 +753,19 @@ function mergeRows(...groups: AnyRow[][]) {
 }
 
 function formatPhoneForStorage(value: string) {
-  const digits = value.replace(/\D/g, "").slice(-10);
+  let digits = value.replace(/\D/g, "");
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    digits = digits.slice(1);
+  }
+
+  digits = digits.slice(0, 10);
 
   if (digits.length === 10) {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
 
-  return value;
+  return value.trim();
 }
 
 async function createAmbassadorLead(formData: FormData) {
@@ -665,17 +777,19 @@ async function createAmbassadorLead(formData: FormData) {
   const program = asString(formData.get("program"));
   const source = asString(formData.get("source"));
   const status = normalizeStatus(asString(formData.get("status")));
-  const zipCode = asString(formData.get("zip_code"));
-  const city = asString(formData.get("city"));
-  const state = asString(formData.get("state")).toUpperCase();
-  const county = asString(formData.get("county"));
-  const country = asString(formData.get("country")) || "United States";
+  const resolvedLocation = resolveLeadLocation({
+    zipCode: asString(formData.get("zip_code")),
+    city: asString(formData.get("city")),
+    state: asString(formData.get("state")),
+    county: asString(formData.get("county")),
+    country: asString(formData.get("country")),
+  });
   const location = buildLocationDisplay({
-    city,
-    state,
-    zipCode,
-    county,
-    country,
+    city: resolvedLocation.city,
+    state: resolvedLocation.state,
+    zipCode: resolvedLocation.zipCode,
+    county: resolvedLocation.county,
+    country: resolvedLocation.country,
   });
   const notes = asString(formData.get("notes"));
   const resumeFileUrl = asString(formData.get("resume_file_url"));
@@ -699,11 +813,11 @@ async function createAmbassadorLead(formData: FormData) {
     source,
     status,
     location: location === "—" ? null : location,
-    zip_code: zipCode || null,
-    city: city || null,
-    state: state || null,
-    county: county || null,
-    country: country || null,
+    zip_code: resolvedLocation.zipCode || null,
+    city: resolvedLocation.city || null,
+    state: resolvedLocation.state || null,
+    county: resolvedLocation.county || null,
+    country: resolvedLocation.country || null,
     notes: notes || null,
     resume_file_url: resumeFileUrl || null,
     resume_file_name: resumeFileName || null,
@@ -738,17 +852,19 @@ async function updateAmbassadorLead(formData: FormData) {
   const program = asString(formData.get("program"));
   const source = asString(formData.get("source"));
   const status = normalizeStatus(asString(formData.get("status")));
-  const zipCode = asString(formData.get("zip_code"));
-  const city = asString(formData.get("city"));
-  const state = asString(formData.get("state")).toUpperCase();
-  const county = asString(formData.get("county"));
-  const country = asString(formData.get("country")) || "United States";
+  const resolvedLocation = resolveLeadLocation({
+    zipCode: asString(formData.get("zip_code")),
+    city: asString(formData.get("city")),
+    state: asString(formData.get("state")),
+    county: asString(formData.get("county")),
+    country: asString(formData.get("country")),
+  });
   const location = buildLocationDisplay({
-    city,
-    state,
-    zipCode,
-    county,
-    country,
+    city: resolvedLocation.city,
+    state: resolvedLocation.state,
+    zipCode: resolvedLocation.zipCode,
+    county: resolvedLocation.county,
+    country: resolvedLocation.country,
   });
   const notes = asString(formData.get("notes"));
   const resumeFileUrl = asString(formData.get("resume_file_url"));
@@ -786,11 +902,11 @@ async function updateAmbassadorLead(formData: FormData) {
       source,
       status,
       location: location === "—" ? null : location,
-      zip_code: zipCode || null,
-      city: city || null,
-      state: state || null,
-      county: county || null,
-      country: country || null,
+      zip_code: resolvedLocation.zipCode || null,
+      city: resolvedLocation.city || null,
+      state: resolvedLocation.state || null,
+      county: resolvedLocation.county || null,
+      country: resolvedLocation.country || null,
       notes: notes || null,
       resume_file_url: resumeFileUrl || null,
       resume_file_name: resumeFileName || null,
@@ -1099,31 +1215,42 @@ async function getAmbassadorLeadData() {
     return dateB - dateA;
   });
 
-  const normalizedLeads = allLeads.map((lead) => ({
-    raw: lead,
-    id: getText(lead, ["id"]),
-    sourceTable: getText(lead, ["__source_table"], "ambassador_leads"),
-    name: getDisplayName(lead),
-    email: getEmail(lead),
-    phone: getPhone(lead),
-    program: getProgramLabel(lead),
-    source: getSourceLabel(lead),
-    status: getReadableStatus(lead),
-    zipCode: getZipCode(lead),
-    city: getCity(lead),
-    state: getState(lead),
-    county: getCounty(lead),
-    country: getCountry(lead) || "United States",
-    location: getLocation(lead),
-    notes: getNotes(lead),
-    date: getDate(lead),
-    lastContacted:
-      asString(lead.last_contacted_at) ||
-      asString(lead.contacted_at) ||
-      asString(lead.updated_at) ||
-      null,
-    documents: getLeadDocuments(lead),
-  }));
+  const normalizedLeads = allLeads.map((lead) => {
+    const rawZipCode = getZipCode(lead);
+    const resolvedLocation = resolveLeadLocation({
+      zipCode: rawZipCode,
+      city: getCity(lead),
+      state: getState(lead),
+      county: getCounty(lead),
+      country: getCountry(lead),
+    });
+
+    return {
+      raw: lead,
+      id: getText(lead, ["id"]),
+      sourceTable: getText(lead, ["__source_table"], "ambassador_leads"),
+      name: getDisplayName(lead),
+      email: getEmail(lead),
+      phone: formatPhoneForStorage(getPhone(lead)),
+      program: getProgramLabel(lead),
+      source: getSourceLabel(lead),
+      status: getReadableStatus(lead),
+      zipCode: resolvedLocation.zipCode,
+      city: resolvedLocation.city,
+      state: resolvedLocation.state,
+      county: resolvedLocation.county,
+      country: resolvedLocation.country || "United States",
+      location: getLocation(lead),
+      notes: getNotes(lead),
+      date: getDate(lead),
+      lastContacted:
+        asString(lead.last_contacted_at) ||
+        asString(lead.contacted_at) ||
+        asString(lead.updated_at) ||
+        null,
+      documents: getLeadDocuments(lead),
+    };
+  });
 
   const metrics = {
     total: normalizedLeads.length,
@@ -1984,13 +2111,55 @@ export default async function AmbassadorLeadsPage({
 function AmbassadorLeadFormEnhancementScript() {
   const script = `
     (() => {
-      if (window.__sitguruAmbassadorLeadEnhancementsLoaded === true) {
-        return;
-      }
-
-      window.__sitguruAmbassadorLeadEnhancementsLoaded = true;
-
       const zipFallbacks = {
+        "01085": {
+          city: "Westfield",
+          state: "MA",
+          county: "Hampden",
+          country: "United States",
+        },
+        "14476": {
+          city: "Kendall",
+          state: "NY",
+          county: "Orleans",
+          country: "United States",
+        },
+        "18951": {
+          city: "Quakertown",
+          state: "PA",
+          county: "Bucks",
+          country: "United States",
+        },
+        "27217": {
+          city: "Burlington",
+          state: "NC",
+          county: "Alamance",
+          country: "United States",
+        },
+        "38242": {
+          city: "Paris",
+          state: "TN",
+          county: "Henry",
+          country: "United States",
+        },
+        "46001": {
+          city: "Alexandria",
+          state: "IN",
+          county: "Madison",
+          country: "United States",
+        },
+        "64850": {
+          city: "Neosho",
+          state: "MO",
+          county: "Newton",
+          country: "United States",
+        },
+        "77494": {
+          city: "Katy",
+          state: "TX",
+          county: "Fort Bend",
+          country: "United States",
+        },
         "81643": {
           city: "Mesa",
           state: "CO",
@@ -2001,12 +2170,6 @@ function AmbassadorLeadFormEnhancementScript() {
           city: "Lancaster",
           state: "CA",
           county: "Los Angeles",
-          country: "United States",
-        },
-        "18951": {
-          city: "Quakertown",
-          state: "PA",
-          county: "Bucks",
           country: "United States",
         },
       };
@@ -2036,6 +2199,17 @@ function AmbassadorLeadFormEnhancementScript() {
           "-" +
           digits.slice(6)
         );
+      };
+
+      const normalizeZip = (value) => {
+        return String(value || "").replace(/\\D/g, "").slice(0, 5);
+      };
+
+      const normalizeState = (value) => {
+        return String(value || "")
+          .replace(/[^a-z]/gi, "")
+          .slice(0, 2)
+          .toUpperCase();
       };
 
       const getFormScope = (input) => {
@@ -2085,7 +2259,7 @@ function AmbassadorLeadFormEnhancementScript() {
         const helper = getLocationHelper(zipInput);
 
         if (cityInput && location.city) cityInput.value = location.city;
-        if (stateInput && location.state) stateInput.value = location.state;
+        if (stateInput && location.state) stateInput.value = normalizeState(location.state);
         if (countyInput && location.county) countyInput.value = location.county;
         if (countryInput && location.country) countryInput.value = location.country;
 
@@ -2094,6 +2268,21 @@ function AmbassadorLeadFormEnhancementScript() {
           message ||
             "Location auto-filled from ZIP. Please confirm city, state, county, and country before saving.",
         );
+      };
+
+      const applyZipFallback = (zipInput, zip) => {
+        const fallback = zipFallbacks[zip];
+
+        if (!fallback) return false;
+
+        setLocationValues(
+          zipInput,
+          fallback,
+          "Location auto-filled from SitGuru ZIP fallback. Please confirm before saving.",
+        );
+        zipInput.dataset.lastLookupZip = zip;
+
+        return true;
       };
 
       const lookupCounty = async ({ latitude, longitude }) => {
@@ -2121,20 +2310,14 @@ function AmbassadorLeadFormEnhancementScript() {
       const lookupZip = async (zipInput) => {
         if (!zipInput) return;
 
-        const zip = String(zipInput.value || "").replace(/\\D/g, "").slice(0, 5);
+        const zip = normalizeZip(zipInput.value);
         zipInput.value = zip;
 
         if (zip.length !== 5) return;
 
         const helper = getLocationHelper(zipInput);
 
-        if (zipFallbacks[zip]) {
-          setLocationValues(
-            zipInput,
-            zipFallbacks[zip],
-            "Location auto-filled from SitGuru ZIP fallback. Please confirm before saving.",
-          );
-          zipInput.dataset.lastLookupZip = zip;
+        if (applyZipFallback(zipInput, zip)) {
           return;
         }
 
@@ -2179,22 +2362,27 @@ function AmbassadorLeadFormEnhancementScript() {
             country: data.country || "United States",
           });
         } catch {
-          setHelper(
-            helper,
-            "ZIP lookup is temporarily unavailable. You can enter the location manually.",
-            "amber",
-          );
+          if (!applyZipFallback(zipInput, zip)) {
+            setHelper(
+              helper,
+              "ZIP lookup is temporarily unavailable. You can enter the location manually.",
+              "amber",
+            );
+          }
         }
       };
 
       const scheduleZipLookup = (zipInput) => {
         if (!zipInput) return;
 
-        zipInput.value = String(zipInput.value || "")
-          .replace(/\\D/g, "")
-          .slice(0, 5);
-
+        zipInput.value = normalizeZip(zipInput.value);
         zipInput.dataset.lastLookupZip = "";
+
+        const zip = normalizeZip(zipInput.value);
+
+        if (zip.length === 5 && applyZipFallback(zipInput, zip)) {
+          return;
+        }
 
         const existingTimer = zipTimers.get(zipInput);
 
@@ -2204,7 +2392,7 @@ function AmbassadorLeadFormEnhancementScript() {
 
         const timer = window.setTimeout(() => {
           lookupZip(zipInput);
-        }, 300);
+        }, 200);
 
         zipTimers.set(zipInput, timer);
       };
@@ -2212,44 +2400,20 @@ function AmbassadorLeadFormEnhancementScript() {
       const normalizeStateInput = (stateInput) => {
         if (!stateInput) return;
 
-        stateInput.value = String(stateInput.value || "")
-          .replace(/[^a-z]/gi, "")
-          .slice(0, 2)
-          .toUpperCase();
+        stateInput.value = normalizeState(stateInput.value);
       };
 
-      const applyInitialEnhancements = () => {
-        document
-          .querySelectorAll("[data-phone-input='true']")
-          .forEach((input) => {
-            input.value = formatPhone(input.value);
-          });
+      const normalizePhoneInput = (phoneInput) => {
+        if (!phoneInput) return;
 
-        document
-          .querySelectorAll("[data-state-input='true']")
-          .forEach((input) => {
-            normalizeStateInput(input);
-          });
-
-        document
-          .querySelectorAll("[data-zip-input='true']")
-          .forEach((input) => {
-            const zip = String(input.value || "").replace(/\\D/g, "").slice(0, 5);
-            input.value = zip;
-
-            if (zip.length === 5) {
-              lookupZip(input);
-            }
-          });
+        phoneInput.value = formatPhone(phoneInput.value);
       };
 
-      document.addEventListener("input", (event) => {
-        const input = event.target;
-
+      const enhanceInput = (input) => {
         if (!input || !input.matches) return;
 
         if (input.matches("[data-phone-input='true']")) {
-          input.value = formatPhone(input.value);
+          normalizePhoneInput(input);
           return;
         }
 
@@ -2261,60 +2425,110 @@ function AmbassadorLeadFormEnhancementScript() {
         if (input.matches("[data-zip-input='true']")) {
           scheduleZipLookup(input);
         }
-      });
+      };
 
-      document.addEventListener("paste", (event) => {
-        const input = event.target;
+      const applyInitialEnhancements = () => {
+        document
+          .querySelectorAll("[data-phone-input='true']")
+          .forEach((input) => {
+            normalizePhoneInput(input);
+          });
 
-        if (!input || !input.matches) return;
+        document
+          .querySelectorAll("[data-state-input='true']")
+          .forEach((input) => {
+            normalizeStateInput(input);
+          });
 
-        if (
-          input.matches("[data-phone-input='true']") ||
-          input.matches("[data-zip-input='true']") ||
-          input.matches("[data-state-input='true']")
-        ) {
-          window.setTimeout(() => {
-            if (input.matches("[data-phone-input='true']")) {
-              input.value = formatPhone(input.value);
+        document
+          .querySelectorAll("[data-zip-input='true']")
+          .forEach((input) => {
+            const zip = normalizeZip(input.value);
+            input.value = zip;
+
+            if (zip.length === 5) {
+              lookupZip(input);
             }
+          });
+      };
 
-            if (input.matches("[data-state-input='true']")) {
-              normalizeStateInput(input);
-            }
+      if (window.__sitguruAmbassadorLeadEnhancementsLoaded !== true) {
+        window.__sitguruAmbassadorLeadEnhancementsLoaded = true;
 
-            if (input.matches("[data-zip-input='true']")) {
-              scheduleZipLookup(input);
-            }
-          }, 0);
-        }
-      });
+        document.addEventListener("input", (event) => {
+          enhanceInput(event.target);
+        });
 
-      document.addEventListener(
-        "blur",
-        (event) => {
+        document.addEventListener("change", (event) => {
+          enhanceInput(event.target);
+        });
+
+        document.addEventListener("keyup", (event) => {
+          enhanceInput(event.target);
+        });
+
+        document.addEventListener("paste", (event) => {
           const input = event.target;
 
           if (!input || !input.matches) return;
 
-          if (input.matches("[data-phone-input='true']")) {
-            input.value = formatPhone(input.value);
+          if (
+            input.matches("[data-phone-input='true']") ||
+            input.matches("[data-zip-input='true']") ||
+            input.matches("[data-state-input='true']")
+          ) {
+            window.setTimeout(() => {
+              enhanceInput(input);
+            }, 0);
           }
+        });
 
-          if (input.matches("[data-state-input='true']")) {
-            normalizeStateInput(input);
-          }
+        document.addEventListener(
+          "blur",
+          (event) => {
+            enhanceInput(event.target);
+          },
+          true,
+        );
 
-          if (input.matches("[data-zip-input='true']")) {
-            lookupZip(input);
-          }
-        },
-        true,
-      );
+        document.addEventListener(
+          "submit",
+          (event) => {
+            const form = event.target;
+
+            if (!form || !form.querySelectorAll) return;
+
+            form
+              .querySelectorAll("[data-phone-input='true']")
+              .forEach((input) => normalizePhoneInput(input));
+
+            form
+              .querySelectorAll("[data-state-input='true']")
+              .forEach((input) => normalizeStateInput(input));
+
+            form
+              .querySelectorAll("[data-zip-input='true']")
+              .forEach((input) => {
+                const zip = normalizeZip(input.value);
+                input.value = zip;
+
+                if (zip.length === 5) {
+                  applyZipFallback(input, zip);
+                }
+              });
+          },
+          true,
+        );
+
+        window.addEventListener("pageshow", () => {
+          window.setTimeout(applyInitialEnhancements, 0);
+        });
+      }
 
       if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", applyInitialEnhancements);
       } else {
-        applyInitialEnhancements();
+        window.setTimeout(applyInitialEnhancements, 0);
       }
     })();
   `;
@@ -2773,6 +2987,10 @@ function PipelineEditForm({ lead }: { lead: NormalizedLead }) {
           <PipelineEditField label="Phone">
             <input
               name="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              maxLength={14}
               defaultValue={lead.phone === "—" ? "" : lead.phone}
               data-phone-input="true"
               className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
@@ -2824,6 +3042,9 @@ function PipelineEditForm({ lead }: { lead: NormalizedLead }) {
           <PipelineEditField label="ZIP Code">
             <input
               name="zip_code"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              maxLength={10}
               defaultValue={lead.zipCode}
               data-zip-input="true"
               className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
@@ -2842,9 +3063,10 @@ function PipelineEditForm({ lead }: { lead: NormalizedLead }) {
           <PipelineEditField label="State">
             <input
               name="state"
+              maxLength={2}
               defaultValue={lead.state}
               data-state-input="true"
-              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+              className="w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold uppercase text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
             />
           </PipelineEditField>
 
@@ -2926,6 +3148,14 @@ function PipelineEditForm({ lead }: { lead: NormalizedLead }) {
             />
           </PipelineEditField>
         </div>
+
+        <p
+          data-location-helper="true"
+          className="rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900"
+        >
+          ZIP edits can auto-fill city, state, county, and country. You can
+          still edit any location field before saving.
+        </p>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <button
