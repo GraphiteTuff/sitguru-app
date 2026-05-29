@@ -114,11 +114,22 @@ type GuruRow = {
 };
 
 type RecipientContact = {
-  userId: string;
+  userId: string | null;
   role: string;
   name: string;
   email: string;
   phone: string;
+  isSnapshotOnly?: boolean;
+};
+
+type ParticipantCard = {
+  user_id: string;
+  role: string;
+  name: string;
+  avatar: string;
+  email: string;
+  phone: string;
+  isSnapshotOnly?: boolean;
 };
 
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
@@ -172,6 +183,35 @@ function normalizeRole(role?: string | null) {
   if (value.includes("ambassador")) return "ambassador";
 
   return value;
+}
+
+
+function getDirectMessageTypeForRole(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "ambassador") return "direct_ambassador";
+  if (normalizedRole === "guru") return "direct_guru";
+  if (normalizedRole === "customer") return "direct_customer";
+  if (normalizedRole === "admin") return "direct_admin";
+
+  return "direct_message";
+}
+
+function getSnapshotContactKey(message: MessageRow, direction: "sender" | "recipient") {
+  const email =
+    direction === "sender"
+      ? safeString(message.sender_email_snapshot)
+      : safeString(message.recipient_email_snapshot);
+  const name =
+    direction === "sender"
+      ? safeString(message.sender_name_snapshot)
+      : safeString(message.recipient_name_snapshot);
+  const role =
+    direction === "sender"
+      ? normalizeRole(message.sender_role || message.sender_role_snapshot)
+      : normalizeRole(message.recipient_role || message.recipient_role_snapshot);
+
+  return `${direction}:${role}:${email || name}`.toLowerCase();
 }
 
 function getProfileName(profile?: ProfileRow | null) {
@@ -468,19 +508,26 @@ async function getConversationRecipient({
   conversationId: string;
   currentUserId: string;
 }) {
-  const [{ data: conversation }, { data: participants }] = await Promise.all([
-    supabaseAdmin
-      .from("conversations")
-      .select("*")
-      .eq("id", conversationId)
-      .maybeSingle<ConversationRow>(),
-    supabaseAdmin
-      .from("conversation_participants")
-      .select("*")
-      .eq("conversation_id", conversationId),
-  ]);
+  const [{ data: conversation }, { data: participants }, { data: messages }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("conversations")
+        .select("*")
+        .eq("id", conversationId)
+        .maybeSingle<ConversationRow>(),
+      supabaseAdmin
+        .from("conversation_participants")
+        .select("*")
+        .eq("conversation_id", conversationId),
+      supabaseAdmin
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true }),
+    ]);
 
   const participantRows = (participants || []) as ParticipantRow[];
+  const messageRows = (messages || []) as MessageRow[];
 
   const preferredRecipient =
     participantRows.find(
@@ -495,50 +542,98 @@ async function getConversationRecipient({
     conversation?.customer_id ||
     "";
 
-  if (!recipientUserId) {
-    return null;
+  if (recipientUserId) {
+    const [{ data: profile }, { data: guru }] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("*")
+        .eq("id", recipientUserId)
+        .maybeSingle<ProfileRow>(),
+      supabaseAdmin
+        .from("gurus")
+        .select("*")
+        .eq("user_id", recipientUserId)
+        .maybeSingle<GuruRow>(),
+    ]);
+
+    const profileRow = profile as ProfileRow | null;
+    const guruRow = guru as GuruRow | null;
+
+    const recipientRole = normalizeRole(
+      preferredRecipient?.role ||
+        profileRow?.role ||
+        (guruRow?.user_id ? "guru" : "user"),
+    );
+
+    const recipientName =
+      getGuruName(guruRow) || getProfileName(profileRow) || "SitGuru User";
+
+    const recipientEmail =
+      safeString(profileRow?.email) || safeString(guruRow?.email);
+
+    const recipientPhone = getProfilePhone(profileRow) || getGuruPhone(guruRow);
+
+    return {
+      userId: recipientUserId,
+      role: recipientRole,
+      name: recipientName,
+      email: recipientEmail,
+      phone: recipientPhone,
+      isSnapshotOnly: false,
+    } satisfies RecipientContact;
   }
 
-  const [{ data: profile }, { data: guru }] = await Promise.all([
-    supabaseAdmin
-      .from("profiles")
-      .select("*")
-      .eq("id", recipientUserId)
-      .maybeSingle<ProfileRow>(),
-    supabaseAdmin
-      .from("gurus")
-      .select("*")
-      .eq("user_id", recipientUserId)
-      .maybeSingle<GuruRow>(),
-  ]);
+  const snapshotRecipient = [...messageRows].reverse().find((message) => {
+    const recipientRole = normalizeRole(
+      message.recipient_role || message.recipient_role_snapshot,
+    );
+    const hasRecipientSnapshot =
+      safeString(message.recipient_name_snapshot) ||
+      safeString(message.recipient_email_snapshot);
 
-  const profileRow = profile as ProfileRow | null;
-  const guruRow = guru as GuruRow | null;
+    return recipientRole !== "admin" && Boolean(hasRecipientSnapshot);
+  });
 
-  const recipientRole = normalizeRole(
-    preferredRecipient?.role || profileRow?.role || (guruRow?.user_id ? "guru" : "user"),
-  );
+  if (snapshotRecipient) {
+    return {
+      userId: null,
+      role: normalizeRole(
+        snapshotRecipient.recipient_role || snapshotRecipient.recipient_role_snapshot,
+      ),
+      name:
+        safeString(snapshotRecipient.recipient_name_snapshot) ||
+        safeString(snapshotRecipient.recipient_email_snapshot) ||
+        "SitGuru Contact",
+      email: safeString(snapshotRecipient.recipient_email_snapshot),
+      phone: safeString(snapshotRecipient.recipient_phone_snapshot),
+      isSnapshotOnly: true,
+    } satisfies RecipientContact;
+  }
 
-  const recipientName =
-    getGuruName(guruRow) ||
-    getProfileName(profileRow) ||
-    "SitGuru User";
+  const snapshotSender = [...messageRows].reverse().find((message) => {
+    const senderRole = normalizeRole(message.sender_role || message.sender_role_snapshot);
+    const hasSenderSnapshot =
+      safeString(message.sender_name_snapshot) ||
+      safeString(message.sender_email_snapshot);
 
-  const recipientEmail =
-    safeString(profileRow?.email) ||
-    safeString(guruRow?.email);
+    return senderRole !== "admin" && Boolean(hasSenderSnapshot);
+  });
 
-  const recipientPhone =
-    getProfilePhone(profileRow) ||
-    getGuruPhone(guruRow);
+  if (snapshotSender) {
+    return {
+      userId: null,
+      role: normalizeRole(snapshotSender.sender_role || snapshotSender.sender_role_snapshot),
+      name:
+        safeString(snapshotSender.sender_name_snapshot) ||
+        safeString(snapshotSender.sender_email_snapshot) ||
+        "SitGuru Contact",
+      email: safeString(snapshotSender.sender_email_snapshot),
+      phone: safeString(snapshotSender.sender_phone_snapshot),
+      isSnapshotOnly: true,
+    } satisfies RecipientContact;
+  }
 
-  return {
-    userId: recipientUserId,
-    role: recipientRole,
-    name: recipientName,
-    email: recipientEmail,
-    phone: recipientPhone,
-  } satisfies RecipientContact;
+  return null;
 }
 
 async function writeAdminAuditLog(params: {
@@ -618,7 +713,7 @@ async function sendAdminMessage(conversationId: string, formData: FormData) {
   const { error: messageError } = await supabaseAdmin.from("messages").insert({
     conversation_id: conversationId,
     sender_id: user.id,
-    recipient_id: recipient.userId,
+    recipient_id: recipient.userId || null,
     sender_role: "admin",
     recipient_role: recipient.role || "user",
     sender_name_snapshot: "SitGuru Admin",
@@ -630,7 +725,7 @@ async function sendAdminMessage(conversationId: string, formData: FormData) {
     recipient_role_snapshot: recipient.role || "user",
     content: messageBody,
     body: messageBody,
-    message_type: "admin_reply",
+    message_type: getDirectMessageTypeForRole(recipient.role),
     topic,
     status: "unread",
     is_read: false,
@@ -654,32 +749,36 @@ async function sendAdminMessage(conversationId: string, formData: FormData) {
     })
     .eq("id", conversationId);
 
-  await supabaseAdmin.from("conversation_participants").upsert(
-    [
-      {
-        conversation_id: conversationId,
-        user_id: user.id,
-        role: "admin",
-        updated_at: now,
-      },
-      {
-        conversation_id: conversationId,
-        user_id: recipient.userId,
-        role: recipient.role || "user",
-        updated_at: now,
-      },
-    ],
+  const participantUpserts: ParticipantRow[] = [
     {
-      onConflict: "conversation_id,user_id",
-      ignoreDuplicates: false,
+      conversation_id: conversationId,
+      user_id: user.id,
+      role: "admin",
+      updated_at: now,
     },
-  );
+  ];
 
-  const notificationSent = await createRecipientNotification({
-    userId: recipient.userId,
-    conversationId,
-    preview,
+  if (recipient.userId) {
+    participantUpserts.push({
+      conversation_id: conversationId,
+      user_id: recipient.userId,
+      role: recipient.role || "user",
+      updated_at: now,
+    });
+  }
+
+  await supabaseAdmin.from("conversation_participants").upsert(participantUpserts, {
+    onConflict: "conversation_id,user_id",
+    ignoreDuplicates: false,
   });
+
+  const notificationSent = recipient.userId
+    ? await createRecipientNotification({
+        userId: recipient.userId,
+        conversationId,
+        preview,
+      })
+    : false;
 
   const emailSent = await sendRecipientEmail({
     toEmail: recipient.email,
@@ -918,7 +1017,7 @@ export default async function AdminMessageThreadPage({
     if (guru.user_id) guruMap.set(guru.user_id, guru);
   });
 
-  const participantCards = participantRows.map((participant) => {
+  const realParticipantCards: ParticipantCard[] = participantRows.map((participant) => {
     const profile = profileMap.get(participant.user_id) || null;
     const guru = guruMap.get(participant.user_id) || null;
     const role = normalizeRole(participant.role || profile?.role);
@@ -938,24 +1037,76 @@ export default async function AdminMessageThreadPage({
           : getProfileAvatar(profile);
 
     return {
-      ...participant,
+      user_id: participant.user_id,
       role,
       name,
       avatar,
       email: profile?.email || guru?.email || "",
       phone: getProfilePhone(profile) || getGuruPhone(guru),
+      isSnapshotOnly: false,
     };
   });
 
+  const realParticipantIds = new Set(realParticipantCards.map((participant) => participant.user_id));
+  const snapshotParticipantMap = new Map<string, ParticipantCard>();
+
+  messageRows.forEach((message) => {
+    const snapshotCandidates = [
+      {
+        direction: "sender" as const,
+        id: message.sender_id || "",
+        role: normalizeRole(message.sender_role || message.sender_role_snapshot),
+        name: safeString(message.sender_name_snapshot),
+        email: safeString(message.sender_email_snapshot),
+        phone: safeString(message.sender_phone_snapshot),
+      },
+      {
+        direction: "recipient" as const,
+        id: message.recipient_id || "",
+        role: normalizeRole(message.recipient_role || message.recipient_role_snapshot),
+        name: safeString(message.recipient_name_snapshot),
+        email: safeString(message.recipient_email_snapshot),
+        phone: safeString(message.recipient_phone_snapshot),
+      },
+    ];
+
+    snapshotCandidates.forEach((candidate) => {
+      if (!candidate.name && !candidate.email) return;
+      if (candidate.id && realParticipantIds.has(candidate.id)) return;
+      if (candidate.role === "admin") return;
+
+      const key = getSnapshotContactKey(message, candidate.direction);
+      if (!key || snapshotParticipantMap.has(key)) return;
+
+      snapshotParticipantMap.set(key, {
+        user_id: `snapshot-${key}`,
+        role: candidate.role || "user",
+        name: candidate.name || candidate.email || "SitGuru Contact",
+        avatar: "",
+        email: candidate.email,
+        phone: candidate.phone,
+        isSnapshotOnly: true,
+      });
+    });
+  });
+
+  const participantCards = [
+    ...realParticipantCards,
+    ...Array.from(snapshotParticipantMap.values()),
+  ];
+
   const unreadCount = messageRows.filter(isUnreadMessage).length;
   const threadType =
-    participantCards.some((participant) => participant.role === "guru") &&
+    participantCards.some((participant) => participant.role === "ambassador") &&
     participantCards.some((participant) => participant.role === "admin")
-      ? "Guru → Admin"
-      : participantCards.some((participant) => participant.role === "customer") &&
+      ? "Ambassador → Admin"
+      : participantCards.some((participant) => participant.role === "guru") &&
           participantCards.some((participant) => participant.role === "admin")
-        ? "Pet Parent → Admin"
-        : "SitGuru Thread";
+        ? "Guru → Admin"
+        : participantCards.some((participant) => participant.role === "customer") &&
+            participantCards.some((participant) => participant.role === "admin")
+          ? "Pet Parent → Admin"
+          : "SitGuru Thread";
 
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
@@ -1055,7 +1206,13 @@ export default async function AdminMessageThreadPage({
                   </p>
                   <p className="text-xs font-bold capitalize text-slate-500">
                     {participant.role}
+                    {participant.isSnapshotOnly ? " · Snapshot Contact" : ""}
                   </p>
+                  {participant.email ? (
+                    <p className="text-xs font-semibold text-slate-400">
+                      {participant.email}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ))}

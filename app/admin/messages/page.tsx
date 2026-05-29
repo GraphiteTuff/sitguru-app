@@ -149,7 +149,7 @@ type AdminThreadCard = {
   subject: string;
   preview: string;
   href: string;
-  type: "guru-customer" | "guru-admin" | "customer-admin" | "internal" | "general";
+  type: "guru-customer" | "guru-admin" | "customer-admin" | "ambassador-admin" | "internal" | "general";
   inquiryType: InquiryKey;
   inquiryLabel: string;
   lastActivity: string | null;
@@ -159,6 +159,8 @@ type AdminThreadCard = {
   guruAvatar: string;
   adminName: string | null;
   adminAvatar: string;
+  ambassadorName: string | null;
+  ambassadorAvatar: string;
   unreadCount: number;
   status: string;
   messageCount: number;
@@ -208,6 +210,11 @@ const filterLinks = [
     key: "customer-admin",
     label: "Customer ↔ Admin",
     href: "/admin/messages?filter=customer-admin",
+  },
+  {
+    key: "ambassador-admin",
+    label: "Ambassador ↔ Admin",
+    href: "/admin/messages?filter=ambassador-admin",
   },
   { key: "unread", label: "Unread", href: "/admin/messages?filter=unread" },
   { key: "read", label: "Read", href: "/admin/messages?filter=read" },
@@ -812,6 +819,7 @@ function getThreadTypeLabel(type: AdminThreadCard["type"]) {
   if (type === "guru-admin") return "Guru ↔ Admin";
   if (type === "guru-customer") return "Guru ↔ Customer";
   if (type === "customer-admin") return "Pet Parent ↔ Admin";
+  if (type === "ambassador-admin") return "Ambassador ↔ Admin";
   return "General";
 }
 
@@ -830,6 +838,10 @@ function getThreadTypeClasses(type: AdminThreadCard["type"]) {
 
   if (type === "customer-admin") {
     return "border-sky-200 bg-sky-100 text-sky-900";
+  }
+
+  if (type === "ambassador-admin") {
+    return "border-cyan-200 bg-cyan-100 text-cyan-900";
   }
 
   return "border-slate-200 bg-slate-100 text-slate-800";
@@ -863,6 +875,7 @@ function buildThreadTypeChart(threads: AdminThreadCard[]) {
     "guru-customer",
     "guru-admin",
     "customer-admin",
+    "ambassador-admin",
     "general",
   ];
 
@@ -951,14 +964,21 @@ function getIntentFromParams(params: SearchParams) {
 
   const isAmbassadorContext = Boolean(ambassadorId || ambassadorEmail || referralCode);
 
-  return {
+  const resolvedThreadType = resolveDirectThreadType({
     threadType:
       threadType ||
       (department
         ? "internal_department"
         : isAmbassadorContext
-          ? "ambassador_support"
+          ? "direct_ambassador"
           : "internal"),
+    recipientRole: recipientRole || (isAmbassadorContext ? "ambassador" : ""),
+    isDepartment: Boolean(department),
+    isAmbassadorContext,
+  });
+
+  return {
+    threadType: resolvedThreadType,
     recipientId,
     recipientEmail: recipientEmail || ambassadorEmail,
     recipientName: recipientName || ambassadorName,
@@ -987,6 +1007,53 @@ function getDepartmentMessageHref(params: {
   });
 
   return `/admin/messages?${query.toString()}`;
+}
+
+
+function resolveDirectThreadType(params: {
+  threadType?: string | null;
+  recipientRole?: string | null;
+  isDepartment?: boolean;
+  isAmbassadorContext?: boolean;
+}) {
+  const rawThreadType = asString(params.threadType).toLowerCase();
+  const role = normalizeRole(params.recipientRole);
+
+  if (params.isDepartment || rawThreadType === "internal_department") {
+    return "internal_department";
+  }
+
+  if (role === "ambassador" || params.isAmbassadorContext) {
+    return "direct_ambassador";
+  }
+
+  if (role === "guru") return "direct_guru";
+  if (role === "customer") return "direct_customer";
+  if (role === "admin") return "direct_admin";
+
+  if (
+    rawThreadType === "direct_guru" ||
+    rawThreadType === "direct_customer" ||
+    rawThreadType === "direct_ambassador" ||
+    rawThreadType === "direct_admin" ||
+    rawThreadType === "internal"
+  ) {
+    return rawThreadType;
+  }
+
+  return rawThreadType || "internal";
+}
+
+function getConversationTopic(params: {
+  threadType: string;
+  messageCategory?: string | null;
+  department?: string | null;
+  isAmbassadorContext?: boolean;
+}) {
+  if (params.threadType.startsWith("direct")) return "direct_message";
+  if (params.department) return "internal_department";
+  if (params.isAmbassadorContext) return "ambassador_support";
+  return asString(params.messageCategory) || "internal";
 }
 
 function buildComposeErrorRedirect(reason: string) {
@@ -1039,7 +1106,7 @@ async function createInternalThread(formData: FormData) {
     redirect("/admin/login");
   }
 
-  const threadType = String(formData.get("threadType") || "internal").trim();
+  const rawThreadType = String(formData.get("threadType") || "internal").trim();
   const recipientId = String(formData.get("recipientId") || "").trim();
   const recipientEmail = String(formData.get("recipientEmail") || "").trim();
   const recipientName = String(formData.get("recipientName") || "").trim();
@@ -1056,6 +1123,14 @@ async function createInternalThread(formData: FormData) {
   const ambassadorEmail = String(formData.get("ambassadorEmail") || "").trim();
   const referralCode = String(formData.get("referralCode") || "").trim();
 
+  const isAmbassadorContextFromForm = Boolean(ambassadorId || ambassadorEmail || referralCode);
+  const threadType = resolveDirectThreadType({
+    threadType: rawThreadType,
+    recipientRole,
+    isDepartment: Boolean(department),
+    isAmbassadorContext: isAmbassadorContextFromForm,
+  });
+
   const isDirectThread = threadType.startsWith("direct");
   const isGuruThread = recipientRole === "guru" || threadType === "direct_guru";
   const isCustomerThread =
@@ -1064,7 +1139,7 @@ async function createInternalThread(formData: FormData) {
     threadType.startsWith("ambassador") ||
     threadType === "direct_ambassador" ||
     recipientRole === "ambassador" ||
-    Boolean(ambassadorId || ambassadorEmail || referralCode);
+    isAmbassadorContextFromForm;
 
   const recipientLabel =
     departmentLabel ||
@@ -1097,13 +1172,12 @@ async function createInternalThread(formData: FormData) {
   }
 
   const now = new Date().toISOString();
-  const topic = isDirectThread
-    ? "direct_message"
-    : isAmbassadorThread
-      ? "ambassador_support"
-      : department
-        ? "internal_department"
-        : messageCategory || "internal";
+  const topic = getConversationTopic({
+    threadType,
+    messageCategory,
+    department,
+    isAmbassadorContext: isAmbassadorThread,
+  });
 
   const preview = body.slice(0, 240);
 
@@ -1824,6 +1898,15 @@ function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
               />
             ) : null}
 
+            {thread.ambassadorName ? (
+              <ParticipantPill
+                label="Ambassador"
+                name={thread.ambassadorName}
+                avatar={thread.ambassadorAvatar}
+                icon={<Handshake size={16} />}
+              />
+            ) : null}
+
             {thread.adminName ? (
               <ParticipantPill
                 label="Admin"
@@ -2081,6 +2164,23 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
         return recipientRole === "guru";
       })?.recipient_id ||
       "";
+    const ambassadorId =
+      participants.find((participant) => normalizeRole(participant.role) === "ambassador")
+        ?.user_id ||
+      messages.find((message) => {
+        const senderRole =
+          getProfileRole(profileMap.get(message.sender_id || "")) ||
+          getMessageSenderRole(message);
+        return senderRole === "ambassador";
+      })?.sender_id ||
+      messages.find((message) => {
+        const recipientRole =
+          getProfileRole(profileMap.get(message.recipient_id || "")) ||
+          getMessageRecipientRole(message);
+        return recipientRole === "ambassador";
+      })?.recipient_id ||
+      "";
+
     const adminId =
       participants.find((participant) => normalizeRole(participant.role) === "admin")
         ?.user_id ||
@@ -2101,6 +2201,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
 
     const customerProfile = customerId ? profileMap.get(customerId) || null : null;
     const guruProfile = guruId ? profileMap.get(guruId) || null : null;
+    const ambassadorProfile = ambassadorId ? profileMap.get(ambassadorId) || null : null;
     const adminProfileForThread = adminId ? profileMap.get(adminId) || null : null;
     const topic =
       conversation?.topic || latestMessage?.topic || latestMessage?.message_type || "";
@@ -2120,7 +2221,9 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       type = "guru-admin";
     } else if (customerId && adminId) {
       type = "customer-admin";
-    } else if (adminId && !customerId && !guruId) {
+    } else if ((ambassadorId || messages.some((message) => getMessageRecipientRole(message) === "ambassador" || getMessageSenderRole(message) === "ambassador")) && adminId) {
+      type = "ambassador-admin";
+    } else if (adminId && !customerId && !guruId && !ambassadorId) {
       type = "internal";
     }
 
@@ -2178,6 +2281,23 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       adminAvatar: adminProfileForThread
         ? getAdminAvatar(adminProfileForThread)
         : defaultAdminAvatar,
+      ambassadorName: ambassadorId
+        ? ambassadorProfile
+          ? getProfileName(ambassadorProfile)
+          : getSnapshotName({
+              userId: ambassadorId,
+              role: "ambassador",
+              messages,
+              direction: "either",
+            })
+        : messages.find((message) => getMessageRecipientRole(message) === "ambassador")
+            ?.recipient_name_snapshot ||
+          messages.find((message) => getMessageSenderRole(message) === "ambassador")
+            ?.sender_name_snapshot ||
+          null,
+      ambassadorAvatar: ambassadorProfile
+        ? getProfileAvatar(ambassadorProfile)
+        : getSnapshotAvatar(),
       unreadCount,
       status,
       messageCount: messages.length,
@@ -2191,7 +2311,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       if (activeFilter === "read") return thread.unreadCount === 0;
       if (activeFilter === "escalations") return isEscalationThread(thread);
       if (
-        ["internal", "guru-customer", "guru-admin", "customer-admin", "general"].includes(
+        ["internal", "guru-customer", "guru-admin", "customer-admin", "ambassador-admin", "general"].includes(
           activeFilter,
         )
       ) {
@@ -2213,6 +2333,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
         thread.customerName,
         thread.guruName,
         thread.adminName,
+        thread.ambassadorName,
         thread.inquiryLabel,
         thread.status,
         thread.topic,
