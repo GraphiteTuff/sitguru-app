@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { Resend } from "resend";
 import {
   AlertTriangle,
   BadgeHelp,
@@ -114,6 +115,10 @@ type ProfileRow = {
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
+  mobile_phone?: string | null;
+  cell_phone?: string | null;
   profile_photo_url?: string | null;
   avatar_url?: string | null;
   image_url?: string | null;
@@ -127,6 +132,46 @@ type ProfileRow = {
   account_type?: string | null;
   type?: string | null;
 };
+
+type GuruRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  display_name?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
+  mobile_phone?: string | null;
+  cell_phone?: string | null;
+  avatar_url?: string | null;
+  profile_photo_url?: string | null;
+};
+
+type AmbassadorContactRow = {
+  id?: string | null;
+  user_id?: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
+  mobile_phone?: string | null;
+  cell_phone?: string | null;
+  referral_code?: string | null;
+  role?: string | null;
+  internal_role?: string | null;
+  source?: string | null;
+};
+
+type RecipientContact = {
+  userId: string | null;
+  role: string;
+  name: string;
+  email: string;
+  phone: string;
+  isSnapshotOnly?: boolean;
+};
+
 
 type ConversationParticipantRow = {
   conversation_id: string;
@@ -338,6 +383,58 @@ function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getBaseUrl() {
+  const raw =
+    asString(process.env.NEXT_PUBLIC_APP_URL) ||
+    asString(process.env.NEXT_PUBLIC_SITE_URL) ||
+    "https://www.sitguru.com";
+
+  return raw.replace(/\/+$/, "");
+}
+
+function getSupportFromEmail() {
+  return (
+    asString(process.env.SITGURU_SUPPORT_FROM) ||
+    asString(process.env.RESEND_FROM_EMAIL) ||
+    "SitGuru <support@sitguru.com>"
+  );
+}
+
+function getSupportReplyToEmail() {
+  return (
+    asString(process.env.RESEND_REPLY_TO_EMAIL) ||
+    asString(process.env.SITGURU_SUPPORT_EMAIL) ||
+    "support@sitguru.com"
+  );
+}
+
+function normalizeUsPhone(phone: string) {
+  const clean = asString(phone);
+  if (!clean) return "";
+
+  if (clean.startsWith("+")) return clean;
+
+  const digits = clean.replace(/\D/g, "");
+
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+
+  return "";
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function buildPublicThreadUrl(conversationId: string) {
+  return `${getBaseUrl()}/messages/${conversationId}`;
+}
+
 function getOptionalBoolean(value: unknown) {
   if (typeof value === "boolean") return value;
 
@@ -423,6 +520,59 @@ function getProfileAvatar(profile?: ProfileRow | null) {
     profile.headshot_url ||
     profile.image_url ||
     ""
+  );
+}
+
+function getProfilePhone(profile?: ProfileRow | null) {
+  if (!profile) return "";
+
+  return (
+    asString(profile.phone) ||
+    asString(profile.phone_number) ||
+    asString(profile.mobile_phone) ||
+    asString(profile.cell_phone)
+  );
+}
+
+function getGuruName(guru?: GuruRow | null) {
+  if (!guru) return "";
+
+  return (
+    asString(guru.display_name) ||
+    asString(guru.full_name) ||
+    asString(guru.email).split("@")[0]
+  );
+}
+
+function getGuruPhone(guru?: GuruRow | null) {
+  if (!guru) return "";
+
+  return (
+    asString(guru.phone) ||
+    asString(guru.phone_number) ||
+    asString(guru.mobile_phone) ||
+    asString(guru.cell_phone)
+  );
+}
+
+function getAmbassadorContactName(contact?: AmbassadorContactRow | null) {
+  if (!contact) return "";
+
+  return (
+    asString(contact.full_name) ||
+    asString(contact.display_name) ||
+    asString(contact.email).split("@")[0]
+  );
+}
+
+function getAmbassadorContactPhone(contact?: AmbassadorContactRow | null) {
+  if (!contact) return "";
+
+  return (
+    asString(contact.phone) ||
+    asString(contact.phone_number) ||
+    asString(contact.mobile_phone) ||
+    asString(contact.cell_phone)
   );
 }
 
@@ -1056,6 +1206,354 @@ function getConversationTopic(params: {
   return asString(params.messageCategory) || "internal";
 }
 
+async function sendRecipientEmail(params: {
+  toEmail: string;
+  recipientName: string;
+  senderName: string;
+  conversationId: string;
+}) {
+  try {
+    const apiKey = asString(process.env.RESEND_API_KEY);
+    const toEmail = asString(params.toEmail);
+
+    if (!apiKey || !toEmail) return false;
+
+    const resend = new Resend(apiKey);
+    const threadUrl = buildPublicThreadUrl(params.conversationId);
+    const safeRecipientName = escapeHtml(params.recipientName || "there");
+    const safeSenderName = escapeHtml(params.senderName || "SitGuru Admin");
+
+    const result = await resend.emails.send({
+      from: getSupportFromEmail(),
+      to: [toEmail],
+      replyTo: getSupportReplyToEmail(),
+      subject: "New SitGuru Message",
+      html: `
+        <div style="font-family: Arial, sans-serif; background: #f6fbf7; padding: 24px;">
+          <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #dcefe2; border-radius: 18px; overflow: hidden;">
+            <div style="background: #0f5132; color: #ffffff; padding: 24px;">
+              <h1 style="margin: 0; font-size: 24px;">New SitGuru Message</h1>
+              <p style="margin: 8px 0 0; color: #d9f7e5;">Trusted Pet Care. Simplified.</p>
+            </div>
+            <div style="padding: 24px; color: #123524;">
+              <p style="font-size: 16px; line-height: 1.6;">Hi ${safeRecipientName},</p>
+              <p style="font-size: 16px; line-height: 1.6;">
+                You have a new message from ${safeSenderName} in SitGuru.
+              </p>
+              <p style="margin: 24px 0;">
+                <a href="${threadUrl}" style="display: inline-block; background: #0f8f4f; color: #ffffff; text-decoration: none; padding: 13px 20px; border-radius: 999px; font-weight: 700;">
+                  Open SitGuru Message
+                </a>
+              </p>
+              <p style="font-size: 13px; color: #607568; line-height: 1.6;">
+                Please log in to SitGuru to read and reply to this message. If your account is not created yet, use this message as a reminder to finish your SitGuru onboarding.
+              </p>
+            </div>
+          </div>
+        </div>
+      `,
+      text: [
+        `Hi ${params.recipientName || "there"},`,
+        "",
+        `You have a new message from ${params.senderName || "SitGuru Admin"} in SitGuru.`,
+        "",
+        `Open your message here: ${threadUrl}`,
+        "",
+        "Thank you,",
+        "SitGuru",
+        "Trusted Pet Care. Simplified.",
+      ].join("\n"),
+    });
+
+    if (result.error) {
+      console.error("Recipient email delivery failed:", result.error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Recipient email delivery error:", error);
+    return false;
+  }
+}
+
+async function sendRecipientSms(params: {
+  toPhone: string;
+  conversationId: string;
+}) {
+  try {
+    const accountSid = asString(process.env.TWILIO_ACCOUNT_SID);
+    const authToken = asString(process.env.TWILIO_AUTH_TOKEN);
+    const messagingServiceSid = asString(process.env.TWILIO_MESSAGING_SERVICE_SID);
+    const fromPhone = asString(process.env.TWILIO_PHONE_NUMBER);
+    const toPhone = normalizeUsPhone(params.toPhone);
+
+    if (!accountSid || !authToken || !toPhone || (!messagingServiceSid && !fromPhone)) {
+      return false;
+    }
+
+    const threadUrl = buildPublicThreadUrl(params.conversationId);
+    const messageBody = `SitGuru: You have a new message from SitGuru Admin. Log in to view and reply: ${threadUrl}`;
+
+    const body = new URLSearchParams({
+      To: toPhone,
+      Body: messageBody,
+    });
+
+    if (messagingServiceSid) {
+      body.set("MessagingServiceSid", messagingServiceSid);
+    } else {
+      body.set("From", fromPhone);
+    }
+
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString(
+            "base64",
+          )}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+      },
+    );
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.error("Recipient SMS delivery failed:", response.status, text);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Recipient SMS delivery error:", error);
+    return false;
+  }
+}
+
+async function createRecipientNotification(params: {
+  userId: string;
+  conversationId: string;
+  preview: string;
+}) {
+  try {
+    const now = new Date().toISOString();
+    const threadHref = `/messages/${params.conversationId}`;
+
+    const { error } = await supabaseAdmin.from("notifications").insert({
+      user_id: params.userId,
+      title: "New SitGuru Message",
+      body: params.preview || "You have a new message from SitGuru Admin.",
+      type: "message",
+      href: threadHref,
+      link: threadHref,
+      is_read: false,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (error) {
+      console.error("Recipient notification insert failed:", error.message);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Recipient notification insert error:", error);
+    return false;
+  }
+}
+
+async function getFirstMessageRecipientContact(params: {
+  recipientId: string;
+  recipientEmail: string;
+  recipientName: string;
+  recipientRole: string;
+  ambassadorId: string;
+  ambassadorName: string;
+  ambassadorEmail: string;
+}): Promise<RecipientContact> {
+  const recipientUserId = asString(params.recipientId);
+  const requestedRole = normalizeRole(params.recipientRole);
+  const requestedEmail = asString(params.recipientEmail) || asString(params.ambassadorEmail);
+  const requestedName = asString(params.recipientName) || asString(params.ambassadorName);
+
+  if (recipientUserId) {
+    const [{ data: profile }, { data: guru }] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("*")
+        .eq("id", recipientUserId)
+        .maybeSingle<ProfileRow>(),
+      supabaseAdmin
+        .from("gurus")
+        .select("*")
+        .eq("user_id", recipientUserId)
+        .maybeSingle<GuruRow>(),
+    ]);
+
+    const profileRow = profile as ProfileRow | null;
+    const guruRow = guru as GuruRow | null;
+    const role = normalizeRole(
+      requestedRole || profileRow?.role || (guruRow?.user_id ? "guru" : "user"),
+    );
+
+    return {
+      userId: recipientUserId,
+      role,
+      name:
+        getGuruName(guruRow) ||
+        getProfileName(profileRow) ||
+        requestedName ||
+        requestedEmail ||
+        "SitGuru User",
+      email: asString(profileRow?.email) || asString(guruRow?.email) || requestedEmail,
+      phone: getProfilePhone(profileRow) || getGuruPhone(guruRow),
+      isSnapshotOnly: false,
+    } satisfies RecipientContact;
+  }
+
+  if (requestedRole === "ambassador" || params.ambassadorId || params.ambassadorEmail) {
+    const ambassadorId = asString(params.ambassadorId);
+    const ambassadorEmail = asString(params.ambassadorEmail) || requestedEmail;
+
+    let ambassador: AmbassadorContactRow | null = null;
+    let ambassadorLead: AmbassadorContactRow | null = null;
+
+    if (ambassadorId) {
+      const { data } = await supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .eq("id", ambassadorId)
+        .maybeSingle<AmbassadorContactRow>();
+      ambassador = data as AmbassadorContactRow | null;
+    }
+
+    if (!ambassador && ambassadorEmail) {
+      const { data } = await supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .ilike("email", ambassadorEmail)
+        .maybeSingle<AmbassadorContactRow>();
+      ambassador = data as AmbassadorContactRow | null;
+    }
+
+    if (ambassador?.user_id) {
+      const contact = await getFirstMessageRecipientContact({
+        recipientId: ambassador.user_id,
+        recipientEmail: ambassador.email || ambassadorEmail,
+        recipientName:
+          getAmbassadorContactName(ambassador) || requestedName || ambassadorEmail,
+        recipientRole: "ambassador",
+        ambassadorId: "",
+        ambassadorName: "",
+        ambassadorEmail: "",
+      });
+
+      return {
+        ...contact,
+        role: "ambassador",
+        phone: contact.phone || getAmbassadorContactPhone(ambassador),
+      } satisfies RecipientContact;
+    }
+
+    if (ambassadorEmail) {
+      const { data } = await supabaseAdmin
+        .from("ambassador_leads")
+        .select("*")
+        .ilike("email", ambassadorEmail)
+        .maybeSingle<AmbassadorContactRow>();
+      ambassadorLead = data as AmbassadorContactRow | null;
+    }
+
+    return {
+      userId: null,
+      role: "ambassador",
+      name:
+        getAmbassadorContactName(ambassador) ||
+        getAmbassadorContactName(ambassadorLead) ||
+        requestedName ||
+        ambassadorEmail ||
+        "SitGuru Ambassador",
+      email: asString(ambassador?.email) || asString(ambassadorLead?.email) || ambassadorEmail,
+      phone: getAmbassadorContactPhone(ambassador) || getAmbassadorContactPhone(ambassadorLead),
+      isSnapshotOnly: true,
+    } satisfies RecipientContact;
+  }
+
+  return {
+    userId: null,
+    role: requestedRole || "user",
+    name: requestedName || requestedEmail || "SitGuru Contact",
+    email: requestedEmail,
+    phone: "",
+    isSnapshotOnly: true,
+  } satisfies RecipientContact;
+}
+
+async function writeFirstMessageAuditLog(params: {
+  actorId: string;
+  actorEmail: string | null;
+  conversationId: string;
+  threadType: string;
+  messageCategory: string;
+  recipient: RecipientContact;
+  department: string;
+  departmentLabel: string;
+  source: string;
+  ambassadorId: string;
+  ambassadorName: string;
+  ambassadorEmail: string;
+  referralCode: string;
+  notificationSent: boolean;
+  emailSent: boolean;
+  smsSent: boolean;
+}) {
+  try {
+    const { error } = await supabaseAdmin.from("admin_audit_logs").insert({
+      actor_id: params.actorId,
+      actor_email: params.actorEmail || null,
+      action: params.threadType.startsWith("direct")
+        ? "direct_message_thread_created"
+        : "message_thread_created",
+      area: "admin.messages",
+      target_type: "conversation",
+      target_id: params.conversationId,
+      metadata: {
+        thread_type: params.threadType,
+        message_category: params.messageCategory || null,
+        recipient_user_id: params.recipient.userId,
+        recipient_id: params.recipient.userId,
+        recipient_email: params.recipient.email || null,
+        recipient_name: params.recipient.name || null,
+        recipient_role: params.recipient.role || null,
+        recipient_email_available: Boolean(params.recipient.email),
+        recipient_phone_available: Boolean(params.recipient.phone),
+        notification_sent: params.notificationSent,
+        email_sent: params.emailSent,
+        sms_sent: params.smsSent,
+        department: params.department || null,
+        department_label: params.departmentLabel || null,
+        source: params.source || null,
+        ambassador_id: params.ambassadorId || null,
+        ambassador_name: params.ambassadorName || null,
+        ambassador_email: params.ambassadorEmail || null,
+        referral_code: params.referralCode || null,
+        super_admin_actor: superAdminEmails.has(String(params.actorEmail || "").toLowerCase()),
+      },
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error("First message audit log insert failed:", error.message);
+    }
+  } catch (error) {
+    console.error("First message audit log insert error:", error);
+  }
+}
+
 function buildComposeErrorRedirect(reason: string) {
   return `/admin/messages?compose_error=${encodeURIComponent(reason)}`;
 }
@@ -1171,6 +1669,16 @@ async function createInternalThread(formData: FormData) {
     redirect(buildComposeErrorRedirect("missing_recipient"));
   }
 
+  const recipientContact = await getFirstMessageRecipientContact({
+    recipientId,
+    recipientEmail,
+    recipientName,
+    recipientRole,
+    ambassadorId,
+    ambassadorName,
+    ambassadorEmail,
+  });
+
   const now = new Date().toISOString();
   const topic = getConversationTopic({
     threadType,
@@ -1281,15 +1789,16 @@ async function createInternalThread(formData: FormData) {
   const { error: messageError } = await supabaseAdmin.from("messages").insert({
     conversation_id: conversationId,
     sender_id: user.id,
-    recipient_id: recipientId || null,
+    recipient_id: recipientContact.userId || null,
     sender_role: "admin",
-    recipient_role: recipientRole || null,
+    recipient_role: recipientContact.role || recipientRole || null,
     sender_name_snapshot: user.email || "SitGuru Admin",
     sender_email_snapshot: user.email || null,
     sender_role_snapshot: "admin",
-    recipient_name_snapshot: recipientLabel,
-    recipient_email_snapshot: recipientEmail || ambassadorEmail || null,
-    recipient_role_snapshot: recipientRole || null,
+    recipient_name_snapshot: recipientContact.name || recipientLabel,
+    recipient_email_snapshot: recipientContact.email || recipientEmail || ambassadorEmail || null,
+    recipient_phone_snapshot: recipientContact.phone || null,
+    recipient_role_snapshot: recipientContact.role || recipientRole || null,
     content: body,
     body,
     message_type: threadType,
@@ -1305,58 +1814,62 @@ async function createInternalThread(formData: FormData) {
     redirect(buildComposeErrorRedirect("message_create_failed"));
   }
 
-  if (recipientId && recipientId !== user.id) {
-    try {
-      const { error: notificationError } = await supabaseAdmin
-        .from("notifications")
-        .insert({
-          user_id: recipientId,
-          title: "New SitGuru Message",
-          body: preview || "You have a new message from SitGuru.",
-          type: "message",
-          href: `/messages/${conversationId}`,
-          link: `/messages/${conversationId}`,
-          is_read: false,
+  if (recipientContact.userId && recipientContact.userId !== user.id) {
+    await supabaseAdmin.from("conversation_participants").upsert(
+      [
+        {
+          conversation_id: conversationId,
+          user_id: recipientContact.userId,
+          role: recipientContact.role || "user",
           created_at: now,
           updated_at: now,
-        });
-
-      if (notificationError) {
-        console.warn("Message notification skipped:", notificationError);
-      }
-    } catch (notificationError) {
-      console.warn("Message notification skipped:", notificationError);
-    }
+        },
+      ],
+      {
+        onConflict: "conversation_id,user_id",
+        ignoreDuplicates: false,
+      },
+    );
   }
 
-  await supabaseAdmin.from("admin_audit_logs").insert({
-    actor_id: user.id,
-    actor_email: user.email || null,
-    action: isDirectThread
-      ? "direct_message_thread_created"
-      : "message_thread_created",
-    area: "admin.messages",
-    target_type: "conversation",
-    target_id: conversationId,
-    metadata: {
-      thread_type: threadType,
-      message_category: messageCategory || null,
-      recipient_id: recipientId || null,
-      recipient_email: recipientEmail || null,
-      recipient_name: recipientName || null,
-      recipient_role: recipientRole || null,
-      department: department || null,
-      department_label: departmentLabel || null,
-      source: source || null,
-      ambassador_id: ambassadorId || null,
-      ambassador_name: ambassadorName || null,
-      ambassador_email: ambassadorEmail || null,
-      referral_code: referralCode || null,
-      super_admin_actor: superAdminEmails.has(
-        String(user.email || "").toLowerCase(),
-      ),
-    },
-    created_at: now,
+  const notificationSent =
+    recipientContact.userId && recipientContact.userId !== user.id
+      ? await createRecipientNotification({
+          userId: recipientContact.userId,
+          conversationId,
+          preview,
+        })
+      : false;
+
+  const emailSent = await sendRecipientEmail({
+    toEmail: recipientContact.email,
+    recipientName: recipientContact.name,
+    senderName: "SitGuru Admin",
+    conversationId,
+  });
+
+  const smsSent = await sendRecipientSms({
+    toPhone: recipientContact.phone,
+    conversationId,
+  });
+
+  await writeFirstMessageAuditLog({
+    actorId: user.id,
+    actorEmail: user.email || null,
+    conversationId,
+    threadType,
+    messageCategory,
+    recipient: recipientContact,
+    department,
+    departmentLabel,
+    source,
+    ambassadorId,
+    ambassadorName,
+    ambassadorEmail,
+    referralCode,
+    notificationSent,
+    emailSent,
+    smsSent,
   });
 
   revalidatePath("/admin/messages");
