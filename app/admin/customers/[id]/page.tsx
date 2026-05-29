@@ -561,6 +561,33 @@ function getRelatedRecordId({
   );
 }
 
+
+function buildCustomerDirectMessageHref({
+  customerId,
+  name,
+  email,
+  phone,
+}: {
+  customerId: string;
+  name: string;
+  email: string;
+  phone: string;
+}) {
+  const query = new URLSearchParams({
+    threadType: "direct_customer",
+    messageCategory: "direct",
+    source: "admin_customer_detail",
+    recipientRole: "customer",
+    recipientName: name || "Pet Parent",
+  });
+
+  if (customerId) query.set("recipientId", customerId);
+  if (email && email !== "No email found") query.set("recipientEmail", email);
+  if (phone && phone !== "No phone found") query.set("recipientPhone", phone);
+
+  return `/admin/messages?${query.toString()}`;
+}
+
 function buildRelatedIdFilters(customerId: string) {
   return [
     `customer_id.eq.${customerId}`,
@@ -706,6 +733,15 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
   const email = getEmail(profile, authUser);
   const phone = getPhone(profile, authUser);
   const location = getLocation(profile);
+  const customerDirectMessageHref = buildCustomerDirectMessageHref({
+    customerId: relatedCustomerId || (isUuid(lookupKey) ? lookupKey : ""),
+    name,
+    email,
+    phone,
+  });
+  const customerMessageSearchHref = `/admin/messages?q=${encodeURIComponent(
+    name || email || phone || relatedCustomerId || lookupKey,
+  )}`;
   const role = getText(profile, ["role", "user_role", "account_type"], "customer");
   const source = getText(
     profile,
@@ -860,11 +896,19 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
               </Link>
 
               <Link
-                href="/admin/messages"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800"
+                href={customerMessageSearchHref}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-800 shadow-sm hover:bg-emerald-50"
               >
                 <MessageSquare className="h-4 w-4" />
                 View Messages
+              </Link>
+
+              <Link
+                href={customerDirectMessageHref}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Start Message
               </Link>
             </div>
           </div>
