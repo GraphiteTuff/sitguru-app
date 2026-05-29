@@ -38,6 +38,7 @@ const adminRoutes = {
   hr: "/admin/hr",
   ambassadors: "/admin/ambassadors",
   ambassadorLeads: "/admin/ambassador-leads",
+  ambassadorTraining: "/admin/ambassador-training",
   programs: "/admin/programs",
   gurus: "/admin/gurus",
   newGuru: "/admin/gurus/new",
@@ -741,7 +742,7 @@ export default async function AdminHrPage() {
             </p>
           </div>
 
-          <div className="grid w-full shrink-0 gap-3 sm:grid-cols-3 xl:w-auto">
+          <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
             <Link
               href={adminRoutes.ambassadorLeads}
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
@@ -756,6 +757,14 @@ export default async function AdminHrPage() {
             >
               <HeartHandshake size={17} />
               Dashboards
+            </Link>
+
+            <Link
+              href={adminRoutes.ambassadorTraining}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+            >
+              <GraduationCap size={17} />
+              Training Manager
             </Link>
 
             <Link
@@ -810,7 +819,7 @@ export default async function AdminHrPage() {
         />
       </section>
 
-      <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-5">
+      <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-6">
         <HrFeatureCard
           href={adminRoutes.ambassadorLeads}
           icon={<HeartHandshake size={22} />}
@@ -829,6 +838,16 @@ export default async function AdminHrPage() {
           detail="Open Student Ambassador dashboard records, referral codes, referral links, and early referral tracking."
           action="Open Dashboards"
           tone="emerald"
+        />
+
+        <HrFeatureCard
+          href={adminRoutes.ambassadorTraining}
+          icon={<GraduationCap size={22} />}
+          title="Training Manager"
+          value="Mass"
+          detail="Mass update Ambassador onboarding modules, documents, videos, acknowledgments, signatures, certification steps, and Stripe/banking setup steps."
+          action="Open Training Manager"
+          tone="green"
         />
 
         <HrFeatureCard
@@ -1137,6 +1156,59 @@ export default async function AdminHrPage() {
         </div>
       </section>
 
+
+      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-12">
+          <DashboardCard>
+            <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">
+                  Ambassador & Guru Onboarding Tools
+                </h2>
+                <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
+                  Direct HR access for mass updates to training modules, onboarding steps, referral setup, payout readiness, documents, videos, acknowledgments, and certification requirements.
+                </p>
+              </div>
+
+              <Link
+                href={adminRoutes.ambassadorTraining}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900 lg:shrink-0"
+              >
+                <GraduationCap size={17} />
+                Open Training Manager
+              </Link>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <QuickAction
+                href={adminRoutes.ambassadorTraining}
+                icon={<GraduationCap size={18} />}
+                title="Mass update training modules"
+                detail="Manage Ambassador onboarding steps, materials, documents, videos, required acknowledgments, signatures, certifications, and Stripe/banking setup."
+              />
+              <QuickAction
+                href={adminRoutes.ambassadors}
+                icon={<ClipboardCheck size={18} />}
+                title="View Ambassador progress"
+                detail="Open Ambassador dashboard records to see training progress, referral codes, onboarding status, and message follow-up."
+              />
+              <QuickAction
+                href={adminRoutes.ambassadorLeads}
+                icon={<UserPlus size={18} />}
+                title="Move leads into onboarding"
+                detail="Review ZipRecruiter, Indeed, PA CareerLink, referral, and website leads before converting them into active Ambassador dashboard records."
+              />
+              <QuickAction
+                href={adminRoutes.gurus}
+                icon={<PawPrint size={18} />}
+                title="Review Guru onboarding"
+                detail="Check Guru applicants, trust readiness, service setup, and approval status from the same HR command center."
+              />
+            </div>
+          </DashboardCard>
+        </div>
+      </section>
+
       <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-7">
           <DashboardCard>
@@ -1155,7 +1227,7 @@ export default async function AdminHrPage() {
               <InfoTile
                 icon={<ClipboardList size={18} />}
                 title="Ambassador intake"
-                detail="Use Ambassador Leads for applications and use Ambassador Dashboards for referral codes, tracking, and individual dashboard access."
+                detail="Use Ambassador Leads for applications, Ambassador Dashboards for referral codes, and the Training Manager for mass onboarding module updates."
               />
               <InfoTile
                 icon={<BriefcaseBusiness size={18} />}
@@ -1200,6 +1272,12 @@ export default async function AdminHrPage() {
                 icon={<ClipboardCheck size={18} />}
                 title="Open Student Ambassador dashboards"
                 detail="View referral codes, dashboard records, signup links, and early referral tracking."
+              />
+              <QuickAction
+                href={adminRoutes.ambassadorTraining}
+                icon={<GraduationCap size={18} />}
+                title="Mass update training modules"
+                detail="Update onboarding videos, PowerPoints, PDFs, documents, acknowledgments, certification steps, and payout setup modules."
               />
               <QuickAction
                 href={adminRoutes.ambassadorLeads}
