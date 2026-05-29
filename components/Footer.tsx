@@ -1,5 +1,12 @@
 import Link from "next/link";
 import SiteLogo from "@/components/SiteLogo";
+import {
+  FaFacebookF,
+  FaInstagram,
+  FaTiktok,
+  FaXTwitter,
+  FaYoutube,
+} from "react-icons/fa6";
 
 const serviceLinks = [
   { label: "Pet Sitting", href: "/search?service=Pet%20Sitting" },
@@ -55,6 +62,34 @@ const companyLinks = [
   { label: "Admin", href: "/admin/login" },
 ];
 
+const socialLinks = [
+  {
+    label: "Facebook",
+    href: "https://www.facebook.com/SitGuruOfficial",
+    icon: FaFacebookF,
+  },
+  {
+    label: "Instagram",
+    href: "https://www.instagram.com/SitGuruOfficial",
+    icon: FaInstagram,
+  },
+  {
+    label: "TikTok",
+    href: "https://www.tiktok.com/@SitGuruOfficial",
+    icon: FaTiktok,
+  },
+  {
+    label: "X",
+    href: "https://x.com/SitGuruOfficial",
+    icon: FaXTwitter,
+  },
+  {
+    label: "YouTube",
+    href: "https://www.youtube.com/@SitGuruOfficial",
+    icon: FaYoutube,
+  },
+];
+
 type FooterLink = {
   label: string;
   href: string;
@@ -88,6 +123,42 @@ function FooterColumn({ title, links }: FooterColumnProps) {
             ) : null}
           </Link>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SocialLinks() {
+  return (
+    <div className="mt-5 rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm shadow-slate-900/[0.03]">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-black text-slate-900">Follow SitGuru</p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+            Pet-care tips, Guru opportunities, Ambassador updates, and SitGuru
+            community news.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {socialLinks.map((social) => {
+            const Icon = social.icon;
+
+            return (
+              <a
+                key={social.href}
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Follow SitGuru on ${social.label}`}
+                title={social.label}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 text-lg text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-700 hover:text-white hover:shadow-md"
+              >
+                <Icon aria-hidden="true" />
+              </a>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -127,6 +198,8 @@ export default function Footer() {
                   Become a Guru
                 </Link>
               </div>
+
+              <SocialLinks />
 
               <div className="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50/80 p-4 text-sm leading-6 text-slate-600">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
