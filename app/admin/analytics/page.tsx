@@ -1,36 +1,129 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
+import {
+  Activity,
+  BriefcaseBusiness,
+  CalendarCheck,
+  ChevronRight,
+  DollarSign,
+  HandCoins,
+  Handshake,
+  Megaphone,
+  MousePointerClick,
+  PawPrint,
+  Share2,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-type BookingRow = Record<string, unknown>;
-type GuruRow = Record<string, unknown>;
-type ProfileRow = Record<string, unknown>;
-type LaunchSignupRow = Record<string, unknown>;
-type MessageRow = Record<string, unknown>;
-type AnalyticsEventRow = Record<string, unknown>;
-type GrowthCampaignRoiRow = Record<string, unknown>;
-type GrowthCampaignEventRow = Record<string, unknown>;
-type GrowthCampaignRow = Record<string, unknown>;
-
-type Tone = "emerald" | "sky" | "violet" | "amber" | "rose";
+type AnyRow = Record<string, unknown>;
+type Tone = "emerald" | "sky" | "violet" | "amber" | "rose" | "slate";
 
 type SafeQueryResponse = {
   data: unknown;
   error: unknown;
 };
 
+type CountItem = {
+  label: string;
+  count: number;
+};
+
+type RevenueItem = {
+  label: string;
+  revenue: number;
+  bookings: number;
+};
+
+type GrowthCampaignItem = {
+  campaignName: string;
+  channel: string;
+  clicks: number;
+  leads: number;
+  signups: number;
+  bookings: number;
+  attributedRevenue: number;
+  totalCost: number;
+  roiPercent: number;
+  costPerSignup: number;
+  costPerBooking: number;
+  signal: string;
+  signalLabel: string;
+  recommendation: string;
+};
+
+type ChannelMixItem = {
+  label: string;
+  clicks: number;
+  leads: number;
+  signups: number;
+  bookings: number;
+  revenue: number;
+  cost: number;
+  roi: number;
+};
+
+type RecentLeadItem = {
+  name: string;
+  email: string;
+  source: string;
+  program: string;
+  status: string;
+  stage: string;
+  referralCode: string;
+  joined: string;
+};
+
+type RecentEventItem = {
+  eventName: string;
+  eventType: string;
+  source: string;
+  role: string;
+  pagePath: string;
+  createdAt: string;
+};
+
+type RecentBookingItem = {
+  service: string;
+  market: string;
+  status: string;
+  amount: string;
+  date: string;
+};
+
+const adminLinks = [
+  { href: "/admin", label: "Admin Home" },
+  { href: "/admin/bookings", label: "Bookings" },
+  { href: "/admin/ambassadors", label: "Ambassadors" },
+  { href: "/admin/referrals", label: "Referrals" },
+  { href: "/admin/financials", label: "Financials", primary: true },
+];
+
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalized(value: unknown) {
+  return asTrimmedString(value).toLowerCase();
 }
 
 function toNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
 
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[$,]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
 }
 
 function money(value: number) {
@@ -38,11 +131,19 @@ function money(value: number) {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+function moneyDetailed(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(value) ? value : 0);
 }
 
 function percent(value: number) {
-  return `${value.toFixed(1)}%`;
+  return `${(Number.isFinite(value) ? value : 0).toFixed(1)}%`;
 }
 
 function calcPercent(value: number, total: number) {
@@ -54,7 +155,6 @@ function formatDateShort(value?: string | null) {
   if (!value) return "—";
 
   const parsed = new Date(value);
-
   if (Number.isNaN(parsed.getTime())) return "—";
 
   return parsed.toLocaleDateString("en-US", {
@@ -63,40 +163,70 @@ function formatDateShort(value?: string | null) {
   });
 }
 
-function getGrossAmount(booking: BookingRow) {
-  const subtotal = toNumber(booking.subtotal_amount);
+function formatDateMonth(value?: string | null) {
+  if (!value) return "Unknown";
 
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Unknown";
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getCreatedAt(row: AnyRow) {
+  return (
+    asTrimmedString(row.created_at) ||
+    asTrimmedString(row.inserted_at) ||
+    asTrimmedString(row.updated_at) ||
+    ""
+  );
+}
+
+function getGrossAmount(booking: AnyRow) {
+  const subtotal = toNumber(booking.subtotal_amount);
   if (subtotal > 0) return subtotal;
 
   return (
     toNumber(booking.total_amount) ||
+    toNumber(booking.amount_total) ||
+    toNumber(booking.customer_total_amount) ||
     toNumber(booking.amount) ||
     toNumber(booking.price) ||
     toNumber(booking.hourly_rate)
   );
 }
 
-function getTaxAmount(booking: BookingRow) {
-  return toNumber(booking.sales_tax_amount);
+function getTaxAmount(booking: AnyRow) {
+  return toNumber(booking.sales_tax_amount) || toNumber(booking.tax_amount);
 }
 
-function getFeeAmount(booking: BookingRow) {
-  const storedFee = toNumber(booking.sitguru_fee_amount);
+function getFeeAmount(booking: AnyRow) {
+  const storedFee =
+    toNumber(booking.sitguru_fee_amount) ||
+    toNumber(booking.platform_fee_amount) ||
+    toNumber(booking.platform_fee) ||
+    toNumber(booking.marketplace_fee_amount) ||
+    toNumber(booking.marketplace_fee);
 
   if (storedFee > 0) return storedFee;
 
   return getGrossAmount(booking) * 0.08;
 }
 
-function getGuruNetAmount(booking: BookingRow) {
-  const storedNet = toNumber(booking.guru_net_amount);
+function getGuruNetAmount(booking: AnyRow) {
+  const storedNet =
+    toNumber(booking.guru_net_amount) ||
+    toNumber(booking.guru_payout_amount) ||
+    toNumber(booking.payout_amount);
 
   if (storedNet > 0) return storedNet;
 
-  return getGrossAmount(booking) - getFeeAmount(booking);
+  return Math.max(0, getGrossAmount(booking) - getFeeAmount(booking));
 }
 
-function getServiceName(booking: BookingRow) {
+function getServiceName(booking: AnyRow) {
   return (
     asTrimmedString(booking.service) ||
     asTrimmedString(booking.service_name) ||
@@ -106,9 +236,10 @@ function getServiceName(booking: BookingRow) {
   );
 }
 
-function getBookingDate(booking: BookingRow) {
+function getBookingDate(booking: AnyRow) {
   return (
     asTrimmedString(booking.booking_date) ||
+    asTrimmedString(booking.requested_date) ||
     asTrimmedString(booking.start_date) ||
     asTrimmedString(booking.start_time) ||
     asTrimmedString(booking.created_at) ||
@@ -116,24 +247,28 @@ function getBookingDate(booking: BookingRow) {
   );
 }
 
-function getCityState(row: Record<string, unknown>) {
+function getCityState(row: AnyRow) {
   return (
     [asTrimmedString(row.city), asTrimmedString(row.state)]
       .filter(Boolean)
-      .join(", ") || "Unknown"
+      .join(", ") ||
+    asTrimmedString(row.market) ||
+    asTrimmedString(row.location) ||
+    "Unknown"
   );
 }
 
-function getCustomerId(booking: BookingRow) {
+function getCustomerId(booking: AnyRow) {
   return (
     asTrimmedString(booking.customer_id) ||
     asTrimmedString(booking.pet_owner_id) ||
+    asTrimmedString(booking.pet_parent_id) ||
     asTrimmedString(booking.user_id) ||
     "unknown"
   );
 }
 
-function getGuruId(booking: BookingRow) {
+function getGuruId(booking: AnyRow) {
   return (
     asTrimmedString(booking.guru_id) ||
     asTrimmedString(booking.sitter_id) ||
@@ -142,87 +277,148 @@ function getGuruId(booking: BookingRow) {
   );
 }
 
-function getLaunchRole(signup: LaunchSignupRow) {
-  const role = asTrimmedString(
-    signup.role || signup.interest_type || signup.joining_as || signup.user_type || signup.segment
-  ).toLowerCase();
-
-  if (role.includes("both")) return "Both";
-  if (role.includes("guru")) return "Guru";
-  return "Pet Parent";
-}
-
-function getLaunchSource(signup: LaunchSignupRow) {
+function getStatus(row: AnyRow) {
   return (
-    asTrimmedString(signup.source) ||
-    asTrimmedString(signup.utm_source) ||
-    "direct"
-  ).toLowerCase();
+    asTrimmedString(row.status) ||
+    asTrimmedString(row.lead_stage) ||
+    asTrimmedString(row.stage) ||
+    asTrimmedString(row.payment_status) ||
+    "pending"
+  );
 }
 
-function isPaidBooking(booking: BookingRow) {
-  return asTrimmedString(booking.payment_status).toLowerCase() === "paid";
+function isPaidBooking(booking: AnyRow) {
+  return normalized(booking.payment_status) === "paid";
 }
 
-function isCompletedBooking(booking: BookingRow) {
-  const status = asTrimmedString(booking.status).toLowerCase();
-  const paymentStatus = asTrimmedString(booking.payment_status).toLowerCase();
+function isCompletedBooking(booking: AnyRow) {
+  const status = normalized(booking.status);
+  const paymentStatus = normalized(booking.payment_status);
 
   return (
     status.includes("complete") ||
+    status.includes("completed") ||
     status.includes("paid") ||
     paymentStatus === "paid"
   );
 }
 
-function isCancelledBooking(booking: BookingRow) {
-  const status = asTrimmedString(booking.status).toLowerCase();
-  return status.includes("cancel");
+function isCancelledBooking(booking: AnyRow) {
+  return normalized(booking.status).includes("cancel");
 }
 
-function isUnreadMessage(message: MessageRow) {
+function isUnreadMessage(message: AnyRow) {
   const readAt = asTrimmedString(message.read_at);
-  const status = asTrimmedString(message.status).toLowerCase();
+  const status = normalized(message.status);
   const isRead = Boolean(message.is_read);
 
   return !readAt && !isRead && status !== "read" && status !== "archived";
 }
 
-function getEventName(event: AnalyticsEventRow) {
+function isActiveAmbassador(row: AnyRow) {
+  const status = normalized(row.status);
+  return !status || ["active", "approved", "onboarding", "contacted"].some((value) => status.includes(value));
+}
+
+function getLaunchRole(signup: AnyRow) {
+  const role = normalized(
+    signup.role || signup.interest_type || signup.joining_as || signup.user_type || signup.segment,
+  );
+
+  if (role.includes("both")) return "Both";
+  if (role.includes("guru")) return "Guru";
+  if (role.includes("ambassador")) return "Ambassador";
+  return "Pet Parent";
+}
+
+function getLaunchSource(signup: AnyRow) {
+  return (
+    normalized(signup.source) ||
+    normalized(signup.utm_source) ||
+    normalized(signup.referral_source) ||
+    "direct"
+  );
+}
+
+function getLeadSource(row: AnyRow) {
+  return (
+    asTrimmedString(row.source) ||
+    asTrimmedString(row.utm_source) ||
+    asTrimmedString(row.referral_source) ||
+    asTrimmedString(row.campaign) ||
+    "Unknown"
+  );
+}
+
+function getLeadProgram(row: AnyRow) {
+  return (
+    asTrimmedString(row.program) ||
+    asTrimmedString(row.program_name) ||
+    asTrimmedString(row.candidate_path) ||
+    asTrimmedString(row.ambassador_type) ||
+    "Unassigned"
+  );
+}
+
+function getLeadName(row: AnyRow) {
+  return (
+    asTrimmedString(row.full_name) ||
+    asTrimmedString(row.display_name) ||
+    asTrimmedString(row.name) ||
+    asTrimmedString(row.first_name) ||
+    asTrimmedString(row.email) ||
+    "Unknown Lead"
+  );
+}
+
+function getReferralCode(row: AnyRow) {
+  return (
+    asTrimmedString(row.referral_code) ||
+    asTrimmedString(row.code) ||
+    asTrimmedString(row.ref_code) ||
+    "—"
+  );
+}
+
+function getEventName(event: AnyRow) {
   return asTrimmedString(event.event_name) || "unknown_event";
 }
 
-function getEventType(event: AnalyticsEventRow) {
+function getEventType(event: AnyRow) {
   return asTrimmedString(event.event_type) || "event";
 }
 
-function getEventSource(event: AnalyticsEventRow) {
+function getEventSource(event: AnyRow) {
   return asTrimmedString(event.source) || "direct";
 }
 
-function getEventPagePath(event: AnalyticsEventRow) {
+function getEventPagePath(event: AnyRow) {
   return asTrimmedString(event.page_path) || "—";
 }
 
-function getEventRole(event: AnalyticsEventRow) {
+function getEventRole(event: AnyRow) {
   return asTrimmedString(event.role) || "—";
 }
 
-function getEventCreatedAt(event: AnalyticsEventRow) {
+function getEventCreatedAt(event: AnyRow) {
   return asTrimmedString(event.created_at);
 }
 
+function isEvent(event: AnyRow, eventName: string) {
+  return getEventName(event) === eventName;
+}
 
-function getGrowthLabel(row: GrowthCampaignRoiRow) {
+function getGrowthLabel(row: AnyRow) {
   return (
     asTrimmedString(row.campaign_name) ||
     asTrimmedString(row.campaign_slug) ||
     asTrimmedString(row.utm_campaign) ||
+    asTrimmedString(row.name) ||
     "Unassigned Campaign"
   );
 }
 
-function getGrowthChannel(row: GrowthCampaignRoiRow) {
+function getGrowthChannel(row: AnyRow) {
   return (
     asTrimmedString(row.channel) ||
     asTrimmedString(row.source) ||
@@ -231,24 +427,20 @@ function getGrowthChannel(row: GrowthCampaignRoiRow) {
   );
 }
 
-function getGrowthSignal(row: GrowthCampaignRoiRow) {
+function getGrowthSignal(row: AnyRow) {
   return asTrimmedString(row.growth_signal) || "needs_more_data";
 }
 
-function getGrowthRecommendation(row: GrowthCampaignRoiRow) {
+function getGrowthRecommendation(row: AnyRow) {
   return (
     asTrimmedString(row.admin_recommendation) ||
     "Keep tracking. More campaign events are needed before making a strong decision."
   );
 }
 
-function getGrowthNumber(row: GrowthCampaignRoiRow, key: string) {
-  return toNumber(row[key]);
-}
-
 function getGrowthStatusLabel(signal: string) {
-  const normalized = signal.toLowerCase().replaceAll("_", " ");
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  const normalizedSignal = signal.toLowerCase().replaceAll("_", " ");
+  return normalizedSignal.charAt(0).toUpperCase() + normalizedSignal.slice(1);
 }
 
 function getGrowthSignalTone(signal: string): Tone {
@@ -259,14 +451,27 @@ function getGrowthSignalTone(signal: string): Tone {
   return "violet";
 }
 
-function isEvent(event: AnalyticsEventRow, eventName: string) {
-  return getEventName(event) === eventName;
+function getRewardAmount(row: AnyRow) {
+  return (
+    toNumber(row.amount) ||
+    toNumber(row.reward_amount) ||
+    toNumber(row.payout_amount) ||
+    toNumber(row.total_amount) ||
+    toNumber(row.liability_amount)
+  );
 }
 
-function groupCount<T>(
-  rows: T[],
-  getKey: (row: T) => string
-): { label: string; count: number }[] {
+function isPaidReward(row: AnyRow) {
+  const status = normalized(row.status || row.payout_status || row.payment_status);
+  return status.includes("paid") || status.includes("sent");
+}
+
+function isPendingReward(row: AnyRow) {
+  const status = normalized(row.status || row.payout_status || row.payment_status);
+  return !isPaidReward(row) && !status.includes("cancel") && !status.includes("void");
+}
+
+function groupCount<T>(rows: T[], getKey: (row: T) => string): CountItem[] {
   const map = new Map<string, number>();
 
   for (const row of rows) {
@@ -276,37 +481,28 @@ function groupCount<T>(
 
   return Array.from(map.entries())
     .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-function groupRevenue(
-  bookings: BookingRow[],
-  getKey: (booking: BookingRow) => string
-): { label: string; revenue: number; bookings: number }[] {
+function groupRevenue(bookings: AnyRow[], getKey: (booking: AnyRow) => string): RevenueItem[] {
   const map = new Map<string, { revenue: number; bookings: number }>();
 
   for (const booking of bookings) {
     const key = getKey(booking) || "Unknown";
     const existing = map.get(key) || { revenue: 0, bookings: 0 };
-
     existing.revenue += getGrossAmount(booking) + getTaxAmount(booking);
     existing.bookings += 1;
-
     map.set(key, existing);
   }
 
   return Array.from(map.entries())
-    .map(([label, value]) => ({
-      label,
-      revenue: value.revenue,
-      bookings: value.bookings,
-    }))
+    .map(([label, value]) => ({ label, ...value }))
     .sort((a, b) => b.revenue - a.revenue);
 }
 
 async function safeRows<T>(
   query: PromiseLike<SafeQueryResponse>,
-  label: string
+  label: string,
 ): Promise<T[]> {
   try {
     const result = await query;
@@ -332,50 +528,67 @@ function ActionLink({
   label: string;
   primary?: boolean;
 }) {
-  if (primary) {
-    return (
-      <Link
-        href={href}
-        className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
-      >
-        {label}
-      </Link>
-    );
-  }
+  const className = primary
+    ? "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
+    : "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800";
 
   return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
-    >
+    <Link href={href} className={className}>
       {label}
+      <ChevronRight className="h-4 w-4" />
     </Link>
   );
 }
 
-
 function StatCard({
+  icon,
   label,
   value,
   detail,
+  href,
 }: {
+  icon?: ReactNode;
   label: string;
   value: string;
   detail: string;
+  href?: string;
 }) {
-  return (
-    <div className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+  const content = (
+    <>
+      {icon ? (
+        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+          {icon}
+        </div>
+      ) : null}
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
         {label}
       </p>
       <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
         {value}
       </p>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{detail}</p>
+      <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+        {detail}
+      </p>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
+      {content}
     </div>
   );
 }
-
 
 function SectionCard({
   eyebrow,
@@ -394,13 +607,13 @@ function SectionCard({
     <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
             {eyebrow}
           </p>
           <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
             {title}
           </h2>
-          <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+          <p className="mt-3 text-sm font-semibold leading-7 text-slate-600 sm:text-base">
             {description}
           </p>
         </div>
@@ -412,7 +625,6 @@ function SectionCard({
     </section>
   );
 }
-
 
 function BarRow({
   label,
@@ -435,28 +647,27 @@ function BarRow({
     violet: "bg-violet-400",
     amber: "bg-amber-400",
     rose: "bg-rose-400",
+    slate: "bg-slate-400",
   }[tone];
 
   return (
     <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
       <div className="mb-2 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-black text-slate-950">{label}</p>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black text-slate-950">{label}</p>
           <p className="mt-1 text-xs font-semibold text-slate-500">{detail}</p>
         </div>
-        <p className="text-sm font-black text-slate-950">{value.toLocaleString()}</p>
+        <p className="shrink-0 text-sm font-black text-slate-950">
+          {value.toLocaleString()}
+        </p>
       </div>
 
       <div className="h-2.5 rounded-full bg-slate-100">
-        <div
-          className={`h-full rounded-full ${toneClass}`}
-          style={{ width: `${width}%` }}
-        />
+        <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${width}%` }} />
       </div>
     </div>
   );
 }
-
 
 function RevenueBarRow({
   label,
@@ -474,25 +685,21 @@ function RevenueBarRow({
   return (
     <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
       <div className="mb-2 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-black text-slate-950">{label}</p>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black text-slate-950">{label}</p>
           <p className="mt-1 text-xs font-semibold text-slate-500">
             {bookings.toLocaleString()} bookings
           </p>
         </div>
-        <p className="text-sm font-black text-slate-950">{money(revenue)}</p>
+        <p className="shrink-0 text-sm font-black text-slate-950">{money(revenue)}</p>
       </div>
 
       <div className="h-2.5 rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-emerald-500"
-          style={{ width: `${width}%` }}
-        />
+        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${width}%` }} />
       </div>
     </div>
   );
 }
-
 
 function TableCard({
   headers,
@@ -508,10 +715,7 @@ function TableCard({
           <thead className="bg-slate-50 text-slate-600">
             <tr>
               {headers.map((header) => (
-                <th
-                  key={header}
-                  className="px-4 py-3 text-xs font-black uppercase tracking-[0.16em]"
-                >
+                <th key={header} className="px-4 py-3 text-xs font-black uppercase tracking-[0.16em]">
                   {header}
                 </th>
               ))}
@@ -520,10 +724,7 @@ function TableCard({
 
           <tbody className="divide-y divide-slate-100">
             {rows.map((row, index) => (
-              <tr
-                key={index}
-                className="text-slate-600 transition hover:bg-slate-50"
-              >
+              <tr key={index} className="text-slate-600 transition hover:bg-slate-50">
                 {row.map((cell, cellIndex) => (
                   <td key={cellIndex} className="px-4 py-3 font-semibold">
                     {cell}
@@ -538,6 +739,13 @@ function TableCard({
   );
 }
 
+function EmptyCard({ label }: { label: string }) {
+  return (
+    <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-500">
+      {label}
+    </p>
+  );
+}
 
 function toneForIndex(index: number): Tone {
   if (index === 0) return "emerald";
@@ -545,6 +753,35 @@ function toneForIndex(index: number): Tone {
   if (index === 2) return "violet";
   if (index === 3) return "amber";
   return "rose";
+}
+
+function buildGrowthRows(rows: AnyRow[]): GrowthCampaignItem[] {
+  return rows.map((row) => {
+    const clicks = toNumber(row.clicks);
+    const leads = toNumber(row.leads);
+    const signups = toNumber(row.signups);
+    const bookings = toNumber(row.bookings);
+    const attributedRevenue = toNumber(row.attributed_revenue);
+    const totalCost = toNumber(row.total_cost);
+    const signal = getGrowthSignal(row);
+
+    return {
+      campaignName: getGrowthLabel(row),
+      channel: getGrowthChannel(row),
+      clicks,
+      leads,
+      signups,
+      bookings,
+      attributedRevenue,
+      totalCost,
+      roiPercent: toNumber(row.roi_percent),
+      costPerSignup: toNumber(row.cost_per_signup),
+      costPerBooking: toNumber(row.cost_per_booking),
+      signal,
+      signalLabel: getGrowthStatusLabel(signal),
+      recommendation: getGrowthRecommendation(row),
+    };
+  });
 }
 
 async function getAnalyticsData() {
@@ -558,92 +795,89 @@ async function getAnalyticsData() {
     growthCampaignRoi,
     growthCampaignEvents,
     growthCampaigns,
+    ambassadorLeads,
+    ambassadors,
+    ambassadorReferrals,
+    ambassadorRewards,
+    referralRewards,
+    referralCodes,
+    referralEvents,
+    partnerPayouts,
+    programApplications,
+    partnerApplications,
   ] = await Promise.all([
-    safeRows<BookingRow>(
-      supabaseAdmin.from("bookings").select("*").limit(1000),
-      "bookings"
+    safeRows<AnyRow>(supabaseAdmin.from("bookings").select("*").limit(1500), "bookings"),
+    safeRows<AnyRow>(supabaseAdmin.from("gurus").select("*").limit(1500), "gurus"),
+    safeRows<AnyRow>(supabaseAdmin.from("profiles").select("*").limit(1500), "profiles"),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("launch_signups").select("*").order("created_at", { ascending: false }).limit(1500),
+      "launch_signups",
     ),
-    safeRows<GuruRow>(
-      supabaseAdmin.from("gurus").select("*").limit(1000),
-      "gurus"
+    safeRows<AnyRow>(
+      supabaseAdmin.from("messages").select("*").order("created_at", { ascending: false }).limit(2500),
+      "messages",
     ),
-    safeRows<ProfileRow>(
-      supabaseAdmin.from("profiles").select("*").limit(1000),
-      "profiles"
+    safeRows<AnyRow>(
+      supabaseAdmin.from("analytics_events").select("*").order("created_at", { ascending: false }).limit(5000),
+      "analytics_events",
     ),
-    safeRows<LaunchSignupRow>(
-      supabaseAdmin
-        .from("launch_signups")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "launch_signups"
+    safeRows<AnyRow>(supabaseAdmin.from("admin_growth_campaign_roi").select("*").limit(750), "admin_growth_campaign_roi"),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("growth_campaign_events").select("*").order("created_at", { ascending: false }).limit(5000),
+      "growth_campaign_events",
     ),
-    safeRows<MessageRow>(
-      supabaseAdmin
-        .from("messages")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "messages"
+    safeRows<AnyRow>(supabaseAdmin.from("growth_campaigns").select("*").limit(750), "growth_campaigns"),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("ambassador_leads").select("*").order("created_at", { ascending: false }).limit(2000),
+      "ambassador_leads",
     ),
-    safeRows<AnalyticsEventRow>(
-      supabaseAdmin
-        .from("analytics_events")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2500),
-      "analytics_events"
+    safeRows<AnyRow>(
+      supabaseAdmin.from("ambassadors").select("*").order("created_at", { ascending: false }).limit(2000),
+      "ambassadors",
     ),
-    safeRows<GrowthCampaignRoiRow>(
-      supabaseAdmin
-        .from("admin_growth_campaign_roi")
-        .select("*")
-        .limit(500),
-      "admin_growth_campaign_roi"
+    safeRows<AnyRow>(
+      supabaseAdmin.from("ambassador_referrals").select("*").order("created_at", { ascending: false }).limit(2000),
+      "ambassador_referrals",
     ),
-    safeRows<GrowthCampaignEventRow>(
-      supabaseAdmin
-        .from("growth_campaign_events")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2500),
-      "growth_campaign_events"
+    safeRows<AnyRow>(
+      supabaseAdmin.from("ambassador_rewards").select("*").order("created_at", { ascending: false }).limit(2000),
+      "ambassador_rewards",
     ),
-    safeRows<GrowthCampaignRow>(
-      supabaseAdmin
-        .from("growth_campaigns")
-        .select("*")
-        .limit(500),
-      "growth_campaigns"
+    safeRows<AnyRow>(
+      supabaseAdmin.from("referral_rewards").select("*").order("created_at", { ascending: false }).limit(2000),
+      "referral_rewards",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("referral_codes").select("*").order("created_at", { ascending: false }).limit(2000),
+      "referral_codes",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("referral_events").select("*").order("created_at", { ascending: false }).limit(3000),
+      "referral_events",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("partner_payouts").select("*").order("created_at", { ascending: false }).limit(2000),
+      "partner_payouts",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("program_applications").select("*").order("created_at", { ascending: false }).limit(2000),
+      "program_applications",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("partner_applications").select("*").order("created_at", { ascending: false }).limit(2000),
+      "partner_applications",
     ),
   ]);
 
-  const totalRevenue = bookings.reduce(
-    (sum, booking) => sum + getGrossAmount(booking) + getTaxAmount(booking),
-    0
-  );
-
-  const platformRevenue = bookings.reduce(
-    (sum, booking) => sum + getFeeAmount(booking),
-    0
-  );
-
-  const guruPayouts = bookings.reduce(
-    (sum, booking) => sum + getGuruNetAmount(booking),
-    0
-  );
+  const totalRevenue = bookings.reduce((sum, booking) => sum + getGrossAmount(booking) + getTaxAmount(booking), 0);
+  const platformRevenue = bookings.reduce((sum, booking) => sum + getFeeAmount(booking), 0);
+  const guruPayouts = bookings.reduce((sum, booking) => sum + getGuruNetAmount(booking), 0);
 
   const customerIds = new Set(
-    bookings
-      .map((booking) => getCustomerId(booking))
-      .filter((value) => value && value !== "unknown")
+    bookings.map((booking) => getCustomerId(booking)).filter((value) => value && value !== "unknown"),
   );
-
   const guruIds = new Set(
-    bookings
-      .map((booking) => getGuruId(booking))
-      .filter((value) => value && value !== "unknown")
+    bookings.map((booking) => getGuruId(booking)).filter((value) => value && value !== "unknown"),
   );
 
   const paidBookings = bookings.filter(isPaidBooking);
@@ -651,163 +885,33 @@ async function getAnalyticsData() {
   const cancelledBookings = bookings.filter(isCancelledBooking);
   const unreadMessages = messages.filter(isUnreadMessage);
 
-  const homepageVisits = analyticsEvents.filter((event) =>
-    isEvent(event, "homepage_visit")
-  );
-
-  const launchPageVisits = analyticsEvents.filter((event) =>
-    isEvent(event, "launch_page_visit")
-  );
-
-  const searchesStarted = analyticsEvents.filter((event) =>
-    isEvent(event, "search_started")
-  );
-
+  const homepageVisits = analyticsEvents.filter((event) => isEvent(event, "homepage_visit"));
+  const launchPageVisits = analyticsEvents.filter((event) => isEvent(event, "launch_page_visit"));
+  const searchesStarted = analyticsEvents.filter((event) => isEvent(event, "search_started"));
   const guruProfileViews = analyticsEvents.filter(
-    (event) =>
-      isEvent(event, "guru_profile_view") ||
-      isEvent(event, "guru_profile_view_clicked")
+    (event) => isEvent(event, "guru_profile_view") || isEvent(event, "guru_profile_view_clicked"),
   );
-
-  const bookingStarts = analyticsEvents.filter((event) =>
-    isEvent(event, "booking_started")
-  );
-
-  const bookingCompletedEvents = analyticsEvents.filter((event) =>
-    isEvent(event, "booking_completed")
-  );
-
-  const launchSignupStarts = analyticsEvents.filter((event) =>
-    isEvent(event, "launch_signup_started")
-  );
-
-  const launchSignupCompletedEvents = analyticsEvents.filter((event) =>
-    isEvent(event, "launch_signup_completed")
-  );
-
-  const launchFormOpened = analyticsEvents.filter((event) =>
-    isEvent(event, "launch_form_opened")
-  );
-
-  const ctaClicks = analyticsEvents.filter((event) =>
-    isEvent(event, "homepage_cta_clicked")
-  );
-
-  const referralShares = analyticsEvents.filter((event) =>
-    isEvent(event, "referral_shared")
-  );
-
-  const referralClicks = analyticsEvents.filter((event) =>
-    isEvent(event, "referral_clicked")
-  );
-
+  const bookingStarts = analyticsEvents.filter((event) => isEvent(event, "booking_started"));
+  const bookingCompletedEvents = analyticsEvents.filter((event) => isEvent(event, "booking_completed"));
+  const launchSignupStarts = analyticsEvents.filter((event) => isEvent(event, "launch_signup_started"));
+  const launchSignupCompletedEvents = analyticsEvents.filter((event) => isEvent(event, "launch_signup_completed"));
+  const launchFormOpened = analyticsEvents.filter((event) => isEvent(event, "launch_form_opened"));
+  const ctaClicks = analyticsEvents.filter((event) => isEvent(event, "homepage_cta_clicked"));
+  const referralShares = analyticsEvents.filter((event) => isEvent(event, "referral_shared"));
+  const referralClicksTracked = analyticsEvents.filter((event) => isEvent(event, "referral_clicked"));
   const carouselClicks = analyticsEvents.filter(
     (event) =>
       isEvent(event, "homepage_carousel_next_clicked") ||
       isEvent(event, "homepage_carousel_previous_clicked") ||
-      isEvent(event, "homepage_carousel_slide_selected")
+      isEvent(event, "homepage_carousel_slide_selected"),
   );
-
-  const checkoutStarts = analyticsEvents.filter((event) =>
-    isEvent(event, "checkout_started")
-  );
-
-  const bookingRequestsCreated = analyticsEvents.filter((event) =>
-    isEvent(event, "booking_request_created")
-  );
-
+  const checkoutStarts = analyticsEvents.filter((event) => isEvent(event, "checkout_started"));
+  const bookingRequestsCreated = analyticsEvents.filter((event) => isEvent(event, "booking_request_created"));
   const bookingFailures = analyticsEvents.filter(
-    (event) =>
-      isEvent(event, "booking_request_failed") ||
-      isEvent(event, "checkout_failed")
+    (event) => isEvent(event, "booking_request_failed") || isEvent(event, "checkout_failed"),
   );
 
-  const profileViewRate = calcPercent(
-    guruProfileViews.length,
-    homepageVisits.length
-  );
-
-  const searchEngagementRate = calcPercent(
-    searchesStarted.length,
-    homepageVisits.length
-  );
-
-  const bookingStartRate = calcPercent(
-    bookingStarts.length,
-    searchesStarted.length
-  );
-
-  const launchFormOpenRate = calcPercent(
-    launchFormOpened.length,
-    homepageVisits.length
-  );
-
-  const launchSignupCompletionRate = calcPercent(
-    launchSignupCompletedEvents.length,
-    launchSignupStarts.length
-  );
-
-  const sourceMix = groupCount(launchSignups, getLaunchSource).slice(0, 6);
-  const roleMix = groupCount(launchSignups, getLaunchRole).slice(0, 6);
-  const eventSourceMix = groupCount(analyticsEvents, getEventSource).slice(0, 8);
-  const eventNameMix = groupCount(analyticsEvents, getEventName).slice(0, 10);
-  const eventTypeMix = groupCount(analyticsEvents, getEventType).slice(0, 8);
-  const eventPageMix = groupCount(analyticsEvents, getEventPagePath).slice(0, 8);
-
-  const serviceRevenue = groupRevenue(bookings, getServiceName).slice(0, 6);
-  const marketRevenue = groupRevenue(bookings, getCityState).slice(0, 6);
-
-  const bookingStatus = groupCount(bookings, (booking) => {
-    return (
-      asTrimmedString(booking.status) ||
-      asTrimmedString(booking.payment_status) ||
-      "pending"
-    );
-  }).slice(0, 6);
-
-  const monthlyBookings = groupCount(bookings, (booking) => {
-    const date = getBookingDate(booking);
-    const parsed = new Date(date);
-
-    if (Number.isNaN(parsed.getTime())) return "Unknown";
-
-    return parsed.toLocaleDateString("en-US", {
-      month: "short",
-      year: "numeric",
-    });
-  }).slice(0, 6);
-
-
-  const growthRows = growthCampaignRoi.map((row) => {
-    const clicks = getGrowthNumber(row, "clicks");
-    const leads = getGrowthNumber(row, "leads");
-    const signups = getGrowthNumber(row, "signups");
-    const bookingsCount = getGrowthNumber(row, "bookings");
-    const attributedRevenue = getGrowthNumber(row, "attributed_revenue");
-    const totalCost = getGrowthNumber(row, "total_cost");
-    const roiPercent = getGrowthNumber(row, "roi_percent");
-    const costPerSignup = getGrowthNumber(row, "cost_per_signup");
-    const costPerBooking = getGrowthNumber(row, "cost_per_booking");
-    const signal = getGrowthSignal(row);
-
-    return {
-      campaignName: getGrowthLabel(row),
-      channel: getGrowthChannel(row),
-      clicks,
-      leads,
-      signups,
-      bookings: bookingsCount,
-      attributedRevenue,
-      totalCost,
-      roiPercent,
-      costPerSignup,
-      costPerBooking,
-      signal,
-      signalLabel: getGrowthStatusLabel(signal),
-      recommendation: getGrowthRecommendation(row),
-    };
-  });
-
+  const growthRows = buildGrowthRows(growthCampaignRoi);
   const growthTotals = growthRows.reduce(
     (totals, row) => {
       totals.clicks += row.clicks;
@@ -818,53 +922,23 @@ async function getAnalyticsData() {
       totals.totalCost += row.totalCost;
       return totals;
     },
-    {
-      clicks: 0,
-      leads: 0,
-      signups: 0,
-      bookings: 0,
-      attributedRevenue: 0,
-      totalCost: 0,
-    }
+    { clicks: 0, leads: 0, signups: 0, bookings: 0, attributedRevenue: 0, totalCost: 0 },
   );
 
   const growthNetReturn = growthTotals.attributedRevenue - growthTotals.totalCost;
-  const growthRoiPercent = growthTotals.totalCost
-    ? (growthNetReturn / growthTotals.totalCost) * 100
-    : 0;
-  const growthCostPerSignup = growthTotals.signups
-    ? growthTotals.totalCost / growthTotals.signups
-    : 0;
-  const growthCostPerBooking = growthTotals.bookings
-    ? growthTotals.totalCost / growthTotals.bookings
-    : 0;
+  const growthRoiPercent = growthTotals.totalCost ? (growthNetReturn / growthTotals.totalCost) * 100 : 0;
+  const growthCostPerSignup = growthTotals.signups ? growthTotals.totalCost / growthTotals.signups : 0;
+  const growthCostPerBooking = growthTotals.bookings ? growthTotals.totalCost / growthTotals.bookings : 0;
 
   const topGrowthCampaigns = growthRows
     .slice()
-    .sort((a, b) => {
-      if (b.bookings !== a.bookings) return b.bookings - a.bookings;
-      if (b.attributedRevenue !== a.attributedRevenue) {
-        return b.attributedRevenue - a.attributedRevenue;
-      }
-      return b.signups - a.signups;
-    })
+    .sort((a, b) => b.bookings - a.bookings || b.attributedRevenue - a.attributedRevenue || b.signups - a.signups)
     .slice(0, 8);
 
-  const channelMap = new Map<
-    string,
-    { clicks: number; leads: number; signups: number; bookings: number; revenue: number; cost: number }
-  >();
+  const channelMap = new Map<string, { clicks: number; leads: number; signups: number; bookings: number; revenue: number; cost: number }>();
 
   for (const row of growthRows) {
-    const current = channelMap.get(row.channel) || {
-      clicks: 0,
-      leads: 0,
-      signups: 0,
-      bookings: 0,
-      revenue: 0,
-      cost: 0,
-    };
-
+    const current = channelMap.get(row.channel) || { clicks: 0, leads: 0, signups: 0, bookings: 0, revenue: 0, cost: 0 };
     current.clicks += row.clicks;
     current.leads += row.leads;
     current.signups += row.signups;
@@ -874,57 +948,71 @@ async function getAnalyticsData() {
     channelMap.set(row.channel, current);
   }
 
-  const growthChannelMix = Array.from(channelMap.entries())
-    .map(([label, value]) => ({
-      label,
-      ...value,
-      roi: value.cost ? ((value.revenue - value.cost) / value.cost) * 100 : 0,
-    }))
+  const growthChannelMix: ChannelMixItem[] = Array.from(channelMap.entries())
+    .map(([label, value]) => ({ label, ...value, roi: value.cost ? ((value.revenue - value.cost) / value.cost) * 100 : 0 }))
     .sort((a, b) => b.bookings - a.bookings || b.revenue - a.revenue)
     .slice(0, 8);
 
-  const maxGrowthCampaignClicks = Math.max(...growthRows.map((row) => row.clicks), 1);
-  const maxGrowthChannelBookings = Math.max(
-    ...growthChannelMix.map((row) => row.bookings),
-    1
-  );
+  const allRewardRows = [...ambassadorRewards, ...referralRewards, ...partnerPayouts];
+  const pendingRewardRows = allRewardRows.filter(isPendingReward);
+  const paidRewardRows = allRewardRows.filter(isPaidReward);
+  const pendingRewardLiability = pendingRewardRows.reduce((sum, row) => sum + getRewardAmount(row), 0);
+  const paidRewardAmount = paidRewardRows.reduce((sum, row) => sum + getRewardAmount(row), 0);
 
-  const recentBookings = bookings
+  const zipRecruiterLeads = ambassadorLeads.filter((lead) => normalized(getLeadSource(lead)).includes("zip"));
+  const indeedLeads = ambassadorLeads.filter((lead) => normalized(getLeadSource(lead)).includes("indeed"));
+  const careerLinkLeads = ambassadorLeads.filter((lead) => normalized(getLeadSource(lead)).includes("career"));
+  const studentHireLeads = ambassadorLeads.filter((lead) => normalized(getLeadProgram(lead)).includes("student"));
+  const communityHireLeads = ambassadorLeads.filter((lead) => normalized(getLeadProgram(lead)).includes("community"));
+  const contactedLeads = ambassadorLeads.filter((lead) => normalized(getStatus(lead)).includes("contact"));
+  const convertedAmbassadorLeads = ambassadorLeads.filter((lead) => {
+    const status = normalized(getStatus(lead));
+    return status.includes("record created") || status.includes("converted") || status.includes("approved") || status.includes("active");
+  });
+
+  const sourceMix = groupCount(launchSignups, getLaunchSource).slice(0, 6);
+  const roleMix = groupCount(launchSignups, getLaunchRole).slice(0, 6);
+  const eventSourceMix = groupCount(analyticsEvents, getEventSource).slice(0, 8);
+  const eventNameMix = groupCount(analyticsEvents, getEventName).slice(0, 10);
+  const eventTypeMix = groupCount(analyticsEvents, getEventType).slice(0, 8);
+  const eventPageMix = groupCount(analyticsEvents, getEventPagePath).slice(0, 8);
+  const leadSourceMix = groupCount(ambassadorLeads, getLeadSource).slice(0, 10);
+  const leadProgramMix = groupCount(ambassadorLeads, getLeadProgram).slice(0, 10);
+  const leadStatusMix = groupCount(ambassadorLeads, getStatus).slice(0, 10);
+  const ambassadorSourceMix = groupCount(ambassadors, getLeadSource).slice(0, 8);
+  const referralEventMix = groupCount(referralEvents, (row) => asTrimmedString(row.event_name) || asTrimmedString(row.event_type) || getStatus(row)).slice(0, 8);
+  const referralCodeMix = groupCount(referralCodes, (row) => asTrimmedString(row.source) || asTrimmedString(row.program) || asTrimmedString(row.owner_role) || "Referral Code").slice(0, 8);
+  const applicationSourceMix = groupCount([...programApplications, ...partnerApplications], getLeadSource).slice(0, 8);
+
+  const serviceRevenue = groupRevenue(bookings, getServiceName).slice(0, 6);
+  const marketRevenue = groupRevenue(bookings, getCityState).slice(0, 6);
+  const bookingStatus = groupCount(bookings, getStatus).slice(0, 6);
+  const monthlyBookings = groupCount(bookings, (booking) => formatDateMonth(getBookingDate(booking))).slice(0, 8);
+
+  const recentBookings: RecentBookingItem[] = bookings
     .slice()
-    .sort((a, b) => {
-      const aDate = new Date(getBookingDate(a)).getTime();
-      const bDate = new Date(getBookingDate(b)).getTime();
-
-      return (
-        (Number.isFinite(bDate) ? bDate : 0) -
-        (Number.isFinite(aDate) ? aDate : 0)
-      );
-    })
+    .sort((a, b) => new Date(getBookingDate(b)).getTime() - new Date(getBookingDate(a)).getTime())
     .slice(0, 6)
     .map((booking) => ({
       service: getServiceName(booking),
       market: getCityState(booking),
-      status:
-        asTrimmedString(booking.status) ||
-        asTrimmedString(booking.payment_status) ||
-        "pending",
+      status: getStatus(booking),
       amount: money(getGrossAmount(booking) + getTaxAmount(booking)),
       date: formatDateShort(getBookingDate(booking)),
     }));
 
-  const launchRecent = launchSignups.slice(0, 6).map((signup) => ({
-    name:
-      asTrimmedString(signup.name) ||
-      asTrimmedString(signup.full_name) ||
-      asTrimmedString(signup.fullName) ||
-      "New signup",
-    email: asTrimmedString(signup.email) || "—",
-    role: getLaunchRole(signup),
-    source: getLaunchSource(signup),
-    joined: formatDateShort(asTrimmedString(signup.created_at)),
+  const recentLeads: RecentLeadItem[] = ambassadorLeads.slice(0, 10).map((lead) => ({
+    name: getLeadName(lead),
+    email: asTrimmedString(lead.email) || "—",
+    source: getLeadSource(lead),
+    program: getLeadProgram(lead),
+    status: getStatus(lead),
+    stage: asTrimmedString(lead.lead_stage) || asTrimmedString(lead.stage) || "—",
+    referralCode: getReferralCode(lead),
+    joined: formatDateShort(getCreatedAt(lead)),
   }));
 
-  const recentEvents = analyticsEvents.slice(0, 10).map((event) => ({
+  const recentEvents: RecentEventItem[] = analyticsEvents.slice(0, 10).map((event) => ({
     eventName: getEventName(event),
     eventType: getEventType(event),
     source: getEventSource(event),
@@ -933,37 +1021,27 @@ async function getAnalyticsData() {
     createdAt: formatDateShort(getEventCreatedAt(event)),
   }));
 
-  const maxSourceCount = Math.max(...sourceMix.map((item) => item.count), 1);
-  const maxRoleCount = Math.max(...roleMix.map((item) => item.count), 1);
-  const maxEventSourceCount = Math.max(
-    ...eventSourceMix.map((item) => item.count),
-    1
-  );
-  const maxEventNameCount = Math.max(
-    ...eventNameMix.map((item) => item.count),
-    1
-  );
-  const maxEventTypeCount = Math.max(
-    ...eventTypeMix.map((item) => item.count),
-    1
-  );
-  const maxEventPageCount = Math.max(
-    ...eventPageMix.map((item) => item.count),
-    1
-  );
-  const maxStatusCount = Math.max(...bookingStatus.map((item) => item.count), 1);
-  const maxMonthlyCount = Math.max(
-    ...monthlyBookings.map((item) => item.count),
-    1
-  );
-  const maxServiceRevenue = Math.max(
-    ...serviceRevenue.map((item) => item.revenue),
-    1
-  );
-  const maxMarketRevenue = Math.max(
-    ...marketRevenue.map((item) => item.revenue),
-    1
-  );
+  const max = {
+    source: Math.max(...sourceMix.map((item) => item.count), 1),
+    role: Math.max(...roleMix.map((item) => item.count), 1),
+    eventSource: Math.max(...eventSourceMix.map((item) => item.count), 1),
+    eventName: Math.max(...eventNameMix.map((item) => item.count), 1),
+    eventType: Math.max(...eventTypeMix.map((item) => item.count), 1),
+    eventPage: Math.max(...eventPageMix.map((item) => item.count), 1),
+    leadSource: Math.max(...leadSourceMix.map((item) => item.count), 1),
+    leadProgram: Math.max(...leadProgramMix.map((item) => item.count), 1),
+    leadStatus: Math.max(...leadStatusMix.map((item) => item.count), 1),
+    ambassadorSource: Math.max(...ambassadorSourceMix.map((item) => item.count), 1),
+    referralEvent: Math.max(...referralEventMix.map((item) => item.count), 1),
+    referralCode: Math.max(...referralCodeMix.map((item) => item.count), 1),
+    applicationSource: Math.max(...applicationSourceMix.map((item) => item.count), 1),
+    status: Math.max(...bookingStatus.map((item) => item.count), 1),
+    month: Math.max(...monthlyBookings.map((item) => item.count), 1),
+    serviceRevenue: Math.max(...serviceRevenue.map((item) => item.revenue), 1),
+    marketRevenue: Math.max(...marketRevenue.map((item) => item.revenue), 1),
+    growthCampaignClicks: Math.max(...growthRows.map((row) => row.clicks), 1),
+    growthChannelBookings: Math.max(...growthChannelMix.map((row) => row.bookings), 1),
+  };
 
   return {
     totals: {
@@ -980,10 +1058,6 @@ async function getAnalyticsData() {
       cancelledBookings: cancelledBookings.length,
       messages: messages.length,
       unreadMessages: unreadMessages.length,
-      bookingConversion: calcPercent(completedBookings.length, bookings.length),
-      paidRate: calcPercent(paidBookings.length, bookings.length),
-      cancellationRate: calcPercent(cancelledBookings.length, bookings.length),
-      takeRate: calcPercent(platformRevenue, totalRevenue),
       analyticsEvents: analyticsEvents.length,
       homepageVisits: homepageVisits.length,
       launchPageVisits: launchPageVisits.length,
@@ -996,7 +1070,7 @@ async function getAnalyticsData() {
       launchFormOpened: launchFormOpened.length,
       ctaClicks: ctaClicks.length,
       referralShares: referralShares.length,
-      referralClicks: referralClicks.length,
+      referralClicks: referralClicksTracked.length + referralEvents.length,
       carouselClicks: carouselClicks.length,
       checkoutStarts: checkoutStarts.length,
       bookingRequestsCreated: bookingRequestsCreated.length,
@@ -1014,11 +1088,37 @@ async function getAnalyticsData() {
       growthRoiPercent,
       growthCostPerSignup,
       growthCostPerBooking,
-      profileViewRate,
-      searchEngagementRate,
-      bookingStartRate,
-      launchFormOpenRate,
-      launchSignupCompletionRate,
+      ambassadorLeads: ambassadorLeads.length,
+      ambassadors: ambassadors.length,
+      activeAmbassadors: ambassadors.filter(isActiveAmbassador).length,
+      zipRecruiterLeads: zipRecruiterLeads.length,
+      indeedLeads: indeedLeads.length,
+      careerLinkLeads: careerLinkLeads.length,
+      studentHireLeads: studentHireLeads.length,
+      communityHireLeads: communityHireLeads.length,
+      contactedLeads: contactedLeads.length,
+      convertedAmbassadorLeads: convertedAmbassadorLeads.length,
+      ambassadorReferrals: ambassadorReferrals.length,
+      ambassadorRewards: ambassadorRewards.length,
+      referralRewards: referralRewards.length,
+      referralCodes: referralCodes.length,
+      referralEvents: referralEvents.length,
+      partnerPayouts: partnerPayouts.length,
+      programApplications: programApplications.length,
+      partnerApplications: partnerApplications.length,
+      pendingRewardLiability,
+      paidRewardAmount,
+      bookingConversion: calcPercent(completedBookings.length, bookings.length),
+      paidRate: calcPercent(paidBookings.length, bookings.length),
+      cancellationRate: calcPercent(cancelledBookings.length, bookings.length),
+      takeRate: calcPercent(platformRevenue, totalRevenue),
+      profileViewRate: calcPercent(guruProfileViews.length, homepageVisits.length),
+      searchEngagementRate: calcPercent(searchesStarted.length, homepageVisits.length),
+      bookingStartRate: calcPercent(bookingStarts.length, searchesStarted.length),
+      launchFormOpenRate: calcPercent(launchFormOpened.length, homepageVisits.length),
+      launchSignupCompletionRate: calcPercent(launchSignupCompletedEvents.length, launchSignupStarts.length),
+      ambassadorLeadConversionRate: calcPercent(convertedAmbassadorLeads.length, ambassadorLeads.length),
+      leadContactRate: calcPercent(contactedLeads.length, ambassadorLeads.length),
     },
     sourceMix,
     roleMix,
@@ -1026,27 +1126,23 @@ async function getAnalyticsData() {
     eventNameMix,
     eventTypeMix,
     eventPageMix,
+    leadSourceMix,
+    leadProgramMix,
+    leadStatusMix,
+    ambassadorSourceMix,
+    referralEventMix,
+    referralCodeMix,
+    applicationSourceMix,
     serviceRevenue,
     marketRevenue,
     bookingStatus,
     monthlyBookings,
     recentBookings,
-    launchRecent,
+    recentLeads,
     recentEvents,
     topGrowthCampaigns,
     growthChannelMix,
-    maxSourceCount,
-    maxRoleCount,
-    maxEventSourceCount,
-    maxEventNameCount,
-    maxEventTypeCount,
-    maxEventPageCount,
-    maxStatusCount,
-    maxMonthlyCount,
-    maxServiceRevenue,
-    maxMarketRevenue,
-    maxGrowthCampaignClicks,
-    maxGrowthChannelBookings,
+    max,
   };
 }
 
@@ -1059,341 +1155,252 @@ export default async function AdminAnalyticsPage() {
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    return null;
+    redirect("/admin/login");
   }
 
   const analytics = await getAnalyticsData();
 
   return (
-    <div className="min-h-screen bg-[#f7fbf8] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f7fbf8] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1600px] space-y-6">
         <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
                 Platform Analytics
               </p>
               <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                Measure SitGuru growth, conversion, booking health, traffic,
-                and network strength.
+                Measure SitGuru growth, conversion, booking health, traffic, and network strength.
               </h1>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                This dashboard combines marketplace tables with tracked analytics
-                events, including homepage visits, searches, profile views, CTA
-                clicks, launch signups, booking actions, referral activity,
-                messages, services, and revenue signals.
+              <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
+                This dashboard now combines booking, message, referral, ambassador, growth-campaign, launch, and tracked event data so you can see whether SitGuru is growing through Pet Parents, Gurus, Ambassadors, ZipRecruiter, Indeed, PA CareerLink, and referral programs.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <ActionLink href="/admin" label="Admin Home" />
-              <ActionLink href="/admin/users" label="Users" />
-              <ActionLink href="/admin/bookings" label="Bookings" />
-              <ActionLink href="/admin/reports" label="Reports & Exports" />
-              <ActionLink href="/admin/audit-trail" label="Audit Trail" />
-              <ActionLink href="/admin/financials" label="Financials" primary />
+              {adminLinks.map((link) => (
+                <ActionLink key={link.href} href={link.href} label={link.label} primary={link.primary} />
+              ))}
             </div>
           </div>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
-              label="Homepage Visits"
-              value={analytics.totals.homepageVisits.toLocaleString()}
-              detail={`${analytics.totals.analyticsEvents.toLocaleString()} total analytics events captured.`}
+              icon={<Activity className="h-5 w-5" />}
+              label="Tracked Events"
+              value={analytics.totals.analyticsEvents.toLocaleString()}
+              detail={`${analytics.totals.homepageVisits.toLocaleString()} homepage visits and ${analytics.totals.searchesStarted.toLocaleString()} searches started.`}
+              href="/admin/audit-trail"
             />
             <StatCard
+              icon={<SearchIcon />}
               label="Search Engagement"
               value={percent(analytics.totals.searchEngagementRate)}
-              detail={`${analytics.totals.searchesStarted.toLocaleString()} searches started from tracked traffic.`}
+              detail={`${analytics.totals.searchesStarted.toLocaleString()} searches from tracked traffic.`}
+              href="/admin/analytics"
             />
             <StatCard
+              icon={<PawPrint className="h-5 w-5" />}
               label="Guru Profile Views"
               value={analytics.totals.guruProfileViews.toLocaleString()}
-              detail={`${percent(
-                analytics.totals.profileViewRate
-              )} of homepage visits led toward Guru profiles.`}
+              detail={`${percent(analytics.totals.profileViewRate)} of homepage visits led toward Guru profiles.`}
+              href="/admin/gurus"
             />
             <StatCard
+              icon={<Sparkles className="h-5 w-5" />}
               label="Launch Conversion"
               value={percent(analytics.totals.launchSignupCompletionRate)}
               detail={`${analytics.totals.launchSignupCompletedEvents.toLocaleString()} tracked launch form completions.`}
+              href="/admin/launch-signups"
             />
           </div>
         </section>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
+            icon={<DollarSign className="h-5 w-5" />}
             label="Total Revenue"
             value={money(analytics.totals.totalRevenue)}
             detail="Gross booking amount plus captured tax across marketplace bookings."
+            href="/admin/financials"
           />
           <StatCard
+            icon={<TrendingUp className="h-5 w-5" />}
             label="Platform Revenue"
             value={money(analytics.totals.platformRevenue)}
-            detail={`${percent(
-              analytics.totals.takeRate
-            )} current estimated SitGuru take rate.`}
+            detail={`${percent(analytics.totals.takeRate)} current estimated SitGuru take rate.`}
+            href="/admin/financials/profit-loss"
           />
           <StatCard
-            label="Booking Starts"
-            value={analytics.totals.bookingStarts.toLocaleString()}
-            detail={`${percent(
-              analytics.totals.bookingStartRate
-            )} of tracked searches became booking-start events.`}
-          />
-          <StatCard
+            icon={<CalendarCheck className="h-5 w-5" />}
             label="Completed Bookings"
             value={analytics.totals.completedBookings.toLocaleString()}
-            detail={`${percent(
-              analytics.totals.bookingConversion
-            )} booking completion rate from booking records.`}
-          />
-        </div>
-
-
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Growth Campaigns"
-            value={analytics.totals.growthCampaigns.toLocaleString()}
-            detail={`${analytics.totals.growthCampaignEvents.toLocaleString()} campaign events captured from Growth & Referral tracking.`}
+            detail={`${percent(analytics.totals.bookingConversion)} booking completion rate from booking records.`}
+            href="/admin/bookings?filter=completed"
           />
           <StatCard
-            label="Growth ROI"
-            value={percent(analytics.totals.growthRoiPercent)}
-            detail={`${money(analytics.totals.growthAttributedRevenue)} attributed revenue against ${money(analytics.totals.growthCost)} tracked spend.`}
-          />
-          <StatCard
-            label="Cost per Signup"
-            value={money(analytics.totals.growthCostPerSignup)}
-            detail={`${analytics.totals.growthSignups.toLocaleString()} tracked signups from growth campaigns.`}
-          />
-          <StatCard
-            label="Cost per Booking"
-            value={money(analytics.totals.growthCostPerBooking)}
-            detail={`${analytics.totals.growthBookings.toLocaleString()} attributed bookings from campaign activity.`}
+            icon={<HandCoins className="h-5 w-5" />}
+            label="Guru Payout Exposure"
+            value={money(analytics.totals.guruPayouts)}
+            detail="Estimated Guru payout exposure from booking records."
+            href="/admin/financials/payouts"
           />
         </div>
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
-            label="Total Users"
-            value={analytics.totals.profiles.toLocaleString()}
-            detail="Profiles currently stored in Supabase."
+            icon={<Users className="h-5 w-5" />}
+            label="Ambassador Leads"
+            value={analytics.totals.ambassadorLeads.toLocaleString()}
+            detail={`${analytics.totals.contactedLeads.toLocaleString()} contacted · ${percent(analytics.totals.leadContactRate)} contact rate.`}
+            href="/admin/ambassador-leads"
           />
           <StatCard
-            label="Gurus"
-            value={analytics.totals.gurus.toLocaleString()}
-            detail="Guru records or active Guru IDs detected through bookings."
+            icon={<UserCheck className="h-5 w-5" />}
+            label="Active Ambassadors"
+            value={analytics.totals.activeAmbassadors.toLocaleString()}
+            detail={`${analytics.totals.ambassadors.toLocaleString()} total Ambassador records in Supabase.`}
+            href="/admin/ambassadors"
           />
           <StatCard
-            label="Customers"
-            value={analytics.totals.customers.toLocaleString()}
-            detail="Unique customer IDs detected through bookings."
+            icon={<Share2 className="h-5 w-5" />}
+            label="Referral Codes"
+            value={analytics.totals.referralCodes.toLocaleString()}
+            detail={`${analytics.totals.referralEvents.toLocaleString()} referral events and tracked referral clicks.`}
+            href="/admin/referrals"
           />
           <StatCard
-            label="Messages"
-            value={analytics.totals.messages.toLocaleString()}
-            detail={`${analytics.totals.unreadMessages.toLocaleString()} unread or unreviewed messages.`}
+            icon={<HandCoins className="h-5 w-5" />}
+            label="Reward Liability"
+            value={money(analytics.totals.pendingRewardLiability)}
+            detail={`${money(analytics.totals.paidRewardAmount)} already marked paid across reward/payout rows.`}
+            href="/admin/referrals/payouts"
           />
         </div>
 
-        <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            icon={<BriefcaseBusiness className="h-5 w-5" />}
+            label="ZipRecruiter Leads"
+            value={analytics.totals.zipRecruiterLeads.toLocaleString()}
+            detail="Ambassador leads sourced from ZipRecruiter and ZipRecruiter database workflows."
+            href="/admin/ambassador-leads?source=ZipRecruiter"
+          />
+          <StatCard
+            icon={<Megaphone className="h-5 w-5" />}
+            label="Indeed Leads"
+            value={analytics.totals.indeedLeads.toLocaleString()}
+            detail="Indeed Student Hire and Ambassador recruiting leads."
+            href="/admin/ambassador-leads?source=Indeed"
+          />
+          <StatCard
+            icon={<ShieldCheck className="h-5 w-5" />}
+            label="Student Hire Leads"
+            value={analytics.totals.studentHireLeads.toLocaleString()}
+            detail={`${analytics.totals.communityHireLeads.toLocaleString()} Community Hire leads also tracked.`}
+            href="/admin/hr"
+          />
+          <StatCard
+            icon={<Handshake className="h-5 w-5" />}
+            label="Partner / Program Apps"
+            value={(analytics.totals.programApplications + analytics.totals.partnerApplications).toLocaleString()}
+            detail="Program and partner applications included in growth analytics."
+            href="/admin/referrals/applications"
+          />
+        </div>
+
+        <div className="grid gap-8 xl:grid-cols-2">
           <SectionCard
             eyebrow="Tracked Funnel"
             title="Homepage to booking behavior"
             description="These numbers come from the analytics_events table and show how visitors are moving through the platform."
-            actions={
-              <>
-                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
-                <ActionLink href="/admin/exports" label="Export" />
-              </>
-            }
+            actions={<ActionLink href="/admin/audit-trail" label="Audit Trail" />}
           >
             <div className="space-y-5">
-              <BarRow
-                label="Homepage visits"
-                value={analytics.totals.homepageVisits}
-                max={Math.max(analytics.totals.homepageVisits, 1)}
-                detail="Users landing on the homepage"
-                tone="emerald"
-              />
-              <BarRow
-                label="Searches started"
-                value={analytics.totals.searchesStarted}
-                max={Math.max(analytics.totals.homepageVisits, 1)}
-                detail={`${percent(
-                  analytics.totals.searchEngagementRate
-                )} of homepage visits`}
-                tone="sky"
-              />
-              <BarRow
-                label="Guru profile views"
-                value={analytics.totals.guruProfileViews}
-                max={Math.max(analytics.totals.homepageVisits, 1)}
-                detail={`${percent(
-                  analytics.totals.profileViewRate
-                )} profile-view signal`}
-                tone="violet"
-              />
-              <BarRow
-                label="Booking starts"
-                value={analytics.totals.bookingStarts}
-                max={Math.max(analytics.totals.homepageVisits, 1)}
-                detail="Users beginning the booking process"
-                tone="amber"
-              />
-              <BarRow
-                label="Booking completed events"
-                value={analytics.totals.bookingCompletedEvents}
-                max={Math.max(analytics.totals.homepageVisits, 1)}
-                detail="Tracked booking_completed analytics events"
-                tone="rose"
-              />
+              <BarRow label="Homepage visits" value={analytics.totals.homepageVisits} max={Math.max(analytics.totals.homepageVisits, 1)} detail="Users landing on the homepage" />
+              <BarRow label="Searches started" value={analytics.totals.searchesStarted} max={Math.max(analytics.totals.homepageVisits, 1)} detail={`${percent(analytics.totals.searchEngagementRate)} of homepage visits`} tone="sky" />
+              <BarRow label="Guru profile views" value={analytics.totals.guruProfileViews} max={Math.max(analytics.totals.homepageVisits, 1)} detail={`${percent(analytics.totals.profileViewRate)} profile-view signal`} tone="violet" />
+              <BarRow label="Booking starts" value={analytics.totals.bookingStarts} max={Math.max(analytics.totals.homepageVisits, 1)} detail="Users beginning the booking process" tone="amber" />
+              <BarRow label="Booking completed events" value={analytics.totals.bookingCompletedEvents} max={Math.max(analytics.totals.homepageVisits, 1)} detail="Tracked booking_completed analytics events" tone="rose" />
             </div>
           </SectionCard>
 
           <SectionCard
             eyebrow="Booking Flow"
             title="Booking request and checkout tracking"
-            description="Track request creation, checkout starts, failures, and successful booking records."
-            actions={
-              <>
-                <ActionLink href="/admin/bookings" label="Open Bookings" />
-                <ActionLink href="/admin/financials" label="Financials" />
-              </>
-            }
+            description="Track request creation, checkout starts, failures, successful booking records, and admin booking health."
+            actions={<ActionLink href="/admin/bookings" label="Open Bookings" />}
           >
             <div className="space-y-5">
-              <BarRow
-                label="Booking requests created"
-                value={analytics.totals.bookingRequestsCreated}
-                max={Math.max(analytics.totals.bookingStarts, 1)}
-                detail="Tracked booking_request_created events"
-                tone="emerald"
-              />
-              <BarRow
-                label="Checkout started"
-                value={analytics.totals.checkoutStarts}
-                max={Math.max(analytics.totals.bookingRequestsCreated, 1)}
-                detail="Users redirected toward Stripe checkout"
-                tone="sky"
-              />
-              <BarRow
-                label="Completed booking records"
-                value={analytics.totals.completedBookings}
-                max={Math.max(analytics.totals.bookings, 1)}
-                detail={`${percent(
-                  analytics.totals.bookingConversion
-                )} completion rate from booking rows`}
-                tone="violet"
-              />
-              <BarRow
-                label="Booking / checkout failures"
-                value={analytics.totals.bookingFailures}
-                max={Math.max(
-                  analytics.totals.bookingFailures +
-                    analytics.totals.bookingRequestsCreated,
-                  1
-                )}
-                detail="Tracked booking_request_failed and checkout_failed events"
-                tone="rose"
-              />
+              <BarRow label="Booking requests created" value={analytics.totals.bookingRequestsCreated} max={Math.max(analytics.totals.bookingStarts, 1)} detail="Tracked booking_request_created events" />
+              <BarRow label="Checkout started" value={analytics.totals.checkoutStarts} max={Math.max(analytics.totals.bookingRequestsCreated, 1)} detail="Users redirected toward Stripe checkout" tone="sky" />
+              <BarRow label="Completed booking records" value={analytics.totals.completedBookings} max={Math.max(analytics.totals.bookings, 1)} detail={`${percent(analytics.totals.bookingConversion)} completion rate from booking rows`} tone="violet" />
+              <BarRow label="Booking / checkout failures" value={analytics.totals.bookingFailures} max={Math.max(analytics.totals.bookingFailures + analytics.totals.bookingRequestsCreated, 1)} detail="Tracked booking_request_failed and checkout_failed events" tone="rose" />
             </div>
           </SectionCard>
         </div>
 
-        <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
+        <div className="grid gap-8 xl:grid-cols-2">
           <SectionCard
-            eyebrow="Launch Funnel"
-            title="Launch form and early-access tracking"
-            description="Track launch form opens, starts, completions, launch page visits, and CTA engagement."
+            eyebrow="Ambassador Pipeline"
+            title="ZipRecruiter, Indeed, Student Hire, and Community Hire funnel"
+            description="This reads ambassador_leads and ambassadors so HR, referrals, and analytics share the same recruiting picture."
             actions={
               <>
-                <ActionLink href="/admin/launch-signups" label="Launch Signups" />
-                <ActionLink href="/admin" label="Admin Home" />
+                <ActionLink href="/admin/ambassador-leads" label="Lead Pipeline" />
+                <ActionLink href="/admin/ambassadors" label="Ambassadors" primary />
               </>
             }
           >
-            <div className="space-y-5">
-              <BarRow
-                label="Launch page visits"
-                value={analytics.totals.launchPageVisits}
-                max={Math.max(analytics.totals.launchPageVisits, 1)}
-                detail="Direct visits to the launch page"
-                tone="emerald"
-              />
-              <BarRow
-                label="Launch form opened"
-                value={analytics.totals.launchFormOpened}
-                max={Math.max(analytics.totals.homepageVisits, 1)}
-                detail={`${percent(
-                  analytics.totals.launchFormOpenRate
-                )} of homepage visits opened the form`}
-                tone="sky"
-              />
-              <BarRow
-                label="Launch signup started"
-                value={analytics.totals.launchSignupStarts}
-                max={Math.max(analytics.totals.launchFormOpened, 1)}
-                detail="Users who began submitting the launch form"
-                tone="violet"
-              />
-              <BarRow
-                label="Launch signup completed"
-                value={analytics.totals.launchSignupCompletedEvents}
-                max={Math.max(analytics.totals.launchSignupStarts, 1)}
-                detail={`${percent(
-                  analytics.totals.launchSignupCompletionRate
-                )} tracked completion rate`}
-                tone="amber"
-              />
-              <BarRow
-                label="Homepage CTA clicks"
-                value={analytics.totals.ctaClicks}
-                max={Math.max(analytics.totals.homepageVisits, 1)}
-                detail="Tracked homepage button and link clicks"
-                tone="rose"
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Contact Rate</p>
+                <p className="mt-2 text-3xl font-black text-slate-950">{percent(analytics.totals.leadContactRate)}</p>
+                <p className="mt-2 text-sm font-semibold text-slate-600">{analytics.totals.contactedLeads.toLocaleString()} of {analytics.totals.ambassadorLeads.toLocaleString()} leads contacted.</p>
+              </div>
+              <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">Conversion Signal</p>
+                <p className="mt-2 text-3xl font-black text-slate-950">{percent(analytics.totals.ambassadorLeadConversionRate)}</p>
+                <p className="mt-2 text-sm font-semibold text-slate-600">{analytics.totals.convertedAmbassadorLeads.toLocaleString()} converted/created/approved signals.</p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              {analytics.leadSourceMix.length ? (
+                analytics.leadSourceMix.map((item, index) => (
+                  <BarRow key={item.label} label={item.label} value={item.count} max={analytics.max.leadSource} detail="Ambassador leads by source" tone={toneForIndex(index)} />
+                ))
+              ) : (
+                <EmptyCard label="No Ambassador lead source data yet." />
+              )}
             </div>
           </SectionCard>
 
           <SectionCard
-            eyebrow="Referral Signals"
-            title="Sharing and referral activity"
-            description="Track referral shares, referral clicks, and carousel interaction signals."
-            actions={
-              <>
-                <ActionLink href="/admin/analytics" label="Refresh Analytics" />
-                <ActionLink href="/admin/exports" label="Export" />
-              </>
-            }
+            eyebrow="Lead Programs"
+            title="Program and stage mix"
+            description="Track whether leads are flowing through Student Hire, Community Hire, Ambassador-only, Guru + Ambassador, and other paths."
+            actions={<ActionLink href="/admin/hr" label="Open HR" />}
           >
             <div className="space-y-5">
-              <BarRow
-                label="Referral shares"
-                value={analytics.totals.referralShares}
-                max={Math.max(analytics.totals.analyticsEvents, 1)}
-                detail="Tracked referral_shared events"
-                tone="emerald"
-              />
-              <BarRow
-                label="Referral clicks"
-                value={analytics.totals.referralClicks}
-                max={Math.max(analytics.totals.analyticsEvents, 1)}
-                detail="Tracked referral_clicked events"
-                tone="sky"
-              />
-              <BarRow
-                label="Carousel engagement"
-                value={analytics.totals.carouselClicks}
-                max={Math.max(analytics.totals.analyticsEvents, 1)}
-                detail="Carousel next, previous, and slide selection events"
-                tone="violet"
-              />
+              {analytics.leadProgramMix.length ? (
+                analytics.leadProgramMix.map((item, index) => (
+                  <BarRow key={item.label} label={item.label} value={item.count} max={analytics.max.leadProgram} detail="Leads grouped by program/candidate path" tone={toneForIndex(index)} />
+                ))
+              ) : (
+                <EmptyCard label="No Ambassador program data yet." />
+              )}
+            </div>
+
+            <div className="mt-6 space-y-5">
+              {analytics.leadStatusMix.length ? (
+                analytics.leadStatusMix.slice(0, 5).map((item, index) => (
+                  <BarRow key={item.label} label={item.label} value={item.count} max={analytics.max.leadStatus} detail="Lead status / stage" tone={toneForIndex(index)} />
+                ))
+              ) : null}
             </div>
           </SectionCard>
         </div>
-
 
         <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
           <SectionCard
@@ -1408,87 +1415,192 @@ export default async function AdminAnalyticsPage() {
             }
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                  Clicks
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  {analytics.totals.growthClicks.toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
-                  Leads
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  {analytics.totals.growthLeads.toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">
-                  Signups
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  {analytics.totals.growthSignups.toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-                  Bookings
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  {analytics.totals.growthBookings.toLocaleString()}
-                </p>
-              </div>
+              <StatMini label="Clicks" value={analytics.totals.growthClicks.toLocaleString()} tone="emerald" />
+              <StatMini label="Leads" value={analytics.totals.growthLeads.toLocaleString()} tone="sky" />
+              <StatMini label="Signups" value={analytics.totals.growthSignups.toLocaleString()} tone="violet" />
+              <StatMini label="Bookings" value={analytics.totals.growthBookings.toLocaleString()} tone="amber" />
             </div>
 
             <div className="mt-6 space-y-5">
               {analytics.topGrowthCampaigns.length ? (
                 analytics.topGrowthCampaigns.slice(0, 6).map((campaign, index) => (
-                  <BarRow
-                    key={`${campaign.campaignName}-${campaign.channel}`}
-                    label={campaign.campaignName}
-                    value={campaign.clicks}
-                    max={analytics.maxGrowthCampaignClicks}
-                    detail={`${campaign.channel} · ${campaign.signups.toLocaleString()} signups · ${campaign.bookings.toLocaleString()} bookings · ${percent(campaign.roiPercent)} ROI`}
-                    tone={getGrowthSignalTone(campaign.signal) || toneForIndex(index)}
-                  />
+                  <BarRow key={`${campaign.campaignName}-${campaign.channel}`} label={campaign.campaignName} value={campaign.clicks} max={analytics.max.growthCampaignClicks} detail={`${campaign.channel} · ${campaign.signups.toLocaleString()} signups · ${campaign.bookings.toLocaleString()} bookings · ${percent(campaign.roiPercent)} ROI`} tone={getGrowthSignalTone(campaign.signal) || toneForIndex(index)} />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No campaign ROI rows yet. As tracked campaign events and costs are added, this section will show what is working and what needs refinement.
-                </p>
+                <EmptyCard label="No campaign ROI rows yet. Add campaign events and costs to populate this section." />
               )}
             </div>
           </SectionCard>
 
           <SectionCard
             eyebrow="Growth Strategy"
-            title="What is working and what needs attention"
-            description="Use the signal and recommendation columns to decide whether to scale, refine, pause, or improve conversion for each campaign."
-            actions={
-              <>
-                <ActionLink href="/admin/financials/payouts" label="Payout Analytics" />
-                <ActionLink href="/admin/financials/pro-forma" label="Forecasting" />
-              </>
-            }
+            title="Channel return by bookings and revenue"
+            description="Use channel ROI to decide whether to scale, refine, pause, or improve conversion."
+            actions={<ActionLink href="/admin/financials/pro-forma" label="Forecasting" />}
           >
             <div className="space-y-5">
               {analytics.growthChannelMix.length ? (
                 analytics.growthChannelMix.map((channel, index) => (
-                  <BarRow
-                    key={channel.label}
-                    label={channel.label}
-                    value={channel.bookings}
-                    max={analytics.maxGrowthChannelBookings}
-                    detail={`${channel.signups.toLocaleString()} signups · ${money(channel.revenue)} revenue · ${money(channel.cost)} cost · ${percent(channel.roi)} ROI`}
-                    tone={toneForIndex(index)}
-                  />
+                  <BarRow key={channel.label} label={channel.label} value={channel.bookings} max={analytics.max.growthChannelBookings} detail={`${channel.signups.toLocaleString()} signups · ${money(channel.revenue)} revenue · ${money(channel.cost)} cost · ${percent(channel.roi)} ROI`} tone={toneForIndex(index)} />
                 ))
               ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No channel mix available yet. Campaign events with source/channel values will populate this view.
-                </p>
+                <EmptyCard label="No channel mix available yet. Campaign events with source/channel values will populate this view." />
+              )}
+            </div>
+          </SectionCard>
+        </div>
+
+        <div className="grid gap-8 xl:grid-cols-2">
+          <SectionCard
+            eyebrow="Referral Network"
+            title="Referral event and code activity"
+            description="Track referral-code creation, click/conversion events, Ambassador referrals, Pet Parent referrals, Guru referrals, and partner/referral payout signals."
+            actions={
+              <>
+                <ActionLink href="/admin/referrals" label="Referral Command Center" primary />
+                <ActionLink href="/admin/referrals/payouts" label="Payouts" />
+              </>
+            }
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <StatMini label="Referral Events" value={analytics.totals.referralEvents.toLocaleString()} tone="emerald" />
+              <StatMini label="Ambassador Referrals" value={analytics.totals.ambassadorReferrals.toLocaleString()} tone="sky" />
+              <StatMini label="Referral Rewards" value={analytics.totals.referralRewards.toLocaleString()} tone="violet" />
+              <StatMini label="Partner Payouts" value={analytics.totals.partnerPayouts.toLocaleString()} tone="amber" />
+            </div>
+
+            <div className="mt-6 space-y-5">
+              {analytics.referralEventMix.length ? (
+                analytics.referralEventMix.map((item, index) => (
+                  <BarRow key={item.label} label={item.label} value={item.count} max={analytics.max.referralEvent} detail="Referral event mix" tone={toneForIndex(index)} />
+                ))
+              ) : (
+                <EmptyCard label="No referral event data yet." />
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            eyebrow="Referral Code Sources"
+            title="Referral code ownership and source mix"
+            description="Shows how referral codes are grouped by source, program, or owner role depending on available columns."
+            actions={<ActionLink href="/admin/referrals/pet-parents" label="Pet Parent Referrals" />}
+          >
+            <div className="space-y-5">
+              {analytics.referralCodeMix.length ? (
+                analytics.referralCodeMix.map((item, index) => (
+                  <BarRow key={item.label} label={item.label} value={item.count} max={analytics.max.referralCode} detail="Referral code records" tone={toneForIndex(index)} />
+                ))
+              ) : (
+                <EmptyCard label="No referral code records found yet." />
+              )}
+            </div>
+          </SectionCard>
+        </div>
+
+        <div className="grid gap-8 xl:grid-cols-2">
+          <SectionCard
+            eyebrow="Services"
+            title="Revenue by service"
+            description="Identify which care categories are producing the strongest booking volume and customer spend."
+            actions={<ActionLink href="/admin/bookings" label="View Bookings" />}
+          >
+            <div className="space-y-5">
+              {analytics.serviceRevenue.length ? (
+                analytics.serviceRevenue.map((item) => (
+                  <RevenueBarRow key={item.label} label={item.label} revenue={item.revenue} bookings={item.bookings} max={analytics.max.serviceRevenue} />
+                ))
+              ) : (
+                <EmptyCard label="No service revenue data yet." />
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            eyebrow="Markets"
+            title="Revenue by location"
+            description="See which cities and states are showing the strongest marketplace traction."
+            actions={<ActionLink href="/admin/exports" label="Export" />}
+          >
+            <div className="space-y-5">
+              {analytics.marketRevenue.length ? (
+                analytics.marketRevenue.map((item) => (
+                  <RevenueBarRow key={item.label} label={item.label} revenue={item.revenue} bookings={item.bookings} max={analytics.max.marketRevenue} />
+                ))
+              ) : (
+                <EmptyCard label="No market revenue data yet." />
+              )}
+            </div>
+          </SectionCard>
+        </div>
+
+        <div className="grid gap-8 xl:grid-cols-2">
+          <SectionCard
+            eyebrow="Event Sources"
+            title="Where tracked behavior is coming from"
+            description="This uses source values from analytics_events, including direct, social, referral, and campaign links."
+            actions={<ActionLink href="/admin/exports" label="Export" />}
+          >
+            <div className="space-y-5">
+              {analytics.eventSourceMix.length ? (
+                analytics.eventSourceMix.map((item, index) => (
+                  <BarRow key={item.label} label={item.label} value={item.count} max={analytics.max.eventSource} detail={`${percent(calcPercent(item.count, analytics.totals.analyticsEvents))} of tracked events`} tone={toneForIndex(index)} />
+                ))
+              ) : (
+                <EmptyCard label="No analytics event source data yet." />
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            eyebrow="Event Mix"
+            title="Top tracked event names"
+            description="See which tracked actions are happening most often across the platform."
+            actions={<ActionLink href="/admin/audit-trail" label="Audit Trail" />}
+          >
+            <div className="space-y-5">
+              {analytics.eventNameMix.length ? (
+                analytics.eventNameMix.map((item, index) => (
+                  <BarRow key={item.label} label={item.label} value={item.count} max={analytics.max.eventName} detail={`${percent(calcPercent(item.count, analytics.totals.analyticsEvents))} of all analytics events`} tone={toneForIndex(index)} />
+                ))
+              ) : (
+                <EmptyCard label="No analytics events found yet." />
+              )}
+            </div>
+          </SectionCard>
+        </div>
+
+        <div className="grid gap-8 xl:grid-cols-2">
+          <SectionCard
+            eyebrow="Booking Status"
+            title="Booking status health"
+            description="Track completed, paid, pending, cancelled, or other booking statuses."
+            actions={<ActionLink href="/admin/bookings" label="Open Bookings" />}
+          >
+            <div className="space-y-5">
+              {analytics.bookingStatus.length ? (
+                analytics.bookingStatus.map((item, index) => (
+                  <BarRow key={item.label} label={item.label} value={item.count} max={analytics.max.status} detail={`${percent(calcPercent(item.count, analytics.totals.bookings))} of bookings`} tone={toneForIndex(index)} />
+                ))
+              ) : (
+                <EmptyCard label="No booking status data yet." />
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            eyebrow="Trend"
+            title="Bookings by month"
+            description="Simple month grouping based on booking, start, request, or created date."
+            actions={<ActionLink href="/admin/exports" label="Export" />}
+          >
+            <div className="space-y-5">
+              {analytics.monthlyBookings.length ? (
+                analytics.monthlyBookings.map((item, index) => (
+                  <BarRow key={item.label} label={item.label} value={item.count} max={analytics.max.month} detail="Tracked booking rows" tone={toneForIndex(index)} />
+                ))
+              ) : (
+                <EmptyCard label="No monthly booking data yet." />
               )}
             </div>
           </SectionCard>
@@ -1498,26 +1610,10 @@ export default async function AdminAnalyticsPage() {
           eyebrow="Campaign ROI Detail"
           title="Top growth campaigns"
           description="Detailed campaign table for admin decision-making: scale profitable channels, improve weak conversion points, and pause spend that is not producing signups or bookings."
-          actions={
-            <>
-              <ActionLink href="/admin/referrals" label="Growth Command Center" primary />
-              <ActionLink href="/admin/exports" label="Export" />
-            </>
-          }
+          actions={<ActionLink href="/admin/referrals" label="Growth Command Center" primary />}
         >
           <TableCard
-            headers={[
-              "Campaign",
-              "Channel",
-              "Clicks",
-              "Signups",
-              "Bookings",
-              "Revenue",
-              "Cost",
-              "ROI",
-              "Signal",
-              "Recommendation",
-            ]}
+            headers={["Campaign", "Channel", "Clicks", "Signups", "Bookings", "Revenue", "Cost", "ROI", "Signal", "Recommendation"]}
             rows={
               analytics.topGrowthCampaigns.length
                 ? analytics.topGrowthCampaigns.map((campaign) => [
@@ -1537,375 +1633,41 @@ export default async function AdminAnalyticsPage() {
           />
         </SectionCard>
 
-        <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
-          <SectionCard
-            eyebrow="Event Sources"
-            title="Where tracked behavior is coming from"
-            description="This uses source values from analytics_events, including direct, Instagram, Facebook, TikTok, referral, and campaign links."
-            actions={
-              <>
-                <ActionLink href="/admin/launch-signups" label="Lead Sources" />
-                <ActionLink href="/admin/exports" label="Export" />
-              </>
+        <SectionCard
+          eyebrow="Ambassador Lead Activity"
+          title="Newest Ambassador and recruiting leads"
+          description="Latest ambassador_leads rows by name, source, program, status, lead stage, and referral code."
+          actions={
+            <>
+              <ActionLink href="/admin/ambassador-leads" label="Open Lead Pipeline" primary />
+              <ActionLink href="/admin/hr" label="HR" />
+            </>
+          }
+        >
+          <TableCard
+            headers={["Name", "Email", "Source", "Program", "Status", "Stage", "Referral Code", "Date"]}
+            rows={
+              analytics.recentLeads.length
+                ? analytics.recentLeads.map((lead) => [
+                    lead.name,
+                    lead.email,
+                    lead.source,
+                    lead.program,
+                    lead.status,
+                    lead.stage,
+                    lead.referralCode,
+                    lead.joined,
+                  ])
+                : [["No leads yet", "—", "—", "—", "—", "—", "—", "—"]]
             }
-          >
-            <div className="space-y-5">
-              {analytics.eventSourceMix.length ? (
-                analytics.eventSourceMix.map((item, index) => (
-                  <BarRow
-                    key={item.label}
-                    label={item.label}
-                    value={item.count}
-                    max={analytics.maxEventSourceCount}
-                    detail={`${percent(
-                      calcPercent(item.count, analytics.totals.analyticsEvents)
-                    )} of tracked events`}
-                    tone={toneForIndex(index)}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No analytics event source data yet.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            eyebrow="Event Mix"
-            title="Top tracked event names"
-            description="See which tracked actions are happening most often across the platform."
-            actions={
-              <>
-                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
-                <ActionLink href="/admin/exports" label="Export" />
-              </>
-            }
-          >
-            <div className="space-y-5">
-              {analytics.eventNameMix.length ? (
-                analytics.eventNameMix.map((item, index) => (
-                  <BarRow
-                    key={item.label}
-                    label={item.label}
-                    value={item.count}
-                    max={analytics.maxEventNameCount}
-                    detail={`${percent(
-                      calcPercent(item.count, analytics.totals.analyticsEvents)
-                    )} of all analytics events`}
-                    tone={toneForIndex(index)}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No analytics events found yet.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-        </div>
-
-        <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
-          <SectionCard
-            eyebrow="Acquisition"
-            title="Launch signup source mix"
-            description="See where early SitGuru interest is coming from across social, direct, referrals, and campaigns."
-            actions={
-              <>
-                <ActionLink href="/admin/launch-signups" label="Launch Signups" />
-                <ActionLink href="/admin/exports" label="Export" />
-              </>
-            }
-          >
-            <div className="space-y-5">
-              {analytics.sourceMix.length ? (
-                analytics.sourceMix.map((item, index) => (
-                  <BarRow
-                    key={item.label}
-                    label={item.label}
-                    value={item.count}
-                    max={analytics.maxSourceCount}
-                    detail={`${percent(
-                      calcPercent(item.count, analytics.totals.launchSignups)
-                    )} of launch signups`}
-                    tone={toneForIndex(index)}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No launch source data yet.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            eyebrow="Audience"
-            title="Role performance"
-            description="Compare early interest between pet parents, future Gurus, and people who selected both."
-            actions={
-              <>
-                <ActionLink href="/admin/users" label="Users" />
-                <ActionLink href="/admin/guru-approvals" label="Guru Approvals" />
-              </>
-            }
-          >
-            <div className="space-y-5">
-              {analytics.roleMix.length ? (
-                analytics.roleMix.map((item, index) => (
-                  <BarRow
-                    key={item.label}
-                    label={item.label}
-                    value={item.count}
-                    max={analytics.maxRoleCount}
-                    detail={`${percent(
-                      calcPercent(item.count, analytics.totals.launchSignups)
-                    )} of launch signups`}
-                    tone={toneForIndex(index)}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No launch role data yet.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-        </div>
-
-        <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
-          <SectionCard
-            eyebrow="Services"
-            title="Revenue by service"
-            description="Identify which care categories are producing the strongest booking volume and customer spend."
-            actions={
-              <>
-                <ActionLink href="/admin/bookings" label="View Bookings" />
-                <ActionLink href="/admin/financials" label="Financials" />
-              </>
-            }
-          >
-            <div className="space-y-5">
-              {analytics.serviceRevenue.length ? (
-                analytics.serviceRevenue.map((item) => (
-                  <RevenueBarRow
-                    key={item.label}
-                    label={item.label}
-                    revenue={item.revenue}
-                    bookings={item.bookings}
-                    max={analytics.maxServiceRevenue}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No service revenue data yet.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            eyebrow="Markets"
-            title="Revenue by location"
-            description="See which cities and states are showing the strongest marketplace traction."
-            actions={
-              <>
-                <ActionLink href="/admin/bookings" label="Bookings" />
-                <ActionLink href="/admin/exports" label="Export" />
-              </>
-            }
-          >
-            <div className="space-y-5">
-              {analytics.marketRevenue.length ? (
-                analytics.marketRevenue.map((item) => (
-                  <RevenueBarRow
-                    key={item.label}
-                    label={item.label}
-                    revenue={item.revenue}
-                    bookings={item.bookings}
-                    max={analytics.maxMarketRevenue}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No market revenue data yet.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-        </div>
-
-        <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
-          <SectionCard
-            eyebrow="Booking Funnel"
-            title="Booking status health"
-            description="Track completed, paid, pending, cancelled, or other booking statuses."
-            actions={
-              <>
-                <ActionLink href="/admin/bookings" label="Open Bookings" />
-                <ActionLink href="/admin/messages/review" label="Review Issues" />
-              </>
-            }
-          >
-            <div className="space-y-5">
-              {analytics.bookingStatus.length ? (
-                analytics.bookingStatus.map((item, index) => (
-                  <BarRow
-                    key={item.label}
-                    label={item.label}
-                    value={item.count}
-                    max={analytics.maxStatusCount}
-                    detail={`${percent(
-                      calcPercent(item.count, analytics.totals.bookings)
-                    )} of bookings`}
-                    tone={toneForIndex(index)}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No booking status data yet.
-                </p>
-              )}
-            </div>
-
-            <div className="mt-6 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  Paid Rate
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  {percent(analytics.totals.paidRate)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  Cancellation
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  {percent(analytics.totals.cancellationRate)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  Guru Payouts
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  {money(analytics.totals.guruPayouts)}
-                </p>
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            eyebrow="Trend"
-            title="Bookings by month"
-            description="Simple month grouping based on booking, start, or created date."
-            actions={
-              <>
-                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
-                <ActionLink href="/admin/exports" label="Export" />
-              </>
-            }
-          >
-            <div className="space-y-5">
-              {analytics.monthlyBookings.length ? (
-                analytics.monthlyBookings.map((item, index) => (
-                  <BarRow
-                    key={item.label}
-                    label={item.label}
-                    value={item.count}
-                    max={analytics.maxMonthlyCount}
-                    detail="Tracked booking rows"
-                    tone={toneForIndex(index)}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No monthly booking data yet.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-        </div>
-
-        <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
-          <SectionCard
-            eyebrow="Event Types"
-            title="Tracked event categories"
-            description="See broad categories like traffic, lead, navigation, search, profile, booking, and referral events."
-            actions={
-              <>
-                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
-                <ActionLink href="/admin/exports" label="Export" />
-              </>
-            }
-          >
-            <div className="space-y-5">
-              {analytics.eventTypeMix.length ? (
-                analytics.eventTypeMix.map((item, index) => (
-                  <BarRow
-                    key={item.label}
-                    label={item.label}
-                    value={item.count}
-                    max={analytics.maxEventTypeCount}
-                    detail={`${percent(
-                      calcPercent(item.count, analytics.totals.analyticsEvents)
-                    )} of tracked events`}
-                    tone={toneForIndex(index)}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No event type data yet.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            eyebrow="Page Paths"
-            title="Tracked page activity"
-            description="See which pages are generating analytics events."
-            actions={
-              <>
-                <ActionLink href="/admin/audit-trail" label="Audit Trail" />
-                <ActionLink href="/admin/exports" label="Export" />
-              </>
-            }
-          >
-            <div className="space-y-5">
-              {analytics.eventPageMix.length ? (
-                analytics.eventPageMix.map((item, index) => (
-                  <BarRow
-                    key={item.label}
-                    label={item.label}
-                    value={item.count}
-                    max={analytics.maxEventPageCount}
-                    detail={`${percent(
-                      calcPercent(item.count, analytics.totals.analyticsEvents)
-                    )} of tracked events`}
-                    tone={toneForIndex(index)}
-                  />
-                ))
-              ) : (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                  No page path data yet.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-        </div>
+          />
+        </SectionCard>
 
         <SectionCard
           eyebrow="Recent Analytics Events"
           title="Newest tracked user actions"
           description="A quick readout of the latest analytics_events rows."
-          actions={
-            <>
-              <ActionLink href="/admin/audit-trail" label="Audit Trail" primary />
-              <ActionLink href="/admin/exports" label="Export Events" />
-            </>
-          }
+          actions={<ActionLink href="/admin/audit-trail" label="Audit Trail" primary />}
         >
           <TableCard
             headers={["Event", "Type", "Source", "Role", "Page", "Date"]}
@@ -1928,12 +1690,7 @@ export default async function AdminAnalyticsPage() {
           eyebrow="Recent Activity"
           title="Recent booking analytics"
           description="Latest booking rows by service, market, status, amount, and date."
-          actions={
-            <>
-              <ActionLink href="/admin/bookings" label="View All Bookings" primary />
-              <ActionLink href="/admin/exports" label="Export" />
-            </>
-          }
+          actions={<ActionLink href="/admin/bookings" label="View All Bookings" primary />}
         >
           <TableCard
             headers={["Service", "Market", "Status", "Amount", "Date"]}
@@ -1951,37 +1708,41 @@ export default async function AdminAnalyticsPage() {
           />
         </SectionCard>
 
-        <SectionCard
-          eyebrow="Launch Leads"
-          title="Recent launch signup analytics"
-          description="Newest pre-launch signups by role and source."
-          actions={
-            <>
-              <ActionLink
-                href="/admin/launch-signups"
-                label="Open Launch Signups"
-                primary
-              />
-              <ActionLink href="/admin/exports" label="Export Leads" />
-            </>
-          }
-        >
-          <TableCard
-            headers={["Name", "Email", "Role", "Source", "Joined"]}
-            rows={
-              analytics.launchRecent.length
-                ? analytics.launchRecent.map((signup) => [
-                    signup.name,
-                    signup.email,
-                    signup.role,
-                    signup.source,
-                    signup.joined,
-                  ])
-                : [["No launch signups yet", "—", "—", "—", "—"]]
-            }
-          />
-        </SectionCard>
+        <div className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 text-sm font-semibold leading-7 text-slate-600 shadow-sm">
+          <span className="font-black text-emerald-800">Supabase wiring:</span>{" "}
+          this page safely reads bookings, gurus, profiles, launch_signups, messages, analytics_events, growth campaign tables/views, ambassador_leads, ambassadors, ambassador_referrals, ambassador_rewards, referral_rewards, referral_codes, referral_events, partner_payouts, program_applications, and partner_applications. Missing optional tables are skipped without breaking the admin page.
+        </div>
       </div>
+    </main>
+  );
+}
+
+function StatMini({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: Tone;
+}) {
+  const classes = {
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
+    sky: "border-sky-100 bg-sky-50 text-sky-700",
+    violet: "border-violet-100 bg-violet-50 text-violet-700",
+    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    rose: "border-rose-100 bg-rose-50 text-rose-700",
+    slate: "border-slate-100 bg-slate-50 text-slate-700",
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl border p-4 ${classes}`}>
+      <p className="text-xs font-black uppercase tracking-[0.18em]">{label}</p>
+      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
     </div>
   );
+}
+
+function SearchIcon() {
+  return <MousePointerClick className="h-5 w-5" />;
 }
