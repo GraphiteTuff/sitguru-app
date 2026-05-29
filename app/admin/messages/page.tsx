@@ -994,9 +994,7 @@ function buildComposeErrorRedirect(reason: string) {
 }
 
 function buildComposeSuccessRedirect(conversationId: string) {
-  return `/admin/messages?compose_success=sent&conversationId=${encodeURIComponent(
-    conversationId,
-  )}`;
+  return `/admin/messages/${encodeURIComponent(conversationId)}`;
 }
 
 async function safeAdminQuery(
