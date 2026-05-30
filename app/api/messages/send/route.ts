@@ -567,6 +567,9 @@ async function ensureParticipants(
     conversation_id: conversationId,
     user_id: participant.userId,
     role: participant.role,
+    last_read_at: null,
+    is_muted: false,
+    is_archived: false,
     created_at: nowIso,
     updated_at: nowIso,
   }));
@@ -654,103 +657,46 @@ async function insertMessage(params: {
   conversationId: string;
   senderUserId: string;
   recipientUserId: string;
+  senderProfile: ProfileLookupRow | null;
+  recipientProfile: ProfileLookupRow | null;
+  senderRole: string;
+  recipientRole: string;
   message: string;
   topic: string;
 }) {
   const nowIso = new Date().toISOString();
 
-  const messageAttempts = [
-    {
-      table: "messages",
-      payload: {
-        conversation_id: params.conversationId,
-        sender_id: params.senderUserId,
-        recipient_id: params.recipientUserId,
-        body: params.message,
-        topic: params.topic,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-    },
-    {
-      table: "messages",
-      payload: {
-        conversation_id: params.conversationId,
-        sender_id: params.senderUserId,
-        recipient_id: params.recipientUserId,
-        content: params.message,
-        topic: params.topic,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-    },
-    {
-      table: "messages",
-      payload: {
-        conversation_id: params.conversationId,
-        sender_user_id: params.senderUserId,
-        recipient_user_id: params.recipientUserId,
-        body: params.message,
-        topic: params.topic,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-    },
-    {
-      table: "messages",
-      payload: {
-        conversation_id: params.conversationId,
-        sender_user_id: params.senderUserId,
-        recipient_user_id: params.recipientUserId,
-        content: params.message,
-        topic: params.topic,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-    },
-    {
-      table: "conversation_messages",
-      payload: {
-        conversation_id: params.conversationId,
-        sender_id: params.senderUserId,
-        recipient_id: params.recipientUserId,
-        body: params.message,
-        topic: params.topic,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-    },
-    {
-      table: "conversation_messages",
-      payload: {
-        conversation_id: params.conversationId,
-        sender_id: params.senderUserId,
-        recipient_id: params.recipientUserId,
-        content: params.message,
-        topic: params.topic,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-    },
-  ];
+  const { error } = await supabaseAdmin.from("messages").insert({
+    conversation_id: params.conversationId,
+    sender_id: params.senderUserId,
+    recipient_id: params.recipientUserId,
+    content: params.message,
+    body: params.message,
+    message_type: "direct",
+    is_read: false,
+    read_at: null,
+    is_deleted: false,
+    edited_at: null,
+    updated_at: nowIso,
+    created_at: nowIso,
+    topic: params.topic || null,
+    sender_name_snapshot: getDisplayName(params.senderProfile),
+    sender_email_snapshot: safeString(params.senderProfile?.email) || null,
+    sender_phone_snapshot: null,
+    sender_role_snapshot: params.senderRole || null,
+    sender_role: params.senderRole || null,
+    recipient_name_snapshot: getDisplayName(params.recipientProfile),
+    recipient_email_snapshot: safeString(params.recipientProfile?.email) || null,
+    recipient_phone_snapshot: null,
+    recipient_role_snapshot: params.recipientRole || null,
+    recipient_role: params.recipientRole || null,
+    status: "sent",
+  });
 
-  const errors: string[] = [];
-
-  for (const attempt of messageAttempts) {
-    const { error } = await supabaseAdmin.from(attempt.table).insert(attempt.payload);
-
-    if (!error) {
-      return;
-    }
-
-    errors.push(`${attempt.table}: ${error.message}`);
+  if (error) {
+    console.error("Message insert error:", error.message);
+    throw new Error(`Unable to save message: ${error.message}`);
   }
-
-  console.error("Message insert failed on all supported message table shapes:", errors);
-
-  throw new Error(
-    "Conversation was prepared, but the message could not be saved. Check the messages table columns."
-  );
 }
 
 async function updateConversationLastMessage(params: {
@@ -759,32 +705,17 @@ async function updateConversationLastMessage(params: {
 }) {
   const nowIso = new Date().toISOString();
 
-  const attempts = [
-    {
+  const { error } = await supabaseAdmin
+    .from("conversations")
+    .update({
       updated_at: nowIso,
       last_message_at: nowIso,
       last_message_preview: getMessagePreview(params.message),
-    },
-    {
-      updated_at: nowIso,
-      last_message_at: nowIso,
-    },
-    {
-      updated_at: nowIso,
-    },
-  ];
+    })
+    .eq("id", params.conversationId);
 
-  for (const payload of attempts) {
-    const { error } = await supabaseAdmin
-      .from("conversations")
-      .update(payload)
-      .eq("id", params.conversationId);
-
-    if (!error) {
-      return;
-    }
-
-    console.error("Conversation last-message update attempt failed:", error.message);
+  if (error) {
+    console.error("Conversation last-message update failed:", error.message);
   }
 }
 
@@ -837,7 +768,6 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
 
     const message = getMessageText(body);
-
     const conversationId = safeString(body?.conversationId);
 
     const recipientId =
@@ -979,6 +909,10 @@ export async function POST(req: NextRequest) {
       conversationId: finalConversationId,
       senderUserId: user.id,
       recipientUserId: target.userId,
+      senderProfile: currentProfile,
+      recipientProfile: target.profile,
+      senderRole: currentUserRole || "customer",
+      recipientRole: target.role || "user",
       message,
       topic: subject,
     });
