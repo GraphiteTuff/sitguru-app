@@ -15,7 +15,7 @@ type CarouselItem = {
   href: string;
 };
 
-const approvedGuruImages: Record<string, string> = {
+const approvedGuruImages: Record<string, string | undefined> = {
   "Avery Johnson": "/images/demo/avery-johnson.png",
   "Brad Norway": "/images/demo/brad-norway.png",
   "Caleb Brooks": "/images/demo/caleb-brooks.png",
@@ -26,6 +26,13 @@ const approvedGuruImages: Record<string, string> = {
   "Olivia Chen": "/images/demo/olivia-chen.png",
   "Sofia Martinez": "/images/demo/sofia-martinez.png",
   "Suzy Q": "/images/demo/suzy-q.png",
+
+  /*
+   * Live SitGuru Gurus can rotate with the existing approved demo Gurus.
+   * Leave image undefined so the carousel uses the image/avatar supplied
+   * by the homepage/Supabase item instead of forcing a demo image path.
+   */
+  "Vanessa Guedez": undefined,
 };
 
 const approvedGuruNames = new Set(Object.keys(approvedGuruImages));
@@ -48,29 +55,41 @@ function getSafeImageForItem(item: CarouselItem) {
 
 function getSafeHrefForItem(item: CarouselItem) {
   const isDemoGuru = approvedGuruNames.has(item.name);
+  const hasLiveGuruHref = Boolean(item.href && item.href !== "/search");
 
-  if (isDemoGuru) {
+  if (isDemoGuru && !hasLiveGuruHref) {
     return "/search";
   }
 
-  if (!item.href || item.href.startsWith("/guru/")) {
-    return "/search";
-  }
-
-  return item.href;
+  return item.href || "/search";
 }
 
 function dedupeAndApproveItems(items: CarouselItem[]) {
   const seenNames = new Set<string>();
 
   return items
-    .filter((item) => approvedGuruNames.has(item.name))
     .filter((item) => {
-      if (seenNames.has(item.name)) {
+      const hasName = Boolean(item.name?.trim());
+      const isApprovedDemoOrLiveGuru = approvedGuruNames.has(item.name);
+      const hasLiveGuruData = Boolean(
+        item.href ||
+          item.image ||
+          item.role ||
+          item.location ||
+          item.petType ||
+          item.rating,
+      );
+
+      return hasName && (isApprovedDemoOrLiveGuru || hasLiveGuruData);
+    })
+    .filter((item) => {
+      const normalizedName = item.name.trim().toLowerCase();
+
+      if (seenNames.has(normalizedName)) {
         return false;
       }
 
-      seenNames.add(item.name);
+      seenNames.add(normalizedName);
       return true;
     })
     .map((item) => ({

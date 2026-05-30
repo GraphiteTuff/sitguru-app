@@ -30,14 +30,31 @@ function cleanText(value: unknown) {
 function getSafeRoleLabel(role: string) {
   const normalized = role.trim().toLowerCase();
 
-  if (normalized === "admin" || normalized === "super_admin") {
+  if (
+    normalized === "admin" ||
+    normalized === "super_admin" ||
+    normalized === "super-admin"
+  ) {
     return "SitGuru Admin";
   }
 
-  if (normalized === "guru") return "Guru";
-  if (normalized === "customer") return "Pet Parent";
-  if (normalized === "pet_parent") return "Pet Parent";
-  if (normalized === "ambassador") return "Ambassador";
+  if (normalized === "guru" || normalized === "provider" || normalized === "sitter") {
+    return "Guru";
+  }
+
+  if (
+    normalized === "customer" ||
+    normalized === "pet_parent" ||
+    normalized === "pet-parent" ||
+    normalized === "pet parent" ||
+    normalized === "client"
+  ) {
+    return "Pet Parent";
+  }
+
+  if (normalized === "ambassador" || normalized === "partner") {
+    return "Ambassador";
+  }
 
   return "SitGuru User";
 }
@@ -78,6 +95,7 @@ export default function GlobalMessageNotifier() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isHidden, setIsHidden] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+
   const originalTitleRef = useRef<string>("");
   const lastAlertIdRef = useRef<string>("");
   const broadcastRef = useRef<BroadcastChannel | null>(null);
@@ -182,13 +200,12 @@ export default function GlobalMessageNotifier() {
       originalTitleRef.current = document.title;
     }
 
+    const cleanOriginalTitle = originalTitleRef.current.replace(/^\(\d+\)\s+/, "");
+
     if (titlePrefix) {
-      document.title = `${titlePrefix}${originalTitleRef.current.replace(
-        /^\(\d+\)\s+/,
-        "",
-      )}`;
+      document.title = `${titlePrefix}${cleanOriginalTitle}`;
     } else {
-      document.title = originalTitleRef.current.replace(/^\(\d+\)\s+/, "");
+      document.title = cleanOriginalTitle;
     }
   }, [titlePrefix]);
 
