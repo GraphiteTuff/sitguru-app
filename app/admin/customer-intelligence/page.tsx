@@ -149,6 +149,8 @@ type CustomerInsight = {
   lastBookingDate: string | null;
   firstSeenDate: string | null;
   segment: string;
+  signupQuality: "active" | "incomplete" | "needs_review" | "likely_test_spam";
+  signupQualityLabel: string;
 };
 
 type LocationInsight = {
@@ -285,6 +287,145 @@ function getDisplayName(row: AnyRow, fallback = "Customer") {
   const combinedName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
   return combinedName || fallback;
+}
+
+function getRawDisplayName(row: AnyRow) {
+  const firstName = getText(row, ["first_name", "firstName"]);
+  const lastName = getText(row, ["last_name", "lastName"]);
+  const combinedName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  if (combinedName) return combinedName;
+
+  return getText(row, [
+    "full_name",
+    "display_name",
+    "name",
+    "customer_name",
+    "pet_parent_name",
+    "owner_name",
+  ]);
+}
+
+function isPlaceholderName(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) return true;
+
+  return [
+    "customer",
+    "pet parent",
+    "petparent",
+    "unknown",
+    "unknown customer",
+    "unknown pet parent",
+    "test",
+    "demo",
+    "fake",
+    "sample",
+    "asdf",
+    "asdasd",
+    "n/a",
+    "na",
+    "none",
+  ].includes(normalized);
+}
+
+function looksLikeRandomToken(value: string) {
+  const compact = value.replace(/[^a-zA-Z0-9]/g, "");
+
+  if (compact.length < 10) return false;
+  if (/^[0-9a-f]{16,}$/i.test(compact)) return true;
+
+  const hasLower = /[a-z]/.test(compact);
+  const hasUpper = /[A-Z]/.test(compact);
+  const hasNumber = /\d/.test(compact);
+  const hasVowel = /[aeiou]/i.test(compact);
+  const hasSuspiciousCamelMix = hasLower && hasUpper && compact.length >= 12;
+  const hasLongConsonantRun = /[bcdfghjklmnpqrstvwxyz]{5,}/i.test(compact);
+
+  return (hasSuspiciousCamelMix && !value.includes(" ")) || (hasNumber && !hasVowel) || hasLongConsonantRun;
+}
+
+function looksLikeSuspiciousEmail(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || !normalized.includes("@")) return false;
+
+  const [localPart, domain = ""] = normalized.split("@");
+  const localWithoutDots = localPart.replace(/\./g, "");
+  const hasManySingleLetterSegments = localPart.split(".").filter((part) => part.length === 1).length >= 4;
+  const hasDisposableDomain = [
+    "example.com",
+    "test.com",
+    "demo.com",
+    "mailinator.com",
+    "tempmail.com",
+    "10minutemail.com",
+  ].includes(domain);
+
+  return (
+    hasManySingleLetterSegments ||
+    hasDisposableDomain ||
+    looksLikeRandomToken(localWithoutDots) ||
+    ["test", "demo", "fake", "sample", "asdf", "asdasd"].some((keyword) =>
+      normalized.includes(keyword),
+    )
+  );
+}
+
+function isTrustworthyDisplayName(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) return false;
+  if (trimmed.includes("@")) return false;
+  if (isPlaceholderName(trimmed)) return false;
+  if (looksLikeRandomToken(trimmed)) return false;
+
+  return /[a-zA-Z]/.test(trimmed);
+}
+
+function getSafeCustomerDisplayName(row: AnyRow, fallback = "Customer") {
+  const rawName = getRawDisplayName(row);
+  const email = getText(row, ["email", "customer_email", "pet_parent_email"]);
+
+  if (rawName && isTrustworthyDisplayName(rawName)) return rawName;
+  if (email && !looksLikeSuspiciousEmail(email)) return email;
+  if (rawName || email) return "Signup Review Needed";
+
+  return fallback;
+}
+
+function getCustomerSignupQuality(customer: CustomerInsight) {
+  const hasActivity = customer.bookingCount > 0 || customer.petCount > 0 || customer.messageCount > 0 || customer.totalSpend > 0;
+  const hasRealName = customer.name !== "Signup Review Needed" && customer.name !== "Customer";
+  const hasEmail = Boolean(customer.email);
+  const suspiciousEmail = customer.email ? looksLikeSuspiciousEmail(customer.email) : false;
+  const hasLocation = Boolean(customer.city || customer.state || customer.zipCode);
+
+  if (hasActivity) {
+    return {
+      signupQuality: "active" as const,
+      signupQualityLabel: getCustomerSegment(customer),
+    };
+  }
+
+  if ((!hasRealName || suspiciousEmail) && !hasLocation) {
+    return {
+      signupQuality: "likely_test_spam" as const,
+      signupQualityLabel: "Likely Test / Spam",
+    };
+  }
+
+  if (!hasEmail || !hasLocation || customer.petCount === 0) {
+    return {
+      signupQuality: "needs_review" as const,
+      signupQualityLabel: "Incomplete Signup",
+    };
+  }
+
+  return {
+    signupQuality: "incomplete" as const,
+    signupQualityLabel: "Registered",
+  };
 }
 
 function getRole(row: AnyRow) {
@@ -948,7 +1089,7 @@ async function getCustomerIntelligenceData() {
 
     customerMap.set(profile.id, {
       id: profile.id,
-      name: getDisplayName(profile as AnyRow, "Customer"),
+      name: getSafeCustomerDisplayName(profile as AnyRow, "Customer"),
       email: profile.email || "",
       avatarUrl: profile.avatar_url || "",
       city: getCity(profile as AnyRow),
@@ -967,6 +1108,8 @@ async function getCustomerIntelligenceData() {
       lastBookingDate: null,
       firstSeenDate: profile.created_at || profile.updated_at || null,
       segment: "Lead",
+      signupQuality: "incomplete",
+      signupQualityLabel: "Registered",
     });
   }
 
@@ -988,7 +1131,7 @@ async function getCustomerIntelligenceData() {
       customerMap.get(fallbackId) ||
       {
         id: fallbackId,
-        name: getDisplayName(booking as AnyRow, "Customer"),
+        name: getSafeCustomerDisplayName(booking as AnyRow, "Customer"),
         email: booking.customer_email || "",
         avatarUrl: "",
         city: "",
@@ -1007,6 +1150,8 @@ async function getCustomerIntelligenceData() {
         lastBookingDate: null,
         firstSeenDate: booking.created_at || booking.updated_at || null,
         segment: "Lead",
+        signupQuality: "incomplete",
+        signupQualityLabel: "Registered",
       };
 
     const bookingDate = getBookingDate(booking);
@@ -1076,9 +1221,18 @@ async function getCustomerIntelligenceData() {
       averageBookingValue,
     };
 
+    const segment = getCustomerSegment(enriched);
+    const signupQuality = getCustomerSignupQuality({
+      ...enriched,
+      segment,
+      signupQuality: "incomplete",
+      signupQualityLabel: "Registered",
+    });
+
     return {
       ...enriched,
-      segment: getCustomerSegment(enriched),
+      segment,
+      ...signupQuality,
     };
   });
 
@@ -1219,11 +1373,15 @@ function getCustomerProfileHref(customerId: string) {
 }
 
 function getCustomerStatus(customer: CustomerInsight) {
-  if (customer.completedBookingCount > 0) return "Active Pet Parent";
-  if (customer.bookingCount > 0) return "Booking Started";
-  if (customer.petCount > 0) return "Pet Profile Added";
-  if (customer.messageCount > 0) return "Messaging";
-  return "Registered";
+  return customer.signupQualityLabel || customer.segment || "Registered";
+}
+
+function getCustomerStatusClasses(customer: CustomerInsight) {
+  if (customer.signupQuality === "active") return "bg-green-100 text-green-800";
+  if (customer.signupQuality === "likely_test_spam") return "bg-rose-100 text-rose-800";
+  if (customer.signupQuality === "needs_review") return "bg-amber-100 text-amber-800";
+
+  return "bg-slate-100 text-slate-700";
 }
 
 function getCustomerLocationLabel(customer: CustomerInsight) {
@@ -1257,8 +1415,7 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
             Click a Pet Parent to open the full profile
           </h2>
           <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-            This gives Super Admin a simple front-door list of real customer /
-            Pet Parent records before the deeper charts and reporting sections.
+            This gives Super Admin a front-door list of Pet Parent records and clearly flags incomplete, suspicious, or review-needed signup records before the deeper charts and reporting sections.
           </p>
         </div>
 
@@ -1320,7 +1477,12 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
                 </p>
 
                 <div>
-                  <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-800">
+                  <span
+                    className={[
+                      "inline-flex rounded-full px-3 py-1 text-xs font-black",
+                      getCustomerStatusClasses(customer),
+                    ].join(" ")}
+                  >
                     {getCustomerStatus(customer)}
                   </span>
                 </div>

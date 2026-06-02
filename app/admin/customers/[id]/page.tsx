@@ -35,6 +35,8 @@ type VerificationStatus =
   | "verified"
   | "active"
   | "pending"
+  | "needs_review"
+  | "likely_test_spam"
   | "incomplete"
   | "missing";
 
@@ -140,7 +142,85 @@ function getAuthName(authUser: AnyRow | null | undefined) {
   return getText(metadata, ["full_name", "name", "display_name"], "");
 }
 
-function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+function isPlaceholderName(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) return true;
+
+  return [
+    "customer",
+    "pet parent",
+    "petparent",
+    "unknown",
+    "unknown customer",
+    "unknown pet parent",
+    "test",
+    "demo",
+    "fake",
+    "sample",
+    "asdf",
+    "asdasd",
+    "n/a",
+    "na",
+    "none",
+  ].includes(normalized);
+}
+
+function looksLikeRandomToken(value: string) {
+  const compact = value.replace(/[^a-zA-Z0-9]/g, "");
+
+  if (compact.length < 10) return false;
+  if (/^[0-9a-f]{16,}$/i.test(compact)) return true;
+
+  const hasLower = /[a-z]/.test(compact);
+  const hasUpper = /[A-Z]/.test(compact);
+  const hasNumber = /\d/.test(compact);
+  const hasVowel = /[aeiou]/i.test(compact);
+  const hasSuspiciousCamelMix = hasLower && hasUpper && compact.length >= 12;
+  const hasLongConsonantRun = /[bcdfghjklmnpqrstvwxyz]{5,}/i.test(compact);
+
+  return (hasSuspiciousCamelMix && !value.includes(" ")) || (hasNumber && !hasVowel) || hasLongConsonantRun;
+}
+
+function looksLikeSuspiciousEmail(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || !normalized.includes("@")) return false;
+
+  const [localPart, domain = ""] = normalized.split("@");
+  const localWithoutDots = localPart.replace(/\./g, "");
+
+  const hasManySingleLetterSegments = localPart.split(".").filter((part) => part.length === 1).length >= 4;
+  const hasDisposableDomain = [
+    "example.com",
+    "test.com",
+    "demo.com",
+    "mailinator.com",
+    "tempmail.com",
+    "10minutemail.com",
+  ].includes(domain);
+
+  return (
+    hasManySingleLetterSegments ||
+    hasDisposableDomain ||
+    looksLikeRandomToken(localWithoutDots) ||
+    ["test", "demo", "fake", "sample", "asdf", "asdasd"].some((keyword) =>
+      normalized.includes(keyword),
+    )
+  );
+}
+
+function isTrustworthyDisplayName(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) return false;
+  if (trimmed.includes("@")) return false;
+  if (isPlaceholderName(trimmed)) return false;
+  if (looksLikeRandomToken(trimmed)) return false;
+
+  return /[a-zA-Z]/.test(trimmed);
+}
+
+function getRawDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
   const firstName = getText(row, ["first_name", "firstName"]);
   const lastName = getText(row, ["last_name", "lastName"]);
 
@@ -164,10 +244,38 @@ function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null
   const authName = getAuthName(authUser);
   if (authName) return authName;
 
+  return "";
+}
+
+function getDisplayNameSource(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+  const rawName = getRawDisplayName(row, authUser);
+
+  if (rawName && isTrustworthyDisplayName(rawName)) return "profile name";
+  if (rawName) return "untrusted signup metadata";
+
   const authEmail = getText(authUser, ["email"]);
   const profileEmail = getText(row, ["email", "customer_email", "pet_parent_email"]);
+  const email = profileEmail || authEmail;
 
-  return profileEmail || authEmail || "Pet Parent";
+  if (email) return "email fallback";
+
+  return "missing";
+}
+
+function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+  const rawName = getRawDisplayName(row, authUser);
+
+  if (rawName && isTrustworthyDisplayName(rawName)) return rawName;
+
+  const authEmail = getText(authUser, ["email"]);
+  const profileEmail = getText(row, ["email", "customer_email", "pet_parent_email"]);
+  const email = profileEmail || authEmail;
+
+  if (email && !looksLikeSuspiciousEmail(email)) return email;
+
+  if (rawName) return "Pet Parent Signup Review";
+
+  return "Pet Parent";
 }
 
 function getEmail(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
@@ -279,38 +387,64 @@ function getProfileCompleteness({
   bookingsCount: number;
   messagesCount: number;
 }) {
+  const verifiedFields = getVerifiedFields(profile, authUser);
+  const rawName = getRawDisplayName(profile, authUser);
+  const trustedName = isTrustworthyDisplayName(rawName);
+  const email = getEmail(profile, authUser);
+  const phone = getPhone(profile, authUser);
+  const location = getLocation(profile);
+
   const checks = [
     {
       label: "Profile row",
       complete: Boolean(profile),
+      detail: profile ? "Found" : "Missing",
     },
     {
-      label: "Name",
-      complete: getDisplayName(profile, authUser) !== "Pet Parent",
+      label: "Real name",
+      complete: trustedName,
+      detail: trustedName ? "Looks usable" : rawName ? "Needs review" : "Missing",
     },
     {
       label: "Email",
-      complete: getEmail(profile, authUser) !== "No email found",
+      complete: email !== "No email found" && !looksLikeSuspiciousEmail(email),
+      detail:
+        email === "No email found"
+          ? "Missing"
+          : looksLikeSuspiciousEmail(email)
+            ? "Suspicious"
+            : "Found",
     },
     {
       label: "Phone",
-      complete: getPhone(profile, authUser) !== "No phone found",
+      complete: phone !== "No phone found",
+      detail: phone !== "No phone found" ? "Found" : "Missing",
+    },
+    {
+      label: "Verified contact",
+      complete: verifiedFields.hasConfirmedEmail || verifiedFields.hasConfirmedPhone,
+      detail:
+        verifiedFields.hasConfirmedEmail || verifiedFields.hasConfirmedPhone
+          ? "Verified"
+          : "Not verified",
     },
     {
       label: "Location",
-      complete: getLocation(profile) !== "Unknown",
+      complete: location !== "Unknown",
+      detail: location !== "Unknown" ? "Found" : "Missing",
     },
     {
       label: "Pet profile",
       complete: petsCount > 0,
+      detail: petsCount > 0 ? `${petsCount} found` : "Missing",
     },
     {
-      label: "Booking activity",
-      complete: bookingsCount > 0,
-    },
-    {
-      label: "Message activity",
-      complete: messagesCount > 0,
+      label: "Platform activity",
+      complete: bookingsCount > 0 || messagesCount > 0,
+      detail:
+        bookingsCount > 0 || messagesCount > 0
+          ? `${bookingsCount} bookings / ${messagesCount} messages`
+          : "Missing",
     },
   ];
 
@@ -322,6 +456,67 @@ function getProfileCompleteness({
     completed,
     total: checks.length,
     percentage,
+  };
+}
+
+function getSignupRiskAssessment({
+  profile,
+  authUser,
+  bookingsCount,
+  petsCount,
+  messagesCount,
+  paidBookings,
+}: {
+  profile: AnyRow | null;
+  authUser: AnyRow | null;
+  bookingsCount: number;
+  petsCount: number;
+  messagesCount: number;
+  paidBookings: number;
+}) {
+  const verifiedFields = getVerifiedFields(profile, authUser);
+  const rawName = getRawDisplayName(profile, authUser);
+  const email = getEmail(profile, authUser);
+  const phone = getPhone(profile, authUser);
+  const hasActivity = bookingsCount > 0 || petsCount > 0 || messagesCount > 0 || paidBookings > 0;
+  const hasVerifiedContact = verifiedFields.hasConfirmedEmail || verifiedFields.hasConfirmedPhone;
+  const suspiciousReasons: string[] = [];
+
+  if (rawName && !isTrustworthyDisplayName(rawName)) {
+    suspiciousReasons.push("Name looks like placeholder, test, or random signup metadata");
+  }
+
+  if (email !== "No email found" && looksLikeSuspiciousEmail(email)) {
+    suspiciousReasons.push("Email pattern looks suspicious or test-like");
+  }
+
+  if (!hasVerifiedContact) {
+    suspiciousReasons.push("No verified email or phone");
+  }
+
+  if (petsCount === 0) suspiciousReasons.push("No pet profile added");
+  if (bookingsCount === 0) suspiciousReasons.push("No bookings found");
+  if (messagesCount === 0) suspiciousReasons.push("No messages found");
+  if (phone === "No phone found" && email === "No email found") suspiciousReasons.push("No usable contact field");
+
+  const likelyTestOrSpam =
+    !hasActivity &&
+    !hasVerifiedContact &&
+    (Boolean(rawName && !isTrustworthyDisplayName(rawName)) || looksLikeSuspiciousEmail(email));
+
+  const needsReview =
+    !likelyTestOrSpam &&
+    !hasActivity &&
+    (!hasVerifiedContact || !isTrustworthyDisplayName(rawName) || petsCount === 0);
+
+  return {
+    likelyTestOrSpam,
+    needsReview,
+    hasActivity,
+    hasVerifiedContact,
+    rawName: rawName || "—",
+    displayNameSource: getDisplayNameSource(profile, authUser),
+    suspiciousReasons,
   };
 }
 
@@ -457,6 +652,14 @@ function getVerificationStatus({
   paidBookings: number;
 }) {
   const verifiedFields = getVerifiedFields(profile, authUser);
+  const riskAssessment = getSignupRiskAssessment({
+    profile,
+    authUser,
+    bookingsCount,
+    petsCount,
+    messagesCount,
+    paidBookings,
+  });
   const hasActivity = bookingsCount > 0 || petsCount > 0 || messagesCount > 0 || paidBookings > 0;
   const hasContact = verifiedFields.hasEmail || verifiedFields.hasPhone;
   const hasVerifiedContact = verifiedFields.hasConfirmedEmail || verifiedFields.hasConfirmedPhone;
@@ -481,7 +684,25 @@ function getVerificationStatus({
     return {
       status: "active" as VerificationStatus,
       label: "Active / Needs Verification Review",
-      description: "This record has activity, so it should not be hard-deleted. Verify contact details before cleanup.",
+      description: "This record has pets, bookings, or messages, so keep it. Verify contact details before cleanup.",
+    };
+  }
+
+  if (riskAssessment.likelyTestOrSpam) {
+    return {
+      status: "likely_test_spam" as VerificationStatus,
+      label: "Likely Test / Spam Signup",
+      description:
+        "This record only has signup/auth data, no verified contact, no pets, no bookings, no messages, and suspicious name or email patterns. Review before deleting or archiving.",
+    };
+  }
+
+  if (riskAssessment.needsReview) {
+    return {
+      status: "needs_review" as VerificationStatus,
+      label: "Incomplete Signup / Needs Review",
+      description:
+        "This person started signup, but the Pet Parent setup is not complete. Review contact quality, verification, location, and pet setup before treating them as a real active Pet Parent.",
     };
   }
 
@@ -525,6 +746,24 @@ function getStatusStyles(status: VerificationStatus) {
       icon: "bg-amber-600 text-white",
       title: "text-amber-950",
       badge: "border-amber-200 bg-white text-amber-800",
+    };
+  }
+
+  if (status === "needs_review") {
+    return {
+      card: "border-orange-200 bg-orange-50",
+      icon: "bg-orange-600 text-white",
+      title: "text-orange-950",
+      badge: "border-orange-200 bg-white text-orange-800",
+    };
+  }
+
+  if (status === "likely_test_spam") {
+    return {
+      card: "border-rose-200 bg-rose-50",
+      icon: "bg-rose-700 text-white",
+      title: "text-rose-950",
+      badge: "border-rose-200 bg-white text-rose-800",
     };
   }
 
@@ -769,6 +1008,14 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
     messagesCount: messages.length,
     paidBookings,
   });
+  const riskAssessment = getSignupRiskAssessment({
+    profile,
+    authUser,
+    bookingsCount: bookings.length,
+    petsCount: pets.length,
+    messagesCount: messages.length,
+    paidBookings,
+  });
   const statusStyles = getStatusStyles(verification.status);
   const profileCompleteness = getProfileCompleteness({
     profile,
@@ -882,6 +1129,9 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                   <span className="break-all rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
                     ID: {relatedCustomerId || lookupKey}
                   </span>
+                  <span className={["rounded-full border px-3 py-1 text-xs font-black", statusStyles.badge].join(" ")}>
+                    {verification.label}
+                  </span>
                 </div>
               </div>
             </div>
@@ -926,13 +1176,51 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
           </div>
         ) : null}
 
+        {riskAssessment.likelyTestOrSpam || riskAssessment.needsReview ? (
+          <div className="mt-5 rounded-[2rem] border border-orange-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">
+                  Super Admin Signup Quality Review
+                </p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950">
+                  Do not treat this as a completed Pet Parent yet
+                </h2>
+                <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
+                  The account exists in Supabase, but the profile does not have the normal trust signals for a completed SitGuru Pet Parent. Keep it in review, archive it, or clean it up after confirming it is not a real person.
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-orange-100 bg-orange-50 p-4 lg:min-w-[280px]">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-orange-700">
+                  Display name source
+                </p>
+                <p className="mt-1 text-sm font-black text-orange-950">
+                  {riskAssessment.displayNameSource}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {riskAssessment.suspiciousReasons.map((reason) => (
+                <div
+                  key={reason}
+                  className="rounded-2xl border border-orange-100 bg-orange-50 px-3 py-2 text-xs font-black text-orange-900"
+                >
+                  {reason}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <section className={["mt-5 rounded-[2rem] border p-5 shadow-sm", statusStyles.card].join(" ")}>
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex gap-4">
               <div className={["flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", statusStyles.icon].join(" ")}>
                 {verification.status === "verified" || verification.status === "active" ? (
                   <ShieldCheck className="h-6 w-6" />
-                ) : verification.status === "pending" ? (
+                ) : verification.status === "pending" || verification.status === "needs_review" ? (
                   <Clock3 className="h-6 w-6" />
                 ) : (
                   <AlertTriangle className="h-6 w-6" />
@@ -1035,8 +1323,20 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
             <div className="mt-5 space-y-3">
               <ProfileInfoRow
                 icon={<UserRound className="mt-0.5 h-5 w-5 text-emerald-700" />}
-                label="Name"
+                label="Display Name"
                 value={name}
+                detail={`Source: ${riskAssessment.displayNameSource}`}
+              />
+
+              <ProfileInfoRow
+                icon={<UserRound className="mt-0.5 h-5 w-5 text-emerald-700" />}
+                label="Raw Signup Name"
+                value={riskAssessment.rawName}
+                detail={
+                  isTrustworthyDisplayName(riskAssessment.rawName)
+                    ? "Looks usable"
+                    : "Needs review before treating as a real name"
+                }
               />
 
               <ProfileInfoRow
@@ -1113,7 +1413,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                         : "bg-amber-100 text-amber-800",
                     ].join(" ")}
                   >
-                    {check.complete ? "Found" : "Missing"}
+                    {check.detail}
                   </span>
                 </div>
               ))}
