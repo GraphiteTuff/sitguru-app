@@ -39,6 +39,7 @@ const adminRoutes = {
   ambassadors: "/admin/ambassadors",
   ambassadorLeads: "/admin/ambassador-leads",
   ambassadorTraining: "/admin/ambassador-training",
+  universityAssignments: "/admin/university-assignments",
   programs: "/admin/programs",
   gurus: "/admin/gurus",
   newGuru: "/admin/gurus/new",
@@ -764,7 +765,7 @@ export default async function AdminHrPage() {
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
             >
               <GraduationCap size={17} />
-              Training Manager
+              SitGuru University
             </Link>
 
             <Link
@@ -879,6 +880,91 @@ export default async function AdminHrPage() {
           action="Review Archived"
           tone="amber"
         />
+      </section>
+
+      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-7">
+          <DashboardCard>
+            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+              <div className="min-w-0">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-green-800 to-emerald-600 text-white">
+                  <GraduationCap size={23} />
+                </div>
+                <h2 className="text-xl font-black text-slate-950">
+                  SitGuru University
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
+                  Manage onboarding, academy training, assignments, certifications, badges, and progress for Pet Parents, Gurus, Ambassadors, and future SitGuru team members.
+                </p>
+              </div>
+
+              <Link
+                href={adminRoutes.ambassadorTraining}
+                className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
+              >
+                Open University
+              </Link>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <QuickAction
+                href={adminRoutes.ambassadorTraining}
+                icon={<GraduationCap size={18} />}
+                title="SitGuru University Training Manager"
+                detail="Update academy modules, training steps, documents, videos, acknowledgments, certifications, and payout setup requirements."
+              />
+              <QuickAction
+                href={adminRoutes.universityAssignments}
+                icon={<ClipboardList size={18} />}
+                title="Academy Assignment Manager"
+                detail="Assign academies individually to Pet Parents, Gurus, Ambassadors, and internal onboarding users."
+              />
+              <QuickAction
+                href={adminRoutes.ambassadorTraining}
+                icon={<BadgeCheck size={18} />}
+                title="Certifications & Badges"
+                detail="Prepare and track completion-based certificates, badges, and readiness markers."
+              />
+              <QuickAction
+                href={adminRoutes.universityAssignments}
+                icon={<ClipboardCheck size={18} />}
+                title="Progress Tracking"
+                detail="Review training completion and academy assignment progress from a visible HR location."
+              />
+            </div>
+          </DashboardCard>
+        </div>
+
+        <div className="min-w-0 xl:col-span-5">
+          <DashboardCard>
+            <div className="mb-5">
+              <h2 className="text-lg font-black text-slate-950">
+                University Quick Map
+              </h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                SitGuru University is now connected directly from HR so training and academy assignments are easier to find.
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              <InfoTile
+                icon={<GraduationCap size={18} />}
+                title="Training Manager"
+                detail="Main academy content, module, document, video, and onboarding step manager."
+              />
+              <InfoTile
+                icon={<ClipboardList size={18} />}
+                title="Academy Assignments"
+                detail="Assign Pet Parent, Guru, and Ambassador academies by person or role."
+              />
+              <InfoTile
+                icon={<BadgeCheck size={18} />}
+                title="Certifications"
+                detail="Use completed training to support badges, certificates, and profile readiness."
+              />
+            </div>
+          </DashboardCard>
+        </div>
       </section>
 
       <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
@@ -1163,10 +1249,10 @@ export default async function AdminHrPage() {
             <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <h2 className="text-lg font-black text-slate-950">
-                  Ambassador & Guru Onboarding Tools
+                  SitGuru University & HR Onboarding Tools
                 </h2>
                 <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-                  Direct HR access for mass updates to training modules, onboarding steps, referral setup, payout readiness, documents, videos, acknowledgments, and certification requirements.
+                  Direct HR access for SitGuru University training, academy assignments, onboarding steps, referral setup, payout readiness, documents, videos, acknowledgments, and certification requirements.
                 </p>
               </div>
 
@@ -1175,7 +1261,7 @@ export default async function AdminHrPage() {
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900 lg:shrink-0"
               >
                 <GraduationCap size={17} />
-                Open Training Manager
+                Open SitGuru University
               </Link>
             </div>
 
@@ -1183,8 +1269,14 @@ export default async function AdminHrPage() {
               <QuickAction
                 href={adminRoutes.ambassadorTraining}
                 icon={<GraduationCap size={18} />}
-                title="Mass update training modules"
-                detail="Manage Ambassador onboarding steps, materials, documents, videos, required acknowledgments, signatures, certifications, and Stripe/banking setup."
+                title="SitGuru University Training Manager"
+                detail="Manage Pet Parent, Guru, and Ambassador onboarding steps, materials, documents, videos, required acknowledgments, signatures, certifications, and Stripe/banking setup."
+              />
+              <QuickAction
+                href={adminRoutes.universityAssignments}
+                icon={<ClipboardList size={18} />}
+                title="Academy Assignment Manager"
+                detail="Assign academies one by one to Pet Parents, Gurus, Ambassadors, and internal onboarding users."
               />
               <QuickAction
                 href={adminRoutes.ambassadors}
@@ -1276,8 +1368,14 @@ export default async function AdminHrPage() {
               <QuickAction
                 href={adminRoutes.ambassadorTraining}
                 icon={<GraduationCap size={18} />}
-                title="Mass update training modules"
-                detail="Update onboarding videos, PowerPoints, PDFs, documents, acknowledgments, certification steps, and payout setup modules."
+                title="SitGuru University Training Manager"
+                detail="Update academy videos, PowerPoints, PDFs, documents, acknowledgments, certification steps, and payout setup modules."
+              />
+              <QuickAction
+                href={adminRoutes.universityAssignments}
+                icon={<ClipboardList size={18} />}
+                title="Academy Assignment Manager"
+                detail="Assign Pet Parent, Guru, and Ambassador academies individually so training access is no longer buried."
               />
               <QuickAction
                 href={adminRoutes.ambassadorLeads}
