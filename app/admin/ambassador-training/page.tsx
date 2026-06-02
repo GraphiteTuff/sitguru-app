@@ -19,14 +19,18 @@ import {
   ShieldCheck,
   ToggleLeft,
   ToggleRight,
+  Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+type AcademyType = "pet_parent" | "guru" | "ambassador";
+
 type TrainingStep = {
   id: string;
+  academy_type?: AcademyType | string | null;
   step_number: number;
   title: string;
   description?: string | null;
@@ -55,9 +59,50 @@ const adminRoutes = {
   dashboard: "/admin",
   hr: "/admin/hr",
   ambassadors: "/admin/ambassadors",
-  ambassadorLeads: "/admin/ambassador-leads",
   ambassadorTraining: "/admin/ambassador-training",
 };
+
+const academyOptions: {
+  value: AcademyType;
+  label: string;
+  shortLabel: string;
+  emoji: string;
+  detail: string;
+  audience: string;
+  modules: string;
+  certificate: string;
+}[] = [
+  {
+    value: "pet_parent",
+    label: "Pet Parent Academy",
+    shortLabel: "Pet Parent",
+    emoji: "🐾",
+    detail: "Profile setup, pet profiles, Guru search, booking, reviews, and safety.",
+    audience: "Pet Parents",
+    modules: "3 modules",
+    certificate: "Certified Pet Parent",
+  },
+  {
+    value: "guru",
+    label: "Guru Academy",
+    shortLabel: "Guru",
+    emoji: "🎓",
+    detail: "Guru profile, bookings, care standards, Stripe payouts, earnings, and success center.",
+    audience: "Gurus",
+    modules: "5 modules",
+    certificate: "Certified Guru",
+  },
+  {
+    value: "ambassador",
+    label: "Ambassador Academy",
+    shortLabel: "Ambassador",
+    emoji: "🌟",
+    detail: "Referral links, outreach, dashboard, PawPerks, Stripe, rewards, and compliance.",
+    audience: "Ambassadors",
+    modules: "5 modules",
+    certificate: "Certified Ambassador",
+  },
+];
 
 const contentTypes = [
   "video",
@@ -105,6 +150,34 @@ function formatDate(value?: string | null) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function normalizeAcademyType(value?: string | null): AcademyType {
+  const normalized = asString(value).toLowerCase();
+
+  if (normalized === "pet_parent" || normalized === "pet-parent") {
+    return "pet_parent";
+  }
+
+  if (normalized === "guru") return "guru";
+
+  return "ambassador";
+}
+
+function getAcademyOption(value?: string | null) {
+  const academyType = normalizeAcademyType(value);
+  return academyOptions.find((academy) => academy.value === academyType) || academyOptions[2];
+}
+
+function getAcademyFilter(value?: string | string[]) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const normalized = asString(rawValue).toLowerCase();
+
+  if (normalized === "pet_parent" || normalized === "guru" || normalized === "ambassador") {
+    return normalized as AcademyType;
+  }
+
+  return "all";
 }
 
 async function requireSuperAdmin() {
@@ -171,7 +244,7 @@ function getNotice(
     return {
       tone: "success" as const,
       title: "Training step added",
-      message: "The Ambassador training step was created successfully.",
+      message: "The SitGuru University training step was created successfully.",
     };
   }
 
@@ -179,7 +252,7 @@ function getNotice(
     return {
       tone: "success" as const,
       title: "Training step updated",
-      message: "The Ambassador training step was updated successfully.",
+      message: "The SitGuru University training step was updated successfully.",
     };
   }
 
@@ -195,7 +268,15 @@ function getNotice(
     return {
       tone: "error" as const,
       title: "Access denied",
-      message: "Only SitGuru Super Admins can update Ambassador training steps.",
+      message: "Only SitGuru Super Admins can update SitGuru University training steps.",
+    };
+  }
+
+  if (error === "academy") {
+    return {
+      tone: "error" as const,
+      title: "Academy type missing",
+      message: "Please select Pet Parent Academy, Guru Academy, or Ambassador Academy.",
     };
   }
 
@@ -204,7 +285,7 @@ function getNotice(
       tone: "error" as const,
       title: "Training update failed",
       message:
-        "The training step could not be saved. Please confirm the training tables exist in Supabase.",
+        "The training step could not be saved. Please confirm the training table and academy_type column exist in Supabase.",
     };
   }
 
@@ -216,6 +297,7 @@ async function createTrainingStep(formData: FormData) {
 
   await requireSuperAdmin();
 
+  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
   const stepNumber = asNumber(formData.get("step_number"));
   const title = asString(formData.get("title"));
   const description = asString(formData.get("description"));
@@ -232,7 +314,7 @@ async function createTrainingStep(formData: FormData) {
   );
   const requiresSignature = asBoolean(formData.get("requires_signature"));
 
-  if (!title || !stepNumber) {
+  if (!title || !stepNumber || !academyType) {
     redirect(`${adminRoutes.ambassadorTraining}?error=missing`);
   }
 
@@ -241,6 +323,7 @@ async function createTrainingStep(formData: FormData) {
   const { error } = await supabaseAdmin
     .from("ambassador_training_steps")
     .insert({
+      academy_type: academyType,
       step_number: stepNumber,
       title,
       description: description || null,
@@ -259,13 +342,15 @@ async function createTrainingStep(formData: FormData) {
     });
 
   if (error) {
-    console.warn("Unable to create Ambassador training step:", error);
+    console.warn("Unable to create SitGuru University training step:", error);
     redirect(`${adminRoutes.ambassadorTraining}?error=create`);
   }
 
   revalidatePath(adminRoutes.ambassadorTraining);
   revalidatePath("/ambassador/training");
-  redirect(`${adminRoutes.ambassadorTraining}?created=success`);
+  revalidatePath("/guru/training");
+  revalidatePath("/customer/training");
+  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&created=success`);
 }
 
 async function updateTrainingStep(formData: FormData) {
@@ -274,6 +359,7 @@ async function updateTrainingStep(formData: FormData) {
   await requireSuperAdmin();
 
   const stepId = asString(formData.get("step_id"));
+  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
   const stepNumber = asNumber(formData.get("step_number"));
   const title = asString(formData.get("title"));
   const description = asString(formData.get("description"));
@@ -290,13 +376,14 @@ async function updateTrainingStep(formData: FormData) {
   );
   const requiresSignature = asBoolean(formData.get("requires_signature"));
 
-  if (!stepId || !title || !stepNumber) {
+  if (!stepId || !title || !stepNumber || !academyType) {
     redirect(`${adminRoutes.ambassadorTraining}?error=missing`);
   }
 
   const { error } = await supabaseAdmin
     .from("ambassador_training_steps")
     .update({
+      academy_type: academyType,
       step_number: stepNumber,
       title,
       description: description || null,
@@ -315,14 +402,17 @@ async function updateTrainingStep(formData: FormData) {
     .eq("id", stepId);
 
   if (error) {
-    console.warn("Unable to update Ambassador training step:", error);
+    console.warn("Unable to update SitGuru University training step:", error);
     redirect(`${adminRoutes.ambassadorTraining}?error=update`);
   }
 
   revalidatePath(adminRoutes.ambassadorTraining);
   revalidatePath("/ambassador/training");
   revalidatePath("/ambassador/dashboard");
-  redirect(`${adminRoutes.ambassadorTraining}?updated=success`);
+  revalidatePath("/guru/training");
+  revalidatePath("/guru/dashboard");
+  revalidatePath("/customer/training");
+  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&updated=success`);
 }
 
 async function toggleTrainingStepStatus(formData: FormData) {
@@ -331,6 +421,7 @@ async function toggleTrainingStepStatus(formData: FormData) {
   await requireSuperAdmin();
 
   const stepId = asString(formData.get("step_id"));
+  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
   const nextActive = asString(formData.get("next_active")) === "true";
 
   if (!stepId) {
@@ -346,14 +437,17 @@ async function toggleTrainingStepStatus(formData: FormData) {
     .eq("id", stepId);
 
   if (error) {
-    console.warn("Unable to toggle Ambassador training step:", error);
+    console.warn("Unable to toggle SitGuru University training step:", error);
     redirect(`${adminRoutes.ambassadorTraining}?error=toggle`);
   }
 
   revalidatePath(adminRoutes.ambassadorTraining);
   revalidatePath("/ambassador/training");
   revalidatePath("/ambassador/dashboard");
-  redirect(`${adminRoutes.ambassadorTraining}?toggled=success`);
+  revalidatePath("/guru/training");
+  revalidatePath("/guru/dashboard");
+  revalidatePath("/customer/training");
+  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&toggled=success`);
 }
 
 type PageProps = {
@@ -367,11 +461,13 @@ export default async function AdminAmbassadorTrainingPage({
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const notice = getNotice(resolvedSearchParams);
+  const academyFilter = getAcademyFilter(resolvedSearchParams?.academy);
 
   const [{ data: stepsResult }, { data: progressResult }] = await Promise.all([
     supabaseAdmin
       .from("ambassador_training_steps")
       .select("*")
+      .order("academy_type", { ascending: true })
       .order("step_number", { ascending: true }),
     supabaseAdmin
       .from("ambassador_training_progress")
@@ -379,9 +475,24 @@ export default async function AdminAmbassadorTrainingPage({
       .limit(5000),
   ]);
 
-  const steps = ((stepsResult || []) as TrainingStep[]).sort(
-    (a, b) => asNumber(a.step_number) - asNumber(b.step_number),
-  );
+  const allSteps = ((stepsResult || []) as TrainingStep[]).sort((a, b) => {
+    const academyA = normalizeAcademyType(a.academy_type);
+    const academyB = normalizeAcademyType(b.academy_type);
+
+    if (academyA !== academyB) {
+      return academyA.localeCompare(academyB);
+    }
+
+    return asNumber(a.step_number) - asNumber(b.step_number);
+  });
+
+  const steps =
+    academyFilter === "all"
+      ? allSteps
+      : allSteps.filter(
+          (step) => normalizeAcademyType(step.academy_type) === academyFilter,
+        );
+
   const progressRows = (progressResult || []) as TrainingProgressSummary[];
 
   const completedByStep = new Map<string, number>();
@@ -409,6 +520,29 @@ export default async function AdminAmbassadorTrainingPage({
     (step) => step.requires_acknowledgment !== false,
   );
 
+  const academyCounts = academyOptions.map((academy) => {
+    const academySteps = allSteps.filter(
+      (step) => normalizeAcademyType(step.academy_type) === academy.value,
+    );
+
+    return {
+      ...academy,
+      total: academySteps.length,
+      active: academySteps.filter((step) => step.is_active !== false).length,
+      required: academySteps.filter((step) => step.is_required !== false).length,
+    };
+  });
+
+  const selectedAcademy =
+    academyFilter === "all" ? null : getAcademyOption(academyFilter);
+
+  const defaultStepNumber =
+    academyFilter === "all"
+      ? steps.length + 1
+      : steps.filter(
+          (step) => normalizeAcademyType(step.academy_type) === academyFilter,
+        ).length + 1;
+
   return (
     <main className="min-h-screen bg-[#f8fbf6] px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1500px] space-y-5">
@@ -430,19 +564,19 @@ export default async function AdminAmbassadorTrainingPage({
 
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
-                    Admin / Ambassador Training
+                    Admin / SitGuru University
                   </p>
                   <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-5xl">
-                    Training Step Manager
+                    Training Manager
                   </h1>
                 </div>
               </div>
 
               <p className="mt-4 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                Add and update Student Ambassador onboarding videos, PowerPoints,
-                PDFs, documents, required acknowledgments, and certification
-                steps. Changes here control what Ambassadors see on their mobile
-                training checklist.
+                Manage Pet Parent Academy, Guru Academy, and Ambassador Academy
+                training materials from one place. Each step can be tied to an
+                academy, assigned by user type, and used for onboarding,
+                acknowledgments, certification, badges, and completion tracking.
               </p>
 
               <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-green-900">
@@ -484,18 +618,95 @@ export default async function AdminAmbassadorTrainingPage({
           </section>
         ) : null}
 
+        <section className="grid gap-3 lg:grid-cols-3">
+          {academyCounts.map((academy) => {
+            const active = academyFilter === academy.value;
+
+            return (
+              <Link
+                key={academy.value}
+                href={`${adminRoutes.ambassadorTraining}?academy=${academy.value}`}
+                className={`rounded-[26px] border p-5 shadow-sm transition ${
+                  active
+                    ? "border-green-300 bg-green-50 ring-4 ring-green-100"
+                    : "border-[#dfe9e2] bg-white hover:bg-green-50"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-3xl">{academy.emoji}</p>
+                    <h2 className="mt-2 text-xl font-black text-green-950">
+                      {academy.label}
+                    </h2>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                      {academy.detail}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-green-100 bg-white px-3 py-2 text-right">
+                    <p className="text-xl font-black text-green-950">
+                      {number(academy.total)}
+                    </p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                      Steps
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <MiniStat
+                    label="Audience"
+                    value={academy.audience}
+                    detail="assigned users"
+                  />
+                  <MiniStat
+                    label="Program"
+                    value={academy.modules}
+                    detail="academy path"
+                  />
+                  <MiniStat
+                    label="Credential"
+                    value={academy.certificate}
+                    detail="completion badge"
+                  />
+                </div>
+              </Link>
+            );
+          })}
+        </section>
+
+        <section className="flex flex-wrap gap-2 rounded-[24px] border border-green-100 bg-white p-3 shadow-sm">
+          <AcademyFilterLink active={academyFilter === "all"} href={adminRoutes.ambassadorTraining}>
+            All Academies
+          </AcademyFilterLink>
+
+          {academyOptions.map((academy) => (
+            <AcademyFilterLink
+              key={academy.value}
+              active={academyFilter === academy.value}
+              href={`${adminRoutes.ambassadorTraining}?academy=${academy.value}`}
+            >
+              {academy.emoji} {academy.shortLabel}
+            </AcademyFilterLink>
+          ))}
+        </section>
+
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <MetricCard
             icon={<ClipboardList size={20} />}
-            label="Total Steps"
+            label="Visible Steps"
             value={number(steps.length)}
-            detail="All active and inactive records"
+            detail={
+              selectedAcademy
+                ? `${selectedAcademy.label} records`
+                : "All academy records"
+            }
           />
           <MetricCard
             icon={<ToggleRight size={20} />}
             label="Active"
             value={number(activeSteps.length)}
-            detail="Visible to Ambassadors"
+            detail="Visible to assigned users"
           />
           <MetricCard
             icon={<BadgeCheck size={20} />}
@@ -522,15 +733,16 @@ export default async function AdminAmbassadorTrainingPage({
             <div className="mb-5">
               <SectionHeader
                 icon={<Plus size={22} />}
-                title="Add Training Step"
-                detail="Create a new onboarding step for all Student Ambassadors."
+                title="Add Academy Step"
+                detail="Create training material for Pet Parents, Gurus, Ambassadors, or future SitGuru University paths."
               />
             </div>
 
             <TrainingStepForm
               action={createTrainingStep}
               submitLabel="Add Training Step"
-              defaultStepNumber={steps.length + 1}
+              defaultAcademyType={selectedAcademy?.value || "ambassador"}
+              defaultStepNumber={defaultStepNumber}
               defaultIsActive
               defaultIsRequired
               defaultRequiresAcknowledgment
@@ -541,8 +753,12 @@ export default async function AdminAmbassadorTrainingPage({
             <div className="mb-5">
               <SectionHeader
                 icon={<BookOpenCheck size={22} />}
-                title="Current Training Steps"
-                detail="Edit titles, descriptions, required settings, materials, storage paths, and certification requirements."
+                title={
+                  selectedAcademy
+                    ? `${selectedAcademy.label} Steps`
+                    : "All Academy Steps"
+                }
+                detail="Edit academy type, step order, descriptions, required settings, training materials, storage paths, and certification requirements."
               />
             </div>
 
@@ -566,8 +782,7 @@ export default async function AdminAmbassadorTrainingPage({
                     No training steps yet
                   </h2>
                   <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-green-900/75">
-                    Add your first Ambassador training step to start building
-                    the mobile onboarding checklist.
+                    Add your first SitGuru University training step for this academy.
                   </p>
                 </div>
               )}
@@ -578,19 +793,19 @@ export default async function AdminAmbassadorTrainingPage({
         <section className="rounded-[28px] border border-green-100 bg-white p-5 shadow-sm">
           <div className="grid gap-4 lg:grid-cols-3">
             <InfoTile
-              icon={<FileText size={20} />}
-              title="Storage path support"
-              detail="Upload PPTs, PDFs, and videos into Supabase Storage, then paste the bucket and file path into the step."
+              icon={<Users size={20} />}
+              title="Multi-academy assignments"
+              detail="A user can be assigned Pet Parent Academy, Guru Academy, Ambassador Academy, or multiple academies depending on their SitGuru role."
             />
             <InfoTile
               icon={<ShieldCheck size={20} />}
               title="Required step control"
-              detail="Required steps count toward Ambassador training completion. Optional steps can be informational."
+              detail="Required steps count toward each academy's completion. Optional steps can be informational or supplemental."
             />
             <InfoTile
               icon={<LockKeyhole size={20} />}
               title="Certification control"
-              detail="Use typed signature on key steps such as referral tracking, payout basics, policy acknowledgments, or contractor onboarding."
+              detail="Use acknowledgment and typed signature on key steps such as safety, payouts, policy acknowledgments, and final certification."
             />
           </div>
         </section>
@@ -610,6 +825,7 @@ function TrainingStepEditor({
 }) {
   const active = step.is_active !== false;
   const materialUrl = getTrainingMaterialUrl(step);
+  const academy = getAcademyOption(step.academy_type);
 
   return (
     <article className="rounded-[28px] border border-[#dfe9e2] bg-[#fbfcf9] p-4 sm:p-5">
@@ -617,6 +833,10 @@ function TrainingStepEditor({
         <div className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-green-800 px-3 py-1 text-xs font-black text-white">
+              {academy.emoji} {academy.shortLabel}
+            </span>
+
+            <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-black text-white">
               Step {step.step_number}
             </span>
 
@@ -664,7 +884,7 @@ function TrainingStepEditor({
             <MiniStat
               label="Completed"
               value={number(completedCount)}
-              detail="Ambassadors"
+              detail="users"
             />
             <MiniStat
               label="Material"
@@ -689,6 +909,7 @@ function TrainingStepEditor({
 
           <form action={toggleTrainingStepStatus}>
             <input type="hidden" name="step_id" value={step.id} />
+            <input type="hidden" name="academy_type" value={academy.value} />
             <input type="hidden" name="next_active" value={String(!active)} />
             <button
               type="submit"
@@ -727,6 +948,7 @@ function TrainingStepForm({
   action,
   submitLabel,
   step,
+  defaultAcademyType = "ambassador",
   defaultStepNumber,
   defaultIsRequired = false,
   defaultIsActive = false,
@@ -735,16 +957,32 @@ function TrainingStepForm({
   action: (formData: FormData) => Promise<void>;
   submitLabel: string;
   step?: TrainingStep;
+  defaultAcademyType?: AcademyType;
   defaultStepNumber?: number;
   defaultIsRequired?: boolean;
   defaultIsActive?: boolean;
   defaultRequiresAcknowledgment?: boolean;
 }) {
   const isEdit = Boolean(step?.id);
+  const academy = getAcademyOption(step?.academy_type || defaultAcademyType);
 
   return (
     <form action={action} className="grid gap-4">
       {isEdit ? <input type="hidden" name="step_id" value={step?.id} /> : null}
+
+      <FormField label="Academy Type">
+        <select
+          name="academy_type"
+          defaultValue={academy.value}
+          className="min-h-12 w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+        >
+          {academyOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.emoji} {option.label}
+            </option>
+          ))}
+        </select>
+      </FormField>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <FormField label="Step Number">
@@ -811,8 +1049,8 @@ function TrainingStepForm({
               Training Material
             </h3>
             <p className="mt-1 text-xs font-bold leading-5 text-green-900/75">
-              Use a video URL, public PowerPoint/PDF URL, or Supabase Storage
-              bucket/path. Storage upload controls can be added next.
+              Use a video URL, Gamma link, public PowerPoint/PDF URL, NotebookLM
+              link, Synthesia video, or Supabase Storage bucket/path.
             </p>
           </div>
         </div>
@@ -840,7 +1078,7 @@ function TrainingStepForm({
             <FormField label="Storage Bucket">
               <input
                 name="storage_bucket"
-                placeholder="ambassador-training"
+                placeholder="sitguru-university"
                 defaultValue={step?.storage_bucket || ""}
                 className="min-h-12 w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-400 focus:ring-4 focus:ring-green-100"
               />
@@ -849,7 +1087,7 @@ function TrainingStepForm({
             <FormField label="Storage Path">
               <input
                 name="storage_path"
-                placeholder="student-hire/video-1.mp4"
+                placeholder="guru-academy/module-1.mp4"
                 defaultValue={step?.storage_path || ""}
                 className="min-h-12 w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-400 focus:ring-4 focus:ring-green-100"
               />
@@ -861,12 +1099,12 @@ function TrainingStepForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <CheckboxField
           name="is_active"
-          label="Active / visible to Ambassadors"
+          label="Active / visible to assigned users"
           defaultChecked={step ? step.is_active !== false : defaultIsActive}
         />
         <CheckboxField
           name="is_required"
-          label="Required for onboarding completion"
+          label="Required for academy completion"
           defaultChecked={step ? step.is_required !== false : defaultIsRequired}
         />
         <CheckboxField
@@ -893,6 +1131,29 @@ function TrainingStepForm({
         {submitLabel}
       </button>
     </form>
+  );
+}
+
+function AcademyFilterLink({
+  active,
+  href,
+  children,
+}: {
+  active: boolean;
+  href: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+        active
+          ? "bg-green-800 text-white shadow-lg shadow-emerald-900/15"
+          : "border border-green-100 bg-green-50 text-green-900 hover:bg-green-100"
+      }`}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -969,7 +1230,7 @@ function MiniStat({
       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
         {label}
       </p>
-      <p className="mt-1 text-lg font-black text-green-950">{value}</p>
+      <p className="mt-1 text-sm font-black text-green-950">{value}</p>
       <p className="text-xs font-bold text-slate-500">{detail}</p>
     </div>
   );
@@ -1046,12 +1307,12 @@ function InfoTile({
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border border-green-100 bg-[#fbfcf9] p-4">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+    <div className="rounded-[24px] border border-green-100 bg-green-50/50 p-4">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-green-800 shadow-sm">
         {icon}
       </div>
-      <p className="font-black text-green-950">{title}</p>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+      <h3 className="text-sm font-black text-green-950">{title}</h3>
+      <p className="mt-2 text-xs font-bold leading-5 text-slate-600">
         {detail}
       </p>
     </div>
