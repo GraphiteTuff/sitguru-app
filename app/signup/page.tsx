@@ -92,6 +92,90 @@ function toE164UsPhone(value: string) {
   return `+1${digits}`;
 }
 
+function sanitizeNameInput(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function getNameParts(value: string) {
+  const cleanName = sanitizeNameInput(value);
+  const parts = cleanName.split(" ").filter(Boolean);
+  const firstName = parts[0] || "";
+  const lastName = parts.slice(1).join(" ");
+
+  return { cleanName, firstName, lastName, parts };
+}
+
+function isLikelyPlaceholderName(value: string) {
+  const cleanName = sanitizeNameInput(value).toLowerCase();
+  const compactName = cleanName.replace(/[^a-z]/g, "");
+
+  if (!cleanName) return true;
+
+  const blockedValues = new Set([
+    "asdf",
+    "asdasd",
+    "asdfasdf",
+    "qwerty",
+    "qwerty qwerty",
+    "test",
+    "test test",
+    "testing",
+    "tester",
+    "fake",
+    "fake name",
+    "none",
+    "no name",
+    "na",
+    "n/a",
+    "unknown",
+    "sample",
+    "demo",
+    "user",
+    "new user",
+  ]);
+
+  if (blockedValues.has(cleanName)) return true;
+  if (/^(.)\1{3,}$/.test(compactName)) return true;
+  if (/^(ab|abc|asdf|qwer|test|fake)+$/.test(compactName)) return true;
+
+  return false;
+}
+
+function isValidFullName(value: string) {
+  const { cleanName, parts } = getNameParts(value);
+
+  if (isLikelyPlaceholderName(cleanName)) return false;
+  if (parts.length < 2) return false;
+
+  return parts.every((part) => {
+    const lettersOnly = part.replace(/[^a-zA-Z]/g, "");
+    return lettersOnly.length >= 2 && /^[a-zA-Z][a-zA-Z'’.-]*$/.test(part);
+  });
+}
+
+function isValidEmailAddress(value: string) {
+  const cleanEmail = value.trim().toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return false;
+
+  const domain = cleanEmail.split("@")[1] || "";
+  const blockedDomains = [
+    "10minutemail.com",
+    "guerrillamail.com",
+    "mailinator.com",
+    "tempmail.com",
+    "tempmail.net",
+    "temp-mail.org",
+    "yopmail.com",
+  ];
+
+  return !blockedDomains.includes(domain);
+}
+
+function isValidZipCode(value: string) {
+  return /^\d{5}$/.test(value.trim());
+}
+
 function getDefaultNextPath(intent: AccountIntent) {
   if (intent === "guru") return "/guru/dashboard/profile?step=1";
   if (intent === "both") return "/guru/dashboard/profile?step=1";
@@ -161,11 +245,14 @@ async function ensureStarterGuruProfile({
 }) {
   const now = new Date().toISOString();
   const displayName = buildStarterGuruName(fullName);
+  const { firstName, lastName } = getNameParts(displayName);
   const slug = buildStarterGuruSlug(userId, displayName);
 
   await supabase.from("profiles").upsert({
     id: userId,
     full_name: displayName,
+    first_name: firstName || null,
+    last_name: lastName || null,
     email: email?.trim() || null,
     phone: phone?.trim() || null,
     role: "guru",
@@ -251,7 +338,7 @@ function SignupPageContent() {
   const [phoneCode, setPhoneCode] = useState("");
   const [phoneCodeSent, setPhoneCodeSent] = useState(false);
 
-  const [acceptedTerms, setAcceptedTerms] = useState(true);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -305,13 +392,22 @@ function SignupPageContent() {
     try {
       resetAlerts();
 
-      if (!fullName.trim()) {
-        setError("Please enter your full name.");
+      const { cleanName, firstName, lastName } = getNameParts(fullName);
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanZipCode = zipCode.trim();
+
+      if (!isValidFullName(cleanName)) {
+        setError("Please enter your real first and last name.");
         return;
       }
 
-      if (!email.trim()) {
-        setError("Please enter your email address.");
+      if (!isValidEmailAddress(cleanEmail)) {
+        setError("Please enter a valid personal email address.");
+        return;
+      }
+
+      if (!isValidZipCode(cleanZipCode)) {
+        setError("Please enter a valid 5-digit ZIP code.");
         return;
       }
 
@@ -333,18 +429,21 @@ function SignupPageContent() {
           : "https://www.sitguru.com";
 
       const { data, error: signupError } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: cleanEmail,
         password,
         options: {
           emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(
             redirectPath,
           )}&intent=${intent}`,
           data: {
-            full_name: fullName.trim(),
+            full_name: cleanName,
+            first_name: firstName,
+            last_name: lastName,
             role: getRoleFromIntent(intent),
             account_intent: intent,
             signup_source: "sitguru_signup_page",
-            zip_code: zipCode.trim(),
+            signup_status: "pending_email_verification",
+            zip_code: cleanZipCode,
           },
         },
       });
@@ -357,19 +456,21 @@ function SignupPageContent() {
         if (shouldCreateGuruProfile(intent)) {
           await ensureStarterGuruProfile({
             userId,
-            fullName,
-            email,
-            zipCode,
+            fullName: cleanName,
+            email: cleanEmail,
+            zipCode: cleanZipCode,
             source: "sitguru_guru_signup_page",
           });
         } else {
           await supabase.from("profiles").upsert({
             id: userId,
-            full_name: fullName.trim(),
-            email: email.trim(),
+            full_name: cleanName,
+            first_name: firstName || null,
+            last_name: lastName || null,
+            email: cleanEmail,
             role: getRoleFromIntent(intent),
             source: "sitguru_signup_page",
-            zip_code: zipCode.trim() || null,
+            zip_code: cleanZipCode,
             updated_at: new Date().toISOString(),
           });
         }
@@ -395,10 +496,27 @@ function SignupPageContent() {
     try {
       resetAlerts();
 
+      const { cleanName, firstName, lastName } = getNameParts(fullName);
+      const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
+
+      if (!isValidFullName(cleanName)) {
+        setError("Please enter your real first and last name before requesting a phone code.");
+        return;
+      }
 
       if (!normalizedPhone) {
         setError("Please enter a valid 10-digit phone number.");
+        return;
+      }
+
+      if (!isValidZipCode(cleanZipCode)) {
+        setError("Please enter a valid 5-digit ZIP code.");
+        return;
+      }
+
+      if (!acceptedTerms) {
+        setError("Please accept the SitGuru terms before requesting a phone code.");
         return;
       }
 
@@ -408,11 +526,14 @@ function SignupPageContent() {
         phone: normalizedPhone,
         options: {
           data: {
-            full_name: fullName.trim(),
+            full_name: cleanName,
+            first_name: firstName,
+            last_name: lastName,
             role: getRoleFromIntent(intent),
             account_intent: intent,
             signup_source: "sitguru_phone_signup",
-            zip_code: zipCode.trim(),
+            signup_status: "pending_phone_verification",
+            zip_code: cleanZipCode,
           },
         },
       });
@@ -436,10 +557,22 @@ function SignupPageContent() {
     try {
       resetAlerts();
 
+      const { cleanName, firstName, lastName } = getNameParts(fullName);
+      const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
+
+      if (!isValidFullName(cleanName)) {
+        setError("Please enter your real first and last name.");
+        return;
+      }
 
       if (!normalizedPhone) {
         setError("Please enter a valid 10-digit phone number.");
+        return;
+      }
+
+      if (!isValidZipCode(cleanZipCode)) {
+        setError("Please enter a valid 5-digit ZIP code.");
         return;
       }
 
@@ -469,19 +602,21 @@ function SignupPageContent() {
         if (shouldCreateGuruProfile(intent)) {
           await ensureStarterGuruProfile({
             userId,
-            fullName,
+            fullName: cleanName,
             phone: normalizedPhone,
-            zipCode,
+            zipCode: cleanZipCode,
             source: "sitguru_guru_phone_signup",
           });
         } else {
           await supabase.from("profiles").upsert({
             id: userId,
-            full_name: fullName.trim() || null,
+            full_name: cleanName,
+            first_name: firstName || null,
+            last_name: lastName || null,
             phone: normalizedPhone,
             role: getRoleFromIntent(intent),
             source: "sitguru_phone_signup",
-            zip_code: zipCode.trim() || null,
+            zip_code: cleanZipCode,
             updated_at: new Date().toISOString(),
           });
         }
@@ -721,6 +856,7 @@ function SignupPageContent() {
                         className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-12 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         placeholder="Your full name"
                         autoComplete="name"
+                        required
                       />
                     </div>
                   </div>
@@ -742,6 +878,7 @@ function SignupPageContent() {
                         className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-12 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         placeholder="you@example.com"
                         autoComplete="email"
+                        required
                       />
                     </div>
                   </div>
@@ -751,7 +888,7 @@ function SignupPageContent() {
                       htmlFor="zip-code"
                       className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
                     >
-                      ZIP code optional
+                      ZIP code
                     </label>
                     <input
                       id="zip-code"
@@ -766,6 +903,7 @@ function SignupPageContent() {
                       className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                       placeholder="18951"
                       autoComplete="postal-code"
+                      required
                     />
                   </div>
 
@@ -785,6 +923,7 @@ function SignupPageContent() {
                         className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 pr-12 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         placeholder="Create a secure password"
                         autoComplete="new-password"
+                        required
                       />
                       <button
                         type="button"
@@ -860,7 +999,7 @@ function SignupPageContent() {
                       htmlFor="phone-name"
                       className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
                     >
-                      Full name optional
+                      Full name
                     </label>
                     <input
                       id="phone-name"
@@ -869,6 +1008,7 @@ function SignupPageContent() {
                       className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                       placeholder="Your full name"
                       autoComplete="name"
+                      required
                     />
                   </div>
 
@@ -892,6 +1032,7 @@ function SignupPageContent() {
                         className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-12 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         placeholder="(555) 123-4567"
                         autoComplete="tel"
+                        required
                       />
                     </div>
                   </div>
@@ -901,7 +1042,7 @@ function SignupPageContent() {
                       htmlFor="phone-zip"
                       className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
                     >
-                      ZIP code optional
+                      ZIP code
                     </label>
                     <input
                       id="phone-zip"
@@ -916,6 +1057,7 @@ function SignupPageContent() {
                       className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                       placeholder="18951"
                       autoComplete="postal-code"
+                      required
                     />
                   </div>
 
