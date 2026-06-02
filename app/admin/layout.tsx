@@ -13,6 +13,7 @@ import {
   FileBarChart,
   FileSpreadsheet,
   Gauge,
+  GraduationCap,
   HandCoins,
   HeartHandshake,
   Home,
@@ -42,6 +43,8 @@ const adminRoutes = {
   settings: "/admin/settings",
   trustSafety: "/admin/background-checks",
   hr: "/admin/hr",
+  universityTraining: "/admin/ambassador-training",
+  universityAssignments: "/admin/university-assignments",
   financials: "/admin/financials",
   banking: "/admin/financials/plaid",
   stripe: "/admin/financials/stripe",
@@ -79,6 +82,7 @@ const navSections = [
       { label: "Customers", href: adminRoutes.customers, icon: Users },
       { label: "Gurus", href: adminRoutes.gurus, icon: PawPrint },
       { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
+      { label: "SitGuru University", href: adminRoutes.universityTraining, icon: GraduationCap },
       { label: "Trust & Safety", href: adminRoutes.trustSafety, icon: ShieldCheck },
       { label: "Messages", href: adminRoutes.messages, icon: MessageCircle },
     ],
@@ -128,6 +132,7 @@ const topHeaderLinks = [
   { label: "Customers", href: adminRoutes.customers },
   { label: "Gurus", href: adminRoutes.gurus },
   { label: "Human Resources", href: adminRoutes.hr },
+  { label: "SitGuru University", href: adminRoutes.universityTraining },
   { label: "Trust & Safety", href: adminRoutes.trustSafety },
   { label: "Messages", href: adminRoutes.messages },
   { label: "Financials", href: adminRoutes.financials },
@@ -139,6 +144,13 @@ const mobileQuickLinks = [
     href: adminRoutes.hr,
     icon: HeartHandshake,
     description: "Hiring and onboarding",
+    featured: true,
+  },
+  {
+    label: "University",
+    href: adminRoutes.universityTraining,
+    icon: GraduationCap,
+    description: "Training and academies",
     featured: true,
   },
   {
@@ -166,6 +178,8 @@ const mobileQuickLinks = [
 
 const mobileGrowthLinks = [
   { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
+  { label: "SitGuru University", href: adminRoutes.universityTraining, icon: GraduationCap },
+  { label: "Academy Assignments", href: adminRoutes.universityAssignments, icon: ClipboardList },
   { label: "Sales & Marketing", href: adminRoutes.salesMarketing, icon: Megaphone },
   { label: "Growth & Referrals", href: adminRoutes.referrals, icon: Link2 },
   { label: "Launch Signups", href: adminRoutes.launchSignups, icon: UserPlus },
@@ -428,6 +442,8 @@ function AdminFooter() {
         { label: "Customers", href: adminRoutes.customers },
         { label: "Gurus", href: adminRoutes.gurus },
         { label: "Human Resources", href: adminRoutes.hr },
+        { label: "SitGuru University", href: adminRoutes.universityTraining },
+        { label: "Academy Assignments", href: adminRoutes.universityAssignments },
         { label: "Trust & Safety", href: adminRoutes.trustSafety },
         { label: "Messages", href: adminRoutes.messages },
       ],
@@ -494,7 +510,7 @@ function AdminFooter() {
 
           <p className="mt-4 max-w-md text-sm font-semibold leading-6 text-slate-600">
             SitGuru Admin keeps bookings, Gurus, customers, messages,
-            financials, programs, referrals, partners, taxes, and reporting
+            financials, training, academies, programs, referrals, partners, taxes, and reporting
             connected in one clean operating center.
           </p>
 
@@ -615,7 +631,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">
                   Oversee users, approvals, bookings, payments, hiring,
-                  growth, reporting, taxes, and messages.
+                  growth, training, academies, reporting, taxes, and messages.
                 </p>
               </div>
             </div>
