@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle,
+  Archive,
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
@@ -14,6 +15,7 @@ import {
   MapPin,
   MessageSquare,
   PawPrint,
+  RotateCcw,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -39,6 +41,51 @@ type VerificationStatus =
   | "likely_test_spam"
   | "incomplete"
   | "missing";
+
+type AdminStatus =
+  | "active"
+  | "needs_review"
+  | "incomplete_signup"
+  | "likely_spam"
+  | "archived";
+
+const adminStatusOptions: {
+  value: AdminStatus;
+  label: string;
+  description: string;
+  tone: string;
+}[] = [
+  {
+    value: "active",
+    label: "Mark Active",
+    description: "Use when this is a real Pet Parent or a valid signup that should remain visible.",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+  },
+  {
+    value: "needs_review",
+    label: "Needs Review",
+    description: "Use when the signup may be real, but contact, name, location, or pet setup needs review.",
+    tone: "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
+  },
+  {
+    value: "incomplete_signup",
+    label: "Incomplete Signup",
+    description: "Use when the person started signup but has not finished enough setup to count as a Pet Parent.",
+    tone: "border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100",
+  },
+  {
+    value: "likely_spam",
+    label: "Likely Spam",
+    description: "Use for suspicious names, suspicious emails, no verification, and no real activity.",
+    tone: "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
+  },
+  {
+    value: "archived",
+    label: "Archive",
+    description: "Hide the record from the main Pet Parent registry without hard deleting it.",
+    tone: "border-slate-200 bg-slate-100 text-slate-900 hover:bg-slate-200",
+  },
+];
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -273,9 +320,9 @@ function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null
 
   if (email && !looksLikeSuspiciousEmail(email)) return email;
 
-  if (rawName) return "Pet Parent Signup Review";
+  if (rawName) return "Signup Review";
 
-  return "Pet Parent";
+  return "Signup Review";
 }
 
 function getEmail(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
@@ -676,7 +723,7 @@ function getVerificationStatus({
     return {
       status: "verified" as VerificationStatus,
       label: "Verified Pet Parent",
-      description: "This Pet Parent has verified contact information and real platform activity.",
+      description: "This verified signup has real Pet Parent profile activity.",
     };
   }
 
@@ -702,7 +749,7 @@ function getVerificationStatus({
       status: "needs_review" as VerificationStatus,
       label: "Incomplete Signup / Needs Review",
       description:
-        "This person started signup, but the Pet Parent setup is not complete. Review contact quality, verification, location, and pet setup before treating them as a real active Pet Parent.",
+        "This person started signup, but setup is not complete. Review contact quality, verification, location, and pet setup before treating this as a real active Pet Parent.",
     };
   }
 
@@ -784,6 +831,79 @@ function getStatusStyles(status: VerificationStatus) {
   };
 }
 
+function normalizeAdminStatus(value: unknown): AdminStatus {
+  const normalized = asString(value).toLowerCase();
+
+  if (
+    normalized === "needs_review" ||
+    normalized === "incomplete_signup" ||
+    normalized === "likely_spam" ||
+    normalized === "archived"
+  ) {
+    return normalized;
+  }
+
+  if (
+    normalized === "spam" ||
+    normalized === "likely_test_spam" ||
+    normalized === "test_spam" ||
+    normalized === "blocked"
+  ) {
+    return "likely_spam";
+  }
+
+  if (normalized === "hidden" || normalized === "inactive") {
+    return "archived";
+  }
+
+  return "active";
+}
+
+function getAdminStatusLabel(status: AdminStatus) {
+  if (status === "needs_review") return "Needs Review";
+  if (status === "incomplete_signup") return "Incomplete Signup";
+  if (status === "likely_spam") return "Likely Spam";
+  if (status === "archived") return "Archived";
+
+  return "Active";
+}
+
+function getAdminStatusDescription(status: AdminStatus) {
+  if (status === "needs_review") {
+    return "This record is still visible for Super Admin review, but should not be treated as a completed Pet Parent until verified.";
+  }
+
+  if (status === "incomplete_signup") {
+    return "This person started signup but has not completed enough setup to count as a real Pet Parent yet.";
+  }
+
+  if (status === "likely_spam") {
+    return "This record is suspicious and should stay out of normal Pet Parent workflows unless you later confirm it is real.";
+  }
+
+  if (status === "archived") {
+    return "This record is hidden from the main registry while preserved in Supabase for audit/history.";
+  }
+
+  return "This record is active and can appear in the normal Pet Parent registry when it also passes profile quality checks.";
+}
+
+function getAdminStatusBadgeClasses(status: AdminStatus) {
+  if (status === "needs_review") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (status === "incomplete_signup") return "border-orange-200 bg-orange-50 text-orange-800";
+  if (status === "likely_spam") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (status === "archived") return "border-slate-200 bg-slate-100 text-slate-800";
+
+  return "border-emerald-200 bg-emerald-50 text-emerald-800";
+}
+
+function getAdminStatusIcon(status: AdminStatus) {
+  if (status === "archived") return <Archive className="h-4 w-4" />;
+  if (status === "active") return <RotateCcw className="h-4 w-4" />;
+
+  return <AlertTriangle className="h-4 w-4" />;
+}
+
 function getRelatedRecordId({
   lookupKey,
   profile,
@@ -817,7 +937,7 @@ function buildCustomerDirectMessageHref({
     messageCategory: "direct",
     source: "admin_customer_detail",
     recipientRole: "customer",
-    recipientName: name || "Pet Parent",
+    recipientName: name || "Signup Review",
   });
 
   if (customerId) query.set("recipientId", customerId);
@@ -860,6 +980,57 @@ function buildMessageRecipientFilters(customerId: string) {
     `recipient_id.eq.${customerId}`,
     `to_user_id.eq.${customerId}`,
   ].join(",");
+}
+
+async function updatePetParentAdminStatusAction(formData: FormData) {
+  "use server";
+
+  const customerId = String(formData.get("customerId") || "").trim();
+  const requestedStatus = String(formData.get("adminStatus") || "").trim();
+  const adminNotes = String(formData.get("adminNotes") || "").trim();
+
+  const allowedStatuses: AdminStatus[] = [
+    "active",
+    "needs_review",
+    "incomplete_signup",
+    "likely_spam",
+    "archived",
+  ];
+
+  if (!isUuid(customerId)) {
+    redirect("/admin/customers?admin_status=invalid-id");
+  }
+
+  if (!allowedStatuses.includes(requestedStatus as AdminStatus)) {
+    redirect(`/admin/customers/${customerId}?admin_status=invalid-status`);
+  }
+
+  const now = new Date().toISOString();
+  const adminStatus = requestedStatus as AdminStatus;
+
+  const updatePayload: AnyRow = {
+    admin_status: adminStatus,
+    admin_notes: adminNotes || null,
+    archived_at: adminStatus === "archived" ? now : null,
+    updated_at: now,
+  };
+
+  const { error } = await supabaseAdmin
+    .from("profiles")
+    .update(updatePayload)
+    .eq("id", customerId);
+
+  if (error) {
+    console.warn("Could not update Pet Parent admin status:", error);
+    redirect(`/admin/customers/${customerId}?admin_status=update-failed`);
+  }
+
+  revalidatePath("/admin/customers");
+  revalidatePath(`/admin/customers/${customerId}`);
+  revalidatePath("/admin/customer-intelligence");
+  revalidatePath("/admin/customers/customer-intelligence");
+
+  redirect(`/admin/customers/${customerId}?admin_status=updated`);
 }
 
 async function deleteIncompletePetParentAction(formData: FormData) {
@@ -941,6 +1112,10 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
     profile,
     authUser,
   });
+
+  const adminStatus = normalizeAdminStatus(profile?.admin_status);
+  const adminNotes = getText(profile, ["admin_notes"]);
+  const archivedAt = getText(profile, ["archived_at"]);
 
   const canLoadRelatedRows = Boolean(relatedCustomerId && isUuid(relatedCustomerId));
 
@@ -1060,7 +1235,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
           </Link>
 
           <div className="mt-6 rounded-3xl border border-red-100 bg-red-50 p-5">
-            <h1 className="text-3xl font-black">Pet Parent record not available</h1>
+            <h1 className="text-3xl font-black">Signup record not available</h1>
             <p className="mt-2 text-sm font-semibold text-red-800">
               No matching Supabase Auth user or profile row was found for this ID or email.
             </p>
@@ -1102,13 +1277,13 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
 
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-800">
-                  Super Admin / Pet Parent Detail
+                  Super Admin / Signup Detail
                 </p>
                 <h1 className="mt-1 text-4xl font-black tracking-tight sm:text-5xl">
                   {name}
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm font-semibold text-slate-700">
-                  Full SitGuru Pet Parent profile with Supabase Auth identity,
+                  Full SitGuru signup record with Supabase Auth identity,
                   customer profile data, verification status, pets, bookings,
                   message activity, and protected cleanup controls.
                 </p>
@@ -1171,7 +1346,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
               The Supabase Auth user was found, so this is a real signup record.
               However, there is no matching `profiles` row yet. The page is
               showing the Auth name, email, provider, created date, confirmation,
-              and sign-in details so Super Admin can still review the Pet Parent.
+              and sign-in details so Super Admin can still review the signup record.
             </p>
           </div>
         ) : null}
@@ -1230,7 +1405,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className={["text-2xl font-black", statusStyles.title].join(" ")}>
-                    Pet Parent Verification
+                    Signup Verification
                   </h2>
                   <span className={["rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.12em]", statusStyles.badge].join(" ")}>
                     {verification.label}
@@ -1250,38 +1425,123 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            <div className="w-full rounded-3xl border border-white/70 bg-white/80 p-4 shadow-sm xl:max-w-sm">
+            <div className="w-full rounded-3xl border border-white/70 bg-white/80 p-4 shadow-sm xl:max-w-md">
               <p className="flex items-center gap-2 text-sm font-black text-slate-950">
                 <Database className="h-4 w-4 text-emerald-700" />
                 Admin cleanup controls
               </p>
-              <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
-                Hard delete is only enabled for records with no contact info, no
-                pets, no bookings, no messages, and no verified auth contact.
-                Real Pet Parents should be kept or reviewed manually.
-              </p>
 
-              {safeToDelete && relatedCustomerId ? (
-                <form action={deleteIncompletePetParentAction} className="mt-4">
-                  <input type="hidden" name="customerId" value={relatedCustomerId} />
-                  <button
-                    type="submit"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-800"
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                    Current admin status
+                  </span>
+                  <span
+                    className={[
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black",
+                      getAdminStatusBadgeClasses(adminStatus),
+                    ].join(" ")}
                   >
-                    <Trash2 className="h-4 w-4" />
-                    Delete incomplete record
-                  </button>
-                </form>
+                    {getAdminStatusIcon(adminStatus)}
+                    {getAdminStatusLabel(adminStatus)}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
+                  {getAdminStatusDescription(adminStatus)}
+                </p>
+
+                {adminNotes ? (
+                  <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-5 text-slate-600">
+                    Notes: {adminNotes}
+                  </p>
+                ) : null}
+
+                {archivedAt ? (
+                  <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-5 text-slate-600">
+                    Archived: {formatDateTime(archivedAt)}
+                  </p>
+                ) : null}
+              </div>
+
+              {relatedCustomerId && profile ? (
+                <div className="mt-4 space-y-3">
+                  {adminStatusOptions.map((option) => (
+                    <form key={option.value} action={updatePetParentAdminStatusAction}>
+                      <input type="hidden" name="customerId" value={relatedCustomerId} />
+                      <input type="hidden" name="adminStatus" value={option.value} />
+                      <input
+                        type="hidden"
+                        name="adminNotes"
+                        value={
+                          option.value === "active"
+                            ? "Marked active by Super Admin review."
+                            : option.value === "needs_review"
+                              ? "Marked needs review by Super Admin review."
+                              : option.value === "incomplete_signup"
+                                ? "Marked incomplete signup by Super Admin review."
+                                : option.value === "likely_spam"
+                                  ? "Marked likely spam by Super Admin review."
+                                  : "Archived by Super Admin review."
+                        }
+                      />
+                      <button
+                        type="submit"
+                        className={[
+                          "flex w-full items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-black shadow-sm transition",
+                          option.tone,
+                          adminStatus === option.value ? "ring-2 ring-offset-2 ring-slate-300" : "",
+                        ].join(" ")}
+                      >
+                        <span>
+                          <span className="block">{option.label}</span>
+                          <span className="mt-1 block text-xs font-semibold leading-5 opacity-80">
+                            {option.description}
+                          </span>
+                        </span>
+                        <span className="mt-0.5 shrink-0">
+                          {getAdminStatusIcon(option.value)}
+                        </span>
+                      </button>
+                    </form>
+                  ))}
+                </div>
               ) : (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="flex items-start gap-2 text-xs font-bold leading-5 text-slate-700">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
-                    Delete is locked because this record has contact data, auth
-                    data, or activity. Keep it for review unless you add a
-                    separate archive workflow.
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                    Admin status buttons require a matching `profiles` row. This
+                    record can still be reviewed here using Auth details.
                   </p>
                 </div>
               )}
+
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold leading-5 text-slate-600">
+                  Archive is the normal cleanup path. Hard delete is only enabled
+                  for records with no contact info, no pets, no bookings, no
+                  messages, and no verified auth contact.
+                </p>
+
+                {safeToDelete && relatedCustomerId ? (
+                  <form action={deleteIncompletePetParentAction} className="mt-3">
+                    <input type="hidden" name="customerId" value={relatedCustomerId} />
+                    <button
+                      type="submit"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-800"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete incomplete record
+                    </button>
+                  </form>
+                ) : (
+                  <p className="mt-3 flex items-start gap-2 text-xs font-bold leading-5 text-slate-700">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+                    Delete is locked for records with contact data, auth data,
+                    or activity. Use archive or likely spam instead.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -1318,7 +1578,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
-            <h2 className="text-2xl font-black">Pet Parent Profile</h2>
+            <h2 className="text-2xl font-black">Signup Profile</h2>
 
             <div className="mt-5 space-y-3">
               <ProfileInfoRow
@@ -1377,7 +1637,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
               <div>
                 <h2 className="text-2xl font-black">Profile Completion</h2>
                 <p className="mt-1 text-sm font-semibold text-slate-600">
-                  Simple Super Admin checklist showing what this Pet Parent has completed.
+                  Simple Super Admin checklist showing what this signup has completed.
                 </p>
               </div>
 
@@ -1439,7 +1699,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
           <div className="mt-5 overflow-hidden rounded-3xl border border-slate-100">
             {bookings.length === 0 ? (
               <div className="bg-slate-50 p-5 text-sm font-bold text-slate-600">
-                No bookings found for this Pet Parent.
+                No bookings found for this signup record.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1485,7 +1745,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
             <div className="mt-5 space-y-3">
               {pets.length === 0 ? (
                 <div className="rounded-3xl border border-slate-100 bg-slate-50 p-5 text-sm font-bold text-slate-600">
-                  No pet profiles found for this Pet Parent.
+                  No pet profiles found for this signup record.
                 </div>
               ) : (
                 pets.map((pet) => (
@@ -1517,7 +1777,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
             <div className="mt-5 space-y-3">
               {messages.length === 0 ? (
                 <div className="rounded-3xl border border-slate-100 bg-slate-50 p-5 text-sm font-bold text-slate-600">
-                  No messages found for this Pet Parent.
+                  No messages found for this signup record.
                 </div>
               ) : (
                 messages.slice(0, 12).map((message) => (
@@ -1559,6 +1819,8 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <ProfileMiniBox label="Lookup Value" value={lookupKey} />
             <ProfileMiniBox label="Resolved ID" value={relatedCustomerId || "—"} />
+            <ProfileMiniBox label="Admin status" value={getAdminStatusLabel(adminStatus)} />
+            <ProfileMiniBox label="Archived at" value={archivedAt ? formatDateTime(archivedAt) : "—"} />
             <ProfileMiniBox label="Profile row found" value={profile ? "Yes" : "No"} />
             <ProfileMiniBox label="Auth user found" value={authUser ? "Yes" : "No"} />
             <ProfileMiniBox label="Auth email" value={getText(authUser, ["email"], "—")} />
