@@ -584,10 +584,17 @@ export default async function AdminCustomerDashboardPreviewPage({
     return bTime - aTime;
   });
 
-  const name = getDisplayName(profile, authUser);
-  const email = getEmail(profile, authUser);
-  const phone = getPhone(profile, authUser);
-  const location = getLocation(profile);
+  const hasAnyPreviewData = Boolean(
+    profile || authUser || bookings.length > 0 || pets.length > 0 || messages.length > 0,
+  );
+  const previewIsIncomplete = !profile || !authUser;
+
+  const name = hasAnyPreviewData
+    ? getDisplayName(profile, authUser)
+    : "Incomplete Pet Parent Preview";
+  const email = hasAnyPreviewData ? getEmail(profile, authUser) : "No email found";
+  const phone = hasAnyPreviewData ? getPhone(profile, authUser) : "No phone found";
+  const location = hasAnyPreviewData ? getLocation(profile) : "Location not added yet";
   const avatarUrl = getAvatarUrl(profile, authUser);
   const profileCompletion = getProfileCompletion({
     profile,
@@ -611,33 +618,6 @@ export default async function AdminCustomerDashboardPreviewPage({
   const nextBooking = getNextBooking(bookings);
   const certifiedPetParent = false;
 
-  if (!profile && !authUser) {
-    return (
-      <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
-        <section className="mx-auto max-w-6xl rounded-[2rem] border border-red-100 bg-white p-6 shadow-sm">
-          <Link
-            href="/admin/customers"
-            className="inline-flex items-center gap-2 text-sm font-extrabold text-emerald-800 hover:text-emerald-950"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Pet Parents
-          </Link>
-
-          <div className="mt-6 rounded-3xl border border-red-100 bg-red-50 p-5">
-            <h1 className="text-3xl font-black">
-              Dashboard preview unavailable
-            </h1>
-            <p className="mt-2 text-sm font-semibold text-red-800">
-              No matching Supabase Auth user or profile row was found for this ID or email.
-            </p>
-            <p className="mt-3 break-all text-xs font-black text-red-900">
-              Lookup: {lookupKey || "Missing route value"}
-            </p>
-          </div>
-        </section>
-      </main>
-    );
-  }
 
   return (
     <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
@@ -672,6 +652,23 @@ export default async function AdminCustomerDashboardPreviewPage({
               modify their account.
             </p>
           </div>
+
+          {previewIsIncomplete ? (
+            <div className="mt-4 rounded-[2rem] border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+                Incomplete Pet Parent Record
+              </p>
+              <p className="mt-1 text-sm font-semibold leading-6 text-amber-950">
+                This preview is using the available customer lookup value and any
+                related pets, bookings, or messages that can be found. The
+                Supabase profile row or Auth user may still need cleanup,
+                linking, or completion.
+              </p>
+              <p className="mt-2 break-all text-xs font-black text-amber-900">
+                Lookup: {lookupKey}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
