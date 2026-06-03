@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Clock3,
   CreditCard,
+  GraduationCap,
   HeartHandshake,
   LockKeyhole,
   MessageCircle,
@@ -335,6 +336,7 @@ const initialProfileForm: CustomerProfileForm = {
 const routes = {
   home: "/",
   dashboard: "/customer/dashboard",
+  university: "/customer/dashboard/university",
   findGuru: "/search",
   bookGuru: "/bookings/new",
   bookings: "/customer/dashboard/bookings",
@@ -2896,8 +2898,9 @@ export default function CustomerDashboardPage() {
                 </h1>
 
                 <p className="mt-5 max-w-3xl text-base leading-8 text-slate-900/75 md:text-xl">
-                  Manage your pets, book Gurus, review messages, and keep your
-                  care details organized in one simple place.
+                  Manage your pets, book Gurus, review messages, complete
+                  SitGuru University, and keep your care details organized in
+                  one simple place.
                 </p>
 
                 <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -2906,6 +2909,11 @@ export default function CustomerDashboardPage() {
                       🐾
                     </span>
                     Pet Parent
+                  </span>
+
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
+                    <GraduationCap className="h-4 w-4 text-emerald-700" />
+                    Certified Pet Parent: Not started
                   </span>
 
                   <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
@@ -2955,6 +2963,14 @@ export default function CustomerDashboardPage() {
                     className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-base font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-lg"
                   >
                     My Profile
+                  </Link>
+
+                  <Link
+                    href={routes.university}
+                    className="inline-flex min-h-[52px] min-w-[190px] items-center justify-center gap-2 rounded-full bg-slate-950 px-7 py-3 text-base font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-lg"
+                  >
+                    <GraduationCap className="h-5 w-5" />
+                    SitGuru University
                   </Link>
                 </div>
               </div>
@@ -3025,7 +3041,7 @@ export default function CustomerDashboardPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-2 lg:grid-cols-5 md:px-8">
+            <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-2 lg:grid-cols-6 md:px-8">
               {[
                 {
                   label: "Upcoming Booking",
@@ -3064,6 +3080,13 @@ export default function CustomerDashboardPage() {
                   href: routes.pawPerks,
                   icon: <Star className="h-5 w-5" />,
                 },
+                {
+                  label: "University",
+                  value: "0 of 9",
+                  helper: "Start academy",
+                  href: routes.university,
+                  icon: <GraduationCap className="h-5 w-5" />,
+                },
               ].map((item) => (
                 <Link
                   key={item.label}
@@ -3088,6 +3111,122 @@ export default function CustomerDashboardPage() {
                   </div>
                 </Link>
               ))}
+            </div>
+          </section>
+
+          <section className="mt-6 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
+            <div className="grid gap-6 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_52%,#e0f2fe_100%)] p-6 md:p-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+              <div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
+                    <GraduationCap className="h-7 w-7" />
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
+                      SitGuru University
+                    </p>
+                    <h2 className="mt-1 text-3xl font-black tracking-tight text-slate-950">
+                      Pet Parent Academy
+                    </h2>
+                  </div>
+                </div>
+
+                <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-700 md:text-base">
+                  Complete your Pet Parent Academy, learn how to use SitGuru
+                  safely, and prepare to earn your Certified Pet Parent badge.
+                  This guided training will walk you through profiles, pets,
+                  messaging, booking, trust and safety, reviews, and next steps.
+                </p>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                      Progress
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-slate-950">
+                      0 of 9
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">
+                      Backend tracking coming next
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                      Badge
+                    </p>
+                    <p className="mt-2 text-lg font-black text-slate-950">
+                      Certified Pet Parent
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">
+                      Awarded after academy completion
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                      Estimated Time
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-slate-950">
+                      9–15 min
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">
+                      Mobile-friendly lessons
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Link
+                    href={routes.university}
+                    className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-lg"
+                  >
+                    <GraduationCap className="h-5 w-5" />
+                    Start Pet Parent Academy
+                  </Link>
+
+                  <Link
+                    href={routes.profile}
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+                  >
+                    Review My Profile
+                  </Link>
+
+                  <Link
+                    href={routes.pets}
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+                  >
+                    Review My Pets
+                  </Link>
+                </div>
+              </div>
+
+              <div className="rounded-[1.7rem] border border-emerald-100 bg-white/85 p-5 shadow-sm">
+                <p className="text-sm font-black text-slate-950">
+                  What you will learn
+                </p>
+
+                <div className="mt-4 grid gap-3">
+                  {[
+                    "Create and complete your Pet Parent profile",
+                    "Add pets with helpful care notes and safety details",
+                    "Find, review, and message trusted local Gurus",
+                    "Book safely through SitGuru and leave reviews",
+                    "Understand trust, safety, support, and certification",
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100"
+                    >
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                      <p className="text-sm font-bold leading-6 text-slate-700">
+                        {item}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 
