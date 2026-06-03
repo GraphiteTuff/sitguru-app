@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
+  Archive,
   ArrowLeft,
   CalendarDays,
   CircleDollarSign,
@@ -62,6 +63,10 @@ type ProfileRow = {
   utm_campaign?: string | null;
   campaign?: string | null;
   campaign_name?: string | null;
+  admin_status?: string | null;
+  archived_at?: string | null;
+  archive_reason?: string | null;
+  deleted_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -154,6 +159,9 @@ type CustomerInsight = {
   segment: string;
   signupQuality: "active" | "incomplete" | "needs_review" | "likely_test_spam";
   signupQualityLabel: string;
+  adminStatus: string;
+  adminStatusLabel: string;
+  archivedAt: string | null;
   profileCompletion: number;
 };
 
@@ -187,6 +195,7 @@ const adminRoutes = {
   dashboard: "/admin",
   bookings: "/admin/bookings",
   customers: "/admin/customers",
+  customerArchive: "/admin/customers/archive",
   customerIntelligence: "/admin/customer-intelligence",
   customerExport: "/admin/customer-intelligence/export",
   messages: "/admin/messages",
@@ -482,6 +491,85 @@ function getCustomerProfileCompletion(customer: CustomerInsight) {
   const completed = checks.filter(Boolean).length;
 
   return Math.round((completed / checks.length) * 100);
+}
+
+function normalizeAdminStatus(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+  if (!normalized) return "active";
+  if (["spam", "likely_test_spam", "test_spam", "likely_spam_signup"].includes(normalized)) {
+    return "likely_spam";
+  }
+  if (["incomplete", "partial_signup", "incomplete_pet_parent"].includes(normalized)) {
+    return "incomplete_signup";
+  }
+  if (["review", "needs_admin_review"].includes(normalized)) return "needs_review";
+  if (["archive", "archived", "hidden"].includes(normalized)) return "archived";
+  if (["deleted", "trash", "permanently_deleted"].includes(normalized)) return "deleted";
+
+  return normalized;
+}
+
+function getAdminStatus(row: AnyRow) {
+  return normalizeAdminStatus(
+    getText(row, [
+      "admin_status",
+      "customer_admin_status",
+      "pet_parent_admin_status",
+      "cleanup_status",
+      "moderation_status",
+    ]),
+  );
+}
+
+function getArchivedAt(row: AnyRow) {
+  return getText(row, ["archived_at", "archive_at", "hidden_at", "deleted_at"]) || null;
+}
+
+function isSeparatedAdminStatus(status: string) {
+  return ["archived", "likely_spam", "incomplete_signup", "deleted"].includes(
+    normalizeAdminStatus(status),
+  );
+}
+
+function getAdminStatusLabel(status: string) {
+  const normalized = normalizeAdminStatus(status);
+
+  if (normalized === "active") return "Active";
+  if (normalized === "needs_review") return "Needs Review";
+  if (normalized === "incomplete_signup") return "Incomplete Signup";
+  if (normalized === "likely_spam") return "Likely Spam";
+  if (normalized === "archived") return "Archived";
+  if (normalized === "deleted") return "Deleted";
+
+  return normalized
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getSeparatedStatusCounts(rows: ProfileRow[]) {
+  return rows.reduce(
+    (counts, row) => {
+      const status = getAdminStatus(row as AnyRow);
+
+      if (status === "archived") counts.archived += 1;
+      if (status === "likely_spam") counts.likelySpam += 1;
+      if (status === "incomplete_signup") counts.incompleteSignup += 1;
+      if (status === "deleted") counts.deleted += 1;
+      if (status === "needs_review") counts.needsReview += 1;
+
+      return counts;
+    },
+    {
+      archived: 0,
+      likelySpam: 0,
+      incompleteSignup: 0,
+      deleted: 0,
+      needsReview: 0,
+    },
+  );
 }
 
 function getRole(row: AnyRow) {
@@ -1073,26 +1161,41 @@ async function getCustomerIntelligenceData() {
       .filter(Boolean),
   );
 
+  const separatedStatusCounts = getSeparatedStatusCounts(rawProfiles);
+
+  const separatedCustomerIds = new Set(
+    rawProfiles
+      .filter((profile) => isSeparatedAdminStatus(getAdminStatus(profile as AnyRow)))
+      .map((profile) => profile.id)
+      .filter(Boolean),
+  );
+
+  const excludedCustomerIds = new Set([
+    ...Array.from(hiddenCustomerIds),
+    ...Array.from(separatedCustomerIds),
+  ]);
+
   const profiles = rawProfiles.filter(
     (profile) =>
       isCustomerProfile(profile) &&
       !isDemoLikeRow(profile as AnyRow) &&
-      !hiddenCustomerIds.has(profile.id),
+      !hiddenCustomerIds.has(profile.id) &&
+      !separatedCustomerIds.has(profile.id),
   );
   const bookings = rawBookings.filter(
     (booking) =>
       !isDemoLikeRow(booking as AnyRow) &&
-      !hasHiddenCustomerReference(booking as AnyRow, hiddenCustomerIds),
+      !hasHiddenCustomerReference(booking as AnyRow, excludedCustomerIds),
   );
   const pets = rawPets.filter(
     (pet) =>
       !isDemoLikeRow(pet as AnyRow) &&
-      !hasHiddenCustomerReference(pet as AnyRow, hiddenCustomerIds),
+      !hasHiddenCustomerReference(pet as AnyRow, excludedCustomerIds),
   );
   const messages = rawMessages.filter(
     (message) =>
       !isDemoLikeRow(message as AnyRow) &&
-      !hasHiddenCustomerReference(message as AnyRow, hiddenCustomerIds),
+      !hasHiddenCustomerReference(message as AnyRow, excludedCustomerIds),
   );
   const launchSignups = rawLaunchSignups.filter((row) => !isDemoLikeRow(row));
   const launchWaitlist = rawLaunchWaitlist.filter((row) => !isDemoLikeRow(row));
@@ -1126,6 +1229,12 @@ async function getCustomerIntelligenceData() {
     networkClicks.length +
     rawPartnerCampaigns.length -
     partnerCampaigns.length;
+
+  const separatedAdminRows =
+    separatedStatusCounts.archived +
+    separatedStatusCounts.likelySpam +
+    separatedStatusCounts.incompleteSignup +
+    separatedStatusCounts.deleted;
 
   const signupRows = [...launchSignups, ...launchWaitlist];
   const clickRows = [...referralClicks, ...networkClicks];
@@ -1162,6 +1271,9 @@ async function getCustomerIntelligenceData() {
       segment: "Lead",
       signupQuality: "incomplete",
       signupQualityLabel: "Registered",
+      adminStatus: getAdminStatus(profile as AnyRow),
+      adminStatusLabel: getAdminStatusLabel(getAdminStatus(profile as AnyRow)),
+      archivedAt: getArchivedAt(profile as AnyRow),
       profileCompletion: 0,
     });
   }
@@ -1205,6 +1317,9 @@ async function getCustomerIntelligenceData() {
         segment: "Lead",
         signupQuality: "incomplete",
         signupQualityLabel: "Registered",
+        adminStatus: "active",
+        adminStatusLabel: "Active",
+        archivedAt: null,
         profileCompletion: 0,
       };
 
@@ -1427,6 +1542,12 @@ async function getCustomerIntelligenceData() {
       socialClicks,
       topSocialPlatform: socialSourceInsights[0]?.label || "None yet",
       hiddenDemoRows,
+      separatedAdminRows,
+      archivedRows: separatedStatusCounts.archived,
+      likelySpamRows: separatedStatusCounts.likelySpam,
+      incompleteSignupRows: separatedStatusCounts.incompleteSignup,
+      deletedRows: separatedStatusCounts.deleted,
+      needsReviewRows: separatedStatusCounts.needsReview,
     },
   };
 }
@@ -1688,6 +1809,14 @@ export default async function AdminCustomerIntelligencePage() {
             </Link>
 
             <Link
+              href={adminRoutes.customerArchive}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-black text-amber-900 shadow-sm transition hover:bg-amber-100"
+            >
+              <Archive size={17} />
+              Archive / Spam
+            </Link>
+
+            <Link
               href={adminRoutes.users}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
             >
@@ -1730,9 +1859,9 @@ export default async function AdminCustomerIntelligencePage() {
 
           <StatCard
             icon={<Search size={22} />}
-            label="Demo Rows Hidden"
-            value={number(data.metrics.hiddenDemoRows)}
-            detail="Filtered from live customer, booking, pet, message, and growth KPIs"
+            label="Rows Excluded"
+            value={number(data.metrics.hiddenDemoRows + data.metrics.separatedAdminRows)}
+            detail={`${number(data.metrics.separatedAdminRows)} archive/spam/incomplete rows removed from active Pet Parent stats`}
           />
         </section>
 
@@ -1950,7 +2079,14 @@ export default async function AdminCustomerIntelligencePage() {
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-3">
+        <section className="grid gap-5 lg:grid-cols-4">
+          <QuickLinkCard
+            href={adminRoutes.customerArchive}
+            icon={<Archive size={22} />}
+            title="Archive & Spam Manager"
+            description={`Review ${number(data.metrics.archivedRows)} archived, ${number(data.metrics.likelySpamRows)} likely spam, and ${number(data.metrics.incompleteSignupRows)} incomplete signup records outside active Pet Parent stats.`}
+          />
+
           <QuickLinkCard
             href={adminRoutes.launchSignups}
             icon={<Megaphone size={22} />}
@@ -2016,7 +2152,10 @@ export default async function AdminCustomerIntelligencePage() {
           `partner_campaigns`. Demo, fake, test, sample, sandbox, archived, and
           deleted rows are filtered in-memory before Customer KPIs, social
           attribution, source charts, location charts, and exportable report
-          data are calculated from live rows.
+          data are calculated from live rows. Records marked archived, likely
+          spam, incomplete signup, or deleted by Admin Cleanup Controls are also
+          excluded from active Pet Parent stats and should be managed from the
+          Archive & Spam Manager.
         </div>
       </div>
     </main>
