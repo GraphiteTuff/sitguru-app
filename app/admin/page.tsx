@@ -5,7 +5,6 @@ import {
   BarChart3,
   BriefcaseBusiness,
   CalendarDays,
-  CheckCircle2,
   CircleDollarSign,
   Database,
   Download,
@@ -65,7 +64,6 @@ const adminRoutes = {
   exports: "/admin/exports",
   reports: "/admin/exports",
   activity: "/admin/activity",
-  launchSignups: "/admin/launch-signups",
   referrals: "/admin/referrals",
   programs: "/admin/programs",
   hr: "/admin/hr",
@@ -229,6 +227,19 @@ function isActiveStatus(row: AnyRow) {
   );
 }
 
+function isConvertedStatus(row: AnyRow) {
+  const status = getStatus(row);
+
+  return (
+    status === "converted" ||
+    status === "approved" ||
+    status === "booked" ||
+    status === "paid" ||
+    status === "completed" ||
+    status === "active"
+  );
+}
+
 function isUnreadMessage(message: AnyRow) {
   const readAt = asString(message.read_at);
   const status = asString(message.status).toLowerCase();
@@ -250,7 +261,14 @@ function getMessageBody(message: AnyRow) {
 function getMessageSender(message: AnyRow) {
   return getText(
     message,
-    ["sender_name", "from_name", "name", "customer_name", "pet_parent_name", "guru_name"],
+    [
+      "sender_name",
+      "from_name",
+      "name",
+      "customer_name",
+      "pet_parent_name",
+      "guru_name",
+    ],
     "SitGuru User",
   );
 }
@@ -291,7 +309,12 @@ function getPlatformFeeAmount(booking: AnyRow) {
 }
 
 function getTipAmount(booking: AnyRow) {
-  return getAmount(booking, ["tip_amount", "guru_tip_amount", "tip", "gratuity"]);
+  return getAmount(booking, [
+    "tip_amount",
+    "guru_tip_amount",
+    "tip",
+    "gratuity",
+  ]);
 }
 
 function getPayoutAmount(booking: AnyRow, gross: number, fee: number) {
@@ -422,8 +445,6 @@ async function getAdminDashboardData() {
     ambassadorLeadsResult,
     bookingsResult,
     messagesResult,
-    launchSignupsResult,
-    launchWaitlistResult,
     partnersResult,
     partnerApplicationsResult,
     partnerPayoutsResult,
@@ -432,6 +453,11 @@ async function getAdminDashboardData() {
     referralRewardsResult,
     networkReferralsResult,
     networkRewardsResult,
+    networkProgramsResult,
+    networkParticipantsResult,
+    networkPartnerLeadsResult,
+    networkClickEventsResult,
+    partnerCampaignsResult,
     universityAssignmentsResult,
   ] = await Promise.all([
     safeRows(
@@ -487,22 +513,6 @@ async function getAdminDashboardData() {
       "messages",
       supabaseAdmin
         .from("messages")
-        .select("*", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .limit(1000),
-    ),
-    safeRows(
-      "launch_signups",
-      supabaseAdmin
-        .from("launch_signups")
-        .select("*", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .limit(1000),
-    ),
-    safeRows(
-      "launch_waitlist",
-      supabaseAdmin
-        .from("launch_waitlist")
         .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
         .limit(1000),
@@ -572,6 +582,46 @@ async function getAdminDashboardData() {
         .limit(1000),
     ),
     safeRows(
+      "network_programs",
+      supabaseAdmin
+        .from("network_programs")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "network_program_participants",
+      supabaseAdmin
+        .from("network_program_participants")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "network_partner_leads",
+      supabaseAdmin
+        .from("network_partner_leads")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "network_click_events",
+      supabaseAdmin
+        .from("network_click_events")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "partner_campaigns",
+      supabaseAdmin
+        .from("partner_campaigns")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
       "university_assignments",
       supabaseAdmin
         .from("university_assignments")
@@ -595,12 +645,12 @@ async function getAdminDashboardData() {
   const referralRewards = referralRewardsResult.rows;
   const networkReferrals = networkReferralsResult.rows;
   const networkRewards = networkRewardsResult.rows;
+  const networkPrograms = networkProgramsResult.rows;
+  const networkParticipants = networkParticipantsResult.rows;
+  const networkPartnerLeads = networkPartnerLeadsResult.rows;
+  const networkClickEvents = networkClickEventsResult.rows;
+  const partnerCampaigns = partnerCampaignsResult.rows;
   const universityAssignments = universityAssignmentsResult.rows;
-
-  const launchSignups = [
-    ...launchSignupsResult.rows,
-    ...launchWaitlistResult.rows,
-  ];
 
   const profilePetParents = profiles.filter((profile) => {
     const role = getRole(profile);
@@ -633,6 +683,10 @@ async function getAdminDashboardData() {
     return !hasName || !hasEmail || !hasCity || !hasState;
   });
 
+  const newPetParentsLast30 = profilePetParents.filter((profile) =>
+    isWithinLastDays(getDate(profile), 30),
+  );
+
   const pendingGurus = gurus.filter((guru) => {
     const verified = guru.is_verified === true;
     const stripeComplete = guru.stripe_onboarding_complete === true;
@@ -640,15 +694,35 @@ async function getAdminDashboardData() {
   });
 
   const verifiedGurus = gurus.filter((guru) => guru.is_verified === true);
+  const newGurusLast30 = gurus.filter((guru) =>
+    isWithinLastDays(getDate(guru), 30),
+  );
+
+  const activeNetworkPrograms = networkPrograms.filter(isActiveStatus);
+  const activeNetworkParticipants = networkParticipants.filter(isActiveStatus);
 
   const pendingAmbassadorItems = [
     ...ambassadorLeads.filter(isPendingStatus),
     ...partnerApplications.filter(isPendingStatus),
+    ...networkPartnerLeads.filter(isPendingStatus),
   ];
 
   const pendingBookings = bookings.filter(isPendingStatus);
   const activeBookings = bookings.filter(isActiveStatus);
   const unreadMessages = messages.filter(isUnreadMessage);
+
+  const convertedReferrals = [
+    ...referralConversions,
+    ...networkReferrals.filter(isConvertedStatus),
+  ];
+
+  const totalGrowthActivity =
+    referralClicks.length +
+    networkClickEvents.length +
+    convertedReferrals.length +
+    networkReferrals.length +
+    ambassadorLeads.length +
+    networkPartnerLeads.length;
 
   const amountFieldsDetected = hasAnyAmountField(bookings);
 
@@ -741,8 +815,6 @@ async function getAdminDashboardData() {
     ambassadorLeadsResult,
     bookingsResult,
     messagesResult,
-    launchSignupsResult,
-    launchWaitlistResult,
     partnersResult,
     partnerApplicationsResult,
     partnerPayoutsResult,
@@ -751,6 +823,11 @@ async function getAdminDashboardData() {
     referralRewardsResult,
     networkReferralsResult,
     networkRewardsResult,
+    networkProgramsResult,
+    networkParticipantsResult,
+    networkPartnerLeadsResult,
+    networkClickEventsResult,
+    partnerCampaignsResult,
     universityAssignmentsResult,
   ];
 
@@ -773,21 +850,30 @@ async function getAdminDashboardData() {
     referralRewards,
     networkReferrals,
     networkRewards,
+    networkPrograms,
+    networkParticipants,
+    networkPartnerLeads,
+    networkClickEvents,
+    partnerCampaigns,
     universityAssignments,
-    launchSignups,
     counts: {
       totalProfiles: safeCountValue(profilesResult),
       petParents: petParentExactCount,
+      newPetParentsLast30: newPetParentsLast30.length,
       gurus: safeCountValue(gurusResult),
       verifiedGurus: verifiedGurus.length,
+      newGurusLast30: newGurusLast30.length,
       ambassadors:
-        safeCountValue(ambassadorsResult) + safeCountValue(ambassadorLeadsResult),
+        safeCountValue(ambassadorsResult) +
+        safeCountValue(ambassadorLeadsResult),
       bookings: safeCountValue(bookingsResult),
       messages: safeCountValue(messagesResult),
-      launchSignups:
-        safeCountValue(launchSignupsResult) + safeCountValue(launchWaitlistResult),
       partners: safeCountValue(partnersResult),
+      activeNetworkPrograms: activeNetworkPrograms.length,
+      activeNetworkParticipants: activeNetworkParticipants.length,
       universityAssignments: safeCountValue(universityAssignmentsResult),
+      liveGrowthActivity: totalGrowthActivity,
+      convertedReferrals: convertedReferrals.length,
     },
     attention: {
       incompletePetParents,
@@ -840,7 +926,7 @@ export default async function AdminDashboardPage() {
     {
       title: "Pet Parents",
       value: number(data.counts.petParents),
-      detail: `${number(data.attention.incompletePetParents.length)} missing basic profile info`,
+      detail: `${number(data.counts.newPetParentsLast30)} new in 30 days, ${number(data.attention.incompletePetParents.length)} missing profile info`,
       href: adminRoutes.petParents,
       icon: <Users size={22} />,
       tone: "green" as const,
@@ -849,7 +935,7 @@ export default async function AdminDashboardPage() {
     {
       title: "Gurus",
       value: number(data.counts.gurus),
-      detail: `${number(data.attention.pendingGurus.length)} need review, Stripe, or verification`,
+      detail: `${number(data.counts.newGurusLast30)} new in 30 days, ${number(data.attention.pendingGurus.length)} need review`,
       href: adminRoutes.gurus,
       icon: <ShieldCheck size={22} />,
       tone: "emerald" as const,
@@ -883,13 +969,13 @@ export default async function AdminDashboardPage() {
       source: "messages",
     },
     {
-      title: "Growth",
-      value: number(data.counts.launchSignups),
-      detail: `${number(data.referralClicks.length)} referral clicks, ${number(data.referralConversions.length)} conversions`,
+      title: "Live Growth",
+      value: number(data.counts.liveGrowthActivity),
+      detail: `${number(data.counts.convertedReferrals)} conversions, ${number(data.networkReferrals.length)} referrals`,
       href: adminRoutes.referrals,
       icon: <Gift size={22} />,
       tone: "pink" as const,
-      source: "launch + referral tables",
+      source: "referral + network tables",
     },
   ];
 
@@ -947,7 +1033,7 @@ export default async function AdminDashboardPage() {
           <div className="min-w-0">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-green-900 shadow-sm">
               <Database size={15} />
-              Accuracy-first dashboard
+              Accuracy-first live dashboard
             </div>
 
             <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl 2xl:text-[3.25rem] 2xl:leading-none">
@@ -955,10 +1041,10 @@ export default async function AdminDashboardPage() {
             </h1>
 
             <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-slate-600">
-              A cleaner business overview for Pet Parents, Gurus, Ambassadors,
-              bookings, messages, growth, University, and financial readiness.
-              Metrics are either pulled from Supabase or clearly marked when a
-              source still needs wiring.
+              A live business overview for Pet Parents, Gurus, Ambassadors,
+              bookings, messages, referrals, University, and financial readiness.
+              Launch signup and waitlist metrics have been removed because
+              SitGuru is now launched.
             </p>
           </div>
 
@@ -1220,27 +1306,25 @@ export default async function AdminDashboardPage() {
             <SectionHeader
               icon={<Gift size={20} />}
               title="Growth & Referrals"
-              subtitle="Launch, PawPerks, referral, partner, and reward activity."
+              subtitle="Live growth activity after launch: PawPerks, referrals, campaigns, partners, and rewards."
               href={adminRoutes.referrals}
               linkLabel="Open growth"
             />
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <MiniMetric
-                label="Launch Signups"
-                value={number(data.counts.launchSignups)}
-                href={adminRoutes.launchSignups}
+                label="Live Growth Activity"
+                value={number(data.counts.liveGrowthActivity)}
+                href={adminRoutes.referrals}
               />
               <MiniMetric
                 label="Referral Clicks"
-                value={number(data.referralClicks.length)}
+                value={number(data.referralClicks.length + data.networkClickEvents.length)}
                 href={adminRoutes.referrals}
               />
               <MiniMetric
                 label="Conversions"
-                value={number(
-                  data.referralConversions.length + data.networkReferrals.length,
-                )}
+                value={number(data.counts.convertedReferrals)}
                 href={adminRoutes.referrals}
               />
               <MiniMetric
@@ -1267,7 +1351,7 @@ export default async function AdminDashboardPage() {
                 href={adminRoutes.partnerCampaigns}
                 icon={<MousePointerClick size={18} />}
                 title="Campaigns"
-                detail="Track links, clicks, and campaign activity"
+                detail={`${number(data.partnerCampaigns.length)} campaigns loaded`}
               />
               <AdminLinkRow
                 href={adminRoutes.partnerPayouts}
@@ -1336,8 +1420,45 @@ export default async function AdminDashboardPage() {
         </div>
       </section>
 
-      <section className="w-full min-w-0">
-        <AccountLifecycleRollupCard />
+      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-4">
+          <DashboardCard>
+            <SectionHeader
+              icon={<BriefcaseBusiness size={20} />}
+              title="Network Programs"
+              subtitle="Partners, Ambassadors, affiliates, active programs, and participants."
+              href={adminRoutes.partners}
+              linkLabel="Open partners"
+            />
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <MiniMetric
+                label="Active Programs"
+                value={number(data.counts.activeNetworkPrograms)}
+                href={adminRoutes.programs}
+              />
+              <MiniMetric
+                label="Participants"
+                value={number(data.counts.activeNetworkParticipants)}
+                href={adminRoutes.partners}
+              />
+              <MiniMetric
+                label="Partner Leads"
+                value={number(data.networkPartnerLeads.length)}
+                href={adminRoutes.partnerApplications}
+              />
+              <MiniMetric
+                label="Applications"
+                value={number(data.partnerApplications.length)}
+                href={adminRoutes.partnerApplications}
+              />
+            </div>
+          </DashboardCard>
+        </div>
+
+        <div className="min-w-0 xl:col-span-8">
+          <AccountLifecycleRollupCard />
+        </div>
       </section>
 
       <DashboardCard>
@@ -1469,7 +1590,9 @@ function SnapshotCard({
       className="group rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-lg"
     >
       <div className="mb-4 flex items-start justify-between gap-4">
-        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${tones[tone]}`}>
+        <div
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${tones[tone]}`}
+        >
           {icon}
         </div>
 
@@ -1490,11 +1613,14 @@ function SnapshotCard({
         <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
           Source
         </p>
-        <p className="mt-1 truncate text-xs font-bold text-slate-500">{source}</p>
+        <p className="mt-1 truncate text-xs font-bold text-slate-500">
+          {source}
+        </p>
       </div>
 
       <p className="mt-4 text-sm font-black text-green-800">
-        View details <span className="transition group-hover:translate-x-1">→</span>
+        View details{" "}
+        <span className="transition group-hover:translate-x-1">→</span>
       </p>
     </Link>
   );
