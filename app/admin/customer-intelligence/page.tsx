@@ -444,23 +444,44 @@ function getCustomerSignupQuality(customer: CustomerInsight) {
   };
 }
 
-function getCustomerProfileCompletion(customer: CustomerInsight) {
-  const fields = [
+function hasUsableCustomerName(customer: CustomerInsight) {
+  return Boolean(
     customer.name &&
-    customer.name !== "Signup Review Needed" &&
-    customer.name !== "Customer"
-      ? "name"
-      : "",
-    customer.email ? "email" : "",
-    customer.city || customer.state || customer.zipCode ? "location" : "",
-    customer.petCount > 0 ? "pets" : "",
-    customer.messageCount > 0 ? "messages" : "",
-    customer.bookingCount > 0 ? "bookings" : "",
+      customer.name !== "Signup Review Needed" &&
+      customer.name !== "Customer",
+  );
+}
+
+function hasCustomerLocation(customer: CustomerInsight) {
+  return Boolean(customer.city || customer.state || customer.zipCode);
+}
+
+function hasContactSignal(customer: CustomerInsight) {
+  /*
+   * Customer Intelligence does not currently load Supabase Auth confirmation
+   * timestamps. Until this page is wired to Auth metadata directly, a usable
+   * email is treated as the contact signal so the registry does not calculate
+   * a different completion percentage than the admin cleanup/profile preview
+   * pages for the same visible record.
+   */
+  return Boolean(customer.email);
+}
+
+function getCustomerProfileCompletion(customer: CustomerInsight) {
+  const checks = [
+    Boolean(customer.id),
+    hasUsableCustomerName(customer),
+    Boolean(customer.email),
+    hasContactSignal(customer),
+    false,
+    hasCustomerLocation(customer),
+    customer.petCount > 0,
+    customer.bookingCount > 0 || customer.messageCount > 0,
   ];
 
-  const completed = fields.filter(Boolean).length;
+  const completed = checks.filter(Boolean).length;
 
-  return Math.round((completed / fields.length) * 100);
+  return Math.round((completed / checks.length) * 100);
 }
 
 function getRole(row: AnyRow) {
