@@ -5,7 +5,9 @@ import {
   CalendarDays,
   CircleDollarSign,
   Download,
+  Eye,
   Globe2,
+  LayoutDashboard,
   Mail,
   MapPin,
   Megaphone,
@@ -13,6 +15,7 @@ import {
   PawPrint,
   Repeat2,
   Search,
+  Settings,
   Share2,
   TrendingUp,
   UserRound,
@@ -151,6 +154,7 @@ type CustomerInsight = {
   segment: string;
   signupQuality: "active" | "incomplete" | "needs_review" | "likely_test_spam";
   signupQualityLabel: string;
+  profileCompletion: number;
 };
 
 type LocationInsight = {
@@ -343,7 +347,11 @@ function looksLikeRandomToken(value: string) {
   const hasSuspiciousCamelMix = hasLower && hasUpper && compact.length >= 12;
   const hasLongConsonantRun = /[bcdfghjklmnpqrstvwxyz]{5,}/i.test(compact);
 
-  return (hasSuspiciousCamelMix && !value.includes(" ")) || (hasNumber && !hasVowel) || hasLongConsonantRun;
+  return (
+    (hasSuspiciousCamelMix && !value.includes(" ")) ||
+    (hasNumber && !hasVowel) ||
+    hasLongConsonantRun
+  );
 }
 
 function looksLikeSuspiciousEmail(value: string) {
@@ -352,7 +360,8 @@ function looksLikeSuspiciousEmail(value: string) {
 
   const [localPart, domain = ""] = normalized.split("@");
   const localWithoutDots = localPart.replace(/\./g, "");
-  const hasManySingleLetterSegments = localPart.split(".").filter((part) => part.length === 1).length >= 4;
+  const hasManySingleLetterSegments =
+    localPart.split(".").filter((part) => part.length === 1).length >= 4;
   const hasDisposableDomain = [
     "example.com",
     "test.com",
@@ -395,10 +404,17 @@ function getSafeCustomerDisplayName(row: AnyRow, fallback = "Customer") {
 }
 
 function getCustomerSignupQuality(customer: CustomerInsight) {
-  const hasActivity = customer.bookingCount > 0 || customer.petCount > 0 || customer.messageCount > 0 || customer.totalSpend > 0;
-  const hasRealName = customer.name !== "Signup Review Needed" && customer.name !== "Customer";
+  const hasActivity =
+    customer.bookingCount > 0 ||
+    customer.petCount > 0 ||
+    customer.messageCount > 0 ||
+    customer.totalSpend > 0;
+  const hasRealName =
+    customer.name !== "Signup Review Needed" && customer.name !== "Customer";
   const hasEmail = Boolean(customer.email);
-  const suspiciousEmail = customer.email ? looksLikeSuspiciousEmail(customer.email) : false;
+  const suspiciousEmail = customer.email
+    ? looksLikeSuspiciousEmail(customer.email)
+    : false;
   const hasLocation = Boolean(customer.city || customer.state || customer.zipCode);
 
   if (hasActivity) {
@@ -426,6 +442,25 @@ function getCustomerSignupQuality(customer: CustomerInsight) {
     signupQuality: "incomplete" as const,
     signupQualityLabel: "Registered",
   };
+}
+
+function getCustomerProfileCompletion(customer: CustomerInsight) {
+  const fields = [
+    customer.name &&
+    customer.name !== "Signup Review Needed" &&
+    customer.name !== "Customer"
+      ? "name"
+      : "",
+    customer.email ? "email" : "",
+    customer.city || customer.state || customer.zipCode ? "location" : "",
+    customer.petCount > 0 ? "pets" : "",
+    customer.messageCount > 0 ? "messages" : "",
+    customer.bookingCount > 0 ? "bookings" : "",
+  ];
+
+  const completed = fields.filter(Boolean).length;
+
+  return Math.round((completed / fields.length) * 100);
 }
 
 function getRole(row: AnyRow) {
@@ -669,9 +704,7 @@ function getMostRecentDate(values: Array<string | null>) {
 
   if (!validDates.length) return null;
 
-  return validDates
-    .sort((a, b) => b.getTime() - a.getTime())[0]
-    .toISOString();
+  return validDates.sort((a, b) => b.getTime() - a.getTime())[0].toISOString();
 }
 
 function getOldestDate(values: Array<string | null>) {
@@ -682,9 +715,7 @@ function getOldestDate(values: Array<string | null>) {
 
   if (!validDates.length) return null;
 
-  return validDates
-    .sort((a, b) => a.getTime() - b.getTime())[0]
-    .toISOString();
+  return validDates.sort((a, b) => a.getTime() - b.getTime())[0].toISOString();
 }
 
 function getCustomerSegment(customer: CustomerInsight) {
@@ -1110,6 +1141,7 @@ async function getCustomerIntelligenceData() {
       segment: "Lead",
       signupQuality: "incomplete",
       signupQualityLabel: "Registered",
+      profileCompletion: 0,
     });
   }
 
@@ -1152,6 +1184,7 @@ async function getCustomerIntelligenceData() {
         segment: "Lead",
         signupQuality: "incomplete",
         signupQualityLabel: "Registered",
+        profileCompletion: 0,
       };
 
     const bookingDate = getBookingDate(booking);
@@ -1227,12 +1260,21 @@ async function getCustomerIntelligenceData() {
       segment,
       signupQuality: "incomplete",
       signupQualityLabel: "Registered",
+      profileCompletion: 0,
+    });
+
+    const profileCompletion = getCustomerProfileCompletion({
+      ...enriched,
+      segment,
+      ...signupQuality,
+      profileCompletion: 0,
     });
 
     return {
       ...enriched,
       segment,
       ...signupQuality,
+      profileCompletion,
     };
   });
 
@@ -1372,16 +1414,35 @@ function getCustomerProfileHref(customerId: string) {
   return `/admin/customers/${encodeURIComponent(customerId)}`;
 }
 
+function getCustomerDashboardPreviewHref(customerId: string) {
+  return `/admin/customers/${encodeURIComponent(customerId)}/dashboard-preview`;
+}
+
+function getCustomerPublicProfilePreviewHref(customerId: string) {
+  return `/admin/customers/${encodeURIComponent(customerId)}/public-profile-preview`;
+}
+
 function getCustomerStatus(customer: CustomerInsight) {
   return customer.signupQualityLabel || customer.segment || "Registered";
 }
 
 function getCustomerStatusClasses(customer: CustomerInsight) {
   if (customer.signupQuality === "active") return "bg-green-100 text-green-800";
-  if (customer.signupQuality === "likely_test_spam") return "bg-rose-100 text-rose-800";
-  if (customer.signupQuality === "needs_review") return "bg-amber-100 text-amber-800";
+  if (customer.signupQuality === "likely_test_spam") {
+    return "bg-rose-100 text-rose-800";
+  }
+  if (customer.signupQuality === "needs_review") {
+    return "bg-amber-100 text-amber-800";
+  }
 
   return "bg-slate-100 text-slate-700";
+}
+
+function getCompletionClasses(percentage: number) {
+  if (percentage >= 80) return "bg-green-100 text-green-800";
+  if (percentage >= 50) return "bg-amber-100 text-amber-800";
+
+  return "bg-rose-100 text-rose-800";
 }
 
 function getCustomerLocationLabel(customer: CustomerInsight) {
@@ -1412,10 +1473,12 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
             Super Admin Pet Parent Registry
           </p>
           <h2 className="mt-1 text-2xl font-black text-slate-950">
-            Click a Pet Parent to open the full profile
+            Click into each Pet Parent view
           </h2>
           <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-            This gives Super Admin a front-door list of Pet Parent records and clearly flags incomplete, suspicious, or review-needed signup records before the deeper charts and reporting sections.
+            View each Pet Parent through their dashboard preview, public profile
+            preview, or admin cleanup controls. Dashboard and public profile
+            previews are read-only. Admin cleanup controls are updatable.
           </p>
         </div>
 
@@ -1430,21 +1493,21 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
 
       {recentCustomers.length ? (
         <div className="overflow-hidden rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9]">
-          <div className="hidden grid-cols-[1.45fr_1fr_0.8fr_0.8fr_0.8fr_0.75fr] gap-3 border-b border-[#e3ece5] bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400 lg:grid">
+          <div className="hidden grid-cols-[1.3fr_0.95fr_0.72fr_0.62fr_0.55fr_0.55fr_1.45fr] gap-3 border-b border-[#e3ece5] bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400 xl:grid">
             <span>Pet Parent</span>
             <span>Location</span>
             <span>Status</span>
+            <span>Completion</span>
             <span>Bookings</span>
             <span>Spend</span>
-            <span className="text-right">Profile</span>
+            <span className="text-right">Views / Controls</span>
           </div>
 
           <div className="divide-y divide-[#e3ece5]">
             {recentCustomers.map((customer) => (
-              <Link
+              <div
                 key={customer.id}
-                href={getCustomerProfileHref(customer.id)}
-                className="grid gap-3 bg-white px-4 py-4 transition hover:bg-green-50/60 lg:grid-cols-[1.45fr_1fr_0.8fr_0.8fr_0.8fr_0.75fr] lg:items-center"
+                className="grid gap-4 bg-white px-4 py-4 transition hover:bg-green-50/60 xl:grid-cols-[1.3fr_0.95fr_0.72fr_0.62fr_0.55fr_0.55fr_1.45fr] xl:items-center"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
@@ -1487,6 +1550,17 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
                   </span>
                 </div>
 
+                <div>
+                  <span
+                    className={[
+                      "inline-flex rounded-full px-3 py-1 text-xs font-black",
+                      getCompletionClasses(customer.profileCompletion),
+                    ].join(" ")}
+                  >
+                    {customer.profileCompletion}%
+                  </span>
+                </div>
+
                 <p className="text-sm font-black text-slate-950">
                   {number(customer.bookingCount)}
                   <span className="ml-1 text-xs font-bold text-slate-400">
@@ -1498,13 +1572,32 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
                   {money(customer.totalSpend)}
                 </p>
 
-                <div className="flex justify-start lg:justify-end">
-                  <span className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-2 text-xs font-black text-white shadow-sm">
-                    View Profile
-                    <MousePointerClick size={14} />
-                  </span>
+                <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:justify-end">
+                  <Link
+                    href={getCustomerDashboardPreviewHref(customer.id)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-800 shadow-sm transition hover:bg-sky-100"
+                  >
+                    <LayoutDashboard size={14} />
+                    Dashboard View
+                  </Link>
+
+                  <Link
+                    href={getCustomerPublicProfilePreviewHref(customer.id)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100"
+                  >
+                    <Eye size={14} />
+                    Public Profile
+                  </Link>
+
+                  <Link
+                    href={getCustomerProfileHref(customer.id)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-green-800 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-green-900"
+                  >
+                    <Settings size={14} />
+                    Admin Cleanup
+                  </Link>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>
