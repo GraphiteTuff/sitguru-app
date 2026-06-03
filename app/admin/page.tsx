@@ -1,25 +1,22 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   BarChart3,
-  Bell,
   BriefcaseBusiness,
   CalendarDays,
+  CheckCircle2,
   CircleDollarSign,
-  CreditCard,
+  Database,
   Download,
   FileBarChart,
   Gift,
-  Link2,
+  GraduationCap,
   MessageCircle,
   MousePointerClick,
   Plus,
-  ReceiptText,
   Settings,
   ShieldCheck,
-  Star,
-  TrendingDown,
-  TrendingUp,
   UserPlus,
   Users,
   WalletCards,
@@ -27,15 +24,24 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AccountLifecycleRollupCard from "@/components/admin/AccountLifecycleRollupCard";
-import GuruFinancialDashboardSnapshot from "./GuruFinancialDashboardSnapshot";
 
 export const dynamic = "force-dynamic";
 
 type AnyRow = Record<string, unknown>;
 
-type SafeAdminQueryResponse = {
-  data: unknown;
-  error: unknown;
+type SafeRowsResult = {
+  label: string;
+  rows: AnyRow[];
+  count: number | null;
+  ok: boolean;
+  errorMessage: string;
+};
+
+type SafeCountResult = {
+  label: string;
+  count: number | null;
+  ok: boolean;
+  errorMessage: string;
 };
 
 const adminRoutes = {
@@ -45,12 +51,11 @@ const adminRoutes = {
   guruAccountLifecycle: "/admin/gurus/account-lifecycle",
   bookings: "/admin/bookings",
   newBooking: "/admin/bookings/new",
-  customers: "/admin/customers",
-  newCustomer: "/admin/customers/new",
+  petParents: "/admin/customers",
+  newPetParent: "/admin/customers/new",
   gurus: "/admin/gurus",
   newGuru: "/admin/gurus/new",
   guruPerformance: "/admin/guru-performance",
-  guruPerformanceExport: "/admin/guru-performance/export",
   messages: "/admin/messages",
   settings: "/admin/settings",
   financials: "/admin/financials",
@@ -64,6 +69,8 @@ const adminRoutes = {
   referrals: "/admin/referrals",
   programs: "/admin/programs",
   hr: "/admin/hr",
+  universityTraining: "/admin/ambassador-training",
+  universityAssignments: "/admin/university-assignments",
   ambassadorLeads: "/admin/ambassador-leads",
   partners: "/admin/partners",
   partnerApplications: "/admin/partners/applications",
@@ -93,65 +100,18 @@ function asNumber(value: unknown) {
   return 0;
 }
 
-function money(value: number) {
+function number(value: number | null | undefined) {
+  return new Intl.NumberFormat("en-US").format(
+    Number.isFinite(value || 0) ? value || 0 : 0,
+  );
+}
+
+function money(value: number | null | undefined) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0);
-}
-
-function number(value: number) {
-  return new Intl.NumberFormat("en-US").format(
-    Number.isFinite(value) ? value : 0,
-  );
-}
-
-function percent(value: number) {
-  return `${Number.isFinite(value) ? value.toFixed(1) : "0.0"}%`;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
-
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatMessageTime(value?: string | null) {
-  if (!value) return "now";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "now";
-
-  const diff = Date.now() - parsed.getTime();
-  const minutes = Math.max(1, Math.floor(diff / 60000));
-
-  if (minutes < 60) return `${minutes}m ago`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
-function getAmount(row: AnyRow, keys: string[]) {
-  for (const key of keys) {
-    const value = asNumber(row[key]);
-    if (value > 0) return value;
-  }
-
-  return 0;
-}
-
-function sumAmounts(rows: AnyRow[], keys: string[]) {
-  return rows.reduce((sum, row) => sum + getAmount(row, keys), 0);
+  }).format(Number.isFinite(value || 0) ? value || 0 : 0);
 }
 
 function getText(row: AnyRow, keys: string[], fallback = "") {
@@ -174,126 +134,12 @@ function getDate(row: AnyRow) {
   );
 }
 
-function isWithinLastDays(value: string | null, days: number) {
-  if (!value) return false;
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return false;
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-
-  return parsed >= cutoff;
-}
-
-function calcChange(current: number, previous: number) {
-  if (!current && !previous) return 0;
-  if (!previous) return 100;
-  return ((current - previous) / previous) * 100;
-}
-
-function getGrossAmount(booking: AnyRow) {
-  return getAmount(booking, [
-    "subtotal_amount",
-    "total_customer_paid",
-    "total_amount",
-    "booking_total",
-    "amount_paid",
-    "amount",
-    "price",
-    "hourly_rate",
-  ]);
-}
-
-function getFeeAmount(booking: AnyRow, gross: number) {
-  const explicitFee = getAmount(booking, [
-    "marketplace_fee_amount",
-    "trust_and_safety_fee_amount",
-    "sitguru_fee_amount",
-    "platform_fee_amount",
-    "platform_fee",
-    "service_fee",
-    "admin_fee",
-    "commission",
-    "commission_amount",
-  ]);
-
-  return explicitFee > 0 ? explicitFee : 0;
-}
-
-function getTipAmount(booking: AnyRow) {
-  return getAmount(booking, [
-    "tip_amount",
-    "guru_tip_amount",
-    "tip",
-    "gratuity",
-  ]);
-}
-
-function getTaxAmount(booking: AnyRow) {
-  return getAmount(booking, [
-    "sales_tax_amount",
-    "tax_amount",
-    "tax",
-    "sales_tax",
-    "taxes_collected",
-  ]);
-}
-
-function getNetGuruAmount(booking: AnyRow, gross: number, fee: number) {
-  const explicitNet = getAmount(booking, [
-    "guru_net_amount",
-    "guru_payout",
-    "payout_amount",
-    "provider_amount",
-    "guru_amount",
-  ]);
-
-  return explicitNet > 0 ? explicitNet : Math.max(gross - fee, 0) + getTipAmount(booking);
-}
-
 function getStatus(row: AnyRow) {
   return getText(
     row,
     ["status", "payment_status", "booking_status", "payout_status"],
     "pending",
   ).toLowerCase();
-}
-
-function isActiveStatus(row: AnyRow) {
-  const status = getStatus(row);
-  return (
-    status === "active" ||
-    status === "approved" ||
-    status === "live" ||
-    status === "enabled"
-  );
-}
-
-function isPendingStatus(row: AnyRow) {
-  const status = getStatus(row);
-  return (
-    status === "new" ||
-    status === "pending" ||
-    status === "submitted" ||
-    status === "review" ||
-    status === "in_review" ||
-    status === "contacted" ||
-    status === "interested" ||
-    status === "applied"
-  );
-}
-
-function isConvertedStatus(row: AnyRow) {
-  const status = getStatus(row);
-  return (
-    status === "converted" ||
-    status === "approved" ||
-    status === "booked" ||
-    status === "paid" ||
-    status === "completed" ||
-    status === "active"
-  );
 }
 
 function getRole(row: AnyRow) {
@@ -304,15 +150,7 @@ function getRole(row: AnyRow) {
   ).toLowerCase();
 }
 
-function getParticipantType(row: AnyRow) {
-  return getText(
-    row,
-    ["participant_type", "partner_type", "program_type", "type", "role"],
-    "",
-  ).toLowerCase();
-}
-
-function getDisplayName(row: AnyRow, fallback = "User") {
+function getDisplayName(row: AnyRow, fallback = "SitGuru User") {
   const firstName = getText(row, ["first_name", "firstName"]);
   const lastName = getText(row, ["last_name", "lastName"]);
 
@@ -325,8 +163,8 @@ function getDisplayName(row: AnyRow, fallback = "User") {
       "display_name",
       "name",
       "customer_name",
+      "pet_parent_name",
       "guru_name",
-      "sitter_name",
       "email",
     ],
     fallback,
@@ -352,31 +190,42 @@ function getInitials(name: string) {
     .join("");
 }
 
-function getGuruId(booking: AnyRow) {
-  return getText(booking, ["guru_id", "sitter_id", "provider_id"], "unknown");
+function isWithinLastDays(value: string | null, days: number) {
+  if (!value) return false;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  return parsed >= cutoff;
 }
 
-function getCustomerId(booking: AnyRow) {
-  return getText(
-    booking,
-    ["customer_id", "pet_owner_id", "client_id", "user_id"],
-    "unknown",
+function isPendingStatus(row: AnyRow) {
+  const status = getStatus(row);
+
+  return (
+    status === "new" ||
+    status === "pending" ||
+    status === "submitted" ||
+    status === "review" ||
+    status === "in_review" ||
+    status === "contacted" ||
+    status === "interested" ||
+    status === "applied"
   );
 }
 
-function getGuruNameFromBooking(booking: AnyRow) {
-  return getText(
-    booking,
-    ["guru_name", "sitter_name", "provider_name"],
-    "Guru",
-  );
-}
+function isActiveStatus(row: AnyRow) {
+  const status = getStatus(row);
 
-function getCustomerNameFromBooking(booking: AnyRow) {
-  return getText(
-    booking,
-    ["customer_name", "pet_parent_name", "owner_name", "customer_email"],
-    "Customer",
+  return (
+    status === "active" ||
+    status === "approved" ||
+    status === "live" ||
+    status === "enabled" ||
+    status === "verified"
   );
 }
 
@@ -401,542 +250,465 @@ function getMessageBody(message: AnyRow) {
 function getMessageSender(message: AnyRow) {
   return getText(
     message,
-    ["sender_name", "from_name", "name", "customer_name", "guru_name"],
+    ["sender_name", "from_name", "name", "customer_name", "pet_parent_name", "guru_name"],
     "SitGuru User",
   );
 }
 
-async function safeAdminQuery(
-  query: PromiseLike<SafeAdminQueryResponse>,
+function getAmount(row: AnyRow, keys: string[]) {
+  for (const key of keys) {
+    const value = asNumber(row[key]);
+    if (value > 0) return value;
+  }
+
+  return 0;
+}
+
+function getGrossBookingAmount(booking: AnyRow) {
+  return getAmount(booking, [
+    "subtotal_amount",
+    "total_customer_paid",
+    "total_amount",
+    "booking_total",
+    "amount_paid",
+    "amount",
+    "price",
+  ]);
+}
+
+function getPlatformFeeAmount(booking: AnyRow) {
+  return getAmount(booking, [
+    "marketplace_fee_amount",
+    "trust_and_safety_fee_amount",
+    "sitguru_fee_amount",
+    "platform_fee_amount",
+    "platform_fee",
+    "service_fee",
+    "admin_fee",
+    "commission",
+    "commission_amount",
+  ]);
+}
+
+function getTipAmount(booking: AnyRow) {
+  return getAmount(booking, ["tip_amount", "guru_tip_amount", "tip", "gratuity"]);
+}
+
+function getPayoutAmount(booking: AnyRow, gross: number, fee: number) {
+  const explicitPayout = getAmount(booking, [
+    "guru_net_amount",
+    "guru_payout",
+    "payout_amount",
+    "provider_amount",
+    "guru_amount",
+  ]);
+
+  if (explicitPayout > 0) return explicitPayout;
+
+  if (gross > 0) {
+    return Math.max(gross - fee, 0) + getTipAmount(booking);
+  }
+
+  return 0;
+}
+
+function hasAnyAmountField(rows: AnyRow[]) {
+  return rows.some((row) =>
+    [
+      "subtotal_amount",
+      "total_customer_paid",
+      "total_amount",
+      "booking_total",
+      "amount_paid",
+      "amount",
+      "price",
+      "platform_fee_amount",
+      "service_fee",
+      "commission_amount",
+      "guru_payout",
+      "payout_amount",
+    ].some((key) => asNumber(row[key]) > 0),
+  );
+}
+
+function safeCountValue(result: SafeCountResult | SafeRowsResult) {
+  return typeof result.count === "number" ? result.count : 0;
+}
+
+async function safeRows(
   label: string,
-): Promise<SafeAdminQueryResponse> {
+  query: PromiseLike<{
+    data: unknown;
+    count?: number | null;
+    error: { message?: string } | null;
+  }>,
+): Promise<SafeRowsResult> {
   try {
     const result = await query;
 
     if (result.error) {
       console.warn(`Admin dashboard query skipped for ${label}:`, result.error);
-      return { data: [], error: null };
+      return {
+        label,
+        rows: [],
+        count: null,
+        ok: false,
+        errorMessage: result.error.message || "Query failed",
+      };
     }
 
-    return result;
+    return {
+      label,
+      rows: Array.isArray(result.data) ? (result.data as AnyRow[]) : [],
+      count: typeof result.count === "number" ? result.count : null,
+      ok: true,
+      errorMessage: "",
+    };
   } catch (error) {
     console.warn(`Admin dashboard query skipped for ${label}:`, error);
-    return { data: [], error: null };
+    return {
+      label,
+      rows: [],
+      count: null,
+      ok: false,
+      errorMessage: error instanceof Error ? error.message : "Query failed",
+    };
   }
 }
 
-function mergeRows(...groups: AnyRow[][]) {
-  const merged: AnyRow[] = [];
-  const seen = new Set<string>();
+async function safeCount(
+  label: string,
+  query: PromiseLike<{
+    count?: number | null;
+    error: { message?: string } | null;
+  }>,
+): Promise<SafeCountResult> {
+  try {
+    const result = await query;
 
-  for (const group of groups) {
-    for (const row of group) {
-      const key =
-        getText(row, ["id", "email", "user_id", "created_at"]) ||
-        `${merged.length}`;
-
-      if (seen.has(key)) continue;
-
-      seen.add(key);
-      merged.push(row);
+    if (result.error) {
+      console.warn(`Admin dashboard count skipped for ${label}:`, result.error);
+      return {
+        label,
+        count: null,
+        ok: false,
+        errorMessage: result.error.message || "Count failed",
+      };
     }
+
+    return {
+      label,
+      count: typeof result.count === "number" ? result.count : null,
+      ok: true,
+      errorMessage: "",
+    };
+  } catch (error) {
+    console.warn(`Admin dashboard count skipped for ${label}:`, error);
+    return {
+      label,
+      count: null,
+      ok: false,
+      errorMessage: error instanceof Error ? error.message : "Count failed",
+    };
   }
-
-  return merged;
-}
-
-function getSourceColor(source: string) {
-  if (source === "Instagram") return "#EC4899";
-  if (source === "Facebook") return "#3B82F6";
-  if (source === "TikTok") return "#1F2937";
-  if (source === "Referral / Email") return "#FB923C";
-  return "#059669";
-}
-
-function buildSignupConicGradient(
-  sources: {
-    name: string;
-    value: number;
-  }[],
-) {
-  const total = sources.reduce((sum, source) => sum + source.value, 0);
-
-  if (!total) {
-    return "conic-gradient(#E5E7EB 0deg 360deg)";
-  }
-
-  let start = 0;
-
-  const stops = sources.map((source) => {
-    const degrees = (source.value / total) * 360;
-    const end = start + degrees;
-    const segment = `${getSourceColor(source.name)} ${start}deg ${end}deg`;
-    start = end;
-    return segment;
-  });
-
-  return `conic-gradient(${stops.join(", ")})`;
 }
 
 async function getAdminDashboardData() {
   const [
-    bookingsResult,
-    gurusResult,
     profilesResult,
+    petParentCountResult,
+    gurusResult,
+    ambassadorsResult,
+    ambassadorLeadsResult,
+    bookingsResult,
+    messagesResult,
     launchSignupsResult,
     launchWaitlistResult,
-    messagesResult,
-    programsResult,
     partnersResult,
-    expensesResult,
-    networkProgramsResult,
-    networkParticipantsResult,
-    networkReferralsResult,
-    networkRewardsResult,
-    networkPartnerLeadsResult,
-    networkClickEventsResult,
     partnerApplicationsResult,
-    referralClickEventsResult,
+    partnerPayoutsResult,
+    referralClicksResult,
     referralConversionsResult,
     referralRewardsResult,
-    partnerPayoutsResult,
-    partnerMessagesResult,
-    ambassadorsResult,
-    affiliatesResult,
-    partnerCampaignsResult,
-    ambassadorLeadsResult,
+    networkReferralsResult,
+    networkRewardsResult,
+    universityAssignmentsResult,
   ] = await Promise.all([
-    safeAdminQuery(
-      supabaseAdmin.from("bookings").select("*").limit(1000),
-      "bookings",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("gurus").select("*").limit(1000),
-      "gurus",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("profiles").select("*").limit(1000),
+    safeRows(
       "profiles",
-    ),
-    safeAdminQuery(
       supabaseAdmin
-        .from("launch_signups")
-        .select("*")
+        .from("profiles")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
         .limit(1000),
-      "launch_signups",
     ),
-    safeAdminQuery(
+    safeCount(
+      "Pet Parent profiles",
       supabaseAdmin
-        .from("launch_waitlist")
-        .select("*")
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .or(
+          "role.ilike.%customer%,role.ilike.%parent%,role.ilike.%client%,role.eq.pet_parent",
+        ),
+    ),
+    safeRows(
+      "gurus",
+      supabaseAdmin
+        .from("gurus")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
         .limit(1000),
-      "launch_waitlist",
     ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("messages")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "messages",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("programs").select("*").limit(500),
-      "programs",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("partners").select("*").limit(500),
-      "partners",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("expenses").select("*").limit(1000),
-      "expenses",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("network_programs").select("*").limit(500),
-      "network_programs",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("network_program_participants").select("*").limit(1000),
-      "network_program_participants",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("network_referrals").select("*").limit(1000),
-      "network_referrals",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("network_rewards").select("*").limit(1000),
-      "network_rewards",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("network_partner_leads").select("*").limit(1000),
-      "network_partner_leads",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("network_click_events").select("*").limit(1000),
-      "network_click_events",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("partner_applications").select("*").limit(1000),
-      "partner_applications",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("referral_clicks").select("*").limit(1000),
-      "referral_clicks",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("referral_conversions").select("*").limit(1000),
-      "referral_conversions",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("referral_rewards").select("*").limit(1000),
-      "referral_rewards",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("partner_payouts").select("*").limit(1000),
-      "partner_payouts",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("partner_messages").select("*").limit(1000),
-      "partner_messages",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("ambassadors").select("*").limit(1000),
+    safeRows(
       "ambassadors",
+      supabaseAdmin
+        .from("ambassadors")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
     ),
-    safeAdminQuery(
-      supabaseAdmin.from("affiliates").select("*").limit(1000),
-      "affiliates",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("partner_campaigns").select("*").limit(1000),
-      "partner_campaigns",
-    ),
-    safeAdminQuery(
+    safeRows(
+      "ambassador_leads",
       supabaseAdmin
         .from("ambassador_leads")
-        .select("*")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
         .limit(1000),
-      "ambassador_leads",
+    ),
+    safeRows(
+      "bookings",
+      supabaseAdmin
+        .from("bookings")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "messages",
+      supabaseAdmin
+        .from("messages")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "launch_signups",
+      supabaseAdmin
+        .from("launch_signups")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "launch_waitlist",
+      supabaseAdmin
+        .from("launch_waitlist")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "partners",
+      supabaseAdmin
+        .from("partners")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "partner_applications",
+      supabaseAdmin
+        .from("partner_applications")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "partner_payouts",
+      supabaseAdmin
+        .from("partner_payouts")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "referral_clicks",
+      supabaseAdmin
+        .from("referral_clicks")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "referral_conversions",
+      supabaseAdmin
+        .from("referral_conversions")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "referral_rewards",
+      supabaseAdmin
+        .from("referral_rewards")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "network_referrals",
+      supabaseAdmin
+        .from("network_referrals")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "network_rewards",
+      supabaseAdmin
+        .from("network_rewards")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ),
+    safeRows(
+      "university_assignments",
+      supabaseAdmin
+        .from("university_assignments")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(1000),
     ),
   ]);
 
-  const bookings = ((bookingsResult.data || []) as AnyRow[]).filter(Boolean);
-  const rawGurus = ((gurusResult.data || []) as AnyRow[]).filter(Boolean);
-  const profiles = ((profilesResult.data || []) as AnyRow[]).filter(Boolean);
-  const messages = ((messagesResult.data || []) as AnyRow[]).filter(Boolean);
-  const programs = ((programsResult.data || []) as AnyRow[]).filter(Boolean);
-  const partners = ((partnersResult.data || []) as AnyRow[]).filter(Boolean);
-  const expenses = ((expensesResult.data || []) as AnyRow[]).filter(Boolean);
+  const profiles = profilesResult.rows;
+  const gurus = gurusResult.rows;
+  const ambassadors = ambassadorsResult.rows;
+  const ambassadorLeads = ambassadorLeadsResult.rows;
+  const bookings = bookingsResult.rows;
+  const messages = messagesResult.rows;
+  const partners = partnersResult.rows;
+  const partnerApplications = partnerApplicationsResult.rows;
+  const partnerPayouts = partnerPayoutsResult.rows;
+  const referralClicks = referralClicksResult.rows;
+  const referralConversions = referralConversionsResult.rows;
+  const referralRewards = referralRewardsResult.rows;
+  const networkReferrals = networkReferralsResult.rows;
+  const networkRewards = networkRewardsResult.rows;
+  const universityAssignments = universityAssignmentsResult.rows;
 
-  const networkPrograms = ((networkProgramsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkParticipants = ((networkParticipantsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkReferrals = ((networkReferralsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkRewards = ((networkRewardsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkPartnerLeads = ((networkPartnerLeadsResult.data || []) as AnyRow[]).filter(Boolean);
-  const networkClickEvents = ((networkClickEventsResult.data || []) as AnyRow[]).filter(Boolean);
-  const partnerApplications = ((partnerApplicationsResult.data || []) as AnyRow[]).filter(Boolean);
-  const referralClickEvents = ((referralClickEventsResult.data || []) as AnyRow[]).filter(Boolean);
-  const referralConversions = ((referralConversionsResult.data || []) as AnyRow[]).filter(Boolean);
-  const referralRewards = ((referralRewardsResult.data || []) as AnyRow[]).filter(Boolean);
-  const partnerPayouts = ((partnerPayoutsResult.data || []) as AnyRow[]).filter(Boolean);
-  const partnerMessages = ((partnerMessagesResult.data || []) as AnyRow[]).filter(Boolean);
-  const ambassadors = ((ambassadorsResult.data || []) as AnyRow[]).filter(Boolean);
-  const affiliates = ((affiliatesResult.data || []) as AnyRow[]).filter(Boolean);
-  const partnerCampaigns = ((partnerCampaignsResult.data || []) as AnyRow[]).filter(Boolean);
-  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).filter(Boolean);
+  const launchSignups = [
+    ...launchSignupsResult.rows,
+    ...launchWaitlistResult.rows,
+  ];
 
-  const launchSignups = mergeRows(
-    ((launchSignupsResult.data || []) as AnyRow[]).filter(Boolean),
-    ((launchWaitlistResult.data || []) as AnyRow[]).filter(Boolean),
-  );
-
-  const profileGurus = profiles.filter((profile) => {
+  const profilePetParents = profiles.filter((profile) => {
     const role = getRole(profile);
-    return (
-      role.includes("guru") ||
-      role.includes("sitter") ||
-      role.includes("provider")
-    );
-  });
 
-  const profileCustomers = profiles.filter((profile) => {
-    const role = getRole(profile);
     return (
       role.includes("customer") ||
       role.includes("parent") ||
-      role.includes("client")
+      role.includes("client") ||
+      role === "pet_parent"
     );
   });
 
-  const gurus = rawGurus.length ? rawGurus : profileGurus;
+  const petParentsLoadedCount = profilePetParents.length;
+  const petParentExactCount =
+    petParentCountResult.ok && petParentCountResult.count !== null
+      ? petParentCountResult.count
+      : petParentsLoadedCount;
 
-  const grossRevenue = bookings.reduce(
-    (sum, booking) => sum + getGrossAmount(booking),
-    0,
-  );
+  const incompletePetParents = profilePetParents.filter((profile) => {
+    const hasName =
+      Boolean(getText(profile, ["full_name", "display_name", "name"])) ||
+      Boolean(getText(profile, ["first_name"])) ||
+      Boolean(getText(profile, ["last_name"]));
+    const hasEmail = Boolean(getText(profile, ["email"]));
+    const hasCity = Boolean(getText(profile, ["city"]));
+    const hasState = Boolean(
+      getText(profile, ["state", "State", "state_code"]),
+    );
 
-  const netPlatformRevenue = bookings.reduce((sum, booking) => {
-    const gross = getGrossAmount(booking);
-    return sum + getFeeAmount(booking, gross);
-  }, 0);
+    return !hasName || !hasEmail || !hasCity || !hasState;
+  });
 
-  const totalTips = bookings.reduce((sum, booking) => sum + getTipAmount(booking), 0);
+  const pendingGurus = gurus.filter((guru) => {
+    const verified = guru.is_verified === true;
+    const stripeComplete = guru.stripe_onboarding_complete === true;
+    return !verified || !stripeComplete || isPendingStatus(guru);
+  });
 
-  const totalGuruEarnings = bookings.reduce((sum, booking) => {
-    const gross = getGrossAmount(booking);
-    const fee = getFeeAmount(booking, gross);
-    return sum + getNetGuruAmount(booking, gross, fee);
-  }, 0);
+  const verifiedGurus = gurus.filter((guru) => guru.is_verified === true);
 
-  const taxesCollected = bookings.reduce(
-    (sum, booking) => sum + getTaxAmount(booking),
-    0,
-  );
-
-  const realExpenseTotal = sumAmounts(expenses, [
-    "amount",
-    "expense_amount",
-    "total",
-    "cost",
-    "price",
-  ]);
-
-  const pendingPayouts = bookings.reduce((sum, booking) => {
-    const paymentStatus = asString(booking.payment_status).toLowerCase();
-    const payoutStatus = asString(booking.payout_status).toLowerCase();
-    const status = getStatus(booking);
-    const gross = getGrossAmount(booking);
-    const fee = getFeeAmount(booking, gross);
-
-    const shouldCount =
-      paymentStatus === "paid" ||
-      status.includes("paid") ||
-      status.includes("complete") ||
-      status.includes("confirmed");
-
-    if (shouldCount && payoutStatus !== "paid") {
-      return sum + getNetGuruAmount(booking, gross, fee);
-    }
-
-    return sum;
-  }, 0);
-
-  const currentRevenue = bookings
-    .filter((booking) => isWithinLastDays(getDate(booking), 30))
-    .reduce((sum, booking) => sum + getGrossAmount(booking), 0);
-
-  const previousRevenue = bookings
-    .filter((booking) => {
-      const dateValue = getDate(booking);
-      if (!dateValue) return false;
-
-      const parsed = new Date(dateValue);
-      if (Number.isNaN(parsed.getTime())) return false;
-
-      const now = new Date();
-      const start = new Date();
-      start.setDate(now.getDate() - 60);
-
-      const end = new Date();
-      end.setDate(now.getDate() - 30);
-
-      return parsed >= start && parsed < end;
-    })
-    .reduce((sum, booking) => sum + getGrossAmount(booking), 0);
-
-  const revenueChange = calcChange(currentRevenue, previousRevenue);
-  const platformTakeRate =
-    grossRevenue > 0 ? (netPlatformRevenue / grossRevenue) * 100 : 0;
-
-  const unreadMessages = messages.filter(isUnreadMessage).length;
-
-  const sourceCounts = launchSignups.reduce<Record<string, number>>(
-    (acc, signup) => {
-      const rawSource = getText(
-        signup,
-        ["source", "utm_source", "signup_source"],
-        "direct",
-      ).toLowerCase();
-
-      const source = rawSource.includes("insta")
-        ? "Instagram"
-        : rawSource.includes("facebook") || rawSource.includes("meta")
-          ? "Facebook"
-          : rawSource.includes("tiktok")
-            ? "TikTok"
-            : rawSource.includes("referral") || rawSource.includes("email")
-              ? "Referral / Email"
-              : "Direct";
-
-      acc[source] = (acc[source] || 0) + 1;
-      return acc;
-    },
-    {},
-  );
-
-  const signupSources = [
-    {
-      name: "Instagram",
-      value: sourceCounts["Instagram"] || 0,
-      color: "bg-pink-500",
-    },
-    {
-      name: "Direct",
-      value: sourceCounts["Direct"] || 0,
-      color: "bg-emerald-600",
-    },
-    {
-      name: "Facebook",
-      value: sourceCounts["Facebook"] || 0,
-      color: "bg-blue-500",
-    },
-    {
-      name: "TikTok",
-      value: sourceCounts["TikTok"] || 0,
-      color: "bg-slate-800",
-    },
-    {
-      name: "Referral / Email",
-      value: sourceCounts["Referral / Email"] || 0,
-      color: "bg-orange-400",
-    },
+  const pendingAmbassadorItems = [
+    ...ambassadorLeads.filter(isPendingStatus),
+    ...partnerApplications.filter(isPendingStatus),
   ];
 
-  const signupTotal = signupSources.reduce(
-    (sum, source) => sum + source.value,
+  const pendingBookings = bookings.filter(isPendingStatus);
+  const activeBookings = bookings.filter(isActiveStatus);
+  const unreadMessages = messages.filter(isUnreadMessage);
+
+  const amountFieldsDetected = hasAnyAmountField(bookings);
+
+  const bookingGross = amountFieldsDetected
+    ? bookings.reduce((sum, booking) => sum + getGrossBookingAmount(booking), 0)
+    : null;
+
+  const platformFees = amountFieldsDetected
+    ? bookings.reduce((sum, booking) => sum + getPlatformFeeAmount(booking), 0)
+    : null;
+
+  const tips = amountFieldsDetected
+    ? bookings.reduce((sum, booking) => sum + getTipAmount(booking), 0)
+    : null;
+
+  const pendingPayouts = amountFieldsDetected
+    ? bookings.reduce((sum, booking) => {
+        const paymentStatus = asString(booking.payment_status).toLowerCase();
+        const payoutStatus = asString(booking.payout_status).toLowerCase();
+        const status = getStatus(booking);
+        const gross = getGrossBookingAmount(booking);
+        const fee = getPlatformFeeAmount(booking);
+
+        const paidByPetParent =
+          paymentStatus === "paid" ||
+          status.includes("paid") ||
+          status.includes("complete") ||
+          status.includes("confirmed");
+
+        if (paidByPetParent && payoutStatus !== "paid") {
+          return sum + getPayoutAmount(booking, gross, fee);
+        }
+
+        return sum;
+      }, 0)
+    : null;
+
+  const referralRewardAmount = [...referralRewards, ...networkRewards].reduce(
+    (sum, reward) =>
+      sum +
+      getAmount(reward, [
+        "amount",
+        "reward_amount",
+        "payout_amount",
+        "total",
+      ]),
     0,
   );
 
-  const guruIncomeMap = new Map<
-    string,
-    {
-      name: string;
-      avatar: string;
-      rating: number;
-      earnings: number;
-      bookings: number;
-      city: string;
-    }
-  >();
-
-  for (const guru of gurus) {
-    const id = getText(guru, ["id", "user_id", "profile_id"], "");
-    if (!id) continue;
-
-    guruIncomeMap.set(id, {
-      name: getDisplayName(guru, "Guru"),
-      avatar: getAvatar(guru),
-      rating:
-        getAmount(guru, ["rating", "average_rating", "review_rating"]) || 4.9,
-      earnings: getAmount(guru, ["earnings", "total_earnings"]),
-      bookings: getAmount(guru, [
-        "bookings",
-        "booking_count",
-        "completed_bookings",
+  const partnerPayoutAmount = partnerPayouts.reduce(
+    (sum, payout) =>
+      sum +
+      getAmount(payout, [
+        "amount",
+        "payout_amount",
+        "reward_amount",
+        "total",
       ]),
-      city: getText(guru, ["city", "service_city", "location"], "—"),
-    });
-  }
-
-  for (const booking of bookings) {
-    const guruId = getGuruId(booking);
-    const gross = getGrossAmount(booking);
-    const fee = getFeeAmount(booking, gross);
-    const net = getNetGuruAmount(booking, gross, fee);
-
-    const existing =
-      guruIncomeMap.get(guruId) ||
-      {
-        name: getGuruNameFromBooking(booking),
-        avatar: "",
-        rating: 4.9,
-        earnings: 0,
-        bookings: 0,
-        city:
-          [asString(booking.city), asString(booking.state)]
-            .filter(Boolean)
-            .join(", ") || "—",
-      };
-
-    existing.earnings += net;
-    existing.bookings += 1;
-
-    if (!existing.city || existing.city === "—") {
-      existing.city =
-        [asString(booking.city), asString(booking.state)]
-          .filter(Boolean)
-          .join(", ") || "—";
-    }
-
-    guruIncomeMap.set(guruId, existing);
-  }
-
-  const topGurus = Array.from(guruIncomeMap.values())
-    .sort((a, b) => b.earnings - a.earnings)
-    .slice(0, 4);
-
-  const customerSpendMap = new Map<
-    string,
-    {
-      name: string;
-      avatar: string;
-      spend: number;
-      bookings: number;
-      lastBooking: string | null;
-    }
-  >();
-
-  for (const customer of profileCustomers) {
-    const id = getText(customer, ["id", "user_id", "profile_id"], "");
-    if (!id) continue;
-
-    customerSpendMap.set(id, {
-      name: getDisplayName(customer, "Customer"),
-      avatar: getAvatar(customer),
-      spend: getAmount(customer, ["total_spend", "lifetime_spend"]),
-      bookings: getAmount(customer, ["bookings", "booking_count"]),
-      lastBooking: getDate(customer),
-    });
-  }
-
-  for (const booking of bookings) {
-    const customerId = getCustomerId(booking);
-
-    const existing =
-      customerSpendMap.get(customerId) ||
-      {
-        name: getCustomerNameFromBooking(booking),
-        avatar: "",
-        spend: 0,
-        bookings: 0,
-        lastBooking: null,
-      };
-
-    existing.spend +=
-      getAmount(booking, ["total_customer_paid", "total_amount", "amount"]) ||
-      getGrossAmount(booking);
-    existing.bookings += 1;
-
-    const bookingDate = getDate(booking);
-    if (
-      bookingDate &&
-      (!existing.lastBooking ||
-        new Date(bookingDate).getTime() >
-          new Date(existing.lastBooking).getTime())
-    ) {
-      existing.lastBooking = bookingDate;
-    }
-
-    customerSpendMap.set(customerId, existing);
-  }
-
-  const topCustomers = Array.from(customerSpendMap.values())
-    .sort((a, b) => b.spend - a.spend)
-    .slice(0, 4);
+    0,
+  );
 
   const recentMessages = messages.slice(0, 5).map((message) => ({
     sender: getMessageSender(message),
@@ -946,162 +718,106 @@ async function getAdminDashboardData() {
     unread: isUnreadMessage(message),
   }));
 
-  const activeNetworkPrograms =
-    networkPrograms.filter(isActiveStatus).length ||
-    programs.filter((program) => {
-      const text = `${getText(program, ["name", "title"])} ${getText(
-        program,
-        ["type", "program_type"],
-      )}`.toLowerCase();
+  const recentPeople = [
+    ...profiles.slice(0, 4).map((row) => ({
+      name: getDisplayName(row),
+      detail: getRole(row) || "profile",
+      avatar: getAvatar(row),
+      href: adminRoutes.accounts,
+    })),
+    ...gurus.slice(0, 3).map((row) => ({
+      name: getDisplayName(row, "Guru"),
+      detail: "Guru",
+      avatar: getAvatar(row),
+      href: adminRoutes.gurus,
+    })),
+  ].slice(0, 6);
 
-      return (
-        isActiveStatus(program) &&
-        (text.includes("partner") ||
-          text.includes("affiliate") ||
-          text.includes("ambassador") ||
-          text.includes("referral"))
-      );
-    }).length;
+  const sourceStatus = [
+    profilesResult,
+    petParentCountResult,
+    gurusResult,
+    ambassadorsResult,
+    ambassadorLeadsResult,
+    bookingsResult,
+    messagesResult,
+    launchSignupsResult,
+    launchWaitlistResult,
+    partnersResult,
+    partnerApplicationsResult,
+    partnerPayoutsResult,
+    referralClicksResult,
+    referralConversionsResult,
+    referralRewardsResult,
+    networkReferralsResult,
+    networkRewardsResult,
+    universityAssignmentsResult,
+  ];
 
-  const activeNetworkParticipants = networkParticipants.filter(isActiveStatus);
-
-  const activePartnerRows = mergeRows(
-    partners.filter(isActiveStatus),
-    networkParticipants.filter((row) => {
-      const type = getParticipantType(row);
-      return (
-        isActiveStatus(row) &&
-        (type.includes("partner") ||
-          type.includes("business") ||
-          type.includes("rescue") ||
-          type.includes("shelter") ||
-          type.includes("vet"))
-      );
-    }),
-  );
-
-  const ambassadorRows = mergeRows(
-    ambassadorLeads,
-    ambassadors,
-    networkParticipants.filter((row) =>
-      getParticipantType(row).includes("ambassador"),
-    ),
-  );
-
-  const pendingAmbassadorLeads = ambassadorLeads.filter(isPendingStatus);
-  const activeAmbassadorLeads = ambassadorLeads.filter(isActiveStatus);
-
-  const affiliateRows = mergeRows(
-    affiliates,
-    networkParticipants.filter((row) =>
-      getParticipantType(row).includes("affiliate"),
-    ),
-  );
-
-  const pendingApplications = partnerApplications.filter(isPendingStatus);
-  const pendingPartnerLeads = networkPartnerLeads.filter(isPendingStatus);
-  const convertedReferrals = networkReferrals.filter(isConvertedStatus);
-
-  const pendingNetworkRewards = networkRewards.filter(isPendingStatus);
-  const pendingReferralRewards = referralRewards.filter(isPendingStatus);
-  const pendingPartnerPayouts = partnerPayouts.filter(isPendingStatus);
-
-  const pendingRewardsAmount =
-    sumAmounts(pendingNetworkRewards, [
-      "amount",
-      "reward_amount",
-      "payout_amount",
-    ]) +
-    sumAmounts(pendingReferralRewards, [
-      "amount",
-      "reward_amount",
-      "payout_amount",
-    ]);
-
-  const pendingPartnerPayoutAmount = sumAmounts(pendingPartnerPayouts, [
-    "amount",
-    "payout_amount",
-    "reward_amount",
-    "total",
-  ]);
-
-  const totalNetworkClicks =
-    networkClickEvents.length + referralClickEvents.length;
-
-  const campaignNames = new Set<string>();
-
-  for (const row of [
-    ...networkClickEvents,
-    ...referralClickEvents,
-    ...partnerCampaigns,
-  ]) {
-    const campaign = getText(row, [
-      "campaign",
-      "campaign_name",
-      "utm_campaign",
-      "name",
-      "title",
-    ]);
-    if (campaign) campaignNames.add(campaign);
-  }
-
-  const partnerUnreadMessages = partnerMessages.filter(isUnreadMessage).length;
+  const connectedSources = sourceStatus.filter((source) => source.ok).length;
+  const missingSources = sourceStatus.filter((source) => !source.ok);
 
   return {
-    bookings,
     profiles,
+    profilePetParents,
     gurus,
+    ambassadors,
+    ambassadorLeads,
+    bookings,
     messages,
-    programs,
     partners,
-    expenses,
+    partnerApplications,
+    partnerPayouts,
+    referralClicks,
+    referralConversions,
+    referralRewards,
+    networkReferrals,
+    networkRewards,
+    universityAssignments,
     launchSignups,
-    grossRevenue,
-    netPlatformRevenue,
-    totalTips,
-    totalGuruEarnings,
-    taxesCollected,
-    realExpenseTotal,
-    pendingPayouts,
-    revenueChange,
-    platformTakeRate,
-    unreadMessages,
-    signupSources,
-    signupTotal,
-    signupConicGradient: buildSignupConicGradient(signupSources),
-    topGurus,
-    topCustomers,
-    recentMessages,
-    hrMetrics: {
-      ambassadorLeads: ambassadorLeads.length,
-      guruRecords: gurus.length,
-      pendingApplications:
-        pendingAmbassadorLeads.length +
-        pendingApplications.length +
-        pendingPartnerLeads.length,
-      recentActivity:
-        gurus.filter((row) => isWithinLastDays(getDate(row), 14)).length +
-        ambassadorLeads.filter((row) => isWithinLastDays(getDate(row), 14)).length +
-        pendingApplications.filter((row) => isWithinLastDays(getDate(row), 14)).length,
+    counts: {
+      totalProfiles: safeCountValue(profilesResult),
+      petParents: petParentExactCount,
+      gurus: safeCountValue(gurusResult),
+      verifiedGurus: verifiedGurus.length,
+      ambassadors:
+        safeCountValue(ambassadorsResult) + safeCountValue(ambassadorLeadsResult),
+      bookings: safeCountValue(bookingsResult),
+      messages: safeCountValue(messagesResult),
+      launchSignups:
+        safeCountValue(launchSignupsResult) + safeCountValue(launchWaitlistResult),
+      partners: safeCountValue(partnersResult),
+      universityAssignments: safeCountValue(universityAssignmentsResult),
     },
-    networkMetrics: {
-      activePrograms: activeNetworkPrograms,
-      activeParticipants: activeNetworkParticipants.length,
-      applications: pendingApplications.length + pendingAmbassadorLeads.length,
-      activePartners: activePartnerRows.length,
-      ambassadors: ambassadorRows.length,
-      affiliates: affiliateRows.length,
-      partnerLeads: pendingPartnerLeads.length,
-      referrals: networkReferrals.length + referralConversions.length,
-      conversions: convertedReferrals.length + referralConversions.length,
-      clicks: totalNetworkClicks,
-      campaigns: partnerCampaigns.length || campaignNames.size,
-      pendingRewardsAmount,
-      pendingRewardsCount:
-        pendingNetworkRewards.length + pendingReferralRewards.length,
-      pendingPayoutAmount: pendingPartnerPayoutAmount,
-      pendingPayoutCount: pendingPartnerPayouts.length,
-      unreadPartnerMessages: partnerUnreadMessages,
+    attention: {
+      incompletePetParents,
+      pendingGurus,
+      pendingAmbassadorItems,
+      pendingBookings,
+      activeBookings,
+      unreadMessages,
+    },
+    financials: {
+      amountFieldsDetected,
+      bookingGross,
+      platformFees,
+      tips,
+      pendingPayouts,
+      referralRewardAmount,
+      partnerPayoutAmount,
+    },
+    recentMessages,
+    recentPeople,
+    sourceHealth: {
+      connectedSources,
+      totalSources: sourceStatus.length,
+      missingSources,
+      bookingsCapped:
+        bookingsResult.count !== null && bookingsResult.count > bookings.length,
+      profilesCapped:
+        profilesResult.count !== null && profilesResult.count > profiles.length,
+      messagesCapped:
+        messagesResult.count !== null && messagesResult.count > messages.length,
     },
   };
 }
@@ -1120,510 +836,302 @@ export default async function AdminDashboardPage() {
 
   const data = await getAdminDashboardData();
 
-  const totalBookings = data.bookings.length;
-  const cashPosition = Math.max(
-    data.netPlatformRevenue + data.taxesCollected - data.pendingPayouts,
-    0,
-  );
-
-  const estimatedExpenseTotal = data.grossRevenue * 0.57;
-  const expenseTotal =
-    data.realExpenseTotal > 0 ? data.realExpenseTotal : estimatedExpenseTotal;
-  const expensesAreEstimated = data.realExpenseTotal <= 0;
-
-  const netProfit = Math.max(data.netPlatformRevenue - expenseTotal, 0);
-  const revenueTarget = data.grossRevenue > 0 ? data.grossRevenue * 1.22 : 1;
-  const revenueTargetPercent =
-    data.grossRevenue > 0
-      ? Math.round((data.grossRevenue / revenueTarget) * 100)
-      : 0;
-  const expensePercent =
-    data.grossRevenue > 0
-      ? Math.round((expenseTotal / data.grossRevenue) * 100)
-      : 0;
-  const netProfitPercent =
-    data.grossRevenue > 0
-      ? Math.round((netProfit / data.grossRevenue) * 100)
-      : 0;
-
-  const metrics = [
+  const snapshotCards = [
     {
-      title: "Booking Volume",
-      value: money(data.grossRevenue),
-      change: `${Math.abs(data.revenueChange).toFixed(1)}%`,
-      trend: data.revenueChange >= 0 ? "up" : "down",
-      icon: <CircleDollarSign size={22} />,
-      href: adminRoutes.financials,
-      action: "View activity",
-      iconBg: "bg-emerald-100 text-emerald-700",
+      title: "Pet Parents",
+      value: number(data.counts.petParents),
+      detail: `${number(data.attention.incompletePetParents.length)} missing basic profile info`,
+      href: adminRoutes.petParents,
+      icon: <Users size={22} />,
+      tone: "green" as const,
+      source: "profiles.role",
     },
     {
-      title: "Marketplace Fees",
-      value: money(data.netPlatformRevenue),
-      change: "Currently free",
-      trend: "up",
-      icon: <BarChart3 size={22} />,
-      href: adminRoutes.profitLoss,
-      action: "View fee tracking",
-      iconBg: "bg-emerald-50 text-emerald-700",
+      title: "Gurus",
+      value: number(data.counts.gurus),
+      detail: `${number(data.attention.pendingGurus.length)} need review, Stripe, or verification`,
+      href: adminRoutes.gurus,
+      icon: <ShieldCheck size={22} />,
+      tone: "emerald" as const,
+      source: "gurus",
     },
     {
-      title: "Tips Sent to Gurus",
-      value: money(data.totalTips),
-      change: "100% tip pass-through",
-      trend: "up",
+      title: "Ambassadors",
+      value: number(data.counts.ambassadors),
+      detail: `${number(data.attention.pendingAmbassadorItems.length)} pending leads/applications`,
+      href: adminRoutes.ambassadorLeads,
+      icon: <UserPlus size={22} />,
+      tone: "orange" as const,
+      source: "ambassadors + ambassador_leads",
+    },
+    {
+      title: "Bookings",
+      value: number(data.counts.bookings),
+      detail: `${number(data.attention.pendingBookings.length)} pending, ${number(data.attention.activeBookings.length)} active`,
+      href: adminRoutes.bookings,
+      icon: <CalendarDays size={22} />,
+      tone: "blue" as const,
+      source: "bookings",
+    },
+    {
+      title: "Messages",
+      value: number(data.attention.unreadMessages.length),
+      detail: `${number(data.counts.messages)} total loaded messages`,
+      href: adminRoutes.messages,
+      icon: <MessageCircle size={22} />,
+      tone: "purple" as const,
+      source: "messages",
+    },
+    {
+      title: "Growth",
+      value: number(data.counts.launchSignups),
+      detail: `${number(data.referralClicks.length)} referral clicks, ${number(data.referralConversions.length)} conversions`,
+      href: adminRoutes.referrals,
       icon: <Gift size={22} />,
+      tone: "pink" as const,
+      source: "launch + referral tables",
+    },
+  ];
+
+  const financialCards = [
+    {
+      title: "Booking Gross",
+      value: data.financials.amountFieldsDetected
+        ? money(data.financials.bookingGross)
+        : "Needs source",
+      detail: data.financials.amountFieldsDetected
+        ? "Calculated from loaded booking amount fields"
+        : "No verified booking amount field detected",
+      href: adminRoutes.financials,
+      icon: <CircleDollarSign size={20} />,
+    },
+    {
+      title: "Platform Fees",
+      value: data.financials.amountFieldsDetected
+        ? money(data.financials.platformFees)
+        : "Needs source",
+      detail: data.financials.amountFieldsDetected
+        ? "Only explicit fee fields are counted"
+        : "Wire a verified fee/payment source",
+      href: adminRoutes.profitLoss,
+      icon: <BarChart3 size={20} />,
+    },
+    {
+      title: "Tips",
+      value: data.financials.amountFieldsDetected
+        ? money(data.financials.tips)
+        : "Needs source",
+      detail: data.financials.amountFieldsDetected
+        ? "Tip fields only; no estimate used"
+        : "No verified tip field detected",
       href: adminRoutes.commissions,
-      action: "View payouts",
-      iconBg: "bg-green-100 text-green-700",
+      icon: <Gift size={20} />,
     },
     {
       title: "Pending Payouts",
-      value: money(data.pendingPayouts),
-      change: data.pendingPayouts > 0 ? "Needs review" : "Clear",
-      trend: data.pendingPayouts > 0 ? "down" : "up",
-      icon: <WalletCards size={22} />,
+      value: data.financials.amountFieldsDetected
+        ? money(data.financials.pendingPayouts)
+        : "Needs source",
+      detail: data.financials.amountFieldsDetected
+        ? "Paid bookings not marked paid out"
+        : "Wire payout/payment status fields",
       href: adminRoutes.commissions,
-      action: "View payouts",
-      iconBg: "bg-orange-100 text-orange-700",
-    },
-    {
-      title: "Taxes Collected",
-      value: money(data.taxesCollected),
-      change:
-        data.grossRevenue > 0
-          ? percent((data.taxesCollected / data.grossRevenue) * 100)
-          : "0.0%",
-      trend: "up",
-      icon: <ReceiptText size={22} />,
-      href: adminRoutes.financials,
-      action: "View taxes",
-      iconBg: "bg-sky-100 text-sky-700",
-    },
-    {
-      title: "Total Bookings",
-      value: number(totalBookings),
-      change: `${
-        data.bookings.filter((booking) => isWithinLastDays(getDate(booking), 30))
-          .length
-      } this month`,
-      trend: "up",
-      icon: <CalendarDays size={22} />,
-      href: adminRoutes.bookings,
-      action: "View bookings",
-      iconBg: "bg-violet-100 text-violet-700",
+      icon: <WalletCards size={20} />,
     },
   ];
 
   return (
-    <div className="w-full min-w-0 space-y-4">
-      <div className="flex w-full min-w-0 flex-col justify-between gap-4 xl:flex-row xl:items-end">
-        <div className="min-w-0">
-          <div className="mb-1 flex flex-wrap items-center gap-3">
+    <div className="w-full min-w-0 space-y-5">
+      <section className="overflow-hidden rounded-[32px] border border-green-100 bg-gradient-to-br from-[#f7fbf4] via-white to-[#eef8ed] p-5 shadow-sm sm:p-7">
+        <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
+          <div className="min-w-0">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-green-900 shadow-sm">
+              <Database size={15} />
+              Accuracy-first dashboard
+            </div>
+
             <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl 2xl:text-[3.25rem] 2xl:leading-none">
-              Welcome back, Admin
+              SitGuru Admin Snapshot
             </h1>
-            <span className="text-3xl">👋</span>
+
+            <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-slate-600">
+              A cleaner business overview for Pet Parents, Gurus, Ambassadors,
+              bookings, messages, growth, University, and financial readiness.
+              Metrics are either pulled from Supabase or clearly marked when a
+              source still needs wiring.
+            </p>
           </div>
-          <p className="text-base font-semibold text-slate-600">
-            Real-time SitGuru operations, marketplace activity, Guru earnings,
-            optional tips, network programs, HR snapshot, and Supabase activity.
-          </p>
+
+          <div className="grid shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <HeroAction href={adminRoutes.messages} icon={<MessageCircle />} label="Messages" />
+            <HeroAction href={adminRoutes.gurus} icon={<ShieldCheck />} label="Review Gurus" />
+            <HeroAction href={adminRoutes.petParents} icon={<Users />} label="Pet Parents" />
+            <HeroAction href={adminRoutes.newBooking} icon={<Plus />} label="New Booking" primary />
+          </div>
         </div>
+      </section>
 
-        <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
-          <Link
-            href={adminRoutes.hr}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-          >
-            <Users size={17} />
-            Human Resources
-          </Link>
-
-          <Link
-            href={adminRoutes.exports}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-          >
-            <Download size={17} />
-            Export Report
-          </Link>
-
-          <Link
-            href={adminRoutes.newBooking}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-green-800 to-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:brightness-105"
-          >
-            <Plus size={18} />
-            Add New
-          </Link>
-        </div>
-      </div>
-
-      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-5">
-        <DataHealthTile label="Supabase Source" value="Live data" />
+      <section className="grid w-full min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <DataHealthTile
-          label="Bookings Loaded"
-          value={number(data.bookings.length)}
+          label="Connected Sources"
+          value={`${number(data.sourceHealth.connectedSources)} / ${number(data.sourceHealth.totalSources)}`}
+          status={data.sourceHealth.missingSources.length ? "Review needed" : "Healthy"}
+          healthy={!data.sourceHealth.missingSources.length}
         />
         <DataHealthTile
           label="Profiles Loaded"
           value={number(data.profiles.length)}
+          status={data.sourceHealth.profilesCapped ? "Sample capped at 1,000" : "Loaded"}
+          healthy={!data.sourceHealth.profilesCapped}
         />
         <DataHealthTile
-          label="Network Rows"
-          value={number(
-            data.networkMetrics.activeParticipants +
-              data.networkMetrics.referrals +
-              data.networkMetrics.clicks +
-              data.hrMetrics.ambassadorLeads,
-          )}
+          label="Bookings Loaded"
+          value={number(data.bookings.length)}
+          status={data.sourceHealth.bookingsCapped ? "Sample capped at 1,000" : "Loaded"}
+          healthy={!data.sourceHealth.bookingsCapped}
         />
-        <DataHealthTile label="Marketplace Mode" value="Free" />
+        <DataHealthTile
+          label="Financial Mode"
+          value={data.financials.amountFieldsDetected ? "Detected" : "Needs wiring"}
+          status={data.financials.amountFieldsDetected ? "No estimates used" : "No fake estimates"}
+          healthy={data.financials.amountFieldsDetected}
+        />
       </section>
 
-      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-7">
-          <DashboardCard>
-            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-              <div className="min-w-0">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-green-800 text-white">
-                  <Users size={22} />
-                </div>
-                <h2 className="text-xl font-black text-slate-950">
-                  Human Resources
-                </h2>
-                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                  Hiring and applicant work now lives in the HR command center,
-                  including Ambassador Leads, PA CareerLink follow-up, Guru applicants,
-                  trust and safety checks, onboarding, and future contractor records.
-                </p>
-              </div>
-
-              <Link
-                href={adminRoutes.hr}
-                className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
-              >
-                Open HR Center
-              </Link>
+      {data.sourceHealth.missingSources.length ? (
+        <DashboardCard>
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-orange-700">
+              <AlertTriangle size={22} />
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <HrSnapshotTile
-                label="Ambassador Leads"
-                value={number(data.hrMetrics.ambassadorLeads)}
-                detail="Student, Community, Military"
-              />
-              <HrSnapshotTile
-                label="Guru Records"
-                value={number(data.hrMetrics.guruRecords)}
-                detail="Applicants and active Gurus"
-              />
-              <HrSnapshotTile
-                label="Pending Review"
-                value={number(data.hrMetrics.pendingApplications)}
-                detail="Applications and leads"
-              />
-              <HrSnapshotTile
-                label="Recent 14 Days"
-                value={number(data.hrMetrics.recentActivity)}
-                detail="New HR activity"
-              />
-            </div>
-          </DashboardCard>
-        </div>
-
-        <div className="min-w-0 xl:col-span-5">
-          <DashboardCard>
-            <h2 className="text-lg font-black text-slate-950">
-              HR Quick Links
-            </h2>
-            <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-              Keep hiring items out of the main operations dashboard and manage
-              them from one dedicated area.
-            </p>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <HrLinkRow
-                href={adminRoutes.hr}
-                icon={<Users size={18} />}
-                title="Human Resources"
-                detail="Main hiring command center"
-              />
-              <HrLinkRow
-                href={adminRoutes.ambassadorLeads}
-                icon={<UserPlus size={18} />}
-                title="Ambassador Leads"
-                detail="PA CareerLink, Indeed, and program applicants"
-              />
-              <HrLinkRow
-                href={adminRoutes.gurus}
-                icon={<ShieldCheck size={18} />}
-                title="Guru Applicants"
-                detail="Applicant review and onboarding"
-              />
-            </div>
-          </DashboardCard>
-        </div>
-      </section>
-
-      <section className="grid w-full min-w-0 items-start gap-4 lg:grid-cols-2 2xl:grid-cols-5">
-        {metrics.map((metric) => (
-          <Link
-            key={metric.title}
-            href={metric.href}
-            className="group min-w-0 rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-lg"
-          >
-            <div className="mb-4 flex items-start gap-4">
-              <div
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${metric.iconBg}`}
-              >
-                {metric.icon}
-              </div>
-
-              <h2 className="text-[15px] font-black leading-5 text-slate-800 sm:text-base">
-                {metric.title}
+            <div className="min-w-0">
+              <h2 className="text-lg font-black text-slate-950">
+                Data sources needing review
               </h2>
-            </div>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                These tables or views did not return cleanly. The dashboard will
+                not pretend they are zero. It will keep the source honest until
+                the table exists or the query is corrected.
+              </p>
 
-            <p className="text-3xl font-black tracking-tight text-slate-950">
-              {metric.value}
-            </p>
-
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm font-extrabold">
-              <span
-                className={
-                  metric.trend === "up" ? "text-green-600" : "text-red-500"
-                }
-              >
-                {metric.trend === "up" ? (
-                  <TrendingUp size={16} />
-                ) : (
-                  <TrendingDown size={16} />
-                )}
-              </span>
-              <span
-                className={
-                  metric.trend === "up" ? "text-green-600" : "text-red-500"
-                }
-              >
-                {metric.change}
-              </span>
-              <span className="text-slate-400">vs last 30 days</span>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {data.sourceHealth.missingSources.slice(0, 6).map((source) => (
+                  <div
+                    key={source.label}
+                    className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3"
+                  >
+                    <p className="text-sm font-black text-orange-950">
+                      {source.label}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-orange-800/80">
+                      {source.errorMessage || "Query needs review"}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
+          </div>
+        </DashboardCard>
+      ) : null}
 
-            <div className="mt-5 flex items-center gap-2 text-sm font-black text-green-800">
-              {metric.action}
-              <span className="transition group-hover:translate-x-1">→</span>
-            </div>
-          </Link>
+      <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        {snapshotCards.map((card) => (
+          <SnapshotCard key={card.title} {...card} />
         ))}
       </section>
 
       <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-4">
-          <div className="overflow-hidden rounded-[28px] bg-gradient-to-br from-green-900 via-green-700 to-emerald-800 p-6 text-white shadow-xl shadow-emerald-900/20">
-            <div className="mb-7 flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-black text-white">Cash Position</h2>
-                <p className="text-sm font-semibold text-white/75">
-                  Internal balance after pending payouts
-                </p>
-              </div>
-              <Bell className="text-white/80" />
-            </div>
+        <div className="min-w-0 xl:col-span-5">
+          <DashboardCard>
+            <SectionHeader
+              icon={<AlertTriangle size={20} />}
+              title="Needs Attention"
+              subtitle="Action items pulled from current Supabase rows. No hidden estimates."
+              href={adminRoutes.accounts}
+              linkLabel="Open lifecycle"
+            />
 
-            <p className="text-4xl font-black tracking-tight text-white">
-              {money(cashPosition)}
-            </p>
-            <p className="mt-2 text-sm font-bold text-white/75">
-              Marketplace fees are tracked internally as $0 during the free launch model
-            </p>
-
-            <div className="mt-8 h-[70px] rounded-2xl border border-white/10 bg-white/5 p-3">
-              <svg viewBox="0 0 280 80" className="h-full w-full">
-                <path
-                  d="M3 60 C 35 55, 33 42, 56 48 S 83 62, 104 44 S 132 28, 153 38 S 181 55, 199 33 S 223 8, 240 27 S 260 46, 277 5"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.9)"
-                  strokeLinecap="round"
-                  strokeWidth="5"
-                />
-              </svg>
+            <div className="mt-5 grid gap-3">
+              <AttentionRow
+                href={adminRoutes.petParents}
+                title="Pet Parents missing basic profile info"
+                value={number(data.attention.incompletePetParents.length)}
+                detail="Checks name, email, city, and state from profile rows"
+              />
+              <AttentionRow
+                href={adminRoutes.gurus}
+                title="Gurus needing review"
+                value={number(data.attention.pendingGurus.length)}
+                detail="Verification, pending status, or Stripe setup"
+              />
+              <AttentionRow
+                href={adminRoutes.ambassadorLeads}
+                title="Ambassador / partner items pending"
+                value={number(data.attention.pendingAmbassadorItems.length)}
+                detail="Lead and application rows with pending-style statuses"
+              />
+              <AttentionRow
+                href={adminRoutes.bookings}
+                title="Bookings pending"
+                value={number(data.attention.pendingBookings.length)}
+                detail="Booking rows with new, pending, review, or submitted status"
+              />
+              <AttentionRow
+                href={adminRoutes.messages}
+                title="Unread messages"
+                value={number(data.attention.unreadMessages.length)}
+                detail="Unread flags, missing read_at, or non-read status"
+              />
             </div>
-          </div>
+          </DashboardCard>
         </div>
 
-        <div className="min-w-0 xl:col-span-8">
-          <GuruFinancialDashboardSnapshot />
-        </div>
-      </section>
-
-      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-4">
           <DashboardCard>
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  Marketplace Activity
-                </h2>
-                <p className="text-sm font-semibold text-slate-500">
-                  Booking volume, fee tracking, taxes, tips, payouts, and expenses.
-                </p>
-              </div>
+            <SectionHeader
+              icon={<CircleDollarSign size={20} />}
+              title="Financial Snapshot"
+              subtitle="Financial cards show verified fields only. No estimated profit or expense math."
+              href={adminRoutes.financials}
+              linkLabel="Open financials"
+            />
 
-              <span className="rounded-2xl border border-[#e3ece5] bg-[#fbfcf9] px-4 py-2 text-xs font-black text-slate-600">
-                Live
-              </span>
-            </div>
-
-            <div className="space-y-5">
-              <ProgressLine
-                title="Booking Volume"
-                value={money(data.grossRevenue)}
-                percent={revenueTargetPercent}
-                label={`${revenueTargetPercent}% of target`}
-              />
-              <ProgressLine
-                title={expensesAreEstimated ? "Expenses Estimate" : "Expenses"}
-                value={money(expenseTotal)}
-                percent={expensePercent}
-                label={
-                  expensesAreEstimated
-                    ? "No expenses table rows found"
-                    : `${expensePercent}% of revenue`
-                }
-                tone="orange"
-              />
-              <ProgressLine
-                title="Net Profit"
-                value={money(netProfit)}
-                percent={netProfitPercent}
-                label={`${netProfitPercent}% margin`}
-              />
-              <ProgressLine
-                title="Marketplace Fees"
-                value={money(data.netPlatformRevenue)}
-                percent={0}
-                label="Currently free and tracked as $0"
-              />
-            </div>
-
-            <div className="mt-5">
-              <Link
-                href={adminRoutes.financials}
-                className="inline-flex items-center justify-center rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 transition hover:bg-green-50"
-              >
-                View Full Financial Overview
-              </Link>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {financialCards.map((card) => (
+                <FinancialRow key={card.title} {...card} />
+              ))}
             </div>
           </DashboardCard>
         </div>
 
         <div className="min-w-0 xl:col-span-3">
           <DashboardCard>
-            <div className="mb-5">
-              <h2 className="text-lg font-black text-slate-950">
-                Launch Signups
-              </h2>
-              <p className="text-sm font-semibold text-slate-500">
-                Signup sources calculated from Supabase rows.
-              </p>
-            </div>
+            <SectionHeader
+              icon={<MessageCircle size={20} />}
+              title="Recent Messages"
+              subtitle="Latest loaded conversations."
+              href={adminRoutes.messages}
+              linkLabel="View all"
+            />
 
-            <div className="grid items-center gap-5 sm:grid-cols-[180px_1fr] xl:grid-cols-1 2xl:grid-cols-[180px_1fr]">
-              <div className="relative mx-auto h-[180px] w-[180px]">
-                <div
-                  className="h-full w-full rounded-full"
-                  style={{ background: data.signupConicGradient }}
-                />
-                <div className="absolute inset-[34px] flex flex-col items-center justify-center rounded-full bg-white shadow-inner">
-                  <span className="text-2xl font-black text-slate-950">
-                    {number(data.signupTotal)}
-                  </span>
-                  <span className="text-xs font-bold text-slate-500">Total</span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {data.signupSources.map((source) => {
-                  const sourcePercent = data.signupTotal
-                    ? Math.round((source.value / data.signupTotal) * 100)
-                    : 0;
-
-                  return (
-                    <div
-                      key={source.name}
-                      className="flex items-center justify-between gap-3 text-sm font-bold"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`h-3 w-3 rounded-full ${source.color}`}
-                        />
-                        <span className="text-slate-700">{source.name}</span>
-                      </div>
-                      <span className="text-slate-950">
-                        {sourcePercent}%{" "}
-                        <span className="text-slate-400">
-                          ({number(source.value)})
-                        </span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <Link
-                href={adminRoutes.launchSignups}
-                className="inline-flex items-center justify-center rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 transition hover:bg-green-50"
-              >
-                View All Signups
-              </Link>
-            </div>
-          </DashboardCard>
-        </div>
-
-        <div className="min-w-0 xl:col-span-5">
-          <DashboardCard>
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-black text-slate-950">Messages</h2>
-                <p className="text-sm font-semibold text-slate-500">
-                  Recent admin, customer, guru, and SitGuru conversations.
-                </p>
-              </div>
-
-              <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-800">
-                {data.unreadMessages} unread
-              </span>
-            </div>
-
-            <div className="space-y-2.5">
+            <div className="mt-5 space-y-3">
               {data.recentMessages.length ? (
                 data.recentMessages.map((message, index) => (
                   <Link
                     href={adminRoutes.messages}
                     key={`${message.sender}-${index}`}
-                    className="flex items-start gap-3 rounded-2xl p-2 transition hover:bg-green-50"
+                    className="flex items-start gap-3 rounded-2xl border border-[#eef4ef] bg-[#fbfcf9] p-3 transition hover:border-green-200 hover:bg-green-50"
                   >
-                    <Avatar
-                      name={message.sender}
-                      src={message.avatar}
-                      className="mt-0.5 h-11 w-11"
-                    />
+                    <Avatar name={message.sender} src={message.avatar} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-black text-slate-950">
                           {message.sender}
                         </p>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <p className="text-xs font-bold text-slate-500">
-                            {formatMessageTime(message.time)}
-                          </p>
-                          {message.unread ? (
-                            <span className="h-2.5 w-2.5 rounded-full bg-green-600" />
-                          ) : null}
-                        </div>
+                        {message.unread ? (
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-600" />
+                        ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">
                         {message.body}
@@ -1632,22 +1140,12 @@ export default async function AdminDashboardPage() {
                   </Link>
                 ))
               ) : (
-                <div className="rounded-2xl bg-[#f7faf6] p-5 text-center">
-                  <MessageCircle className="mx-auto mb-2 text-slate-400" />
-                  <p className="text-sm font-bold text-slate-500">
-                    No recent messages yet.
-                  </p>
-                </div>
+                <EmptyState
+                  icon={<MessageCircle size={22} />}
+                  title="No recent messages"
+                  detail="Messages will appear here once conversations are created."
+                />
               )}
-            </div>
-
-            <div className="mt-5">
-              <Link
-                href={adminRoutes.messages}
-                className="inline-flex items-center justify-center rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 transition hover:bg-green-50"
-              >
-                View All Messages
-              </Link>
             </div>
           </DashboardCard>
         </div>
@@ -1656,340 +1154,214 @@ export default async function AdminDashboardPage() {
       <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-4">
           <DashboardCard>
-            <TableHeader
-              title="Top Performing Gurus"
-              subtitle="Calculated from real Guru rows, bookings, and tips."
-              href={adminRoutes.guruPerformance}
+            <SectionHeader
+              icon={<Users size={20} />}
+              title="People Snapshot"
+              subtitle="Pet Parents, Gurus, Ambassadors, partners, and recent profiles."
+              href={adminRoutes.accounts}
+              linkLabel="Open accounts"
             />
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#edf3ee] text-xs font-black text-slate-500">
-                    <th className="pb-3">Guru</th>
-                    <th className="pb-3">Rating</th>
-                    <th className="pb-3">Earnings</th>
-                    <th className="pb-3">Bookings</th>
-                    <th className="pb-3">City</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.topGurus.length ? (
-                    data.topGurus.map((guru, index) => (
-                      <tr
-                        key={`${guru.name}-${guru.city}-${index}`}
-                        className="border-b border-[#f1f5f2] last:border-0"
-                      >
-                        <td className="py-3">
-                          <div className="flex items-center gap-3">
-                            <Avatar name={guru.name} src={guru.avatar} />
-                            <span className="font-black text-slate-950">
-                              {guru.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 font-bold text-slate-600">
-                          {guru.rating ? guru.rating.toFixed(2) : "—"}
-                        </td>
-                        <td className="py-3 font-bold text-slate-600">
-                          {money(guru.earnings)}
-                        </td>
-                        <td className="py-3 font-bold text-slate-600">
-                          {number(guru.bookings)}
-                        </td>
-                        <td className="py-3 font-bold text-slate-600">
-                          {guru.city}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="py-8 text-center font-bold text-slate-500"
-                      >
-                        No gurus found yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <MiniMetric
+                label="Total Profiles"
+                value={number(data.counts.totalProfiles)}
+                href={adminRoutes.accounts}
+              />
+              <MiniMetric
+                label="Pet Parents"
+                value={number(data.counts.petParents)}
+                href={adminRoutes.petParents}
+              />
+              <MiniMetric
+                label="Verified Gurus"
+                value={number(data.counts.verifiedGurus)}
+                href={adminRoutes.gurus}
+              />
+              <MiniMetric
+                label="Partners"
+                value={number(data.counts.partners)}
+                href={adminRoutes.partners}
+              />
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {data.recentPeople.length ? (
+                data.recentPeople.map((person, index) => (
+                  <Link
+                    href={person.href}
+                    key={`${person.name}-${index}`}
+                    className="flex items-center gap-3 rounded-2xl border border-[#eef4ef] bg-[#fbfcf9] p-3 transition hover:border-green-200 hover:bg-green-50"
+                  >
+                    <Avatar name={person.name} src={person.avatar} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-slate-950">
+                        {person.name}
+                      </p>
+                      <p className="truncate text-xs font-bold text-slate-500">
+                        {person.detail || "Profile"}
+                      </p>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <EmptyState
+                  icon={<Users size={22} />}
+                  title="No recent profiles"
+                  detail="Profile rows will appear here once available."
+                />
+              )}
             </div>
           </DashboardCard>
         </div>
 
         <div className="min-w-0 xl:col-span-4">
           <DashboardCard>
-            <TableHeader
-              title="Top Customers"
-              subtitle="Calculated from profile and booking spend."
-              href={adminRoutes.customers}
-            />
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[480px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#edf3ee] text-xs font-black text-slate-500">
-                    <th className="pb-3">Customer</th>
-                    <th className="pb-3">Total Spend</th>
-                    <th className="pb-3">Bookings</th>
-                    <th className="pb-3">Last Booking</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.topCustomers.length ? (
-                    data.topCustomers.map((customer, index) => (
-                      <tr
-                        key={`${customer.name}-${customer.spend}-${customer.bookings}-${index}`}
-                        className="border-b border-[#f1f5f2] last:border-0"
-                      >
-                        <td className="py-3">
-                          <div className="flex items-center gap-3">
-                            <Avatar
-                              name={customer.name}
-                              src={customer.avatar}
-                            />
-                            <span className="font-black text-slate-950">
-                              {customer.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 font-bold text-slate-600">
-                          {money(customer.spend)}
-                        </td>
-                        <td className="py-3 font-bold text-slate-600">
-                          {number(customer.bookings)}
-                        </td>
-                        <td className="py-3 font-bold text-slate-600">
-                          {formatDate(customer.lastBooking)}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="py-8 text-center font-bold text-slate-500"
-                      >
-                        No customers found yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </DashboardCard>
-        </div>
-
-        <div className="min-w-0 xl:col-span-4">
-          <DashboardCard>
-            <TableHeader
-              title="SitGuru Network Programs"
-              subtitle="Partners, ambassadors, affiliates, referrals, rewards, and campaigns."
-              href={adminRoutes.partners}
-            />
-
-            <Link
+            <SectionHeader
+              icon={<Gift size={20} />}
+              title="Growth & Referrals"
+              subtitle="Launch, PawPerks, referral, partner, and reward activity."
               href={adminRoutes.referrals}
-              className="mb-4 flex items-start justify-between gap-4 rounded-2xl border border-green-200 bg-green-50 p-4 transition hover:-translate-y-0.5 hover:border-green-300 hover:bg-green-100"
-            >
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
-                  <Gift size={18} />
-                </div>
+              linkLabel="Open growth"
+            />
 
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-green-950">
-                    Growth & Referrals
-                  </p>
-                  <p className="mt-1 text-xs font-bold leading-5 text-green-900/70">
-                    Open the PawPerks, Guru referral, Ambassador, Partner, reward, and payout command center.
-                  </p>
-                </div>
-              </div>
-
-              <span className="shrink-0 text-sm font-black text-green-800">
-                Open →
-              </span>
-            </Link>
-
-            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-              <NetworkKpiTile
-                href={adminRoutes.programs}
-                icon={<ShieldCheck size={16} />}
-                title="Active Programs"
-                value={number(data.networkMetrics.activePrograms)}
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <MiniMetric
+                label="Launch Signups"
+                value={number(data.counts.launchSignups)}
+                href={adminRoutes.launchSignups}
               />
-              <NetworkKpiTile
-                href={adminRoutes.partnerApplications}
-                icon={<FileBarChart size={16} />}
-                title="Applications"
-                value={number(data.networkMetrics.applications)}
+              <MiniMetric
+                label="Referral Clicks"
+                value={number(data.referralClicks.length)}
+                href={adminRoutes.referrals}
               />
-              <NetworkKpiTile
-                href={adminRoutes.activePartners}
-                icon={<BriefcaseBusiness size={16} />}
-                title="Partners"
-                value={number(data.networkMetrics.activePartners)}
+              <MiniMetric
+                label="Conversions"
+                value={number(
+                  data.referralConversions.length + data.networkReferrals.length,
+                )}
+                href={adminRoutes.referrals}
               />
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <NetworkStatusRow
-                href={adminRoutes.partnerAmbassadors}
-                title="Ambassadors"
-                value={number(data.networkMetrics.ambassadors)}
-                detail="Community growth leaders"
-                icon={<Users size={18} />}
-              />
-
-              <NetworkStatusRow
-                href={adminRoutes.partnerAffiliates}
-                title="Affiliates"
-                value={number(data.networkMetrics.affiliates)}
-                detail="Creators and promoters"
-                icon={<Link2 size={18} />}
-              />
-
-              <NetworkStatusRow
-                href={adminRoutes.partnerCampaigns}
-                title="Campaign Clicks"
-                value={number(data.networkMetrics.clicks)}
-                detail={`${number(data.networkMetrics.campaigns)} campaigns tracked`}
-                icon={<MousePointerClick size={18} />}
-              />
-
-              <NetworkStatusRow
+              <MiniMetric
+                label="Rewards"
+                value={money(data.financials.referralRewardAmount)}
                 href={adminRoutes.partnerRewards}
-                title="Pending Rewards"
-                value={money(data.networkMetrics.pendingRewardsAmount)}
-                detail={`${number(data.networkMetrics.pendingRewardsCount)} rewards pending`}
-                icon={<Gift size={18} />}
-              />
-
-              <NetworkStatusRow
-                href={adminRoutes.partnerPayouts}
-                title="Pending Payouts"
-                value={money(data.networkMetrics.pendingPayoutAmount)}
-                detail={`${number(data.networkMetrics.pendingPayoutCount)} payouts waiting`}
-                icon={<WalletCards size={18} />}
-              />
-
-              <NetworkStatusRow
-                href={adminRoutes.partnerMessages}
-                title="Partner Messages"
-                value={number(data.networkMetrics.unreadPartnerMessages)}
-                detail="Unread network messages"
-                icon={<MessageCircle size={18} />}
               />
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <Link
+              <AdminLinkRow
+                href={adminRoutes.referrals}
+                icon={<Gift size={18} />}
+                title="Growth & Referrals"
+                detail="PawPerks, referrals, campaigns, and rewards"
+              />
+              <AdminLinkRow
                 href={adminRoutes.partners}
-                className="inline-flex items-center justify-center rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white transition hover:bg-green-900"
-              >
-                Open Partner Admin
-              </Link>
+                icon={<BriefcaseBusiness size={18} />}
+                title="Partner Admin"
+                detail="Partners, affiliates, and community growth"
+              />
+              <AdminLinkRow
+                href={adminRoutes.partnerCampaigns}
+                icon={<MousePointerClick size={18} />}
+                title="Campaigns"
+                detail="Track links, clicks, and campaign activity"
+              />
+              <AdminLinkRow
+                href={adminRoutes.partnerPayouts}
+                icon={<WalletCards size={18} />}
+                title="Partner Payouts"
+                detail={`${money(data.financials.partnerPayoutAmount)} currently loaded`}
+              />
+            </div>
+          </DashboardCard>
+        </div>
 
-              <Link
-                href={adminRoutes.partnerApplications}
-                className="inline-flex items-center justify-center rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 transition hover:bg-green-50"
-              >
-                Review Applications
-              </Link>
+        <div className="min-w-0 xl:col-span-4">
+          <DashboardCard>
+            <SectionHeader
+              icon={<GraduationCap size={20} />}
+              title="SitGuru University"
+              subtitle="Training and academy visibility without taking over the dashboard."
+              href={adminRoutes.universityTraining}
+              linkLabel="Open University"
+            />
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <MiniMetric
+                label="Assignments"
+                value={number(data.counts.universityAssignments)}
+                href={adminRoutes.universityAssignments}
+              />
+              <MiniMetric
+                label="Guru Records"
+                value={number(data.counts.gurus)}
+                href={adminRoutes.gurus}
+              />
+              <MiniMetric
+                label="Ambassador Leads"
+                value={number(data.ambassadorLeads.length)}
+                href={adminRoutes.ambassadorLeads}
+              />
+              <MiniMetric
+                label="Pet Parents"
+                value={number(data.counts.petParents)}
+                href={adminRoutes.petParents}
+              />
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <AdminLinkRow
+                href={adminRoutes.universityTraining}
+                icon={<GraduationCap size={18} />}
+                title="Training Manager"
+                detail="Academies, lessons, videos, and materials"
+              />
+              <AdminLinkRow
+                href={adminRoutes.universityAssignments}
+                icon={<FileBarChart size={18} />}
+                title="Academy Assignments"
+                detail="Assign academies to Pet Parents, Gurus, and Ambassadors"
+              />
+              <AdminLinkRow
+                href={adminRoutes.hr}
+                icon={<UserPlus size={18} />}
+                title="HR Onboarding"
+                detail="Use HR for applicant and onboarding workflow"
+              />
             </div>
           </DashboardCard>
         </div>
       </section>
 
-      <section className="w-full min-w-0 space-y-4">
-        <div className="w-full min-w-0">
-          <AccountLifecycleRollupCard />
-        </div>
-
-        <DashboardCard>
-          <h2 className="mb-5 text-lg font-black text-slate-950">
-            Quick Actions
-          </h2>
-
-          <div className="grid w-full min-w-0 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
-            <QuickAction
-              href={adminRoutes.accounts}
-              icon={<ShieldCheck />}
-              label="Lifecycle"
-            />
-            <QuickAction
-              href={adminRoutes.newBooking}
-              icon={<CalendarDays />}
-              label="New Booking"
-            />
-            <QuickAction
-              href={adminRoutes.hr}
-              icon={<UserPlus />}
-              label="Human Resources"
-            />
-            <QuickAction
-              href={adminRoutes.newCustomer}
-              icon={<Users />}
-              label="Add Customer"
-            />
-            <QuickAction
-              href={adminRoutes.messages}
-              icon={<MessageCircle />}
-              label="Send Message"
-            />
-            <QuickAction
-              href={adminRoutes.guruPerformance}
-              icon={<BarChart3 />}
-              label="Guru Financials"
-            />
-            <QuickAction
-              href={adminRoutes.stripeTransactions}
-              icon={<CreditCard />}
-              label="Stripe"
-            />
-            <QuickAction
-              href={adminRoutes.reports}
-              icon={<FileBarChart />}
-              label="Run Report"
-            />
-            <QuickAction
-              href={adminRoutes.exports}
-              icon={<Download />}
-              label="Export Data"
-            />
-            <QuickAction
-              href={adminRoutes.referrals}
-              icon={<Gift />}
-              label="Growth Referrals"
-            />
-            <QuickAction
-              href={adminRoutes.partners}
-              icon={<BriefcaseBusiness />}
-              label="Partner Admin"
-            />
-            <QuickAction
-              href={adminRoutes.settings}
-              icon={<Settings />}
-              label="System Settings"
-            />
-          </div>
-        </DashboardCard>
+      <section className="w-full min-w-0">
+        <AccountLifecycleRollupCard />
       </section>
 
-      <DesignSystem />
-    </div>
-  );
-}
+      <DashboardCard>
+        <SectionHeader
+          icon={<Settings size={20} />}
+          title="Admin Tools"
+          subtitle="Fast access to the deeper admin areas."
+          href={adminRoutes.dashboard}
+          linkLabel="Dashboard"
+        />
 
-function DataHealthTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-green-100 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 text-xl font-black text-green-950">{value}</p>
+        <div className="mt-5 grid w-full min-w-0 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
+          <QuickAction href={adminRoutes.accounts} icon={<ShieldCheck />} label="Lifecycle" />
+          <QuickAction href={adminRoutes.newBooking} icon={<CalendarDays />} label="New Booking" />
+          <QuickAction href={adminRoutes.hr} icon={<UserPlus />} label="HR" />
+          <QuickAction href={adminRoutes.universityTraining} icon={<GraduationCap />} label="University" />
+          <QuickAction href={adminRoutes.newPetParent} icon={<Users />} label="Add Pet Parent" />
+          <QuickAction href={adminRoutes.messages} icon={<MessageCircle />} label="Messages" />
+          <QuickAction href={adminRoutes.guruPerformance} icon={<BarChart3 />} label="Guru Financials" />
+          <QuickAction href={adminRoutes.stripeTransactions} icon={<WalletCards />} label="Stripe" />
+          <QuickAction href={adminRoutes.reports} icon={<FileBarChart />} label="Reports" />
+          <QuickAction href={adminRoutes.exports} icon={<Download />} label="Exports" />
+        </div>
+      </DashboardCard>
     </div>
   );
 }
@@ -2002,122 +1374,201 @@ function DashboardCard({ children }: { children: ReactNode }) {
   );
 }
 
-function TableHeader({
-  title,
-  subtitle,
-  href,
-}: {
-  title: string;
-  subtitle: string;
-  href: string;
-}) {
-  return (
-    <div className="mb-5 flex items-start justify-between gap-4">
-      <div>
-        <h2 className="text-lg font-black text-slate-950">{title}</h2>
-        <p className="text-sm font-semibold text-slate-500">{subtitle}</p>
-      </div>
-      <Link href={href} className="shrink-0 text-sm font-black text-green-800">
-        View all
-      </Link>
-    </div>
-  );
-}
-
-function ProgressLine({
-  title,
-  value,
-  percent,
-  label,
-  tone = "green",
-}: {
-  title: string;
-  value: string;
-  percent: number;
-  label: string;
-  tone?: "green" | "orange";
-}) {
-  return (
-    <div>
-      <div className="mb-2 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-black text-slate-700">{title}</p>
-          <p className="text-2xl font-black text-slate-950">{value}</p>
-        </div>
-        <p className="text-xs font-bold text-slate-500">{label}</p>
-      </div>
-
-      <div className="h-2.5 overflow-hidden rounded-full bg-[#eef4ef]">
-        <div
-          className={`h-full rounded-full ${
-            tone === "orange" ? "bg-orange-400" : "bg-green-700"
-          }`}
-          style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Avatar({
-  name,
-  src,
-  className = "h-9 w-9",
-}: {
-  name: string;
-  src?: string;
-  className?: string;
-}) {
-  if (src) {
-    return (
-      <img
-        alt={name}
-        className={`${className} shrink-0 rounded-full object-cover`}
-        src={src}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={`${className} flex shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-black text-green-800`}
-    >
-      {getInitials(name) || "SG"}
-    </div>
-  );
-}
-
-function NetworkKpiTile({
+function HeroAction({
   href,
   icon,
-  title,
-  value,
+  label,
+  primary = false,
 }: {
   href: string;
   icon: ReactNode;
-  title: string;
-  value: string;
+  label: string;
+  primary?: boolean;
 }) {
   return (
     <Link
       href={href}
-      className="group rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
+      className={
+        primary
+          ? "inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-green-900/15 transition hover:bg-green-900"
+          : "inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+      }
     >
-      <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-green-800 text-white">
-        {icon}
+      <span className="h-4 w-4">{icon}</span>
+      {label}
+    </Link>
+  );
+}
+
+function DataHealthTile({
+  label,
+  value,
+  status,
+  healthy,
+}: {
+  label: string;
+  value: string;
+  status: string;
+  healthy: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-green-100 bg-white px-4 py-3 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+            {label}
+          </p>
+          <p className="mt-1 text-xl font-black text-green-950">{value}</p>
+        </div>
+
+        <span
+          className={
+            healthy
+              ? "rounded-full bg-green-50 px-2.5 py-1 text-[10px] font-black text-green-800"
+              : "rounded-full bg-orange-50 px-2.5 py-1 text-[10px] font-black text-orange-800"
+          }
+        >
+          {healthy ? "OK" : "Check"}
+        </span>
       </div>
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-        {title}
+
+      <p className="mt-2 text-xs font-bold text-slate-500">{status}</p>
+    </div>
+  );
+}
+
+function SnapshotCard({
+  title,
+  value,
+  detail,
+  href,
+  icon,
+  tone,
+  source,
+}: {
+  title: string;
+  value: string;
+  detail: string;
+  href: string;
+  icon: ReactNode;
+  tone: "green" | "emerald" | "orange" | "blue" | "purple" | "pink";
+  source: string;
+}) {
+  const tones = {
+    green: "bg-green-50 text-green-800",
+    emerald: "bg-emerald-50 text-emerald-800",
+    orange: "bg-orange-50 text-orange-800",
+    blue: "bg-sky-50 text-sky-800",
+    purple: "bg-violet-50 text-violet-800",
+    pink: "bg-pink-50 text-pink-800",
+  };
+
+  return (
+    <Link
+      href={href}
+      className="group rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-lg"
+    >
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${tones[tone]}`}>
+          {icon}
+        </div>
+
+        <span className="rounded-full bg-[#f7faf6] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+          Live
+        </span>
+      </div>
+
+      <p className="text-sm font-black text-slate-700">{title}</p>
+      <p className="mt-1 text-3xl font-black tracking-tight text-slate-950">
+        {value}
       </p>
-      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
-      <p className="mt-2 text-xs font-black text-green-800">
+      <p className="mt-2 min-h-[40px] text-sm font-semibold leading-5 text-slate-500">
+        {detail}
+      </p>
+
+      <div className="mt-4 border-t border-[#edf3ee] pt-3">
+        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+          Source
+        </p>
+        <p className="mt-1 truncate text-xs font-bold text-slate-500">{source}</p>
+      </div>
+
+      <p className="mt-4 text-sm font-black text-green-800">
         View details <span className="transition group-hover:translate-x-1">→</span>
       </p>
     </Link>
   );
 }
 
-function NetworkStatusRow({
+function SectionHeader({
+  icon,
+  title,
+  subtitle,
+  href,
+  linkLabel,
+}: {
+  icon: ReactNode;
+  title: string;
+  subtitle: string;
+  href: string;
+  linkLabel: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+          {icon}
+        </div>
+
+        <div className="min-w-0">
+          <h2 className="text-lg font-black text-slate-950">{title}</h2>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+            {subtitle}
+          </p>
+        </div>
+      </div>
+
+      <Link href={href} className="shrink-0 text-sm font-black text-green-800">
+        {linkLabel}
+      </Link>
+    </div>
+  );
+}
+
+function AttentionRow({
+  href,
+  title,
+  value,
+  detail,
+}: {
+  href: string;
+  title: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center justify-between gap-4 rounded-2xl border border-[#eef4ef] bg-[#fbfcf9] p-4 transition hover:border-green-200 hover:bg-green-50"
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-black text-slate-950">{title}</p>
+        <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+          {detail}
+        </p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-3">
+        <p className="text-2xl font-black text-green-900">{value}</p>
+        <span className="text-sm font-black text-green-800 transition group-hover:translate-x-1">
+          →
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function FinancialRow({
   href,
   title,
   value,
@@ -2133,48 +1584,46 @@ function NetworkStatusRow({
   return (
     <Link
       href={href}
-      className="group flex items-center justify-between gap-3 rounded-2xl border border-[#f0f4f1] bg-white p-4 transition hover:border-green-200 hover:bg-green-50"
+      className="group flex items-start gap-3 rounded-2xl border border-[#eef4ef] bg-[#fbfcf9] p-4 transition hover:border-green-200 hover:bg-green-50"
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800 transition group-hover:bg-green-800 group-hover:text-white">
-          {icon}
-        </div>
-
-        <div className="min-w-0">
-          <p className="truncate text-sm font-black text-slate-950">{title}</p>
-          <p className="truncate text-xs font-bold text-slate-500">{detail}</p>
-        </div>
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800 transition group-hover:bg-green-800 group-hover:text-white">
+        {icon}
       </div>
 
-      <p className="shrink-0 text-sm font-black text-green-800">{value}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-black text-slate-950">{title}</p>
+        <p className="mt-1 text-2xl font-black text-green-950">{value}</p>
+        <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+          {detail}
+        </p>
+      </div>
     </Link>
   );
 }
 
-function HrSnapshotTile({
+function MiniMetric({
   label,
   value,
-  detail,
+  href,
 }: {
   label: string;
   value: string;
-  detail: string;
+  href: string;
 }) {
   return (
     <Link
-      href={adminRoutes.hr}
-      className="rounded-2xl border border-green-100 bg-[#fbfcf9] p-4 transition hover:border-green-200 hover:bg-green-50"
+      href={href}
+      className="rounded-2xl border border-[#eef4ef] bg-[#fbfcf9] p-4 transition hover:border-green-200 hover:bg-green-50"
     >
       <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
         {label}
       </p>
       <p className="mt-1 text-2xl font-black text-green-950">{value}</p>
-      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">{detail}</p>
     </Link>
   );
 }
 
-function HrLinkRow({
+function AdminLinkRow({
   href,
   icon,
   title,
@@ -2188,7 +1637,7 @@ function HrLinkRow({
   return (
     <Link
       href={href}
-      className="group flex min-w-0 items-center gap-3 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
+      className="group flex min-w-0 items-center gap-3 rounded-2xl border border-[#eef4ef] bg-[#fbfcf9] p-4 transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50"
     >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800 transition group-hover:bg-green-800 group-hover:text-white">
         {icon}
@@ -2226,111 +1675,52 @@ function QuickAction({
   );
 }
 
-function ColorSwatch({
-  color,
-  label,
+function Avatar({
+  name,
+  src,
+  className = "h-10 w-10",
 }: {
-  color: string;
-  label: string;
+  name: string;
+  src?: string;
+  className?: string;
 }) {
-  return (
-    <div>
-      <div
-        className="mb-2 h-12 rounded-xl border border-black/5"
-        style={{ backgroundColor: color }}
+  if (src) {
+    return (
+      <img
+        alt={name}
+        className={`${className} shrink-0 rounded-full object-cover`}
+        src={src}
       />
-      <p className="text-[10px] font-black leading-tight text-slate-700">
-        {label}
-      </p>
-      <p className="text-[10px] font-bold text-slate-400">{color}</p>
+    );
+  }
+
+  return (
+    <div
+      className={`${className} flex shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-black text-green-800`}
+    >
+      {getInitials(name) || "SG"}
     </div>
   );
 }
 
-function DesignSystem() {
+function EmptyState({
+  icon,
+  title,
+  detail,
+}: {
+  icon: ReactNode;
+  title: string;
+  detail: string;
+}) {
   return (
-    <section className="w-full min-w-0 rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-      <h2 className="mb-5 text-lg font-black uppercase tracking-wide text-slate-950">
-        Design System
-      </h2>
-
-      <div className="grid gap-8 lg:grid-cols-4">
-        <div>
-          <p className="mb-4 text-sm font-black text-slate-700">
-            Color Palette
-          </p>
-          <div className="grid grid-cols-5 gap-3">
-            <ColorSwatch color="#16A34A" label="Primary Green" />
-            <ColorSwatch color="#15803D" label="Dark Green" />
-            <ColorSwatch color="#DCFCE7" label="Light Green" />
-            <ColorSwatch color="#F9FAF5" label="Cream" />
-            <ColorSwatch color="#647468" label="Warm Gray" />
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-4 text-sm font-black text-slate-700">Typography</p>
-          <div className="rounded-2xl border border-[#e3ece5] bg-white p-5">
-            <p className="text-4xl font-black text-slate-950">Aa</p>
-            <p className="mt-2 text-sm font-black text-slate-950">Inter</p>
-            <p className="text-xs font-semibold text-slate-500">
-              Clean, modern, highly readable
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-4 text-sm font-black text-slate-700">UI Elements</p>
-          <div className="space-y-3">
-            <button className="w-full rounded-xl bg-green-800 px-4 py-3 text-sm font-black text-white">
-              Primary Button
-            </button>
-            <button className="w-full rounded-xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-800">
-              Secondary Button
-            </button>
-            <Link
-              href={adminRoutes.dashboard}
-              className="text-sm font-black text-green-800 underline"
-            >
-              Link Text
-            </Link>
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-4 text-sm font-black text-slate-700">
-            Other Elements
-          </p>
-          <div className="flex flex-wrap gap-3">
-            {[CalendarDays, Users, BarChart3, MessageCircle, Download].map(
-              (Icon, index) => (
-                <div
-                  key={index}
-                  className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#e3ece5] bg-white text-green-800"
-                >
-                  <Icon size={20} />
-                </div>
-              ),
-            )}
-
-            <div className="flex items-center gap-2 rounded-2xl border border-[#e3ece5] bg-white px-4 py-3">
-              <span className="h-2.5 w-2.5 rounded-full bg-green-600" />
-              <span className="text-sm font-black text-slate-950">Live</span>
-            </div>
-
-            <div className="flex items-center gap-1 rounded-2xl border border-[#e3ece5] bg-white px-4 py-3 text-sm font-black text-slate-950">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className="fill-yellow-400 text-yellow-400"
-                  size={16}
-                />
-              ))}
-              <span className="ml-1">4.9</span>
-            </div>
-          </div>
-        </div>
+    <div className="rounded-2xl bg-[#f7faf6] p-5 text-center">
+      <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-400">
+        {icon}
       </div>
-    </section>
+      <p className="text-sm font-black text-slate-700">{title}</p>
+      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+        {detail}
+      </p>
+    </div>
   );
 }
