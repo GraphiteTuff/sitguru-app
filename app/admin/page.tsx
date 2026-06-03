@@ -1084,9 +1084,9 @@ export default async function AdminDashboardPage() {
         <div className="min-w-0 xl:col-span-5">
           <DashboardCard>
             <SectionHeader
-              icon={<AlertTriangle size={20} />}
-              title="Needs Attention"
-              subtitle="Action items pulled from current Supabase rows. No hidden estimates."
+              icon={<ShieldCheck size={20} />}
+              title="Action Center"
+              subtitle="Live follow-up items from current Supabase rows. These are setup and review queues, not emergency alerts."
               href={adminRoutes.accounts}
               linkLabel="Open lifecycle"
             />
@@ -1094,33 +1094,33 @@ export default async function AdminDashboardPage() {
             <div className="mt-5 grid gap-3">
               <AttentionRow
                 href={adminRoutes.petParents}
-                title="Pet Parents missing basic profile info"
+                title="Pet Parent profile setup"
                 value={number(data.attention.incompletePetParents.length)}
-                detail="Checks name, email, city, and state from profile rows"
+                detail="Profiles still missing basic setup fields like name, email, city, or state"
               />
               <AttentionRow
                 href={adminRoutes.gurus}
-                title="Gurus needing review"
+                title="Guru onboarding / verification"
                 value={number(data.attention.pendingGurus.length)}
-                detail="Verification, pending status, or Stripe setup"
+                detail="Gurus with verification, pending status, or Stripe setup still to complete"
               />
               <AttentionRow
                 href={adminRoutes.ambassadorLeads}
-                title="Ambassador / partner items pending"
+                title="Ambassador & partner follow-up"
                 value={number(data.attention.pendingAmbassadorItems.length)}
-                detail="Lead and application rows with pending-style statuses"
+                detail="Leads and applications still in pending, contacted, interested, or review status"
               />
               <AttentionRow
                 href={adminRoutes.bookings}
-                title="Bookings pending"
+                title="Pending bookings"
                 value={number(data.attention.pendingBookings.length)}
-                detail="Booking rows with new, pending, review, or submitted status"
+                detail="Booking rows currently marked new, pending, review, or submitted"
               />
               <AttentionRow
                 href={adminRoutes.messages}
-                title="Unread messages"
+                title="Messages to review"
                 value={number(data.attention.unreadMessages.length)}
-                detail="Unread flags, missing read_at, or non-read status"
+                detail="Message rows that are unread, missing read_at, or not marked read/archived"
               />
             </div>
           </DashboardCard>
