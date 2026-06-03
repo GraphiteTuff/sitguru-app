@@ -3,14 +3,11 @@ import Link from "next/link";
 import {
   ArrowLeft,
   CalendarDays,
-  CheckCircle2,
   HeartHandshake,
   Mail,
   MapPin,
-  MessageSquare,
   PawPrint,
   ShieldCheck,
-  Sparkles,
   Star,
   UserRound,
 } from "lucide-react";
@@ -43,7 +40,7 @@ function asNumber(value: unknown) {
 }
 
 function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     value,
   );
 }
@@ -397,6 +394,24 @@ async function safeSelect(
   }
 }
 
+async function safeProfileLookup(column: string, value: string) {
+  if (!value) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq(column, value)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return data as AnyRow;
+  } catch {
+    return null;
+  }
+}
+
 async function getAuthUserById(userId: string) {
   if (!isUuid(userId)) return null;
 
@@ -441,65 +456,167 @@ async function getAuthUserByLookupKey(lookupKey: string) {
 }
 
 async function getProfileByLookupKey(lookupKey: string) {
-  try {
-    if (isUuid(lookupKey)) {
-      const { data, error } = await supabaseAdmin
-        .from("profiles")
-        .select("*")
-        .eq("id", lookupKey)
-        .maybeSingle();
+  const cleanLookup = lookupKey.trim();
 
-      if (error) return null;
+  if (!cleanLookup) return null;
 
-      return (data ?? null) as AnyRow | null;
+  const directProfile =
+    (isUuid(cleanLookup) ? await safeProfileLookup("id", cleanLookup) : null) ||
+    (cleanLookup.includes("@")
+      ? await safeProfileLookup("email", cleanLookup.toLowerCase())
+      : null);
+
+  if (directProfile) return directProfile;
+
+  if (isUuid(cleanLookup)) {
+    const fallbackColumns = [
+      "user_id",
+      "auth_user_id",
+      "customer_id",
+      "pet_parent_id",
+      "profile_id",
+    ];
+
+    for (const column of fallbackColumns) {
+      const match = await safeProfileLookup(column, cleanLookup);
+      if (match) return match;
     }
-
-    if (lookupKey.includes("@")) {
-      const { data, error } = await supabaseAdmin
-        .from("profiles")
-        .select("*")
-        .eq("email", lookupKey)
-        .maybeSingle();
-
-      if (error) return null;
-
-      return (data ?? null) as AnyRow | null;
-    }
-
-    return null;
-  } catch {
-    return null;
   }
+
+  return null;
+}
+
+async function resolvePetParentRecord(lookupKey: string) {
+  let profile = await getProfileByLookupKey(lookupKey);
+  let authUser = await getAuthUserByLookupKey(lookupKey);
+
+  if (!authUser && profile?.id && isUuid(String(profile.id))) {
+    authUser = await getAuthUserById(String(profile.id));
+  }
+
+  if (!authUser) {
+    const profileEmail = getText(profile, [
+      "email",
+      "customer_email",
+      "pet_parent_email",
+    ]);
+
+    if (profileEmail) {
+      authUser = await getAuthUserByEmail(profileEmail);
+    }
+  }
+
+  if (!profile && authUser?.id) {
+    profile = await getProfileByLookupKey(String(authUser.id));
+  }
+
+  if (!profile) {
+    const authEmail = getText(authUser, ["email"]);
+
+    if (authEmail) {
+      profile = await getProfileByLookupKey(authEmail);
+    }
+  }
+
+  if (profile && !authUser) {
+    const profileEmail = getText(profile, [
+      "email",
+      "customer_email",
+      "pet_parent_email",
+    ]);
+
+    if (profileEmail) {
+      authUser = await getAuthUserByEmail(profileEmail);
+    }
+  }
+
+  if (authUser && !profile) {
+    const authEmail = getText(authUser, ["email"]);
+
+    if (authEmail) {
+      profile = await getProfileByLookupKey(authEmail);
+    }
+  }
+
+  return {
+    profile,
+    authUser,
+  };
+}
+
+function getVerifiedFields(
+  profile: AnyRow | null,
+  authUser: AnyRow | null,
+) {
+  const hasEmail = Boolean(getEmail(profile, authUser) !== "No email found");
+  const hasPhone = Boolean(getPhone(profile, authUser) !== "No phone found");
+  const hasConfirmedEmail = Boolean(
+    getText(authUser, ["email_confirmed_at", "confirmed_at"]),
+  );
+  const hasConfirmedPhone = Boolean(
+    getText(authUser, ["phone_confirmed_at"]),
+  );
+
+  return {
+    hasEmail,
+    hasPhone,
+    hasConfirmedEmail,
+    hasConfirmedPhone,
+  };
+}
+
+function hasRealName(profile: AnyRow | null, authUser: AnyRow | null) {
+  const name = getRawDisplayName(profile, authUser).trim().toLowerCase();
+
+  if (!name) return false;
+
+  return ![
+    "customer",
+    "pet parent",
+    "petparent",
+    "unknown",
+    "unknown customer",
+    "unknown pet parent",
+    "incomplete pet parent preview",
+    "test",
+    "demo",
+    "fake",
+    "sample",
+  ].includes(name);
+}
+
+function hasLocation(profile: AnyRow | null) {
+  return getLocation(profile) !== "Location not added yet";
 }
 
 function getProfileCompletion({
   profile,
+  authUser,
   petsCount,
+  bookingsCount,
+  messagesCount,
 }: {
   profile: AnyRow | null;
+  authUser: AnyRow | null;
   petsCount: number;
+  bookingsCount: number;
+  messagesCount: number;
 }) {
-  const fields = [
-    getDisplayName(profile),
-    getEmail(profile),
-    getPhone(profile),
-    getLocation(profile),
-    getServiceAddress(profile),
-    getCarePreferences(profile),
-    petsCount > 0 ? "pets" : "",
+  const verified = getVerifiedFields(profile, authUser);
+  const checks = [
+    Boolean(profile),
+    hasRealName(profile, authUser),
+    verified.hasEmail,
+    verified.hasConfirmedEmail || verified.hasConfirmedPhone,
+    verified.hasPhone,
+    hasLocation(profile),
+    petsCount > 0,
+    bookingsCount > 0 || messagesCount > 0,
   ];
 
-  const completed = fields.filter((field) => {
-    const value = String(field || "").trim();
-    return (
-      value &&
-      value !== "No email found" &&
-      value !== "No phone found" &&
-      value !== "Location not added yet"
-    );
-  }).length;
+  const completed = checks.filter(Boolean).length;
 
-  return Math.round((completed / fields.length) * 100);
+  return Math.round((completed / checks.length) * 100);
 }
 
 function getNextBooking(bookings: AnyRow[]) {
@@ -535,14 +652,7 @@ export default async function AdminCustomerDashboardPreviewPage({
   const resolvedParams = await params;
   const lookupKey = decodeURIComponent(resolvedParams.id || "").trim();
 
-  const [profile, authUserByLookup] = await Promise.all([
-    getProfileByLookupKey(lookupKey),
-    getAuthUserByLookupKey(lookupKey),
-  ]);
-
-  const authUser =
-    authUserByLookup ||
-    (profile?.id ? await getAuthUserById(String(profile.id)) : null);
+  const { profile, authUser } = await resolvePetParentRecord(lookupKey);
 
   const relatedCustomerId = getRelatedRecordId({
     lookupKey,
@@ -585,7 +695,11 @@ export default async function AdminCustomerDashboardPreviewPage({
   });
 
   const hasAnyPreviewData = Boolean(
-    profile || authUser || bookings.length > 0 || pets.length > 0 || messages.length > 0,
+    profile ||
+      authUser ||
+      bookings.length > 0 ||
+      pets.length > 0 ||
+      messages.length > 0,
   );
   const previewIsIncomplete = !profile || !authUser;
 
@@ -594,11 +708,16 @@ export default async function AdminCustomerDashboardPreviewPage({
     : "Incomplete Pet Parent Preview";
   const email = hasAnyPreviewData ? getEmail(profile, authUser) : "No email found";
   const phone = hasAnyPreviewData ? getPhone(profile, authUser) : "No phone found";
-  const location = hasAnyPreviewData ? getLocation(profile) : "Location not added yet";
+  const location = hasAnyPreviewData
+    ? getLocation(profile)
+    : "Location not added yet";
   const avatarUrl = getAvatarUrl(profile, authUser);
   const profileCompletion = getProfileCompletion({
     profile,
+    authUser,
     petsCount: pets.length,
+    bookingsCount: bookings.length,
+    messagesCount: messages.length,
   });
 
   const totalSpend = bookings.reduce(
@@ -618,14 +737,15 @@ export default async function AdminCustomerDashboardPreviewPage({
   const nextBooking = getNextBooking(bookings);
   const certifiedPetParent = false;
 
-
   return (
     <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
       <section className="mx-auto max-w-7xl space-y-5">
         <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap gap-3">
             <Link
-              href={`/admin/customers/${encodeURIComponent(relatedCustomerId || lookupKey)}`}
+              href={`/admin/customers/${encodeURIComponent(
+                relatedCustomerId || lookupKey,
+              )}`}
               className="inline-flex items-center gap-2 text-sm font-extrabold text-emerald-800 hover:text-emerald-950"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -647,9 +767,9 @@ export default async function AdminCustomerDashboardPreviewPage({
               Super Admin Dashboard Preview
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-emerald-950">
-              This is a read-only Super Admin preview of the Pet Parent
-              dashboard data. It does not impersonate the user and does not
-              modify their account.
+              This is a read-only Super Admin preview of the Pet Parent dashboard
+              data. It does not impersonate the user and does not modify their
+              account.
             </p>
           </div>
 
@@ -715,7 +835,9 @@ export default async function AdminCustomerDashboardPreviewPage({
                 {nextBooking ? (
                   <TrustBadge
                     icon={<CalendarDays className="h-4 w-4" />}
-                    label={`Next booking: ${formatDate(getBookingDate(nextBooking))}`}
+                    label={`Next booking: ${formatDate(
+                      getBookingDate(nextBooking),
+                    )}`}
                     tone="white"
                   />
                 ) : null}
@@ -753,7 +875,9 @@ export default async function AdminCustomerDashboardPreviewPage({
               </p>
               <p className="mt-1 max-w-xs text-sm font-semibold leading-6 text-slate-600">
                 {pets.length > 0
-                  ? `${pets.length} pet profile${pets.length === 1 ? "" : "s"} ready for care`
+                  ? `${pets.length} pet profile${
+                      pets.length === 1 ? "" : "s"
+                    } ready for care`
                   : "No pet profiles added yet"}
               </p>
             </div>
@@ -880,7 +1004,11 @@ export default async function AdminCustomerDashboardPreviewPage({
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <p className="text-base font-black text-slate-950">
-                            {getText(booking, ["pet_name", "animal_name"], "Pet Care")}
+                            {getText(
+                              booking,
+                              ["pet_name", "animal_name"],
+                              "Pet Care",
+                            )}
                           </p>
                           <p className="mt-1 text-sm font-semibold text-slate-600">
                             {formatDate(getBookingDate(booking))} •{" "}
@@ -1005,9 +1133,18 @@ export default async function AdminCustomerDashboardPreviewPage({
             <MiniBox label="Auth User" value={authUser ? "Found" : "Missing"} />
             <MiniBox label="Profile Row" value={profile ? "Found" : "Missing"} />
             <MiniBox label="Auth Provider" value={getAuthProvider(authUser)} />
-            <MiniBox label="Auth Created" value={formatDateTime(authUser?.created_at)} />
-            <MiniBox label="Profile Created" value={formatDateTime(profile?.created_at)} />
-            <MiniBox label="Profile Updated" value={formatDateTime(profile?.updated_at)} />
+            <MiniBox
+              label="Auth Created"
+              value={formatDateTime(authUser?.created_at)}
+            />
+            <MiniBox
+              label="Profile Created"
+              value={formatDateTime(profile?.created_at)}
+            />
+            <MiniBox
+              label="Profile Updated"
+              value={formatDateTime(profile?.updated_at)}
+            />
           </div>
         </section>
       </section>
