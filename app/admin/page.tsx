@@ -5,7 +5,6 @@ import {
   BarChart3,
   BriefcaseBusiness,
   CalendarDays,
-  CircleDollarSign,
   Database,
   Download,
   FileBarChart,
@@ -23,6 +22,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AccountLifecycleRollupCard from "@/components/admin/AccountLifecycleRollupCard";
+import GuruFinancialDashboardSnapshot from "./GuruFinancialDashboardSnapshot";
 
 export const dynamic = "force-dynamic";
 
@@ -979,53 +979,6 @@ export default async function AdminDashboardPage() {
     },
   ];
 
-  const financialCards = [
-    {
-      title: "Booking Gross",
-      value: data.financials.amountFieldsDetected
-        ? money(data.financials.bookingGross)
-        : "Needs source",
-      detail: data.financials.amountFieldsDetected
-        ? "Calculated from loaded booking amount fields"
-        : "No verified booking amount field detected",
-      href: adminRoutes.financials,
-      icon: <CircleDollarSign size={20} />,
-    },
-    {
-      title: "Platform Fees",
-      value: data.financials.amountFieldsDetected
-        ? money(data.financials.platformFees)
-        : "Needs source",
-      detail: data.financials.amountFieldsDetected
-        ? "Only explicit fee fields are counted"
-        : "Wire a verified fee/payment source",
-      href: adminRoutes.profitLoss,
-      icon: <BarChart3 size={20} />,
-    },
-    {
-      title: "Tips",
-      value: data.financials.amountFieldsDetected
-        ? money(data.financials.tips)
-        : "Needs source",
-      detail: data.financials.amountFieldsDetected
-        ? "Tip fields only; no estimate used"
-        : "No verified tip field detected",
-      href: adminRoutes.commissions,
-      icon: <Gift size={20} />,
-    },
-    {
-      title: "Pending Payouts",
-      value: data.financials.amountFieldsDetected
-        ? money(data.financials.pendingPayouts)
-        : "Needs source",
-      detail: data.financials.amountFieldsDetected
-        ? "Paid bookings not marked paid out"
-        : "Wire payout/payment status fields",
-      href: adminRoutes.commissions,
-      icon: <WalletCards size={20} />,
-    },
-  ];
-
   return (
     <div className="w-full min-w-0 space-y-5">
       <section className="overflow-hidden rounded-[32px] border border-green-100 bg-gradient-to-br from-[#f7fbf4] via-white to-[#eef8ed] p-5 shadow-sm sm:p-7">
@@ -1077,10 +1030,10 @@ export default async function AdminDashboardPage() {
           healthy={!data.sourceHealth.bookingsCapped}
         />
         <DataHealthTile
-          label="Financial Mode"
-          value={data.financials.amountFieldsDetected ? "Detected" : "Needs wiring"}
-          status={data.financials.amountFieldsDetected ? "No estimates used" : "No fake estimates"}
-          healthy={data.financials.amountFieldsDetected}
+          label="Financial Snapshot"
+          value="Wired"
+          status="Uses GuruFinancialDashboardSnapshot"
+          healthy
         />
       </section>
 
@@ -1174,21 +1127,7 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="min-w-0 xl:col-span-4">
-          <DashboardCard>
-            <SectionHeader
-              icon={<CircleDollarSign size={20} />}
-              title="Financial Snapshot"
-              subtitle="Financial cards show verified fields only. No estimated profit or expense math."
-              href={adminRoutes.financials}
-              linkLabel="Open financials"
-            />
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              {financialCards.map((card) => (
-                <FinancialRow key={card.title} {...card} />
-              ))}
-            </div>
-          </DashboardCard>
+          <GuruFinancialDashboardSnapshot />
         </div>
 
         <div className="min-w-0 xl:col-span-3">
@@ -1689,39 +1628,6 @@ function AttentionRow({
         <span className="text-sm font-black text-green-800 transition group-hover:translate-x-1">
           →
         </span>
-      </div>
-    </Link>
-  );
-}
-
-function FinancialRow({
-  href,
-  title,
-  value,
-  detail,
-  icon,
-}: {
-  href: string;
-  title: string;
-  value: string;
-  detail: string;
-  icon: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-start gap-3 rounded-2xl border border-[#eef4ef] bg-[#fbfcf9] p-4 transition hover:border-green-200 hover:bg-green-50"
-    >
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800 transition group-hover:bg-green-800 group-hover:text-white">
-        {icon}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-black text-slate-950">{title}</p>
-        <p className="mt-1 text-2xl font-black text-green-950">{value}</p>
-        <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-          {detail}
-        </p>
       </div>
     </Link>
   );
