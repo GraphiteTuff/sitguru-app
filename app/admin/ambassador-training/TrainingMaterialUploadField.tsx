@@ -1,11 +1,17 @@
 "use client";
 
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
+import { createBrowserClient } from "@supabase/ssr";
 import { AlertTriangle, CheckCircle2, Trash2, UploadCloud } from "lucide-react";
 
 type AcademyType = "pet_parent" | "guru" | "ambassador";
 
 type UploadStatus = "idle" | "uploading" | "uploaded" | "error" | "removed";
+
+type BrowserSupabaseConfig = {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+};
 
 const universityStorageBucket = "sitguru-university";
 
@@ -68,6 +74,51 @@ function getMaterialTitleFromForm(input: HTMLInputElement | null) {
   return titleInput?.value?.trim() || "training-material";
 }
 
+async function getBrowserSupabaseConfig() {
+  const response = await fetch("/api/supabase-browser-config", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    let message = "Unable to load Supabase browser upload configuration.";
+
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      // Keep default message.
+    }
+
+    throw new Error(message);
+  }
+
+  const config = (await response.json()) as Partial<BrowserSupabaseConfig>;
+  const supabaseUrl = asString(config.supabaseUrl);
+  const supabaseAnonKey = asString(config.supabaseAnonKey);
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Supabase browser upload configuration is missing the URL or anon/publishable key.",
+    );
+  }
+
+  return { supabaseUrl, supabaseAnonKey } satisfies BrowserSupabaseConfig;
+}
+
+function createDirectUploadClient(config: BrowserSupabaseConfig) {
+  return createBrowserClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      persistSession: true,
+      storage: typeof window === "undefined" ? undefined : window.sessionStorage,
+      storageKey: "sitguru-session",
+    },
+  });
+}
+
 export default function TrainingMaterialUploadField({
   academyType,
   stepNumber,
@@ -107,7 +158,7 @@ export default function TrainingMaterialUploadField({
     if (!file) return;
 
     setStatus("uploading");
-    setMessage("Uploading directly to Supabase Storage...");
+    setMessage("Loading Supabase upload configuration...");
     setRemoveStorageFile(false);
 
     const bucket = storageBucket || universityStorageBucket;
@@ -120,43 +171,50 @@ export default function TrainingMaterialUploadField({
       fileName: file.name,
     });
 
-    let supabase: ReturnType<
-      typeof import("@/lib/supabase/client")["createClient"]
-    >;
-
     try {
-      const supabaseClientModule = await import("@/lib/supabase/client");
-      supabase = supabaseClientModule.createClient();
+      const config = await getBrowserSupabaseConfig();
+      const supabase = createDirectUploadClient(config);
+
+      setMessage("Uploading directly to Supabase Storage...");
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw new Error(`Supabase session check failed: ${sessionError.message}`);
+      }
+
+      if (!sessionData.session) {
+        throw new Error(
+          "No active Supabase browser session was found. Refresh the page, sign in as Super Admin again, and retry the upload.",
+        );
+      }
+
+      const { error } = await supabase.storage
+        .from(bucket)
+        .upload(nextStoragePath, file, {
+          cacheControl: "3600",
+          contentType: file.type || "application/octet-stream",
+          upsert: false,
+        });
+
+      if (error) {
+        throw new Error(
+          `${error.message}. Confirm the sitguru-university bucket exists and Storage policies allow authenticated admins to upload.`,
+        );
+      }
+
+      setStorageBucket(bucket);
+      setStoragePath(nextStoragePath);
+      setStatus("uploaded");
+      setMessage("Uploaded. Now click Save/Add Material to attach it to this step.");
     } catch (error) {
       setStatus("error");
       setMessage(
         error instanceof Error
-          ? `Upload setup failed: ${error.message}`
-          : "Upload setup failed. The Supabase browser client could not be loaded.",
+          ? error.message
+          : "Upload failed. The file could not be uploaded to Supabase Storage.",
       );
-      return;
     }
-
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(nextStoragePath, file, {
-        cacheControl: "3600",
-        contentType: file.type || "application/octet-stream",
-        upsert: false,
-      });
-
-    if (error) {
-      setStatus("error");
-      setMessage(
-        `Upload failed: ${error.message}. Confirm the bucket exists and storage upload policies allow authenticated admins to upload.`,
-      );
-      return;
-    }
-
-    setStorageBucket(bucket);
-    setStoragePath(nextStoragePath);
-    setStatus("uploaded");
-    setMessage("Uploaded. Now click Save/Add Material to attach it to this step.");
   }
 
   function markRemoveAttachedFile() {
