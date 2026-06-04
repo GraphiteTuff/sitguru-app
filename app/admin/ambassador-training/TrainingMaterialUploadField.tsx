@@ -2,7 +2,6 @@
 
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Trash2, UploadCloud } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 
 type AcademyType = "pet_parent" | "guru" | "ambassador";
 
@@ -121,7 +120,22 @@ export default function TrainingMaterialUploadField({
       fileName: file.name,
     });
 
-    const supabase = createClient();
+    let supabase: ReturnType<
+      typeof import("@/lib/supabase/client")["createClient"]
+    >;
+
+    try {
+      const supabaseClientModule = await import("@/lib/supabase/client");
+      supabase = supabaseClientModule.createClient();
+    } catch (error) {
+      setStatus("error");
+      setMessage(
+        error instanceof Error
+          ? `Upload setup failed: ${error.message}`
+          : "Upload setup failed. The Supabase browser client could not be loaded.",
+      );
+      return;
+    }
 
     const { error } = await supabase.storage
       .from(bucket)
