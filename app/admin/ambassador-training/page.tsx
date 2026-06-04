@@ -16,6 +16,7 @@ import {
   Pencil,
   Plus,
   Save,
+  UploadCloud,
   ShieldCheck,
   ToggleLeft,
   ToggleRight,
@@ -132,6 +133,9 @@ const contentTypes = [
   "quiz",
   "certification",
 ];
+
+const universityStorageBucket = "sitguru-university";
+const maxTrainingUploadBytes = 500 * 1024 * 1024;
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -291,6 +295,141 @@ function getDefaultMaterialPath(step: TrainingStep) {
   return `${folder}/${String(step.step_number).padStart(2, "0")}-${safeTitle || "training-material"}`;
 }
 
+function slugify(value: string, fallback = "training-material") {
+  const slug = asString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  return slug || fallback;
+}
+
+function getAcademyStorageFolder(academyType: AcademyType) {
+  if (academyType === "pet_parent") return "pet-parent";
+  if (academyType === "guru") return "guru";
+
+  return "ambassador";
+}
+
+function getFileExtension(fileName: string) {
+  const cleanName = asString(fileName).toLowerCase();
+  const extension = cleanName.includes(".")
+    ? cleanName.slice(cleanName.lastIndexOf("."))
+    : "";
+
+  return extension.replace(/[^a-z0-9.]/g, "") || "";
+}
+
+function getTrainingUploadFile(formData: FormData) {
+  const file = formData.get("material_file");
+
+  if (!(file instanceof File)) return null;
+  if (!file.name || file.size <= 0) return null;
+
+  return file;
+}
+
+function buildTrainingMaterialStoragePath({
+  academyType,
+  stepNumber,
+  stepTitle,
+  materialTitle,
+  fileName,
+}: {
+  academyType: AcademyType;
+  stepNumber: number;
+  stepTitle: string;
+  materialTitle: string;
+  fileName: string;
+}) {
+  const folder = getAcademyStorageFolder(academyType);
+  const safeStepNumber = String(stepNumber || 1).padStart(2, "0");
+  const safeStepTitle = slugify(stepTitle, "academy-step");
+  const safeMaterialTitle = slugify(materialTitle, "material");
+  const safeOriginalName = slugify(fileName.replace(/\.[^/.]+$/, ""), "upload");
+  const extension = getFileExtension(fileName);
+  const timestamp = Date.now();
+
+  return `${folder}/${safeStepNumber}-${safeStepTitle}/${timestamp}-${safeMaterialTitle}-${safeOriginalName}${extension}`;
+}
+
+async function uploadTrainingMaterialFile({
+  formData,
+  academyType,
+  materialTitle,
+}: {
+  formData: FormData;
+  academyType: AcademyType;
+  materialTitle: string;
+}) {
+  const file = getTrainingUploadFile(formData);
+
+  if (!file) {
+    return {
+      didUpload: false,
+      storageBucket: asString(formData.get("storage_bucket")),
+      storagePath: asString(formData.get("storage_path")),
+    };
+  }
+
+  if (file.size > maxTrainingUploadBytes) {
+    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&material=upload_error`);
+  }
+
+  const stepNumber = asNumber(formData.get("step_number")) || 1;
+  const stepTitle = asString(formData.get("step_title")) || "Academy Step";
+  const storageBucket =
+    asString(formData.get("storage_bucket")) || universityStorageBucket;
+  const storagePath = buildTrainingMaterialStoragePath({
+    academyType,
+    stepNumber,
+    stepTitle,
+    materialTitle,
+    fileName: file.name,
+  });
+
+  const fileBuffer = new Uint8Array(await file.arrayBuffer());
+
+  const { error } = await supabaseAdmin.storage
+    .from(storageBucket)
+    .upload(storagePath, fileBuffer, {
+      contentType: file.type || "application/octet-stream",
+      upsert: false,
+    });
+
+  if (error) {
+    console.warn("Unable to upload SitGuru University material file:", error);
+    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&material=upload_error`);
+  }
+
+  return {
+    didUpload: true,
+    storageBucket,
+    storagePath,
+  };
+}
+
+async function removeTrainingMaterialStorageFile(
+  storageBucket?: string | null,
+  storagePath?: string | null,
+) {
+  const bucket = asString(storageBucket);
+  const path = asString(storagePath);
+
+  if (!bucket || !path) return;
+
+  try {
+    const { error } = await supabaseAdmin.storage.from(bucket).remove([path]);
+
+    if (error) {
+      console.warn("Unable to remove SitGuru University material file:", error);
+    }
+  } catch (error) {
+    console.warn("Unable to remove SitGuru University material file:", error);
+  }
+}
+
+
 function sortTrainingMaterials(a: TrainingMaterial, b: TrainingMaterial) {
   const aSort = asNumber(a.sort_order) || 999;
   const bSort = asNumber(b.sort_order) || 999;
@@ -344,6 +483,15 @@ function getNotice(
     };
   }
 
+  if (material === "uploaded") {
+    return {
+      tone: "success" as const,
+      title: "Training material uploaded and saved",
+      message:
+        "The file was attached, uploaded to Supabase Storage, and saved to this academy step.",
+    };
+  }
+
   if (material === "updated") {
     return {
       tone: "success" as const,
@@ -364,7 +512,26 @@ function getNotice(
     return {
       tone: "success" as const,
       title: "Training material deleted",
-      message: "The supplemental material was removed from the academy step.",
+      message:
+        "The supplemental material was removed from the academy step. If it had an uploaded storage file, that file was removed too.",
+    };
+  }
+
+  if (material === "file_removed") {
+    return {
+      tone: "success" as const,
+      title: "Uploaded file removed",
+      message:
+        "The uploaded file was removed from Supabase Storage and detached from the material record.",
+    };
+  }
+
+  if (material === "upload_error") {
+    return {
+      tone: "error" as const,
+      title: "File upload failed",
+      message:
+        "The material could not upload to Supabase Storage. Confirm the sitguru-university bucket exists and the file is under the allowed upload size.",
     };
   }
 
@@ -561,8 +728,6 @@ async function createTrainingMaterial(formData: FormData) {
   const description = asString(formData.get("description"));
   const contentType = asString(formData.get("content_type")) || "document";
   const sortOrder = asNumber(formData.get("sort_order")) || 1;
-  const storageBucket = asString(formData.get("storage_bucket"));
-  const storagePath = asString(formData.get("storage_path"));
   const externalUrl = asString(formData.get("external_url"));
   const videoUrl = asString(formData.get("video_url"));
   const isRequired = asBoolean(formData.get("is_required"));
@@ -571,6 +736,14 @@ async function createTrainingMaterial(formData: FormData) {
   if (!trainingStepId || !title || !academyType) {
     redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`);
   }
+
+  const uploadedFile = await uploadTrainingMaterialFile({
+    formData,
+    academyType,
+    materialTitle: title,
+  });
+  const storageBucket = uploadedFile.storageBucket;
+  const storagePath = uploadedFile.storagePath;
 
   const now = new Date().toISOString();
 
@@ -597,7 +770,11 @@ async function createTrainingMaterial(formData: FormData) {
   }
 
   revalidateUniversityPaths();
-  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&material=created`);
+  redirect(
+    `${adminRoutes.ambassadorTraining}?academy=${academyType}&material=${
+      uploadedFile.didUpload ? "uploaded" : "created"
+    }`,
+  );
 }
 
 async function updateTrainingMaterial(formData: FormData) {
@@ -612,8 +789,7 @@ async function updateTrainingMaterial(formData: FormData) {
   const description = asString(formData.get("description"));
   const contentType = asString(formData.get("content_type")) || "document";
   const sortOrder = asNumber(formData.get("sort_order")) || 1;
-  const storageBucket = asString(formData.get("storage_bucket"));
-  const storagePath = asString(formData.get("storage_path"));
+  const removeUploadedFile = asBoolean(formData.get("remove_storage_file"));
   const externalUrl = asString(formData.get("external_url"));
   const videoUrl = asString(formData.get("video_url"));
   const isRequired = asBoolean(formData.get("is_required"));
@@ -621,6 +797,36 @@ async function updateTrainingMaterial(formData: FormData) {
 
   if (!materialId || !trainingStepId || !title || !academyType) {
     redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`);
+  }
+
+  const { data: existingMaterial } = await supabaseAdmin
+    .from("academy_step_materials")
+    .select("storage_bucket,storage_path")
+    .eq("id", materialId)
+    .maybeSingle();
+
+  const uploadedFile = await uploadTrainingMaterialFile({
+    formData,
+    academyType,
+    materialTitle: title,
+  });
+
+  let storageBucket = uploadedFile.storageBucket;
+  let storagePath = uploadedFile.storagePath;
+
+  if (uploadedFile.didUpload) {
+    await removeTrainingMaterialStorageFile(
+      (existingMaterial as TrainingMaterial | null)?.storage_bucket,
+      (existingMaterial as TrainingMaterial | null)?.storage_path,
+    );
+  } else if (removeUploadedFile) {
+    await removeTrainingMaterialStorageFile(
+      (existingMaterial as TrainingMaterial | null)?.storage_bucket,
+      (existingMaterial as TrainingMaterial | null)?.storage_path,
+    );
+
+    storageBucket = "";
+    storagePath = "";
   }
 
   const { error } = await supabaseAdmin
@@ -648,7 +854,15 @@ async function updateTrainingMaterial(formData: FormData) {
   }
 
   revalidateUniversityPaths();
-  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&material=updated`);
+  redirect(
+    `${adminRoutes.ambassadorTraining}?academy=${academyType}&material=${
+      uploadedFile.didUpload
+        ? "uploaded"
+        : removeUploadedFile
+          ? "file_removed"
+          : "updated"
+    }`,
+  );
 }
 
 async function toggleTrainingMaterialStatus(formData: FormData) {
@@ -693,6 +907,12 @@ async function deleteTrainingMaterial(formData: FormData) {
     redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`);
   }
 
+  const { data: existingMaterial } = await supabaseAdmin
+    .from("academy_step_materials")
+    .select("storage_bucket,storage_path")
+    .eq("id", materialId)
+    .maybeSingle();
+
   const { error } = await supabaseAdmin
     .from("academy_step_materials")
     .delete()
@@ -702,6 +922,11 @@ async function deleteTrainingMaterial(formData: FormData) {
     console.warn("Unable to delete SitGuru University training material:", error);
     redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=materials`);
   }
+
+  await removeTrainingMaterialStorageFile(
+    (existingMaterial as TrainingMaterial | null)?.storage_bucket,
+    (existingMaterial as TrainingMaterial | null)?.storage_path,
+  );
 
   revalidateUniversityPaths();
   redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&material=deleted`);
@@ -1423,7 +1648,7 @@ function TrainingMaterialCard({
           <input type="hidden" name="material_id" value={material.id} />
           <input type="hidden" name="academy_type" value={academy.value} />
           <p className="mb-3 text-xs font-bold leading-5 text-red-800">
-            This removes only this material from the step. It does not delete files from Supabase Storage.
+            This removes this material from the step and deletes its uploaded Supabase Storage file, if one is attached.
           </p>
           <button
             type="submit"
@@ -1454,9 +1679,11 @@ function TrainingMaterialForm({
   const isEdit = Boolean(material?.id);
 
   return (
-    <form action={action} className="grid gap-4">
+    <form action={action} encType="multipart/form-data" className="grid gap-4">
       <input type="hidden" name="training_step_id" value={step.id} />
       <input type="hidden" name="academy_type" value={academy.value} />
+      <input type="hidden" name="step_number" value={step.step_number} />
+      <input type="hidden" name="step_title" value={step.title} />
       {isEdit ? <input type="hidden" name="material_id" value={material?.id} /> : null}
 
       <div className="grid gap-3 sm:grid-cols-[1fr_130px]">
@@ -1514,17 +1741,52 @@ function TrainingMaterialForm({
               Material File / Link
             </h3>
             <p className="mt-1 text-xs font-bold leading-5 text-green-900/75">
-              Add a video URL, Gamma link, PowerPoint/PDF URL, NotebookLM link,
-              Synthesia video, image URL, or Supabase Storage bucket/path.
+              Attach a file for the easiest workflow. SitGuru will upload it to Supabase Storage and save the bucket/path automatically. Use URLs only for externally hosted videos or resources.
             </p>
           </div>
         </div>
 
         <div className="grid gap-3">
+          <FormField label={isEdit ? "Replace / Attach Uploaded File" : "Attach Uploaded File"}>
+            <div className="rounded-2xl border border-dashed border-green-200 bg-white p-4">
+              <div className="mb-3 flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+                  <UploadCloud size={18} />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-green-950">
+                    Upload the file from your computer
+                  </p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                    Attach PowerPoint, PDF, Word doc, image, or video. SitGuru automatically uploads it to Supabase Storage and saves the bucket/path.
+                  </p>
+                </div>
+              </div>
+
+              <input
+                name="material_file"
+                type="file"
+                accept=".pdf,.ppt,.pptx,.doc,.docx,.png,.jpg,.jpeg,.webp,.mp4,.mov,.m4v,.webm"
+                className="block w-full cursor-pointer rounded-2xl border border-[#dfe9e2] bg-white text-sm font-bold text-slate-900 file:mr-4 file:border-0 file:bg-green-800 file:px-4 file:py-3 file:text-sm file:font-black file:text-white hover:file:bg-green-900"
+              />
+
+              {material?.storage_path ? (
+                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-xs font-bold leading-5 text-red-800">
+                  <input
+                    name="remove_storage_file"
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 accent-red-700"
+                  />
+                  Remove the currently uploaded file from this material and Supabase Storage.
+                </label>
+              ) : null}
+            </div>
+          </FormField>
+
           <FormField label="Video URL">
             <input
               name="video_url"
-              placeholder="https://..."
+              placeholder="Only use this for YouTube/Vimeo/Synthesia-style video links"
               defaultValue={material?.video_url || ""}
               className="min-h-12 w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-400 focus:ring-4 focus:ring-green-100"
             />
@@ -1544,7 +1806,7 @@ function TrainingMaterialForm({
               <input
                 name="storage_bucket"
                 placeholder="sitguru-university"
-                defaultValue={material?.storage_bucket || "sitguru-university"}
+                defaultValue={material?.storage_bucket || universityStorageBucket}
                 className="min-h-12 w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-400 focus:ring-4 focus:ring-green-100"
               />
             </FormField>
