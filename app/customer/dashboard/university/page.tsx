@@ -460,13 +460,62 @@ function AcademyStepCard({ step }: { step: StepWithMaterials }) {
         <h4 className="text-lg font-black text-slate-950">Training materials</h4>
         {step.materials.length ? <div className="mt-4 grid gap-3">{step.materials.map((material) => <MaterialCard key={material.id} material={material} step={step} />)}</div> : <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-500">No materials have been added to this step yet.</div>}
       </div>
-      <div className="mt-4 rounded-[24px] border border-slate-100 bg-slate-50 p-4">
+      <div
+        className={`mt-4 rounded-[24px] border p-4 ${
+          step.isCompleted
+            ? "border-emerald-200 bg-emerald-50"
+            : readyToComplete
+              ? "border-red-200 bg-red-50"
+              : "border-red-100 bg-red-50/70"
+        }`}
+      >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-black text-slate-950">{step.isCompleted ? `Step ${step.step_number} complete` : readyToComplete ? `Ready to complete Step ${step.step_number}` : "Required acknowledgments needed"}</p>
-            <p className="mt-1 text-xs font-bold leading-5 text-slate-500">{step.isCompleted ? `Completed on ${formatDateTime(step.completedAt)}.` : readyToComplete ? "All required materials are acknowledged. You can now complete this step." : "Acknowledge every required material above before completing this step."}</p>
+            <p
+              className={`text-sm font-black ${
+                step.isCompleted ? "text-emerald-950" : "text-red-900"
+              }`}
+            >
+              {step.isCompleted
+                ? `Step ${step.step_number} complete`
+                : readyToComplete
+                  ? `Action required: click Complete Step ${step.step_number}`
+                  : "Required acknowledgments needed"}
+            </p>
+            <p
+              className={`mt-1 text-xs font-bold leading-5 ${
+                step.isCompleted ? "text-emerald-800" : "text-red-800"
+              }`}
+            >
+              {step.isCompleted
+                ? `Completed on ${formatDateTime(step.completedAt)}.`
+                : readyToComplete
+                  ? `All required materials are acknowledged. To finish this module, click Complete Step ${step.step_number}.`
+                  : "Acknowledge every required material above before the Complete Step button unlocks."}
+            </p>
           </div>
-          {step.isCompleted ? <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-emerald-100 px-5 py-3 text-sm font-black text-emerald-900"><CheckCircle2 size={17} />Completed</span> : <form action={completeStep}><input type="hidden" name="training_step_id" value={step.id} /><button type="submit" disabled={!readyToComplete} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition ${readyToComplete ? "bg-emerald-800 text-white shadow-sm hover:bg-emerald-900" : "bg-slate-200 text-slate-500"}`}><CheckCircle2 size={17} />Complete Step {step.step_number}</button></form>}
+          {step.isCompleted ? (
+            <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm">
+              <CheckCircle2 size={17} />
+              Completed
+            </span>
+          ) : (
+            <form action={completeStep}>
+              <input type="hidden" name="training_step_id" value={step.id} />
+              <button
+                type="submit"
+                disabled={!readyToComplete}
+                className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition ${
+                  readyToComplete
+                    ? "bg-red-700 text-white shadow-sm hover:bg-red-800"
+                    : "bg-red-100 text-red-400"
+                }`}
+              >
+                <CheckCircle2 size={17} />
+                Complete Step {step.step_number}
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </article>
