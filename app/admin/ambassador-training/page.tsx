@@ -773,7 +773,7 @@ async function createTrainingMaterial(formData: FormData) {
   redirect(
     `${adminRoutes.ambassadorTraining}?academy=${academyType}&material=${
       uploadedFile.didUpload ? "uploaded" : "created"
-    }`,
+    }&saved_step=${trainingStepId}`,
   );
 }
 
@@ -861,7 +861,7 @@ async function updateTrainingMaterial(formData: FormData) {
         : removeUploadedFile
           ? "file_removed"
           : "updated"
-    }`,
+    }&saved_step=${trainingStepId}`,
   );
 }
 
@@ -909,9 +909,11 @@ async function deleteTrainingMaterial(formData: FormData) {
 
   const { data: existingMaterial } = await supabaseAdmin
     .from("academy_step_materials")
-    .select("storage_bucket,storage_path")
+    .select("training_step_id,storage_bucket,storage_path")
     .eq("id", materialId)
     .maybeSingle();
+
+  const savedStepId = asString((existingMaterial as TrainingMaterial | null)?.training_step_id);
 
   const { error } = await supabaseAdmin
     .from("academy_step_materials")
@@ -929,7 +931,11 @@ async function deleteTrainingMaterial(formData: FormData) {
   );
 
   revalidateUniversityPaths();
-  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&material=deleted`);
+  redirect(
+    `${adminRoutes.ambassadorTraining}?academy=${academyType}&material=deleted${
+      savedStepId ? `&saved_step=${savedStepId}` : ""
+    }`,
+  );
 }
 
 function revalidateUniversityPaths() {
@@ -975,6 +981,7 @@ export default async function AdminAmbassadorTrainingPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const notice = getNotice(resolvedSearchParams);
   const academyFilter = getAcademyFilter(resolvedSearchParams?.academy);
+  const savedStepId = asString(resolvedSearchParams?.saved_step);
 
   const [{ data: stepsResult }, { data: progressResult }, materialsResult] = await Promise.all([
     supabaseAdmin
@@ -1310,6 +1317,7 @@ export default async function AdminAmbassadorTrainingPage({
                     materials={materialsByStep.get(step.id) || []}
                     completedCount={completedByStep.get(step.id) || 0}
                     startedCount={startedByStep.get(step.id) || 0}
+                    saved={savedStepId === step.id}
                   />
                 ))
               ) : (
@@ -1359,11 +1367,13 @@ function TrainingStepEditor({
   materials,
   completedCount,
   startedCount,
+  saved,
 }: {
   step: TrainingStep;
   materials: TrainingMaterial[];
   completedCount: number;
   startedCount: number;
+  saved?: boolean;
 }) {
   const active = step.is_active !== false;
   const primaryMaterialUrl = getTrainingMaterialUrl(step);
@@ -1372,7 +1382,30 @@ function TrainingStepEditor({
   const requiredMaterials = materials.filter((material) => material.is_required !== false);
 
   return (
-    <article className="rounded-[28px] border border-[#dfe9e2] bg-[#fbfcf9] p-4 sm:p-5">
+    <article
+      className={[
+        "rounded-[28px] border bg-[#fbfcf9] p-4 sm:p-5",
+        saved
+          ? "border-green-400 ring-4 ring-green-100"
+          : "border-[#dfe9e2]",
+      ].join(" ")}
+    >
+      {saved ? (
+        <div className="mb-4 rounded-[22px] border border-green-200 bg-green-700 px-5 py-4 text-white shadow-lg shadow-emerald-900/15">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xl font-black">Saved</p>
+              <p className="mt-1 text-sm font-bold text-green-50">
+                This training step was updated successfully. The attached material is now saved to this step.
+              </p>
+            </div>
+            <span className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2 text-sm font-black text-green-800">
+              Step {step.step_number} saved
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center gap-2">
