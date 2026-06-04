@@ -121,6 +121,23 @@ type ReferralProfile = {
   available_credit: number;
 };
 
+
+type UniversityProgress = {
+  totalSteps: number;
+  completedSteps: number;
+  totalMaterials: number;
+  acknowledgedMaterials: number;
+  requiredMaterials: number;
+  progressPercent: number;
+  isStarted: boolean;
+  isComplete: boolean;
+  certificationLabel: string;
+  badgeStatus: string;
+  progressHelper: string;
+  universityTileHelper: string;
+  academyButtonLabel: string;
+};
+
 type Booking = {
   id: string;
   status: string;
@@ -416,6 +433,23 @@ const ZIP_FALLBACK_LOCATIONS: Record<string, ZipLookupLocation> = {
     latitude: 39.9526,
     longitude: -75.1746,
   },
+};
+
+
+const defaultUniversityProgress: UniversityProgress = {
+  totalSteps: 9,
+  completedSteps: 0,
+  totalMaterials: 0,
+  acknowledgedMaterials: 0,
+  requiredMaterials: 0,
+  progressPercent: 0,
+  isStarted: false,
+  isComplete: false,
+  certificationLabel: "Certified Pet Parent: Not started",
+  badgeStatus: "Locked",
+  progressHelper: "Start the academy to begin tracking",
+  universityTileHelper: "Start academy",
+  academyButtonLabel: "Start Pet Parent Academy",
 };
 
 function createConfettiPieces() {
@@ -1882,6 +1916,110 @@ async function getOrCreateReferralProfile(userId: string) {
   return null;
 }
 
+
+async function fetchCustomerUniversityProgress(userId: string): Promise<UniversityProgress> {
+  try {
+    const [
+      stepsResult,
+      materialsResult,
+      materialProgressResult,
+      stepProgressResult,
+    ] = await Promise.all([
+      supabase
+        .from("ambassador_training_steps")
+        .select("id")
+        .eq("academy_type", "pet_parent")
+        .eq("is_active", true),
+      supabase
+        .from("academy_step_materials")
+        .select("id, is_required")
+        .eq("academy_type", "pet_parent")
+        .eq("is_active", true),
+      supabase
+        .from("academy_material_progress")
+        .select("material_id, acknowledged_at")
+        .eq("academy_type", "pet_parent")
+        .eq("user_id", userId)
+        .not("acknowledged_at", "is", null),
+      supabase
+        .from("academy_step_progress")
+        .select("training_step_id, status, completed_at")
+        .eq("academy_type", "pet_parent")
+        .eq("user_id", userId),
+    ]);
+
+    const totalSteps = Array.isArray(stepsResult.data)
+      ? stepsResult.data.length || 9
+      : 9;
+
+    const materialRows = Array.isArray(materialsResult.data)
+      ? materialsResult.data
+      : [];
+
+    const totalMaterials = materialRows.length;
+    const requiredMaterials = materialRows.filter(
+      (material) => material.is_required !== false,
+    ).length;
+
+    const acknowledgedMaterials = Array.isArray(materialProgressResult.data)
+      ? materialProgressResult.data.filter((progress) =>
+          Boolean(progress.acknowledged_at),
+        ).length
+      : 0;
+
+    const completedSteps = Array.isArray(stepProgressResult.data)
+      ? stepProgressResult.data.filter((progress) =>
+          Boolean(progress.completed_at) ||
+          String(progress.status || "").toLowerCase() === "completed",
+        ).length
+      : 0;
+
+    const progressPercent =
+      totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+    const isComplete = totalSteps > 0 && completedSteps >= totalSteps;
+    const isStarted = completedSteps > 0 || acknowledgedMaterials > 0;
+
+    return {
+      totalSteps,
+      completedSteps,
+      totalMaterials,
+      acknowledgedMaterials,
+      requiredMaterials,
+      progressPercent,
+      isStarted,
+      isComplete,
+      certificationLabel: isComplete
+        ? "Certified Pet Parent: Completed"
+        : isStarted
+          ? "Certified Pet Parent: In progress"
+          : "Certified Pet Parent: Not started",
+      badgeStatus: isComplete
+        ? "Certified Pet Parent"
+        : isStarted
+          ? "In progress"
+          : "Locked",
+      progressHelper: isComplete
+        ? "Academy complete"
+        : isStarted
+          ? `${acknowledgedMaterials} of ${requiredMaterials || totalMaterials} materials acknowledged`
+          : "Start the academy to begin tracking",
+      universityTileHelper: isComplete
+        ? "View certificate"
+        : isStarted
+          ? "Continue academy"
+          : "Start academy",
+      academyButtonLabel: isComplete
+        ? "Review Pet Parent Academy"
+        : isStarted
+          ? "Continue Pet Parent Academy"
+          : "Start Pet Parent Academy",
+    };
+  } catch (error) {
+    console.warn("Unable to load Pet Parent Academy progress:", error);
+    return defaultUniversityProgress;
+  }
+}
+
 function NearbyGurusCarousel({
   gurus,
   careZip,
@@ -2311,6 +2449,9 @@ export default function CustomerDashboardPage() {
   const [careLocationLabel, setCareLocationLabel] = useState("");
   const [nearbyGuruMessage, setNearbyGuruMessage] = useState("");
   const [loadingNearbyGurus, setLoadingNearbyGurus] = useState(false);
+  const [universityProgress, setUniversityProgress] = useState<UniversityProgress>(
+    defaultUniversityProgress,
+  );
 
   const customerAvatarSrc =
     customerProfile?.avatar_url?.trim() || CUSTOMER_PROFILE_PHOTO_SRC;
@@ -2356,13 +2497,19 @@ export default function CustomerDashboardPage() {
       return;
     }
 
-    const [profileData, bookingsData, petsData, referralData] =
-      await Promise.all([
-        fetchCustomerProfile(user),
-        fetchBookingsForUser(user.id, user.email),
-        fetchPetsForUser(user.id),
-        getOrCreateReferralProfile(user.id),
-      ]);
+    const [
+      profileData,
+      bookingsData,
+      petsData,
+      referralData,
+      universityProgressData,
+    ] = await Promise.all([
+      fetchCustomerProfile(user),
+      fetchBookingsForUser(user.id, user.email),
+      fetchPetsForUser(user.id),
+      getOrCreateReferralProfile(user.id),
+      fetchCustomerUniversityProgress(user.id),
+    ]);
 
     const dashboardCareZip = getLatestCareZip(bookingsData, profileData);
 
@@ -2372,6 +2519,7 @@ export default function CustomerDashboardPage() {
     setBookings(bookingsData);
     setPets(petsData);
     setReferralProfile(referralData);
+    setUniversityProgress(universityProgressData);
     setCareZip(dashboardCareZip);
     setCareZipInput(dashboardCareZip);
 
@@ -2913,7 +3061,7 @@ export default function CustomerDashboardPage() {
 
                   <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
                     <GraduationCap className="h-4 w-4 text-emerald-700" />
-                    Certified Pet Parent: Not started
+                    {universityProgress.certificationLabel}
                   </span>
 
                   <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
@@ -3082,8 +3230,8 @@ export default function CustomerDashboardPage() {
                 },
                 {
                   label: "University",
-                  value: "0 of 9",
-                  helper: "Start academy",
+                  value: `${universityProgress.completedSteps} of ${universityProgress.totalSteps}`,
+                  helper: universityProgress.universityTileHelper,
                   href: routes.university,
                   icon: <GraduationCap className="h-5 w-5" />,
                 },
@@ -3145,10 +3293,11 @@ export default function CustomerDashboardPage() {
                       Progress
                     </p>
                     <p className="mt-2 text-2xl font-black text-slate-950">
-                      0 of 9
+                      {universityProgress.completedSteps} of{" "}
+                      {universityProgress.totalSteps}
                     </p>
                     <p className="mt-1 text-xs font-bold text-slate-500">
-                      Backend tracking coming next
+                      {universityProgress.progressHelper}
                     </p>
                   </div>
 
@@ -3157,10 +3306,12 @@ export default function CustomerDashboardPage() {
                       Badge
                     </p>
                     <p className="mt-2 text-lg font-black text-slate-950">
-                      Certified Pet Parent
+                      {universityProgress.badgeStatus}
                     </p>
                     <p className="mt-1 text-xs font-bold text-slate-500">
-                      Awarded after academy completion
+                      {universityProgress.isComplete
+                        ? "Academy completed"
+                        : "Awarded after academy completion"}
                     </p>
                   </div>
 
@@ -3183,7 +3334,7 @@ export default function CustomerDashboardPage() {
                     className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-lg"
                   >
                     <GraduationCap className="h-5 w-5" />
-                    Start Pet Parent Academy
+                    {universityProgress.academyButtonLabel}
                   </Link>
 
                   <Link
