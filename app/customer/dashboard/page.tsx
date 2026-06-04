@@ -1922,102 +1922,44 @@ async function getOrCreateReferralProfile(userId: string) {
 }
 
 
-async function fetchCustomerUniversityProgress(userId: string): Promise<UniversityProgress> {
+async function fetchCustomerUniversityProgress(): Promise<UniversityProgress> {
   try {
-    const [
-      stepsResult,
-      materialsResult,
-      materialProgressResult,
-      stepProgressResult,
-    ] = await Promise.all([
-      supabase
-        .from("ambassador_training_steps")
-        .select("id")
-        .eq("academy_type", "pet_parent")
-        .eq("is_active", true),
-      supabase
-        .from("academy_step_materials")
-        .select("id, is_required")
-        .eq("academy_type", "pet_parent")
-        .eq("is_active", true),
-      supabase
-        .from("academy_material_progress")
-        .select("material_id, acknowledged_at")
-        .eq("academy_type", "pet_parent")
-        .eq("user_id", userId)
-        .not("acknowledged_at", "is", null),
-      supabase
-        .from("academy_step_progress")
-        .select("training_step_id, status, completed_at")
-        .eq("academy_type", "pet_parent")
-        .eq("user_id", userId),
-    ]);
+    const response = await fetch("/api/customer/university-progress", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    });
 
-    const totalSteps = Array.isArray(stepsResult.data)
-      ? stepsResult.data.length || 9
-      : 9;
+    if (!response.ok) {
+      console.warn("Unable to load Pet Parent Academy progress:", response.status);
+      return defaultUniversityProgress;
+    }
 
-    const materialRows = Array.isArray(materialsResult.data)
-      ? materialsResult.data
-      : [];
+    const payload = await response.json();
+    const progress = payload?.progress as Partial<UniversityProgress> | undefined;
 
-    const totalMaterials = materialRows.length;
-    const requiredMaterials = materialRows.filter(
-      (material) => material.is_required !== false,
-    ).length;
-
-    const acknowledgedMaterials = Array.isArray(materialProgressResult.data)
-      ? materialProgressResult.data.filter((progress) =>
-          Boolean(progress.acknowledged_at),
-        ).length
-      : 0;
-
-    const completedSteps = Array.isArray(stepProgressResult.data)
-      ? stepProgressResult.data.filter((progress) =>
-          Boolean(progress.completed_at) ||
-          String(progress.status || "").toLowerCase() === "completed",
-        ).length
-      : 0;
-
-    const progressPercent =
-      totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
-    const isComplete = totalSteps > 0 && completedSteps >= totalSteps;
-    const isStarted = completedSteps > 0 || acknowledgedMaterials > 0;
+    if (!progress) return defaultUniversityProgress;
 
     return {
-      totalSteps,
-      completedSteps,
-      totalMaterials,
-      acknowledgedMaterials,
-      requiredMaterials,
-      progressPercent,
-      isStarted,
-      isComplete,
-      certificationLabel: isComplete
-        ? "Certified Pet Parent: Completed"
-        : isStarted
-          ? "Certified Pet Parent: In progress"
-          : "Certified Pet Parent: Not started",
-      badgeStatus: isComplete
-        ? "Certified Pet Parent"
-        : isStarted
-          ? "In progress"
-          : "Locked",
-      progressHelper: isComplete
-        ? "Academy complete"
-        : isStarted
-          ? `${acknowledgedMaterials} of ${requiredMaterials || totalMaterials} materials acknowledged`
-          : "Start the academy to begin tracking",
-      universityTileHelper: isComplete
-        ? "View certificate"
-        : isStarted
-          ? "Continue academy"
-          : "Start academy",
-      academyButtonLabel: isComplete
-        ? "Review Pet Parent Academy"
-        : isStarted
-          ? "Continue Pet Parent Academy"
-          : "Start Pet Parent Academy",
+      totalSteps: Number(progress.totalSteps ?? defaultUniversityProgress.totalSteps),
+      completedSteps: Number(progress.completedSteps ?? 0),
+      totalMaterials: Number(progress.totalMaterials ?? 0),
+      acknowledgedMaterials: Number(progress.acknowledgedMaterials ?? 0),
+      requiredMaterials: Number(progress.requiredMaterials ?? 0),
+      progressPercent: Number(progress.progressPercent ?? 0),
+      isStarted: Boolean(progress.isStarted),
+      isComplete: Boolean(progress.isComplete),
+      certificationLabel:
+        progress.certificationLabel || defaultUniversityProgress.certificationLabel,
+      badgeStatus: progress.badgeStatus || defaultUniversityProgress.badgeStatus,
+      progressHelper: progress.progressHelper || defaultUniversityProgress.progressHelper,
+      universityTileHelper:
+        progress.universityTileHelper || defaultUniversityProgress.universityTileHelper,
+      academyButtonLabel:
+        progress.academyButtonLabel || defaultUniversityProgress.academyButtonLabel,
     };
   } catch (error) {
     console.warn("Unable to load Pet Parent Academy progress:", error);
@@ -2119,7 +2061,7 @@ function NearbyGurusCarousel({
                       <img
                         src={guru.image_url}
                         alt={guru.name}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover object-center"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-5xl">
@@ -2289,7 +2231,7 @@ function BookingCard({
                     <img
                       src={petPhotoUrl}
                       alt={booking.pet_name || "Pet"}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover object-center"
                     />
                   ) : (
                     <PawPrint className="h-7 w-7 text-emerald-600" />
@@ -2302,7 +2244,7 @@ function BookingCard({
                     <img
                       src={booking.guru_avatar_url}
                       alt={booking.guru_name || "Guru"}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover object-center"
                     />
                   </div>
                 ) : null}
@@ -2513,7 +2455,7 @@ export default function CustomerDashboardPage() {
       fetchBookingsForUser(user.id, user.email),
       fetchPetsForUser(user.id),
       getOrCreateReferralProfile(user.id),
-      fetchCustomerUniversityProgress(user.id),
+      fetchCustomerUniversityProgress(),
     ]);
 
     const dashboardCareZip = getLatestCareZip(bookingsData, profileData);
@@ -3138,7 +3080,7 @@ export default function CustomerDashboardPage() {
                         src={customerAvatarSrc}
                         alt={`${customerDisplayName} profile photo`}
                         onError={() => setCustomerPhotoFailed(true)}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover object-center"
                       />
                     ) : (
                       customerInitials
@@ -3425,7 +3367,7 @@ export default function CustomerDashboardPage() {
                           <img
                             src={PAWPERKS_PREVIEW_DOG_SRC}
                             alt="Golden retriever for PawPerks preview"
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-cover object-center"
                           />
                         </div>
                         <div className="mb-2 h-32 w-28 overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-xl">
@@ -3433,7 +3375,7 @@ export default function CustomerDashboardPage() {
                           <img
                             src={PAWPERKS_PREVIEW_CAT_SRC}
                             alt="Tabby cat for PawPerks preview"
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-cover object-center"
                           />
                         </div>
                       </div>
@@ -3534,7 +3476,7 @@ export default function CustomerDashboardPage() {
                         src={customerAvatarSrc}
                         alt={`${customerDisplayName} profile photo`}
                         onError={() => setCustomerPhotoFailed(true)}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover object-center"
                       />
                     ) : (
                       getCustomerInitials(customerProfile)
@@ -4074,7 +4016,7 @@ export default function CustomerDashboardPage() {
                                 <img
                                   src={pet.photo_url}
                                   alt={pet.name}
-                                  className="h-full w-full object-cover"
+                                  className="h-full w-full object-cover object-center"
                                 />
                               ) : (
                                 <div className="flex h-full w-full items-center justify-center text-2xl">
@@ -4253,7 +4195,7 @@ export default function CustomerDashboardPage() {
                                     <img
                                       src={matchedPet.photo_url}
                                       alt={booking.pet_name || matchedPet.name}
-                                      className="h-full w-full object-cover"
+                                      className="h-full w-full object-cover object-center"
                                     />
                                   ) : (
                                     <PawPrint className="h-6 w-6 text-emerald-600" />
