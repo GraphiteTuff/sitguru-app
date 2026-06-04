@@ -1459,6 +1459,7 @@ async function saveCustomerProfile(userId: string, form: CustomerProfileForm) {
       label: "full",
       payload: {
         id: userId,
+        role: "customer",
         full_name: fullName || null,
         first_name: firstName,
         phone: form.phone.trim() || null,
@@ -1471,6 +1472,7 @@ async function saveCustomerProfile(userId: string, form: CustomerProfileForm) {
       label: "full",
       payload: {
         id: userId,
+        role: "customer",
         full_name: fullName || null,
         first_name: firstName,
         phone: form.phone.trim() || null,
@@ -1483,6 +1485,7 @@ async function saveCustomerProfile(userId: string, form: CustomerProfileForm) {
       label: "contact",
       payload: {
         id: userId,
+        role: "customer",
         full_name: fullName || null,
         first_name: firstName,
         phone: form.phone.trim() || null,
@@ -1493,6 +1496,7 @@ async function saveCustomerProfile(userId: string, form: CustomerProfileForm) {
       label: "contact",
       payload: {
         id: userId,
+        role: "customer",
         full_name: fullName || null,
         first_name: firstName,
         phone: form.phone.trim() || null,
@@ -1503,6 +1507,7 @@ async function saveCustomerProfile(userId: string, form: CustomerProfileForm) {
       label: "basic",
       payload: {
         id: userId,
+        role: "customer",
         full_name: fullName || null,
         first_name: firstName,
       },
@@ -1572,9 +1577,9 @@ async function uploadCustomerProfilePhoto(userId: string, file: File) {
 
 async function saveCustomerProfilePhotoUrl(userId: string, avatarUrl: string) {
   const saveAttempts = [
-    { id: userId, avatar_url: avatarUrl },
-    { id: userId, profile_photo_url: avatarUrl },
-    { id: userId, photo_url: avatarUrl },
+    { id: userId, role: "customer", avatar_url: avatarUrl },
+    { id: userId, role: "customer", profile_photo_url: avatarUrl },
+    { id: userId, role: "customer", photo_url: avatarUrl },
   ];
 
   let lastError =
