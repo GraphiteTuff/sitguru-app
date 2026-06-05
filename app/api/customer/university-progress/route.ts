@@ -34,7 +34,8 @@ const defaultUniversityProgress: UniversityProgress = {
   isComplete: false,
   certificationLabel: "Certified Pet Parent: Not started",
   badgeStatus: "Locked",
-  progressHelper: "Watch the intro video, review the guide, and acknowledge completion.",
+  progressHelper:
+    "Watch the intro video, review the guide, and acknowledge completion.",
   universityTileHelper: "Start Easy as 1, 2, 3",
   academyButtonLabel: "Start Pet Parent Academy",
 };
@@ -187,14 +188,17 @@ export async function GET() {
 
     const orientationMaterials = orientationStepId
       ? activeMaterials.filter(
-          (material) => String(material.training_step_id || "") === orientationStepId,
+          (material) =>
+            String(material.training_step_id || "") === orientationStepId,
         )
       : activeMaterials;
 
     const requiredMaterials = orientationMaterials.filter(isRequired);
 
     const visibleMaterialIds = new Set(
-      orientationMaterials.map((material) => String(material.id)).filter(Boolean),
+      orientationMaterials
+        .map((material) => String(material.id))
+        .filter(Boolean),
     );
 
     const materialProgress = Array.isArray(materialProgressResult.data)

@@ -63,6 +63,7 @@ type PageData = {
   userId: string;
   email: string;
   displayName: string;
+  avatarUrl: string;
   orientationStep: TrainingStep | null;
   videoMaterial: MaterialWithUrl | null;
   guideMaterial: MaterialWithUrl | null;
@@ -118,6 +119,22 @@ function getDisplayName(profile: AnyRow | null, email: string) {
     asString(profile?.display_name) ||
     email ||
     "Pet Parent"
+  );
+}
+
+
+function getAvatarUrl(profile: AnyRow | null, userMetadata?: AnyRow | null) {
+  return (
+    asString(profile?.avatar_url) ||
+    asString(profile?.profile_photo_url) ||
+    asString(profile?.photo_url) ||
+    asString(profile?.image_url) ||
+    asString(userMetadata?.avatar_url) ||
+    asString(userMetadata?.profile_photo_url) ||
+    asString(userMetadata?.photo_url) ||
+    asString(userMetadata?.picture) ||
+    asString(userMetadata?.avatar) ||
+    ""
   );
 }
 
@@ -276,7 +293,7 @@ async function getProfile(userId: string) {
   }
 }
 
-async function getPetParentAcademyData(userId: string, email: string): Promise<PageData> {
+async function getPetParentAcademyData(userId: string, email: string, userMetadata?: AnyRow | null): Promise<PageData> {
   const [profile, stepsResult, materialsResult, materialProgressResult, stepProgressResult] =
     await Promise.all([
       getProfile(userId),
@@ -376,6 +393,7 @@ async function getPetParentAcademyData(userId: string, email: string): Promise<P
     userId,
     email,
     displayName: getDisplayName(profile, email),
+    avatarUrl: getAvatarUrl(profile, userMetadata),
     orientationStep,
     videoMaterial,
     guideMaterial,
@@ -552,7 +570,11 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const notice = getNotice(resolvedSearchParams);
 
-  const data = await getPetParentAcademyData(user.id, asString(user.email));
+  const data = await getPetParentAcademyData(
+    user.id,
+    asString(user.email),
+    (user.user_metadata || null) as AnyRow | null,
+  );
   const firstName = data.displayName.split(" ")[0] || "Pet Parent";
   const canComplete = Boolean(
     data.orientationStep &&
@@ -588,8 +610,17 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
               </div>
 
               <div className="flex shrink-0 flex-col items-center rounded-[2rem] bg-white/85 p-5 text-center shadow-sm ring-1 ring-white/70">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 text-2xl font-black text-emerald-800 ring-1 ring-emerald-100">
-                  {getInitials(data.displayName)}
+                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-emerald-50 text-2xl font-black text-emerald-800 ring-1 ring-emerald-100">
+                  {data.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={data.avatarUrl}
+                      alt={`${data.displayName} profile photo`}
+                      className="h-full w-full object-cover object-center"
+                    />
+                  ) : (
+                    getInitials(data.displayName)
+                  )}
                 </div>
                 <p className="mt-3 text-sm font-black text-slate-950">
                   {data.displayName}
