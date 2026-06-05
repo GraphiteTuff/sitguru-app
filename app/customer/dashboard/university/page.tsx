@@ -10,11 +10,12 @@ import {
   ExternalLink,
   FileText,
   GraduationCap,
+  ImageIcon,
   LockKeyhole,
   PawPrint,
   PlayCircle,
   ShieldCheck,
-  Sparkles,
+  Star,
 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
@@ -27,13 +28,13 @@ type AnyRow = Record<string, unknown>;
 type TrainingStep = {
   id: string;
   academy_type?: string | null;
-  step_number?: number | null;
-  title?: string | null;
+  step_number: number;
+  title: string;
   description?: string | null;
+  estimated_minutes?: number | null;
+  is_required?: boolean | null;
   is_active?: boolean | null;
   requires_acknowledgment?: boolean | null;
-  requires_signature?: boolean | null;
-  estimated_minutes?: number | null;
 };
 
 type TrainingMaterial = {
@@ -53,30 +54,46 @@ type TrainingMaterial = {
   created_at?: string | null;
 };
 
+type MaterialProgress = {
+  training_step_id?: string | null;
+  material_id?: string | null;
+  acknowledged_at?: string | null;
+};
+
+type StepProgress = {
+  training_step_id?: string | null;
+  status?: string | null;
+  acknowledged_at?: string | null;
+  completed_at?: string | null;
+};
+
 type MaterialWithUrl = TrainingMaterial & {
   openUrl: string;
   downloadUrl: string;
-  acknowledged: boolean;
+  acknowledgedAt: string | null;
+  isAcknowledged: boolean;
 };
 
-type PageData = {
-  userId: string;
-  email: string;
-  displayName: string;
-  avatarUrl: string;
+type OrientationData = {
   orientationStep: TrainingStep | null;
   videoMaterial: MaterialWithUrl | null;
   guideMaterial: MaterialWithUrl | null;
-  orientationCompleted: boolean;
+  certificationMaterial: MaterialWithUrl | null;
+  allDisplayedMaterials: MaterialWithUrl[];
+  requiredDisplayedMaterials: MaterialWithUrl[];
+  acknowledgedRequiredMaterials: number;
   completedAt: string | null;
-  progressPercent: number;
+  isCompleted: boolean;
+};
+
+type PageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 const academyType = "pet_parent";
+
 const customerRoutes = {
   dashboard: "/customer/dashboard",
-  profile: "/customer/dashboard/profile",
-  pets: "/customer/dashboard/pets",
   university: "/customer/dashboard/university",
 };
 
@@ -95,77 +112,97 @@ function asNumber(value: unknown) {
   return 0;
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "Not completed yet";
+function asBoolean(value: FormDataEntryValue | null) {
+  return value === "on" || value === "true" || value === "yes";
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "—";
 
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Not completed yet";
+  if (Number.isNaN(parsed.getTime())) return "—";
 
-  return parsed.toLocaleDateString("en-US", {
+  return parsed.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
-function getDisplayName(
-  profile: AnyRow | null,
-  _email: string,
-  userMetadata?: AnyRow | null,
-) {
+function getAuthMetadata(authUser: AnyRow | null | undefined) {
+  const userMetadata = authUser?.user_metadata;
+  const rawUserMetadata = authUser?.raw_user_meta_data;
+
+  if (userMetadata && typeof userMetadata === "object") {
+    return userMetadata as AnyRow;
+  }
+
+  if (rawUserMetadata && typeof rawUserMetadata === "object") {
+    return rawUserMetadata as AnyRow;
+  }
+
+  return null;
+}
+
+function getDisplayName(profile: AnyRow | null, authUser: AnyRow | null) {
+  const metadata = getAuthMetadata(authUser);
+
   const firstName =
-    asString(profile?.first_name) || asString(userMetadata?.first_name);
+    asString(profile?.first_name) ||
+    asString(metadata?.first_name) ||
+    asString(metadata?.given_name);
   const lastName =
-    asString(profile?.last_name) || asString(userMetadata?.last_name);
+    asString(profile?.last_name) ||
+    asString(metadata?.last_name) ||
+    asString(metadata?.family_name);
   const combined = [firstName, lastName].filter(Boolean).join(" ").trim();
 
-  const profileName =
+  return (
+    combined ||
     asString(profile?.full_name) ||
     asString(profile?.display_name) ||
     asString(profile?.name) ||
-    asString(profile?.customer_name) ||
-    asString(profile?.pet_parent_name);
-
-  const metadataName =
-    asString(userMetadata?.full_name) ||
-    asString(userMetadata?.name) ||
-    asString(userMetadata?.display_name);
-
-  return combined || profileName || metadataName || "Pet Parent";
+    asString(metadata?.full_name) ||
+    asString(metadata?.name) ||
+    asString(metadata?.display_name) ||
+    "Pet Parent"
+  );
 }
 
-function getFirstNameOnly(value: string) {
-  const cleanValue = value.trim();
-
-  if (!cleanValue || cleanValue.includes("@")) return "Pet Parent";
-
-  const firstName = cleanValue.split(/\s+/)[0]?.trim();
+function getFirstName(displayName: string) {
+  const cleanName = displayName.replace(/@.*/, "").trim();
+  const firstName = cleanName.split(/[\s._-]+/).filter(Boolean)[0];
 
   return firstName || "Pet Parent";
 }
 
-function getAvatarUrl(profile: AnyRow | null, userMetadata?: AnyRow | null) {
+function getInitials(displayName: string) {
+  const cleanName = displayName.replace(/@.*/, "").trim();
+  const parts = cleanName.split(/[\s._-]+/).filter(Boolean);
+
+  const firstInitial = parts[0]?.charAt(0) || "P";
+  const secondInitial = parts[1]?.charAt(0) || "P";
+
+  return `${firstInitial}${secondInitial}`.toUpperCase();
+}
+
+function getAvatarUrl(profile: AnyRow | null, authUser: AnyRow | null) {
+  const metadata = getAuthMetadata(authUser);
+
   return (
     asString(profile?.avatar_url) ||
     asString(profile?.profile_photo_url) ||
     asString(profile?.photo_url) ||
     asString(profile?.image_url) ||
-    asString(userMetadata?.avatar_url) ||
-    asString(userMetadata?.profile_photo_url) ||
-    asString(userMetadata?.photo_url) ||
-    asString(userMetadata?.picture) ||
-    asString(userMetadata?.avatar) ||
-    ""
+    asString(profile?.profile_image_url) ||
+    asString(metadata?.avatar_url) ||
+    asString(metadata?.profile_photo_url) ||
+    asString(metadata?.photo_url) ||
+    asString(metadata?.picture) ||
+    asString(metadata?.image_url)
   );
-}
-
-function getInitials(value: string) {
-  const parts = value
-    .replace(/@.*/, "")
-    .split(/[\s._-]+/)
-    .filter(Boolean);
-
-  return `${parts[0]?.charAt(0) || "P"}${parts[1]?.charAt(0) || "P"}`.toUpperCase();
 }
 
 function getContentTypeLabel(value?: string | null) {
@@ -174,48 +211,21 @@ function getContentTypeLabel(value?: string | null) {
   if (normalized === "video") return "Video";
   if (normalized === "ppt" || normalized === "powerpoint") return "PowerPoint";
   if (normalized === "pdf") return "PDF";
-  if (normalized === "document") return "Guide";
+  if (normalized === "document") return "Document";
   if (normalized === "image") return "Image / Slide";
-  if (normalized === "link") return "Link";
+  if (normalized === "certification") return "Certification";
 
   return "Training";
 }
 
-function isVideoMaterial(material: TrainingMaterial) {
-  const type = asString(material.content_type).toLowerCase();
-  const title = asString(material.title).toLowerCase();
-  const path = asString(material.storage_path).toLowerCase();
+function getMaterialIcon(type?: string | null) {
+  const normalized = asString(type).toLowerCase();
 
-  return (
-    type === "video" ||
-    title.includes("video") ||
-    path.endsWith(".mp4") ||
-    path.endsWith(".mov") ||
-    path.endsWith(".webm") ||
-    Boolean(material.video_url)
-  );
-}
+  if (normalized === "video") return <PlayCircle size={18} />;
+  if (normalized === "image") return <ImageIcon size={18} />;
+  if (normalized === "certification") return <BadgeCheck size={18} />;
 
-function isGuideMaterial(material: TrainingMaterial) {
-  const type = asString(material.content_type).toLowerCase();
-  const title = asString(material.title).toLowerCase();
-  const path = asString(material.storage_path).toLowerCase();
-
-  return (
-    type === "powerpoint" ||
-    type === "ppt" ||
-    type === "pdf" ||
-    type === "document" ||
-    title.includes("guide") ||
-    title.includes("ppt") ||
-    title.includes("powerpoint") ||
-    title.includes("overview") ||
-    path.endsWith(".ppt") ||
-    path.endsWith(".pptx") ||
-    path.endsWith(".pdf") ||
-    path.endsWith(".doc") ||
-    path.endsWith(".docx")
-  );
+  return <FileText size={18} />;
 }
 
 function sortMaterials(a: TrainingMaterial, b: TrainingMaterial) {
@@ -234,15 +244,28 @@ function getExternalMaterialUrl(material: TrainingMaterial) {
   return asString(material.video_url) || asString(material.external_url);
 }
 
-function isCompletedStep(row: AnyRow) {
-  const status = asString(row.status).toLowerCase();
+function isVideoMaterial(material: TrainingMaterial) {
+  const type = asString(material.content_type).toLowerCase();
+  const title = asString(material.title).toLowerCase();
 
-  return Boolean(
-    row.completed_at ||
-    status === "completed" ||
-    status === "complete" ||
-    status === "done",
+  return type === "video" || title.includes("video") || title.includes("masterclass");
+}
+
+function isCertificationMaterial(material: TrainingMaterial) {
+  const type = asString(material.content_type).toLowerCase();
+  const title = asString(material.title).toLowerCase();
+
+  return (
+    type === "certification" ||
+    title.includes("certification") ||
+    title.includes("certificate") ||
+    title.includes("badge") ||
+    title.includes("acknowledg")
   );
+}
+
+function isGuideMaterial(material: TrainingMaterial) {
+  return !isVideoMaterial(material) && !isCertificationMaterial(material);
 }
 
 async function getSignedMaterialUrls(material: TrainingMaterial) {
@@ -271,7 +294,7 @@ async function getSignedMaterialUrls(material: TrainingMaterial) {
       .createSignedUrl(path, 60 * 60);
 
     if (error || !data?.signedUrl) {
-      console.warn("Unable to create signed Pet Parent Academy material URL:", {
+      console.warn("Unable to create signed SitGuru University material URL:", {
         bucket,
         path,
         error,
@@ -288,7 +311,7 @@ async function getSignedMaterialUrls(material: TrainingMaterial) {
       downloadUrl: data.signedUrl,
     };
   } catch (error) {
-    console.warn("Unable to create signed Pet Parent Academy material URL:", {
+    console.warn("Unable to create signed SitGuru University material URL:", {
       bucket,
       path,
       error,
@@ -301,28 +324,12 @@ async function getSignedMaterialUrls(material: TrainingMaterial) {
   }
 }
 
-async function getProfile(userId: string, email: string) {
+async function getProfile(userId: string) {
   try {
     const { data, error } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("id", userId)
-      .maybeSingle();
-
-    if (!error && data) return data as AnyRow;
-  } catch {
-    // Continue to email fallback below.
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-
-  if (!cleanEmail || !cleanEmail.includes("@")) return null;
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .select("*")
-      .ilike("email", cleanEmail)
       .maybeSingle();
 
     if (error) return null;
@@ -333,19 +340,42 @@ async function getProfile(userId: string, email: string) {
   }
 }
 
-async function getPetParentAcademyData(
-  userId: string,
-  email: string,
-  userMetadata?: AnyRow | null,
-): Promise<PageData> {
-  const [
-    profile,
-    stepsResult,
-    materialsResult,
-    materialProgressResult,
-    stepProgressResult,
-  ] = await Promise.all([
-    getProfile(userId, email),
+async function getProgressRows(userId: string) {
+  const [materialProgressResult, stepProgressResult] = await Promise.all([
+    supabaseAdmin
+      .from("academy_material_progress")
+      .select("training_step_id,material_id,acknowledged_at")
+      .eq("user_id", userId)
+      .eq("academy_type", academyType),
+    supabaseAdmin
+      .from("academy_step_progress")
+      .select("training_step_id,status,acknowledged_at,completed_at")
+      .eq("user_id", userId)
+      .eq("academy_type", academyType),
+  ]);
+
+  if (materialProgressResult.error) {
+    console.warn(
+      "Unable to load Pet Parent Academy material progress:",
+      materialProgressResult.error,
+    );
+  }
+
+  if (stepProgressResult.error) {
+    console.warn(
+      "Unable to load Pet Parent Academy step progress:",
+      stepProgressResult.error,
+    );
+  }
+
+  return {
+    materialProgressRows: (materialProgressResult.data || []) as MaterialProgress[],
+    stepProgressRows: (stepProgressResult.data || []) as StepProgress[],
+  };
+}
+
+async function getPetParentUniversityData(userId: string): Promise<OrientationData> {
+  const [stepsResult, materialsResult, progressResult] = await Promise.all([
     supabaseAdmin
       .from("ambassador_training_steps")
       .select("*")
@@ -359,140 +389,119 @@ async function getPetParentAcademyData(
       .eq("is_active", true)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
-    supabaseAdmin
-      .from("academy_material_progress")
-      .select("material_id, acknowledged_at")
-      .eq("academy_type", academyType)
-      .eq("user_id", userId)
-      .not("acknowledged_at", "is", null),
-    supabaseAdmin
-      .from("academy_step_progress")
-      .select("training_step_id, status, completed_at")
-      .eq("academy_type", academyType)
-      .eq("user_id", userId),
+    getProgressRows(userId),
   ]);
 
   if (stepsResult.error) {
-    console.warn("Unable to load Pet Parent Academy step:", stepsResult.error);
+    console.warn("Unable to load Pet Parent Academy steps:", stepsResult.error);
   }
 
   if (materialsResult.error) {
-    console.warn(
-      "Unable to load Pet Parent Academy materials:",
-      materialsResult.error,
-    );
+    console.warn("Unable to load Pet Parent Academy materials:", materialsResult.error);
   }
 
-  const activeSteps = ((stepsResult.data || []) as TrainingStep[]).filter(
-    (step) => step.is_active !== false,
+  const steps = ((stepsResult.data || []) as TrainingStep[]).sort(
+    (a, b) => asNumber(a.step_number) - asNumber(b.step_number),
   );
-  const orientationStep = activeSteps[0] || null;
-  const activeStepIds = new Set(activeSteps.map((step) => step.id));
+  const orientationStep = steps[0] || null;
+  const orientationStepId = asString(orientationStep?.id);
 
-  const allMaterials = ((materialsResult.data || []) as TrainingMaterial[])
-    .filter((material) => material.is_active !== false)
-    .filter((material) =>
-      orientationStep
-        ? asString(material.training_step_id) === orientationStep.id
-        : activeStepIds.has(asString(material.training_step_id)),
-    )
+  const materialProgressByMaterialId = new Map<string, MaterialProgress>();
+  const stepProgressByStepId = new Map<string, StepProgress>();
+
+  progressResult.materialProgressRows.forEach((row) => {
+    const materialId = asString(row.material_id);
+    if (materialId) materialProgressByMaterialId.set(materialId, row);
+  });
+
+  progressResult.stepProgressRows.forEach((row) => {
+    const stepId = asString(row.training_step_id);
+    if (stepId) stepProgressByStepId.set(stepId, row);
+  });
+
+  const rawMaterials = ((materialsResult.data || []) as TrainingMaterial[])
+    .filter((material) => {
+      if (!orientationStepId) return true;
+      return asString(material.training_step_id) === orientationStepId;
+    })
     .sort(sortMaterials);
 
-  const acknowledgedMaterialIds = new Set(
-    ((materialProgressResult.data || []) as AnyRow[])
-      .map((row) => asString(row.material_id))
-      .filter(Boolean),
-  );
+  const materialsWithUrls: MaterialWithUrl[] = [];
 
-  const videoBase = allMaterials.find(isVideoMaterial) || null;
-  const guideBase =
-    allMaterials.find(
-      (material) => !isVideoMaterial(material) && isGuideMaterial(material),
+  for (const material of rawMaterials) {
+    const signedUrls = await getSignedMaterialUrls(material);
+    const materialProgress = materialProgressByMaterialId.get(material.id);
+    const acknowledgedAt = asString(materialProgress?.acknowledged_at) || null;
+
+    materialsWithUrls.push({
+      ...material,
+      ...signedUrls,
+      acknowledgedAt,
+      isAcknowledged: Boolean(acknowledgedAt),
+    });
+  }
+
+  const videoMaterial = materialsWithUrls.find(isVideoMaterial) || null;
+  const guideMaterial =
+    materialsWithUrls.find((material) => material.id !== videoMaterial?.id && isGuideMaterial(material)) ||
+    null;
+  const certificationMaterial =
+    materialsWithUrls.find(
+      (material) =>
+        material.id !== videoMaterial?.id &&
+        material.id !== guideMaterial?.id &&
+        isCertificationMaterial(material),
     ) || null;
 
-  const videoUrls = videoBase ? await getSignedMaterialUrls(videoBase) : null;
-  const guideUrls = guideBase ? await getSignedMaterialUrls(guideBase) : null;
+  const allDisplayedMaterials = [videoMaterial, guideMaterial, certificationMaterial].filter(
+    Boolean,
+  ) as MaterialWithUrl[];
+  const requiredDisplayedMaterials = [videoMaterial, guideMaterial].filter(
+    Boolean,
+  ) as MaterialWithUrl[];
 
-  const videoMaterial = videoBase
-    ? {
-        ...videoBase,
-        openUrl: videoUrls?.openUrl || "",
-        downloadUrl: videoUrls?.downloadUrl || "",
-        acknowledged: acknowledgedMaterialIds.has(videoBase.id),
-      }
+  const stepProgress = orientationStepId
+    ? stepProgressByStepId.get(orientationStepId)
     : null;
-
-  const guideMaterial = guideBase
-    ? {
-        ...guideBase,
-        openUrl: guideUrls?.openUrl || "",
-        downloadUrl: guideUrls?.downloadUrl || "",
-        acknowledged: acknowledgedMaterialIds.has(guideBase.id),
-      }
-    : null;
-
-  const stepProgress = ((stepProgressResult.data || []) as AnyRow[]).find(
-    (row) =>
-      orientationStep
-        ? asString(row.training_step_id) === orientationStep.id
-        : false,
-  );
-
-  const orientationCompleted = Boolean(
-    stepProgress && isCompletedStep(stepProgress),
-  );
   const completedAt = asString(stepProgress?.completed_at) || null;
 
-  const actionCount = 3;
-  const completedActions =
-    (videoMaterial?.acknowledged ? 1 : 0) +
-    (guideMaterial?.acknowledged ? 1 : 0) +
-    (orientationCompleted ? 1 : 0);
-
   return {
-    userId,
-    email,
-    displayName: getDisplayName(profile, email, userMetadata),
-    avatarUrl: getAvatarUrl(profile, userMetadata),
     orientationStep,
     videoMaterial,
     guideMaterial,
-    orientationCompleted,
+    certificationMaterial,
+    allDisplayedMaterials,
+    requiredDisplayedMaterials,
+    acknowledgedRequiredMaterials: requiredDisplayedMaterials.filter(
+      (material) => material.isAcknowledged,
+    ).length,
     completedAt,
-    progressPercent: Math.round((completedActions / actionCount) * 100),
+    isCompleted: Boolean(completedAt),
   };
 }
 
-async function requireCustomerUser() {
-  const supabase = await createClient();
+async function acknowledgeMaterial(formData: FormData) {
+  "use server";
 
+  const supabase = await createClient();
   const {
     data: { user },
     error,
   } = await supabase.auth.getUser();
 
-  if (error || !user) {
-    redirect("/login");
-  }
-
-  return user;
-}
-
-async function acknowledgeAcademyMaterial(formData: FormData) {
-  "use server";
-
-  const user = await requireCustomerUser();
+  if (error || !user) redirect("/login");
 
   const materialId = asString(formData.get("material_id"));
   const trainingStepId = asString(formData.get("training_step_id"));
+  const acknowledged = asBoolean(formData.get("acknowledgment"));
 
-  if (!materialId || !trainingStepId) {
-    redirect(`${customerRoutes.university}?error=missing_material`);
+  if (!materialId || !trainingStepId || !acknowledged) {
+    redirect(`${customerRoutes.university}?error=acknowledgment`);
   }
 
   const now = new Date().toISOString();
 
-  const { error } = await supabaseAdmin
+  const { error: upsertError } = await supabaseAdmin
     .from("academy_material_progress")
     .upsert(
       {
@@ -506,245 +515,249 @@ async function acknowledgeAcademyMaterial(formData: FormData) {
       { onConflict: "user_id,material_id" },
     );
 
-  if (error) {
-    console.warn("Unable to acknowledge Pet Parent Academy material:", error);
-    redirect(`${customerRoutes.university}?error=acknowledgment`);
+  if (upsertError) {
+    console.warn("Unable to acknowledge Pet Parent Academy material:", upsertError);
+    redirect(`${customerRoutes.university}?error=progress`);
   }
 
   revalidatePath(customerRoutes.university);
   revalidatePath(customerRoutes.dashboard);
-  redirect(`${customerRoutes.university}?saved=material`);
+  redirect(`${customerRoutes.university}?acknowledged=success`);
 }
 
-async function completeCertifiedPetParentOrientation(formData: FormData) {
+async function completeOrientation(formData: FormData) {
   "use server";
 
-  const user = await requireCustomerUser();
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) redirect("/login");
 
   const trainingStepId = asString(formData.get("training_step_id"));
-  const finalAcknowledgment = formData.get("final_acknowledgment") === "on";
+  const requiredMaterialIds = formData
+    .getAll("required_material_id")
+    .map((value) => asString(value))
+    .filter(Boolean);
 
-  if (!trainingStepId || !finalAcknowledgment) {
-    redirect(`${customerRoutes.university}?error=final_acknowledgment`);
-  }
+  if (!trainingStepId) redirect(`${customerRoutes.university}?error=step`);
 
-  const [{ data: materialRows }, { data: progressRows }] = await Promise.all([
-    supabaseAdmin
-      .from("academy_step_materials")
-      .select(
-        "id, training_step_id, content_type, title, storage_path, video_url, external_url, is_active",
-      )
-      .eq("academy_type", academyType)
-      .eq("training_step_id", trainingStepId)
-      .eq("is_active", true),
-    supabaseAdmin
+  if (requiredMaterialIds.length) {
+    const { data: acknowledgedRows, error: progressError } = await supabaseAdmin
       .from("academy_material_progress")
-      .select("material_id, acknowledged_at")
-      .eq("academy_type", academyType)
+      .select("material_id,acknowledged_at")
       .eq("user_id", user.id)
-      .not("acknowledged_at", "is", null),
-  ]);
+      .eq("training_step_id", trainingStepId)
+      .eq("academy_type", academyType);
 
-  const activeMaterials = ((materialRows || []) as TrainingMaterial[]).sort(
-    sortMaterials,
-  );
-  const videoMaterial = activeMaterials.find(isVideoMaterial) || null;
-  const guideMaterial =
-    activeMaterials.find(
-      (material) => !isVideoMaterial(material) && isGuideMaterial(material),
-    ) || null;
-  const acknowledgedIds = new Set(
-    ((progressRows || []) as AnyRow[])
-      .map((row) => asString(row.material_id))
-      .filter(Boolean),
-  );
+    if (progressError) {
+      console.warn("Unable to verify Pet Parent Academy acknowledgments:", progressError);
+      redirect(`${customerRoutes.university}?error=progress`);
+    }
 
-  const missingVideoAck = Boolean(
-    videoMaterial && !acknowledgedIds.has(videoMaterial.id),
-  );
-  const missingGuideAck = Boolean(
-    guideMaterial && !acknowledgedIds.has(guideMaterial.id),
-  );
+    const acknowledgedMaterialIds = new Set(
+      ((acknowledgedRows || []) as Array<{
+        material_id: string | null;
+        acknowledged_at: string | null;
+      }>)
+        .filter((row) => row.material_id && row.acknowledged_at)
+        .map((row) => row.material_id as string),
+    );
 
-  if (!videoMaterial || !guideMaterial || missingVideoAck || missingGuideAck) {
-    redirect(`${customerRoutes.university}?error=materials_required`);
+    const missingRequiredAcknowledgment = requiredMaterialIds.some(
+      (materialId) => !acknowledgedMaterialIds.has(materialId),
+    );
+
+    if (missingRequiredAcknowledgment) {
+      redirect(`${customerRoutes.university}?error=incomplete`);
+    }
   }
 
   const now = new Date().toISOString();
 
-  const { error } = await supabaseAdmin.from("academy_step_progress").upsert(
-    {
-      user_id: user.id,
-      training_step_id: trainingStepId,
-      academy_type: academyType,
-      status: "completed",
-      acknowledged_at: now,
-      completed_at: now,
-      updated_at: now,
-    },
-    { onConflict: "user_id,training_step_id" },
-  );
+  const { error: upsertError } = await supabaseAdmin
+    .from("academy_step_progress")
+    .upsert(
+      {
+        user_id: user.id,
+        training_step_id: trainingStepId,
+        academy_type: academyType,
+        status: "completed",
+        acknowledged_at: now,
+        completed_at: now,
+        updated_at: now,
+      },
+      { onConflict: "user_id,training_step_id" },
+    );
 
-  if (error) {
-    console.warn("Unable to complete Pet Parent Academy orientation:", error);
-    redirect(`${customerRoutes.university}?error=complete`);
+  if (upsertError) {
+    console.warn("Unable to complete Pet Parent Academy orientation:", upsertError);
+    redirect(`${customerRoutes.university}?error=progress`);
   }
 
   revalidatePath(customerRoutes.university);
   revalidatePath(customerRoutes.dashboard);
-  redirect(`${customerRoutes.university}?saved=certified`);
+  redirect(`${customerRoutes.university}?completed=success`);
 }
 
-function getNotice(
-  searchParams?: Record<string, string | string[] | undefined>,
-) {
-  const saved = asString(searchParams?.saved);
+function getNotice(searchParams?: Record<string, string | string[] | undefined>) {
+  const acknowledged = asString(searchParams?.acknowledged);
+  const completed = asString(searchParams?.completed);
   const error = asString(searchParams?.error);
 
-  if (saved === "material") {
+  if (acknowledged === "success") {
     return {
       tone: "success" as const,
       title: "Acknowledgment saved",
-      message:
-        "Your training acknowledgment was saved. Continue to the next item when ready.",
+      message: "Your training material acknowledgment was saved.",
     };
   }
 
-  if (saved === "certified") {
+  if (completed === "success") {
     return {
       tone: "success" as const,
       title: "Certified Pet Parent orientation complete",
-      message:
-        "Your Certified Pet Parent badge is now ready to display across SitGuru.",
+      message: "Your completion was saved and your Certified Pet Parent status is ready.",
     };
   }
 
-  if (error === "materials_required") {
+  if (error === "incomplete") {
     return {
       tone: "error" as const,
-      title: "Training still needs review",
-      message:
-        "Please acknowledge the intro video and Pet Parent guide before completing certification.",
+      title: "Required acknowledgments still needed",
+      message: "Please acknowledge the video and Pet Parent guide before completing certification.",
+    };
+  }
+
+  if (error === "acknowledgment") {
+    return {
+      tone: "error" as const,
+      title: "Acknowledgment required",
+      message: "Check the acknowledgment box before saving this material.",
+    };
+  }
+
+  if (error === "progress") {
+    return {
+      tone: "error" as const,
+      title: "Progress could not be saved",
+      message: "Confirm the academy progress tables exist in Supabase, then try again.",
     };
   }
 
   if (error) {
     return {
       tone: "error" as const,
-      title: "Unable to save training progress",
-      message:
-        "Please confirm the training material is available and try again.",
+      title: "Training progress update failed",
+      message: "The academy progress update could not be completed. Please try again.",
     };
   }
 
   return null;
 }
 
-type PageProps = {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-};
+export default async function CustomerUniversityPage({ searchParams }: PageProps) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
-export default async function CustomerUniversityPage({
-  searchParams,
-}: PageProps) {
-  const user = await requireCustomerUser();
+  if (error || !user) redirect("/login");
+
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const notice = getNotice(resolvedSearchParams);
 
-  const data = await getPetParentAcademyData(
-    user.id,
-    asString(user.email),
-    (user.user_metadata || null) as AnyRow | null,
-  );
-  const firstName = getFirstNameOnly(data.displayName);
-  const canComplete = Boolean(
-    data.orientationStep &&
-    data.videoMaterial?.acknowledged &&
-    data.guideMaterial?.acknowledged &&
-    !data.orientationCompleted,
-  );
+  const [profile, orientationData] = await Promise.all([
+    getProfile(user.id),
+    getPetParentUniversityData(user.id),
+  ]);
+
+  const authUser = user as unknown as AnyRow;
+  const displayName = getDisplayName(profile, authUser);
+  const firstName = getFirstName(displayName);
+  const avatarUrl = getAvatarUrl(profile, authUser);
+  const acknowledgedRequired = orientationData.acknowledgedRequiredMaterials;
+  const requiredCount = orientationData.requiredDisplayedMaterials.length;
+  const actionProgress =
+    acknowledgedRequired + (orientationData.isCompleted ? 1 : 0);
+  const actionProgressPercent = Math.round((actionProgress / 3) * 100);
+  const academyCompleted = orientationData.isCompleted;
+  const canCompleteOrientation =
+    Boolean(orientationData.orientationStep) &&
+    requiredCount > 0 &&
+    acknowledgedRequired >= requiredCount;
 
   return (
     <main className="min-h-screen bg-[#f7fbf7] px-4 py-5 text-[#062f2b] sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl space-y-5">
+      <div className="mx-auto max-w-[1280px] space-y-5">
         <section className="overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-sm">
-          <div className="bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-5 py-7 sm:px-8 sm:py-10">
-            <Link
-              href={customerRoutes.dashboard}
-              className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-white"
-            >
-              <ArrowLeft size={16} />
-              Back to Dashboard
-            </Link>
+          <div className="grid gap-7 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-5 py-6 sm:px-7 md:px-10 md:py-9 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+            <div>
+              <Link
+                href={customerRoutes.dashboard}
+                className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-white"
+              >
+                <ArrowLeft size={16} />
+                Back to Dashboard
+              </Link>
 
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-900/80">
-                  SitGuru University
-                </p>
-                <h1 className="mt-3 text-4xl font-black tracking-[-0.045em] text-slate-950 sm:text-5xl">
-                  Learn SitGuru. Easy as 1, 2, 3.
-                </h1>
-                <p className="mt-4 max-w-3xl text-base font-semibold leading-7 text-slate-900/75 sm:text-lg">
-                  Hi {firstName}, complete your Certified Pet Parent orientation
-                  by watching the intro video, reviewing the Pet Parent guide,
-                  and acknowledging completion to earn your badge.
-                </p>
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-900/80">
+                SitGuru University
+              </p>
+              <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-[-0.045em] text-slate-950 sm:text-5xl md:text-6xl">
+                Learn SitGuru. Easy as 1, 2, 3.
+              </h1>
+              <p className="mt-4 max-w-3xl text-base font-semibold leading-8 text-slate-900/75 md:text-lg">
+                Hi {firstName}, learn the basics of SitGuru, how to set up your
+                profile, and how to safely connect with trusted local Gurus.
+                Review the video and guide, then acknowledge completion to earn
+                your Certified Pet Parent badge.
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <TrustBadge icon={<PawPrint size={15} />} label="Pet Parent" />
+                <TrustBadge
+                  icon={<GraduationCap size={15} />}
+                  label={`${actionProgress} of 3 actions complete`}
+                />
+                <TrustBadge icon={<Star size={15} />} label={`${actionProgressPercent}% complete`} />
               </div>
+            </div>
 
-              <div className="flex shrink-0 flex-col items-center rounded-[2rem] bg-white/85 p-5 text-center shadow-sm ring-1 ring-white/70">
-                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-emerald-50 text-2xl font-black text-emerald-800 ring-1 ring-emerald-100">
-                  {data.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={data.avatarUrl}
-                      alt={`${firstName} profile photo`}
-                      className="h-full w-full object-cover object-center"
-                    />
-                  ) : (
-                    getInitials(data.displayName)
-                  )}
-                </div>
-                <p className="mt-3 text-sm font-black text-slate-950">
+            <div className="flex flex-col items-center text-center">
+              <div className="rounded-[2.2rem] bg-white/75 p-5 shadow-xl ring-1 ring-white/60 backdrop-blur md:min-w-[280px]">
+                <AvatarCircle avatarUrl={avatarUrl} displayName={displayName} />
+                <h2 className="mt-4 text-2xl font-black text-slate-950 md:text-3xl">
                   {firstName}
-                </p>
-                <p className="mt-1 text-xs font-black text-emerald-800">
-                  {data.orientationCompleted
-                    ? "Certified Pet Parent"
-                    : "Badge locked"}
+                </h2>
+                <p className="mt-1 text-sm font-black text-emerald-800">
+                  {academyCompleted ? "Badge issued" : "Badge locked"}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 bg-white px-5 py-5 sm:grid-cols-3 sm:px-8">
-            <ProgressStat
+          <div className="grid gap-4 bg-white px-5 py-5 sm:px-6 sm:grid-cols-2 lg:grid-cols-3">
+            <DashboardStatCard
               label="Progress"
-              value={data.orientationCompleted ? "1 of 1" : "0 of 1"}
-              detail={`${data.progressPercent}% complete`}
+              value={`${actionProgress} of 3`}
+              detail="Video, guide, certification"
               icon={<GraduationCap size={20} />}
             />
-            <ProgressStat
+            <DashboardStatCard
               label="Training"
               value="3 actions"
-              detail="Video, guide, certification"
-              icon={<Sparkles size={20} />}
+              detail="Easy as 1, 2, 3"
+              icon={<ShieldCheck size={20} />}
             />
-            <ProgressStat
+            <DashboardStatCard
               label="Badge"
-              value={data.orientationCompleted ? "Issued" : "Locked"}
-              detail={
-                data.orientationCompleted
-                  ? "Certified Pet Parent"
-                  : "Complete all 3 actions"
-              }
-              icon={
-                data.orientationCompleted ? (
-                  <BadgeCheck size={20} />
-                ) : (
-                  <LockKeyhole size={20} />
-                )
-              }
+              value={academyCompleted ? "Issued" : "Locked"}
+              detail={academyCompleted ? "Certified Pet Parent" : "Complete all actions"}
+              icon={academyCompleted ? <BadgeCheck size={20} /> : <LockKeyhole size={20} />}
             />
           </div>
         </section>
@@ -753,7 +766,7 @@ export default async function CustomerUniversityPage({
           <section
             className={`rounded-[24px] border p-4 text-sm font-bold leading-6 ${
               notice.tone === "success"
-                ? "border-emerald-100 bg-emerald-50 text-emerald-900"
+                ? "border-green-100 bg-green-50 text-green-900"
                 : "border-red-100 bg-red-50 text-red-800"
             }`}
           >
@@ -762,342 +775,356 @@ export default async function CustomerUniversityPage({
           </section>
         ) : null}
 
-        <section className="rounded-[34px] border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
-          <div className="mb-5 rounded-[28px] border border-emerald-100 bg-emerald-50 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <section className="rounded-[32px] border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
+          <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/70 p-5 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
                   Certified Pet Parent Orientation
                 </p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl md:text-5xl">
                   Watch. Review. Acknowledge.
                 </h2>
-                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-                  This page intentionally shows only three simple actions.
-                  Upload one intro video and one Pet Parent guide in Admin. Step
-                  3 issues the certification after both are acknowledged.
+                <p className="mt-3 max-w-4xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
+                  Learn the basics of SitGuru, how to set up your profile, and
+                  how to safely connect with trusted local Gurus. Review the
+                  video and guide, then acknowledge completion to earn your
+                  Certified Pet Parent badge.
                 </p>
               </div>
 
               <span
-                className={`inline-flex shrink-0 items-center justify-center rounded-2xl px-4 py-3 text-sm font-black ${
-                  data.orientationCompleted
+                className={`inline-flex w-fit rounded-2xl px-5 py-3 text-sm font-black ${
+                  academyCompleted
                     ? "bg-emerald-700 text-white"
                     : "bg-white text-emerald-900 ring-1 ring-emerald-100"
                 }`}
               >
-                {data.orientationCompleted ? "Completed" : "In progress"}
+                {academyCompleted ? "Certified" : actionProgress > 0 ? "In progress" : "Not started"}
               </span>
             </div>
-          </div>
 
-          {!data.orientationStep ? (
-            <div className="rounded-[28px] border border-dashed border-amber-200 bg-amber-50 p-6 text-center text-sm font-bold leading-6 text-amber-900">
-              Pet Parent Academy is not active yet. In Admin Training Manager,
-              create one active Pet Parent step named Certified Pet Parent
-              Orientation.
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              <ActionCard
-                stepNumber="1"
+            <div className="mt-6 grid gap-4">
+              <OrientationActionCard
+                stepLabel="Step 1"
                 title="Watch the Intro Video"
-                description="Start with the SitGuru intro video to understand the platform, trust expectations, and how Pet Parents use SitGuru."
-                material={data.videoMaterial}
-                emptyTitle="Intro video not uploaded yet"
-                emptyDescription="Upload one video material to the active Pet Parent orientation step in Admin."
-                icon={<PlayCircle size={24} />}
-                action={acknowledgeAcademyMaterial}
-                orientationStepId={data.orientationStep.id}
+                description="Learn what SitGuru is and how it helps Pet Parents find trusted care."
+                material={orientationData.videoMaterial}
+                orientationStepId={orientationData.orientationStep?.id || ""}
+                icon={<PlayCircle size={22} />}
               />
 
-              <ActionCard
-                stepNumber="2"
+              <OrientationActionCard
+                stepLabel="Step 2"
                 title="Review the Pet Parent Guide"
-                description="Open the Pet Parent PowerPoint or PDF guide to review profiles, pets, messaging, bookings, reviews, trust, and safety."
-                material={data.guideMaterial}
-                emptyTitle="Pet Parent guide not uploaded yet"
-                emptyDescription="Upload one PowerPoint, PDF, or document material to the active Pet Parent orientation step in Admin."
-                icon={<FileText size={24} />}
-                action={acknowledgeAcademyMaterial}
-                orientationStepId={data.orientationStep.id}
+                description="Understand profile setup, pet details, messaging, booking, safety, and reviews."
+                material={orientationData.guideMaterial}
+                orientationStepId={orientationData.orientationStep?.id || ""}
+                icon={<FileText size={22} />}
               />
 
-              <CertificationCard
-                orientationStepId={data.orientationStep.id}
-                canComplete={canComplete}
-                completed={data.orientationCompleted}
-                completedAt={data.completedAt}
-                action={completeCertifiedPetParentOrientation}
+              <CertificationActionCard
+                stepLabel="Step 3"
+                title="Acknowledge & Get Certified"
+                description="Confirm you reviewed the training and earn your Certified Pet Parent badge."
+                orientationStep={orientationData.orientationStep}
+                requiredMaterials={orientationData.requiredDisplayedMaterials}
+                canComplete={canCompleteOrientation}
+                isCompleted={orientationData.isCompleted}
+                completedAt={orientationData.completedAt}
               />
             </div>
-          )}
+          </div>
         </section>
       </div>
     </main>
   );
 }
 
-function ActionCard({
-  stepNumber,
+function AvatarCircle({
+  avatarUrl,
+  displayName,
+}: {
+  avatarUrl: string;
+  displayName: string;
+}) {
+  return (
+    <div className="mx-auto flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-[7px] border-white bg-white text-4xl font-black text-emerald-800 shadow-2xl sm:h-36 sm:w-36">
+      {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={avatarUrl}
+          alt={`${displayName} profile photo`}
+          className="h-full w-full object-cover object-center"
+        />
+      ) : (
+        getInitials(displayName)
+      )}
+    </div>
+  );
+}
+
+function OrientationActionCard({
+  stepLabel,
   title,
   description,
   material,
-  emptyTitle,
-  emptyDescription,
-  icon,
-  action,
   orientationStepId,
+  icon,
 }: {
-  stepNumber: string;
+  stepLabel: string;
   title: string;
   description: string;
   material: MaterialWithUrl | null;
-  emptyTitle: string;
-  emptyDescription: string;
-  icon: ReactNode;
-  action: (formData: FormData) => Promise<void>;
   orientationStepId: string;
+  icon: ReactNode;
 }) {
-  const complete = Boolean(material?.acknowledged);
+  const hasUrl = Boolean(material?.openUrl);
 
   return (
     <article
-      className={`rounded-[28px] border p-4 transition sm:p-5 ${
-        complete
-          ? "border-emerald-200 bg-emerald-50"
-          : "border-slate-200 bg-slate-50"
+      className={`rounded-[26px] border p-4 sm:p-5 ${
+        material?.isAcknowledged
+          ? "border-emerald-200 bg-white"
+          : "border-slate-100 bg-white/90"
       }`}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div
-          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white ${
-            complete ? "bg-emerald-700" : "bg-slate-900"
-          }`}
-        >
-          {complete ? <CheckCircle2 size={25} /> : icon}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-800 ring-1 ring-slate-200">
-              Step {stepNumber}
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-800 px-3 py-1 text-xs font-black text-white">
+              {icon}
+              {stepLabel}
             </span>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-black ${
-                complete
-                  ? "bg-emerald-700 text-white"
-                  : "bg-amber-100 text-amber-900"
-              }`}
-            >
-              {complete ? "Acknowledged" : "Action needed"}
+            <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-black text-amber-900">
+              Required
             </span>
+            {material?.isAcknowledged ? (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-900">
+                Acknowledged
+              </span>
+            ) : null}
           </div>
 
-          <h3 className="mt-3 text-xl font-black text-slate-950 sm:text-2xl">
+          <h3 className="text-2xl font-black tracking-tight text-slate-950">
             {title}
           </h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
             {description}
           </p>
 
           {material ? (
-            <div className="mt-4 rounded-2xl border border-white bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-slate-950">
-                    {material.title}
-                  </p>
-                  <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">
-                    {getContentTypeLabel(material.content_type)}
-                  </p>
-                  {material.description ? (
-                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                      {material.description}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="grid shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                  {material.openUrl ? (
-                    <a
-                      href={material.openUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
-                    >
-                      <ExternalLink size={16} />
-                      Open Material
-                    </a>
-                  ) : null}
-
-                  {material.downloadUrl ? (
-                    <a
-                      href={material.downloadUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
-                    >
-                      <Download size={16} />
-                      Download / View
-                    </a>
-                  ) : null}
-                </div>
+            <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-1 text-xs font-black text-emerald-900">
+                  {getMaterialIcon(material.content_type)}
+                  {getContentTypeLabel(material.content_type)}
+                </span>
               </div>
-
-              {complete ? (
-                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-black text-emerald-900">
-                  Acknowledgment complete.
-                </div>
-              ) : (
-                <form
-                  action={action}
-                  className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3"
-                >
-                  <input type="hidden" name="material_id" value={material.id} />
-                  <input
-                    type="hidden"
-                    name="training_step_id"
-                    value={orientationStepId}
-                  />
-                  <p className="text-sm font-bold leading-6 text-amber-950">
-                    I acknowledge that I have honestly and accurately reviewed
-                    this training material, understand the information provided,
-                    and completed this portion of SitGuru University training.
-                  </p>
-                  <button
-                    type="submit"
-                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-amber-600 px-4 py-3 text-sm font-black text-white transition hover:bg-amber-700 sm:w-auto"
-                  >
-                    Save Acknowledgment
-                  </button>
-                </form>
-              )}
+              <p className="mt-3 text-base font-black text-slate-950">
+                {material.title}
+              </p>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                {material.description || "Open this material to continue."}
+              </p>
             </div>
           ) : (
-            <div className="mt-4 rounded-2xl border border-dashed border-amber-200 bg-white p-4 text-sm font-bold leading-6 text-amber-900">
-              <p className="font-black">{emptyTitle}</p>
-              <p className="mt-1">{emptyDescription}</p>
+            <div className="mt-4 rounded-2xl border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-900">
+              This material has not been uploaded yet. Add one file in Admin for
+              this action.
             </div>
           )}
         </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row lg:min-w-[220px] lg:flex-col">
+          {hasUrl ? (
+            <>
+              <a
+                href={material?.openUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
+              >
+                <ExternalLink size={16} />
+                Open Material
+              </a>
+              <a
+                href={material?.downloadUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+              >
+                <Download size={16} />
+                Download / View
+              </a>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-4">
+        {material?.isAcknowledged ? (
+          <div className="flex items-start gap-3 text-sm font-bold leading-6 text-emerald-900">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-black">Acknowledgment saved</p>
+              <p className="text-emerald-800">
+                You acknowledged this material on {formatDateTime(material.acknowledgedAt)}.
+              </p>
+            </div>
+          </div>
+        ) : material ? (
+          <form action={acknowledgeMaterial} className="grid gap-3">
+            <input type="hidden" name="material_id" value={material.id} />
+            <input
+              type="hidden"
+              name="training_step_id"
+              value={material.training_step_id || orientationStepId}
+            />
+            <label className="flex cursor-pointer items-start gap-3 text-sm font-bold leading-6 text-slate-700">
+              <input
+                name="acknowledgment"
+                type="checkbox"
+                required
+                className="mt-1 h-5 w-5 shrink-0 accent-emerald-700"
+              />
+              <span>
+                I acknowledge that I have honestly and accurately reviewed this
+                training material, understand the information provided, and
+                completed this portion of the SitGuru University training.
+              </span>
+            </label>
+            <button
+              type="submit"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
+            >
+              <CheckCircle2 size={17} />
+              Save Acknowledgment
+            </button>
+          </form>
+        ) : (
+          <p className="text-sm font-bold leading-6 text-slate-500">
+            Acknowledgment will appear after the material is uploaded.
+          </p>
+        )}
       </div>
     </article>
   );
 }
 
-function CertificationCard({
-  orientationStepId,
+function CertificationActionCard({
+  stepLabel,
+  title,
+  description,
+  orientationStep,
+  requiredMaterials,
   canComplete,
-  completed,
+  isCompleted,
   completedAt,
-  action,
 }: {
-  orientationStepId: string;
+  stepLabel: string;
+  title: string;
+  description: string;
+  orientationStep: TrainingStep | null;
+  requiredMaterials: MaterialWithUrl[];
   canComplete: boolean;
-  completed: boolean;
+  isCompleted: boolean;
   completedAt: string | null;
-  action: (formData: FormData) => Promise<void>;
 }) {
   return (
     <article
-      className={`rounded-[28px] border p-4 transition sm:p-5 ${
-        completed
-          ? "border-emerald-200 bg-emerald-50"
+      className={`rounded-[26px] border p-4 sm:p-5 ${
+        isCompleted
+          ? "border-emerald-300 bg-emerald-50 ring-4 ring-emerald-100/80"
           : canComplete
             ? "border-red-200 bg-red-50"
-            : "border-slate-200 bg-slate-50"
+            : "border-slate-100 bg-white/90"
       }`}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div
-          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white ${
-            completed
-              ? "bg-emerald-700"
-              : canComplete
-                ? "bg-red-700"
-                : "bg-slate-900"
-          }`}
-        >
-          {completed ? <BadgeCheck size={25} /> : <ShieldCheck size={25} />}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-800 ring-1 ring-slate-200">
-              Step 3
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-800 px-3 py-1 text-xs font-black text-white">
+              <BadgeCheck size={18} />
+              {stepLabel}
             </span>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-black ${
-                completed
-                  ? "bg-emerald-700 text-white"
-                  : canComplete
-                    ? "bg-red-700 text-white"
-                    : "bg-slate-200 text-slate-700"
-              }`}
-            >
-              {completed
-                ? "Certified"
-                : canComplete
-                  ? "Ready to complete"
-                  : "Locked"}
+            <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-black text-amber-900">
+              Final Certification
             </span>
+            {isCompleted ? (
+              <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-900">
+                Certified
+              </span>
+            ) : null}
           </div>
 
-          <h3 className="mt-3 text-xl font-black text-slate-950 sm:text-2xl">
-            Acknowledge & Get Certified
+          <h3 className="text-2xl font-black tracking-tight text-slate-950">
+            {title}
           </h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-            After reviewing the intro video and Pet Parent guide, complete the
-            final acknowledgment to receive your Certified Pet Parent badge.
+          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+            {description}
           </p>
 
-          {completed ? (
-            <div className="mt-4 rounded-2xl border border-emerald-200 bg-white p-4">
-              <p className="text-lg font-black text-emerald-900">
-                Certified Pet Parent badge issued
-              </p>
-              <p className="mt-1 text-sm font-bold text-slate-600">
-                Completed on {formatDate(completedAt)}. Your badge can now
-                appear on your SitGuru profile.
-              </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <MiniProgressBox
+              label="Required reviews"
+              value={`${requiredMaterials.filter((material) => material.isAcknowledged).length} of ${requiredMaterials.length}`}
+              detail="Video and guide acknowledgments"
+            />
+            <MiniProgressBox
+              label="Badge status"
+              value={isCompleted ? "Issued" : "Locked"}
+              detail={isCompleted ? "Certified Pet Parent" : "Complete this final action"}
+            />
+          </div>
+        </div>
+
+        <div className="lg:min-w-[240px]">
+          {isCompleted ? (
+            <div className="rounded-2xl border border-emerald-200 bg-white p-4 text-sm font-bold leading-6 text-emerald-900">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="font-black">Certified Pet Parent complete</p>
+                  <p className="text-emerald-800">
+                    Completed on {formatDateTime(completedAt)}.
+                  </p>
+                </div>
+              </div>
             </div>
-          ) : canComplete ? (
-            <form
-              action={action}
-              className="mt-4 rounded-2xl border border-red-200 bg-white p-4"
-            >
-              <input
-                type="hidden"
-                name="training_step_id"
-                value={orientationStepId}
-              />
-              <label className="flex cursor-pointer items-start gap-3 text-sm font-bold leading-6 text-slate-800">
+          ) : (
+            <form action={completeOrientation} className="grid gap-3">
+              <input type="hidden" name="training_step_id" value={orientationStep?.id || ""} />
+              {requiredMaterials.map((material) => (
                 <input
-                  name="final_acknowledgment"
-                  type="checkbox"
-                  required
-                  className="mt-1 h-5 w-5 shrink-0 accent-red-700"
+                  key={material.id}
+                  type="hidden"
+                  name="required_material_id"
+                  value={material.id}
                 />
-                <span>
-                  I certify that I honestly and accurately completed the Pet
-                  Parent Academy orientation, reviewed the required training
-                  materials, understand SitGuru’s trust and safety expectations,
-                  and agree to use the platform responsibly.
-                </span>
-              </label>
+              ))}
               <button
                 type="submit"
-                className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-red-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-red-800 sm:w-auto"
+                disabled={!canComplete}
+                className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition ${
+                  canComplete
+                    ? "bg-red-700 text-white shadow-sm hover:bg-red-800"
+                    : "bg-red-100 text-red-400"
+                }`}
               >
-                <BadgeCheck size={17} />
-                Complete Certification & Issue Badge
+                <CheckCircle2 size={17} />
+                Complete Certification
               </button>
+              <p
+                className={`text-xs font-bold leading-5 ${
+                  canComplete ? "text-red-800" : "text-slate-500"
+                }`}
+              >
+                {canComplete
+                  ? "Action required: click Complete Certification to issue your badge."
+                  : "Watch and acknowledge the video and guide first."}
+              </p>
             </form>
-          ) : (
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold leading-6 text-slate-600">
-              Step 3 unlocks after Step 1 and Step 2 are acknowledged.
-            </div>
           )}
         </div>
       </div>
@@ -1105,7 +1132,16 @@ function CertificationCard({
   );
 }
 
-function ProgressStat({
+function TrustBadge({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs font-black text-slate-800 shadow-sm ring-1 ring-white/70">
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+function DashboardStatCard({
   icon,
   label,
   value,
@@ -1117,21 +1153,39 @@ function ProgressStat({
   detail: string;
 }) {
   return (
-    <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200">
+    <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div>
           <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
             {label}
           </p>
-          <p className="mt-2 truncate text-2xl font-black text-slate-950">
-            {value}
-          </p>
+          <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
           <p className="mt-2 text-sm font-bold text-emerald-700">{detail}</p>
         </div>
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
           {icon}
         </div>
       </div>
+    </div>
+  );
+}
+
+function MiniProgressBox({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
+      <p className="text-xs font-bold text-slate-500">{detail}</p>
     </div>
   );
 }
