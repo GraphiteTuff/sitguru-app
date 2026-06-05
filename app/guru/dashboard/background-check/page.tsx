@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock3,
-  CreditCard,
   ExternalLink,
   Loader2,
   Lock,
@@ -52,11 +51,6 @@ type GuruProfile = {
   background_check_reimbursement_status?: string | null;
 };
 
-type PaymentOption =
-  | "pay_full_today"
-  | "pay_15_three_monthly"
-  | "pay_15_booking_deductions";
-
 type CheckrApiResponse = {
   ok?: boolean;
   error?: string;
@@ -70,16 +64,6 @@ type CheckrApiResponse = {
   candidate_id?: string;
   candidateId?: string;
   status?: string;
-};
-
-type CheckoutApiResponse = {
-  ok?: boolean;
-  error?: string;
-  message?: string;
-  url?: string;
-  checkout_url?: string;
-  checkoutUrl?: string;
-  session_id?: string;
 };
 
 type FriendlyStatus = {
@@ -96,6 +80,11 @@ const routes = {
   messages: "/guru/dashboard/messages",
   login: "/guru/login",
 };
+
+const TRUST_SAFETY_WAIVER_END_DISPLAY = "December 31, 2026";
+const TRUST_SAFETY_WAIVER_LABEL = "Waived Through 2026";
+const TRUST_SAFETY_WAIVER_PLAN_LABEL = "2026 Launch Year Waiver";
+
 
 const textDark = {
   color: "#07132f",
@@ -161,49 +150,6 @@ function formatMoney(value: number | string | null | undefined) {
     style: "currency",
     currency: "USD",
   });
-}
-
-function normalizeFeeStatus(profile: GuruProfile | null) {
-  const raw = String(profile?.background_check_fee_status || "")
-    .trim()
-    .toLowerCase();
-
-  if (
-    raw === "paid" ||
-    raw === "waived" ||
-    raw === "complete" ||
-    raw === "completed" ||
-    raw === "partially_paid" ||
-    Boolean(profile?.background_check_fee_paid_at)
-  ) {
-    return {
-      label: raw === "waived" ? "Fee Waived" : "Payment Started",
-      paid: true,
-      tone: "complete" as const,
-    };
-  }
-
-  if (raw === "checkout_started" || raw === "pending" || raw === "processing") {
-    return {
-      label: "Payment Pending",
-      paid: false,
-      tone: "pending" as const,
-    };
-  }
-
-  if (raw === "refunded") {
-    return {
-      label: "Refunded",
-      paid: false,
-      tone: "pending" as const,
-    };
-  }
-
-  return {
-    label: "Payment Needed",
-    paid: false,
-    tone: "needs_action" as const,
-  };
 }
 
 function normalizeCheckrStatus(profile: GuruProfile | null): FriendlyStatus {
@@ -300,10 +246,19 @@ function getFeeBadgeClass(tone: "complete" | "pending" | "needs_action") {
 }
 
 function getSelectedPlanLabel(value?: string | null) {
+  if (
+    value === "waived_2026" ||
+    value === "launch_waived" ||
+    value === "launch_year_waiver"
+  ) {
+    return TRUST_SAFETY_WAIVER_PLAN_LABEL;
+  }
+
   if (value === "pay_full_today") return "Paw in Full";
   if (value === "pay_15_three_monthly") return "Pawstep Plan";
   if (value === "pay_15_booking_deductions") return "Book & Bark Plan";
-  return "Not selected yet";
+
+  return TRUST_SAFETY_WAIVER_PLAN_LABEL;
 }
 
 function PawPrint({ className = "" }: { className?: string }) {
@@ -345,6 +300,65 @@ function HeroPawDecor() {
   );
 }
 
+
+async function applyTrustSafetyLaunchWaiver(profile: GuruProfile | null) {
+  if (!profile?.id) return profile;
+
+  const currentFeeStatus = String(profile.background_check_fee_status || "")
+    .trim()
+    .toLowerCase();
+  const currentPaymentOption = String(
+    profile.background_check_fee_payment_option || "",
+  )
+    .trim()
+    .toLowerCase();
+
+  const alreadyWaived =
+    currentFeeStatus === "waived_2026" ||
+    currentFeeStatus === "launch_waived" ||
+    currentFeeStatus === "launch_year_waiver" ||
+    currentPaymentOption === "waived_2026" ||
+    currentPaymentOption === "launch_waived" ||
+    currentPaymentOption === "launch_year_waiver";
+
+  const waiverPayload = {
+    background_check_fee_amount: 0,
+    background_check_fee_status: "waived_2026",
+    background_check_fee_payment_option: "waived_2026",
+    background_check_payment_plan_status: "waived_2026",
+    background_check_reimbursement_balance: 0,
+    background_check_reimbursement_status: "waived_2026",
+  };
+
+  if (alreadyWaived) {
+    return {
+      ...profile,
+      ...waiverPayload,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("gurus")
+    .update(waiverPayload)
+    .eq("id", profile.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.warn("Could not persist 2026 Trust & Safety fee waiver:", error);
+
+    return {
+      ...profile,
+      ...waiverPayload,
+    };
+  }
+
+  return (data as GuruProfile) || {
+    ...profile,
+    ...waiverPayload,
+  };
+}
+
 async function loadGuruProfile(userId: string, email?: string | null) {
   const byUserId = await supabase
     .from("gurus")
@@ -376,7 +390,6 @@ export default function GuruBackgroundCheckPage() {
 
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
-  const [payingOption, setPayingOption] = useState<PaymentOption | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const [userId, setUserId] = useState("");
@@ -391,18 +404,20 @@ export default function GuruBackgroundCheckPage() {
   const firstName = getFirstName(profile, email);
   const invitationUrl = profile?.checkr_invitation_url || "";
 
-  const feeStatus = normalizeFeeStatus(profile);
-  const feeAmount = parseMoney(profile?.background_check_fee_amount);
   const reimbursementBalance = parseMoney(
     profile?.background_check_reimbursement_balance,
   );
 
-  const fullFeeDisplay = feeAmount > 0 ? formatMoney(feeAmount) : "$37.99";
+  const feeStatus = {
+    label: TRUST_SAFETY_WAIVER_LABEL,
+    paid: true,
+    tone: "complete" as const,
+  };
   const selectedPlanLabel = getSelectedPlanLabel(
     profile?.background_check_fee_payment_option,
   );
 
-  const canStartCheckr = feeStatus.paid;
+  const canStartCheckr = true;
 
   async function loadPage() {
     try {
@@ -423,7 +438,9 @@ export default function GuruBackgroundCheckPage() {
       setEmail(user.email || "");
 
       const guruProfile = await loadGuruProfile(user.id, user.email);
-      setProfile(guruProfile);
+      const launchWaivedProfile = await applyTrustSafetyLaunchWaiver(guruProfile);
+
+      setProfile(launchWaivedProfile);
     } catch (error) {
       setErrorMessage(
         `Could not load Trust & Safety Screening status: ${stringifyError(error)}`,
@@ -445,64 +462,15 @@ export default function GuruBackgroundCheckPage() {
       setSuccessMessage("");
 
       const guruProfile = await loadGuruProfile(userId, email);
-      setProfile(guruProfile);
+      const launchWaivedProfile = await applyTrustSafetyLaunchWaiver(guruProfile);
+
+      setProfile(launchWaivedProfile);
 
       setSuccessMessage("Trust & Safety Screening status refreshed.");
     } catch (error) {
       setErrorMessage(`Could not refresh status: ${stringifyError(error)}`);
     } finally {
       setRefreshing(false);
-    }
-  }
-
-  async function startBackgroundCheckPayment(paymentOption: PaymentOption) {
-    try {
-      setPayingOption(paymentOption);
-      setErrorMessage("");
-      setSuccessMessage("");
-
-      if (!profile?.id) {
-        throw new Error(
-          "Missing Guru profile ID. Return to the dashboard and try again.",
-        );
-      }
-
-      const response = await fetch("/api/checkr/create-screening-checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          guruId: String(profile.id),
-          paymentOption,
-        }),
-      });
-
-      const result = (await response
-        .json()
-        .catch(() => ({}))) as CheckoutApiResponse;
-
-      if (!response.ok || result.error) {
-        throw new Error(
-          result.error ||
-            result.message ||
-            "Could not start the Trust & Safety Screening payment checkout.",
-        );
-      }
-
-      const checkoutUrl = result.url || result.checkout_url || result.checkoutUrl;
-
-      if (!checkoutUrl) {
-        throw new Error("Checkout was created, but no checkout URL was returned.");
-      }
-
-      window.location.href = checkoutUrl;
-    } catch (error) {
-      setErrorMessage(
-        `Could not start Trust & Safety Screening payment: ${stringifyError(error)}`,
-      );
-    } finally {
-      setPayingOption(null);
     }
   }
 
@@ -515,12 +483,6 @@ export default function GuruBackgroundCheckPage() {
       if (!profile?.id) {
         throw new Error(
           "Missing Guru profile ID. Return to the dashboard and try again.",
-        );
-      }
-
-      if (!canStartCheckr) {
-        throw new Error(
-          "Please complete a Trust & Safety Screening payment plan before starting the secure screening form.",
         );
       }
 
@@ -630,17 +592,17 @@ export default function GuruBackgroundCheckPage() {
               className="relative z-10 mt-5 max-w-4xl text-4xl font-extrabold tracking-[-0.045em] md:text-6xl lg:text-7xl"
               style={textDark}
             >
-              Step 4: Complete your Trust & Safety Screening
+              Step 4: Trust & Safety Screening Fee Waived Through 2026
             </h1>
 
             <p
               className="relative z-10 mt-5 max-w-3xl text-base font-bold leading-8 md:text-xl"
               style={textSlate}
             >
-              Hi {firstName}. We all want the best care for our pets. This
-              standard Trust & Safety Screening helps pet parents feel confident
-              choosing a Guru and helps keep the SitGuru marketplace safer for
-              everyone.
+              Hi {firstName}. SitGuru is waiving the Trust & Safety
+              Screening fee for all Gurus through {TRUST_SAFETY_WAIVER_END_DISPLAY}
+              as part of our launch year. You can continue building your Guru
+              profile and onboarding without paying this fee.
             </p>
 
             <div className="relative z-10 mt-6 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm">
@@ -656,9 +618,9 @@ export default function GuruBackgroundCheckPage() {
                     className="mt-1 text-sm font-semibold leading-6"
                     style={textSlate}
                   >
-                    This page is designed to guide you clearly and respectfully.
-                    The Trust & Safety Screening is a normal part of onboarding
-                    and is not meant to feel personal or uncomfortable.
+                    No payment is due for this step during the 2026 launch
+                    year waiver. SitGuru may still require normal Trust & Safety
+                    review steps before certain marketplace features are enabled.
                   </p>
                 </div>
               </div>
@@ -825,12 +787,12 @@ export default function GuruBackgroundCheckPage() {
                 style={textDark}
               >
                 <span>
-                  {canStartCheckr
+                  {status.tone === "complete"
                     ? status.title
-                    : "Choose the plan that fits your pack"}
+                    : "Your 2026 Trust & Safety fee is waived"}
                 </span>
 
-                {!canStartCheckr ? (
+                {status.tone !== "complete" ? (
                   <span className="inline-flex items-center gap-1 opacity-40">
                     <PawPrint className="h-5 w-5 rotate-[10deg] text-emerald-500" />
                     <PawPrint className="h-4 w-4 -rotate-[8deg] text-sky-500" />
@@ -842,211 +804,106 @@ export default function GuruBackgroundCheckPage() {
                 className="mt-3 max-w-4xl text-base font-bold leading-7"
                 style={textSlate}
               >
-                {canStartCheckr
+                {status.tone === "complete"
                   ? status.description
-                  : `Your one-time SitGuru Trust & Safety screening fee is ${fullFeeDisplay} when paid in full. To make onboarding easier, SitGuru gives you a few flexible ways to cover this one-time cost.`}
+                  : `SitGuru is waiving the Trust & Safety Screening fee for all Gurus through ${TRUST_SAFETY_WAIVER_END_DISPLAY}. No payment is due today, and this page will not send you to Stripe checkout.`}
               </p>
 
               <p
                 className="mt-3 max-w-4xl text-sm font-semibold leading-6"
                 style={textMuted}
               >
-                {canStartCheckr
+                {status.tone === "complete"
                   ? status.helper
-                  : "This is the only required marketplace cost to become a Guru. There is no monthly subscription, no profile listing fee, and no charge to complete Steps 1–3."}
+                  : "Continue your Guru onboarding by completing your profile, services, availability, payout setup, and any secure Trust & Safety review steps SitGuru requires."}
               </p>
 
-              {!canStartCheckr ? (
-                <>
-                  <div className="mt-5 rounded-[1.5rem] border border-emerald-200 bg-white p-4 shadow-sm">
-                    <p className="text-sm font-extrabold leading-6" style={textDark}>
-                      Paw in Full is the best value if you want no remaining
-                      balance, no future screening-balance deductions, and the
-                      Launch Pro Guru badge.
-                    </p>
-                    <p
-                      className="mt-2 text-sm font-semibold leading-6"
-                      style={textSlate}
-                    >
-                      Flexible plans are available if you prefer a lower upfront
-                      cost. No interest. No hidden fees. No pressure — just
-                      choose the option that works best for you.
-                    </p>
-                  </div>
-
-                  <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-3">
-                    <div className="relative min-w-0 rounded-[1.5rem] border-2 border-emerald-400 bg-white p-5 shadow-[0_18px_40px_rgba(16,185,129,0.16)]">
-                      <div className="absolute right-4 top-4 rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-white">
-                        Recommended
+              {status.tone !== "complete" ? (
+                <div className="mt-6 rounded-[1.5rem] border-2 border-emerald-300 bg-white p-5 shadow-[0_18px_40px_rgba(16,185,129,0.14)]">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex min-w-0 flex-1 items-start gap-4">
+                      <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700">
+                        <ShieldCheck className="h-6 w-6" />
                       </div>
 
-                      <div className="flex flex-wrap items-start gap-3 pr-24">
-                        <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700">
-                          <CreditCard className="h-5 w-5" />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap gap-2">
+                          <span
+                            className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-black uppercase tracking-[0.12em]"
+                            style={textWhite}
+                          >
+                            Launch Year Waiver
+                          </span>
+
+                          <span
+                            className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ring-1 ring-emerald-200"
+                            style={{
+                              color: "#047857",
+                              WebkitTextFillColor: "#047857",
+                            }}
+                          >
+                            No Payment Due
+                          </span>
                         </div>
 
-                        <span
-                          className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ring-1 ring-emerald-200"
-                          style={{ color: "#047857", WebkitTextFillColor: "#047857" }}
-                        >
-                          Best Value
-                        </span>
+                        <h3 className="mt-4 text-2xl font-extrabold" style={textDark}>
+                          2026 Trust & Safety Screening Fee Waived
+                        </h3>
 
-                        <span
-                          className="rounded-full bg-slate-900 px-3 py-1 text-xs font-black uppercase tracking-[0.12em]"
+                        <p
+                          className="mt-3 text-sm font-semibold leading-7"
+                          style={textSlate}
+                        >
+                          SitGuru is waiving the Trust & Safety Screening fee for
+                          all Gurus through {TRUST_SAFETY_WAIVER_END_DISPLAY} as
+                          part of our launch year. There is no Stripe payment,
+                          no plan selection, no monthly payment, and no booking
+                          payout deduction required for this step during 2026.
+                        </p>
+
+                        <p
+                          className="mt-3 text-sm font-extrabold leading-6"
+                          style={textDark}
+                        >
+                          Keep moving forward by completing your Guru profile,
+                          services, availability, Stripe payout setup, and any
+                          secure Trust & Safety review steps SitGuru requires.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:w-[280px] lg:flex-col">
+                      {status.tone === "needs_action" ? (
+                        <button
+                          type="button"
+                          onClick={startBackgroundCheck}
+                          disabled={starting}
+                          className={`inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-extrabold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-70 ${classes.button}`}
                           style={textWhite}
                         >
-                          Launch Pro Guru
-                        </span>
-                      </div>
+                          {starting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <ShieldCheck className="h-4 w-4" />
+                          )}
+                          <span style={textWhite}>
+                            {starting
+                              ? "Starting secure screening..."
+                              : "Start Secure Screening"}
+                          </span>
+                        </button>
+                      ) : null}
 
-                      <h3 className="mt-5 text-2xl font-extrabold" style={textDark}>
-                        Paw in Full
-                      </h3>
-
-                      <p className="mt-3 text-sm font-semibold leading-6" style={textSlate}>
-                        Pay $37.99 today and unlock your secure screening form
-                        immediately.
-                      </p>
-
-                      <p className="mt-3 text-sm font-extrabold leading-6" style={textDark}>
-                        No remaining balance. No future screening-balance
-                        deductions.
-                      </p>
-
-                      <p className="mt-3 text-sm font-semibold leading-6" style={textSlate}>
-                        Includes the Launch Pro Guru badge and helps you keep
-                        more of your future booking payouts sooner.
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={() => startBackgroundCheckPayment("pay_full_today")}
-                        disabled={Boolean(payingOption)}
-                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-4 text-sm font-extrabold shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
-                        style={textWhite}
+                      <Link
+                        href={routes.dashboard}
+                        className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-6 py-4 text-sm font-extrabold shadow-sm transition hover:bg-slate-50"
+                        style={textDark}
                       >
-                        {payingOption === "pay_full_today" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <CreditCard className="h-4 w-4" />
-                        )}
-                        <span style={textWhite}>
-                          {payingOption === "pay_full_today"
-                            ? "Opening checkout..."
-                            : "Pay $37.99 Today"}
-                        </span>
-                      </button>
-                    </div>
-
-                    <div className="min-w-0 rounded-[1.5rem] border border-sky-200 bg-white p-5 shadow-sm">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="rounded-2xl bg-sky-100 p-3 text-sky-700">
-                          <CreditCard className="h-5 w-5" />
-                        </div>
-
-                        <span
-                          className="rounded-full bg-sky-50 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ring-1 ring-sky-200"
-                          style={{ color: "#0369a1", WebkitTextFillColor: "#0369a1" }}
-                        >
-                          Lower Upfront
-                        </span>
-                      </div>
-
-                      <h3 className="mt-5 text-2xl font-extrabold" style={textDark}>
-                        Pawstep Plan
-                      </h3>
-
-                      <p className="mt-3 text-sm font-semibold leading-6" style={textSlate}>
-                        Pay $15 today, then split the remaining $24.99 into 3
-                        automatic monthly Stripe payments.
-                      </p>
-
-                      <p className="mt-3 text-sm font-extrabold leading-6" style={textDark}>
-                        A simple way to keep your upfront cost lower while
-                        staying on track.
-                      </p>
-
-                      <p className="mt-3 text-sm font-semibold leading-6" style={textSlate}>
-                        Flexible plan total: $39.99.
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          startBackgroundCheckPayment("pay_15_three_monthly")
-                        }
-                        disabled={Boolean(payingOption)}
-                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-4 text-sm font-extrabold shadow-lg transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
-                        style={textWhite}
-                      >
-                        {payingOption === "pay_15_three_monthly" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <CreditCard className="h-4 w-4" />
-                        )}
-                        <span style={textWhite}>
-                          {payingOption === "pay_15_three_monthly"
-                            ? "Opening checkout..."
-                            : "Pay $15 + Set Up Monthly Payments"}
-                        </span>
-                      </button>
-                    </div>
-
-                    <div className="min-w-0 rounded-[1.5rem] border border-amber-300 bg-white p-5 shadow-sm">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="rounded-2xl bg-amber-100 p-3 text-amber-700">
-                          <CreditCard className="h-5 w-5" />
-                        </div>
-
-                        <span
-                          className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ring-1 ring-amber-200"
-                          style={{ color: "#92400e", WebkitTextFillColor: "#92400e" }}
-                        >
-                          Flexible Start
-                        </span>
-                      </div>
-
-                      <h3 className="mt-5 text-2xl font-extrabold" style={textDark}>
-                        Book & Bark Plan
-                      </h3>
-
-                      <p className="mt-3 text-sm font-semibold leading-6" style={textSlate}>
-                        Pay $15 today, then repay the remaining $24.99 from
-                        future completed booking payouts.
-                      </p>
-
-                      <p className="mt-3 text-sm font-extrabold leading-6" style={textDark}>
-                        A flexible choice for new Gurus getting started.
-                      </p>
-
-                      <p className="mt-3 text-sm font-semibold leading-6" style={textSlate}>
-                        Flexible plan total: $39.99.
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          startBackgroundCheckPayment("pay_15_booking_deductions")
-                        }
-                        disabled={Boolean(payingOption)}
-                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 py-4 text-sm font-extrabold shadow-lg transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-70"
-                        style={textWhite}
-                      >
-                        {payingOption === "pay_15_booking_deductions" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <CreditCard className="h-4 w-4" />
-                        )}
-                        <span style={textWhite}>
-                          {payingOption === "pay_15_booking_deductions"
-                            ? "Opening checkout..."
-                            : "Pay $15 + Booking Payouts"}
-                        </span>
-                      </button>
+                        <span style={textDark}>Continue Guru Onboarding</span>
+                      </Link>
                     </div>
                   </div>
-                </>
+                </div>
               ) : (
                 <div className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-white p-5 shadow-sm">
                   <div className="flex items-start gap-3">
@@ -1056,11 +913,11 @@ export default function GuruBackgroundCheckPage() {
 
                     <div>
                       <p className="text-sm font-extrabold" style={textDark}>
-                        Payment complete
+                        Trust & Safety Screening complete
                       </p>
                       <p className="mt-1 text-sm font-semibold leading-6" style={textSlate}>
-                        Your selected plan is active. You can now begin your
-                        secure Trust & Safety Screening form.
+                        This step is complete. SitGuru is also waiving the Trust
+                        & Safety Screening fee through {TRUST_SAFETY_WAIVER_END_DISPLAY}.
                       </p>
 
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1088,7 +945,7 @@ export default function GuruBackgroundCheckPage() {
                               WebkitTextFillColor: "#92400e",
                             }}
                           >
-                            Balance: {formatMoney(reimbursementBalance)}
+                            Previous Balance: {formatMoney(reimbursementBalance)}
                           </span>
                         ) : null}
                       </div>
@@ -1296,10 +1153,10 @@ export default function GuruBackgroundCheckPage() {
               A normal secure screening process
             </h3>
             <p className="mt-3 text-sm font-semibold leading-7" style={textSlate}>
-              After your plan is started, you can begin the secure screening form. Checkr
-              may ask for identifying details so they can complete the screening.
-              Most Gurus can start this process quickly and monitor status from
-              their dashboard.
+              During the 2026 launch waiver, no payment plan is needed before
+              starting the secure screening form. Checkr may ask for identifying
+              details so they can complete the screening. Most Gurus can monitor
+              status from their dashboard.
             </p>
           </div>
 
@@ -1308,16 +1165,16 @@ export default function GuruBackgroundCheckPage() {
               className="text-xs font-extrabold uppercase tracking-[0.18em]"
               style={{ color: "#047857", WebkitTextFillColor: "#047857" }}
             >
-              Payment, support, and privacy
+              Fee waiver, support, and privacy
             </p>
             <h3 className="mt-3 text-2xl font-extrabold" style={textDark}>
               Simple and transparent
             </h3>
             <p className="mt-3 text-sm font-semibold leading-7" style={textSlate}>
-              The Trust & Safety screening fee is the only required marketplace cost for
-              Gurus. SitGuru may contact you by email or SitGuru Messages while
-              this step is pending, and your dashboard will show your current
-              setup progress.
+              The Trust & Safety Screening fee is waived for Gurus through
+              {TRUST_SAFETY_WAIVER_END_DISPLAY}. SitGuru may contact you by
+              email or SitGuru Messages while this step is pending, and your
+              dashboard will show your current setup progress.
             </p>
           </div>
         </section>
