@@ -3,11 +3,31 @@ import Stripe from "stripe";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+export const dynamic = "force-dynamic";
+
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+if (!stripeSecretKey) {
+  throw new Error("Missing STRIPE_SECRET_KEY environment variable.");
+}
+
+const stripe = new Stripe(stripeSecretKey);
+
+function getAppUrl() {
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_URL ||
+    "http://localhost:3000";
+
+  return appUrl.startsWith("http")
+    ? appUrl.replace(/\/$/, "")
+    : `https://${appUrl.replace(/\/$/, "")}`;
+}
 
 export async function POST() {
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = getAppUrl();
     const supabase = await createClient();
 
     const {
@@ -16,33 +36,56 @@ export async function POST() {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
     const { data: guru, error: guruError } = await supabaseAdmin
       .from("gurus")
-      .select("*")
+      .select(
+        [
+          "id",
+          "user_id",
+          "email",
+          "full_name",
+          "display_name",
+          "name",
+          "stripe_account_id",
+          "stripe_onboarding_complete",
+          "charges_enabled",
+          "payouts_enabled",
+        ].join(","),
+      )
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (guruError || !guru) {
+    if (guruError) {
       console.error("Guru lookup error:", guruError);
       return NextResponse.json(
-        { error: "Guru profile not found" },
-        { status: 404 }
+        { error: "Could not load Guru profile." },
+        { status: 500 },
+      );
+    }
+
+    if (!guru) {
+      return NextResponse.json(
+        { error: "Guru profile not found." },
+        { status: 404 },
       );
     }
 
     let stripeAccountId = guru.stripe_account_id as string | null;
 
     if (!stripeAccountId) {
-      console.log("Creating Stripe Express account for user:", user.id);
-
       const account = await stripe.accounts.create({
         type: "express",
         country: "US",
-        email: user.email ?? undefined,
+        email: guru.email || user.email || undefined,
         business_type: "individual",
+        metadata: {
+          guru_id: String(guru.id),
+          user_id: String(user.id),
+          source: "sitguru_guru_step_5_onboarding",
+        },
         capabilities: {
           card_payments: { requested: true },
           transfers: { requested: true },
@@ -50,7 +93,6 @@ export async function POST() {
       });
 
       stripeAccountId = account.id;
-      console.log("Stripe account created:", stripeAccountId);
 
       const { error: updateError } = await supabaseAdmin
         .from("gurus")
@@ -59,20 +101,17 @@ export async function POST() {
           stripe_onboarding_complete: false,
           charges_enabled: false,
           payouts_enabled: false,
+          updated_at: new Date().toISOString(),
         })
         .eq("user_id", user.id);
 
       if (updateError) {
         console.error("Error saving Stripe account ID:", updateError);
         return NextResponse.json(
-          { error: "Could not save Stripe account" },
-          { status: 500 }
+          { error: "Could not save Stripe Connect account." },
+          { status: 500 },
         );
       }
-
-      console.log("Stripe account ID saved to gurus table.");
-    } else {
-      console.log("Existing Stripe account found:", stripeAccountId);
     }
 
     const accountLink = await stripe.accountLinks.create({
@@ -82,12 +121,17 @@ export async function POST() {
       type: "account_onboarding",
     });
 
-    return NextResponse.json({ url: accountLink.url });
+    return NextResponse.json({
+      ok: true,
+      url: accountLink.url,
+      stripe_account_id: stripeAccountId,
+    });
   } catch (error) {
-    console.error("Stripe connect route error:", error);
+    console.error("Stripe Connect route error:", error);
+
     return NextResponse.json(
-      { error: "Failed to connect Stripe" },
-      { status: 500 }
+      { error: "Failed to start Stripe Connect onboarding." },
+      { status: 500 },
     );
   }
 }

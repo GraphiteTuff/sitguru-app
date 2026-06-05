@@ -1138,7 +1138,7 @@ function GuruSetupChecklist({
       number: 5,
       title: "Connect payouts",
       body: "Connect Stripe payouts so SitGuru can pay you after completed bookings.",
-      href: "/guru/dashboard/earnings",
+      href: "/api/stripe/connect",
       status: payoutConnected ? "complete" : "needs_action",
       statusLabel: payoutConnected ? "Complete" : "Needs Action",
     },
