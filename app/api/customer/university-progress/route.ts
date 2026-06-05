@@ -24,7 +24,7 @@ type UniversityProgress = {
 };
 
 const defaultUniversityProgress: UniversityProgress = {
-  totalSteps: 3,
+  totalSteps: 1,
   completedSteps: 0,
   totalMaterials: 0,
   acknowledgedMaterials: 0,
@@ -34,8 +34,8 @@ const defaultUniversityProgress: UniversityProgress = {
   isComplete: false,
   certificationLabel: "Certified Pet Parent: Not started",
   badgeStatus: "Locked",
-  progressHelper: "Start with Step 1: watch the intro video",
-  universityTileHelper: "Start 1, 2, 3",
+  progressHelper: "Watch the intro video, review the guide, and acknowledge completion.",
+  universityTileHelper: "Start Easy as 1, 2, 3",
   academyButtonLabel: "Start Pet Parent Academy",
 };
 
@@ -44,10 +44,76 @@ function isRequired(row: AnyRow) {
 }
 
 function isCompletedStep(row: AnyRow) {
-  return (
-    Boolean(row.completed_at) ||
-    String(row.status || "").toLowerCase() === "completed"
+  const status = String(row.status || "").trim().toLowerCase();
+
+  return Boolean(
+    row.completed_at ||
+      status === "completed" ||
+      status === "complete" ||
+      status === "done",
   );
+}
+
+function buildProgress({
+  completedSteps,
+  totalSteps,
+  totalMaterials,
+  requiredMaterials,
+  acknowledgedMaterials,
+}: {
+  completedSteps: number;
+  totalSteps: number;
+  totalMaterials: number;
+  requiredMaterials: number;
+  acknowledgedMaterials: number;
+}): UniversityProgress {
+  const normalizedTotalSteps = totalSteps || 1;
+  const normalizedRequiredMaterials = requiredMaterials || totalMaterials;
+
+  const isComplete =
+    normalizedTotalSteps > 0 && completedSteps >= normalizedTotalSteps;
+  const isStarted = completedSteps > 0 || acknowledgedMaterials > 0;
+
+  const progressPercent =
+    normalizedTotalSteps > 0
+      ? Math.round((completedSteps / normalizedTotalSteps) * 100)
+      : 0;
+
+  return {
+    totalSteps: normalizedTotalSteps,
+    completedSteps,
+    totalMaterials,
+    acknowledgedMaterials,
+    requiredMaterials: normalizedRequiredMaterials,
+    progressPercent,
+    isStarted,
+    isComplete,
+    certificationLabel: isComplete
+      ? "Certified Pet Parent: Completed"
+      : isStarted
+        ? "Certified Pet Parent: In progress"
+        : "Certified Pet Parent: Not started",
+    badgeStatus: isComplete
+      ? "Certified Pet Parent"
+      : isStarted
+        ? "In progress"
+        : "Locked",
+    progressHelper: isComplete
+      ? "Certified Pet Parent complete"
+      : isStarted
+        ? `${acknowledgedMaterials} of ${normalizedRequiredMaterials} required materials acknowledged`
+        : "Watch the intro video, review the guide, and acknowledge completion.",
+    universityTileHelper: isComplete
+      ? "View certification"
+      : isStarted
+        ? "Continue Easy as 1, 2, 3"
+        : "Start Easy as 1, 2, 3",
+    academyButtonLabel: isComplete
+      ? "Review Pet Parent Academy"
+      : isStarted
+        ? "Continue Pet Parent Academy"
+        : "Start Pet Parent Academy",
+  };
 }
 
 export async function GET() {
@@ -78,21 +144,24 @@ export async function GET() {
     ] = await Promise.all([
       supabaseAdmin
         .from("ambassador_training_steps")
-        .select("id, step_number")
+        .select("id, step_number, title, is_active")
         .eq("academy_type", "pet_parent")
         .eq("is_active", true)
-        .lte("step_number", 3),
+        .order("step_number", { ascending: true }),
+
       supabaseAdmin
         .from("academy_step_materials")
-        .select("id, training_step_id, is_required")
+        .select("id, training_step_id, title, content_type, is_required, is_active")
         .eq("academy_type", "pet_parent")
         .eq("is_active", true),
+
       supabaseAdmin
         .from("academy_material_progress")
-        .select("material_id, acknowledged_at")
+        .select("material_id, training_step_id, acknowledged_at")
         .eq("academy_type", "pet_parent")
         .eq("user_id", user.id)
         .not("acknowledged_at", "is", null),
+
       supabaseAdmin
         .from("academy_step_progress")
         .select("training_step_id, status, completed_at")
@@ -105,37 +174,32 @@ export async function GET() {
     if (materialProgressResult.error) throw materialProgressResult.error;
     if (stepProgressResult.error) throw stepProgressResult.error;
 
-    const steps = Array.isArray(stepsResult.data)
+    const activeSteps = Array.isArray(stepsResult.data)
       ? (stepsResult.data as AnyRow[])
       : [];
 
-    const materials = Array.isArray(materialsResult.data)
+    const firstActiveStep = activeSteps[0] || null;
+    const orientationStepId = String(firstActiveStep?.id || "");
+
+    const activeMaterials = Array.isArray(materialsResult.data)
       ? (materialsResult.data as AnyRow[])
       : [];
+
+    const orientationMaterials = orientationStepId
+      ? activeMaterials.filter(
+          (material) => String(material.training_step_id || "") === orientationStepId,
+        )
+      : activeMaterials;
+
+    const requiredMaterials = orientationMaterials.filter(isRequired);
+
+    const visibleMaterialIds = new Set(
+      orientationMaterials.map((material) => String(material.id)).filter(Boolean),
+    );
 
     const materialProgress = Array.isArray(materialProgressResult.data)
       ? (materialProgressResult.data as AnyRow[])
       : [];
-
-    const stepProgress = Array.isArray(stepProgressResult.data)
-      ? (stepProgressResult.data as AnyRow[])
-      : [];
-
-    const activeStepIds = new Set(
-      steps.map((step) => String(step.id)).filter(Boolean),
-    );
-
-    const visibleMaterials = materials.filter((material) =>
-      activeStepIds.has(String(material.training_step_id || "")),
-    );
-
-    const visibleMaterialIds = new Set(
-      visibleMaterials.map((material) => String(material.id)).filter(Boolean),
-    );
-
-    const totalSteps = steps.length || 3;
-    const totalMaterials = visibleMaterials.length;
-    const requiredMaterials = visibleMaterials.filter(isRequired).length;
 
     const acknowledgedMaterials = materialProgress.filter(
       (row) =>
@@ -143,51 +207,25 @@ export async function GET() {
         visibleMaterialIds.has(String(row.material_id || "")),
     ).length;
 
-    const completedSteps = stepProgress.filter(isCompletedStep).length;
+    const stepProgress = Array.isArray(stepProgressResult.data)
+      ? (stepProgressResult.data as AnyRow[])
+      : [];
 
-    const progressPercent =
-      totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+    const completedSteps = stepProgress.filter((row) => {
+      if (!isCompletedStep(row)) return false;
 
-    const isComplete = totalSteps > 0 && completedSteps >= totalSteps;
-    const isStarted = completedSteps > 0 || acknowledgedMaterials > 0;
+      if (!orientationStepId) return true;
 
-    const progress: UniversityProgress = {
-      totalSteps,
-      completedSteps,
-      totalMaterials,
+      return String(row.training_step_id || "") === orientationStepId;
+    }).length;
+
+    const progress = buildProgress({
+      totalSteps: 1,
+      completedSteps: completedSteps > 0 ? 1 : 0,
+      totalMaterials: orientationMaterials.length,
+      requiredMaterials: requiredMaterials.length,
       acknowledgedMaterials,
-      requiredMaterials,
-      progressPercent,
-      isStarted,
-      isComplete,
-      certificationLabel: isComplete
-        ? "Certified Pet Parent: Completed"
-        : isStarted
-          ? "Certified Pet Parent: In progress"
-          : "Certified Pet Parent: Not started",
-      badgeStatus: isComplete
-        ? "Certified Pet Parent"
-        : isStarted
-          ? "In progress"
-          : "Locked",
-      progressHelper: isComplete
-        ? "Certified Pet Parent complete"
-        : isStarted
-          ? `${acknowledgedMaterials} of ${
-              requiredMaterials || totalMaterials
-            } materials acknowledged`
-          : "Start with Step 1: watch the intro video",
-      universityTileHelper: isComplete
-        ? "View certificate"
-        : isStarted
-          ? "Continue academy"
-          : "Start 1, 2, 3",
-      academyButtonLabel: isComplete
-        ? "Review Pet Parent Academy"
-        : isStarted
-          ? "Continue Pet Parent Academy"
-          : "Start Pet Parent Academy",
-    };
+    });
 
     return NextResponse.json(
       {
