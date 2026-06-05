@@ -934,26 +934,26 @@ export default async function GuruUniversityPage({ searchParams }: PageProps) {
     acknowledgedRequired >= requiredCount;
 
   return (
-    <main className="min-h-screen bg-[#f7fbf7] px-4 py-5 text-[#062f2b] sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f7fbf7] px-4 py-5 !text-[#062f2b] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1280px] space-y-5">
         <section className="overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-sm">
           <div className="grid gap-7 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-5 py-6 sm:px-7 md:px-10 md:py-9 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
             <div>
               <Link
                 href={guruRoutes.dashboard}
-                className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-white"
+                className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-sm font-black !text-emerald-900 shadow-sm transition hover:bg-white"
               >
                 <ArrowLeft size={16} />
                 Back to Dashboard
               </Link>
 
-              <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-900/80">
+              <p className="text-xs font-black uppercase tracking-[0.28em] !!text-slate-900/80">
                 SitGuru University
               </p>
-              <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-[-0.045em] text-slate-950 sm:text-5xl md:text-6xl">
+              <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-[-0.045em] !text-[#07132f] sm:text-5xl md:text-6xl">
                 Learn SitGuru. Easy as 1, 2, 3.
               </h1>
-              <p className="mt-4 max-w-3xl text-base font-semibold leading-8 text-slate-900/75 md:text-lg">
+              <p className="mt-4 max-w-3xl text-base font-semibold leading-8 !!text-slate-900/75 md:text-lg">
                 Hi {firstName}, learn the basics of SitGuru, how to complete your Guru
                 profile, manage bookings professionally, provide safe pet care,
                 set up payouts, and build trust with Pet Parents. Review the
@@ -974,10 +974,10 @@ export default async function GuruUniversityPage({ searchParams }: PageProps) {
             <div className="flex flex-col items-center text-center">
               <div className="rounded-[2.2rem] bg-white/75 p-5 shadow-xl ring-1 ring-white/60 backdrop-blur md:min-w-[280px]">
                 <AvatarCircle avatarUrl={avatarUrl} displayName={displayName} />
-                <h2 className="mt-4 text-2xl font-black text-slate-950 md:text-3xl">
+                <h2 className="mt-4 text-2xl font-black !text-slate-950 md:text-3xl">
                   {firstName}
                 </h2>
-                <p className="mt-1 text-sm font-black text-emerald-800">
+                <p className="mt-1 text-sm font-black !text-emerald-800">
                   {academyCompleted ? "Badge issued" : "Badge locked"}
                 </p>
               </div>
@@ -1011,7 +1011,7 @@ export default async function GuruUniversityPage({ searchParams }: PageProps) {
             className={`rounded-[24px] border p-4 text-sm font-bold leading-6 ${
               notice.tone === "success"
                 ? "border-green-100 bg-green-50 text-green-900"
-                : "border-red-100 bg-red-50 text-red-800"
+                : "border-red-100 bg-red-50 !text-red-800"
             }`}
           >
             <p className="font-black">{notice.title}</p>
@@ -1023,13 +1023,13 @@ export default async function GuruUniversityPage({ searchParams }: PageProps) {
           <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/70 p-5 sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+                <p className="text-xs font-black uppercase tracking-[0.22em] !text-emerald-700">
                   Certified Guru Orientation
                 </p>
-                <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl md:text-5xl">
+                <h2 className="mt-2 text-3xl font-black tracking-tight !text-[#07132f] sm:text-4xl md:text-5xl">
                   Watch. Review. Acknowledge.
                 </h2>
-                <p className="mt-3 max-w-4xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
+                <p className="mt-3 max-w-4xl text-sm font-semibold leading-7 !text-slate-600 sm:text-base">
                   Learn the basics of SitGuru, how to complete your Guru profile,
                   manage bookings professionally, provide safe pet care, set up
                   payouts, and build trust with Pet Parents. Review the video and
@@ -1040,8 +1040,8 @@ export default async function GuruUniversityPage({ searchParams }: PageProps) {
               <span
                 className={`inline-flex w-fit rounded-2xl px-5 py-3 text-sm font-black ${
                   academyCompleted
-                    ? "bg-emerald-700 text-white"
-                    : "bg-white text-emerald-900 ring-1 ring-emerald-100"
+                    ? "bg-emerald-700 !text-white"
+                    : "bg-white !text-emerald-900 ring-1 ring-emerald-100"
                 }`}
               >
                 {academyCompleted ? "Certified" : actionProgress > 0 ? "In progress" : "Not started"}
@@ -1093,7 +1093,7 @@ function AvatarCircle({
   displayName: string;
 }) {
   return (
-    <div className="mx-auto flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-[7px] border-white bg-white text-4xl font-black text-emerald-800 shadow-2xl sm:h-36 sm:w-36">
+    <div className="mx-auto flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-[7px] border-white bg-white text-4xl font-black !text-emerald-800 shadow-2xl sm:h-36 sm:w-36">
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -1136,44 +1136,44 @@ function OrientationActionCard({
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
         <div className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-800 px-3 py-1 text-xs font-black text-white">
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-800 px-3 py-1 text-xs font-black !text-white">
               {icon}
               {stepLabel}
             </span>
-            <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-black text-amber-900">
+            <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-black !text-amber-900">
               Required
             </span>
             {material?.isAcknowledged ? (
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-900">
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-900">
                 Acknowledged
               </span>
             ) : null}
           </div>
 
-          <h3 className="text-2xl font-black tracking-tight text-slate-950">
+          <h3 className="text-2xl font-black tracking-tight !text-[#07132f]">
             {title}
           </h3>
-          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 !text-slate-600">
             {description}
           </p>
 
           {material ? (
             <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-1 text-xs font-black text-emerald-900">
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-1 text-xs font-black !text-emerald-900">
                   {getMaterialIcon(material.content_type)}
                   {getContentTypeLabel(material.content_type)}
                 </span>
               </div>
-              <p className="mt-3 text-base font-black text-slate-950">
+              <p className="mt-3 text-base font-black !text-slate-950">
                 {material.title}
               </p>
-              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+              <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
                 {material.description || "Open this material to continue."}
               </p>
             </div>
           ) : (
-            <div className="mt-4 rounded-2xl border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-900">
+            <div className="mt-4 rounded-2xl border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 !text-amber-900">
               This material has not been uploaded yet. Add one file in Admin for
               this action.
             </div>
@@ -1187,7 +1187,7 @@ function OrientationActionCard({
                 href={material?.openUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-5 py-3 text-sm font-black !text-white shadow-sm transition hover:bg-emerald-900"
               >
                 <ExternalLink size={16} />
                 Open Material
@@ -1196,7 +1196,7 @@ function OrientationActionCard({
                 href={material?.downloadUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black !text-emerald-900 shadow-sm transition hover:bg-emerald-50"
               >
                 <Download size={16} />
                 Download / View
@@ -1208,11 +1208,11 @@ function OrientationActionCard({
 
       <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-4">
         {material?.isAcknowledged ? (
-          <div className="flex items-start gap-3 text-sm font-bold leading-6 text-emerald-900">
+          <div className="flex items-start gap-3 text-sm font-bold leading-6 !text-emerald-900">
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
               <p className="font-black">Acknowledgment saved</p>
-              <p className="text-emerald-800">
+              <p className="!text-emerald-800">
                 You acknowledged this material on {formatDateTime(material.acknowledgedAt)}.
               </p>
             </div>
@@ -1225,7 +1225,7 @@ function OrientationActionCard({
               name="training_step_id"
               value={material.training_step_id || orientationStepId}
             />
-            <label className="flex cursor-pointer items-start gap-3 text-sm font-bold leading-6 text-slate-700">
+            <label className="flex cursor-pointer items-start gap-3 text-sm font-bold leading-6 !text-slate-700">
               <input
                 name="acknowledgment"
                 type="checkbox"
@@ -1240,14 +1240,14 @@ function OrientationActionCard({
             </label>
             <button
               type="submit"
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-5 py-3 text-sm font-black !text-white shadow-sm transition hover:bg-emerald-900"
             >
               <CheckCircle2 size={17} />
               Save Acknowledgment
             </button>
           </form>
         ) : (
-          <p className="text-sm font-bold leading-6 text-slate-500">
+          <p className="text-sm font-bold leading-6 !text-slate-500">
             Acknowledgment will appear after the material is uploaded.
           </p>
         )}
@@ -1288,24 +1288,24 @@ function CertificationActionCard({
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
         <div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-800 px-3 py-1 text-xs font-black text-white">
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-800 px-3 py-1 text-xs font-black !text-white">
               <BadgeCheck size={18} />
               {stepLabel}
             </span>
-            <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-black text-amber-900">
+            <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-black !text-amber-900">
               Final Certification
             </span>
             {isCompleted ? (
-              <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-900">
+              <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black !text-emerald-900">
                 Certified
               </span>
             ) : null}
           </div>
 
-          <h3 className="text-2xl font-black tracking-tight text-slate-950">
+          <h3 className="text-2xl font-black tracking-tight !text-[#07132f]">
             {title}
           </h3>
-          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 !text-slate-600">
             {description}
           </p>
 
@@ -1325,12 +1325,12 @@ function CertificationActionCard({
 
         <div className="lg:min-w-[240px]">
           {isCompleted ? (
-            <div className="rounded-2xl border border-emerald-200 bg-white p-4 text-sm font-bold leading-6 text-emerald-900">
+            <div className="rounded-2xl border border-emerald-200 bg-white p-4 text-sm font-bold leading-6 !text-emerald-900">
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
                   <p className="font-black">Badge issued</p>
-                  <p className="text-emerald-800">
+                  <p className="!text-emerald-800">
                     Completed on {formatDateTime(completedAt)}. Your official certificate will be prepared and sent within 24 hours.
                   </p>
                 </div>
@@ -1352,8 +1352,8 @@ function CertificationActionCard({
                 disabled={!canComplete}
                 className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition ${
                   canComplete
-                    ? "bg-red-700 text-white shadow-sm hover:bg-red-800"
-                    : "bg-red-100 text-red-400"
+                    ? "bg-red-700 !text-white shadow-sm hover:bg-red-800"
+                    : "bg-red-100 !text-red-400"
                 }`}
               >
                 <CheckCircle2 size={17} />
@@ -1361,7 +1361,7 @@ function CertificationActionCard({
               </button>
               <p
                 className={`text-xs font-bold leading-5 ${
-                  canComplete ? "text-red-800" : "text-slate-500"
+                  canComplete ? "!text-red-800" : "!text-slate-500"
                 }`}
               >
                 {canComplete
@@ -1378,7 +1378,7 @@ function CertificationActionCard({
 
 function TrustBadge({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs font-black text-slate-800 shadow-sm ring-1 ring-white/70">
+    <span className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs font-black !text-slate-800 shadow-sm ring-1 ring-white/70">
       {icon}
       {label}
     </span>
@@ -1400,13 +1400,13 @@ function DashboardStatCard({
     <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+          <p className="text-xs font-black uppercase tracking-[0.14em] !text-slate-500">
             {label}
           </p>
-          <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
-          <p className="mt-2 text-sm font-bold text-emerald-700">{detail}</p>
+          <p className="mt-2 text-2xl font-black !text-slate-950">{value}</p>
+          <p className="mt-2 text-sm font-bold !text-emerald-700">{detail}</p>
         </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 !text-emerald-700 ring-1 ring-emerald-100">
           {icon}
         </div>
       </div>
@@ -1425,11 +1425,11 @@ function MiniProgressBox({
 }) {
   return (
     <div className="rounded-2xl border border-slate-100 bg-white p-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+      <p className="text-[10px] font-black uppercase tracking-[0.14em] !text-slate-500">
         {label}
       </p>
-      <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
-      <p className="text-xs font-bold text-slate-500">{detail}</p>
+      <p className="mt-1 text-lg font-black !text-slate-950">{value}</p>
+      <p className="text-xs font-bold !text-slate-500">{detail}</p>
     </div>
   );
 }
