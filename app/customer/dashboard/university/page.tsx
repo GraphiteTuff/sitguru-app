@@ -369,7 +369,7 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
   const email = asString(user.email);
   const displayName = getDisplayName(profile, email);
   const firstName = displayName.split(" ")[0] || "Pet Parent";
-  const totalSteps = universityData.steps.length || 9;
+  const totalSteps = universityData.steps.length || 3;
   const completedSteps = universityData.completedSteps;
   const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
   const academyCompleted = totalSteps > 0 && completedSteps >= totalSteps;
@@ -384,9 +384,9 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
                 <ArrowLeft size={16} /> Back to Dashboard
               </Link>
               <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-900/80">SitGuru University</p>
-              <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-[-0.045em] text-slate-950 md:text-6xl">Pet Parent Academy</h1>
+              <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-[-0.045em] text-slate-950 md:text-6xl">Learn SitGuru. Easy as 1, 2, 3.</h1>
               <p className="mt-4 max-w-3xl text-base font-semibold leading-8 text-slate-900/75 md:text-lg">
-                Welcome, {firstName}. Complete your Pet Parent Academy training materials, acknowledge each required material honestly, and prepare to earn your Certified Pet Parent badge.
+                Welcome, {firstName}. Complete three simple Pet Parent Academy steps: watch the intro video, review the guide, then acknowledge completion to earn your Certified Pet Parent badge.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <TrustBadge icon={<PawPrint size={15} />} label="Pet Parent" />
@@ -414,7 +414,7 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Academy Lessons</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">Complete each step in order</h2>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">Complete 3 simple steps</h2>
               <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-600">Open each material, review it fully, then check the acknowledgment box. A step can only be completed after every required material inside that step is acknowledged.</p>
             </div>
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-900">{number(universityData.totalMaterials)} materials loaded</div>

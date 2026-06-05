@@ -96,9 +96,9 @@ const academyOptions: {
     label: "Pet Parent Academy",
     shortLabel: "Pet Parent",
     emoji: "🐾",
-    detail: "Profile setup, pet profiles, Guru search, booking, reviews, and safety.",
+    detail: "Watch the intro video, review the Pet Parent guide, and acknowledge completion to earn the badge.",
     audience: "Pet Parents",
-    modules: "9 steps",
+    modules: "3 steps",
     certificate: "Certified Pet Parent",
   },
   {
@@ -106,9 +106,9 @@ const academyOptions: {
     label: "Guru Academy",
     shortLabel: "Guru",
     emoji: "🎓",
-    detail: "Guru profile, bookings, care standards, Stripe payouts, earnings, and success center.",
+    detail: "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion to earn the badge.",
     audience: "Gurus",
-    modules: "13 steps",
+    modules: "3 steps",
     certificate: "Certified Guru",
   },
   {
@@ -116,9 +116,9 @@ const academyOptions: {
     label: "Ambassador Academy",
     shortLabel: "Ambassador",
     emoji: "🌟",
-    detail: "Referral links, outreach, dashboard, PawPerks, Stripe, rewards, and compliance.",
+    detail: "Watch the Ambassador intro video, review the Ambassador Guide, and acknowledge completion to earn the badge.",
     audience: "Ambassadors",
-    modules: "14 steps",
+    modules: "3 steps",
     certificate: "Certified Ambassador",
   },
 ];
@@ -987,10 +987,7 @@ export default async function AdminAmbassadorTrainingPage({
               </div>
 
               <p className="mt-4 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                Manage Pet Parent Academy, Guru Academy, and Ambassador Academy
-                training materials from one place. Your existing step titles stay
-                in place, and each step can now hold multiple videos, slide decks,
-                PDFs, images, links, quizzes, certificates, or checklists.
+                Manage Pet Parent Academy, Guru Academy, and Ambassador Academy training materials from one place. Each academy now follows the same simple message: Learn SitGuru. Easy as 1, 2, 3. Watch the video, review the guide, acknowledge completion, and earn the certification badge.
               </p>
 
               <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-green-900">
@@ -1153,7 +1150,7 @@ export default async function AdminAmbassadorTrainingPage({
               <SectionHeader
                 icon={<Plus size={22} />}
                 title="Add Academy Step"
-                detail="Create a new step only when you need another step. To add videos, PDFs, slides, documents, or links to an existing step, use Add Material under that step."
+                detail="Create only the three core academy steps: Step 1 video, Step 2 guide, Step 3 acknowledgment and certification. Add videos, PDFs, slides, documents, or links under the matching step."
               />
             </div>
 
@@ -1177,7 +1174,7 @@ export default async function AdminAmbassadorTrainingPage({
                     ? `${selectedAcademy.label} Steps`
                     : "All Academy Steps"
                 }
-                detail="Keep the existing step titles and add multiple training materials under each step."
+                detail="Use the 3-step academy structure and add the matching training materials under each step."
               />
             </div>
 

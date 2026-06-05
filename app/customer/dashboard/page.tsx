@@ -437,7 +437,7 @@ const ZIP_FALLBACK_LOCATIONS: Record<string, ZipLookupLocation> = {
 
 
 const defaultUniversityProgress: UniversityProgress = {
-  totalSteps: 9,
+  totalSteps: 3,
   completedSteps: 0,
   totalMaterials: 0,
   acknowledgedMaterials: 0,
@@ -447,8 +447,8 @@ const defaultUniversityProgress: UniversityProgress = {
   isComplete: false,
   certificationLabel: "Certified Pet Parent: Not started",
   badgeStatus: "Locked",
-  progressHelper: "Start the academy to begin tracking",
-  universityTileHelper: "Start academy",
+  progressHelper: "Start with Step 1: watch the intro video",
+  universityTileHelper: "Start 1, 2, 3",
   academyButtonLabel: "Start Pet Parent Academy",
 };
 
@@ -3228,10 +3228,7 @@ export default function CustomerDashboardPage() {
                 </div>
 
                 <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-700 md:text-base">
-                  Complete your Pet Parent Academy, learn how to use SitGuru
-                  safely, and prepare to earn your Certified Pet Parent badge.
-                  This guided training will walk you through profiles, pets,
-                  messaging, booking, trust and safety, reviews, and next steps.
+                  Learn SitGuru. Easy as 1, 2, 3. Watch the intro video, review the Pet Parent guide, and acknowledge completion to earn your Certified Pet Parent badge.
                 </p>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -3267,10 +3264,10 @@ export default function CustomerDashboardPage() {
                       Estimated Time
                     </p>
                     <p className="mt-2 text-2xl font-black text-slate-950">
-                      9–15 min
+                      3–6 min
                     </p>
                     <p className="mt-1 text-xs font-bold text-slate-500">
-                      Mobile-friendly lessons
+                      Easy as 1, 2, 3
                     </p>
                   </div>
                 </div>
@@ -3307,11 +3304,9 @@ export default function CustomerDashboardPage() {
 
                 <div className="mt-4 grid gap-3">
                   {[
-                    "Create and complete your Pet Parent profile",
-                    "Add pets with helpful care notes and safety details",
-                    "Find, review, and message trusted local Gurus",
-                    "Book safely through SitGuru and leave reviews",
-                    "Understand trust, safety, support, and certification",
+                    "Step 1: Watch the SitGuru intro video",
+                    "Step 2: Review the Pet Parent guide",
+                    "Step 3: Acknowledge completion and earn your badge",
                   ].map((item) => (
                     <div
                       key={item}

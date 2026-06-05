@@ -7,259 +7,192 @@ export const dynamic = "force-dynamic";
 
 type AnyRow = Record<string, unknown>;
 
-type AcademyStepRow = {
-  id: string;
-  academy_type?: string | null;
-  step_number?: number | null;
-  title?: string | null;
-  is_active?: boolean | null;
+type UniversityProgress = {
+  totalSteps: number;
+  completedSteps: number;
+  totalMaterials: number;
+  acknowledgedMaterials: number;
+  requiredMaterials: number;
+  progressPercent: number;
+  isStarted: boolean;
+  isComplete: boolean;
+  certificationLabel: string;
+  badgeStatus: string;
+  progressHelper: string;
+  universityTileHelper: string;
+  academyButtonLabel: string;
 };
 
-type AcademyMaterialRow = {
-  id: string;
-  training_step_id?: string | null;
-  academy_type?: string | null;
-  is_required?: boolean | null;
-  is_active?: boolean | null;
+const defaultUniversityProgress: UniversityProgress = {
+  totalSteps: 3,
+  completedSteps: 0,
+  totalMaterials: 0,
+  acknowledgedMaterials: 0,
+  requiredMaterials: 0,
+  progressPercent: 0,
+  isStarted: false,
+  isComplete: false,
+  certificationLabel: "Certified Pet Parent: Not started",
+  badgeStatus: "Locked",
+  progressHelper: "Start with Step 1: watch the intro video",
+  universityTileHelper: "Start 1, 2, 3",
+  academyButtonLabel: "Start Pet Parent Academy",
 };
 
-type AcademyMaterialProgressRow = {
-  id?: string;
-  user_id?: string | null;
-  training_step_id?: string | null;
-  material_id?: string | null;
-  academy_type?: string | null;
-  acknowledged_at?: string | null;
-};
-
-type AcademyStepProgressRow = {
-  id?: string;
-  user_id?: string | null;
-  training_step_id?: string | null;
-  academy_type?: string | null;
-  status?: string | null;
-  acknowledged_at?: string | null;
-  completed_at?: string | null;
-};
-
-function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+function isRequired(row: AnyRow) {
+  return row.is_required !== false;
 }
 
-function isCompletedStep(row: AcademyStepProgressRow) {
-  const status = asString(row.status).toLowerCase();
-
-  return Boolean(
-    row.completed_at ||
-      status === "completed" ||
-      status === "complete" ||
-      status === "done",
+function isCompletedStep(row: AnyRow) {
+  return (
+    Boolean(row.completed_at) ||
+    String(row.status || "").toLowerCase() === "completed"
   );
 }
 
-function getAcademyStatus({
-  completedSteps,
-  totalSteps,
-}: {
-  completedSteps: number;
-  totalSteps: number;
-}) {
-  if (totalSteps > 0 && completedSteps >= totalSteps) {
-    return {
-      status: "completed",
-      label: "Certified Pet Parent: Completed",
-      badgeStatus: "Certified Pet Parent",
-      badgeLocked: false,
-      actionLabel: "Review Pet Parent Academy",
-    };
-  }
-
-  if (completedSteps > 0) {
-    return {
-      status: "in_progress",
-      label: "Certified Pet Parent: In progress",
-      badgeStatus: "Locked",
-      badgeLocked: true,
-      actionLabel: "Continue Pet Parent Academy",
-    };
-  }
-
-  return {
-    status: "not_started",
-    label: "Certified Pet Parent: Not started",
-    badgeStatus: "Locked",
-    badgeLocked: true,
-    actionLabel: "Start Pet Parent Academy",
-  };
-}
-
-async function safeSelect<T>({
-  table,
-  select,
-  filter,
-}: {
-  table: string;
-  select: string;
-  filter?: (query: any) => any;
-}) {
-  try {
-    const baseQuery = supabaseAdmin.from(table).select(select);
-    const query = filter ? filter(baseQuery) : baseQuery;
-    const { data, error } = await query;
-
-    if (error) {
-      console.warn(`University progress query skipped for ${table}:`, error);
-      return [] as T[];
-    }
-
-    return Array.isArray(data) ? (data as T[]) : [];
-  } catch (error) {
-    console.warn(`University progress query failed for ${table}:`, error);
-    return [] as T[];
-  }
-}
-
 export async function GET() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Not authenticated.",
+        progress: defaultUniversityProgress,
+      },
+      { status: 401 },
+    );
+  }
+
   try {
-    const supabase = await createClient();
+    const [
+      stepsResult,
+      materialsResult,
+      materialProgressResult,
+      stepProgressResult,
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("ambassador_training_steps")
+        .select("id, step_number")
+        .eq("academy_type", "pet_parent")
+        .eq("is_active", true)
+        .lte("step_number", 3),
+      supabaseAdmin
+        .from("academy_step_materials")
+        .select("id, training_step_id, is_required")
+        .eq("academy_type", "pet_parent")
+        .eq("is_active", true),
+      supabaseAdmin
+        .from("academy_material_progress")
+        .select("material_id, acknowledged_at")
+        .eq("academy_type", "pet_parent")
+        .eq("user_id", user.id)
+        .not("acknowledged_at", "is", null),
+      supabaseAdmin
+        .from("academy_step_progress")
+        .select("training_step_id, status, completed_at")
+        .eq("academy_type", "pet_parent")
+        .eq("user_id", user.id),
+    ]);
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    if (stepsResult.error) throw stepsResult.error;
+    if (materialsResult.error) throw materialsResult.error;
+    if (materialProgressResult.error) throw materialProgressResult.error;
+    if (stepProgressResult.error) throw stepProgressResult.error;
 
-    if (userError || !user) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Not authenticated.",
-        },
-        { status: 401 },
-      );
-    }
+    const steps = Array.isArray(stepsResult.data)
+      ? (stepsResult.data as AnyRow[])
+      : [];
 
-    const academyType = "pet_parent";
+    const materials = Array.isArray(materialsResult.data)
+      ? (materialsResult.data as AnyRow[])
+      : [];
 
-    const [steps, materials, materialProgress, stepProgress] =
-      await Promise.all([
-        safeSelect<AcademyStepRow>({
-          table: "ambassador_training_steps",
-          select: "id, academy_type, step_number, title, is_active",
-          filter: (query) =>
-            query
-              .eq("academy_type", academyType)
-              .eq("is_active", true)
-              .order("step_number", { ascending: true }),
-        }),
+    const materialProgress = Array.isArray(materialProgressResult.data)
+      ? (materialProgressResult.data as AnyRow[])
+      : [];
 
-        safeSelect<AcademyMaterialRow>({
-          table: "academy_step_materials",
-          select:
-            "id, training_step_id, academy_type, is_required, is_active",
-          filter: (query) =>
-            query
-              .eq("academy_type", academyType)
-              .eq("is_active", true)
-              .order("sort_order", { ascending: true }),
-        }),
+    const stepProgress = Array.isArray(stepProgressResult.data)
+      ? (stepProgressResult.data as AnyRow[])
+      : [];
 
-        safeSelect<AcademyMaterialProgressRow>({
-          table: "academy_material_progress",
-          select:
-            "id, user_id, training_step_id, material_id, academy_type, acknowledged_at",
-          filter: (query) =>
-            query
-              .eq("academy_type", academyType)
-              .eq("user_id", user.id),
-        }),
-
-        safeSelect<AcademyStepProgressRow>({
-          table: "academy_step_progress",
-          select:
-            "id, user_id, training_step_id, academy_type, status, acknowledged_at, completed_at",
-          filter: (query) =>
-            query
-              .eq("academy_type", academyType)
-              .eq("user_id", user.id),
-        }),
-      ]);
-
-    const activeSteps = steps.filter((step) => step.is_active !== false);
-    const activeMaterials = materials.filter(
-      (material) => material.is_active !== false,
+    const activeStepIds = new Set(
+      steps.map((step) => String(step.id)).filter(Boolean),
     );
 
-    const requiredMaterials = activeMaterials.filter(
-      (material) => material.is_required !== false,
+    const visibleMaterials = materials.filter((material) =>
+      activeStepIds.has(String(material.training_step_id || "")),
     );
 
-    const acknowledgedMaterialIds = new Set(
-      materialProgress
-        .filter((progress) => Boolean(progress.acknowledged_at))
-        .map((progress) => asString(progress.material_id))
-        .filter(Boolean),
+    const visibleMaterialIds = new Set(
+      visibleMaterials.map((material) => String(material.id)).filter(Boolean),
     );
 
-    const acknowledgedRequiredMaterials = requiredMaterials.filter((material) =>
-      acknowledgedMaterialIds.has(material.id),
-    );
+    const totalSteps = steps.length || 3;
+    const totalMaterials = visibleMaterials.length;
+    const requiredMaterials = visibleMaterials.filter(isRequired).length;
 
-    const completedStepIds = new Set(
-      stepProgress
-        .filter(isCompletedStep)
-        .map((progress) => asString(progress.training_step_id))
-        .filter(Boolean),
-    );
+    const acknowledgedMaterials = materialProgress.filter(
+      (row) =>
+        Boolean(row.acknowledged_at) &&
+        visibleMaterialIds.has(String(row.material_id || "")),
+    ).length;
 
-    const completedSteps = activeSteps.filter((step) =>
-      completedStepIds.has(step.id),
-    );
-
-    const totalSteps = activeSteps.length || 9;
-    const completedStepCount = completedSteps.length;
-    const totalMaterials = activeMaterials.length;
-    const requiredMaterialCount = requiredMaterials.length;
-    const acknowledgedRequiredMaterialCount =
-      acknowledgedRequiredMaterials.length;
+    const completedSteps = stepProgress.filter(isCompletedStep).length;
 
     const progressPercent =
-      totalSteps > 0
-        ? Math.round((completedStepCount / totalSteps) * 100)
-        : 0;
+      totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
-    const materialPercent =
-      requiredMaterialCount > 0
-        ? Math.round(
-            (acknowledgedRequiredMaterialCount / requiredMaterialCount) * 100,
-          )
-        : 0;
+    const isComplete = totalSteps > 0 && completedSteps >= totalSteps;
+    const isStarted = completedSteps > 0 || acknowledgedMaterials > 0;
 
-    const academyStatus = getAcademyStatus({
-      completedSteps: completedStepCount,
+    const progress: UniversityProgress = {
       totalSteps,
-    });
+      completedSteps,
+      totalMaterials,
+      acknowledgedMaterials,
+      requiredMaterials,
+      progressPercent,
+      isStarted,
+      isComplete,
+      certificationLabel: isComplete
+        ? "Certified Pet Parent: Completed"
+        : isStarted
+          ? "Certified Pet Parent: In progress"
+          : "Certified Pet Parent: Not started",
+      badgeStatus: isComplete
+        ? "Certified Pet Parent"
+        : isStarted
+          ? "In progress"
+          : "Locked",
+      progressHelper: isComplete
+        ? "Certified Pet Parent complete"
+        : isStarted
+          ? `${acknowledgedMaterials} of ${
+              requiredMaterials || totalMaterials
+            } materials acknowledged`
+          : "Start with Step 1: watch the intro video",
+      universityTileHelper: isComplete
+        ? "View certificate"
+        : isStarted
+          ? "Continue academy"
+          : "Start 1, 2, 3",
+      academyButtonLabel: isComplete
+        ? "Review Pet Parent Academy"
+        : isStarted
+          ? "Continue Pet Parent Academy"
+          : "Start Pet Parent Academy",
+    };
 
     return NextResponse.json(
       {
         ok: true,
-        academyType,
-        userId: user.id,
-        totalSteps,
-        completedSteps: completedStepCount,
-        progressPercent,
-        totalMaterials,
-        requiredMaterials: requiredMaterialCount,
-        acknowledgedRequiredMaterials: acknowledgedRequiredMaterialCount,
-        materialPercent,
-        status: academyStatus.status,
-        certificationLabel: academyStatus.label,
-        badgeStatus: academyStatus.badgeStatus,
-        badgeLocked: academyStatus.badgeLocked,
-        actionLabel: academyStatus.actionLabel,
-        helperText:
-          completedStepCount > 0
-            ? `${completedStepCount} of ${totalSteps} academy steps complete`
-            : "Start the academy to begin tracking",
+        progress,
       },
       {
         headers: {
@@ -268,15 +201,13 @@ export async function GET() {
       },
     );
   } catch (error) {
-    console.error("Customer university progress API error:", error);
+    console.warn("Unable to load Pet Parent Academy dashboard progress:", error);
 
     return NextResponse.json(
       {
         ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to load university progress.",
+        error: "Unable to load Pet Parent Academy progress.",
+        progress: defaultUniversityProgress,
       },
       { status: 500 },
     );
