@@ -108,20 +108,41 @@ function formatDate(value?: string | null) {
   });
 }
 
-function getDisplayName(profile: AnyRow | null, email: string) {
-  const firstName = asString(profile?.first_name);
-  const lastName = asString(profile?.last_name);
+function getDisplayName(
+  profile: AnyRow | null,
+  _email: string,
+  userMetadata?: AnyRow | null,
+) {
+  const firstName =
+    asString(profile?.first_name) || asString(userMetadata?.first_name);
+  const lastName =
+    asString(profile?.last_name) || asString(userMetadata?.last_name);
   const combined = [firstName, lastName].filter(Boolean).join(" ").trim();
 
-  return (
-    combined ||
+  const profileName =
     asString(profile?.full_name) ||
     asString(profile?.display_name) ||
-    email ||
-    "Pet Parent"
-  );
+    asString(profile?.name) ||
+    asString(profile?.customer_name) ||
+    asString(profile?.pet_parent_name);
+
+  const metadataName =
+    asString(userMetadata?.full_name) ||
+    asString(userMetadata?.name) ||
+    asString(userMetadata?.display_name);
+
+  return combined || profileName || metadataName || "Pet Parent";
 }
 
+function getFirstNameOnly(value: string) {
+  const cleanValue = value.trim();
+
+  if (!cleanValue || cleanValue.includes("@")) return "Pet Parent";
+
+  const firstName = cleanValue.split(/\s+/)[0]?.trim();
+
+  return firstName || "Pet Parent";
+}
 
 function getAvatarUrl(profile: AnyRow | null, userMetadata?: AnyRow | null) {
   return (
@@ -217,7 +238,10 @@ function isCompletedStep(row: AnyRow) {
   const status = asString(row.status).toLowerCase();
 
   return Boolean(
-    row.completed_at || status === "completed" || status === "complete" || status === "done",
+    row.completed_at ||
+    status === "completed" ||
+    status === "complete" ||
+    status === "done",
   );
 }
 
@@ -277,12 +301,28 @@ async function getSignedMaterialUrls(material: TrainingMaterial) {
   }
 }
 
-async function getProfile(userId: string) {
+async function getProfile(userId: string, email: string) {
   try {
     const { data, error } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("id", userId)
+      .maybeSingle();
+
+    if (!error && data) return data as AnyRow;
+  } catch {
+    // Continue to email fallback below.
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (!cleanEmail || !cleanEmail.includes("@")) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .ilike("email", cleanEmail)
       .maybeSingle();
 
     if (error) return null;
@@ -293,42 +333,54 @@ async function getProfile(userId: string) {
   }
 }
 
-async function getPetParentAcademyData(userId: string, email: string, userMetadata?: AnyRow | null): Promise<PageData> {
-  const [profile, stepsResult, materialsResult, materialProgressResult, stepProgressResult] =
-    await Promise.all([
-      getProfile(userId),
-      supabaseAdmin
-        .from("ambassador_training_steps")
-        .select("*")
-        .eq("academy_type", academyType)
-        .eq("is_active", true)
-        .order("step_number", { ascending: true }),
-      supabaseAdmin
-        .from("academy_step_materials")
-        .select("*")
-        .eq("academy_type", academyType)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true }),
-      supabaseAdmin
-        .from("academy_material_progress")
-        .select("material_id, acknowledged_at")
-        .eq("academy_type", academyType)
-        .eq("user_id", userId)
-        .not("acknowledged_at", "is", null),
-      supabaseAdmin
-        .from("academy_step_progress")
-        .select("training_step_id, status, completed_at")
-        .eq("academy_type", academyType)
-        .eq("user_id", userId),
-    ]);
+async function getPetParentAcademyData(
+  userId: string,
+  email: string,
+  userMetadata?: AnyRow | null,
+): Promise<PageData> {
+  const [
+    profile,
+    stepsResult,
+    materialsResult,
+    materialProgressResult,
+    stepProgressResult,
+  ] = await Promise.all([
+    getProfile(userId, email),
+    supabaseAdmin
+      .from("ambassador_training_steps")
+      .select("*")
+      .eq("academy_type", academyType)
+      .eq("is_active", true)
+      .order("step_number", { ascending: true }),
+    supabaseAdmin
+      .from("academy_step_materials")
+      .select("*")
+      .eq("academy_type", academyType)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabaseAdmin
+      .from("academy_material_progress")
+      .select("material_id, acknowledged_at")
+      .eq("academy_type", academyType)
+      .eq("user_id", userId)
+      .not("acknowledged_at", "is", null),
+    supabaseAdmin
+      .from("academy_step_progress")
+      .select("training_step_id, status, completed_at")
+      .eq("academy_type", academyType)
+      .eq("user_id", userId),
+  ]);
 
   if (stepsResult.error) {
     console.warn("Unable to load Pet Parent Academy step:", stepsResult.error);
   }
 
   if (materialsResult.error) {
-    console.warn("Unable to load Pet Parent Academy materials:", materialsResult.error);
+    console.warn(
+      "Unable to load Pet Parent Academy materials:",
+      materialsResult.error,
+    );
   }
 
   const activeSteps = ((stepsResult.data || []) as TrainingStep[]).filter(
@@ -353,7 +405,10 @@ async function getPetParentAcademyData(userId: string, email: string, userMetada
   );
 
   const videoBase = allMaterials.find(isVideoMaterial) || null;
-  const guideBase = allMaterials.find((material) => !isVideoMaterial(material) && isGuideMaterial(material)) || null;
+  const guideBase =
+    allMaterials.find(
+      (material) => !isVideoMaterial(material) && isGuideMaterial(material),
+    ) || null;
 
   const videoUrls = videoBase ? await getSignedMaterialUrls(videoBase) : null;
   const guideUrls = guideBase ? await getSignedMaterialUrls(guideBase) : null;
@@ -376,11 +431,16 @@ async function getPetParentAcademyData(userId: string, email: string, userMetada
       }
     : null;
 
-  const stepProgress = ((stepProgressResult.data || []) as AnyRow[]).find((row) =>
-    orientationStep ? asString(row.training_step_id) === orientationStep.id : false,
+  const stepProgress = ((stepProgressResult.data || []) as AnyRow[]).find(
+    (row) =>
+      orientationStep
+        ? asString(row.training_step_id) === orientationStep.id
+        : false,
   );
 
-  const orientationCompleted = Boolean(stepProgress && isCompletedStep(stepProgress));
+  const orientationCompleted = Boolean(
+    stepProgress && isCompletedStep(stepProgress),
+  );
   const completedAt = asString(stepProgress?.completed_at) || null;
 
   const actionCount = 3;
@@ -392,7 +452,7 @@ async function getPetParentAcademyData(userId: string, email: string, userMetada
   return {
     userId,
     email,
-    displayName: getDisplayName(profile, email),
+    displayName: getDisplayName(profile, email, userMetadata),
     avatarUrl: getAvatarUrl(profile, userMetadata),
     orientationStep,
     videoMaterial,
@@ -432,17 +492,19 @@ async function acknowledgeAcademyMaterial(formData: FormData) {
 
   const now = new Date().toISOString();
 
-  const { error } = await supabaseAdmin.from("academy_material_progress").upsert(
-    {
-      user_id: user.id,
-      training_step_id: trainingStepId,
-      material_id: materialId,
-      academy_type: academyType,
-      acknowledged_at: now,
-      updated_at: now,
-    },
-    { onConflict: "user_id,material_id" },
-  );
+  const { error } = await supabaseAdmin
+    .from("academy_material_progress")
+    .upsert(
+      {
+        user_id: user.id,
+        training_step_id: trainingStepId,
+        material_id: materialId,
+        academy_type: academyType,
+        acknowledged_at: now,
+        updated_at: now,
+      },
+      { onConflict: "user_id,material_id" },
+    );
 
   if (error) {
     console.warn("Unable to acknowledge Pet Parent Academy material:", error);
@@ -469,7 +531,9 @@ async function completeCertifiedPetParentOrientation(formData: FormData) {
   const [{ data: materialRows }, { data: progressRows }] = await Promise.all([
     supabaseAdmin
       .from("academy_step_materials")
-      .select("id, training_step_id, content_type, title, storage_path, video_url, external_url, is_active")
+      .select(
+        "id, training_step_id, content_type, title, storage_path, video_url, external_url, is_active",
+      )
       .eq("academy_type", academyType)
       .eq("training_step_id", trainingStepId)
       .eq("is_active", true),
@@ -481,17 +545,26 @@ async function completeCertifiedPetParentOrientation(formData: FormData) {
       .not("acknowledged_at", "is", null),
   ]);
 
-  const activeMaterials = ((materialRows || []) as TrainingMaterial[]).sort(sortMaterials);
+  const activeMaterials = ((materialRows || []) as TrainingMaterial[]).sort(
+    sortMaterials,
+  );
   const videoMaterial = activeMaterials.find(isVideoMaterial) || null;
-  const guideMaterial = activeMaterials.find((material) => !isVideoMaterial(material) && isGuideMaterial(material)) || null;
+  const guideMaterial =
+    activeMaterials.find(
+      (material) => !isVideoMaterial(material) && isGuideMaterial(material),
+    ) || null;
   const acknowledgedIds = new Set(
     ((progressRows || []) as AnyRow[])
       .map((row) => asString(row.material_id))
       .filter(Boolean),
   );
 
-  const missingVideoAck = Boolean(videoMaterial && !acknowledgedIds.has(videoMaterial.id));
-  const missingGuideAck = Boolean(guideMaterial && !acknowledgedIds.has(guideMaterial.id));
+  const missingVideoAck = Boolean(
+    videoMaterial && !acknowledgedIds.has(videoMaterial.id),
+  );
+  const missingGuideAck = Boolean(
+    guideMaterial && !acknowledgedIds.has(guideMaterial.id),
+  );
 
   if (!videoMaterial || !guideMaterial || missingVideoAck || missingGuideAck) {
     redirect(`${customerRoutes.university}?error=materials_required`);
@@ -522,7 +595,9 @@ async function completeCertifiedPetParentOrientation(formData: FormData) {
   redirect(`${customerRoutes.university}?saved=certified`);
 }
 
-function getNotice(searchParams?: Record<string, string | string[] | undefined>) {
+function getNotice(
+  searchParams?: Record<string, string | string[] | undefined>,
+) {
   const saved = asString(searchParams?.saved);
   const error = asString(searchParams?.error);
 
@@ -530,7 +605,8 @@ function getNotice(searchParams?: Record<string, string | string[] | undefined>)
     return {
       tone: "success" as const,
       title: "Acknowledgment saved",
-      message: "Your training acknowledgment was saved. Continue to the next item when ready.",
+      message:
+        "Your training acknowledgment was saved. Continue to the next item when ready.",
     };
   }
 
@@ -538,7 +614,8 @@ function getNotice(searchParams?: Record<string, string | string[] | undefined>)
     return {
       tone: "success" as const,
       title: "Certified Pet Parent orientation complete",
-      message: "Your Certified Pet Parent badge is now ready to display across SitGuru.",
+      message:
+        "Your Certified Pet Parent badge is now ready to display across SitGuru.",
     };
   }
 
@@ -546,7 +623,8 @@ function getNotice(searchParams?: Record<string, string | string[] | undefined>)
     return {
       tone: "error" as const,
       title: "Training still needs review",
-      message: "Please acknowledge the intro video and Pet Parent guide before completing certification.",
+      message:
+        "Please acknowledge the intro video and Pet Parent guide before completing certification.",
     };
   }
 
@@ -554,7 +632,8 @@ function getNotice(searchParams?: Record<string, string | string[] | undefined>)
     return {
       tone: "error" as const,
       title: "Unable to save training progress",
-      message: "Please confirm the training material is available and try again.",
+      message:
+        "Please confirm the training material is available and try again.",
     };
   }
 
@@ -565,7 +644,9 @@ type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function CustomerUniversityPage({ searchParams }: PageProps) {
+export default async function CustomerUniversityPage({
+  searchParams,
+}: PageProps) {
   const user = await requireCustomerUser();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const notice = getNotice(resolvedSearchParams);
@@ -575,12 +656,12 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
     asString(user.email),
     (user.user_metadata || null) as AnyRow | null,
   );
-  const firstName = data.displayName.split(" ")[0] || "Pet Parent";
+  const firstName = getFirstNameOnly(data.displayName);
   const canComplete = Boolean(
     data.orientationStep &&
-      data.videoMaterial?.acknowledged &&
-      data.guideMaterial?.acknowledged &&
-      !data.orientationCompleted,
+    data.videoMaterial?.acknowledged &&
+    data.guideMaterial?.acknowledged &&
+    !data.orientationCompleted,
   );
 
   return (
@@ -605,7 +686,9 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
                   Learn SitGuru. Easy as 1, 2, 3.
                 </h1>
                 <p className="mt-4 max-w-3xl text-base font-semibold leading-7 text-slate-900/75 sm:text-lg">
-                  Hi {firstName}, complete your Certified Pet Parent orientation by watching the intro video, reviewing the Pet Parent guide, and acknowledging completion to earn your badge.
+                  Hi {firstName}, complete your Certified Pet Parent orientation
+                  by watching the intro video, reviewing the Pet Parent guide,
+                  and acknowledging completion to earn your badge.
                 </p>
               </div>
 
@@ -615,7 +698,7 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={data.avatarUrl}
-                      alt={`${data.displayName} profile photo`}
+                      alt={`${firstName} profile photo`}
                       className="h-full w-full object-cover object-center"
                     />
                   ) : (
@@ -623,10 +706,12 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
                   )}
                 </div>
                 <p className="mt-3 text-sm font-black text-slate-950">
-                  {data.displayName}
+                  {firstName}
                 </p>
                 <p className="mt-1 text-xs font-black text-emerald-800">
-                  {data.orientationCompleted ? "Certified Pet Parent" : "Badge locked"}
+                  {data.orientationCompleted
+                    ? "Certified Pet Parent"
+                    : "Badge locked"}
                 </p>
               </div>
             </div>
@@ -648,8 +733,18 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
             <ProgressStat
               label="Badge"
               value={data.orientationCompleted ? "Issued" : "Locked"}
-              detail={data.orientationCompleted ? "Certified Pet Parent" : "Complete all 3 actions"}
-              icon={data.orientationCompleted ? <BadgeCheck size={20} /> : <LockKeyhole size={20} />}
+              detail={
+                data.orientationCompleted
+                  ? "Certified Pet Parent"
+                  : "Complete all 3 actions"
+              }
+              icon={
+                data.orientationCompleted ? (
+                  <BadgeCheck size={20} />
+                ) : (
+                  <LockKeyhole size={20} />
+                )
+              }
             />
           </div>
         </section>
@@ -678,7 +773,9 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
                   Watch. Review. Acknowledge.
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-                  This page intentionally shows only three simple actions. Upload one intro video and one Pet Parent guide in Admin. Step 3 issues the certification after both are acknowledged.
+                  This page intentionally shows only three simple actions.
+                  Upload one intro video and one Pet Parent guide in Admin. Step
+                  3 issues the certification after both are acknowledged.
                 </p>
               </div>
 
@@ -696,7 +793,9 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
 
           {!data.orientationStep ? (
             <div className="rounded-[28px] border border-dashed border-amber-200 bg-amber-50 p-6 text-center text-sm font-bold leading-6 text-amber-900">
-              Pet Parent Academy is not active yet. In Admin Training Manager, create one active Pet Parent step named Certified Pet Parent Orientation.
+              Pet Parent Academy is not active yet. In Admin Training Manager,
+              create one active Pet Parent step named Certified Pet Parent
+              Orientation.
             </div>
           ) : (
             <div className="grid gap-4">
@@ -851,11 +950,20 @@ function ActionCard({
                   Acknowledgment complete.
                 </div>
               ) : (
-                <form action={action} className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                <form
+                  action={action}
+                  className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3"
+                >
                   <input type="hidden" name="material_id" value={material.id} />
-                  <input type="hidden" name="training_step_id" value={orientationStepId} />
+                  <input
+                    type="hidden"
+                    name="training_step_id"
+                    value={orientationStepId}
+                  />
                   <p className="text-sm font-bold leading-6 text-amber-950">
-                    I acknowledge that I have honestly and accurately reviewed this training material, understand the information provided, and completed this portion of SitGuru University training.
+                    I acknowledge that I have honestly and accurately reviewed
+                    this training material, understand the information provided,
+                    and completed this portion of SitGuru University training.
                   </p>
                   <button
                     type="submit"
@@ -904,7 +1012,11 @@ function CertificationCard({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div
           className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white ${
-            completed ? "bg-emerald-700" : canComplete ? "bg-red-700" : "bg-slate-900"
+            completed
+              ? "bg-emerald-700"
+              : canComplete
+                ? "bg-red-700"
+                : "bg-slate-900"
           }`}
         >
           {completed ? <BadgeCheck size={25} /> : <ShieldCheck size={25} />}
@@ -924,7 +1036,11 @@ function CertificationCard({
                     : "bg-slate-200 text-slate-700"
               }`}
             >
-              {completed ? "Certified" : canComplete ? "Ready to complete" : "Locked"}
+              {completed
+                ? "Certified"
+                : canComplete
+                  ? "Ready to complete"
+                  : "Locked"}
             </span>
           </div>
 
@@ -932,7 +1048,8 @@ function CertificationCard({
             Acknowledge & Get Certified
           </h3>
           <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-            After reviewing the intro video and Pet Parent guide, complete the final acknowledgment to receive your Certified Pet Parent badge.
+            After reviewing the intro video and Pet Parent guide, complete the
+            final acknowledgment to receive your Certified Pet Parent badge.
           </p>
 
           {completed ? (
@@ -941,12 +1058,20 @@ function CertificationCard({
                 Certified Pet Parent badge issued
               </p>
               <p className="mt-1 text-sm font-bold text-slate-600">
-                Completed on {formatDate(completedAt)}. Your badge can now appear on your SitGuru profile.
+                Completed on {formatDate(completedAt)}. Your badge can now
+                appear on your SitGuru profile.
               </p>
             </div>
           ) : canComplete ? (
-            <form action={action} className="mt-4 rounded-2xl border border-red-200 bg-white p-4">
-              <input type="hidden" name="training_step_id" value={orientationStepId} />
+            <form
+              action={action}
+              className="mt-4 rounded-2xl border border-red-200 bg-white p-4"
+            >
+              <input
+                type="hidden"
+                name="training_step_id"
+                value={orientationStepId}
+              />
               <label className="flex cursor-pointer items-start gap-3 text-sm font-bold leading-6 text-slate-800">
                 <input
                   name="final_acknowledgment"
@@ -955,7 +1080,10 @@ function CertificationCard({
                   className="mt-1 h-5 w-5 shrink-0 accent-red-700"
                 />
                 <span>
-                  I certify that I honestly and accurately completed the Pet Parent Academy orientation, reviewed the required training materials, understand SitGuru’s trust and safety expectations, and agree to use the platform responsibly.
+                  I certify that I honestly and accurately completed the Pet
+                  Parent Academy orientation, reviewed the required training
+                  materials, understand SitGuru’s trust and safety expectations,
+                  and agree to use the platform responsibly.
                 </span>
               </label>
               <button
