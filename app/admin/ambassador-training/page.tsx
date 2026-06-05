@@ -96,7 +96,8 @@ const academyOptions: {
     label: "Pet Parent Academy",
     shortLabel: "Pet Parent",
     emoji: "🐾",
-    detail: "Watch the intro video, review the Pet Parent guide, and acknowledge completion to earn the badge.",
+    detail:
+      "Watch the intro video, review the Pet Parent guide, and acknowledge completion to earn the badge.",
     audience: "Pet Parents",
     modules: "3 steps",
     certificate: "Certified Pet Parent",
@@ -106,7 +107,8 @@ const academyOptions: {
     label: "Guru Academy",
     shortLabel: "Guru",
     emoji: "🎓",
-    detail: "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion to earn the badge.",
+    detail:
+      "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion to earn the badge.",
     audience: "Gurus",
     modules: "3 steps",
     certificate: "Certified Guru",
@@ -116,7 +118,8 @@ const academyOptions: {
     label: "Ambassador Academy",
     shortLabel: "Ambassador",
     emoji: "🌟",
-    detail: "Watch the Ambassador intro video, review the Ambassador Guide, and acknowledge completion to earn the badge.",
+    detail:
+      "Watch the Ambassador intro video, review the Ambassador Guide, and acknowledge completion to earn the badge.",
     audience: "Ambassadors",
     modules: "3 steps",
     certificate: "Certified Ambassador",
@@ -188,14 +191,84 @@ function normalizeAcademyType(value?: string | null): AcademyType {
 
 function getAcademyOption(value?: string | null) {
   const academyType = normalizeAcademyType(value);
-  return academyOptions.find((academy) => academy.value === academyType) || academyOptions[2];
+  return (
+    academyOptions.find((academy) => academy.value === academyType) ||
+    academyOptions[2]
+  );
+}
+
+function getOrientationTitle(academyType: AcademyType) {
+  if (academyType === "pet_parent") return "Certified Pet Parent Orientation";
+  if (academyType === "guru") return "Certified Guru Orientation";
+
+  return "Certified Ambassador Orientation";
+}
+
+function getOrientationDescription(academyType: AcademyType) {
+  if (academyType === "pet_parent") {
+    return "Learn the basics of SitGuru, how to set up your profile, and how to safely connect with trusted local Gurus. Review the video and guide, then acknowledge completion to earn your Certified Pet Parent badge.";
+  }
+
+  if (academyType === "guru") {
+    return "Learn how SitGuru works for Gurus, how to complete your profile, serve Pet Parents safely, manage bookings, and acknowledge completion to earn your Certified Guru badge.";
+  }
+
+  return "Learn how to represent SitGuru, use approved outreach, understand referrals and PawPerks, and acknowledge completion to earn your Certified Ambassador badge.";
+}
+
+function getCoreOrientationStep(steps: TrainingStep[]) {
+  const activeStepOne = steps.find(
+    (step) => asNumber(step.step_number) === 1 && step.is_active !== false,
+  );
+
+  if (activeStepOne) return activeStepOne;
+
+  const stepOne = steps.find((step) => asNumber(step.step_number) === 1);
+
+  if (stepOne) return stepOne;
+
+  return steps[0] || null;
+}
+
+function getOrientationMaterialPlan(academyType?: string | null) {
+  const academy = getAcademyOption(academyType);
+
+  return [
+    {
+      label: "Step 1",
+      title: "Watch the Intro Video",
+      detail: `Upload the ${academy.shortLabel} intro video.`,
+      type: "Video",
+    },
+    {
+      label: "Step 2",
+      title:
+        academy.value === "pet_parent"
+          ? "Review the Pet Parent Guide"
+          : academy.value === "guru"
+            ? "Review the Guru Success Guide"
+            : "Review the Ambassador Guide",
+      detail: "Upload the PowerPoint, PDF, or guide file.",
+      type: "PowerPoint / PDF",
+    },
+    {
+      label: "Step 3",
+      title: "Acknowledge & Get Certified",
+      detail: `Final acknowledgment and ${academy.certificate} badge issuance.`,
+      type: "Certification",
+    },
+  ];
 }
 
 function getAcademyFilter(value?: string | string[]) {
   const rawValue = Array.isArray(value) ? value[0] : value;
   const normalized = asString(rawValue).toLowerCase();
 
-  if (normalized === "pet_parent" || normalized === "guru" || normalized === "ambassador") {
+  if (
+    normalized === "pet_parent" ||
+    normalized === "guru" ||
+    normalized === "ambassador"
+  ) {
     return normalized as AcademyType;
   }
 
@@ -277,7 +350,6 @@ function getMaterialLocationLabel(material: TrainingMaterial) {
   return "No file/link added";
 }
 
-
 async function removeTrainingMaterialStorageFile(
   storageBucket?: string | null,
   storagePath?: string | null,
@@ -291,10 +363,7 @@ async function removeTrainingMaterialStorageFile(
     const { error } = await supabaseAdmin.storage.from(bucket).remove([path]);
 
     if (error) {
-      console.warn(
-        "Unable to remove SitGuru University material file:",
-        error,
-      );
+      console.warn("Unable to remove SitGuru University material file:", error);
     }
   } catch (error) {
     console.warn("Unable to remove SitGuru University material file:", error);
@@ -367,7 +436,8 @@ function getNotice(
     return {
       tone: "success" as const,
       title: "Training material added",
-      message: "The additional training material was added to the academy step.",
+      message:
+        "The additional training material was added to the academy step.",
     };
   }
 
@@ -427,7 +497,8 @@ function getNotice(
     return {
       tone: "error" as const,
       title: "Access denied",
-      message: "Only SitGuru Super Admins can update SitGuru University training steps.",
+      message:
+        "Only SitGuru Super Admins can update SitGuru University training steps.",
     };
   }
 
@@ -435,7 +506,8 @@ function getNotice(
     return {
       tone: "error" as const,
       title: "Academy type missing",
-      message: "Please select Pet Parent Academy, Guru Academy, or Ambassador Academy.",
+      message:
+        "Please select Pet Parent Academy, Guru Academy, or Ambassador Academy.",
     };
   }
 
@@ -465,7 +537,9 @@ async function createTrainingStep(formData: FormData) {
 
   await requireSuperAdmin();
 
-  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
+  const academyType = normalizeAcademyType(
+    asString(formData.get("academy_type")),
+  );
   const stepNumber = asNumber(formData.get("step_number"));
   const title = asString(formData.get("title"));
   const description = asString(formData.get("description"));
@@ -515,7 +589,9 @@ async function createTrainingStep(formData: FormData) {
   }
 
   revalidateUniversityPaths();
-  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&created=success`);
+  redirect(
+    `${adminRoutes.ambassadorTraining}?academy=${academyType}&created=success`,
+  );
 }
 
 async function updateTrainingStep(formData: FormData) {
@@ -524,7 +600,9 @@ async function updateTrainingStep(formData: FormData) {
   await requireSuperAdmin();
 
   const stepId = asString(formData.get("step_id"));
-  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
+  const academyType = normalizeAcademyType(
+    asString(formData.get("academy_type")),
+  );
   const stepNumber = asNumber(formData.get("step_number"));
   const title = asString(formData.get("title"));
   const description = asString(formData.get("description"));
@@ -572,7 +650,9 @@ async function updateTrainingStep(formData: FormData) {
   }
 
   revalidateUniversityPaths();
-  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&updated=success`);
+  redirect(
+    `${adminRoutes.ambassadorTraining}?academy=${academyType}&updated=success`,
+  );
 }
 
 async function toggleTrainingStepStatus(formData: FormData) {
@@ -581,7 +661,9 @@ async function toggleTrainingStepStatus(formData: FormData) {
   await requireSuperAdmin();
 
   const stepId = asString(formData.get("step_id"));
-  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
+  const academyType = normalizeAcademyType(
+    asString(formData.get("academy_type")),
+  );
   const nextActive = asString(formData.get("next_active")) === "true";
 
   if (!stepId) {
@@ -602,7 +684,9 @@ async function toggleTrainingStepStatus(formData: FormData) {
   }
 
   revalidateUniversityPaths();
-  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&toggled=success`);
+  redirect(
+    `${adminRoutes.ambassadorTraining}?academy=${academyType}&toggled=success`,
+  );
 }
 
 async function createTrainingMaterial(formData: FormData) {
@@ -611,7 +695,9 @@ async function createTrainingMaterial(formData: FormData) {
   await requireSuperAdmin();
 
   const trainingStepId = asString(formData.get("training_step_id"));
-  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
+  const academyType = normalizeAcademyType(
+    asString(formData.get("academy_type")),
+  );
   const title = asString(formData.get("title"));
   const description = asString(formData.get("description"));
   const contentType = asString(formData.get("content_type")) || "document";
@@ -624,7 +710,9 @@ async function createTrainingMaterial(formData: FormData) {
   const isActive = asBoolean(formData.get("is_active"));
 
   if (!trainingStepId || !title || !academyType) {
-    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`);
+    redirect(
+      `${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`,
+    );
   }
 
   const now = new Date().toISOString();
@@ -647,8 +735,13 @@ async function createTrainingMaterial(formData: FormData) {
   });
 
   if (error) {
-    console.warn("Unable to create SitGuru University training material:", error);
-    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=materials`);
+    console.warn(
+      "Unable to create SitGuru University training material:",
+      error,
+    );
+    redirect(
+      `${adminRoutes.ambassadorTraining}?academy=${academyType}&error=materials`,
+    );
   }
 
   revalidateUniversityPaths();
@@ -666,7 +759,9 @@ async function updateTrainingMaterial(formData: FormData) {
 
   const materialId = asString(formData.get("material_id"));
   const trainingStepId = asString(formData.get("training_step_id"));
-  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
+  const academyType = normalizeAcademyType(
+    asString(formData.get("academy_type")),
+  );
   const title = asString(formData.get("title"));
   const description = asString(formData.get("description"));
   const contentType = asString(formData.get("content_type")) || "document";
@@ -680,7 +775,9 @@ async function updateTrainingMaterial(formData: FormData) {
   let storagePath = asString(formData.get("storage_path"));
 
   if (!materialId || !trainingStepId || !title || !academyType) {
-    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`);
+    redirect(
+      `${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`,
+    );
   }
 
   const { data: existingMaterial } = await supabaseAdmin
@@ -689,9 +786,15 @@ async function updateTrainingMaterial(formData: FormData) {
     .eq("id", materialId)
     .maybeSingle();
 
-  const existingBucket = asString((existingMaterial as TrainingMaterial | null)?.storage_bucket);
-  const existingPath = asString((existingMaterial as TrainingMaterial | null)?.storage_path);
-  const storageFileWasReplaced = Boolean(storagePath && existingPath && storagePath !== existingPath);
+  const existingBucket = asString(
+    (existingMaterial as TrainingMaterial | null)?.storage_bucket,
+  );
+  const existingPath = asString(
+    (existingMaterial as TrainingMaterial | null)?.storage_path,
+  );
+  const storageFileWasReplaced = Boolean(
+    storagePath && existingPath && storagePath !== existingPath,
+  );
 
   if (storageFileWasReplaced || removeUploadedFile) {
     await removeTrainingMaterialStorageFile(existingBucket, existingPath);
@@ -722,8 +825,13 @@ async function updateTrainingMaterial(formData: FormData) {
     .eq("id", materialId);
 
   if (error) {
-    console.warn("Unable to update SitGuru University training material:", error);
-    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=materials`);
+    console.warn(
+      "Unable to update SitGuru University training material:",
+      error,
+    );
+    redirect(
+      `${adminRoutes.ambassadorTraining}?academy=${academyType}&error=materials`,
+    );
   }
 
   revalidateUniversityPaths();
@@ -744,11 +852,15 @@ async function toggleTrainingMaterialStatus(formData: FormData) {
   await requireSuperAdmin();
 
   const materialId = asString(formData.get("material_id"));
-  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
+  const academyType = normalizeAcademyType(
+    asString(formData.get("academy_type")),
+  );
   const nextActive = asString(formData.get("next_active")) === "true";
 
   if (!materialId) {
-    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`);
+    redirect(
+      `${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`,
+    );
   }
 
   const { error } = await supabaseAdmin
@@ -760,12 +872,19 @@ async function toggleTrainingMaterialStatus(formData: FormData) {
     .eq("id", materialId);
 
   if (error) {
-    console.warn("Unable to toggle SitGuru University training material:", error);
-    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=materials`);
+    console.warn(
+      "Unable to toggle SitGuru University training material:",
+      error,
+    );
+    redirect(
+      `${adminRoutes.ambassadorTraining}?academy=${academyType}&error=materials`,
+    );
   }
 
   revalidateUniversityPaths();
-  redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&material=toggled`);
+  redirect(
+    `${adminRoutes.ambassadorTraining}?academy=${academyType}&material=toggled`,
+  );
 }
 
 async function deleteTrainingMaterial(formData: FormData) {
@@ -774,10 +893,14 @@ async function deleteTrainingMaterial(formData: FormData) {
   await requireSuperAdmin();
 
   const materialId = asString(formData.get("material_id"));
-  const academyType = normalizeAcademyType(asString(formData.get("academy_type")));
+  const academyType = normalizeAcademyType(
+    asString(formData.get("academy_type")),
+  );
 
   if (!materialId) {
-    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`);
+    redirect(
+      `${adminRoutes.ambassadorTraining}?academy=${academyType}&error=missing`,
+    );
   }
 
   const { data: existingMaterial } = await supabaseAdmin
@@ -786,7 +909,9 @@ async function deleteTrainingMaterial(formData: FormData) {
     .eq("id", materialId)
     .maybeSingle();
 
-  const savedStepId = asString((existingMaterial as TrainingMaterial | null)?.training_step_id);
+  const savedStepId = asString(
+    (existingMaterial as TrainingMaterial | null)?.training_step_id,
+  );
 
   const { error } = await supabaseAdmin
     .from("academy_step_materials")
@@ -794,8 +919,13 @@ async function deleteTrainingMaterial(formData: FormData) {
     .eq("id", materialId);
 
   if (error) {
-    console.warn("Unable to delete SitGuru University training material:", error);
-    redirect(`${adminRoutes.ambassadorTraining}?academy=${academyType}&error=materials`);
+    console.warn(
+      "Unable to delete SitGuru University training material:",
+      error,
+    );
+    redirect(
+      `${adminRoutes.ambassadorTraining}?academy=${academyType}&error=materials`,
+    );
   }
 
   await removeTrainingMaterialStorageFile(
@@ -819,6 +949,7 @@ function revalidateUniversityPaths() {
   revalidatePath("/guru/dashboard");
   revalidatePath("/customer/training");
   revalidatePath("/customer/dashboard");
+  revalidatePath("/customer/dashboard/university");
 }
 
 async function getTrainingMaterials() {
@@ -856,18 +987,19 @@ export default async function AdminAmbassadorTrainingPage({
   const academyFilter = getAcademyFilter(resolvedSearchParams?.academy);
   const savedStepId = asString(resolvedSearchParams?.saved_step);
 
-  const [{ data: stepsResult }, { data: progressResult }, materialsResult] = await Promise.all([
-    supabaseAdmin
-      .from("ambassador_training_steps")
-      .select("*")
-      .order("academy_type", { ascending: true })
-      .order("step_number", { ascending: true }),
-    supabaseAdmin
-      .from("ambassador_training_progress")
-      .select("training_step_id,status")
-      .limit(5000),
-    getTrainingMaterials(),
-  ]);
+  const [{ data: stepsResult }, { data: progressResult }, materialsResult] =
+    await Promise.all([
+      supabaseAdmin
+        .from("ambassador_training_steps")
+        .select("*")
+        .order("academy_type", { ascending: true })
+        .order("step_number", { ascending: true }),
+      supabaseAdmin
+        .from("ambassador_training_progress")
+        .select("training_step_id,status")
+        .limit(5000),
+      getTrainingMaterials(),
+    ]);
 
   const allSteps = ((stepsResult || []) as TrainingStep[]).sort((a, b) => {
     const academyA = normalizeAcademyType(a.academy_type);
@@ -892,12 +1024,30 @@ export default async function AdminAmbassadorTrainingPage({
     materialsByStep.set(stepId, existing.sort(sortTrainingMaterials));
   });
 
-  const steps =
+  const filteredSteps =
     academyFilter === "all"
       ? allSteps
       : allSteps.filter(
           (step) => normalizeAcademyType(step.academy_type) === academyFilter,
         );
+
+  const orientationStepIds = new Set(
+    academyOptions
+      .map((academy) =>
+        getCoreOrientationStep(
+          allSteps.filter(
+            (step) => normalizeAcademyType(step.academy_type) === academy.value,
+          ),
+        ),
+      )
+      .filter(Boolean)
+      .map((step) => (step as TrainingStep).id),
+  );
+
+  const steps = filteredSteps.filter((step) => orientationStepIds.has(step.id));
+  const legacySteps = filteredSteps.filter(
+    (step) => !orientationStepIds.has(step.id),
+  );
 
   const progressRows = (progressResult || []) as TrainingProgressSummary[];
 
@@ -921,41 +1071,50 @@ export default async function AdminAmbassadorTrainingPage({
 
   const activeSteps = steps.filter((step) => step.is_active !== false);
   const requiredSteps = steps.filter((step) => step.is_required !== false);
-  const signatureSteps = steps.filter((step) => step.requires_signature === true);
+  const signatureSteps = steps.filter(
+    (step) => step.requires_signature === true,
+  );
   const acknowledgmentSteps = steps.filter(
     (step) => step.requires_acknowledgment !== false,
   );
-  const visibleStepMaterials = steps.flatMap((step) => materialsByStep.get(step.id) || []);
-  const activeMaterials = visibleStepMaterials.filter((material) => material.is_active !== false);
-  const requiredMaterials = visibleStepMaterials.filter((material) => material.is_required !== false);
+  const visibleStepMaterials = steps.flatMap(
+    (step) => materialsByStep.get(step.id) || [],
+  );
+  const activeMaterials = visibleStepMaterials.filter(
+    (material) => material.is_active !== false,
+  );
+  const requiredMaterials = visibleStepMaterials.filter(
+    (material) => material.is_required !== false,
+  );
 
   const academyCounts = academyOptions.map((academy) => {
     const academySteps = allSteps.filter(
       (step) => normalizeAcademyType(step.academy_type) === academy.value,
     );
-    const academyStepIds = new Set(academySteps.map((step) => step.id));
-    const academyMaterials = allMaterials.filter((material) =>
-      academyStepIds.has(asString(material.training_step_id)),
-    );
+    const orientationStep = getCoreOrientationStep(academySteps);
+    const academyMaterials = orientationStep
+      ? allMaterials.filter(
+          (material) =>
+            asString(material.training_step_id) === orientationStep.id,
+        )
+      : [];
 
     return {
       ...academy,
-      total: academySteps.length,
-      active: academySteps.filter((step) => step.is_active !== false).length,
-      required: academySteps.filter((step) => step.is_required !== false).length,
+      total: orientationStep ? 1 : 0,
+      active: orientationStep && orientationStep.is_active !== false ? 1 : 0,
+      required:
+        orientationStep && orientationStep.is_required !== false ? 1 : 0,
       materials: academyMaterials.length,
+      legacy: Math.max(academySteps.length - (orientationStep ? 1 : 0), 0),
     };
   });
 
   const selectedAcademy =
     academyFilter === "all" ? null : getAcademyOption(academyFilter);
 
-  const defaultStepNumber =
-    academyFilter === "all"
-      ? steps.length + 1
-      : steps.filter(
-          (step) => normalizeAcademyType(step.academy_type) === academyFilter,
-        ).length + 1;
+  const defaultStepNumber = 1;
+  const defaultAcademyType = selectedAcademy?.value || "pet_parent";
 
   return (
     <main className="min-h-screen bg-[#f8fbf6] px-4 py-5 sm:px-6 lg:px-8">
@@ -987,7 +1146,11 @@ export default async function AdminAmbassadorTrainingPage({
               </div>
 
               <p className="mt-4 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                Manage Pet Parent Academy, Guru Academy, and Ambassador Academy training materials from one place. Each academy now follows the same simple message: Learn SitGuru. Easy as 1, 2, 3. Watch the video, review the guide, acknowledge completion, and earn the certification badge.
+                Manage Pet Parent Academy, Guru Academy, and Ambassador Academy
+                from one clean backend. Each academy should have one active
+                orientation record with three user-facing actions: watch the
+                video, review the guide, and acknowledge completion to earn the
+                certification badge.
               </p>
 
               <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-green-900">
@@ -1056,10 +1219,10 @@ export default async function AdminAmbassadorTrainingPage({
 
                   <div className="rounded-2xl border border-green-100 bg-white px-3 py-2 text-right">
                     <p className="text-xl font-black text-green-950">
-                      {number(academy.total)}
+                      {academy.active ? "Ready" : "Setup"}
                     </p>
                     <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
-                      Steps
+                      Orientation
                     </p>
                   </div>
                 </div>
@@ -1071,9 +1234,13 @@ export default async function AdminAmbassadorTrainingPage({
                     detail="assigned users"
                   />
                   <MiniStat
-                    label="Program"
-                    value={academy.modules}
-                    detail="academy path"
+                    label="Flow"
+                    value="Easy as 1, 2, 3"
+                    detail={
+                      academy.legacy
+                        ? `${number(academy.legacy)} legacy hidden`
+                        : "clean academy path"
+                    }
                   />
                   <MiniStat
                     label="Materials"
@@ -1092,7 +1259,10 @@ export default async function AdminAmbassadorTrainingPage({
         </section>
 
         <section className="flex flex-wrap gap-2 rounded-[24px] border border-green-100 bg-white p-3 shadow-sm">
-          <AcademyFilterLink active={academyFilter === "all"} href={adminRoutes.ambassadorTraining}>
+          <AcademyFilterLink
+            active={academyFilter === "all"}
+            href={adminRoutes.ambassadorTraining}
+          >
             All Academies
           </AcademyFilterLink>
 
@@ -1110,12 +1280,12 @@ export default async function AdminAmbassadorTrainingPage({
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <MetricCard
             icon={<ClipboardList size={20} />}
-            label="Visible Steps"
+            label="Orientation Records"
             value={number(steps.length)}
             detail={
               selectedAcademy
-                ? `${selectedAcademy.label} records`
-                : "All academy records"
+                ? `${selectedAcademy.label} active setup`
+                : "One core record per academy"
             }
           />
           <MetricCard
@@ -1149,16 +1319,18 @@ export default async function AdminAmbassadorTrainingPage({
             <div className="mb-5">
               <SectionHeader
                 icon={<Plus size={22} />}
-                title="Add Academy Step"
-                detail="Create only the three core academy steps: Step 1 video, Step 2 guide, Step 3 acknowledgment and certification. Add videos, PDFs, slides, documents, or links under the matching step."
+                title="Add Orientation Record"
+                detail="Create one active orientation record per academy. Add the three user-facing actions as materials under that one record: video, guide, and certification."
               />
             </div>
 
             <TrainingStepForm
               action={createTrainingStep}
               submitLabel="Add Training Step"
-              defaultAcademyType={selectedAcademy?.value || "ambassador"}
+              defaultAcademyType={defaultAcademyType}
               defaultStepNumber={defaultStepNumber}
+              defaultTitle={getOrientationTitle(defaultAcademyType)}
+              defaultDescription={getOrientationDescription(defaultAcademyType)}
               defaultIsActive
               defaultIsRequired
               defaultRequiresAcknowledgment
@@ -1171,10 +1343,10 @@ export default async function AdminAmbassadorTrainingPage({
                 icon={<BookOpenCheck size={22} />}
                 title={
                   selectedAcademy
-                    ? `${selectedAcademy.label} Steps`
-                    : "All Academy Steps"
+                    ? `${selectedAcademy.label} Orientation`
+                    : "Academy Orientations"
                 }
-                detail="Use the 3-step academy structure and add the matching training materials under each step."
+                detail="Keep one active orientation record per academy. Add only the three clean actions inside that record: Step 1 video, Step 2 guide, Step 3 acknowledgment/certification."
               />
             </div>
 
@@ -1188,6 +1360,7 @@ export default async function AdminAmbassadorTrainingPage({
                     completedCount={completedByStep.get(step.id) || 0}
                     startedCount={startedByStep.get(step.id) || 0}
                     saved={savedStepId === step.id}
+                    orientationMode
                   />
                 ))
               ) : (
@@ -1197,13 +1370,42 @@ export default async function AdminAmbassadorTrainingPage({
                     size={36}
                   />
                   <h2 className="text-lg font-black text-green-950">
-                    No training steps yet
+                    No orientation record yet
                   </h2>
                   <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-green-900/75">
-                    Add your first SitGuru University training step for this academy.
+                    Add one orientation record, then add the video, guide, and
+                    certification materials inside it.
                   </p>
                 </div>
               )}
+
+              {legacySteps.length ? (
+                <details className="rounded-[24px] border border-amber-200 bg-amber-50 p-4">
+                  <summary className="cursor-pointer list-none text-sm font-black text-amber-950">
+                    Legacy / extra steps hidden from the simplified academy flow
+                    ({number(legacySteps.length)})
+                  </summary>
+
+                  <p className="mt-2 text-xs font-bold leading-5 text-amber-900/80">
+                    These older step records are separated so they do not
+                    confuse the Easy as 1, 2, 3 backend. Deactivate them if they
+                    should not appear to users.
+                  </p>
+
+                  <div className="mt-4 grid gap-4">
+                    {legacySteps.map((step) => (
+                      <TrainingStepEditor
+                        key={step.id}
+                        step={step}
+                        materials={materialsByStep.get(step.id) || []}
+                        completedCount={completedByStep.get(step.id) || 0}
+                        startedCount={startedByStep.get(step.id) || 0}
+                        saved={savedStepId === step.id}
+                      />
+                    ))}
+                  </div>
+                </details>
+              ) : null}
             </div>
           </DashboardCard>
         </section>
@@ -1238,26 +1440,31 @@ function TrainingStepEditor({
   completedCount,
   startedCount,
   saved,
+  orientationMode = false,
 }: {
   step: TrainingStep;
   materials: TrainingMaterial[];
   completedCount: number;
   startedCount: number;
   saved?: boolean;
+  orientationMode?: boolean;
 }) {
   const active = step.is_active !== false;
   const primaryMaterialUrl = getTrainingMaterialUrl(step);
   const academy = getAcademyOption(step.academy_type);
-  const activeMaterials = materials.filter((material) => material.is_active !== false);
-  const requiredMaterials = materials.filter((material) => material.is_required !== false);
+  const activeMaterials = materials.filter(
+    (material) => material.is_active !== false,
+  );
+  const requiredMaterials = materials.filter(
+    (material) => material.is_required !== false,
+  );
+  const materialPlan = getOrientationMaterialPlan(step.academy_type);
 
   return (
     <article
       className={[
         "rounded-[28px] border bg-[#fbfcf9] p-4 sm:p-5",
-        saved
-          ? "border-green-400 ring-4 ring-green-100"
-          : "border-[#dfe9e2]",
+        saved ? "border-green-400 ring-4 ring-green-100" : "border-[#dfe9e2]",
       ].join(" ")}
     >
       {saved ? (
@@ -1266,7 +1473,8 @@ function TrainingStepEditor({
             <div>
               <p className="text-xl font-black">Saved</p>
               <p className="mt-1 text-sm font-bold text-green-50">
-                This training step was updated successfully. The attached material is now saved to this step.
+                This training step was updated successfully. The attached
+                material is now saved to this step.
               </p>
             </div>
             <span className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2 text-sm font-black text-green-800">
@@ -1344,6 +1552,27 @@ function TrainingStepEditor({
               detail="visible resources"
             />
           </div>
+
+          {orientationMode ? (
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
+              {materialPlan.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-2xl border border-green-100 bg-white p-3"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-green-700">
+                    {item.label} · {item.type}
+                  </p>
+                  <p className="mt-1 text-sm font-black text-green-950">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                    {item.detail}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
@@ -1381,7 +1610,9 @@ function TrainingStepEditor({
               Training Materials
             </h3>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-              Add each portion of this step here: video, PowerPoint, PDF, slide image, external resource, quiz, or certificate.
+              For the simplified flow, keep this clean: Material 1 = video,
+              Material 2 = guide/PDF/PowerPoint, Material 3 = certification
+              acknowledgment.
             </p>
           </div>
 
@@ -1413,7 +1644,8 @@ function TrainingStepEditor({
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-green-200 bg-green-50/60 p-4 text-sm font-bold leading-6 text-green-900">
-            No additional materials have been added to this step yet. Use Add Material to attach the video, PowerPoint, PDF, slide image, external link, quiz, or certificate portion for this step.
+            No materials have been added yet. Add only the three core items:
+            video, guide, and certification acknowledgment.
           </div>
         )}
       </div>
@@ -1476,7 +1708,9 @@ function TrainingMaterialCard({
             </span>
           </div>
 
-          <h4 className="text-lg font-black text-green-950">{material.title}</h4>
+          <h4 className="text-lg font-black text-green-950">
+            {material.title}
+          </h4>
           <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
             {material.description || "No material description added yet."}
           </p>
@@ -1551,7 +1785,8 @@ function TrainingMaterialCard({
           <input type="hidden" name="material_id" value={material.id} />
           <input type="hidden" name="academy_type" value={academy.value} />
           <p className="mb-3 text-xs font-bold leading-5 text-red-800">
-            This removes this material from the step and deletes its uploaded Supabase Storage file, if one is attached.
+            This removes this material from the step and deletes its uploaded
+            Supabase Storage file, if one is attached.
           </p>
           <button
             type="submit"
@@ -1587,7 +1822,9 @@ function TrainingMaterialForm({
       <input type="hidden" name="academy_type" value={academy.value} />
       <input type="hidden" name="step_number" value={step.step_number} />
       <input type="hidden" name="step_title" value={step.title} />
-      {isEdit ? <input type="hidden" name="material_id" value={material?.id} /> : null}
+      {isEdit ? (
+        <input type="hidden" name="material_id" value={material?.id} />
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-[1fr_130px]">
         <FormField label="Material Title">
@@ -1644,7 +1881,9 @@ function TrainingMaterialForm({
               Material File / Link
             </h3>
             <p className="mt-1 text-xs font-bold leading-5 text-green-900/75">
-              Attach a file for the easiest workflow. SitGuru will upload it to Supabase Storage and save the bucket/path automatically. Use URLs only for externally hosted videos or resources.
+              Attach a file for the easiest workflow. SitGuru will upload it to
+              Supabase Storage and save the bucket/path automatically. Use URLs
+              only for externally hosted videos or resources.
             </p>
           </div>
         </div>
@@ -1712,6 +1951,8 @@ function TrainingStepForm({
   defaultIsRequired = false,
   defaultIsActive = false,
   defaultRequiresAcknowledgment = false,
+  defaultTitle = "",
+  defaultDescription = "",
 }: {
   action: (formData: FormData) => Promise<void>;
   submitLabel: string;
@@ -1721,6 +1962,8 @@ function TrainingStepForm({
   defaultIsRequired?: boolean;
   defaultIsActive?: boolean;
   defaultRequiresAcknowledgment?: boolean;
+  defaultTitle?: string;
+  defaultDescription?: string;
 }) {
   const isEdit = Boolean(step?.id);
   const academy = getAcademyOption(step?.academy_type || defaultAcademyType);
@@ -1768,8 +2011,8 @@ function TrainingStepForm({
       <FormField label="Training Title">
         <input
           name="title"
-          placeholder="Welcome to SitGuru"
-          defaultValue={step?.title || ""}
+          placeholder="Certified Pet Parent Orientation"
+          defaultValue={step?.title || defaultTitle}
           className="min-h-12 w-full rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-400 focus:ring-4 focus:ring-green-100"
         />
       </FormField>
@@ -1778,8 +2021,8 @@ function TrainingStepForm({
         <textarea
           name="description"
           rows={4}
-          placeholder="Explain what this training step covers."
-          defaultValue={step?.description || ""}
+          placeholder="Explain what this training orientation covers."
+          defaultValue={step?.description || defaultDescription}
           className="w-full resize-none rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-400 focus:ring-4 focus:ring-green-100"
         />
       </FormField>
@@ -1808,7 +2051,8 @@ function TrainingStepForm({
               Primary / Legacy Material
             </h3>
             <p className="mt-1 text-xs font-bold leading-5 text-green-900/75">
-              This keeps your original one-material fields working. Use Training Materials above for multiple portions inside the same step.
+              This keeps your original one-material fields working. Use Training
+              Materials above for multiple portions inside the same step.
             </p>
           </div>
         </div>
@@ -1988,7 +2232,9 @@ function MiniStat({
       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
         {label}
       </p>
-      <p className="mt-1 break-words text-sm font-black text-green-950">{value}</p>
+      <p className="mt-1 break-words text-sm font-black text-green-950">
+        {value}
+      </p>
       <p className="break-words text-xs font-bold text-slate-500">{detail}</p>
     </div>
   );
