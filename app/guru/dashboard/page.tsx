@@ -50,6 +50,10 @@ type GuruProfile = {
   payouts_enabled?: boolean | null;
   charges_enabled?: boolean | null;
   background_check_status?: string | null;
+  background_check_fee_status?: string | null;
+  background_check_fee_payment_option?: string | null;
+  background_check_payment_plan_status?: string | null;
+  background_check_reimbursement_status?: string | null;
   checkr_status?: string | null;
   checkr_invitation_id?: string | null;
   checkr_candidate_id?: string | null;
@@ -982,18 +986,47 @@ async function getGuruServiceRates(guruProfile: GuruProfile | null) {
   return data as GuruServiceRateRow[];
 }
 
+function isTrustSafetyFeeWaivedThrough2026() {
+  return new Date().getTime() < new Date("2027-01-01T00:00:00.000Z").getTime();
+}
+
 function getBackgroundCheckDisplay(profile: GuruProfile | null) {
-  const raw = String(
-    profile?.background_check_status || profile?.checkr_status || ""
-  )
-    .trim()
-    .toLowerCase();
+  const statusValues = [
+    profile?.background_check_status,
+    profile?.background_check_fee_status,
+    profile?.background_check_fee_payment_option,
+    profile?.background_check_payment_plan_status,
+    profile?.background_check_reimbursement_status,
+    profile?.checkr_status,
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  const combinedStatus = statusValues.join(" ");
+  const hasLaunchWaiverStatus = statusValues.some((status) =>
+    [
+      "waived",
+      "waived_2026",
+      "launch_waived",
+      "launch_year_2026_waiver",
+      "deferred_launch",
+    ].includes(status),
+  );
+
+  if (isTrustSafetyFeeWaivedThrough2026() || hasLaunchWaiverStatus) {
+    return {
+      label: "Waived Through 2026",
+      status: "complete" as const,
+      href: "/guru/dashboard/background-check?screening_payment=waived_2026",
+    };
+  }
 
   if (
-    raw.includes("clear") ||
-    raw.includes("complete") ||
-    raw.includes("approved") ||
-    raw.includes("passed")
+    combinedStatus.includes("clear") ||
+    combinedStatus.includes("complete") ||
+    combinedStatus.includes("approved") ||
+    combinedStatus.includes("passed") ||
+    combinedStatus.includes("paid")
   ) {
     return {
       label: "Complete",
@@ -1003,10 +1036,10 @@ function getBackgroundCheckDisplay(profile: GuruProfile | null) {
   }
 
   if (
-    raw.includes("pending") ||
-    raw.includes("invited") ||
-    raw.includes("created") ||
-    raw.includes("review") ||
+    combinedStatus.includes("pending") ||
+    combinedStatus.includes("invited") ||
+    combinedStatus.includes("created") ||
+    combinedStatus.includes("review") ||
     Boolean(profile?.checkr_invitation_id || profile?.checkr_candidate_id)
   ) {
     return {
@@ -1093,7 +1126,10 @@ function GuruSetupChecklist({
     {
       number: 4,
       title: "Complete Trust & Safety Screening",
-      body: "Start or finish your secure SitGuru Trust & Safety Screening to build trust with pet parents and qualify for bookings.",
+      body:
+        background.status === "complete" && background.label.includes("Waived")
+          ? "Your Trust & Safety Screening fee is waived through December 31, 2026 during SitGuru’s launch year."
+          : "Start or finish your secure SitGuru Trust & Safety Screening to build trust with pet parents and qualify for bookings.",
       href: background.href,
       status: background.status,
       statusLabel: background.label,
@@ -1240,7 +1276,9 @@ function GuruSetupChecklist({
                   <span className="text-sm font-black !text-white">
                     {step.number === 4
                       ? isComplete
-                        ? "View screening"
+                        ? step.statusLabel.includes("Waived")
+                          ? "View waiver"
+                          : "View screening"
                         : isPending
                           ? "Check screening status"
                           : "Start screening"
