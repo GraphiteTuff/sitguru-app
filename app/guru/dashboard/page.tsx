@@ -1065,87 +1065,6 @@ function isPayoutConnected(profile: GuruProfile | null) {
   );
 }
 
-function getPayoutSetupDisplay(profile: GuruProfile | null) {
-  const hasStripeAccount = Boolean(profile?.stripe_account_id);
-  const payoutConnected = isPayoutConnected(profile);
-
-  if (payoutConnected) {
-    return {
-      eyebrow: "Payout Setup",
-      title: "Stripe payouts connected",
-      body: "Your Stripe payout account is connected and ready for eligible completed bookings.",
-      statusLabel: "Connected",
-      statusClassName: "border-emerald-200 bg-emerald-50 !text-emerald-800",
-      buttonLabel: "View Earnings",
-      href: "/guru/dashboard/earnings",
-      buttonClassName:
-        "bg-emerald-600 !text-white hover:bg-emerald-700",
-    };
-  }
-
-  if (hasStripeAccount) {
-    return {
-      eyebrow: "Payout Setup",
-      title: "Stripe setup needs attention",
-      body: "Your Stripe account was started, but payouts are not fully enabled yet. Continue setup so SitGuru can pay you after completed care.",
-      statusLabel: "Action Needed",
-      statusClassName: "border-amber-200 bg-amber-50 !text-amber-800",
-      buttonLabel: "Continue Stripe Setup",
-      href: "/api/stripe/connect",
-      buttonClassName:
-        "bg-[#020826] !text-white hover:bg-[#0b1436]",
-    };
-  }
-
-  return {
-    eyebrow: "Payout Setup",
-    title: "Connect Stripe payouts",
-    body: "Connect Stripe payouts so SitGuru can pay you after eligible completed bookings. This is internal to your Guru account only.",
-    statusLabel: "Not Connected",
-    statusClassName: "border-rose-200 bg-rose-50 !text-rose-800",
-    buttonLabel: "Connect Payouts",
-    href: "/api/stripe/connect",
-    buttonClassName:
-      "bg-[#020826] !text-white hover:bg-[#0b1436]",
-  };
-}
-
-function PayoutSetupCard({ profile }: { profile: GuruProfile | null }) {
-  const payout = getPayoutSetupDisplay(profile);
-
-  return (
-    <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
-            {payout.eyebrow}
-          </p>
-          <p className="mt-2 text-lg font-black !text-slate-900">
-            {payout.title}
-          </p>
-        </div>
-
-        <span
-          className={`shrink-0 rounded-full border px-3 py-1 text-[0.68rem] font-black uppercase tracking-[0.12em] ${payout.statusClassName}`}
-        >
-          {payout.statusLabel}
-        </span>
-      </div>
-
-      <p className="mt-3 text-sm font-bold leading-6 !text-slate-700">
-        {payout.body}
-      </p>
-
-      <Link
-        href={payout.href}
-        className={`mt-5 inline-flex w-full items-center justify-center rounded-[1rem] px-6 py-4 text-base font-black transition ${payout.buttonClassName}`}
-      >
-        {payout.buttonLabel}
-      </Link>
-    </div>
-  );
-}
-
 function GuruSetupChecklist({
   profile,
   profileCompletion,
@@ -1219,7 +1138,7 @@ function GuruSetupChecklist({
       number: 5,
       title: "Connect payouts",
       body: "Connect Stripe payouts so SitGuru can pay you after completed bookings.",
-      href: payoutConnected ? "/guru/dashboard/earnings" : "/api/stripe/connect",
+      href: "/api/stripe/connect",
       status: payoutConnected ? "complete" : "needs_action",
       statusLabel: payoutConnected ? "Complete" : "Needs Action",
     },
@@ -1308,16 +1227,25 @@ function GuruSetupChecklist({
             </p>
           </div>
 
-          <Link
-            href={allComplete ? "/guru/dashboard/profile" : nextStep.href}
-            className={`inline-flex min-h-[54px] items-center justify-center rounded-[1rem] px-7 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 ${
-              allComplete
-                ? "bg-emerald-600 hover:bg-emerald-700"
-                : "bg-[#07132f] hover:bg-[#0b1436]"
-            }`}
-          >
-            {allComplete ? "View Profile ✓" : "Continue Setup →"}
-          </Link>
+          {nextStep.number === 5 && !allComplete ? (
+            <a
+              href={nextStep.href}
+              className="inline-flex min-h-[54px] items-center justify-center rounded-[1rem] bg-[#07132f] px-7 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
+            >
+              Continue Setup →
+            </a>
+          ) : (
+            <Link
+              href={allComplete ? "/guru/dashboard/profile" : nextStep.href}
+              className={`inline-flex min-h-[54px] items-center justify-center rounded-[1rem] px-7 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 ${
+                allComplete
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-[#07132f] hover:bg-[#0b1436]"
+              }`}
+            >
+              {allComplete ? "View Profile ✓" : "Continue Setup →"}
+            </Link>
+          )}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-5">
@@ -1325,14 +1253,12 @@ function GuruSetupChecklist({
             const isComplete = step.status === "complete";
             const isPending = step.status === "pending";
 
-            return (
-              <Link
-                key={step.number}
-                href={step.href}
-                className={`group flex min-h-[230px] flex-col justify-between rounded-[1.45rem] border p-5 transition hover:-translate-y-1 hover:shadow-xl ${getStepClassName(
-                  step.status,
-                )}`}
-              >
+            const stepCardClassName = `group flex min-h-[230px] flex-col justify-between rounded-[1.45rem] border p-5 transition hover:-translate-y-1 hover:shadow-xl ${getStepClassName(
+              step.status,
+            )}`;
+
+            const stepCardContent = (
+              <>
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20 text-xl font-black !text-white ring-1 ring-white/35">
@@ -1373,6 +1299,25 @@ function GuruSetupChecklist({
                     →
                   </span>
                 </div>
+              </>
+            );
+
+            if (step.number === 5 && !isComplete) {
+              return (
+                <a key={step.number} href={step.href} className={stepCardClassName}>
+                  {stepCardContent}
+                </a>
+              );
+            }
+
+            return (
+              <Link
+                key={step.number}
+                href={step.href}
+                prefetch={step.href.startsWith("/api/") ? false : undefined}
+                className={stepCardClassName}
+              >
+                {stepCardContent}
               </Link>
             );
           })}
@@ -1872,9 +1817,7 @@ export default async function GuruDashboardPage() {
               </p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-              <PayoutSetupCard profile={guruProfile} />
-
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
                   Availability
