@@ -447,43 +447,48 @@ async function getGuruProfile(userId: string) {
 }
 
 async function getGuruTrainingData(userId: string) {
-  const [stepsResult, materialsResult, materialProgressResult, stepProgressResult, certificationResult] =
-    await Promise.all([
-      supabaseAdmin
-        .from("ambassador_training_steps")
-        .select("*")
-        .eq("academy_type", academyType)
-        .eq("is_active", true)
-        .order("step_number", { ascending: true }),
+  const [
+    stepsResult,
+    materialsResult,
+    materialProgressResult,
+    stepProgressResult,
+    certificationResult,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("ambassador_training_steps")
+      .select("*")
+      .eq("academy_type", academyType)
+      .eq("is_active", true)
+      .order("step_number", { ascending: true }),
 
-      supabaseAdmin
-        .from("academy_step_materials")
-        .select("*")
-        .eq("academy_type", academyType)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true }),
+    supabaseAdmin
+      .from("academy_step_materials")
+      .select("*")
+      .eq("academy_type", academyType)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
 
-      supabaseAdmin
-        .from("academy_material_progress")
-        .select("*")
-        .eq("academy_type", academyType)
-        .eq("user_id", userId)
-        .not("acknowledged_at", "is", null),
+    supabaseAdmin
+      .from("academy_material_progress")
+      .select("*")
+      .eq("academy_type", academyType)
+      .eq("user_id", userId)
+      .not("acknowledged_at", "is", null),
 
-      supabaseAdmin
-        .from("academy_step_progress")
-        .select("*")
-        .eq("academy_type", academyType)
-        .eq("user_id", userId),
+    supabaseAdmin
+      .from("academy_step_progress")
+      .select("*")
+      .eq("academy_type", academyType)
+      .eq("user_id", userId),
 
-      supabaseAdmin
-        .from("academy_certifications")
-        .select("*")
-        .eq("academy_type", academyType)
-        .eq("user_id", userId)
-        .maybeSingle(),
-    ]);
+    supabaseAdmin
+      .from("academy_certifications")
+      .select("*")
+      .eq("academy_type", academyType)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ]);
 
   const steps = ((stepsResult.data || []) as TrainingStep[]).filter(
     (step) => step.is_active !== false,
@@ -535,7 +540,8 @@ async function getGuruTrainingData(userId: string) {
     (material) => material && acknowledgedMaterialIds.has(material.id),
   ).length;
 
-  const completedActions = (videoMaterial && acknowledgedMaterialIds.has(videoMaterial.id) ? 1 : 0) +
+  const completedActions =
+    (videoMaterial && acknowledgedMaterialIds.has(videoMaterial.id) ? 1 : 0) +
     (guideMaterial && acknowledgedMaterialIds.has(guideMaterial.id) ? 1 : 0) +
     (certified ? 1 : 0);
 
@@ -626,22 +632,20 @@ async function completeGuruAcademy(formData: FormData) {
   const email = asString(user.email) || asString(profile?.email) || asString(guru?.email);
   const certificateId = buildCertificateId(asString(user.id));
 
-  const { error: stepError } = await supabaseAdmin
-    .from("academy_step_progress")
-    .upsert(
-      {
-        user_id: asString(user.id),
-        training_step_id: trainingStepId,
-        academy_type: academyType,
-        status: "completed",
-        acknowledged_at: now,
-        completed_at: now,
-        updated_at: now,
-      },
-      {
-        onConflict: "user_id,training_step_id",
-      },
-    );
+  const { error: stepError } = await supabaseAdmin.from("academy_step_progress").upsert(
+    {
+      user_id: asString(user.id),
+      training_step_id: trainingStepId,
+      academy_type: academyType,
+      status: "completed",
+      acknowledged_at: now,
+      completed_at: now,
+      updated_at: now,
+    },
+    {
+      onConflict: "user_id,training_step_id",
+    },
+  );
 
   if (stepError) {
     console.warn("Unable to complete Guru Academy step:", stepError);
@@ -728,28 +732,28 @@ export default async function GuruDashboardUniversityPage({
   );
 
   return (
-    <main className="min-h-screen bg-[#f7fbf7] px-3 py-4 text-[#07132f] sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f7fbf7] px-3 py-4 !text-[#07132f] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl space-y-5">
         <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
           <div className="grid gap-6 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.95),transparent_19%),linear-gradient(120deg,#15d6a0_0%,#6ee7c8_48%,#b8e5ff_100%)] p-5 sm:p-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
             <div>
               <Link
                 href={guruRoutes.dashboard}
-                className="mb-6 inline-flex min-h-11 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-black text-emerald-900 shadow-sm ring-1 ring-white/70 transition hover:bg-white"
+                className="mb-6 inline-flex min-h-11 items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-black !text-emerald-900 shadow-sm ring-1 ring-white/70 transition hover:bg-white"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Dashboard
               </Link>
 
-              <p className="text-xs font-black uppercase tracking-[0.32em] text-emerald-950/80">
+              <p className="text-xs font-black uppercase tracking-[0.32em] !text-emerald-950/90">
                 SitGuru University
               </p>
 
-              <h1 className="mt-3 text-4xl font-black leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-6xl lg:text-7xl">
+              <h1 className="mt-3 text-4xl font-black leading-[0.98] tracking-[-0.055em] !text-[#07132f] sm:text-6xl lg:text-7xl">
                 Guru Academy
               </h1>
 
-              <p className="mt-5 max-w-3xl text-base font-bold leading-8 text-slate-800 sm:text-xl">
+              <p className="mt-5 max-w-3xl text-base font-bold leading-8 !text-[#12233f] sm:text-xl">
                 Hi {firstName}, learn SitGuru. Easy as 1, 2, 3. Watch the Guru
                 intro video, review the Guru Success Guide, then acknowledge
                 completion to earn your Certified Guru badge.
@@ -769,8 +773,8 @@ export default async function GuruDashboardUniversityPage({
             </div>
 
             <div className="flex justify-center lg:justify-end">
-              <div className="w-full max-w-sm rounded-[2rem] border border-white/70 bg-white/75 p-5 text-center shadow-xl backdrop-blur">
-                <div className="mx-auto flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-[7px] border-white bg-emerald-50 text-3xl font-black text-emerald-800 shadow-xl">
+              <div className="w-full max-w-sm rounded-[2rem] border border-white/70 bg-white/85 p-5 text-center shadow-xl backdrop-blur">
+                <div className="mx-auto flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-[7px] border-white bg-emerald-50 text-3xl font-black !text-emerald-800 shadow-xl">
                   {avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -783,10 +787,10 @@ export default async function GuruDashboardUniversityPage({
                   )}
                 </div>
 
-                <h2 className="mt-4 text-2xl font-black text-slate-950">
+                <h2 className="mt-4 text-2xl font-black !text-slate-950">
                   {firstName}
                 </h2>
-                <p className="mt-1 text-sm font-black text-emerald-800">
+                <p className="mt-1 text-sm font-black !text-emerald-800">
                   {certified ? "Certified Guru" : "Badge locked"}
                 </p>
               </div>
@@ -830,8 +834,8 @@ export default async function GuruDashboardUniversityPage({
             className={[
               "rounded-[1.5rem] border p-4 text-sm font-bold leading-6 shadow-sm",
               notice.tone === "success"
-                ? "border-emerald-100 bg-emerald-50 text-emerald-900"
-                : "border-red-100 bg-red-50 text-red-800",
+                ? "border-emerald-100 bg-emerald-50 !text-emerald-900"
+                : "border-red-100 bg-red-50 !text-red-800",
             ].join(" ")}
           >
             <p className="font-black">{notice.title}</p>
@@ -843,13 +847,13 @@ export default async function GuruDashboardUniversityPage({
           <div className="rounded-[1.75rem] border border-emerald-100 bg-emerald-50 p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-800">
+                <p className="text-xs font-black uppercase tracking-[0.24em] !text-emerald-800">
                   Certified Guru Orientation
                 </p>
-                <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-5xl">
+                <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] !text-slate-950 sm:text-5xl">
                   Watch. Review. Acknowledge.
                 </h2>
-                <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-slate-700">
+                <p className="mt-3 max-w-4xl text-base font-semibold leading-7 !text-slate-700">
                   Learn how to complete your Guru profile, manage bookings
                   professionally, provide safe pet care, set up payouts, and
                   build trust with Pet Parents. Review the video and guide,
@@ -861,8 +865,8 @@ export default async function GuruDashboardUniversityPage({
                 className={[
                   "rounded-2xl px-5 py-3 text-sm font-black",
                   certified
-                    ? "bg-emerald-600 text-white"
-                    : "border border-emerald-100 bg-white text-emerald-900",
+                    ? "bg-emerald-600 !text-white"
+                    : "border border-emerald-100 bg-white !text-emerald-900",
                 ].join(" ")}
               >
                 {certified ? "Certified" : "In progress"}
@@ -909,7 +913,7 @@ export default async function GuruDashboardUniversityPage({
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 ring-1 ring-emerald-100">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white !text-emerald-700 ring-1 ring-emerald-100">
                     {certified ? (
                       <BadgeCheck className="h-6 w-6" />
                     ) : (
@@ -918,20 +922,20 @@ export default async function GuruDashboardUniversityPage({
                   </div>
 
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+                    <p className="text-xs font-black uppercase tracking-[0.2em] !text-emerald-700">
                       Step 3
                     </p>
-                    <h3 className="mt-1 text-2xl font-black text-slate-950">
+                    <h3 className="mt-1 text-2xl font-black !text-slate-950">
                       Acknowledge & Get Certified
                     </h3>
-                    <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                    <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 !text-slate-600">
                       Confirm you reviewed the training and earn your Certified
                       Guru badge. Your official SitGuru University certificate
                       will be prepared and sent within 24 hours.
                     </p>
 
                     {certified ? (
-                      <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-4 text-sm font-bold text-emerald-900">
+                      <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-4 text-sm font-bold !text-emerald-900">
                         <p className="font-black">Certified Guru badge issued.</p>
                         <p className="mt-1">
                           Certificate status:{" "}
@@ -940,7 +944,7 @@ export default async function GuruDashboardUniversityPage({
                         </p>
                       </div>
                     ) : (
-                      <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 text-sm font-bold leading-6 text-slate-700">
+                      <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 text-sm font-bold leading-6 !text-slate-700">
                         I acknowledge that I have honestly and accurately
                         reviewed the required Guru Academy training materials,
                         understand the information provided, and completed this
@@ -951,7 +955,7 @@ export default async function GuruDashboardUniversityPage({
                 </div>
 
                 {certified ? (
-                  <div className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white">
+                  <div className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black !text-white">
                     <CheckCircle2 className="h-5 w-5" />
                     Completed
                   </div>
@@ -968,8 +972,8 @@ export default async function GuruDashboardUniversityPage({
                       className={[
                         "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition lg:w-auto",
                         canComplete
-                          ? "bg-emerald-700 text-white shadow-lg shadow-emerald-900/15 hover:bg-emerald-800"
-                          : "cursor-not-allowed bg-red-100 text-red-500",
+                          ? "bg-emerald-700 !text-white shadow-lg shadow-emerald-900/15 hover:bg-emerald-800"
+                          : "cursor-not-allowed bg-red-100 !text-red-500",
                       ].join(" ")}
                     >
                       <BadgeCheck className="h-5 w-5" />
@@ -980,7 +984,7 @@ export default async function GuruDashboardUniversityPage({
               </div>
 
               {!canComplete && !certified ? (
-                <p className="mt-4 text-sm font-black text-red-700">
+                <p className="mt-4 text-sm font-black !text-red-700">
                   Required acknowledgments needed: acknowledge the intro video
                   and Guru Success Guide before certification unlocks.
                 </p>
@@ -1001,7 +1005,7 @@ function HeroPill({
   children: ReactNode;
 }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs font-black text-slate-800 shadow-sm ring-1 ring-white/80">
+    <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-xs font-black !text-slate-800 shadow-sm ring-1 ring-white/80">
       {icon}
       {children}
     </span>
@@ -1023,13 +1027,13 @@ function StatCard({
     <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+          <p className="text-xs font-black uppercase tracking-[0.2em] !text-slate-500">
             {label}
           </p>
-          <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
-          <p className="mt-1 text-sm font-bold text-emerald-700">{detail}</p>
+          <p className="mt-2 text-2xl font-black !text-slate-950">{value}</p>
+          <p className="mt-1 text-sm font-bold !text-emerald-700">{detail}</p>
         </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 !text-emerald-700 ring-1 ring-emerald-100">
           {icon}
         </div>
       </div>
@@ -1071,48 +1075,48 @@ function ActionCard({
     >
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
         <div className="flex gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 !text-emerald-700 ring-1 ring-emerald-100">
             {icon}
           </div>
 
           <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+            <p className="text-xs font-black uppercase tracking-[0.2em] !text-emerald-700">
               Step {number}
             </p>
-            <h3 className="mt-1 text-2xl font-black text-slate-950">
+            <h3 className="mt-1 text-2xl font-black !text-slate-950">
               {title}
             </h3>
-            <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
+            <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 !text-slate-600">
               {description}
             </p>
 
             {material ? (
               <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-xs font-black text-emerald-800">
+                  <span className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-xs font-black !text-emerald-800">
                     {getContentTypeLabel(material)}
                   </span>
                   {material.is_required !== false ? (
-                    <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-black text-amber-800">
+                    <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-black !text-amber-800">
                       Required
                     </span>
                   ) : null}
                   {acknowledged ? (
-                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
+                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-800">
                       Acknowledged
                     </span>
                   ) : null}
                 </div>
 
-                <p className="mt-3 text-base font-black text-slate-950">
+                <p className="mt-3 text-base font-black !text-slate-950">
                   {material.title}
                 </p>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
                   {material.description || "Training material"}
                 </p>
               </div>
             ) : (
-              <div className="mt-4 rounded-2xl border border-dashed border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+              <div className="mt-4 rounded-2xl border border-dashed border-red-200 bg-red-50 p-4 text-sm font-bold !text-red-700">
                 {missingText}
               </div>
             )}
@@ -1125,7 +1129,7 @@ function ActionCard({
               href={materialUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
             >
               <ExternalLink className="h-4 w-4" />
               Open Material
@@ -1134,7 +1138,7 @@ function ActionCard({
               href={materialUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black !text-emerald-800 transition hover:bg-emerald-50"
             >
               <Download className="h-4 w-4" />
               Download / View
@@ -1146,13 +1150,11 @@ function ActionCard({
       {material ? (
         <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-4">
           {acknowledged ? (
-            <div className="flex items-start gap-3 text-sm font-bold text-emerald-800">
+            <div className="flex items-start gap-3 text-sm font-bold !text-emerald-800">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
                 <p className="font-black">Acknowledgment saved</p>
-                <p className="mt-1">
-                  You acknowledged this training material.
-                </p>
+                <p className="mt-1">You acknowledged this training material.</p>
               </div>
             </div>
           ) : (
@@ -1164,7 +1166,7 @@ function ActionCard({
                 value={trainingStepId}
               />
 
-              <label className="flex items-start gap-3 text-sm font-bold leading-6 text-slate-700">
+              <label className="flex items-start gap-3 text-sm font-bold leading-6 !text-slate-700">
                 <input
                   type="checkbox"
                   required
@@ -1179,7 +1181,7 @@ function ActionCard({
 
               <button
                 type="submit"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
               >
                 <CheckCircle2 className="h-5 w-5" />
                 Save Acknowledgment
