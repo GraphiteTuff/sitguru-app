@@ -127,9 +127,6 @@ type ProfileRow = {
   profile_photo_url?: string | null;
   avatar_url?: string | null;
   image_url?: string | null;
-  video_url?: string | null;
-  profile_video_url?: string | null;
-  intro_video_url?: string | null;
 };
 
 type DashboardConversation = {
@@ -152,11 +149,26 @@ type GuruTier = {
   cardClassName: string;
 };
 
+type GuruUniversityProgress = {
+  totalSteps: number;
+  completedSteps: number;
+  totalMaterials: number;
+  acknowledgedMaterials: number;
+  requiredMaterials: number;
+  progressPercent: number;
+  isStarted: boolean;
+  isComplete: boolean;
+  certificationLabel: string;
+  badgeStatus: string;
+  progressHelper: string;
+  academyButtonLabel: string;
+};
+
 function normalizeRole(value?: string | null) {
-  const role = String(value || "").trim().toLowerCase();
-
+  const role = String(value || "")
+    .trim()
+    .toLowerCase();
   if (role === "provider" || role === "sitter") return "guru";
-
   return role;
 }
 
@@ -172,7 +184,11 @@ function getDisplayNameFromEmail(email?: string | null) {
 }
 
 function getFirstName(name?: string | null) {
-  return String(name || "Guru").trim().split(/\s+/)[0] || "Guru";
+  return (
+    String(name || "Guru")
+      .trim()
+      .split(/\s+/)[0] || "Guru"
+  );
 }
 
 function getProfileName(profile?: ProfileRow | null) {
@@ -195,7 +211,7 @@ function getProfileName(profile?: ProfileRow | null) {
 
 function getGuruName(
   profile: GuruProfile | null,
-  fallbackEmail?: string | null
+  fallbackEmail?: string | null,
 ) {
   return (
     profile?.full_name ||
@@ -243,16 +259,6 @@ function normalizeServices(value: GuruProfile["services"]) {
   return [];
 }
 
-function getRate(profile: GuruProfile | null) {
-  const value = profile?.rate ?? profile?.hourly_rate ?? profile?.price ?? null;
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return `$${value}/hr`;
-  }
-
-  return "Rate pending";
-}
-
 function normalizeApplicationStatus(profile: GuruProfile | null) {
   const raw = String(profile?.application_status || profile?.status || "")
     .trim()
@@ -274,7 +280,6 @@ function normalizeApplicationStatus(profile: GuruProfile | null) {
 
 function isBookable(profile: GuruProfile | null) {
   const status = normalizeApplicationStatus(profile).toLowerCase();
-
   return Boolean(profile?.is_bookable) || status === "bookable";
 }
 
@@ -300,7 +305,7 @@ function calculateProfileCompletion(profile: GuruProfile | null) {
 
   return Math.max(
     10,
-    Math.round((checks.filter(Boolean).length / checks.length) * 100)
+    Math.round((checks.filter(Boolean).length / checks.length) * 100),
   );
 }
 
@@ -309,7 +314,7 @@ function getBookingStatus(booking: BookingRow) {
     booking.status ||
       booking.booking_status ||
       booking.payment_status ||
-      "pending"
+      "pending",
   );
 }
 
@@ -318,7 +323,7 @@ function getBookingService(booking: BookingRow) {
     booking.service ||
       booking.service_type ||
       booking.booking_type ||
-      "Pet Care"
+      "Pet Care",
   );
 }
 
@@ -328,7 +333,7 @@ function getPetName(booking: BookingRow) {
 
 function getCustomerName(booking: BookingRow) {
   return String(
-    booking.customer_name || booking.pet_parent_name || "Pet Parent"
+    booking.customer_name || booking.pet_parent_name || "Pet Parent",
   );
 }
 
@@ -343,7 +348,6 @@ function getBookingDate(booking: BookingRow) {
   if (!value) return "Date pending";
 
   const parsed = new Date(value);
-
   if (Number.isNaN(parsed.getTime())) return "Date pending";
 
   return parsed.toLocaleDateString("en-US", {
@@ -357,7 +361,6 @@ function formatActivity(value?: string | null) {
   if (!value) return "No recent activity";
 
   const parsed = new Date(value);
-
   if (Number.isNaN(parsed.getTime())) return "No recent activity";
 
   return parsed.toLocaleString("en-US", {
@@ -375,9 +378,15 @@ function getMessagePreview(message?: MessageRow | null) {
 function getGuruTier(
   completedBookingsCount: number,
   profileCompletion: number,
-  bookable: boolean
+  bookable: boolean,
+  certifiedGuru: boolean,
 ): GuruTier {
-  if (completedBookingsCount >= 25 && profileCompletion >= 90 && bookable) {
+  if (
+    completedBookingsCount >= 25 &&
+    profileCompletion >= 90 &&
+    bookable &&
+    certifiedGuru
+  ) {
     return {
       label: "Elite Guru",
       shortLabel: "Elite",
@@ -388,6 +397,20 @@ function getGuruTier(
       badgeClassName: "border-amber-200 bg-amber-50 text-amber-800",
       cardClassName:
         "border-amber-200 bg-[linear-gradient(180deg,#fffaf0_0%,#ffffff_100%)]",
+    };
+  }
+
+  if (certifiedGuru && bookable) {
+    return {
+      label: "Certified Guru",
+      shortLabel: "Certified",
+      description:
+        "You completed Guru Academy and are ready to build trust with Pet Parents through professional, reliable pet care.",
+      icon: "🎓",
+      stars: 4,
+      badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      cardClassName:
+        "border-emerald-200 bg-[linear-gradient(180deg,#f2fffb_0%,#ffffff_100%)]",
     };
   }
 
@@ -413,9 +436,9 @@ function getGuruTier(
         "You are approved, bookable, and ready to help pets feel safe, loved, and cared for through SitGuru.",
       icon: "🛡️",
       stars: 3,
-      badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      badgeClassName: "border-cyan-200 bg-cyan-50 text-cyan-800",
       cardClassName:
-        "border-emerald-200 bg-[linear-gradient(180deg,#f2fffb_0%,#ffffff_100%)]",
+        "border-cyan-200 bg-[linear-gradient(180deg,#f3fbff_0%,#ffffff_100%)]",
     };
   }
 
@@ -423,7 +446,7 @@ function getGuruTier(
     label: "Rising Guru",
     shortLabel: "Rising",
     description:
-      "You are on the path to becoming bookable. Finish your profile and keep building trust so pet families can choose you with confidence.",
+      "You are on the path to becoming bookable. Finish your profile, complete Guru Academy, and keep building trust so pet families can choose you with confidence.",
     icon: "🐾",
     stars: 2,
     badgeClassName: "border-cyan-200 bg-cyan-50 text-cyan-800",
@@ -443,22 +466,21 @@ function getEliteProgress({
 }) {
   const bookingProgress = Math.min(
     100,
-    Math.round((completedBookingsCount / 25) * 100)
+    Math.round((completedBookingsCount / 25) * 100),
   );
 
   const profileProgress = Math.min(
     100,
-    Math.round((profileCompletion / 90) * 100)
+    Math.round((profileCompletion / 90) * 100),
   );
 
   const bookableProgress = bookable ? 100 : 0;
-
   return Math.round((bookingProgress + profileProgress + bookableProgress) / 3);
 }
 
 async function getGuruProfile(
   userId: string,
-  email?: string | null
+  email?: string | null,
 ): Promise<GuruProfile | null> {
   const byUserId = await supabaseAdmin
     .from("gurus")
@@ -485,14 +507,14 @@ async function getGuruProfile(
   const profileFallback = await supabaseAdmin
     .from("profiles")
     .select(
-      "id, full_name, display_name, name, email, role, account_type, profile_photo_url, avatar_url, image_url"
+      "id, full_name, display_name, name, email, role, account_type, profile_photo_url, avatar_url, image_url",
     )
     .eq("id", userId)
     .maybeSingle();
 
   if (!profileFallback.error && profileFallback.data) {
     const role = normalizeRole(
-      profileFallback.data.role || profileFallback.data.account_type
+      profileFallback.data.role || profileFallback.data.account_type,
     );
 
     if (role === "guru") {
@@ -507,9 +529,6 @@ async function getGuruProfile(
         profile_photo_url: profileFallback.data.profile_photo_url,
         avatar_url: profileFallback.data.avatar_url,
         image_url: profileFallback.data.image_url,
-        video_url: null,
-        profile_video_url: null,
-        intro_video_url: null,
         services: null,
         rate: null,
         hourly_rate: null,
@@ -528,14 +547,14 @@ async function getGuruProfile(
 
 async function getGuruBookings(
   guruProfile: GuruProfile | null,
-  userId: string
+  userId: string,
 ) {
   const guruIds = Array.from(
     new Set(
       [guruProfile?.id, guruProfile?.user_id, userId]
         .map((value) => String(value ?? "").trim())
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
 
   if (!guruIds.length) return [] as BookingRow[];
@@ -567,14 +586,14 @@ async function getGuruBookings(
 
 async function getGuruConversations(
   guruProfile: GuruProfile | null,
-  userId: string
+  userId: string,
 ) {
   const guruIds = Array.from(
     new Set(
       [guruProfile?.id, guruProfile?.user_id, userId]
         .map((value) => String(value ?? "").trim())
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
 
   if (!guruIds.length) return [] as DashboardConversation[];
@@ -588,11 +607,10 @@ async function getGuruConversations(
     .limit(12);
 
   const safeConversations = (conversations || []) as ConversationRow[];
-
   if (!safeConversations.length) return [] as DashboardConversation[];
 
   const conversationIds = safeConversations.map(
-    (conversation) => conversation.id
+    (conversation) => conversation.id,
   );
 
   const { data: messages } = await supabaseAdmin
@@ -606,7 +624,6 @@ async function getGuruConversations(
 
   safeMessages.forEach((message) => {
     const conversationId = String(message.conversation_id || "").trim();
-
     if (conversationId && !latestMessageByConversation.has(conversationId)) {
       latestMessageByConversation.set(conversationId, message);
     }
@@ -625,21 +642,20 @@ async function getGuruConversations(
             ]),
         ])
         .filter(Boolean)
-        .filter((id) => !guruIds.includes(id))
-    )
+        .filter((id) => !guruIds.includes(id)),
+    ),
   );
 
   const { data: profiles } = profileIds.length
     ? await supabaseAdmin
         .from("profiles")
         .select(
-          "id, full_name, display_name, name, first_name, last_name, email, role, account_type, profile_photo_url, avatar_url, image_url"
+          "id, full_name, display_name, name, first_name, last_name, email, role, account_type, profile_photo_url, avatar_url, image_url",
         )
         .in("id", profileIds)
     : { data: [] as ProfileRow[] };
 
   const profileMap = new Map<string, ProfileRow>();
-
   ((profiles || []) as ProfileRow[]).forEach((profile) => {
     profileMap.set(profile.id, profile);
   });
@@ -654,13 +670,14 @@ async function getGuruConversations(
 
     const otherProfile = profileMap.get(otherUserId) || null;
     const role = normalizeRole(
-      otherProfile?.role || otherProfile?.account_type || "customer"
+      otherProfile?.role || otherProfile?.account_type || "customer",
     );
 
     return {
       id: conversation.id,
       name: getProfileName(otherProfile),
-      role: role === "admin" ? "Admin" : role === "guru" ? "Guru" : "Customer",
+      role:
+        role === "admin" ? "Admin" : role === "guru" ? "Guru" : "Pet Parent",
       subject: conversation.subject || "Care conversation",
       preview:
         conversation.last_message_preview ||
@@ -675,6 +692,297 @@ async function getGuruConversations(
       href: `/guru/dashboard/messages/${conversation.id}`,
     };
   });
+}
+
+async function getGuruServiceRates(guruProfile: GuruProfile | null) {
+  const guruId = String(guruProfile?.id ?? "").trim();
+  if (!guruId) return [] as GuruServiceRateRow[];
+
+  const { data, error } = await supabaseAdmin
+    .from("guru_service_rates")
+    .select("*")
+    .eq("guru_id", guruId);
+
+  if (error || !data) return [] as GuruServiceRateRow[];
+  return data as GuruServiceRateRow[];
+}
+
+function isServiceRatePriced(rate: GuruServiceRateRow) {
+  const rateUnit = String(rate.rate_unit || "")
+    .trim()
+    .toLowerCase();
+  const rateAmount = String(rate.rate_amount ?? "").trim();
+
+  if (!rate.is_enabled) return false;
+  if (rateUnit === "custom") return true;
+  return rateAmount.length > 0 && !Number.isNaN(Number(rateAmount));
+}
+
+function hasEnabledPricedServiceRates(serviceRates: GuruServiceRateRow[]) {
+  return serviceRates.some((rate) => isServiceRatePriced(rate));
+}
+
+function isTrustSafetyFeeWaivedThrough2026() {
+  return new Date().getTime() < new Date("2027-01-01T00:00:00.000Z").getTime();
+}
+
+function getBackgroundCheckDisplay(profile: GuruProfile | null) {
+  const statusValues = [
+    profile?.background_check_status,
+    profile?.background_check_fee_status,
+    profile?.background_check_fee_payment_option,
+    profile?.background_check_payment_plan_status,
+    profile?.background_check_reimbursement_status,
+    profile?.checkr_status,
+  ]
+    .map((value) =>
+      String(value || "")
+        .trim()
+        .toLowerCase(),
+    )
+    .filter(Boolean);
+
+  const combinedStatus = statusValues.join(" ");
+  const hasLaunchWaiverStatus = statusValues.some((status) =>
+    [
+      "waived",
+      "waived_2026",
+      "launch_waived",
+      "launch_year_2026_waiver",
+      "deferred_launch",
+    ].includes(status),
+  );
+
+  if (isTrustSafetyFeeWaivedThrough2026() || hasLaunchWaiverStatus) {
+    return {
+      label: "Waived Through 2026",
+      status: "complete" as const,
+      href: "/guru/dashboard/background-check?screening_payment=waived_2026",
+    };
+  }
+
+  if (
+    combinedStatus.includes("clear") ||
+    combinedStatus.includes("complete") ||
+    combinedStatus.includes("approved") ||
+    combinedStatus.includes("passed") ||
+    combinedStatus.includes("paid")
+  ) {
+    return {
+      label: "Complete",
+      status: "complete" as const,
+      href: "/guru/dashboard/background-check",
+    };
+  }
+
+  if (
+    combinedStatus.includes("pending") ||
+    combinedStatus.includes("invited") ||
+    combinedStatus.includes("created") ||
+    combinedStatus.includes("review") ||
+    Boolean(profile?.checkr_invitation_id || profile?.checkr_candidate_id)
+  ) {
+    return {
+      label: "Pending",
+      status: "pending" as const,
+      href: "/guru/dashboard/background-check",
+    };
+  }
+
+  return {
+    label: "Needs Action",
+    status: "needs_action" as const,
+    href: "/guru/dashboard/background-check",
+  };
+}
+
+function isPayoutConnected(profile: GuruProfile | null) {
+  return Boolean(
+    profile?.stripe_account_id &&
+    profile?.stripe_onboarding_complete === true &&
+    profile?.charges_enabled === true &&
+    profile?.payouts_enabled === true,
+  );
+}
+
+function isCompletedStep(row: Record<string, unknown>) {
+  const status = String(row.status || "")
+    .trim()
+    .toLowerCase();
+  return Boolean(
+    row.completed_at ||
+    status === "completed" ||
+    status === "complete" ||
+    status === "done",
+  );
+}
+
+async function getGuruUniversityProgress(
+  userId: string,
+): Promise<GuruUniversityProgress> {
+  const defaultProgress: GuruUniversityProgress = {
+    totalSteps: 1,
+    completedSteps: 0,
+    totalMaterials: 0,
+    acknowledgedMaterials: 0,
+    requiredMaterials: 0,
+    progressPercent: 0,
+    isStarted: false,
+    isComplete: false,
+    certificationLabel: "Certified Guru: Not started",
+    badgeStatus: "Locked",
+    progressHelper:
+      "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion.",
+    academyButtonLabel: "Start Guru Academy",
+  };
+
+  try {
+    const academyType = "guru";
+
+    const [
+      certificationResult,
+      stepsResult,
+      materialsResult,
+      materialProgressResult,
+      stepProgressResult,
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("academy_certifications")
+        .select("badge_status, certificate_status, issued_at")
+        .eq("academy_type", academyType)
+        .eq("user_id", userId)
+        .maybeSingle(),
+
+      supabaseAdmin
+        .from("ambassador_training_steps")
+        .select("id, step_number, title, is_active")
+        .eq("academy_type", academyType)
+        .eq("is_active", true)
+        .order("step_number", { ascending: true }),
+
+      supabaseAdmin
+        .from("academy_step_materials")
+        .select(
+          "id, training_step_id, title, content_type, is_required, is_active",
+        )
+        .eq("academy_type", academyType)
+        .eq("is_active", true),
+
+      supabaseAdmin
+        .from("academy_material_progress")
+        .select("material_id, training_step_id, acknowledged_at")
+        .eq("academy_type", academyType)
+        .eq("user_id", userId)
+        .not("acknowledged_at", "is", null),
+
+      supabaseAdmin
+        .from("academy_step_progress")
+        .select("training_step_id, status, completed_at")
+        .eq("academy_type", academyType)
+        .eq("user_id", userId),
+    ]);
+
+    if (stepsResult.error) throw stepsResult.error;
+    if (materialsResult.error) throw materialsResult.error;
+    if (materialProgressResult.error) throw materialProgressResult.error;
+    if (stepProgressResult.error) throw stepProgressResult.error;
+
+    const activeSteps = Array.isArray(stepsResult.data) ? stepsResult.data : [];
+    const firstActiveStep = activeSteps[0] || null;
+    const orientationStepId = String(firstActiveStep?.id || "");
+
+    const activeMaterials = Array.isArray(materialsResult.data)
+      ? materialsResult.data
+      : [];
+    const orientationMaterials = orientationStepId
+      ? activeMaterials.filter(
+          (material) =>
+            String(material.training_step_id || "") === orientationStepId,
+        )
+      : activeMaterials;
+
+    const requiredMaterials = orientationMaterials.filter(
+      (material) => material.is_required !== false,
+    );
+
+    const visibleMaterialIds = new Set(
+      orientationMaterials
+        .map((material) => String(material.id))
+        .filter(Boolean),
+    );
+
+    const materialProgress = Array.isArray(materialProgressResult.data)
+      ? materialProgressResult.data
+      : [];
+
+    const acknowledgedMaterials = materialProgress.filter(
+      (row) =>
+        Boolean(row.acknowledged_at) &&
+        visibleMaterialIds.has(String(row.material_id || "")),
+    ).length;
+
+    const stepProgress = Array.isArray(stepProgressResult.data)
+      ? stepProgressResult.data
+      : [];
+
+    const completedSteps = stepProgress.filter((row) => {
+      if (!isCompletedStep(row)) return false;
+      if (!orientationStepId) return true;
+      return String(row.training_step_id || "") === orientationStepId;
+    }).length;
+
+    const certification = certificationResult.error
+      ? null
+      : certificationResult.data;
+    const certificationBadgeIssued =
+      String(certification?.badge_status || "").toLowerCase() === "issued";
+
+    const totalSteps = 1;
+    const normalizedCompletedSteps =
+      completedSteps > 0 || certificationBadgeIssued ? 1 : 0;
+    const isComplete =
+      normalizedCompletedSteps >= totalSteps || certificationBadgeIssued;
+    const isStarted = isComplete || acknowledgedMaterials > 0;
+    const progressPercent = Math.round(
+      (normalizedCompletedSteps / totalSteps) * 100,
+    );
+    const normalizedRequiredMaterials =
+      requiredMaterials.length || orientationMaterials.length;
+
+    return {
+      totalSteps,
+      completedSteps: normalizedCompletedSteps,
+      totalMaterials: orientationMaterials.length,
+      acknowledgedMaterials,
+      requiredMaterials: normalizedRequiredMaterials,
+      progressPercent,
+      isStarted,
+      isComplete,
+      certificationLabel: isComplete
+        ? "Certified Guru: Completed"
+        : isStarted
+          ? "Certified Guru: In progress"
+          : "Certified Guru: Not started",
+      badgeStatus: isComplete
+        ? "Certified Guru"
+        : isStarted
+          ? "In progress"
+          : "Locked",
+      progressHelper: isComplete
+        ? "Certified Guru badge issued"
+        : isStarted
+          ? `${acknowledgedMaterials} of ${normalizedRequiredMaterials} required materials acknowledged`
+          : "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion.",
+      academyButtonLabel: isComplete
+        ? "Review Guru Academy"
+        : isStarted
+          ? "Continue Guru Academy"
+          : "Start Guru Academy",
+    };
+  } catch (error) {
+    console.warn("Unable to load Guru Academy dashboard progress:", error);
+    return defaultProgress;
+  }
 }
 
 function GuruAvatar({
@@ -781,9 +1089,7 @@ function TierStars({ stars }: { stars: number }) {
       {Array.from({ length: 5 }).map((_, index) => (
         <span
           key={index}
-          className={`text-base ${
-            index < stars ? "text-amber-400" : "text-slate-300"
-          }`}
+          className={`text-base ${index < stars ? "text-amber-400" : "text-slate-300"}`}
         >
           ★
         </span>
@@ -810,7 +1116,6 @@ function StatCard({
             {value}
           </p>
         </div>
-
         {icon ? (
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-cyan-50 text-2xl ring-1 ring-cyan-100">
             {icon}
@@ -838,12 +1143,10 @@ function BookingCard({ booking }: { booking: BookingRow }) {
             {getCustomerName(booking)}
           </p>
         </div>
-
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase !text-emerald-800">
           {status}
         </span>
       </div>
-
       <p className="mt-4 text-sm font-bold !text-slate-700">
         {getBookingDate(booking)}
       </p>
@@ -870,12 +1173,10 @@ function ConversationCard({
             {conversation.role}
           </p>
         </div>
-
         <span className="text-xs font-bold !text-slate-700">
           {formatActivity(conversation.lastActivity)}
         </span>
       </div>
-
       <p className="mt-3 text-sm font-black !text-slate-900">
         {conversation.subject}
       </p>
@@ -900,11 +1201,9 @@ function EmptyState({
   return (
     <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
       <h3 className="text-xl font-black !text-slate-900">{title}</h3>
-
       <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 !text-slate-700">
         {body}
       </p>
-
       {actionHref && actionLabel ? (
         <Link
           href={actionHref}
@@ -941,12 +1240,10 @@ function EliteProgressRow({
             Current: {value}
           </p>
         </div>
-
         <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-black !text-slate-900 ring-1 ring-cyan-100">
           Goal: {goal}
         </span>
       </div>
-
       <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
         <div
           className="h-full rounded-full bg-[linear-gradient(90deg,#39c8b4_0%,#49aaf0_100%)]"
@@ -957,206 +1254,84 @@ function EliteProgressRow({
   );
 }
 
-function isServiceRatePriced(rate: GuruServiceRateRow) {
-  const rateUnit = String(rate.rate_unit || "").trim().toLowerCase();
-  const rateAmount = String(rate.rate_amount ?? "").trim();
-
-  if (!rate.is_enabled) return false;
-  if (rateUnit === "custom") return true;
-
-  return rateAmount.length > 0 && !Number.isNaN(Number(rateAmount));
-}
-
-function hasEnabledPricedServiceRates(serviceRates: GuruServiceRateRow[]) {
-  return serviceRates.some((rate) => isServiceRatePriced(rate));
-}
-
-async function getGuruServiceRates(guruProfile: GuruProfile | null) {
-  const guruId = String(guruProfile?.id ?? "").trim();
-
-  if (!guruId) return [] as GuruServiceRateRow[];
-
-  const { data, error } = await supabaseAdmin
-    .from("guru_service_rates")
-    .select("*")
-    .eq("guru_id", guruId);
-
-  if (error || !data) return [] as GuruServiceRateRow[];
-
-  return data as GuruServiceRateRow[];
-}
-
-function isTrustSafetyFeeWaivedThrough2026() {
-  return new Date().getTime() < new Date("2027-01-01T00:00:00.000Z").getTime();
-}
-
-function getBackgroundCheckDisplay(profile: GuruProfile | null) {
-  const statusValues = [
-    profile?.background_check_status,
-    profile?.background_check_fee_status,
-    profile?.background_check_fee_payment_option,
-    profile?.background_check_payment_plan_status,
-    profile?.background_check_reimbursement_status,
-    profile?.checkr_status,
-  ]
-    .map((value) => String(value || "").trim().toLowerCase())
-    .filter(Boolean);
-
-  const combinedStatus = statusValues.join(" ");
-  const hasLaunchWaiverStatus = statusValues.some((status) =>
-    [
-      "waived",
-      "waived_2026",
-      "launch_waived",
-      "launch_year_2026_waiver",
-      "deferred_launch",
-    ].includes(status),
-  );
-
-  if (isTrustSafetyFeeWaivedThrough2026() || hasLaunchWaiverStatus) {
-    return {
-      label: "Waived Through 2026",
-      status: "complete" as const,
-      href: "/guru/dashboard/background-check?screening_payment=waived_2026",
-    };
-  }
-
-  if (
-    combinedStatus.includes("clear") ||
-    combinedStatus.includes("complete") ||
-    combinedStatus.includes("approved") ||
-    combinedStatus.includes("passed") ||
-    combinedStatus.includes("paid")
-  ) {
-    return {
-      label: "Complete",
-      status: "complete" as const,
-      href: "/guru/dashboard/background-check",
-    };
-  }
-
-  if (
-    combinedStatus.includes("pending") ||
-    combinedStatus.includes("invited") ||
-    combinedStatus.includes("created") ||
-    combinedStatus.includes("review") ||
-    Boolean(profile?.checkr_invitation_id || profile?.checkr_candidate_id)
-  ) {
-    return {
-      label: "Pending",
-      status: "pending" as const,
-      href: "/guru/dashboard/background-check",
-    };
-  }
-
-  return {
-    label: "Needs Action",
-    status: "needs_action" as const,
-    href: "/guru/dashboard/background-check",
-  };
-}
-
-function isPayoutConnected(profile: GuruProfile | null) {
-  return Boolean(
-    profile?.stripe_account_id &&
-      profile?.stripe_onboarding_complete === true &&
-      profile?.charges_enabled === true &&
-      profile?.payouts_enabled === true
-  );
-}
-
 function GuruSetupChecklist({
   profile,
   profileCompletion,
-  services,
-  serviceRates,
+  serviceRatesReady,
 }: {
   profile: GuruProfile | null;
   profileCompletion: number;
-  services: string[];
-  serviceRates: GuruServiceRateRow[];
+  serviceRatesReady: boolean;
 }) {
-  const hasName = Boolean(profile?.full_name || profile?.display_name || profile?.name);
-  const hasBio = Boolean(profile?.bio?.trim());
-  const hasPhoto = Boolean(getGuruImage(profile));
-  const hasStep1Profile = hasName && hasBio && hasPhoto;
-
-  const hasCity = Boolean(profile?.city?.trim());
-  const hasState = Boolean(profile?.state?.trim());
-  const hasZip = Boolean(profile?.zip_code || profile?.postal_code);
-  const hasRadius = Boolean(
-    profile?.service_radius_miles || profile?.service_radius || profile?.radius_miles,
-  );
-  const hasServiceArea = hasCity && hasState && hasZip && hasRadius;
-
-  const hasFallbackRate = Boolean(profile?.rate || profile?.hourly_rate || profile?.price);
-  const hasServiceSpecificPricing = hasEnabledPricedServiceRates(serviceRates);
-  const hasServicesAndPricing =
-    services.length > 0 && (hasServiceSpecificPricing || hasFallbackRate);
-  const hasRequestedPublicVisibility = Boolean(profile?.is_public);
-  const hasStep3Complete = hasServicesAndPricing && hasRequestedPublicVisibility;
   const background = getBackgroundCheckDisplay(profile);
   const payoutConnected = isPayoutConnected(profile);
+  const hasProfile = profileCompletion >= 70;
+  const hasServiceArea = Boolean(
+    profile?.city ||
+    profile?.state ||
+    profile?.zip_code ||
+    profile?.postal_code,
+  );
+  const hasServices =
+    normalizeServices(profile?.services).length > 0 || serviceRatesReady;
 
   const steps = [
     {
       number: 1,
       title: "Complete your profile",
       body: "Add your name, bio, and profile photo so pet parents know who you are.",
+      status: hasProfile ? "complete" : "needs_action",
+      statusLabel: hasProfile ? "Complete" : "Needs Action",
       href: "/guru/dashboard/profile?step=1",
-      status: hasStep1Profile ? "complete" : "needs_action",
-      statusLabel: hasStep1Profile ? "Complete" : "Needs Action",
     },
     {
       number: 2,
       title: "Set your service area",
       body: "Add your city, state, ZIP/address, and travel radius so local pet parents can find you.",
-      href: "/guru/dashboard/profile?step=2",
       status: hasServiceArea ? "complete" : "needs_action",
       statusLabel: hasServiceArea ? "Complete" : "Needs Action",
+      href: "/guru/dashboard/profile?step=2",
     },
     {
       number: 3,
       title: "Add services, pricing, and public request",
       body: "Choose your care services, confirm your rates, and request public visibility after Steps 1–3 are complete.",
+      status: hasServices ? "complete" : "needs_action",
+      statusLabel: hasServices ? "Complete" : "Needs Action",
       href: "/guru/dashboard/profile?step=3",
-      status: hasStep3Complete ? "complete" : "needs_action",
-      statusLabel: hasStep3Complete ? "Complete" : "Needs Action",
     },
     {
       number: 4,
       title: "Complete Trust & Safety Screening",
-      body:
-        background.status === "complete" && background.label.includes("Waived")
-          ? "Your Trust & Safety Screening fee is waived through December 31, 2026 during SitGuru’s launch year."
-          : "Start or finish your secure SitGuru Trust & Safety Screening to build trust with pet parents and qualify for bookings.",
-      href: background.href,
+      body: "Your Trust & Safety Screening fee is waived through December 31, 2026 during SitGuru's launch year.",
       status: background.status,
       statusLabel: background.label,
+      href: background.href,
     },
     {
       number: 5,
       title: "Connect payouts",
       body: "Connect Stripe payouts so SitGuru can pay you after completed bookings.",
-      href: "/api/stripe/connect",
       status: payoutConnected ? "complete" : "needs_action",
       statusLabel: payoutConnected ? "Complete" : "Needs Action",
+      href: "/api/stripe/connect/onboard?role=guru",
     },
   ];
 
-  const completedSteps = steps.filter((step) => step.status === "complete").length;
+  const completedSteps = steps.filter(
+    (step) => step.status === "complete",
+  ).length;
   const allComplete = completedSteps === steps.length;
-  const nextStep = steps.find((step) => step.status !== "complete") || steps[0];
+  const nextStep =
+    steps.find((step) => step.status !== "complete") || steps[steps.length - 1];
 
   const getStepClassName = (status: string) => {
     if (status === "complete") {
-      return "border-emerald-400 bg-[linear-gradient(135deg,#059669_0%,#10b981_100%)] text-white shadow-[0_18px_36px_rgba(5,150,105,0.24)]";
+      return "border-emerald-400 bg-[linear-gradient(135deg,#10b981_0%,#05a877_100%)] text-white shadow-[0_18px_36px_rgba(5,150,105,0.24)]";
     }
-
     if (status === "pending") {
       return "border-amber-400 bg-[linear-gradient(135deg,#d97706_0%,#f59e0b_100%)] text-white shadow-[0_18px_36px_rgba(217,119,6,0.22)]";
     }
-
     return "border-rose-400 bg-[linear-gradient(135deg,#dc2626_0%,#f43f5e_100%)] text-white shadow-[0_18px_36px_rgba(220,38,38,0.24)]";
   };
 
@@ -1176,17 +1351,15 @@ function GuruSetupChecklist({
             <p className="text-sm font-black uppercase tracking-[0.28em] !text-white/85">
               {allComplete ? "Setup Complete" : "Action Required"}
             </p>
-
             <h2 className="mt-3 text-4xl font-black leading-tight tracking-[-0.04em] !text-white sm:text-5xl">
               {allComplete
                 ? "Your Guru setup is complete"
                 : "Complete your Guru setup"}
             </h2>
-
             <p className="mt-3 max-w-4xl text-lg font-bold leading-8 !text-white/90">
               {allComplete
-                ? "Great work. All 5 setup steps are complete, and your dashboard is ready for bookings based on your approval status."
-                : "Follow these steps in order so pet parents can find you, trust you, book your services, and SitGuru can pay you after completed care."}
+                ? "Great work. All 5 setup steps are complete. Complete Guru Academy and wait for approval before your profile becomes bookable."
+                : "Follow these steps in order so Pet Parents can find you, trust you, book your services, and SitGuru can pay you after completed care."}
             </p>
           </div>
 
@@ -1253,9 +1426,7 @@ function GuruSetupChecklist({
             const isComplete = step.status === "complete";
             const isPending = step.status === "pending";
 
-            const stepCardClassName = `group flex min-h-[230px] flex-col justify-between rounded-[1.45rem] border p-5 transition hover:-translate-y-1 hover:shadow-xl ${getStepClassName(
-              step.status,
-            )}`;
+            const stepCardClassName = `group flex min-h-[230px] flex-col justify-between rounded-[1.45rem] border p-5 transition hover:-translate-y-1 hover:shadow-xl ${getStepClassName(step.status)}`;
 
             const stepCardContent = (
               <>
@@ -1264,21 +1435,17 @@ function GuruSetupChecklist({
                     <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20 text-xl font-black !text-white ring-1 ring-white/35">
                       {isComplete ? "✓" : step.number}
                     </span>
-
                     <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] !text-white ring-1 ring-white/30">
                       {step.statusLabel}
                     </span>
                   </div>
-
                   <p className="mt-5 text-lg font-black leading-6 !text-white">
                     Step {step.number} {isComplete ? "✓" : "→"} {step.title}
                   </p>
-
                   <p className="mt-3 text-sm font-bold leading-6 !text-white/90">
                     {step.body}
                   </p>
                 </div>
-
                 <div className="mt-5 flex items-center justify-between gap-3">
                   <span className="text-sm font-black !text-white">
                     {step.number === 4
@@ -1304,7 +1471,11 @@ function GuruSetupChecklist({
 
             if (step.number === 5 && !isComplete) {
               return (
-                <a key={step.number} href={step.href} className={stepCardClassName}>
+                <a
+                  key={step.number}
+                  href={step.href}
+                  className={stepCardClassName}
+                >
                   {stepCardContent}
                 </a>
               );
@@ -1321,6 +1492,111 @@ function GuruSetupChecklist({
               </Link>
             );
           })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function GuruAcademyCard({ progress }: { progress: GuruUniversityProgress }) {
+  return (
+    <section className="mt-8 overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+      <div className="grid gap-6 bg-[radial-gradient(circle_at_88%_20%,rgba(255,255,255,0.88),transparent_20%),linear-gradient(110deg,#ecfdf5_0%,#e8fff7_48%,#e8f7ff_100%)] p-6 sm:p-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.26em] !text-emerald-800">
+            SitGuru University
+          </p>
+          <h2 className="mt-3 text-4xl font-black leading-tight tracking-[-0.045em] !text-[#07132f] sm:text-5xl">
+            Guru Academy
+          </h2>
+          <p className="mt-3 max-w-3xl text-base font-bold leading-7 !text-slate-700">
+            Learn SitGuru. Easy as 1, 2, 3. Watch the Guru intro video, review
+            the Guru Success Guide, then acknowledge completion to earn your
+            Certified Guru badge.
+          </p>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-700">
+                Progress
+              </p>
+              <p className="mt-2 text-2xl font-black !text-slate-950">
+                {progress.completedSteps} of {progress.totalSteps}
+              </p>
+              <p className="mt-1 text-xs font-bold !text-slate-600">
+                {progress.progressHelper}
+              </p>
+            </div>
+
+            <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-700">
+                Badge
+              </p>
+              <p className="mt-2 text-2xl font-black !text-slate-950">
+                {progress.badgeStatus}
+              </p>
+              <p className="mt-1 text-xs font-bold !text-slate-600">
+                {progress.isComplete
+                  ? "Certified Guru badge issued"
+                  : "Issued after academy completion"}
+              </p>
+            </div>
+
+            <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-700">
+                Estimated Time
+              </p>
+              <p className="mt-2 text-2xl font-black !text-slate-950">
+                10–15 min
+              </p>
+              <p className="mt-1 text-xs font-bold !text-slate-600">
+                Mobile-friendly training
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/guru/dashboard/university"
+              className="inline-flex min-h-[52px] items-center justify-center rounded-[1rem] bg-emerald-600 px-7 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(5,150,105,0.18)] transition hover:-translate-y-0.5 hover:bg-emerald-700"
+            >
+              {progress.academyButtonLabel}
+            </Link>
+            <Link
+              href="/guru/dashboard/profile?step=1"
+              className="inline-flex min-h-[52px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-7 py-3 text-base font-black !text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50"
+            >
+              Review My Profile
+            </Link>
+            <Link
+              href="/guru/dashboard/earnings"
+              className="inline-flex min-h-[52px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-7 py-3 text-base font-black !text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50"
+            >
+              Review Payouts
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-[1.75rem] border border-emerald-100 bg-white/90 p-5 shadow-sm">
+          <p className="text-sm font-black !text-slate-950">
+            What you will learn
+          </p>
+          <div className="mt-4 grid gap-3">
+            {[
+              "Complete and polish your Guru profile",
+              "Manage bookings, messages, care details, and reviews",
+              "Follow SitGuru trust, safety, and pet care standards",
+              "Understand Stripe payouts, earnings, and tax reminders",
+              "Use the Guru Success Center to keep growing",
+            ].map((item) => (
+              <div
+                key={item}
+                className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black !text-emerald-900"
+              >
+                ✓ {item}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -1345,58 +1621,40 @@ export default async function GuruDashboardPage() {
     redirect("/guru/application");
   }
 
-  const [bookings, conversations, serviceRates] = await Promise.all([
-    getGuruBookings(guruProfile, user.id),
-    getGuruConversations(guruProfile, user.id),
-    getGuruServiceRates(guruProfile),
-  ]);
+  const [bookings, conversations, serviceRates, universityProgress] =
+    await Promise.all([
+      getGuruBookings(guruProfile, user.id),
+      getGuruConversations(guruProfile, user.id),
+      getGuruServiceRates(guruProfile),
+      getGuruUniversityProgress(user.id),
+    ]);
 
-  const displayName = getGuruName(guruProfile, user.email);
-  const welcomeName = getFirstName(displayName);
+  const name = getGuruName(guruProfile, user.email);
+  const welcomeName = getFirstName(name);
   const imageUrl = getGuruImage(guruProfile);
-  const services = normalizeServices(guruProfile.services);
+  const location = getGuruLocation(guruProfile);
   const profileCompletion = calculateProfileCompletion(guruProfile);
-  const status = normalizeApplicationStatus(guruProfile);
   const bookable = isBookable(guruProfile);
-
-  const upcomingBookings = bookings.filter((booking) => {
-    const statusText = getBookingStatus(booking).toLowerCase();
-
-    return (
-      statusText.includes("pending") ||
-      statusText.includes("confirm") ||
-      statusText.includes("active") ||
-      statusText === "paid"
-    );
-  });
-
-  const completedBookings = bookings.filter((booking) =>
-    getBookingStatus(booking).toLowerCase().includes("complete")
-  );
-
-  const completedBookingsCount = completedBookings.length;
-
   const guruTier = getGuruTier(
-    completedBookingsCount,
+    bookings.filter(
+      (booking) => getBookingStatus(booking).toLowerCase() === "completed",
+    ).length,
     profileCompletion,
-    bookable
+    bookable,
+    universityProgress.isComplete,
   );
-
+  const completedBookings = bookings.filter(
+    (booking) => getBookingStatus(booking).toLowerCase() === "completed",
+  );
+  const upcomingBookings = bookings.filter((booking) => {
+    const status = getBookingStatus(booking).toLowerCase();
+    return !["completed", "complete", "cancelled", "canceled"].includes(status);
+  });
   const eliteProgress = getEliteProgress({
-    completedBookingsCount,
+    completedBookingsCount: completedBookings.length,
     profileCompletion,
     bookable,
   });
-
-  const completedCarePercent = Math.min(
-    100,
-    Math.round((completedBookingsCount / 25) * 100)
-  );
-
-  const profilePercent = Math.min(
-    100,
-    Math.round((profileCompletion / 90) * 100)
-  );
 
   return (
     <main
@@ -1410,14 +1668,13 @@ export default async function GuruDashboardPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.34em] !text-[#07132f]">
                 SitGuru Guru Portal
               </p>
-
               <h1 className="mt-4 text-5xl font-extrabold leading-[0.98] tracking-[-0.055em] !text-[#07132f] sm:text-6xl lg:text-7xl">
                 Welcome back, {welcomeName} 👋
               </h1>
-
               <p className="mt-5 max-w-3xl text-xl font-light leading-9 !text-slate-700">
-                Manage bookings, messages, availability, earnings, and profile
-                photos — all in one polished Guru workspace.
+                Manage bookings, messages, availability, earnings, academy
+                training, and profile photos — all in one polished Guru
+                workspace.
               </p>
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -1427,7 +1684,12 @@ export default async function GuruDashboardPage() {
                   <GuruPawCrest className="h-6 w-6" />
                   <span>{guruTier.label}</span>
                 </div>
-
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2">
+                  <span className="text-lg">🎓</span>
+                  <span className="text-sm font-black !text-slate-900">
+                    {universityProgress.certificationLabel}
+                  </span>
+                </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2">
                   <TierStars stars={guruTier.stars} />
                   <span className="text-sm font-black !text-slate-900">
@@ -1443,69 +1705,65 @@ export default async function GuruDashboardPage() {
                 >
                   My Bookings
                 </Link>
-
                 <Link
                   href="/guru/dashboard/messages"
                   className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   Open Messages
                 </Link>
-
                 <Link
                   href="/guru/dashboard/availability"
                   className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   Availability
                 </Link>
-
                 <Link
-                  href="/guru/dashboard/profile?step=1"
+                  href="/guru/dashboard/profile"
                   className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   My Profile
                 </Link>
-
                 <Link
                   href="/guru/dashboard/earnings"
                   className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   Earnings
                 </Link>
+                <Link
+                  href="/guru/dashboard/university"
+                  className="rounded-[1.2rem] bg-emerald-700 px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(5,150,105,0.18)] transition hover:-translate-y-0.5 hover:bg-emerald-800"
+                >
+                  Guru Academy
+                </Link>
               </div>
             </div>
 
             <div className="flex flex-col items-center text-center">
-              <GuruAvatar name={displayName} imageUrl={imageUrl} />
-
-              <h2 className="mt-5 text-4xl font-extrabold tracking-[-0.04em] !text-[#07132f] lg:text-5xl">
-                {displayName}
+              <GuruAvatar name={name} imageUrl={imageUrl} />
+              <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] !text-[#07132f]">
+                {name}
               </h2>
-
-              <div className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-white/70 px-4 py-2 shadow-sm ring-1 ring-white/80">
-                <GuruPawCrest className="h-8 w-8" />
-                <p className="text-2xl font-extrabold !text-slate-900">
-                  {guruTier.label}
+              <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm">
+                <GuruPawCrest className="h-6 w-6" />
+                {guruTier.label}
+              </div>
+              <div className="mt-2 flex flex-col items-center gap-1">
+                <TierStars stars={guruTier.stars} />
+                <p className="text-sm font-semibold !text-slate-700">
+                  {getGuruTitle(guruProfile)}
+                </p>
+                <p className="text-sm font-semibold !text-slate-700">
+                  {location}
                 </p>
               </div>
-
-              <div className="mt-2">
-                <TierStars stars={guruTier.stars} />
+              <div className="mt-5 w-full max-w-[300px] rounded-[1.4rem] bg-white/90 p-4 text-left shadow-[0_12px_28px_rgba(15,23,42,0.10)] ring-1 ring-white/70">
+                <GuruMediaUploader
+                  userId={user.id}
+                  guruProfileId={String(guruProfile.id ?? "")}
+                  displayName={name}
+                  initialPhotoUrl={imageUrl}
+                />
               </div>
-
-              <p className="mt-3 text-lg font-semibold !text-slate-700">
-                {getGuruTitle(guruProfile)}
-              </p>
-
-              <p className="mt-1 text-lg font-semibold !text-slate-700">
-                {getGuruLocation(guruProfile)}
-              </p>
-
-              <GuruMediaUploader
-                userId={user.id}
-                guruProfileId={String(guruProfile.id ?? "")}
-                displayName={displayName}
-                initialPhotoUrl={imageUrl}
-              />
             </div>
           </div>
         </section>
@@ -1513,47 +1771,55 @@ export default async function GuruDashboardPage() {
         <GuruSetupChecklist
           profile={guruProfile}
           profileCompletion={profileCompletion}
-          services={services}
-          serviceRates={serviceRates}
+          serviceRatesReady={hasEnabledPricedServiceRates(serviceRates)}
         />
 
-        <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <GuruAcademyCard progress={universityProgress} />
+
+        <section className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           <StatCard label="Bookings" value={bookings.length} icon="🗓️" />
-          <StatCard label="Upcoming" value={upcomingBookings.length} icon="🕘" />
+          <StatCard
+            label="Upcoming"
+            value={upcomingBookings.length}
+            icon="⏱️"
+          />
           <StatCard
             label="Completed"
             value={completedBookings.length}
             icon="✅"
           />
-          <StatCard label="Unread" value={conversations.length} icon="💬" />
+          <StatCard label="Unread" value={0} icon="💬" />
           <StatCard label="Profile" value={`${profileCompletion}%`} icon="⭐" />
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-2">
-          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
-                Bookings
-              </p>
-
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
+                  Bookings
+                </p>
+                <h2 className="text-2xl font-black !text-[#07132f]">
+                  Your care schedule
+                </h2>
+              </div>
               <Link
                 href="/guru/dashboard/bookings"
-                className="rounded-full border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm font-black !text-slate-900 transition hover:bg-cyan-100"
+                className="rounded-full border border-cyan-200 px-4 py-2 text-sm font-black !text-[#07132f] hover:bg-cyan-50"
               >
                 View all bookings
               </Link>
             </div>
-
-            <div className="mt-6">
-              {upcomingBookings.slice(0, 4).length ? (
-                <div className="grid gap-4">
-                  {upcomingBookings.slice(0, 4).map((booking, index) => (
+            <div className="grid gap-4">
+              {upcomingBookings.length ? (
+                upcomingBookings
+                  .slice(0, 3)
+                  .map((booking) => (
                     <BookingCard
-                      key={String(booking.id || index)}
+                      key={String(booking.id || Math.random())}
                       booking={booking}
                     />
-                  ))}
-                </div>
+                  ))
               ) : (
                 <EmptyState
                   title="No upcoming bookings yet"
@@ -1561,32 +1827,35 @@ export default async function GuruDashboardPage() {
                 />
               )}
             </div>
-          </section>
+          </div>
 
-          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
-                Messages
-              </p>
-
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
+                  Messages
+                </p>
+                <h2 className="text-2xl font-black !text-[#07132f]">
+                  Inbox activity
+                </h2>
+              </div>
               <Link
                 href="/guru/dashboard/messages"
-                className="rounded-full border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm font-black !text-slate-900 transition hover:bg-cyan-100"
+                className="rounded-full border border-cyan-200 px-4 py-2 text-sm font-black !text-[#07132f] hover:bg-cyan-50"
               >
                 Open inbox
               </Link>
             </div>
-
-            <div className="mt-6">
-              {conversations.slice(0, 4).length ? (
-                <div className="grid gap-4">
-                  {conversations.slice(0, 4).map((conversation) => (
+            <div className="grid gap-4">
+              {conversations.length ? (
+                conversations
+                  .slice(0, 3)
+                  .map((conversation) => (
                     <ConversationCard
                       key={conversation.id}
                       conversation={conversation}
                     />
-                  ))}
-                </div>
+                  ))
               ) : (
                 <EmptyState
                   title="No messages yet"
@@ -1594,261 +1863,172 @@ export default async function GuruDashboardPage() {
                 />
               )}
             </div>
-          </section>
+          </div>
         </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-3">
-          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)] lg:col-span-2">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
-                  Guru Recognition
-                </p>
-
-                <h3 className="mt-3 text-4xl font-black leading-tight !text-slate-900">
-                  Become an Elite Guru 🐾
-                </h3>
-
-                <p className="mt-3 max-w-3xl text-base font-bold leading-7 !text-slate-700">
-                  Elite Guru is SitGuru’s top recognition for Gurus who build
-                  trust one happy pet, one safe walk, and one completed booking
-                  at a time. Think of it like earning your place at the front of
-                  the pack.
-                </p>
-              </div>
-
-              <div
-                className={`inline-flex w-fit items-center gap-2 rounded-full border px-4 py-2 text-sm font-black ${guruTier.badgeClassName}`}
-              >
-                <GuruPawCrest className="h-6 w-6" />
-                <span>{guruTier.label}</span>
-              </div>
-            </div>
-
-            <div
-              className={`mt-6 rounded-[1.5rem] border p-5 ${guruTier.cardClassName}`}
-            >
-              <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-                <div>
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white bg-white shadow-sm">
-                    <GuruPawCrest className="h-20 w-20" />
-                  </div>
-
-                  <p className="mt-5 text-2xl font-black !text-slate-900">
-                    Current crest: {guruTier.label}
-                  </p>
-
-                  <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
-                    {guruTier.description}
-                  </p>
-
-                  <div className="mt-5 flex items-center gap-3 rounded-[1rem] border border-slate-200 bg-white px-4 py-3">
-                    <TierStars stars={guruTier.stars} />
-                    <span className="text-sm font-black !text-slate-900">
-                      {guruTier.shortLabel} Level
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-[1.25rem] border border-slate-200 bg-white p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
-                        Elite Guru Progress
-                      </p>
-                      <p className="mt-1 text-3xl font-black !text-slate-900">
-                        {eliteProgress}%
-                      </p>
-                    </div>
-
-                    <span className="rounded-full bg-amber-50 px-4 py-2 text-sm font-black !text-amber-800 ring-1 ring-amber-200">
-                      Goal: Elite Guru
-                    </span>
-                  </div>
-
-                  <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-[linear-gradient(90deg,#39c8b4_0%,#49aaf0_50%,#f59e0b_100%)]"
-                      style={{ width: `${eliteProgress}%` }}
-                    />
-                  </div>
-
-                  <div className="mt-5 grid gap-3">
-                    <EliteProgressRow
-                      icon="🐕"
-                      label="Complete happy pet care bookings"
-                      value={`${completedBookingsCount} completed`}
-                      goal="25 completed"
-                      percent={completedCarePercent}
-                    />
-
-                    <EliteProgressRow
-                      icon="🐾"
-                      label="Keep your Guru profile polished"
-                      value={`${profileCompletion}% complete`}
-                      goal="90% complete"
-                      percent={profilePercent}
-                    />
-
-                    <EliteProgressRow
-                      icon="🦴"
-                      label="Stay bookable for pet parents"
-                      value={bookable ? "Bookable" : "Not bookable yet"}
-                      goal="Bookable"
-                      percent={bookable ? 100 : 0}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-5">
-                <p className="text-lg font-black !text-slate-900">
-                  How to move up the pack
-                </p>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-[1rem] bg-white p-4 ring-1 ring-emerald-100">
-                    <p className="text-sm font-black !text-slate-900">
-                      🐶 Give pet parents confidence
-                    </p>
-                    <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
-                      Keep your bio, services, location, rate, and photo updated.
-                    </p>
-                  </div>
-
-                  <div className="rounded-[1rem] bg-white p-4 ring-1 ring-emerald-100">
-                    <p className="text-sm font-black !text-slate-900">
-                      🐕 Complete more care
-                    </p>
-                    <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
-                      The more confirmed care you complete, the stronger your
-                      SitGuru reputation becomes.
-                    </p>
-                  </div>
-
-                  <div className="rounded-[1rem] bg-white p-4 ring-1 ring-emerald-100">
-                    <p className="text-sm font-black !text-slate-900">
-                      💬 Be responsive and friendly
-                    </p>
-                    <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
-                      Quick, kind updates help families feel their pets are in
-                      good hands.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
-            <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
-              Public Profile
+        <section className="mt-8 grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+          <div
+            className={`rounded-[2rem] border p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)] ${guruTier.cardClassName}`}
+          >
+            <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
+              Guru Recognition
+            </p>
+            <h2 className="mt-1 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
+              {universityProgress.isComplete
+                ? "Certified Guru badge issued 🎓"
+                : "Become a Certified Guru 🎓"}
+            </h2>
+            <p className="mt-2 max-w-4xl text-sm font-bold leading-7 !text-slate-700">
+              {universityProgress.isComplete
+                ? "Your Guru Academy badge is active. Keep your profile polished, respond quickly, and deliver trusted care to move toward Elite Guru."
+                : "Complete Guru Academy to unlock your Certified Guru badge. This badge helps Pet Parents understand that you completed SitGuru University onboarding."}
             </p>
 
-            <div className="mt-8 h-3 overflow-hidden rounded-full bg-slate-200">
+            <div className="mt-6 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+              <div className="rounded-[1.5rem] border border-cyan-200 bg-white/70 p-5 text-center">
+                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-cyan-50 text-4xl ring-1 ring-cyan-100">
+                  {universityProgress.isComplete ? "🎓" : "🛡️"}
+                </div>
+                <p className="mt-4 text-xl font-black !text-[#07132f]">
+                  Current crest: {guruTier.label}
+                </p>
+                <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
+                  {guruTier.description}
+                </p>
+              </div>
+
+              <div className="grid gap-4">
+                <EliteProgressRow
+                  label="Complete happy pet care bookings"
+                  value={`${completedBookings.length} completed`}
+                  goal="25 completed"
+                  percent={Math.min(
+                    100,
+                    Math.round((completedBookings.length / 25) * 100),
+                  )}
+                  icon="🐕"
+                />
+                <EliteProgressRow
+                  label="Keep your Guru profile polished"
+                  value={`${profileCompletion}% complete`}
+                  goal="90% complete"
+                  percent={Math.min(
+                    100,
+                    Math.round((profileCompletion / 90) * 100),
+                  )}
+                  icon="🧹"
+                />
+                <EliteProgressRow
+                  label="Complete Guru Academy"
+                  value={
+                    universityProgress.isComplete
+                      ? "Certified"
+                      : "Not certified yet"
+                  }
+                  goal="Certified Guru"
+                  percent={
+                    universityProgress.isComplete
+                      ? 100
+                      : universityProgress.progressPercent
+                  }
+                  icon="🎓"
+                />
+              </div>
+            </div>
+          </div>
+
+          <aside className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
+            <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
+              Public Profile
+            </p>
+            <h2 className="mt-1 text-2xl font-black !text-[#07132f]">
+              {profileCompletion}% complete
+            </h2>
+            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,#39c8c1_0%,#66a8f4_100%)]"
+                className="h-full rounded-full bg-[linear-gradient(90deg,#39c8b4_0%,#49aaf0_100%)]"
                 style={{ width: `${profileCompletion}%` }}
               />
             </div>
-
-            <p className="mt-3 text-sm font-black !text-slate-800">
-              {profileCompletion}% complete
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              {(services.length
-                ? services
-                : ["Dog Walking", "Drop-In Visits", "Pet Sitting"]
-              )
-                .slice(0, 6)
+            <div className="mt-5 grid gap-3">
+              {normalizeServices(guruProfile.services)
+                .slice(0, 4)
                 .map((service) => (
                   <span
                     key={service}
-                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black !text-slate-900"
+                    className="rounded-full bg-emerald-50 px-3 py-2 text-sm font-black !text-emerald-800 ring-1 ring-emerald-100"
                   >
                     {service}
                   </span>
                 ))}
+              {!normalizeServices(guruProfile.services).length ? (
+                <span className="rounded-full bg-amber-50 px-3 py-2 text-sm font-black !text-amber-800 ring-1 ring-amber-100">
+                  Services pending
+                </span>
+              ) : null}
             </div>
-
             <div className="mt-5 rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
+              <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-700">
                 Current Booking Status
               </p>
-              <p className="mt-2 text-lg font-black !text-slate-900">
-                {status}
+              <p className="mt-1 text-lg font-black !text-slate-900">
+                {bookable ? "Bookable" : "Profile setup"}
               </p>
             </div>
-
-            <div className="mt-5 rounded-[1rem] border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-700">
-                Profile Photo
-              </p>
-              <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
-                Use the upload button in your hero card to add a polished
-                profile photo customers can recognize.
-              </p>
-            </div>
-
             <Link
-              href="/guru/dashboard/profile?step=1"
-              className="mt-8 inline-flex w-full items-center justify-center rounded-[1rem] bg-[#020826] px-6 py-4 text-base font-black !text-white transition hover:bg-[#0b1436]"
+              href="/guru/dashboard/profile"
+              className="mt-5 flex min-h-[54px] items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-3 text-base font-black !text-white hover:bg-[#0b1436]"
             >
               Update Profile
             </Link>
-          </section>
+          </aside>
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
-          <div className="grid gap-6 lg:grid-cols-2">
+        <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
+          <div className="grid gap-5 lg:grid-cols-[1fr_280px_280px] lg:items-center">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.25em] !text-slate-800">
+              <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
                 Availability & Earnings
               </p>
-
-              <h3 className="mt-5 text-4xl font-black leading-tight !text-slate-900">
+              <h2 className="text-2xl font-black !text-[#07132f]">
                 Stay ready to book
-              </h3>
-
-              <p className="mt-4 text-base font-black leading-7 !text-slate-800">
-                Keep your calendar current and make it easy for pet parents to
-                trust and choose you.
+              </h2>
+              <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
+                Keep your calendar current, finish Guru Academy, and make it
+                easy for Pet Parents to trust and choose you.
               </p>
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
-                  Availability
-                </p>
-                <p className="mt-2 text-lg font-black !text-slate-900">
-                  Keep your schedule updated
-                </p>
-
-                <Link
-                  href="/guru/dashboard/availability"
-                  className="mt-5 inline-flex w-full items-center justify-center rounded-[1rem] bg-[linear-gradient(90deg,#39c8b4_0%,#49aaf0_100%)] px-6 py-4 text-base font-black !text-white transition hover:opacity-95"
-                >
-                  Manage Availability
-                </Link>
-              </div>
-
-              <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] !text-slate-600">
-                  Rate
-                </p>
-                <p className="mt-2 text-lg font-black !text-slate-900">
-                  {getRate(guruProfile)}
-                </p>
-
-                <Link
-                  href="/guru/dashboard/earnings"
-                  className="mt-5 inline-flex w-full items-center justify-center rounded-[1rem] border border-cyan-200 bg-cyan-50 px-6 py-4 text-base font-black !text-slate-900 transition hover:bg-cyan-100"
-                >
-                  View Earnings
-                </Link>
-              </div>
+            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.16em] !text-slate-700">
+                Availability
+              </p>
+              <p className="mt-1 text-lg font-black !text-slate-900">
+                Keep your schedule updated
+              </p>
+              <Link
+                href="/guru/dashboard/availability"
+                className="mt-4 flex rounded-xl bg-cyan-500 px-5 py-3 text-sm font-black !text-white hover:bg-cyan-600"
+              >
+                Manage Availability
+              </Link>
+            </div>
+            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.16em] !text-slate-700">
+                Rate
+              </p>
+              <p className="mt-1 text-lg font-black !text-slate-900">
+                {guruProfile.rate ||
+                guruProfile.hourly_rate ||
+                guruProfile.price
+                  ? "Rate ready"
+                  : "Rate pending"}
+              </p>
+              <Link
+                href="/guru/dashboard/earnings"
+                className="mt-4 flex rounded-xl border border-cyan-200 px-5 py-3 text-sm font-black !text-[#07132f] hover:bg-cyan-50"
+              >
+                View Earnings
+              </Link>
             </div>
           </div>
         </section>
