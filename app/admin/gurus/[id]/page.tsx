@@ -14,6 +14,7 @@ type PageProps = {
   searchParams?: Promise<{
     saved?: string;
     error?: string;
+    emailed?: string;
   }>;
 };
 
@@ -45,6 +46,15 @@ type SafeQueryResponse = {
   data: unknown;
   error: unknown;
 };
+
+type GuruStatusEmailPayload = {
+  toEmail: string;
+  guruName: string;
+  action: AdminAction;
+  note: string;
+};
+
+const guruAcademyHref = "/guru/dashboard/university";
 
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -107,6 +117,24 @@ function getMissingColumnFromError(message?: string) {
 
   const match = message.match(/Could not find the '([^']+)' column/i);
   return match?.[1] || "";
+}
+
+function getBaseUrl() {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.APP_URL ||
+    "https://www.sitguru.com"
+  ).replace(/\/$/, "");
+}
+
+function getFirstName(name: string) {
+  const clean = name.replace(/@.*/, "").trim();
+  return clean.split(/\s+/)[0] || "Guru";
+}
+
+function isEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 async function updateWithColumnFallback({
@@ -393,17 +421,17 @@ function getProfileCompletion(guru: GuruRow) {
   const checks = [
     Boolean(
       asTrimmedString(guru.display_name) ||
-        asTrimmedString(guru.full_name) ||
-        asTrimmedString(guru.name),
+      asTrimmedString(guru.full_name) ||
+      asTrimmedString(guru.name),
     ),
     Boolean(asTrimmedString(guru.bio)),
     Boolean(asTrimmedString(guru.city) || asTrimmedString(guru.state)),
     getGuruServices(guru).length > 0,
     Boolean(
       asTrimmedString(guru.avatar_url) ||
-        asTrimmedString(guru.photo_url) ||
-        asTrimmedString(guru.image_url) ||
-        asTrimmedString(guru.profile_photo_url),
+      asTrimmedString(guru.photo_url) ||
+      asTrimmedString(guru.image_url) ||
+      asTrimmedString(guru.profile_photo_url),
     ),
     toNumber(guru.hourly_rate) > 0 || toNumber(guru.price) > 0,
   ];
@@ -443,17 +471,17 @@ function getActionLabel(action: AdminAction) {
 function getActionDescription(action: AdminAction) {
   switch (action) {
     case "reviewing":
-      return "Moves this Guru into Admin review.";
+      return "Moves this Guru into Admin review and emails the Guru that review has started.";
     case "needs_info":
       return "Asks the Guru to update missing profile or application details.";
     case "pre_approved":
-      return "Pre-approves the Guru before verification steps.";
+      return "Pre-approves the Guru before verification steps and explains next steps.";
     case "verification_pending":
       return "Moves the Guru into identity/background verification.";
     case "approved":
-      return "Approves the Guru but does not make them visible yet.";
+      return "Approves the Guru and emails them to complete Guru Academy before becoming bookable.";
     case "bookable":
-      return "Final switch. Makes Guru active and visible to customers.";
+      return "Final switch. Makes Guru active and visible to Pet Parents.";
     case "rejected":
       return "Rejects this application and keeps it hidden.";
     case "suspended":
@@ -596,6 +624,187 @@ function buildStatusPayload({
   return basePayload;
 }
 
+function getGuruStatusEmailContent({
+  guruName,
+  action,
+  note,
+}: Omit<GuruStatusEmailPayload, "toEmail">) {
+  const firstName = getFirstName(guruName);
+  const baseUrl = getBaseUrl();
+  const academyUrl = `${baseUrl}${guruAcademyHref}`;
+  const dashboardUrl = `${baseUrl}/guru/dashboard`;
+  const supportEmail = "support@sitguru.com";
+
+  switch (action) {
+    case "reviewing":
+      return {
+        subject: "Your SitGuru Guru application is under review",
+        preview: "Your SitGuru Guru application has moved into Admin review.",
+        body: `Hi ${firstName},\n\nYour SitGuru Guru application has moved into Admin review.\n\nOur team is reviewing your profile, service details, trust readiness, and account information. We will contact you if anything needs to be updated before we can continue.\n\nYou can continue improving your Guru profile from your dashboard:\n${dashboardUrl}\n\nThank you for your interest in becoming a SitGuru Guru.\n\nSincerely,\nThe SitGuru Team`,
+      };
+    case "needs_info":
+      return {
+        subject: "Action needed for your SitGuru Guru application",
+        preview:
+          "SitGuru needs a few updates before continuing your Guru review.",
+        body: `Hi ${firstName},\n\nThank you for applying to become a SitGuru Guru. Before we can continue your review, we need a few updates.\n\n${
+          note
+            ? `Admin note:\n${note}\n\n`
+            : "Please review your Guru profile and complete any missing application details.\n\n"
+        }After updating your information, please return to your Guru dashboard:\n${dashboardUrl}\n\nIf you have questions, contact us at ${supportEmail}.\n\nSincerely,\nThe SitGuru Team`,
+      };
+    case "pre_approved":
+      return {
+        subject: "Your SitGuru Guru application is pre-approved",
+        preview:
+          "You are pre-approved. Next steps include verification and Guru Academy.",
+        body: `Hi ${firstName},\n\nGood news — your SitGuru Guru application has been pre-approved.\n\nThis means your application is moving forward, but your profile is not bookable yet. Next steps may include verification, payout readiness, profile completion, and Guru Academy completion.\n\nYou can continue preparing your Guru account here:\n${dashboardUrl}\n\nSincerely,\nThe SitGuru Team`,
+      };
+    case "verification_pending":
+      return {
+        subject: "Your SitGuru Guru verification has started",
+        preview: "Your Guru application has moved into verification review.",
+        body: `Hi ${firstName},\n\nYour SitGuru Guru application has moved into identity/background verification review.\n\nPlease watch your email and Guru dashboard for any required verification or payout setup steps. Your profile will not become bookable until SitGuru confirms the required trust, payout, and profile readiness items are complete.\n\nGuru dashboard:\n${dashboardUrl}\n\nSincerely,\nThe SitGuru Team`,
+      };
+    case "approved":
+      return {
+        subject:
+          "Your SitGuru Guru application has been approved — complete Guru Academy next",
+        preview:
+          "You are approved. Please complete Guru Academy before becoming bookable.",
+        body: `Hi ${firstName},\n\nCongratulations — your SitGuru Guru application has been approved.\n\nBefore your Guru profile can become bookable, please complete Guru Academy in SitGuru University. The academy explains profile expectations, bookings, communication, safety standards, payouts, and how to provide trusted care through SitGuru.\n\nComplete Guru Academy here:\n${academyUrl}\n\nOnce your Guru Academy is complete and your payout/verification requirements are finished, SitGuru Admin will complete the final review and make your profile bookable.\n\nSincerely,\nThe SitGuru Team`,
+      };
+    case "bookable":
+      return {
+        subject: "You are now bookable on SitGuru",
+        preview:
+          "Your Guru profile is now active and visible for booking on SitGuru.",
+        body: `Hi ${firstName},\n\nCongratulations — your Guru profile is now active and bookable on SitGuru.\n\nPet Parents can now find your profile when your services and location match their care needs. Keep your availability, services, pricing, and communication current to build trust and earn bookings.\n\nOpen your Guru dashboard:\n${dashboardUrl}\n\nSincerely,\nThe SitGuru Team`,
+      };
+    case "rejected":
+      return {
+        subject: "Update on your SitGuru Guru application",
+        preview: "Your SitGuru Guru application was not approved at this time.",
+        body: `Hi ${firstName},\n\nThank you for your interest in becoming a SitGuru Guru. After review, your Guru application was not approved at this time.\n\n${
+          note ? `Reason or note:\n${note}\n\n` : ""
+        }If you believe this was an error or you have questions, you may contact ${supportEmail}.\n\nSincerely,\nThe SitGuru Team`,
+      };
+    case "suspended":
+      return {
+        subject: "Your SitGuru Guru account has been paused",
+        preview:
+          "Your Guru account has been paused and booking visibility removed.",
+        body: `Hi ${firstName},\n\nYour SitGuru Guru account has been paused, and your booking visibility has been removed.\n\nIf you have questions or believe this needs review, please contact ${supportEmail}.\n\nSincerely,\nThe SitGuru Team`,
+      };
+    default:
+      return {
+        subject: "Your SitGuru Guru application status was updated",
+        preview: "Your Guru application status was updated by SitGuru Admin.",
+        body: `Hi ${firstName},\n\nYour SitGuru Guru application status was updated by SitGuru Admin.\n\nYou can review your dashboard here:\n${dashboardUrl}\n\nSincerely,\nThe SitGuru Team`,
+      };
+  }
+}
+
+function toHtmlEmail({ body, preview }: { body: string; preview: string }) {
+  const paragraphs = body
+    .split("\n\n")
+    .map((paragraph) =>
+      paragraph
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join("<br />"),
+    )
+    .filter(Boolean)
+    .map(
+      (paragraph) =>
+        `<p style="margin:0 0 16px 0;font-size:16px;line-height:1.65;color:#12312b;">${paragraph}</p>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f6fbf7;font-family:Arial,Helvetica,sans-serif;color:#12312b;">
+    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${preview}</span>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6fbf7;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #d9f3e5;border-radius:24px;overflow:hidden;">
+            <tr>
+              <td style="background:linear-gradient(135deg,#00d69f,#b8e5ff);padding:28px 30px;">
+                <p style="margin:0;font-size:12px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#063b33;">SitGuru</p>
+                <h1 style="margin:10px 0 0 0;font-size:30px;line-height:1.1;color:#061329;">Guru Application Update</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:30px;">
+                ${paragraphs}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+async function sendGuruStatusEmail(payload: GuruStatusEmailPayload) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromEmail =
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.SITGURU_FROM_EMAIL ||
+    "SitGuru <support@sitguru.com>";
+
+  if (!resendApiKey) {
+    console.warn("Guru status email skipped: missing RESEND_API_KEY.");
+    return false;
+  }
+
+  if (!isEmail(payload.toEmail)) {
+    console.warn(
+      "Guru status email skipped: invalid Guru email.",
+      payload.toEmail,
+    );
+    return false;
+  }
+
+  const content = getGuruStatusEmailContent({
+    guruName: payload.guruName,
+    action: payload.action,
+    note: payload.note,
+  });
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: [payload.toEmail],
+        bcc: ["jason@sitguru.com", "nette@sitguru.com", "support@sitguru.com"],
+        subject: content.subject,
+        text: content.body,
+        html: toHtmlEmail({ body: content.body, preview: content.preview }),
+      }),
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text();
+      console.warn("Guru status email failed:", response.status, responseText);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn("Guru status email failed:", error);
+    return false;
+  }
+}
+
 async function getGuruById(id: string) {
   const cleanId = decodeURIComponent(id).trim();
 
@@ -603,7 +812,11 @@ async function getGuruById(id: string) {
 
   const queries = [
     supabaseAdmin.from("gurus").select("*").eq("id", cleanId).maybeSingle(),
-    supabaseAdmin.from("gurus").select("*").eq("user_id", cleanId).maybeSingle(),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .eq("user_id", cleanId)
+      .maybeSingle(),
     supabaseAdmin.from("gurus").select("*").eq("email", cleanId).maybeSingle(),
   ];
 
@@ -623,12 +836,17 @@ async function getGuruById(id: string) {
 }
 
 async function getProfileForGuru(guru: GuruRow) {
-  const userId = asTrimmedString(guru.user_id) || asTrimmedString(guru.profile_id);
+  const userId =
+    asTrimmedString(guru.user_id) || asTrimmedString(guru.profile_id);
   const email = getGuruEmail(guru);
 
   const queries = [
     userId
-      ? supabaseAdmin.from("profiles").select("*").eq("id", userId).maybeSingle()
+      ? supabaseAdmin
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle()
       : null,
     userId
       ? supabaseAdmin
@@ -638,7 +856,11 @@ async function getProfileForGuru(guru: GuruRow) {
           .maybeSingle()
       : null,
     email && email !== "—"
-      ? supabaseAdmin.from("profiles").select("*").eq("email", email).maybeSingle()
+      ? supabaseAdmin
+          .from("profiles")
+          .select("*")
+          .eq("email", email)
+          .maybeSingle()
       : null,
   ].filter(Boolean);
 
@@ -725,8 +947,11 @@ async function updateGuruStatusAction(formData: FormData) {
     );
   }
 
+  const profile = await getProfileForGuru(guru);
   const realGuruId = getGuruId(guru);
   const oldStatus = normalizeApplicationStatus(guru);
+  const guruEmail = getGuruEmail(guru, profile);
+  const guruName = getGuruName(guru, profile);
   const payload = buildStatusPayload({
     action,
     adminUserId: user.id,
@@ -749,6 +974,13 @@ async function updateGuruStatusAction(formData: FormData) {
     );
   }
 
+  const emailSent = await sendGuruStatusEmail({
+    toEmail: guruEmail,
+    guruName,
+    action,
+    note,
+  });
+
   await insertEventSafely({
     guru_id: realGuruId,
     admin_user_id: user.id,
@@ -756,6 +988,8 @@ async function updateGuruStatusAction(formData: FormData) {
     old_status: oldStatus,
     new_status: action,
     note: note || null,
+    email_sent: emailSent,
+    email_to: isEmail(guruEmail) ? guruEmail : null,
     created_at: new Date().toISOString(),
   });
 
@@ -766,7 +1000,11 @@ async function updateGuruStatusAction(formData: FormData) {
   revalidatePath("/search");
   revalidatePath("/", "layout");
 
-  redirect(`/admin/gurus/${encodeURIComponent(realGuruId)}?saved=1`);
+  redirect(
+    `/admin/gurus/${encodeURIComponent(realGuruId)}?saved=1&emailed=${
+      emailSent ? "1" : "0"
+    }`,
+  );
 }
 
 function DetailItem({
@@ -788,13 +1026,7 @@ function DetailItem({
   );
 }
 
-function CredentialPill({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function CredentialPill({ label, value }: { label: string; value: string }) {
   return (
     <div className={`rounded-2xl border px-4 py-3 ${credentialClasses(value)}`}>
       <p className="text-xs font-black uppercase tracking-[0.18em] opacity-80">
@@ -927,6 +1159,26 @@ function AdminActionCard({
   );
 }
 
+function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-600">{detail}</p>
+    </div>
+  );
+}
+
 export default async function AdminGuruDetailPage({
   params,
   searchParams,
@@ -972,6 +1224,7 @@ export default async function AdminGuruDetailPage({
   const backgroundStatus = getCredentialStatus(guru.background_check_status);
   const safetyStatus = getCredentialStatus(guru.safety_cert_status);
   const stripeConnectStatus = getCredentialStatus(guru.stripe_connect_status);
+  const lastUpdated = formatDate(guru.updated_at || guru.created_at);
 
   return (
     <main className="space-y-8">
@@ -993,13 +1246,6 @@ export default async function AdminGuruDetailPage({
                 className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 Guru Approvals
-              </Link>
-
-              <Link
-                href="/admin/gurus?status=new"
-                className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
-              >
-                New Applications
               </Link>
 
               <Link
@@ -1028,8 +1274,9 @@ export default async function AdminGuruDetailPage({
 
               <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
                 Review this Guru’s application, profile readiness, trust checks,
-                and Admin status. Only make a Guru bookable when they are ready
-                to appear in customer search.
+                and Admin status. Each Admin status change sends a formal email
+                to the Guru’s email on file. Approval directs the Guru to
+                complete Guru Academy before you make them bookable.
               </p>
             </div>
           </div>
@@ -1049,8 +1296,8 @@ export default async function AdminGuruDetailPage({
 
             <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
               {toBoolean(guru.is_bookable) || status === "bookable"
-                ? "This Guru is visible to customers if search is filtering by is_bookable."
-                : "This Guru should remain hidden from customer search until made bookable."}
+                ? "This Guru is visible to Pet Parents if search is filtering by is_bookable."
+                : "This Guru should remain hidden from Pet Parent search until made bookable."}
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2">
@@ -1073,7 +1320,10 @@ export default async function AdminGuruDetailPage({
 
         {resolvedSearchParams.saved ? (
           <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
-            Guru status updated successfully.
+            Guru status updated successfully.{" "}
+            {resolvedSearchParams.emailed === "1"
+              ? "Email sent to the Guru."
+              : "Email was not sent; check Resend settings or the Guru email on file."}
           </div>
         ) : null}
 
@@ -1082,6 +1332,29 @@ export default async function AdminGuruDetailPage({
             {resolvedSearchParams.error}
           </div>
         ) : null}
+      </section>
+
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Status"
+          value={statusLabel}
+          detail="Current Admin stage"
+        />
+        <StatCard
+          label="Profile"
+          value={`${profileCompletion}%`}
+          detail="Estimated profile completion"
+        />
+        <StatCard
+          label="Bookable"
+          value={toBoolean(guru.is_bookable) ? "Yes" : "No"}
+          detail="Final search visibility"
+        />
+        <StatCard
+          label="Updated"
+          value={lastUpdated}
+          detail="Most recent record update"
+        />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -1100,7 +1373,10 @@ export default async function AdminGuruDetailPage({
             <DetailItem label="Phone" value={phone} />
             <DetailItem label="Location" value={location} />
             <DetailItem label="Experience" value={experience} />
-            <DetailItem label="Joined" value={formatShortDate(guru.created_at)} />
+            <DetailItem
+              label="Joined"
+              value={formatShortDate(guru.created_at)}
+            />
             <DetailItem label="Guru ID" value={guruId} />
             <DetailItem label="User ID" value={userId || "—"} />
           </div>
@@ -1129,38 +1405,32 @@ export default async function AdminGuruDetailPage({
 
             <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-7 text-slate-700">
               {asTrimmedString(guru.bio) ||
-                asTrimmedString(profile?.bio) ||
-                "No bio listed yet."}
+                asTrimmedString(guru.notes) ||
+                asTrimmedString(guru.admin_notes) ||
+                "No bio or notes listed yet."}
             </p>
           </div>
         </div>
 
         <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-            Trust & Safety
+            Trust Readiness
           </p>
 
           <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
-            Approval readiness
+            Profile, payout, and verification checks
           </h2>
 
-          <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+          <div className="mt-6">
             <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-black text-slate-950">
-                  Profile Completion
-                </p>
-                <p className="mt-1 text-sm font-semibold text-slate-600">
-                  Stronger profiles convert better and reduce customer doubt.
-                </p>
-              </div>
-
-              <p className="text-2xl font-black text-slate-950">
+              <p className="text-sm font-black text-slate-700">
+                Profile completion
+              </p>
+              <p className="text-sm font-black text-emerald-700">
                 {profileCompletion}%
               </p>
             </div>
-
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
+            <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
               <div
                 className="h-full rounded-full bg-emerald-500"
                 style={{ width: `${profileCompletion}%` }}
@@ -1169,7 +1439,10 @@ export default async function AdminGuruDetailPage({
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <CredentialPill label="Stripe Connect" value={stripeConnectStatus} />
+            <CredentialPill
+              label="Stripe Connect"
+              value={stripeConnectStatus}
+            />
             <CredentialPill label="Identity" value={identityStatus} />
             <CredentialPill label="Background" value={backgroundStatus} />
             <CredentialPill label="Safety Cert" value={safetyStatus} />
@@ -1180,9 +1453,10 @@ export default async function AdminGuruDetailPage({
               Bookable is the final switch
             </p>
             <p className="mt-2 text-sm font-semibold leading-6 text-emerald-700">
-              Make a Guru bookable only after SitGuru is comfortable with their
-              public profile, verification progress, and customer trust
-              readiness.
+              Approve only means this Guru can move to Guru Academy and final
+              readiness. Make a Guru bookable only after SitGuru is comfortable
+              with their public profile, verification progress, payout setup,
+              academy completion, and customer trust readiness.
             </p>
           </div>
         </div>
@@ -1199,9 +1473,10 @@ export default async function AdminGuruDetailPage({
           </h2>
 
           <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
-            Use these actions to move a Guru through review. The final bookable
-            action should only be used when profile, payout, and trust readiness
-            are complete.
+            Use these actions to move a Guru through review. Each action emails
+            the Guru. The final bookable action should only be used when
+            profile, payout, Guru Academy, verification, and trust readiness are
+            complete.
           </p>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -1230,44 +1505,45 @@ export default async function AdminGuruDetailPage({
           </p>
 
           <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
-            Recent Admin activity
+            Recent application events
           </h2>
 
           <div className="mt-6 space-y-3">
-            {events.length > 0 ? (
+            {events.length ? (
               events.map((event) => {
-                const eventRow = event as Record<string, unknown>;
-                const eventType = asTrimmedString(eventRow.event_type);
-                const note = asTrimmedString(eventRow.note);
-                const createdAt = asTrimmedString(eventRow.created_at);
+                const row = event as Record<string, unknown>;
+                const eventType =
+                  asTrimmedString(row.event_type) || "status_update";
+                const eventNote = asTrimmedString(row.note);
+                const emailSent = toBoolean(row.email_sent);
 
                 return (
                   <div
-                    key={`${eventType}-${createdAt}-${note}`}
+                    key={`${eventType}-${asTrimmedString(row.created_at)}-${eventNote}`}
                     className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-black text-slate-950">
-                          {eventType || "Guru event"}
-                        </p>
-                        {note ? (
-                          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                            {note}
-                          </p>
-                        ) : null}
-                      </div>
-
-                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-500">
-                        {formatDate(createdAt)}
-                      </span>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <p className="text-sm font-black text-slate-950">
+                        {getActionLabel(eventType as AdminAction) || eventType}
+                      </p>
+                      <p className="text-xs font-bold text-slate-500">
+                        {formatDate(row.created_at)}
+                      </p>
                     </div>
+                    <p className="mt-2 text-xs font-bold text-slate-500">
+                      Email: {emailSent ? "Sent" : "Not recorded"}
+                    </p>
+                    {eventNote ? (
+                      <p className="mt-3 whitespace-pre-wrap rounded-2xl bg-white p-3 text-sm font-semibold leading-6 text-slate-700">
+                        {eventNote}
+                      </p>
+                    ) : null}
                   </div>
                 );
               })
             ) : (
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm font-semibold leading-7 text-slate-600">
-                No review events have been recorded yet.
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-600">
+                No application events recorded yet.
               </div>
             )}
           </div>
