@@ -480,6 +480,208 @@ async function getPetParentUniversityData(userId: string): Promise<OrientationDa
   };
 }
 
+
+function getCertificationName() {
+  return "Certified Pet Parent";
+}
+
+function getFormalAcademyName() {
+  return "Pet Parent Academy";
+}
+
+function getCertifiedRoleName() {
+  return "Pet Parent";
+}
+
+function getSiteUrl() {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.SITE_URL ||
+    "https://www.sitguru.com"
+  ).replace(/\/$/, "");
+}
+
+function getEmailFromName() {
+  return (
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.SITGURU_FROM_EMAIL ||
+    "SitGuru University <support@sitguru.com>"
+  );
+}
+
+function getCertificateNoticeEmailHtml({
+  firstName,
+  academyName,
+  certifiedRoleName,
+  dashboardUrl,
+}: {
+  firstName: string;
+  academyName: string;
+  certifiedRoleName: string;
+  dashboardUrl: string;
+}) {
+  return `
+    <div style="margin:0;padding:0;background:#f3fbf7;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3fbf7;padding:28px 12px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:28px;overflow:hidden;border:1px solid #d7f3e3;">
+              <tr>
+                <td style="background:linear-gradient(135deg,#00d69f,#b8e5ff);padding:34px 28px;text-align:center;">
+                  <div style="font-size:42px;line-height:1;margin-bottom:12px;">🐾</div>
+                  <h1 style="margin:0;font-size:28px;line-height:1.15;font-weight:900;color:#062f2b;">Congratulations, ${firstName}!</h1>
+                  <p style="margin:12px 0 0;font-size:16px;line-height:1.6;font-weight:700;color:#123833;">Your SitGuru University certification is complete.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:30px 28px;">
+                  <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#334155;">You have successfully completed the <strong>${academyName}</strong>.</p>
+                  <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#334155;">You are now a <strong>Certified SitGuru ${certifiedRoleName}</strong>. Your certification badge has been issued and will appear on your SitGuru profile.</p>
+                  <div style="margin:22px 0;padding:18px;border-radius:18px;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46;">
+                    <p style="margin:0;font-size:15px;line-height:1.6;font-weight:800;">Your official SitGuru University Certificate of Completion will be prepared and sent within 24 hours.</p>
+                  </div>
+                  <p style="margin:0 0 22px;font-size:15px;line-height:1.7;color:#475569;">This certificate will include your name, academy completed, completion date, certificate ID, and SitGuru verification details.</p>
+                  <a href="${dashboardUrl}" style="display:inline-block;background:#047857;color:#ffffff;text-decoration:none;font-weight:900;padding:14px 20px;border-radius:16px;font-size:14px;">Open SitGuru Dashboard</a>
+                  <p style="margin:28px 0 0;font-size:15px;line-height:1.7;color:#475569;">Thank you for taking the time to complete your training and for being part of the SitGuru community.</p>
+                  <p style="margin:18px 0 0;font-size:15px;line-height:1.7;color:#334155;font-weight:800;">The SitGuru Team<br/>SitGuru University</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+}
+
+function getCertificateNoticeEmailText({
+  firstName,
+  academyName,
+  certifiedRoleName,
+  dashboardUrl,
+}: {
+  firstName: string;
+  academyName: string;
+  certifiedRoleName: string;
+  dashboardUrl: string;
+}) {
+  return [
+    `Hi ${firstName},`,
+    "",
+    `Congratulations on completing your SitGuru University ${academyName}.`,
+    "",
+    `You are now a Certified SitGuru ${certifiedRoleName}. Your certification badge has been issued and will appear on your SitGuru profile.`,
+    "",
+    "Your official SitGuru University Certificate of Completion will be prepared and sent within 24 hours. This certificate will include your name, academy completed, completion date, certificate ID, and SitGuru verification details.",
+    "",
+    `Open your dashboard: ${dashboardUrl}`,
+    "",
+    "Thank you for taking the time to complete your training and for being part of the SitGuru community.",
+    "",
+    "Sincerely,",
+    "The SitGuru Team",
+    "SitGuru University",
+  ].join("\n");
+}
+
+async function sendCertificationEmail({
+  to,
+  firstName,
+}: {
+  to?: string | null;
+  firstName: string;
+}) {
+  const cleanTo = asString(to).toLowerCase();
+  const resendApiKey = asString(process.env.RESEND_API_KEY);
+
+  if (!cleanTo || !cleanTo.includes("@") || !resendApiKey) {
+    return false;
+  }
+
+  const academyName = getFormalAcademyName();
+  const certifiedRoleName = getCertifiedRoleName();
+  const dashboardUrl = `${getSiteUrl()}${customerRoutes.dashboard}`;
+  const subject = "Congratulations — Your SitGuru University Certification Is Complete";
+  const adminBcc = [
+    "jason@sitguru.com",
+    "nette@sitguru.com",
+    "support@sitguru.com",
+  ];
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: getEmailFromName(),
+        to: [cleanTo],
+        bcc: adminBcc,
+        subject,
+        html: getCertificateNoticeEmailHtml({
+          firstName,
+          academyName,
+          certifiedRoleName,
+          dashboardUrl,
+        }),
+        text: getCertificateNoticeEmailText({
+          firstName,
+          academyName,
+          certifiedRoleName,
+          dashboardUrl,
+        }),
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("SitGuru University certification email failed:", await response.text());
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn("SitGuru University certification email failed:", error);
+    return false;
+  }
+}
+
+async function issueAcademyCertification({
+  userId,
+  email,
+  firstName,
+}: {
+  userId: string;
+  email?: string | null;
+  firstName: string;
+}) {
+  const now = new Date().toISOString();
+  const emailSent = await sendCertificationEmail({ to: email, firstName });
+
+  const { error } = await supabaseAdmin.from("academy_certifications").upsert(
+    {
+      user_id: userId,
+      academy_type: academyType,
+      certification_name: getCertificationName(),
+      badge_status: "issued",
+      certificate_status: "pending",
+      email_sent_at: emailSent ? now : null,
+      issued_at: now,
+      updated_at: now,
+    },
+    { onConflict: "user_id,academy_type" },
+  );
+
+  if (error) {
+    console.warn("Unable to issue Pet Parent Academy certification:", error);
+    return false;
+  }
+
+  return true;
+}
+
 async function acknowledgeMaterial(formData: FormData) {
   "use server";
 
@@ -597,6 +799,17 @@ async function completeOrientation(formData: FormData) {
     redirect(`${customerRoutes.university}?error=progress`);
   }
 
+  const [profile] = await Promise.all([getProfile(user.id)]);
+  const authUser = user as unknown as AnyRow;
+  const displayName = getDisplayName(profile, authUser);
+  const firstName = getFirstName(displayName);
+
+  await issueAcademyCertification({
+    userId: user.id,
+    email: user.email,
+    firstName,
+  });
+
   revalidatePath(customerRoutes.university);
   revalidatePath(customerRoutes.dashboard);
   redirect(`${customerRoutes.university}?completed=success`);
@@ -618,8 +831,9 @@ function getNotice(searchParams?: Record<string, string | string[] | undefined>)
   if (completed === "success") {
     return {
       tone: "success" as const,
-      title: "Certified Pet Parent orientation complete",
-      message: "Your completion was saved and your Certified Pet Parent status is ready.",
+      title: "Certified Pet Parent badge issued",
+      message:
+        "Congratulations! Your badge has been issued. Your official SitGuru University certificate will be prepared and sent within 24 hours.",
     };
   }
 
@@ -826,7 +1040,7 @@ export default async function CustomerUniversityPage({ searchParams }: PageProps
               <CertificationActionCard
                 stepLabel="Step 3"
                 title="Acknowledge & Get Certified"
-                description="Confirm you reviewed the training and earn your Certified Pet Parent badge."
+                description="Confirm you reviewed the training. Your badge is issued immediately, and your official certificate will be prepared and sent within 24 hours."
                 orientationStep={orientationData.orientationStep}
                 requiredMaterials={orientationData.requiredDisplayedMaterials}
                 canComplete={canCompleteOrientation}
@@ -1074,7 +1288,7 @@ function CertificationActionCard({
             <MiniProgressBox
               label="Badge status"
               value={isCompleted ? "Issued" : "Locked"}
-              detail={isCompleted ? "Certified Pet Parent" : "Complete this final action"}
+              detail={isCompleted ? "Certificate pending within 24 hours" : "Complete this final action"}
             />
           </div>
         </div>
@@ -1085,9 +1299,9 @@ function CertificationActionCard({
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="font-black">Certified Pet Parent complete</p>
+                  <p className="font-black">Badge issued</p>
                   <p className="text-emerald-800">
-                    Completed on {formatDateTime(completedAt)}.
+                    Completed on {formatDateTime(completedAt)}. Your official certificate will be prepared and sent within 24 hours.
                   </p>
                 </div>
               </div>
@@ -1113,7 +1327,7 @@ function CertificationActionCard({
                 }`}
               >
                 <CheckCircle2 size={17} />
-                Complete Certification
+                Complete Pet Parent Academy
               </button>
               <p
                 className={`text-xs font-bold leading-5 ${
