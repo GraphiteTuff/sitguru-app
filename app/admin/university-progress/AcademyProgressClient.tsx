@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import {
   BadgeCheck,
@@ -62,7 +63,10 @@ function getSortedRecords(records: AcademyProgressRecord[], sortBy: SortOption) 
     if (sortBy === "progress-high") return b.progress - a.progress;
     if (sortBy === "progress-low") return a.progress - b.progress;
     if (sortBy === "updated-new") {
-      return dateValue(b.updatedAt || b.assignedAt) - dateValue(a.updatedAt || a.assignedAt);
+      return (
+        dateValue(b.updatedAt || b.assignedAt) -
+        dateValue(a.updatedAt || a.assignedAt)
+      );
     }
     if (sortBy === "completed-new") {
       return dateValue(b.completedAt) - dateValue(a.completedAt);
@@ -107,10 +111,12 @@ export default function AcademyProgressClient({
   const [showAcademyGroups, setShowAcademyGroups] = useState(true);
 
   const roles = useMemo(() => unique(records.map((record) => record.role)), [records]);
+
   const academies = useMemo(
     () => unique(records.map((record) => record.academy)),
     [records],
   );
+
   const statuses = useMemo(
     () => unique(records.map((record) => record.status)),
     [records],
@@ -176,7 +182,7 @@ export default function AcademyProgressClient({
               </h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
                 Search, filter, sort, and review academy progress by person,
-                role, academy, status, and completion percentage.
+                avatar, role, academy, status, and completion percentage.
               </p>
             </div>
 
@@ -360,7 +366,7 @@ export default function AcademyProgressClient({
                     >
                       <td className="py-4">
                         <div className="flex min-w-0 items-center gap-3">
-                          <Avatar name={record.name} />
+                          <Avatar name={record.name} avatarUrl={record.avatarUrl} />
                           <div className="min-w-0">
                             <p className="truncate font-black text-slate-950">
                               {record.name}
@@ -426,9 +432,7 @@ export default function AcademyProgressClient({
                   className="rounded-2xl border border-green-100 bg-green-50/70 p-4"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-green-100 text-green-800">
-                      <BadgeCheck size={18} />
-                    </div>
+                    <Avatar name={record.name} avatarUrl={record.avatarUrl} />
                     <div className="min-w-0">
                       <p className="truncate font-black text-slate-950">
                         {record.name}
@@ -561,13 +565,33 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
-function Avatar({ name }: { name: string }) {
+function Avatar({
+  name,
+  avatarUrl,
+}: {
+  name: string;
+  avatarUrl?: string | null;
+}) {
   const initials = name
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+
+  if (avatarUrl) {
+    return (
+      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-green-100 bg-green-50 shadow-sm">
+        <Image
+          src={avatarUrl}
+          alt={name}
+          fill
+          sizes="40px"
+          className="object-cover"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-black text-green-800">
@@ -596,7 +620,7 @@ function MobileProgressList({ records }: { records: AcademyProgressRecord[] }) {
           className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4"
         >
           <div className="flex min-w-0 items-start gap-3">
-            <Avatar name={record.name} />
+            <Avatar name={record.name} avatarUrl={record.avatarUrl} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-black text-slate-950">
                 {record.name}

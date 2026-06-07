@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   ArrowLeft,
-  BadgeCheck,
   BookOpenCheck,
   CheckCircle2,
   ClipboardCheck,
@@ -25,6 +24,7 @@ export type AcademyProgressRecord = {
   key: string;
   name: string;
   email: string;
+  avatarUrl: string;
   role: string;
   academy: string;
   status: string;
@@ -142,6 +142,32 @@ function getEmail(row: AnyRow) {
       "profile_email",
     ],
     "—",
+  );
+}
+
+function getAvatarUrl(row: AnyRow | null) {
+  if (!row) return "";
+
+  return getText(
+    row,
+    [
+      "avatar_url",
+      "avatarUrl",
+      "profile_photo_url",
+      "profilePhotoUrl",
+      "photo_url",
+      "photoUrl",
+      "image_url",
+      "imageUrl",
+      "profile_image_url",
+      "profileImageUrl",
+      "headshot_url",
+      "headshotUrl",
+      "picture",
+      "picture_url",
+      "pictureUrl",
+    ],
+    "",
   );
 }
 
@@ -382,6 +408,7 @@ function buildPersonMap(rows: AnyRow[]) {
       getId(row, ["user_id"]),
       getId(row, ["profile_id"]),
       getId(row, ["auth_user_id"]),
+      getId(row, ["owner_id"]),
       getEmail(row).toLowerCase(),
     ].filter(Boolean);
 
@@ -420,6 +447,7 @@ function resolvePerson(row: AnyRow, personMap: Map<string, AnyRow>) {
     getId(row, ["ambassador_id"]),
     getId(row, ["pet_parent_id"]),
     getId(row, ["customer_id"]),
+    getId(row, ["owner_id"]),
     getEmail(row).toLowerCase(),
   ].filter(Boolean);
 
@@ -443,8 +471,16 @@ function normalizeProgressRow(
 
   const name = person ? getDisplayName(person) : getDisplayName(row);
   const email = person ? getEmail(person) : getEmail(row);
+  const avatarUrl = person ? getAvatarUrl(person) : getAvatarUrl(row);
+
   const role = person
-    ? getRole({ ...row, role: getText(person, ["role", "account_type", "type"], "") }, academy)
+    ? getRole(
+        {
+          ...row,
+          role: getText(person, ["role", "account_type", "type", "segment"], ""),
+        },
+        academy,
+      )
     : getRole(row, academy);
 
   const userId =
@@ -457,6 +493,7 @@ function normalizeProgressRow(
       "ambassador_id",
       "pet_parent_id",
       "customer_id",
+      "owner_id",
       "id",
     ]) || email;
 
@@ -464,6 +501,7 @@ function normalizeProgressRow(
     key: `${userId || name}:${academy}:${source}`.toLowerCase(),
     name,
     email,
+    avatarUrl,
     role,
     academy,
     status: getReadableStatus(row, progress),
@@ -497,10 +535,15 @@ function mergeProgressRecords(records: AcademyProgressRecord[]) {
             new Date(b || 0).getTime() - new Date(a || 0).getTime(),
         )[0] || null;
 
+    const source = Array.from(
+      new Set(`${existing.source}, ${record.source}`.split(", ")),
+    ).join(", ");
+
     map.set(mergeKey, {
       ...existing,
       name: existing.name !== "Unknown User" ? existing.name : record.name,
       email: existing.email !== "—" ? existing.email : record.email,
+      avatarUrl: existing.avatarUrl || record.avatarUrl,
       role: existing.role !== "User" ? existing.role : record.role,
       academy:
         existing.academy !== "SitGuru Academy" ? existing.academy : record.academy,
@@ -514,7 +557,7 @@ function mergeProgressRecords(records: AcademyProgressRecord[]) {
       completedAt,
       updatedAt,
       assignedAt: existing.assignedAt || record.assignedAt,
-      source: Array.from(new Set(`${existing.source}, ${record.source}`.split(", "))).join(", "),
+      source,
     });
   }
 
@@ -551,8 +594,14 @@ async function getUniversityProgressData() {
   ] = await Promise.all([
     safeAdminQuery(supabaseAdmin.from("profiles").select("*").limit(5000), "profiles"),
     safeAdminQuery(supabaseAdmin.from("gurus").select("*").limit(5000), "gurus"),
-    safeAdminQuery(supabaseAdmin.from("ambassadors").select("*").limit(5000), "ambassadors"),
-    safeAdminQuery(supabaseAdmin.from("pet_parents").select("*").limit(5000), "pet_parents"),
+    safeAdminQuery(
+      supabaseAdmin.from("ambassadors").select("*").limit(5000),
+      "ambassadors",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("pet_parents").select("*").limit(5000),
+      "pet_parents",
+    ),
     safeAdminQuery(supabaseAdmin.from("academies").select("*").limit(1000), "academies"),
     safeAdminQuery(
       supabaseAdmin.from("university_academies").select("*").limit(1000),
@@ -733,7 +782,7 @@ export default async function AdminUniversityProgressPage() {
 
             <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
               Sort, filter, and review academy progress by user, role, academy,
-              status, completion percentage, and last activity.
+              status, completion percentage, avatar, and last activity.
             </p>
           </div>
 
