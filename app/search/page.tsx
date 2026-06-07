@@ -494,7 +494,30 @@ function locationsMatchByText(guru: GuruRow, location: ZipLookupResult | null) {
   );
 }
 
-function getGuruSearchCoordinates(guru: GuruRow): [number, number] | null {
+function getGuruZipFallbackCoordinates(
+  guru: GuruRow,
+  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
+): [number, number] | null {
+  const zip = cleanZip(guru.zip_code);
+  const zipLookup = zip ? guruZipLookupsByZip[zip] : null;
+
+  if (
+    zipLookup &&
+    typeof zipLookup.latitude === "number" &&
+    typeof zipLookup.longitude === "number" &&
+    Number.isFinite(zipLookup.latitude) &&
+    Number.isFinite(zipLookup.longitude)
+  ) {
+    return [zipLookup.latitude, zipLookup.longitude];
+  }
+
+  return null;
+}
+
+function getGuruSearchCoordinates(
+  guru: GuruRow,
+  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
+): [number, number] | null {
   const latitude = getGuruLatitude(guru);
   const longitude = getGuruLongitude(guru);
 
@@ -502,12 +525,16 @@ function getGuruSearchCoordinates(guru: GuruRow): [number, number] | null {
     return [latitude, longitude];
   }
 
-  return getGuruFallbackCoordinates(guru);
+  return (
+    getGuruZipFallbackCoordinates(guru, guruZipLookupsByZip) ||
+    getGuruFallbackCoordinates(guru)
+  );
 }
 
 function getDistanceFromSearchLocation(
   guru: GuruRow,
   searchLocation: ZipLookupResult | null,
+  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
 ) {
   if (
     !searchLocation ||
@@ -519,7 +546,7 @@ function getDistanceFromSearchLocation(
     return null;
   }
 
-  const coordinates = getGuruSearchCoordinates(guru);
+  const coordinates = getGuruSearchCoordinates(guru, guruZipLookupsByZip);
 
   if (!coordinates) return null;
 
@@ -535,6 +562,7 @@ function guruServesSearchLocation(
   guru: GuruRow,
   searchLocation: ZipLookupResult | null,
   zipFilter: string,
+  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
 ) {
   const zip = cleanZip(zipFilter);
 
@@ -546,7 +574,11 @@ function guruServesSearchLocation(
 
   if (textLocationMatches) return true;
 
-  const distanceMiles = getDistanceFromSearchLocation(guru, searchLocation);
+  const distanceMiles = getDistanceFromSearchLocation(
+    guru,
+    searchLocation,
+    guruZipLookupsByZip,
+  );
 
   if (distanceMiles === null) {
     return cleanZip(guru.zip_code) === zip;
@@ -558,16 +590,27 @@ function guruServesSearchLocation(
 function enrichGuruWithDistance(
   guru: GuruRow,
   searchLocation: ZipLookupResult | null,
+  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
 ): GuruRow {
   const textLocationMatches = locationsMatchByText(guru, searchLocation);
   const distanceMiles = textLocationMatches
     ? 0
-    : getDistanceFromSearchLocation(guru, searchLocation);
+    : getDistanceFromSearchLocation(
+        guru,
+        searchLocation,
+        guruZipLookupsByZip,
+      );
 
   const normalizedServiceRadiusMiles = getGuruRadius(guru);
+  const zipFallbackCoordinates = getGuruZipFallbackCoordinates(
+    guru,
+    guruZipLookupsByZip,
+  );
 
   return {
     ...guru,
+    service_latitude: getGuruLatitude(guru) ?? zipFallbackCoordinates?.[0] ?? guru.service_latitude,
+    service_longitude: getGuruLongitude(guru) ?? zipFallbackCoordinates?.[1] ?? guru.service_longitude,
     service_radius_miles: normalizedServiceRadiusMiles,
     service_radius_display: normalizedServiceRadiusMiles,
     distance_miles: distanceMiles,
@@ -741,6 +784,7 @@ function SearchPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [zipLookup, setZipLookup] = useState<ZipLookupResult | null>(null);
+  const [guruZipLookupsByZip, setGuruZipLookupsByZip] = useState<Record<string, ZipLookupResult>>({});
   const [zipLookupStatus, setZipLookupStatus] = useState<
     "idle" | "loading" | "found" | "not_found"
   >("idle");
@@ -963,6 +1007,79 @@ function SearchPageContent() {
     };
   }, [zipFilter]);
 
+  useEffect(() => {
+    if (!gurus.length) {
+      setGuruZipLookupsByZip({});
+      return;
+    }
+
+    const uniqueGuruZips = Array.from(
+      new Set(
+        gurus
+          .map((guru) => cleanZip(guru.zip_code))
+          .filter((zip) => zip.length === 5),
+      ),
+    );
+
+    const missingZips = uniqueGuruZips.filter(
+      (zip) => !guruZipLookupsByZip[zip],
+    );
+
+    if (!missingZips.length) return;
+
+    let cancelled = false;
+
+    async function lookupGuruZips() {
+      const lookupResults = await Promise.all(
+        missingZips.map(async (zip) => {
+          try {
+            const response = await fetch(`/api/geo/zip?zip=${zip}`, {
+              cache: "no-store",
+            });
+
+            if (!response.ok) return null;
+
+            const data = (await response.json()) as ZipLookupResult;
+
+            if (
+              typeof data.latitude !== "number" ||
+              typeof data.longitude !== "number" ||
+              !Number.isFinite(data.latitude) ||
+              !Number.isFinite(data.longitude)
+            ) {
+              return null;
+            }
+
+            return [zip, data] as const;
+          } catch (lookupError) {
+            console.warn(`Could not auto-map Guru ZIP ${zip}:`, lookupError);
+            return null;
+          }
+        }),
+      );
+
+      if (cancelled) return;
+
+      const nextLookupResults = lookupResults.filter(
+        (result): result is readonly [string, ZipLookupResult] =>
+          Boolean(result),
+      );
+
+      if (!nextLookupResults.length) return;
+
+      setGuruZipLookupsByZip((currentLookups) => ({
+        ...currentLookups,
+        ...Object.fromEntries(nextLookupResults),
+      }));
+    }
+
+    lookupGuruZips();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gurus, guruZipLookupsByZip]);
+
   const filteredGurus = useMemo(() => {
     const query = normalizeText(searchTerm);
     const city = normalizeText(cityFilter);
@@ -1005,6 +1122,7 @@ function SearchPageContent() {
           guru,
           zipLookup,
           zip,
+          guruZipLookupsByZip,
         );
         const matchesManualCityFilter = zip
           ? true
@@ -1022,7 +1140,9 @@ function SearchPageContent() {
           matchesSelectedService
         );
       })
-      .map((guru) => enrichGuruWithDistance(guru, zipLookup))
+      .map((guru) =>
+        enrichGuruWithDistance(guru, zipLookup, guruZipLookupsByZip),
+      )
       .sort((a, b) => {
         const aSelected =
           (selectedId && String(a.id) === selectedId) ||
@@ -1055,6 +1175,7 @@ function SearchPageContent() {
     stateFilter,
     serviceFilter,
     zipLookup,
+    guruZipLookupsByZip,
     selectedGuruId,
     selectedGuruSlug,
   ]);
