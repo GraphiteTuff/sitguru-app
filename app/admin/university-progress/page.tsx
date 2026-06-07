@@ -7,10 +7,10 @@ import {
   ClipboardCheck,
   Clock3,
   GraduationCap,
-  Search,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AcademyProgressClient from "./AcademyProgressClient";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ type SafeAdminQueryResponse = {
   error: unknown;
 };
 
-type AcademyProgressRecord = {
+export type AcademyProgressRecord = {
   key: string;
   name: string;
   email: string;
@@ -36,13 +36,9 @@ type AcademyProgressRecord = {
 };
 
 const adminRoutes = {
-  dashboard: "/admin",
   hr: "/admin/hr",
   university: "/admin/ambassador-training",
   assignments: "/admin/university-assignments",
-  gurus: "/admin/gurus",
-  ambassadors: "/admin/ambassadors",
-  petParents: "/admin/pet-parents",
 };
 
 function asString(value: unknown) {
@@ -79,19 +75,6 @@ function number(value: number) {
   );
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
-
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 function getText(row: AnyRow, keys: string[], fallback = "") {
   for (const key of keys) {
     const value = asString(row[key]);
@@ -108,6 +91,17 @@ function getDate(row: AnyRow, keys: string[]) {
   }
 
   return null;
+}
+
+function getId(row: AnyRow, keys: string[]) {
+  for (const key of keys) {
+    const value = row[key];
+
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+
+  return "";
 }
 
 function getDisplayName(row: AnyRow) {
@@ -151,8 +145,8 @@ function getEmail(row: AnyRow) {
   );
 }
 
-function getAcademy(row: AnyRow) {
-  return getText(
+function getAcademyFromRow(row: AnyRow, academyNameById: Map<string, string>) {
+  const directName = getText(
     row,
     [
       "academy_name",
@@ -164,11 +158,28 @@ function getAcademy(row: AnyRow) {
       "assignment_name",
       "title",
     ],
-    "SitGuru Academy",
+    "",
   );
+
+  if (directName) return directName;
+
+  const academyId = getId(row, [
+    "academy_id",
+    "training_id",
+    "course_id",
+    "program_id",
+    "module_id",
+    "assignment_id",
+  ]);
+
+  if (academyId && academyNameById.has(academyId)) {
+    return academyNameById.get(academyId) || "SitGuru Academy";
+  }
+
+  return "SitGuru Academy";
 }
 
-function getRole(row: AnyRow) {
+function getRole(row: AnyRow, academy: string) {
   const role = getText(
     row,
     [
@@ -182,17 +193,17 @@ function getRole(row: AnyRow) {
     "",
   ).toLowerCase();
 
-  const academy = getAcademy(row).toLowerCase();
+  const academyLower = academy.toLowerCase();
 
-  if (role.includes("guru") || academy.includes("guru")) return "Guru";
-  if (role.includes("ambassador") || academy.includes("ambassador")) {
+  if (role.includes("guru") || academyLower.includes("guru")) return "Guru";
+  if (role.includes("ambassador") || academyLower.includes("ambassador")) {
     return "Ambassador";
   }
   if (
     role.includes("pet_parent") ||
     role.includes("pet parent") ||
     role.includes("customer") ||
-    academy.includes("pet parent")
+    academyLower.includes("pet parent")
   ) {
     return "Pet Parent";
   }
@@ -362,26 +373,95 @@ function withSourceTable(row: AnyRow, source: string) {
   };
 }
 
-function normalizeProgressRow(row: AnyRow): AcademyProgressRecord {
-  const progress = getProgress(row);
-  const academy = getAcademy(row);
-  const email = getEmail(row);
-  const name = getDisplayName(row);
-  const role = getRole(row);
-  const userId = getText(row, [
-    "user_id",
-    "profile_id",
-    "student_id",
-    "participant_id",
-    "guru_id",
-    "ambassador_id",
-    "pet_parent_id",
-    "id",
-  ]);
+function buildPersonMap(rows: AnyRow[]) {
+  const map = new Map<string, AnyRow>();
+
+  for (const row of rows) {
+    const ids = [
+      getId(row, ["id"]),
+      getId(row, ["user_id"]),
+      getId(row, ["profile_id"]),
+      getId(row, ["auth_user_id"]),
+      getEmail(row).toLowerCase(),
+    ].filter(Boolean);
+
+    for (const id of ids) {
+      if (!map.has(id)) map.set(id, row);
+    }
+  }
+
+  return map;
+}
+
+function buildAcademyNameMap(rows: AnyRow[]) {
+  const map = new Map<string, string>();
+
+  for (const row of rows) {
+    const id = getId(row, ["id", "academy_id", "training_id", "course_id"]);
+    const name = getText(
+      row,
+      ["name", "title", "academy_name", "training_name", "course_name"],
+      "",
+    );
+
+    if (id && name) map.set(id, name);
+  }
+
+  return map;
+}
+
+function resolvePerson(row: AnyRow, personMap: Map<string, AnyRow>) {
+  const possibleKeys = [
+    getId(row, ["user_id"]),
+    getId(row, ["profile_id"]),
+    getId(row, ["student_id"]),
+    getId(row, ["participant_id"]),
+    getId(row, ["guru_id"]),
+    getId(row, ["ambassador_id"]),
+    getId(row, ["pet_parent_id"]),
+    getId(row, ["customer_id"]),
+    getEmail(row).toLowerCase(),
+  ].filter(Boolean);
+
+  for (const key of possibleKeys) {
+    const person = personMap.get(key);
+    if (person) return person;
+  }
+
+  return null;
+}
+
+function normalizeProgressRow(
+  row: AnyRow,
+  personMap: Map<string, AnyRow>,
+  academyNameById: Map<string, string>,
+): AcademyProgressRecord {
+  const person = resolvePerson(row, personMap);
   const source = getText(row, ["__source_table"], "unknown");
+  const academy = getAcademyFromRow(row, academyNameById);
+  const progress = getProgress(row);
+
+  const name = person ? getDisplayName(person) : getDisplayName(row);
+  const email = person ? getEmail(person) : getEmail(row);
+  const role = person
+    ? getRole({ ...row, role: getText(person, ["role", "account_type", "type"], "") }, academy)
+    : getRole(row, academy);
+
+  const userId =
+    getId(row, [
+      "user_id",
+      "profile_id",
+      "student_id",
+      "participant_id",
+      "guru_id",
+      "ambassador_id",
+      "pet_parent_id",
+      "customer_id",
+      "id",
+    ]) || email;
 
   return {
-    key: `${userId || email || name}:${academy}`.toLowerCase(),
+    key: `${userId || name}:${academy}:${source}`.toLowerCase(),
     name,
     email,
     role,
@@ -395,15 +475,15 @@ function normalizeProgressRow(row: AnyRow): AcademyProgressRecord {
   };
 }
 
-function mergeProgressRecords(rows: AnyRow[]) {
+function mergeProgressRecords(records: AcademyProgressRecord[]) {
   const map = new Map<string, AcademyProgressRecord>();
 
-  for (const row of rows) {
-    const record = normalizeProgressRow(row);
-    const existing = map.get(record.key);
+  for (const record of records) {
+    const mergeKey = `${record.email}:${record.name}:${record.academy}`.toLowerCase();
+    const existing = map.get(mergeKey);
 
     if (!existing) {
-      map.set(record.key, record);
+      map.set(mergeKey, record);
       continue;
     }
 
@@ -417,7 +497,7 @@ function mergeProgressRecords(rows: AnyRow[]) {
             new Date(b || 0).getTime() - new Date(a || 0).getTime(),
         )[0] || null;
 
-    map.set(record.key, {
+    map.set(mergeKey, {
       ...existing,
       name: existing.name !== "Unknown User" ? existing.name : record.name,
       email: existing.email !== "—" ? existing.email : record.email,
@@ -434,11 +514,14 @@ function mergeProgressRecords(rows: AnyRow[]) {
       completedAt,
       updatedAt,
       assignedAt: existing.assignedAt || record.assignedAt,
-      source: `${existing.source}, ${record.source}`,
+      source: Array.from(new Set(`${existing.source}, ${record.source}`.split(", "))).join(", "),
     });
   }
 
   return Array.from(map.values()).sort((a, b) => {
+    const academyCompare = a.academy.localeCompare(b.academy);
+    if (academyCompare !== 0) return academyCompare;
+
     if (b.progress !== a.progress) return b.progress - a.progress;
 
     const dateA = new Date(a.updatedAt || a.assignedAt || 0).getTime();
@@ -450,6 +533,13 @@ function mergeProgressRecords(rows: AnyRow[]) {
 
 async function getUniversityProgressData() {
   const [
+    profilesResult,
+    gurusResult,
+    ambassadorsResult,
+    petParentsResult,
+    academiesResult,
+    universityAcademiesResult,
+    trainingAcademiesResult,
     universityAssignmentsResult,
     academyAssignmentsResult,
     userAcademyAssignmentsResult,
@@ -459,73 +549,81 @@ async function getUniversityProgressData() {
     trainingProgressResult,
     userTrainingProgressResult,
   ] = await Promise.all([
+    safeAdminQuery(supabaseAdmin.from("profiles").select("*").limit(5000), "profiles"),
+    safeAdminQuery(supabaseAdmin.from("gurus").select("*").limit(5000), "gurus"),
+    safeAdminQuery(supabaseAdmin.from("ambassadors").select("*").limit(5000), "ambassadors"),
+    safeAdminQuery(supabaseAdmin.from("pet_parents").select("*").limit(5000), "pet_parents"),
+    safeAdminQuery(supabaseAdmin.from("academies").select("*").limit(1000), "academies"),
     safeAdminQuery(
-      supabaseAdmin
-        .from("university_assignments")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2000),
+      supabaseAdmin.from("university_academies").select("*").limit(1000),
+      "university_academies",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("training_academies").select("*").limit(1000),
+      "training_academies",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("university_assignments").select("*").limit(5000),
       "university_assignments",
     ),
     safeAdminQuery(
-      supabaseAdmin
-        .from("academy_assignments")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2000),
+      supabaseAdmin.from("academy_assignments").select("*").limit(5000),
       "academy_assignments",
     ),
     safeAdminQuery(
-      supabaseAdmin
-        .from("user_academy_assignments")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2000),
+      supabaseAdmin.from("user_academy_assignments").select("*").limit(5000),
       "user_academy_assignments",
     ),
     safeAdminQuery(
-      supabaseAdmin
-        .from("training_assignments")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2000),
+      supabaseAdmin.from("training_assignments").select("*").limit(5000),
       "training_assignments",
     ),
     safeAdminQuery(
-      supabaseAdmin
-        .from("university_progress")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(2000),
+      supabaseAdmin.from("university_progress").select("*").limit(5000),
       "university_progress",
     ),
     safeAdminQuery(
-      supabaseAdmin
-        .from("academy_progress")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(2000),
+      supabaseAdmin.from("academy_progress").select("*").limit(5000),
       "academy_progress",
     ),
     safeAdminQuery(
-      supabaseAdmin
-        .from("training_progress")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(2000),
+      supabaseAdmin.from("training_progress").select("*").limit(5000),
       "training_progress",
     ),
     safeAdminQuery(
-      supabaseAdmin
-        .from("user_training_progress")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(2000),
+      supabaseAdmin.from("user_training_progress").select("*").limit(5000),
       "user_training_progress",
     ),
   ]);
 
-  const allRows = [
+  const personRows = [
+    ...(((profilesResult.data || []) as AnyRow[]).map((row) =>
+      withSourceTable(row, "profiles"),
+    )),
+    ...(((gurusResult.data || []) as AnyRow[]).map((row) =>
+      withSourceTable(row, "gurus"),
+    )),
+    ...(((ambassadorsResult.data || []) as AnyRow[]).map((row) =>
+      withSourceTable(row, "ambassadors"),
+    )),
+    ...(((petParentsResult.data || []) as AnyRow[]).map((row) =>
+      withSourceTable(row, "pet_parents"),
+    )),
+  ];
+
+  const academyRows = [
+    ...(((academiesResult.data || []) as AnyRow[]).map((row) =>
+      withSourceTable(row, "academies"),
+    )),
+    ...(((universityAcademiesResult.data || []) as AnyRow[]).map((row) =>
+      withSourceTable(row, "university_academies"),
+    )),
+    ...(((trainingAcademiesResult.data || []) as AnyRow[]).map((row) =>
+      withSourceTable(row, "training_academies"),
+    )),
+  ];
+
+  const progressRows = [
     ...(((universityAssignmentsResult.data || []) as AnyRow[]).map((row) =>
       withSourceTable(row, "university_assignments"),
     )),
@@ -552,7 +650,14 @@ async function getUniversityProgressData() {
     )),
   ];
 
-  const records = mergeProgressRecords(allRows);
+  const personMap = buildPersonMap(personRows);
+  const academyNameById = buildAcademyNameMap(academyRows);
+
+  const normalizedRecords = progressRows.map((row) =>
+    normalizeProgressRow(row, personMap, academyNameById),
+  );
+
+  const records = mergeProgressRecords(normalizedRecords);
 
   const completedRecords = records.filter((record) => record.progress >= 100);
   const inProgressRecords = records.filter(
@@ -571,8 +676,6 @@ async function getUniversityProgressData() {
   return {
     records,
     completedRecords,
-    inProgressRecords,
-    notStartedRecords,
     metrics: {
       total: records.length,
       completed: completedRecords.length,
@@ -629,9 +732,8 @@ export default async function AdminUniversityProgressPage() {
             </div>
 
             <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-              See who completed their academies, who is still in progress, who
-              has not started, and how far each Pet Parent, Guru, Ambassador, or
-              onboarding user has progressed.
+              Sort, filter, and review academy progress by user, role, academy,
+              status, completion percentage, and last activity.
             </p>
           </div>
 
@@ -660,7 +762,10 @@ export default async function AdminUniversityProgressPage() {
         <MetricTile label="Completed" value={number(data.metrics.completed)} />
         <MetricTile label="In Progress" value={number(data.metrics.inProgress)} />
         <MetricTile label="Not Started" value={number(data.metrics.notStarted)} />
-        <MetricTile label="Average Progress" value={`${data.metrics.averageProgress}%`} />
+        <MetricTile
+          label="Average Progress"
+          value={`${data.metrics.averageProgress}%`}
+        />
         <MetricTile label="Guru Records" value={number(data.metrics.gurus)} />
         <MetricTile label="Ambassadors" value={number(data.metrics.ambassadors)} />
         <MetricTile label="Pet Parents" value={number(data.metrics.petParents)} />
@@ -690,155 +795,11 @@ export default async function AdminUniversityProgressPage() {
         />
       </section>
 
-      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-8">
-          <DashboardCard>
-            <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  Academy Completion Roster
-                </h2>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                  Full progress view by user, role, academy, status, completion
-                  percentage, and last activity.
-                </p>
-              </div>
-
-              <div className="inline-flex items-center gap-2 rounded-2xl border border-green-100 bg-green-50 px-4 py-2 text-xs font-black text-green-900">
-                <Search size={14} />
-                Browser search works here
-              </div>
-            </div>
-
-            <MobileProgressList records={data.records} />
-
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[980px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#edf3ee] text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    <th className="pb-3">User</th>
-                    <th className="pb-3">Role</th>
-                    <th className="pb-3">Academy</th>
-                    <th className="pb-3">Status</th>
-                    <th className="pb-3">Progress</th>
-                    <th className="pb-3">Completed</th>
-                    <th className="pb-3">Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.records.length ? (
-                    data.records.map((record) => (
-                      <tr
-                        key={record.key}
-                        className="border-b border-[#f1f5f2] last:border-0"
-                      >
-                        <td className="py-4">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <Avatar name={record.name} />
-                            <div className="min-w-0">
-                              <p className="truncate font-black text-slate-950">
-                                {record.name}
-                              </p>
-                              <p className="truncate text-xs font-bold text-slate-500">
-                                {record.email}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4">
-                          <RoleBadge role={record.role} />
-                        </td>
-                        <td className="py-4 font-bold text-slate-700">
-                          {record.academy}
-                        </td>
-                        <td className="py-4">
-                          <StatusBadge status={record.status} />
-                        </td>
-                        <td className="py-4">
-                          <ProgressBar value={record.progress} />
-                        </td>
-                        <td className="py-4 font-bold text-slate-600">
-                          {formatDate(record.completedAt)}
-                        </td>
-                        <td className="py-4 font-bold text-slate-600">
-                          {formatDate(record.updatedAt)}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={7} className="py-8">
-                        <EmptyState
-                          title="No academy progress records found"
-                          detail="This page is ready, but it did not find progress rows in the common SitGuru University progress tables. Once academy assignments or progress records exist, they will appear here."
-                        />
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </DashboardCard>
-        </div>
-
-        <div className="min-w-0 xl:col-span-4">
-          <DashboardCard>
-            <div className="mb-5">
-              <h2 className="text-lg font-black text-slate-950">
-                Completed Academy Users
-              </h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                Quick list of users who reached 100%.
-              </p>
-            </div>
-
-            <div className="grid gap-3">
-              {data.completedRecords.length ? (
-                data.completedRecords.slice(0, 12).map((record) => (
-                  <div
-                    key={`completed-${record.key}`}
-                    className="rounded-2xl border border-green-100 bg-green-50/70 p-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-green-100 text-green-800">
-                        <BadgeCheck size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-black text-slate-950">
-                          {record.name}
-                        </p>
-                        <p className="truncate text-xs font-bold text-slate-500">
-                          {record.email}
-                        </p>
-                        <p className="mt-1 text-xs font-black text-green-800">
-                          {record.academy}
-                        </p>
-                        <p className="mt-1 text-xs font-bold text-slate-500">
-                          Completed: {formatDate(record.completedAt)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <EmptyState
-                  title="No completed academies yet"
-                  detail="Completed users will show here once they reach 100%."
-                />
-              )}
-            </div>
-          </DashboardCard>
-        </div>
-      </section>
+      <AcademyProgressClient
+        records={data.records}
+        completedRecords={data.completedRecords}
+      />
     </main>
-  );
-}
-
-function DashboardCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="w-full min-w-0 rounded-[24px] border border-[#e3ece5] bg-white p-4 shadow-sm sm:rounded-[28px] sm:p-5">
-      {children}
-    </div>
   );
 }
 
@@ -886,145 +847,6 @@ function SummaryCard({
       </div>
       <h2 className="text-xl font-black text-slate-950">{title}</h2>
       <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-        {detail}
-      </p>
-    </div>
-  );
-}
-
-function ProgressBar({ value }: { value: number }) {
-  return (
-    <div className="min-w-[160px]">
-      <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs font-black text-slate-500">Progress</span>
-        <span className="text-xs font-black text-green-800">{value}%</span>
-      </div>
-      <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-green-700"
-          style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const styles =
-    status === "Completed"
-      ? "bg-green-100 text-green-800"
-      : status === "In Progress"
-        ? "bg-amber-100 text-amber-800"
-        : status === "Not Started"
-          ? "bg-slate-100 text-slate-700"
-          : "bg-blue-100 text-blue-800";
-
-  return (
-    <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}
-    >
-      {status}
-    </span>
-  );
-}
-
-function RoleBadge({ role }: { role: string }) {
-  const styles =
-    role === "Guru"
-      ? "border-green-100 bg-green-50 text-green-800"
-      : role === "Ambassador"
-        ? "border-blue-100 bg-blue-50 text-blue-800"
-        : role === "Pet Parent"
-          ? "border-purple-100 bg-purple-50 text-purple-800"
-          : "border-slate-200 bg-slate-50 text-slate-700";
-
-  return (
-    <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${styles}`}
-    >
-      {role}
-    </span>
-  );
-}
-
-function Avatar({ name }: { name: string }) {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-
-  return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-black text-green-800">
-      {initials || "SG"}
-    </div>
-  );
-}
-
-function MobileProgressList({ records }: { records: AcademyProgressRecord[] }) {
-  if (!records.length) {
-    return (
-      <div className="md:hidden">
-        <EmptyState
-          title="No academy progress records found"
-          detail="Progress records will show here once academy assignment or completion data exists."
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-3 md:hidden">
-      {records.map((record) => (
-        <article
-          key={`mobile-${record.key}`}
-          className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4"
-        >
-          <div className="flex min-w-0 items-start gap-3">
-            <Avatar name={record.name} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black text-slate-950">
-                {record.name}
-              </p>
-              <p className="truncate text-xs font-bold text-slate-500">
-                {record.email}
-              </p>
-            </div>
-            <StatusBadge status={record.status} />
-          </div>
-
-          <div className="mt-4 grid gap-2">
-            <MobileMetaRow label="Role" value={record.role} />
-            <MobileMetaRow label="Academy" value={record.academy} />
-            <ProgressBar value={record.progress} />
-            <MobileMetaRow label="Completed" value={formatDate(record.completedAt)} />
-            <MobileMetaRow label="Updated" value={formatDate(record.updatedAt)} />
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function MobileMetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2">
-      <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-        {label}
-      </span>
-      <span className="truncate text-right text-xs font-black text-slate-700">
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function EmptyState({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-green-200 bg-green-50/60 p-6 text-center">
-      <p className="font-black text-green-950">{title}</p>
-      <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-green-900/70">
         {detail}
       </p>
     </div>
