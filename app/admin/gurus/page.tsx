@@ -36,6 +36,8 @@ type GuruLeadPipelineData = {
   referralLeads: number;
   topSource: string;
   topReferralCode: string;
+  totalReferralCodes: number;
+  hiddenReferralCodes: number;
   sourceChart: ChartItem[];
   referralCodeChart: ChartItem[];
 };
@@ -1092,6 +1094,7 @@ function getLeadStatusCount(leads: GuruLeadRow[], status: string) {
 function getLeadLabelCounts(
   leads: GuruLeadRow[],
   getLabel: (lead: GuruLeadRow) => string,
+  limit = 8,
 ) {
   const groupMap = new Map<string, GuruLeadRow[]>();
 
@@ -1109,7 +1112,7 @@ function getLeadLabelCounts(
       helper: `${number(group.length)} Leads`,
     }))
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-    .slice(0, 8);
+    .slice(0, limit);
 }
 
 async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
@@ -1126,14 +1129,17 @@ async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
     asTrimmedString(lead.lead_source),
   );
 
-  const referralCodeChart = getLeadLabelCounts(
+  const allReferralCodeChart = getLeadLabelCounts(
     leads.filter((lead) => Boolean(asTrimmedString(lead.referral_code))),
     (lead) => asTrimmedString(lead.referral_code).toUpperCase(),
+    1000,
   );
+
+  const referralCodeChart = allReferralCodeChart.slice(0, 5);
 
   const topSource = sourceChart.length > 0 ? sourceChart[0].label : "None yet";
   const topReferralCode =
-    referralCodeChart.length > 0 ? referralCodeChart[0].label : "None yet";
+    allReferralCodeChart.length > 0 ? allReferralCodeChart[0].label : "None yet";
 
   return {
     total: leads.length,
@@ -1151,6 +1157,8 @@ async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
     ).length,
     topSource,
     topReferralCode,
+    totalReferralCodes: allReferralCodeChart.length,
+    hiddenReferralCodes: Math.max(allReferralCodeChart.length - referralCodeChart.length, 0),
     sourceChart,
     referralCodeChart,
   };
@@ -1823,12 +1831,49 @@ function GuruLeadPipelineCard({
         </div>
 
         <div className="xl:col-span-4">
-          <HorizontalBarChart
-            title="Referral Codes"
-            valueLabel="Leads"
-            items={pipeline.referralCodeChart}
-            emptyLabel="No Guru Lead referral code data found yet."
-          />
+          <div className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-4">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-black text-slate-950">
+                  Top Referral Codes
+                </h3>
+                <p className="mt-1 text-xs font-bold text-slate-500">
+                  Showing top 5 only to keep this dashboard compact.
+                </p>
+              </div>
+              <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                Leads
+              </span>
+            </div>
+
+            <div className="max-h-[360px] overflow-y-auto pr-1">
+              <HorizontalBarChart
+                title="Referral Codes"
+                valueLabel="Leads"
+                items={pipeline.referralCodeChart}
+                emptyLabel="No Guru Lead referral code data found yet."
+              />
+            </div>
+
+            {pipeline.hiddenReferralCodes > 0 ? (
+              <div className="mt-4 rounded-2xl border border-purple-100 bg-purple-50 p-4">
+                <p className="text-sm font-black text-purple-950">
+                  + {number(pipeline.hiddenReferralCodes)} more referral code
+                  {pipeline.hiddenReferralCodes === 1 ? "" : "s"}
+                </p>
+                <p className="mt-1 text-xs font-bold leading-5 text-purple-700">
+                  Manage the full referral list from Guru Leads so this page stays short.
+                </p>
+              </div>
+            ) : null}
+
+            <Link
+              href={adminRoutes.guruLeads}
+              className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-purple-200 bg-white px-4 py-3 text-sm font-black text-purple-800 transition hover:bg-purple-50"
+            >
+              View All Referral Codes
+            </Link>
+          </div>
         </div>
       </div>
     </DashboardCard>
