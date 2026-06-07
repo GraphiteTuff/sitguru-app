@@ -132,6 +132,17 @@ type ProgramCard = {
   featured: boolean;
 };
 
+type PartnerCard = {
+  id: string;
+  name: string;
+  type: string;
+  location: string;
+  description: string;
+  href: string;
+  logo: string;
+  logoAlt: string;
+};
+
 const demoGuruCards: GuruCard[] = [
   {
     id: "demo-avery-johnson",
@@ -335,6 +346,20 @@ const homepagePrograms: ProgramCard[] = [
     primaryCta: "Start Military Hire",
     secondaryCta: "Military Details",
     featured: false,
+  },
+];
+
+const homepagePartners: PartnerCard[] = [
+  {
+    id: "doylestown-animal-medical-clinic",
+    name: "Doylestown Animal Medical Clinic",
+    type: "Animal Medical Clinic",
+    location: "Doylestown, PA",
+    description:
+      "A local veterinary care connection helping SitGuru build stronger community relationships around safer, easier support for Pet Parents.",
+    href: "https://doylestownanimalmedicalclinic.com/",
+    logo: "/images/partners/doylestown-animal-medical-clinic.png",
+    logoAlt: "Doylestown Animal Medical Clinic logo",
   },
 ];
 
@@ -883,6 +908,172 @@ function ProgramHeroCard({
         </div>
       </div>
     </article>
+  );
+}
+
+
+function PartnerNetworkSection({
+  onTrack,
+}: {
+  onTrack: (label: string, destination: string) => void;
+}) {
+  if (homepagePartners.length === 0) return null;
+
+  const carouselPartners = [...homepagePartners, ...homepagePartners, ...homepagePartners];
+
+  return (
+    <section className="bg-gradient-to-br from-white via-emerald-50/30 to-white py-5 sm:py-10">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="overflow-hidden rounded-[30px] border border-emerald-100 bg-white/95 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 sm:text-xs">
+                SitGuru Partner Network
+              </p>
+
+              <h2 className="mt-2 text-2xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-3xl">
+                Growing with local pet care partners
+              </h2>
+
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
+                SitGuru is building a trusted local pet care network with animal
+                clinics, pet businesses, community organizations, and
+                pet-friendly partners who care about safer, easier support for
+                Pet Parents.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <a
+                href={homepagePartners[0]?.href || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() =>
+                  onTrack(
+                    "Visit Featured Partner",
+                    homepagePartners[0]?.href || "#",
+                  )
+                }
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+              >
+                Visit Featured Partner
+              </a>
+
+              <Link
+                href="/contact"
+                onClick={() => onTrack("Become a Partner", "/contact")}
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
+              >
+                Become a Partner
+              </Link>
+            </div>
+          </div>
+
+          <div
+            className="sitguru-partner-carousel relative mt-6 overflow-hidden"
+            aria-label="SitGuru partner logo carousel"
+          >
+            <style>{`
+              .sitguru-partner-carousel {
+                -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
+                mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
+                -webkit-transform: translateZ(0);
+                transform: translateZ(0);
+              }
+
+              .sitguru-partner-carousel-track {
+                display: flex;
+                width: max-content;
+                animation: sitguruPartnerMarquee 34s linear infinite;
+                -webkit-animation: sitguruPartnerMarquee 34s linear infinite;
+                transform: translate3d(0, 0, 0);
+                -webkit-transform: translate3d(0, 0, 0);
+                will-change: transform;
+              }
+
+              .sitguru-partner-carousel:hover .sitguru-partner-carousel-track,
+              .sitguru-partner-carousel:focus-within .sitguru-partner-carousel-track {
+                animation-play-state: paused;
+                -webkit-animation-play-state: paused;
+              }
+
+              @keyframes sitguruPartnerMarquee {
+                0% {
+                  transform: translate3d(0, 0, 0);
+                }
+                100% {
+                  transform: translate3d(-50%, 0, 0);
+                }
+              }
+
+              @-webkit-keyframes sitguruPartnerMarquee {
+                0% {
+                  -webkit-transform: translate3d(0, 0, 0);
+                }
+                100% {
+                  -webkit-transform: translate3d(-50%, 0, 0);
+                }
+              }
+
+              @media (prefers-reduced-motion: reduce) {
+                .sitguru-partner-carousel-track {
+                  animation: none;
+                  -webkit-animation: none;
+                }
+              }
+            `}</style>
+
+            <div className="sitguru-partner-carousel-track">
+              {[0, 1].map((loopIndex) => (
+                <div
+                  key={`partner-carousel-loop-${loopIndex}`}
+                  aria-hidden={loopIndex === 1}
+                  className="flex shrink-0 gap-4 pr-4 sm:gap-5 sm:pr-5"
+                >
+                  {carouselPartners.map((partner, index) => (
+                    <a
+                      key={`${partner.id}-${loopIndex}-${index}`}
+                      href={partner.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => onTrack(`Partner Logo ${partner.name}`, partner.href)}
+                      className="group flex min-w-[280px] max-w-[280px] flex-col justify-between rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-md sm:min-w-[360px] sm:max-w-[360px]"
+                    >
+                      <div className="flex h-28 items-center justify-center rounded-2xl border border-slate-100 bg-white p-4">
+                        <img
+                          src={partner.logo}
+                          alt={partner.logoAlt}
+                          className="max-h-20 w-full object-contain"
+                          loading="lazy"
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <h3 className="text-base font-black text-slate-950 group-hover:text-emerald-800">
+                          {partner.name}
+                        </h3>
+                        <p className="mt-1 text-xs font-black text-emerald-700">
+                          {partner.type}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          {partner.location}
+                        </p>
+                        <p className="mt-3 line-clamp-3 text-xs font-semibold leading-5 text-slate-600">
+                          {partner.description}
+                        </p>
+                        <p className="mt-4 text-xs font-black text-emerald-800">
+                          Visit partner website →
+                        </p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1547,6 +1738,8 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      <PartnerNetworkSection onTrack={trackHomepageClick} />
 
       <section className="bg-gradient-to-br from-white via-emerald-50/30 to-white pb-8 sm:pb-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
