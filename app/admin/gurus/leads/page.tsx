@@ -278,6 +278,42 @@ function getStatusClass(status: string) {
   }
 }
 
+function getEmailHref(lead: GuruLead) {
+  const referralCode = lead.referral_code || `${lead.first_name}${lead.last_name || ""}`
+    .replace(/\s+/g, "")
+    .toUpperCase();
+
+  const subject = encodeURIComponent("SitGuru Guru Opportunity — Next Steps");
+
+  const body = encodeURIComponent(
+    `Hi ${lead.first_name},
+
+Thank you for your interest in SitGuru. We reviewed your resume and liked your background and experience.
+
+SitGuru is currently speaking with candidates interested in becoming pet care sitters, dog walkers, and local Pet Care Gurus. We would like to see if you are still interested and discuss the next steps in the process.
+
+You can sign up now for free and begin creating your Guru profile here:
+
+https://www.sitguru.com/become-a-guru?ref=${referralCode}
+
+Referral Code: ${referralCode}
+
+Once your profile is started, we can also schedule a conference call if you would like help setting up your profile, services, experience, availability, and service area.
+
+After a Guru profile is reviewed and approved, SitGuru will work to drive Pet Parents to approved Guru profiles as we continue growing in each local area.
+
+Please reply and let us know if you are still interested in moving forward.
+
+Thank you,
+
+Jason Graff
+Founder, SitGuru
+https://www.sitguru.com`,
+  );
+
+  return `mailto:${lead.email}?subject=${subject}&body=${body}`;
+}
+
 async function addGuruLead(formData: FormData) {
   "use server";
 
@@ -286,7 +322,7 @@ async function addGuruLead(formData: FormData) {
   const email = normalizeEmail(getString(formData, "email"));
   const phone = normalizePhone(getString(formData, "phone"));
   const city = getString(formData, "city");
-  const state = getString(formData, "state") || "PA";
+  const state = getString(formData, "state");
   const zip = normalizeZip(getString(formData, "zip"));
   const leadSource = getString(formData, "lead_source");
   const referralCode = normalizeReferralCode(getString(formData, "referral_code"));
@@ -359,22 +395,43 @@ async function updateGuruLead(formData: FormData) {
   "use server";
 
   const id = getRequiredString(formData, "id");
-  const status = getString(formData, "status") || "New";
+  const firstName = getRequiredString(formData, "first_name");
+  const lastName = getString(formData, "last_name");
+  const email = normalizeEmail(getString(formData, "email"));
+  const phone = normalizePhone(getString(formData, "phone"));
+  const city = getString(formData, "city");
+  const state = getString(formData, "state");
+  const zip = normalizeZip(getString(formData, "zip"));
   const leadSource = getString(formData, "lead_source");
   const referralCode = normalizeReferralCode(getString(formData, "referral_code"));
   const referredByName = getString(formData, "referred_by_name");
   const referredByEmail = normalizeEmail(getString(formData, "referred_by_email"));
+  const experienceLevel = getString(formData, "experience_level");
+  const status = getString(formData, "status") || "New";
   const assignedTo = getString(formData, "assigned_to");
   const followUpDate = getString(formData, "follow_up_date");
   const notes = getString(formData, "notes");
   const resumeFile = getResumeFile(formData);
 
+  const interestedServices = formData
+    .getAll("interested_services")
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
   const updatePayload: Record<string, unknown> = {
-    status,
+    first_name: firstName,
+    last_name: lastName,
+    email,
+    phone,
+    city,
+    state,
+    zip,
     lead_source: leadSource,
     referral_code: referralCode,
     referred_by_name: referredByName,
     referred_by_email: referredByEmail,
+    interested_services: interestedServices,
+    experience_level: experienceLevel,
+    status,
     assigned_to: assignedTo,
     follow_up_date: followUpDate,
     notes,
@@ -666,7 +723,7 @@ export default async function GuruLeadsPage() {
                       key={lead.id}
                       className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
                     >
-                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="flex flex-col gap-4">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-lg font-bold text-slate-950">{fullName}</h3>
@@ -809,11 +866,100 @@ export default async function GuruLeadsPage() {
                         <form
                           action={updateGuruLead}
                           encType="multipart/form-data"
-                          className="w-full rounded-2xl bg-slate-50 p-3 xl:w-80"
+                          className="rounded-2xl bg-slate-50 p-4"
                         >
                           <input type="hidden" name="id" value={lead.id} />
 
-                          <div className="space-y-3">
+                          <h4 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                            Edit Lead Information
+                          </h4>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                First Name *
+                              </span>
+                              <input
+                                name="first_name"
+                                required
+                                defaultValue={lead.first_name || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Last Name
+                              </span>
+                              <input
+                                name="last_name"
+                                defaultValue={lead.last_name || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Email
+                              </span>
+                              <input
+                                name="email"
+                                type="email"
+                                defaultValue={lead.email || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Phone
+                              </span>
+                              <input
+                                name="phone"
+                                type="tel"
+                                defaultValue={lead.phone || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                                placeholder="(215) 555-1234"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                City
+                              </span>
+                              <input
+                                name="city"
+                                defaultValue={lead.city || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              />
+                            </label>
+
+                            <div className="grid grid-cols-[90px_1fr] gap-3">
+                              <label className="block">
+                                <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  State
+                                </span>
+                                <input
+                                  name="state"
+                                  defaultValue={lead.state || ""}
+                                  maxLength={2}
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm uppercase text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                                />
+                              </label>
+
+                              <label className="block">
+                                <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  ZIP
+                                </span>
+                                <input
+                                  name="zip"
+                                  inputMode="numeric"
+                                  defaultValue={lead.zip || ""}
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                                />
+                              </label>
+                            </div>
+
                             <label className="block">
                               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
                                 Status
@@ -844,6 +990,24 @@ export default async function GuruLeadsPage() {
                                 {leadSourceOptions.map((source) => (
                                   <option key={source} value={source}>
                                     {source}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Experience
+                              </span>
+                              <select
+                                name="experience_level"
+                                defaultValue={lead.experience_level || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              >
+                                <option value="">Select experience</option>
+                                {experienceOptions.map((experience) => (
+                                  <option key={experience} value={experience}>
+                                    {experience}
                                   </option>
                                 ))}
                               </select>
@@ -885,18 +1049,6 @@ export default async function GuruLeadsPage() {
 
                             <label className="block">
                               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Replace / Upload Resume
-                              </span>
-                              <input
-                                name="resume"
-                                type="file"
-                                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-950 outline-none file:mr-2 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-2 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-emerald-800"
-                              />
-                            </label>
-
-                            <label className="block">
-                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
                                 Assigned To
                               </span>
                               <select
@@ -925,65 +1077,100 @@ export default async function GuruLeadsPage() {
                               />
                             </label>
 
-                            <label className="block">
+                            <label className="block md:col-span-2">
                               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Notes
+                                Replace / Upload Resume
                               </span>
-                              <textarea
-                                name="notes"
-                                rows={3}
-                                defaultValue={lead.notes || ""}
-                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              <input
+                                name="resume"
+                                type="file"
+                                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-950 outline-none file:mr-2 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-2 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-emerald-800"
                               />
                             </label>
+                          </div>
 
+                          <div className="mt-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Interested Services
+                            </p>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              {serviceOptions.map((service) => (
+                                <label
+                                  key={service}
+                                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    name="interested_services"
+                                    value={service}
+                                    defaultChecked={services.includes(service)}
+                                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                  />
+                                  {service}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          <label className="mt-4 block">
+                            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Notes
+                            </span>
+                            <textarea
+                              name="notes"
+                              rows={4}
+                              defaultValue={lead.notes || ""}
+                              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                            />
+                          </label>
+
+                          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <button
                               type="submit"
-                              className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800"
+                              className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800"
                             >
-                              Update Lead
+                              Save Lead Changes
                             </button>
+
+                            <div className="flex flex-wrap gap-2">
+                              {lead.email ? (
+                                <a
+                                  href={getEmailHref(lead)}
+                                  className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                                >
+                                  Email Lead
+                                </a>
+                              ) : null}
+
+                              <Link
+                                href={becomeGuruHref}
+                                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                              >
+                                Become-a-Guru Page
+                              </Link>
+
+                              {lead.resume_signed_url ? (
+                                <a
+                                  href={lead.resume_signed_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+                                >
+                                  View Resume
+                                </a>
+                              ) : null}
+                            </div>
                           </div>
                         </form>
-                      </div>
 
-                      <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex flex-wrap gap-2">
-                          {lead.email ? (
-                            <a
-                              href={`mailto:${lead.email}?subject=SitGuru Guru Opportunity&body=Hi ${lead.first_name},%0D%0A%0D%0AThanks for your interest in becoming a SitGuru Guru. You can sign up for free here: https://www.sitguru.com${becomeGuruHref}`}
-                              className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
-                            >
-                              Email Lead
-                            </a>
-                          ) : null}
-
-                          <Link
-                            href={becomeGuruHref}
-                            className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                          >
-                            Become-a-Guru Page
-                          </Link>
-
-                          {lead.resume_signed_url ? (
-                            <a
-                              href={lead.resume_signed_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50"
-                            >
-                              View Resume
-                            </a>
-                          ) : null}
-                        </div>
-
-                        <form action={deleteGuruLead}>
+                        <form action={deleteGuruLead} className="flex justify-end">
                           <input type="hidden" name="id" value={lead.id} />
                           <button
                             type="submit"
-                            className="inline-flex w-full items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100 sm:w-auto"
+                            className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100"
                           >
-                            Delete
+                            Delete Lead
                           </button>
                         </form>
                       </div>
