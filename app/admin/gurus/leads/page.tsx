@@ -5,6 +5,10 @@ import GuruLeadForm from "./GuruLeadForm";
 
 export const dynamic = "force-dynamic";
 
+const RESUME_BUCKET = "guru-resumes";
+const RESUME_FOLDER = "dog-sitters/guru-leads";
+const MAX_RESUME_SIZE_BYTES = 10 * 1024 * 1024;
+
 type GuruLead = {
   id: string;
   first_name: string;
@@ -26,8 +30,17 @@ type GuruLead = {
   assigned_to: string | null;
   converted_guru_id: string | null;
   converted_at: string | null;
+  resume_file_path: string | null;
+  resume_file_name: string | null;
+  resume_mime_type: string | null;
+  resume_size_bytes: number | null;
+  resume_uploaded_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type GuruLeadWithResumeUrl = GuruLead & {
+  resume_signed_url: string | null;
 };
 
 type CountItem = {
@@ -133,6 +146,87 @@ function normalizeZip(value: string | null) {
   return value.replace(/\D/g, "").slice(0, 5) || null;
 }
 
+function getResumeFile(formData: FormData) {
+  const file = formData.get("resume");
+
+  if (!(file instanceof File)) {
+    return null;
+  }
+
+  if (!file.name || file.size === 0) {
+    return null;
+  }
+
+  return file;
+}
+
+function sanitizeFileName(fileName: string) {
+  const parts = fileName.split(".");
+  const extension = parts.length > 1 ? parts.pop()?.toLowerCase() || "pdf" : "pdf";
+  const baseName = parts
+    .join(".")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  return `${baseName || "resume"}.${extension}`;
+}
+
+function validateResumeFile(file: File) {
+  const allowedMimeTypes = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ];
+
+  const allowedExtensions = [".pdf", ".doc", ".docx"];
+  const lowerName = file.name.toLowerCase();
+  const hasAllowedExtension = allowedExtensions.some((extension) =>
+    lowerName.endsWith(extension),
+  );
+
+  if (!allowedMimeTypes.includes(file.type) && !hasAllowedExtension) {
+    throw new Error("Resume must be a PDF, DOC, or DOCX file.");
+  }
+
+  if (file.size > MAX_RESUME_SIZE_BYTES) {
+    throw new Error("Resume must be 10MB or smaller.");
+  }
+}
+
+async function uploadResumeForLead({
+  leadId,
+  file,
+}: {
+  leadId: string;
+  file: File;
+}) {
+  validateResumeFile(file);
+
+  const safeFileName = sanitizeFileName(file.name);
+  const filePath = `${RESUME_FOLDER}/${leadId}/${Date.now()}-${safeFileName}`;
+
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from(RESUME_BUCKET)
+    .upload(filePath, file, {
+      contentType: file.type || "application/octet-stream",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  return {
+    resume_file_path: filePath,
+    resume_file_name: file.name,
+    resume_mime_type: file.type || "application/octet-stream",
+    resume_size_bytes: file.size,
+    resume_uploaded_at: new Date().toISOString(),
+  };
+}
+
 function countByLabel(items: GuruLead[], getLabel: (lead: GuruLead) => string | null) {
   const map = new Map<string, number>();
 
@@ -149,6 +243,18 @@ function countByLabel(items: GuruLead[], getLabel: (lead: GuruLead) => string | 
 
 function getTopLabel(items: CountItem[]) {
   return items.length > 0 ? items[0].label : "None yet";
+}
+
+function formatFileSize(bytes: number | null) {
+  if (!bytes || bytes <= 0) {
+    return "";
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function getStatusClass(status: string) {
@@ -191,34 +297,58 @@ async function addGuruLead(formData: FormData) {
   const notes = getString(formData, "notes");
   const followUpDate = getString(formData, "follow_up_date");
   const assignedTo = getString(formData, "assigned_to");
+  const resumeFile = getResumeFile(formData);
 
   const interestedServices = formData
     .getAll("interested_services")
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
 
-  const { error } = await supabaseAdmin.from("guru_leads").insert({
-    first_name: firstName,
-    last_name: lastName,
-    email,
-    phone,
-    city,
-    state,
-    zip,
-    lead_source: leadSource,
-    referral_code: referralCode,
-    referred_by_name: referredByName,
-    referred_by_email: referredByEmail,
-    interested_services: interestedServices,
-    experience_level: experienceLevel,
-    status,
-    notes,
-    follow_up_date: followUpDate,
-    assigned_to: assignedTo,
-    updated_at: new Date().toISOString(),
-  });
+  const { data: insertedLead, error } = await supabaseAdmin
+    .from("guru_leads")
+    .insert({
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone,
+      city,
+      state,
+      zip,
+      lead_source: leadSource,
+      referral_code: referralCode,
+      referred_by_name: referredByName,
+      referred_by_email: referredByEmail,
+      interested_services: interestedServices,
+      experience_level: experienceLevel,
+      status,
+      notes,
+      follow_up_date: followUpDate,
+      assigned_to: assignedTo,
+      updated_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  if (resumeFile && insertedLead?.id) {
+    const resumeData = await uploadResumeForLead({
+      leadId: insertedLead.id,
+      file: resumeFile,
+    });
+
+    const { error: resumeUpdateError } = await supabaseAdmin
+      .from("guru_leads")
+      .update({
+        ...resumeData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", insertedLead.id);
+
+    if (resumeUpdateError) {
+      throw new Error(resumeUpdateError.message);
+    }
   }
 
   revalidatePath("/admin/gurus/leads");
@@ -237,20 +367,32 @@ async function updateGuruLead(formData: FormData) {
   const assignedTo = getString(formData, "assigned_to");
   const followUpDate = getString(formData, "follow_up_date");
   const notes = getString(formData, "notes");
+  const resumeFile = getResumeFile(formData);
+
+  const updatePayload: Record<string, unknown> = {
+    status,
+    lead_source: leadSource,
+    referral_code: referralCode,
+    referred_by_name: referredByName,
+    referred_by_email: referredByEmail,
+    assigned_to: assignedTo,
+    follow_up_date: followUpDate,
+    notes,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (resumeFile) {
+    const resumeData = await uploadResumeForLead({
+      leadId: id,
+      file: resumeFile,
+    });
+
+    Object.assign(updatePayload, resumeData);
+  }
 
   const { error } = await supabaseAdmin
     .from("guru_leads")
-    .update({
-      status,
-      lead_source: leadSource,
-      referral_code: referralCode,
-      referred_by_name: referredByName,
-      referred_by_email: referredByEmail,
-      assigned_to: assignedTo,
-      follow_up_date: followUpDate,
-      notes,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", id);
 
   if (error) {
@@ -330,7 +472,27 @@ export default async function GuruLeadsPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  const guruLeads = (leads || []) as GuruLead[];
+  const baseGuruLeads = (leads || []) as GuruLead[];
+
+  const guruLeads: GuruLeadWithResumeUrl[] = await Promise.all(
+    baseGuruLeads.map(async (lead) => {
+      if (!lead.resume_file_path) {
+        return {
+          ...lead,
+          resume_signed_url: null,
+        };
+      }
+
+      const { data: signedUrlData } = await supabaseAdmin.storage
+        .from(RESUME_BUCKET)
+        .createSignedUrl(lead.resume_file_path, 60 * 60);
+
+      return {
+        ...lead,
+        resume_signed_url: signedUrlData?.signedUrl || null,
+      };
+    }),
+  );
 
   const totalLeads = guruLeads.length;
   const newLeads = guruLeads.filter((lead) => lead.status === "New").length;
@@ -372,8 +534,8 @@ export default async function GuruLeadsPage() {
             </h1>
 
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-              Track interested dog sitters, walkers, boarders, trainers, referrals, and pet care
-              providers before they become approved SitGuru Gurus.
+              Track interested dog sitters, walkers, boarders, trainers, referrals, resumes, and
+              pet care providers before they become approved SitGuru Gurus.
             </p>
           </div>
 
@@ -522,6 +684,12 @@ export default async function GuruLeadsPage() {
                                 Ref: {lead.referral_code}
                               </span>
                             ) : null}
+
+                            {lead.resume_file_path ? (
+                              <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">
+                                Resume Uploaded
+                              </span>
+                            ) : null}
                           </div>
 
                           <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
@@ -593,6 +761,28 @@ export default async function GuruLeadsPage() {
                               <span className="font-semibold text-slate-800">Added:</span>{" "}
                               {new Date(lead.created_at).toLocaleDateString()}
                             </p>
+
+                            <p className="sm:col-span-2">
+                              <span className="font-semibold text-slate-800">Resume:</span>{" "}
+                              {lead.resume_signed_url ? (
+                                <a
+                                  href={lead.resume_signed_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-bold text-emerald-700 hover:text-emerald-800"
+                                >
+                                  View Resume
+                                  {lead.resume_file_name ? ` (${lead.resume_file_name})` : ""}
+                                  {lead.resume_size_bytes
+                                    ? ` - ${formatFileSize(lead.resume_size_bytes)}`
+                                    : ""}
+                                </a>
+                              ) : lead.resume_file_path ? (
+                                "Resume uploaded, but signed link could not be created."
+                              ) : (
+                                "Not uploaded"
+                              )}
+                            </p>
                           </div>
 
                           {services.length > 0 ? (
@@ -618,6 +808,7 @@ export default async function GuruLeadsPage() {
 
                         <form
                           action={updateGuruLead}
+                          encType="multipart/form-data"
                           className="w-full rounded-2xl bg-slate-50 p-3 xl:w-80"
                         >
                           <input type="hidden" name="id" value={lead.id} />
@@ -694,6 +885,18 @@ export default async function GuruLeadsPage() {
 
                             <label className="block">
                               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Replace / Upload Resume
+                              </span>
+                              <input
+                                name="resume"
+                                type="file"
+                                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-950 outline-none file:mr-2 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-2 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-emerald-800"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
                                 Assigned To
                               </span>
                               <select
@@ -761,6 +964,17 @@ export default async function GuruLeadsPage() {
                           >
                             Become-a-Guru Page
                           </Link>
+
+                          {lead.resume_signed_url ? (
+                            <a
+                              href={lead.resume_signed_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+                            >
+                              View Resume
+                            </a>
+                          ) : null}
                         </div>
 
                         <form action={deleteGuruLead}>

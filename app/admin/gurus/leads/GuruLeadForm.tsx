@@ -152,7 +152,7 @@ export default function GuruLeadForm({
   }
 
   return (
-    <form action={action} className="mt-5 space-y-4">
+    <form action={action} encType="multipart/form-data" className="mt-5 space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="text-sm font-semibold text-slate-700">First Name *</span>
@@ -303,6 +303,20 @@ export default function GuruLeadForm({
             />
           </label>
         </div>
+      </div>
+
+      <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4">
+        <h3 className="text-sm font-bold text-emerald-950">Resume Upload</h3>
+        <p className="mt-1 text-xs font-medium text-emerald-700">
+          Upload ZipRecruiter or candidate resumes. Supported: PDF, DOC, DOCX.
+        </p>
+
+        <input
+          name="resume"
+          type="file"
+          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="mt-4 w-full rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm file:mr-3 file:rounded-xl file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-bold file:text-white hover:file:bg-emerald-800"
+        />
       </div>
 
       <div>
