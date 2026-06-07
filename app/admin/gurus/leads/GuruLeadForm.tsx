@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type GuruLeadFormProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -11,69 +11,12 @@ type GuruLeadFormProps = {
   assignedToOptions: string[];
 };
 
-const zipCityMap: Record<string, { city: string; state: string }> = {
-  "18951": { city: "Quakertown", state: "PA" },
-  "18901": { city: "Doylestown", state: "PA" },
-  "18902": { city: "Doylestown", state: "PA" },
-  "18914": { city: "Chalfont", state: "PA" },
-  "18917": { city: "Dublin", state: "PA" },
-  "18923": { city: "Fountainville", state: "PA" },
-  "18925": { city: "Furlong", state: "PA" },
-  "18929": { city: "Jamison", state: "PA" },
-  "18938": { city: "New Hope", state: "PA" },
-  "18940": { city: "Newtown", state: "PA" },
-  "18944": { city: "Perkasie", state: "PA" },
-  "18947": { city: "Pipersville", state: "PA" },
-  "18954": { city: "Richboro", state: "PA" },
-  "18955": { city: "Richlandtown", state: "PA" },
-  "18960": { city: "Sellersville", state: "PA" },
-  "18966": { city: "Southampton", state: "PA" },
-  "18969": { city: "Telford", state: "PA" },
-  "18974": { city: "Warminster", state: "PA" },
-  "18976": { city: "Warrington", state: "PA" },
-  "19002": { city: "Ambler", state: "PA" },
-  "19006": { city: "Huntingdon Valley", state: "PA" },
-  "19007": { city: "Bristol", state: "PA" },
-  "19020": { city: "Bensalem", state: "PA" },
-  "19021": { city: "Croydon", state: "PA" },
-  "19030": { city: "Fairless Hills", state: "PA" },
-  "19040": { city: "Hatboro", state: "PA" },
-  "19044": { city: "Horsham", state: "PA" },
-  "19047": { city: "Langhorne", state: "PA" },
-  "19053": { city: "Feasterville-Trevose", state: "PA" },
-  "19054": { city: "Levittown", state: "PA" },
-  "19056": { city: "Levittown", state: "PA" },
-  "19057": { city: "Levittown", state: "PA" },
-  "19067": { city: "Yardley", state: "PA" },
-  "19090": { city: "Willow Grove", state: "PA" },
-  "19446": { city: "Lansdale", state: "PA" },
-  "18036": { city: "Coopersburg", state: "PA" },
-  "18049": { city: "Emmaus", state: "PA" },
-  "18052": { city: "Whitehall", state: "PA" },
-  "18054": { city: "Green Lane", state: "PA" },
-  "18073": { city: "Pennsburg", state: "PA" },
-  "18074": { city: "Perkiomenville", state: "PA" },
-  "18076": { city: "Red Hill", state: "PA" },
-  "18077": { city: "Riegelsville", state: "PA" },
-  "18101": { city: "Allentown", state: "PA" },
-  "18102": { city: "Allentown", state: "PA" },
-  "18103": { city: "Allentown", state: "PA" },
-  "18018": { city: "Bethlehem", state: "PA" },
-  "18020": { city: "Bethlehem", state: "PA" },
+type ZipLookupResponse = {
+  zip: string;
+  city: string;
+  state: string;
+  stateName?: string;
 };
-
-const cityZipMap: Record<string, string> = Object.entries(zipCityMap).reduce(
-  (map, [zip, location]) => {
-    const key = `${location.city.toLowerCase()},${location.state.toLowerCase()}`;
-
-    if (!map[key]) {
-      map[key] = zip;
-    }
-
-    return map;
-  },
-  {} as Record<string, string>,
-);
 
 function formatPhoneNumber(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 10);
@@ -103,13 +46,11 @@ export default function GuruLeadForm({
 }: GuruLeadFormProps) {
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
-  const [state, setState] = useState("PA");
+  const [state, setState] = useState("");
   const [zip, setZip] = useState("");
-
-  const cityStateKey = useMemo(
-    () => `${city.trim().toLowerCase()},${state.trim().toLowerCase()}`,
-    [city, state],
-  );
+  const [zipLookupStatus, setZipLookupStatus] = useState<
+    "idle" | "loading" | "found" | "not_found" | "error"
+  >("idle");
 
   function handlePhoneChange(value: string) {
     setPhone(formatPhoneNumber(value));
@@ -119,37 +60,57 @@ export default function GuruLeadForm({
     const cleanZip = normalizeZip(value);
     setZip(cleanZip);
 
-    const location = zipCityMap[cleanZip];
-
-    if (location) {
-      setCity(location.city);
-      setState(location.state);
+    if (cleanZip.length < 5) {
+      setZipLookupStatus("idle");
     }
   }
 
-  function handleCityBlur() {
-    if (zip.trim()) {
+  useEffect(() => {
+    if (zip.length !== 5) {
       return;
     }
 
-    const matchedZip = cityZipMap[cityStateKey];
+    const controller = new AbortController();
 
-    if (matchedZip) {
-      setZip(matchedZip);
+    async function lookupZip() {
+      try {
+        setZipLookupStatus("loading");
+
+        const response = await fetch(`/api/zip-lookup?zip=${zip}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          setZipLookupStatus("not_found");
+          return;
+        }
+
+        const data = (await response.json()) as ZipLookupResponse;
+
+        if (data.city && data.state) {
+          setCity(data.city);
+          setState(data.state);
+          setZipLookupStatus("found");
+          return;
+        }
+
+        setZipLookupStatus("not_found");
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        console.error("Guru Lead ZIP lookup failed:", error);
+        setZipLookupStatus("error");
+      }
     }
-  }
 
-  function handleStateBlur() {
-    if (zip.trim()) {
-      return;
-    }
+    lookupZip();
 
-    const matchedZip = cityZipMap[cityStateKey];
-
-    if (matchedZip) {
-      setZip(matchedZip);
-    }
-  }
+    return () => {
+      controller.abort();
+    };
+  }, [zip]);
 
   return (
     <form action={action} encType="multipart/form-data" className="mt-5 space-y-4">
@@ -195,6 +156,9 @@ export default function GuruLeadForm({
           className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
           placeholder="(215) 555-1234"
         />
+        <p className="mt-1 text-xs font-medium text-slate-500">
+          Phone auto-formats to (XXX) XXX-XXXX.
+        </p>
       </label>
 
       <div className="grid gap-4 sm:grid-cols-[1fr_90px_110px]">
@@ -204,9 +168,8 @@ export default function GuruLeadForm({
             name="city"
             value={city}
             onChange={(event) => setCity(event.target.value)}
-            onBlur={handleCityBlur}
             className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-            placeholder="Quakertown"
+            placeholder="City"
           />
         </label>
 
@@ -216,8 +179,8 @@ export default function GuruLeadForm({
             name="state"
             value={state}
             onChange={(event) => setState(event.target.value.toUpperCase().slice(0, 2))}
-            onBlur={handleStateBlur}
             className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+            placeholder="PA"
           />
         </label>
 
@@ -233,6 +196,30 @@ export default function GuruLeadForm({
           />
         </label>
       </div>
+
+      {zipLookupStatus === "loading" ? (
+        <p className="rounded-2xl bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+          Looking up ZIP code...
+        </p>
+      ) : null}
+
+      {zipLookupStatus === "found" ? (
+        <p className="rounded-2xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+          ZIP found. City and state were filled automatically.
+        </p>
+      ) : null}
+
+      {zipLookupStatus === "not_found" ? (
+        <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+          ZIP was not found. You can still enter city and state manually.
+        </p>
+      ) : null}
+
+      {zipLookupStatus === "error" ? (
+        <p className="rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+          ZIP lookup failed. You can still enter city and state manually.
+        </p>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
