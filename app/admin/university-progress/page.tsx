@@ -8,8 +8,6 @@ import {
   Clock3,
   GraduationCap,
   Search,
-  UserCheck,
-  Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -153,6 +151,23 @@ function getEmail(row: AnyRow) {
   );
 }
 
+function getAcademy(row: AnyRow) {
+  return getText(
+    row,
+    [
+      "academy_name",
+      "academy",
+      "training_name",
+      "course_name",
+      "program_name",
+      "module_name",
+      "assignment_name",
+      "title",
+    ],
+    "SitGuru Academy",
+  );
+}
+
 function getRole(row: AnyRow) {
   const role = getText(
     row,
@@ -190,23 +205,6 @@ function getRole(row: AnyRow) {
     : "User";
 }
 
-function getAcademy(row: AnyRow) {
-  return getText(
-    row,
-    [
-      "academy_name",
-      "academy",
-      "training_name",
-      "course_name",
-      "program_name",
-      "module_name",
-      "assignment_name",
-      "title",
-    ],
-    "SitGuru Academy",
-  );
-}
-
 function getRawStatus(row: AnyRow) {
   return getText(
     row,
@@ -242,7 +240,10 @@ function getProgress(row: AnyRow) {
   const totalSteps = asNumber(row.total_steps ?? row.steps_total ?? row.step_count);
 
   if (totalSteps > 0) {
-    return Math.min(100, Math.max(0, Math.round((completedSteps / totalSteps) * 100)));
+    return Math.min(
+      100,
+      Math.max(0, Math.round((completedSteps / totalSteps) * 100)),
+    );
   }
 
   if (
@@ -408,16 +409,21 @@ function mergeProgressRecords(rows: AnyRow[]) {
 
     const bestProgress = Math.max(existing.progress, record.progress);
     const completedAt = existing.completedAt || record.completedAt;
-    const updatedAt = [existing.updatedAt, record.updatedAt]
-      .filter(Boolean)
-      .sort((a, b) => new Date(b || 0).getTime() - new Date(a || 0).getTime())[0] || null;
+    const updatedAt =
+      [existing.updatedAt, record.updatedAt]
+        .filter(Boolean)
+        .sort(
+          (a, b) =>
+            new Date(b || 0).getTime() - new Date(a || 0).getTime(),
+        )[0] || null;
 
     map.set(record.key, {
       ...existing,
       name: existing.name !== "Unknown User" ? existing.name : record.name,
       email: existing.email !== "—" ? existing.email : record.email,
       role: existing.role !== "User" ? existing.role : record.role,
-      academy: existing.academy !== "SitGuru Academy" ? existing.academy : record.academy,
+      academy:
+        existing.academy !== "SitGuru Academy" ? existing.academy : record.academy,
       progress: bestProgress,
       status:
         bestProgress >= 100
@@ -555,8 +561,12 @@ async function getUniversityProgressData() {
   const notStartedRecords = records.filter((record) => record.progress === 0);
 
   const guruRecords = records.filter((record) => record.role === "Guru");
-  const ambassadorRecords = records.filter((record) => record.role === "Ambassador");
-  const petParentRecords = records.filter((record) => record.role === "Pet Parent");
+  const ambassadorRecords = records.filter(
+    (record) => record.role === "Ambassador",
+  );
+  const petParentRecords = records.filter(
+    (record) => record.role === "Pet Parent",
+  );
 
   return {
     records,
@@ -619,8 +629,9 @@ export default async function AdminUniversityProgressPage() {
             </div>
 
             <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-              See who completed their academies, who is still in progress, who has not started,
-              and how far each Pet Parent, Guru, Ambassador, or onboarding user has progressed.
+              See who completed their academies, who is still in progress, who
+              has not started, and how far each Pet Parent, Guru, Ambassador, or
+              onboarding user has progressed.
             </p>
           </div>
 
@@ -688,7 +699,8 @@ export default async function AdminUniversityProgressPage() {
                   Academy Completion Roster
                 </h2>
                 <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                  Full progress view by user, role, academy, status, completion percentage, and last activity.
+                  Full progress view by user, role, academy, status, completion
+                  percentage, and last activity.
                 </p>
               </div>
 
@@ -716,7 +728,10 @@ export default async function AdminUniversityProgressPage() {
                 <tbody>
                   {data.records.length ? (
                     data.records.map((record) => (
-                      <tr key={record.key} className="border-b border-[#f1f5f2] last:border-0">
+                      <tr
+                        key={record.key}
+                        className="border-b border-[#f1f5f2] last:border-0"
+                      >
                         <td className="py-4">
                           <div className="flex min-w-0 items-center gap-3">
                             <Avatar name={record.name} />
@@ -862,7 +877,9 @@ function SummaryCard({
   return (
     <div className="rounded-[24px] border border-[#e3ece5] bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-4">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${styles[tone]}`}>
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${styles[tone]}`}
+        >
           {icon}
         </div>
         <p className="text-3xl font-black text-green-950">{value}</p>
@@ -903,7 +920,9 @@ function StatusBadge({ status }: { status: string }) {
           : "bg-blue-100 text-blue-800";
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}>
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}
+    >
       {status}
     </span>
   );
@@ -920,7 +939,9 @@ function RoleBadge({ role }: { role: string }) {
           : "border-slate-200 bg-slate-50 text-slate-700";
 
   return (
-    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${styles}`}>
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${styles}`}
+    >
       {role}
     </span>
   );

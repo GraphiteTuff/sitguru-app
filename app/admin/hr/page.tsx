@@ -40,6 +40,7 @@ const adminRoutes = {
   ambassadorLeads: "/admin/ambassador-leads",
   ambassadorTraining: "/admin/ambassador-training",
   universityAssignments: "/admin/university-assignments",
+  universityProgress: "/admin/university-progress",
   programs: "/admin/programs",
   gurus: "/admin/gurus",
   newGuru: "/admin/gurus/new",
@@ -322,22 +323,6 @@ function getSourceLabel(row: AnyRow) {
   return source || "Other";
 }
 
-function isAmbassadorLead(row: AnyRow) {
-  const text = getCombinedText(row);
-  const participantType = getParticipantType(row);
-
-  return (
-    text.includes("ambassador") ||
-    text.includes("careerlink") ||
-    text.includes("career link") ||
-    text.includes("student hire") ||
-    text.includes("community hire") ||
-    text.includes("military hire") ||
-    text.includes("veteran") ||
-    participantType.includes("ambassador")
-  );
-}
-
 function isGuruApplicant(row: AnyRow) {
   const text = getCombinedText(row);
   const role = getRole(row);
@@ -587,12 +572,6 @@ async function getHrData() {
   const partnerApplications = (
     (partnerApplicationsResult.data || []) as AnyRow[]
   ).map((row) => withSourceTable(row, "partner_applications"));
-  const networkPartnerLeads = (
-    (networkPartnerLeadsResult.data || []) as AnyRow[]
-  ).map((row) => withSourceTable(row, "network_partner_leads"));
-  const networkParticipants = (
-    (networkParticipantsResult.data || []) as AnyRow[]
-  ).map((row) => withSourceTable(row, "network_program_participants"));
   const launchSignups = ((launchSignupsResult.data || []) as AnyRow[]).map(
     (row) => withSourceTable(row, "launch_signups"),
   );
@@ -894,7 +873,9 @@ export default async function AdminHrPage() {
                   SitGuru University
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                  Manage onboarding, academy training, assignments, certifications, badges, and progress for Pet Parents, Gurus, Ambassadors, and future SitGuru team members.
+                  Manage onboarding, academy training, assignments,
+                  certifications, badges, and progress for Pet Parents, Gurus,
+                  Ambassadors, and future SitGuru team members.
                 </p>
               </div>
 
@@ -926,10 +907,10 @@ export default async function AdminHrPage() {
                 detail="Prepare and track completion-based certificates, badges, and readiness markers."
               />
               <QuickAction
-                href={adminRoutes.universityAssignments}
+                href={adminRoutes.universityProgress}
                 icon={<ClipboardCheck size={18} />}
                 title="Progress Tracking"
-                detail="Review training completion and academy assignment progress from a visible HR location."
+                detail="Review who completed academies, who is still in progress, and who has not started."
               />
             </div>
           </DashboardCard>
@@ -942,7 +923,8 @@ export default async function AdminHrPage() {
                 University Quick Map
               </h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                SitGuru University is now connected directly from HR so training and academy assignments are easier to find.
+                SitGuru University is now connected directly from HR so training
+                and academy assignments are easier to find.
               </p>
             </div>
 
@@ -956,6 +938,11 @@ export default async function AdminHrPage() {
                 icon={<ClipboardList size={18} />}
                 title="Academy Assignments"
                 detail="Assign Pet Parent, Guru, and Ambassador academies by person or role."
+              />
+              <InfoTile
+                icon={<ClipboardCheck size={18} />}
+                title="Progress Tracking"
+                detail="Review who completed academies and how far each assigned user has progressed."
               />
               <InfoTile
                 icon={<BadgeCheck size={18} />}
@@ -977,7 +964,8 @@ export default async function AdminHrPage() {
                 </h2>
                 <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
                   Active order: Student Hire, Community Hire, Military Hire.
-                  Archived applicants stay retained but are not treated as active.
+                  Archived applicants stay retained but are not treated as
+                  active.
                 </p>
               </div>
 
@@ -1242,7 +1230,6 @@ export default async function AdminHrPage() {
         </div>
       </section>
 
-
       <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-12">
           <DashboardCard>
@@ -1252,7 +1239,10 @@ export default async function AdminHrPage() {
                   SitGuru University & HR Onboarding Tools
                 </h2>
                 <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-                  Direct HR access for SitGuru University training, academy assignments, onboarding steps, referral setup, payout readiness, documents, videos, acknowledgments, and certification requirements.
+                  Direct HR access for SitGuru University training, academy
+                  assignments, onboarding steps, referral setup, payout
+                  readiness, documents, videos, acknowledgments, and
+                  certification requirements.
                 </p>
               </div>
 
@@ -1277,6 +1267,12 @@ export default async function AdminHrPage() {
                 icon={<ClipboardList size={18} />}
                 title="Academy Assignment Manager"
                 detail="Assign academies one by one to Pet Parents, Gurus, Ambassadors, and internal onboarding users."
+              />
+              <QuickAction
+                href={adminRoutes.universityProgress}
+                icon={<ClipboardCheck size={18} />}
+                title="Academy Progress Tracker"
+                detail="See academy completion by Pet Parent, Guru, and Ambassador, including completion percentage, status, and last activity."
               />
               <QuickAction
                 href={adminRoutes.ambassadors}
@@ -1376,6 +1372,12 @@ export default async function AdminHrPage() {
                 icon={<ClipboardList size={18} />}
                 title="Academy Assignment Manager"
                 detail="Assign Pet Parent, Guru, and Ambassador academies individually so training access is no longer buried."
+              />
+              <QuickAction
+                href={adminRoutes.universityProgress}
+                icon={<ClipboardCheck size={18} />}
+                title="Academy Progress Tracker"
+                detail="See who completed academies, who is in progress, and who has not started."
               />
               <QuickAction
                 href={adminRoutes.ambassadorLeads}
