@@ -278,11 +278,18 @@ function getStatusClass(status: string) {
   }
 }
 
-function getEmailHref(lead: GuruLead) {
-  const referralCode = lead.referral_code || `${lead.first_name}${lead.last_name || ""}`
+function buildReferralCode(lead: GuruLead) {
+  if (lead.referral_code) {
+    return lead.referral_code;
+  }
+
+  return `${lead.first_name}${lead.last_name || ""}`
     .replace(/\s+/g, "")
     .toUpperCase();
+}
 
+function getEmailHref(lead: GuruLead) {
+  const referralCode = buildReferralCode(lead);
   const subject = encodeURIComponent("SitGuru Guru Opportunity — Next Steps");
 
   const body = encodeURIComponent(
