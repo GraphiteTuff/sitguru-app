@@ -104,6 +104,7 @@ type SetupStepConfig = {
 const adminRoutes = {
   dashboard: "/admin",
   gurus: "/admin/gurus",
+  guruLeads: "/admin/gurus/leads",
   guruExport: "/admin/gurus/export",
   newGuru: "/admin/gurus/new",
   approvals: "/admin/guru-approvals",
@@ -1711,13 +1712,21 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
                       ? activeSetupStep.description
                       : activeStuckBeforeStep
                         ? activeStuckBeforeStep.description
-                        : "Review Guru applications, profile readiness, verification progress, trust checks, bookable visibility, and exportable Guru reporting."}
+                        : "Review Guru applications, profile readiness, verification progress, trust checks, bookable visibility, lead tracking, and exportable Guru reporting."}
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href={adminRoutes.guruLeads}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+            >
+              <UserPlus size={17} />
+              Guru Leads
+            </Link>
+
             <Link
               href={adminRoutes.guruExport}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
@@ -2034,7 +2043,14 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
           </DashboardCard>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-3">
+        <section className="grid gap-5 lg:grid-cols-4">
+          <QuickLinkCard
+            href={adminRoutes.guruLeads}
+            icon={<UserPlus size={22} />}
+            title="Guru Leads"
+            description="Track interested sitters, walkers, boarders, trainers, and pet care providers before they complete Guru signup."
+          />
+
           <QuickLinkCard
             href={adminRoutes.approvals}
             icon={<ClipboardCheck size={22} />}
@@ -2066,6 +2082,7 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
           profile quality, identity status, background status, safety status,
           bookable visibility, services, location, experience, joined dates,
           charts, filters, sorting, and CSV export are calculated from live rows.
+          Guru Leads are managed separately at `/admin/gurus/leads`.
         </div>
       </div>
     </main>
