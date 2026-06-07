@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import GuruLeadForm from "./GuruLeadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -115,7 +116,7 @@ function normalizePhone(value: string | null) {
     return null;
   }
 
-  const digits = value.replace(/\D/g, "");
+  const digits = value.replace(/\D/g, "").slice(0, 10);
 
   if (digits.length === 10) {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
@@ -462,226 +463,14 @@ export default async function GuruLeadsPage() {
               Guru signup.
             </p>
 
-            <form action={addGuruLead} className="mt-5 space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-700">First Name *</span>
-                  <input
-                    name="first_name"
-                    required
-                    className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                    placeholder="Sarah"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-700">Last Name</span>
-                  <input
-                    name="last_name"
-                    className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                    placeholder="Miller"
-                  />
-                </label>
-              </div>
-
-              <label className="block">
-                <span className="text-sm font-semibold text-slate-700">Email</span>
-                <input
-                  name="email"
-                  type="email"
-                  className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  placeholder="sarah@email.com"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-semibold text-slate-700">Phone</span>
-                <input
-                  name="phone"
-                  className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  placeholder="(215) 555-1234"
-                />
-              </label>
-
-              <div className="grid gap-4 sm:grid-cols-[1fr_90px_110px]">
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-700">City</span>
-                  <input
-                    name="city"
-                    className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                    placeholder="Quakertown"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-700">State</span>
-                  <input
-                    name="state"
-                    defaultValue="PA"
-                    className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-700">ZIP</span>
-                  <input
-                    name="zip"
-                    className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                    placeholder="18951"
-                  />
-                </label>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-700">Lead Source</span>
-                  <select
-                    name="lead_source"
-                    className="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                    defaultValue=""
-                  >
-                    <option value="">Select source</option>
-                    {leadSourceOptions.map((source) => (
-                      <option key={source} value={source}>
-                        {source}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-700">Experience</span>
-                  <select
-                    name="experience_level"
-                    className="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                    defaultValue=""
-                  >
-                    <option value="">Select experience</option>
-                    {experienceOptions.map((experience) => (
-                      <option key={experience} value={experience}>
-                        {experience}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="rounded-3xl border border-purple-100 bg-purple-50 p-4">
-                <h3 className="text-sm font-bold text-purple-950">Referral Tracking</h3>
-                <p className="mt-1 text-xs font-medium text-purple-700">
-                  Use this when someone refers a future Guru using their SitGuru referral code.
-                </p>
-
-                <div className="mt-4 space-y-4">
-                  <label className="block">
-                    <span className="text-sm font-semibold text-slate-700">Referral Code</span>
-                    <input
-                      name="referral_code"
-                      className="mt-1 w-full rounded-2xl border border-purple-200 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
-                      placeholder="JASON18951"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="text-sm font-semibold text-slate-700">Referred By Name</span>
-                    <input
-                      name="referred_by_name"
-                      className="mt-1 w-full rounded-2xl border border-purple-200 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
-                      placeholder="Jason Graff"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="text-sm font-semibold text-slate-700">Referred By Email</span>
-                    <input
-                      name="referred_by_email"
-                      type="email"
-                      className="mt-1 w-full rounded-2xl border border-purple-200 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
-                      placeholder="jason@sitguru.com"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-semibold text-slate-700">Interested Services</p>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  {serviceOptions.map((service) => (
-                    <label
-                      key={service}
-                      className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700"
-                    >
-                      <input
-                        type="checkbox"
-                        name="interested_services"
-                        value={service}
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      {service}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-700">Status</span>
-                  <select
-                    name="status"
-                    className="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                    defaultValue="New"
-                  >
-                    {statusOptions.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-semibold text-slate-700">Assigned To</span>
-                  <select
-                    name="assigned_to"
-                    className="mt-1 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                    defaultValue=""
-                  >
-                    <option value="">Unassigned</option>
-                    {assignedToOptions.map((person) => (
-                      <option key={person} value={person}>
-                        {person}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label className="block">
-                <span className="text-sm font-semibold text-slate-700">Follow-Up Date</span>
-                <input
-                  name="follow_up_date"
-                  type="date"
-                  className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-semibold text-slate-700">Notes</span>
-                <textarea
-                  name="notes"
-                  rows={4}
-                  className="mt-1 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  placeholder="Met at event, interested in dog walking and drop-ins..."
-                />
-              </label>
-
-              <button
-                type="submit"
-                className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
-              >
-                Add Guru Lead
-              </button>
-            </form>
+            <GuruLeadForm
+              action={addGuruLead}
+              leadSourceOptions={leadSourceOptions}
+              experienceOptions={experienceOptions}
+              serviceOptions={serviceOptions}
+              statusOptions={statusOptions}
+              assignedToOptions={assignedToOptions}
+            />
           </div>
 
           <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-6">
@@ -876,7 +665,7 @@ export default async function GuruLeadsPage() {
                               <input
                                 name="referral_code"
                                 defaultValue={lead.referral_code || ""}
-                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm uppercase text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                               />
                             </label>
 
