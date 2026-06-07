@@ -943,22 +943,10 @@ function PartnerNetworkSection({
               </p>
 
               <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <a
-                  href={featuredPartner.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() =>
-                    onTrack(`Visit Partner ${featuredPartner.name}`, featuredPartner.href)
-                  }
-                  className="inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
-                >
-                  Visit Partner Website
-                </a>
-
                 <Link
                   href="/contact"
                   onClick={() => onTrack("Become a Partner", "/contact")}
-                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+                  className="inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
                 >
                   Become a Partner
                 </Link>
@@ -972,9 +960,14 @@ function PartnerNetworkSection({
               onClick={() =>
                 onTrack(`Partner Logo ${featuredPartner.name}`, featuredPartner.href)
               }
-              className="group block rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-white to-emerald-50/50 p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-md sm:p-6"
+              className="group relative block overflow-hidden rounded-[28px] border border-amber-200 bg-gradient-to-br from-white via-amber-50/40 to-emerald-50/60 p-5 shadow-[0_16px_42px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-[0_20px_50px_rgba(15,23,42,0.12)] sm:p-6"
             >
-              <div className="flex min-h-[160px] items-center justify-center rounded-3xl border border-slate-100 bg-white p-5 sm:min-h-[190px]">
+              <div className="absolute right-4 top-4 z-10 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-100 px-4 py-2 text-[11px] font-black uppercase tracking-[0.12em] text-amber-900 shadow-sm">
+                <span aria-hidden="true">★</span>
+                Featured SitGuru Partner
+              </div>
+
+              <div className="flex min-h-[160px] items-center justify-center rounded-3xl border border-amber-100 bg-white p-5 pt-14 sm:min-h-[190px] sm:pt-12">
                 <img
                   src={featuredPartner.logo}
                   alt={featuredPartner.logoAlt}
@@ -999,8 +992,8 @@ function PartnerNetworkSection({
                   </p>
                 </div>
 
-                <span className="inline-flex rounded-full bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800">
-                  Visit website →
+                <span className="inline-flex rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white shadow-sm transition group-hover:bg-emerald-800">
+                  Visit Partner Website →
                 </span>
               </div>
             </a>
