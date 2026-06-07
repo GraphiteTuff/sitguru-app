@@ -532,7 +532,7 @@ function mapGurusToCards(gurus: Guru[]): GuruCard[] {
     const reviews = Number(guru.review_count || 0);
 
     return {
-      id: String(guru.id),
+      id: `live-${String(guru.id)}`,
       name: getGuruName(guru),
       role: getGuruRole(guru),
       location: formatLocation(guru.city, guru.state),
@@ -544,6 +544,21 @@ function mapGurusToCards(gurus: Guru[]): GuruCard[] {
       badge: guru.is_verified ? "Verified" : "Trusted",
       href: getGuruHref(guru),
     };
+  });
+}
+
+function mergeLiveAndDemoGuruCards(liveCards: GuruCard[], demoCards: GuruCard[]) {
+  const seenKeys = new Set<string>();
+
+  return [...liveCards, ...demoCards].filter((card) => {
+    const normalizedName = card.name.trim().toLowerCase();
+    const normalizedLocation = card.location.trim().toLowerCase();
+    const key = `${normalizedName}|${normalizedLocation}`;
+
+    if (seenKeys.has(key)) return false;
+
+    seenKeys.add(key);
+    return true;
   });
 }
 
@@ -972,18 +987,68 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    setGuruCards(demoGuruCards);
+    let isMounted = true;
 
-    trackEvent({
-      eventName: "homepage_demo_gurus_loaded",
-      eventType: "system",
-      source: detectSourceFromUrl(),
-      metadata: {
-        guru_card_count: demoGuruCards.length,
-        using_demo_gurus_only: true,
-        version: "easy_signup_trusted_local_demo_gurus",
-      },
-    });
+    async function loadHomepageGurus() {
+      const { data, error } = await supabase
+        .from("gurus")
+        .select("*")
+        .eq("is_active", true)
+        .eq("is_public", true)
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .limit(24);
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.warn("Could not load live Gurus for homepage carousel:", error.message);
+
+        setGuruCards(demoGuruCards);
+
+        trackEvent({
+          eventName: "homepage_gurus_load_failed",
+          eventType: "system",
+          source: detectSourceFromUrl(),
+          metadata: {
+            error: error.message,
+            fallback_demo_guru_count: demoGuruCards.length,
+            version: "easy_signup_trusted_local_live_gurus",
+          },
+        });
+
+        return;
+      }
+
+      const liveGuruRows = ((data || []) as Guru[]).filter(
+        (guru) => guru.is_active !== false && guru.is_public !== false,
+      );
+      const liveGuruCards = mapGurusToCards(liveGuruRows);
+      const mergedGuruCards = mergeLiveAndDemoGuruCards(
+        liveGuruCards,
+        demoGuruCards,
+      );
+
+      setGuruCards(mergedGuruCards);
+
+      trackEvent({
+        eventName: "homepage_gurus_loaded",
+        eventType: "system",
+        source: detectSourceFromUrl(),
+        metadata: {
+          live_guru_count: liveGuruCards.length,
+          demo_guru_count: demoGuruCards.length,
+          total_carousel_guru_count: mergedGuruCards.length,
+          using_live_gurus: liveGuruCards.length > 0,
+          version: "easy_signup_trusted_local_live_gurus",
+        },
+      });
+    }
+
+    loadHomepageGurus();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
