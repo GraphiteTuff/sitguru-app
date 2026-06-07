@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 type CarouselItem = {
   id: string;
@@ -13,6 +14,32 @@ type CarouselItem = {
   petType: string;
   badge?: string;
   href: string;
+};
+
+type GuruRow = {
+  [key: string]: unknown;
+  id: string | number;
+  user_id?: string | null;
+  slug?: string | null;
+  display_name?: string | null;
+  full_name?: string | null;
+  title?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+  services?: string[] | null;
+  profile_photo_url?: string | null;
+  photo_url?: string | null;
+  avatar_url?: string | null;
+  image_url?: string | null;
+  rating_avg?: number | null;
+  rating?: number | null;
+  review_count?: number | null;
+  is_verified?: boolean | null;
+  is_active?: boolean | null;
+  is_public?: boolean | null;
+  updated_at?: string | null;
+  created_at?: string | null;
 };
 
 const approvedGuruImages: Record<string, string | undefined> = {
@@ -42,6 +69,77 @@ const fallbackCarouselItems: CarouselItem[] = [];
 type CaregiverCarouselProps = {
   items?: CarouselItem[];
 };
+
+function formatLocation(city?: string | null, state?: string | null, zip?: string | null) {
+  const cityState = [city, state].filter(Boolean).join(", ");
+
+  if (cityState && zip) return `${cityState} · ${zip}`;
+  if (cityState) return cityState;
+  if (zip) return zip;
+
+  return "Local SitGuru service area";
+}
+
+function getGuruName(guru: GuruRow) {
+  return guru.display_name || guru.full_name || "SitGuru Guru";
+}
+
+function getGuruImage(guru: GuruRow) {
+  return (
+    guru.profile_photo_url ||
+    guru.photo_url ||
+    guru.avatar_url ||
+    guru.image_url ||
+    "/images/demo/avery-johnson.png"
+  );
+}
+
+function getGuruHref(guru: GuruRow) {
+  if (guru.slug) return `/guru/${guru.slug}`;
+  return `/guru/${guru.id}`;
+}
+
+function getGuruRatingLabel(guru: GuruRow) {
+  if (typeof guru.rating_avg === "number" && guru.rating_avg > 0) {
+    return guru.rating_avg.toFixed(1);
+  }
+
+  if (typeof guru.rating === "number" && guru.rating > 0) {
+    return guru.rating.toFixed(1);
+  }
+
+  if (typeof guru.review_count === "number" && guru.review_count > 0) {
+    return "New";
+  }
+
+  return "New";
+}
+
+function getPrimaryPetType(guru: GuruRow) {
+  const services = Array.isArray(guru.services) ? guru.services.filter(Boolean) : [];
+
+  return services[0] || "Pet Care";
+}
+
+function isPublicCarouselGuru(guru: GuruRow) {
+  return guru.is_active !== false && guru.is_public !== false;
+}
+
+function mapGuruToCarouselItem(guru: GuruRow): CarouselItem {
+  const name = getGuruName(guru);
+
+  return {
+    id: `live-${guru.id}`,
+    name,
+    role: guru.title || "Pet Care Guru",
+    location: formatLocation(guru.city, guru.state, guru.zip_code),
+    rating: getGuruRatingLabel(guru),
+    image: getGuruImage(guru),
+    petType: getPrimaryPetType(guru),
+    badge: guru.is_verified ? "Verified" : "Trusted",
+    href: getGuruHref(guru),
+  };
+}
 
 function getSafeImageForItem(item: CarouselItem) {
   const approvedImage = approvedGuruImages[item.name];
@@ -103,15 +201,56 @@ function dedupeAndApproveItems(items: CarouselItem[]) {
 export default function CaregiverCarousel({
   items = [],
 }: CaregiverCarouselProps) {
+  const [liveGuruItems, setLiveGuruItems] = useState<CarouselItem[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadLiveGurusForCarousel() {
+      const { data, error } = await supabase
+        .from("gurus")
+        .select("*")
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .limit(24);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        console.warn("Could not load live Gurus for homepage carousel:", error.message);
+        setLiveGuruItems([]);
+        return;
+      }
+
+      const carouselItems = ((data || []) as GuruRow[])
+        .filter(isPublicCarouselGuru)
+        .map(mapGuruToCarouselItem);
+
+      setLiveGuruItems(carouselItems);
+    }
+
+    loadLiveGurusForCarousel();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const displayItems = useMemo(() => {
-    const approvedItems = dedupeAndApproveItems(items);
+    const mergedItems = [
+      ...liveGuruItems,
+      ...items,
+    ];
+
+    const approvedItems = dedupeAndApproveItems(mergedItems);
 
     if (approvedItems.length > 0) {
       return approvedItems;
     }
 
     return fallbackCarouselItems;
-  }, [items]);
+  }, [items, liveGuruItems]);
 
   const hasMultipleItems = displayItems.length > 1;
 
