@@ -22,6 +22,23 @@ export const dynamic = "force-dynamic";
 type GuruRow = Record<string, unknown>;
 type ProfileRow = Record<string, unknown>;
 type BackgroundCheckRow = Record<string, unknown>;
+type GuruLeadRow = Record<string, unknown>;
+
+type GuruLeadPipelineData = {
+  total: number;
+  new: number;
+  contacted: number;
+  interested: number;
+  applicationSent: number;
+  applied: number;
+  approvedGuru: number;
+  notMovingForward: number;
+  referralLeads: number;
+  topSource: string;
+  topReferralCode: string;
+  sourceChart: ChartItem[];
+  referralCodeChart: ChartItem[];
+};
 
 type SearchParams = {
   status?: string;
@@ -1068,6 +1085,77 @@ function buildTrustChartRows(rows: GuruDisplayRow[]) {
   ];
 }
 
+function getLeadStatusCount(leads: GuruLeadRow[], status: string) {
+  return leads.filter((lead) => asTrimmedString(lead.status) === status).length;
+}
+
+function getLeadLabelCounts(
+  leads: GuruLeadRow[],
+  getLabel: (lead: GuruLeadRow) => string,
+) {
+  const groupMap = new Map<string, GuruLeadRow[]>();
+
+  for (const lead of leads) {
+    const label = getLabel(lead) || "Not Added";
+    const existing = groupMap.get(label) || [];
+    existing.push(lead);
+    groupMap.set(label, existing);
+  }
+
+  return Array.from(groupMap.entries())
+    .map(([label, group]) => ({
+      label,
+      value: group.length,
+      helper: `${number(group.length)} Leads`,
+    }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .slice(0, 8);
+}
+
+async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
+  const leads = await safeRows<GuruLeadRow>(
+    supabaseAdmin
+      .from("guru_leads")
+      .select("id,status,lead_source,referral_code,referred_by_email,created_at")
+      .order("created_at", { ascending: false })
+      .limit(1000),
+    "guru_leads",
+  );
+
+  const sourceChart = getLeadLabelCounts(leads, (lead) =>
+    asTrimmedString(lead.lead_source),
+  );
+
+  const referralCodeChart = getLeadLabelCounts(
+    leads.filter((lead) => Boolean(asTrimmedString(lead.referral_code))),
+    (lead) => asTrimmedString(lead.referral_code).toUpperCase(),
+  );
+
+  const topSource = sourceChart.length > 0 ? sourceChart[0].label : "None yet";
+  const topReferralCode =
+    referralCodeChart.length > 0 ? referralCodeChart[0].label : "None yet";
+
+  return {
+    total: leads.length,
+    new: getLeadStatusCount(leads, "New"),
+    contacted: getLeadStatusCount(leads, "Contacted"),
+    interested: getLeadStatusCount(leads, "Interested"),
+    applicationSent: getLeadStatusCount(leads, "Application Sent"),
+    applied: getLeadStatusCount(leads, "Applied"),
+    approvedGuru: getLeadStatusCount(leads, "Approved Guru"),
+    notMovingForward: getLeadStatusCount(leads, "Not Moving Forward"),
+    referralLeads: leads.filter(
+      (lead) =>
+        asTrimmedString(lead.lead_source) === "Referral" ||
+        Boolean(asTrimmedString(lead.referral_code)),
+    ).length,
+    topSource,
+    topReferralCode,
+    sourceChart,
+    referralCodeChart,
+  };
+}
+
 async function getGuruManagementData(searchParams: SearchParams) {
   const [gurus, profiles, backgroundChecks] = await Promise.all([
     safeRows<GuruRow>(
@@ -1623,6 +1711,130 @@ function QuickLinkCard({
   );
 }
 
+function GuruLeadPipelineCard({
+  pipeline,
+}: {
+  pipeline: GuruLeadPipelineData;
+}) {
+  return (
+    <DashboardCard>
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+            Guru Recruiting Pipeline
+          </p>
+          <h2 className="mt-1 text-xl font-black text-slate-950">
+            Guru Lead Pipeline
+          </h2>
+          <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
+            Live Guru Lead data from `guru_leads`, including where prospects are
+            coming from and which referral codes are creating future Guru opportunities.
+          </p>
+        </div>
+
+        <Link
+          href={adminRoutes.guruLeads}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
+        >
+          <UserPlus size={17} />
+          Manage Guru Leads
+        </Link>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+        <MiniMetric
+          icon={<Users size={18} />}
+          label="Total Leads"
+          value={number(pipeline.total)}
+        />
+        <MiniMetric
+          icon={<UserPlus size={18} />}
+          label="New"
+          value={number(pipeline.new)}
+        />
+        <MiniMetric
+          icon={<FileSearch size={18} />}
+          label="Contacted"
+          value={number(pipeline.contacted)}
+        />
+        <MiniMetric
+          icon={<Sparkles size={18} />}
+          label="Interested"
+          value={number(pipeline.interested)}
+        />
+        <MiniMetric
+          icon={<ClipboardCheck size={18} />}
+          label="Application Sent"
+          value={number(pipeline.applicationSent)}
+        />
+        <MiniMetric
+          icon={<BadgeCheck size={18} />}
+          label="Applied"
+          value={number(pipeline.applied)}
+        />
+        <MiniMetric
+          icon={<CheckCircle2 size={18} />}
+          label="Approved Guru"
+          value={number(pipeline.approvedGuru)}
+        />
+        <MiniMetric
+          icon={<Star size={18} />}
+          label="Referral Leads"
+          value={number(pipeline.referralLeads)}
+        />
+      </div>
+
+      <div className="mt-5 grid gap-5 xl:grid-cols-12">
+        <div className="xl:col-span-4">
+          <div className="rounded-[24px] border border-emerald-100 bg-emerald-50 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+              Top Lead Source
+            </p>
+            <p className="mt-2 text-2xl font-black text-emerald-950">
+              {pipeline.topSource}
+            </p>
+            <p className="mt-3 text-sm font-semibold leading-6 text-emerald-800">
+              Use this to see whether Facebook groups, events, referrals, partners,
+              job boards, or website traffic are producing the most Guru interest.
+            </p>
+          </div>
+
+          <div className="mt-4 rounded-[24px] border border-purple-100 bg-purple-50 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-purple-700">
+              Top Referral Code
+            </p>
+            <p className="mt-2 text-2xl font-black text-purple-950">
+              {pipeline.topReferralCode}
+            </p>
+            <p className="mt-3 text-sm font-semibold leading-6 text-purple-800">
+              Referral codes help SitGuru credit people and campaigns that are
+              bringing future Gurus into the platform.
+            </p>
+          </div>
+        </div>
+
+        <div className="xl:col-span-4">
+          <HorizontalBarChart
+            title="Guru Lead Sources"
+            valueLabel="Leads"
+            items={pipeline.sourceChart}
+            emptyLabel="No Guru Lead source data found yet."
+          />
+        </div>
+
+        <div className="xl:col-span-4">
+          <HorizontalBarChart
+            title="Referral Codes"
+            valueLabel="Leads"
+            items={pipeline.referralCodeChart}
+            emptyLabel="No Guru Lead referral code data found yet."
+          />
+        </div>
+      </div>
+    </DashboardCard>
+  );
+}
+
 function WorkflowTile({
   href,
   label,
@@ -1660,7 +1872,10 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
     return null;
   }
 
-  const guruData = await getGuruManagementData(resolvedSearchParams);
+  const [guruData, guruLeadPipeline] = await Promise.all([
+    getGuruManagementData(resolvedSearchParams),
+    getGuruLeadPipelineData(),
+  ]);
   const activeQueue = getActiveQueue(resolvedSearchParams);
   const activeSetupStep = getActiveSetupStep(resolvedSearchParams);
   const activeStuckBeforeStep = getActiveStuckBeforeStep(resolvedSearchParams);
@@ -1712,21 +1927,13 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
                       ? activeSetupStep.description
                       : activeStuckBeforeStep
                         ? activeStuckBeforeStep.description
-                        : "Review Guru applications, profile readiness, verification progress, trust checks, bookable visibility, lead tracking, and exportable Guru reporting."}
+                        : "Review Guru applications, profile readiness, verification progress, trust checks, bookable visibility, and exportable Guru reporting."}
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href={adminRoutes.guruLeads}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
-            >
-              <UserPlus size={17} />
-              Guru Leads
-            </Link>
-
             <Link
               href={adminRoutes.guruExport}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
@@ -1770,6 +1977,8 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
             shown={guruData.totals.shown}
           />
         ) : null}
+
+        {!hasFocusedQueue ? <GuruLeadPipelineCard pipeline={guruLeadPipeline} /> : null}
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <StatCard
@@ -2043,14 +2252,7 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
           </DashboardCard>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-4">
-          <QuickLinkCard
-            href={adminRoutes.guruLeads}
-            icon={<UserPlus size={22} />}
-            title="Guru Leads"
-            description="Track interested sitters, walkers, boarders, trainers, and pet care providers before they complete Guru signup."
-          />
-
+        <section className="grid gap-5 lg:grid-cols-3">
           <QuickLinkCard
             href={adminRoutes.approvals}
             icon={<ClipboardCheck size={22} />}
@@ -2082,7 +2284,6 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
           profile quality, identity status, background status, safety status,
           bookable visibility, services, location, experience, joined dates,
           charts, filters, sorting, and CSV export are calculated from live rows.
-          Guru Leads are managed separately at `/admin/gurus/leads`.
         </div>
       </div>
     </main>
