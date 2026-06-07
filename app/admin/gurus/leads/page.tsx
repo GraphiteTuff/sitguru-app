@@ -14,6 +14,9 @@ type GuruLead = {
   state: string | null;
   zip: string | null;
   lead_source: string | null;
+  referral_code: string | null;
+  referred_by_name: string | null;
+  referred_by_email: string | null;
   interested_services: string[] | null;
   experience_level: string | null;
   status: string;
@@ -24,6 +27,11 @@ type GuruLead = {
   converted_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type CountItem = {
+  label: string;
+  value: number;
 };
 
 const statusOptions = [
@@ -98,6 +106,10 @@ function normalizeEmail(value: string | null) {
   return value ? value.toLowerCase() : null;
 }
 
+function normalizeReferralCode(value: string | null) {
+  return value ? value.trim().toUpperCase() : null;
+}
+
 function normalizePhone(value: string | null) {
   if (!value) {
     return null;
@@ -118,6 +130,24 @@ function normalizeZip(value: string | null) {
   }
 
   return value.replace(/\D/g, "").slice(0, 5) || null;
+}
+
+function countByLabel(items: GuruLead[], getLabel: (lead: GuruLead) => string | null) {
+  const map = new Map<string, number>();
+
+  for (const item of items) {
+    const label = getLabel(item)?.trim() || "Not Added";
+    map.set(label, (map.get(label) || 0) + 1);
+  }
+
+  return Array.from(map.entries())
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .slice(0, 8);
+}
+
+function getTopLabel(items: CountItem[]) {
+  return items.length > 0 ? items[0].label : "None yet";
 }
 
 function getStatusClass(status: string) {
@@ -152,6 +182,9 @@ async function addGuruLead(formData: FormData) {
   const state = getString(formData, "state") || "PA";
   const zip = normalizeZip(getString(formData, "zip"));
   const leadSource = getString(formData, "lead_source");
+  const referralCode = normalizeReferralCode(getString(formData, "referral_code"));
+  const referredByName = getString(formData, "referred_by_name");
+  const referredByEmail = normalizeEmail(getString(formData, "referred_by_email"));
   const experienceLevel = getString(formData, "experience_level");
   const status = getString(formData, "status") || "New";
   const notes = getString(formData, "notes");
@@ -171,6 +204,9 @@ async function addGuruLead(formData: FormData) {
     state,
     zip,
     lead_source: leadSource,
+    referral_code: referralCode,
+    referred_by_name: referredByName,
+    referred_by_email: referredByEmail,
     interested_services: interestedServices,
     experience_level: experienceLevel,
     status,
@@ -185,6 +221,7 @@ async function addGuruLead(formData: FormData) {
   }
 
   revalidatePath("/admin/gurus/leads");
+  revalidatePath("/admin/gurus");
 }
 
 async function updateGuruLead(formData: FormData) {
@@ -192,6 +229,10 @@ async function updateGuruLead(formData: FormData) {
 
   const id = getRequiredString(formData, "id");
   const status = getString(formData, "status") || "New";
+  const leadSource = getString(formData, "lead_source");
+  const referralCode = normalizeReferralCode(getString(formData, "referral_code"));
+  const referredByName = getString(formData, "referred_by_name");
+  const referredByEmail = normalizeEmail(getString(formData, "referred_by_email"));
   const assignedTo = getString(formData, "assigned_to");
   const followUpDate = getString(formData, "follow_up_date");
   const notes = getString(formData, "notes");
@@ -200,6 +241,10 @@ async function updateGuruLead(formData: FormData) {
     .from("guru_leads")
     .update({
       status,
+      lead_source: leadSource,
+      referral_code: referralCode,
+      referred_by_name: referredByName,
+      referred_by_email: referredByEmail,
       assigned_to: assignedTo,
       follow_up_date: followUpDate,
       notes,
@@ -212,6 +257,7 @@ async function updateGuruLead(formData: FormData) {
   }
 
   revalidatePath("/admin/gurus/leads");
+  revalidatePath("/admin/gurus");
 }
 
 async function deleteGuruLead(formData: FormData) {
@@ -226,6 +272,55 @@ async function deleteGuruLead(formData: FormData) {
   }
 
   revalidatePath("/admin/gurus/leads");
+  revalidatePath("/admin/gurus");
+}
+
+function SourceChart({
+  title,
+  subtitle,
+  items,
+}: {
+  title: string;
+  subtitle: string;
+  items: CountItem[];
+}) {
+  const maxValue = Math.max(...items.map((item) => item.value), 0);
+
+  return (
+    <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-slate-950">{title}</h2>
+        <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
+      </div>
+
+      <div className="space-y-4">
+        {items.length > 0 ? (
+          items.map((item) => {
+            const width = maxValue > 0 ? Math.max(8, (item.value / maxValue) * 100) : 0;
+
+            return (
+              <div key={item.label}>
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <p className="truncate text-sm font-bold text-slate-800">{item.label}</p>
+                  <p className="text-sm font-bold text-emerald-700">{item.value}</p>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-emerald-700"
+                    style={{ width: `${width}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-semibold text-slate-500">
+            No source data yet.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default async function GuruLeadsPage() {
@@ -241,6 +336,18 @@ export default async function GuruLeadsPage() {
   const interestedLeads = guruLeads.filter((lead) => lead.status === "Interested").length;
   const appliedLeads = guruLeads.filter((lead) => lead.status === "Applied").length;
   const approvedLeads = guruLeads.filter((lead) => lead.status === "Approved Guru").length;
+  const referralLeads = guruLeads.filter(
+    (lead) => lead.lead_source === "Referral" || Boolean(lead.referral_code),
+  ).length;
+
+  const sourceCounts = countByLabel(guruLeads, (lead) => lead.lead_source);
+  const referralCodeCounts = countByLabel(
+    guruLeads.filter((lead) => Boolean(lead.referral_code)),
+    (lead) => lead.referral_code,
+  );
+
+  const topSource = getTopLabel(sourceCounts);
+  const topReferralCode = getTopLabel(referralCodeCounts);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
@@ -264,8 +371,8 @@ export default async function GuruLeadsPage() {
             </h1>
 
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-              Track interested dog sitters, walkers, boarders, trainers, and pet care providers
-              before they become approved SitGuru Gurus.
+              Track interested dog sitters, walkers, boarders, trainers, referrals, and pet care
+              providers before they become approved SitGuru Gurus.
             </p>
           </div>
 
@@ -283,7 +390,7 @@ export default async function GuruLeadsPage() {
           </div>
         ) : null}
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-medium text-slate-500">Total Leads</p>
             <p className="mt-2 text-3xl font-bold text-slate-950">{totalLeads}</p>
@@ -308,6 +415,43 @@ export default async function GuruLeadsPage() {
             <p className="text-sm font-medium text-slate-500">Approved</p>
             <p className="mt-2 text-3xl font-bold text-green-700">{approvedLeads}</p>
           </div>
+
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <p className="text-sm font-medium text-slate-500">Referral Leads</p>
+            <p className="mt-2 text-3xl font-bold text-purple-700">{referralLeads}</p>
+          </div>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-4">
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 lg:col-span-2">
+            <p className="text-sm font-medium text-slate-500">Top Lead Source</p>
+            <p className="mt-2 text-2xl font-bold text-slate-950">{topSource}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              This helps show where SitGuru is getting the most Guru interest.
+            </p>
+          </div>
+
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 lg:col-span-2">
+            <p className="text-sm font-medium text-slate-500">Top Referral Code</p>
+            <p className="mt-2 text-2xl font-bold text-slate-950">{topReferralCode}</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Tracks which referral code is generating the most Guru leads.
+            </p>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <SourceChart
+            title="Lead Source Reporting"
+            subtitle="Shows where interested Gurus are coming from."
+            items={sourceCounts}
+          />
+
+          <SourceChart
+            title="Referral Code Reporting"
+            subtitle="Shows which referral codes are bringing in Guru prospects."
+            items={referralCodeCounts}
+          />
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
@@ -422,6 +566,43 @@ export default async function GuruLeadsPage() {
                 </label>
               </div>
 
+              <div className="rounded-3xl border border-purple-100 bg-purple-50 p-4">
+                <h3 className="text-sm font-bold text-purple-950">Referral Tracking</h3>
+                <p className="mt-1 text-xs font-medium text-purple-700">
+                  Use this when someone refers a future Guru using their SitGuru referral code.
+                </p>
+
+                <div className="mt-4 space-y-4">
+                  <label className="block">
+                    <span className="text-sm font-semibold text-slate-700">Referral Code</span>
+                    <input
+                      name="referral_code"
+                      className="mt-1 w-full rounded-2xl border border-purple-200 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+                      placeholder="JASON18951"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-semibold text-slate-700">Referred By Name</span>
+                    <input
+                      name="referred_by_name"
+                      className="mt-1 w-full rounded-2xl border border-purple-200 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+                      placeholder="Jason Graff"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-semibold text-slate-700">Referred By Email</span>
+                    <input
+                      name="referred_by_email"
+                      type="email"
+                      className="mt-1 w-full rounded-2xl border border-purple-200 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+                      placeholder="jason@sitguru.com"
+                    />
+                  </label>
+                </div>
+              </div>
+
               <div>
                 <p className="text-sm font-semibold text-slate-700">Interested Services</p>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -525,6 +706,9 @@ export default async function GuruLeadsPage() {
                 guruLeads.map((lead) => {
                   const fullName = `${lead.first_name || ""} ${lead.last_name || ""}`.trim();
                   const services = lead.interested_services || [];
+                  const becomeGuruHref = lead.referral_code
+                    ? `/become-a-guru?ref=${encodeURIComponent(lead.referral_code)}`
+                    : "/become-a-guru";
 
                   return (
                     <article
@@ -538,11 +722,17 @@ export default async function GuruLeadsPage() {
 
                             <span
                               className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${getStatusClass(
-                                lead.status
+                                lead.status,
                               )}`}
                             >
                               {lead.status}
                             </span>
+
+                            {lead.referral_code ? (
+                              <span className="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-700 ring-1 ring-purple-200">
+                                Ref: {lead.referral_code}
+                              </span>
+                            ) : null}
                           </div>
 
                           <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
@@ -583,6 +773,16 @@ export default async function GuruLeadsPage() {
                             <p>
                               <span className="font-semibold text-slate-800">Source:</span>{" "}
                               {lead.lead_source || "Not added"}
+                            </p>
+
+                            <p>
+                              <span className="font-semibold text-slate-800">Referral Code:</span>{" "}
+                              {lead.referral_code || "Not added"}
+                            </p>
+
+                            <p>
+                              <span className="font-semibold text-slate-800">Referred By:</span>{" "}
+                              {lead.referred_by_name || lead.referred_by_email || "Not added"}
                             </p>
 
                             <p>
@@ -653,6 +853,58 @@ export default async function GuruLeadsPage() {
 
                             <label className="block">
                               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Lead Source
+                              </span>
+                              <select
+                                name="lead_source"
+                                defaultValue={lead.lead_source || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              >
+                                <option value="">Select source</option>
+                                {leadSourceOptions.map((source) => (
+                                  <option key={source} value={source}>
+                                    {source}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Referral Code
+                              </span>
+                              <input
+                                name="referral_code"
+                                defaultValue={lead.referral_code || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Referred By Name
+                              </span>
+                              <input
+                                name="referred_by_name"
+                                defaultValue={lead.referred_by_name || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Referred By Email
+                              </span>
+                              <input
+                                name="referred_by_email"
+                                type="email"
+                                defaultValue={lead.referred_by_email || ""}
+                                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
                                 Assigned To
                               </span>
                               <select
@@ -707,7 +959,7 @@ export default async function GuruLeadsPage() {
                         <div className="flex flex-wrap gap-2">
                           {lead.email ? (
                             <a
-                              href={`mailto:${lead.email}?subject=SitGuru Guru Opportunity&body=Hi ${lead.first_name},%0D%0A%0D%0AThanks for your interest in becoming a SitGuru Guru. You can sign up for free here: https://www.sitguru.com/become-a-guru`}
+                              href={`mailto:${lead.email}?subject=SitGuru Guru Opportunity&body=Hi ${lead.first_name},%0D%0A%0D%0AThanks for your interest in becoming a SitGuru Guru. You can sign up for free here: https://www.sitguru.com${becomeGuruHref}`}
                               className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
                             >
                               Email Lead
@@ -715,7 +967,7 @@ export default async function GuruLeadsPage() {
                           ) : null}
 
                           <Link
-                            href="/become-a-guru"
+                            href={becomeGuruHref}
                             className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
                           >
                             Become-a-Guru Page
