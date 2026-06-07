@@ -60,7 +60,6 @@ type GuruRow = {
   service_radius_display?: number | null;
 };
 
-
 type GuruServiceRate = {
   id?: string | null;
   guru_id: string;
@@ -141,7 +140,6 @@ function formatLocation(city?: string | null, state?: string | null) {
   if (state) return state;
   return "Location not listed";
 }
-
 
 const RATE_UNIT_LABELS: Record<string, string> = {
   hour: "hour",
@@ -798,7 +796,6 @@ function SearchPageContent() {
         const { data, error: gurusError } = await supabase
           .from("gurus")
           .select(selectColumns)
-          .or("is_public.eq.true,is_active.eq.true")
           .order("is_verified", { ascending: false })
           .order("rating_avg", { ascending: false, nullsFirst: false });
 
