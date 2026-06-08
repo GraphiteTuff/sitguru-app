@@ -364,6 +364,292 @@ function mapLeadStatusToAmbassadorStatus(status: string) {
   return status;
 }
 
+
+function hasColumn(row: AnyRow, key: string) {
+  return Object.prototype.hasOwnProperty.call(row, key);
+}
+
+function setFirstExistingColumn(
+  patch: Record<string, unknown>,
+  row: AnyRow,
+  keys: string[],
+  value: unknown,
+) {
+  for (const key of keys) {
+    if (hasColumn(row, key)) {
+      patch[key] = value;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function setNameColumns(
+  patch: Record<string, unknown>,
+  row: AnyRow,
+  fullName: string,
+) {
+  const cleanName = fullName || null;
+
+  if (setFirstExistingColumn(
+    patch,
+    row,
+    [
+      "full_name",
+      "display_name",
+      "name",
+      "lead_name",
+      "applicant_name",
+      "candidate_name",
+      "contact_name",
+    ],
+    cleanName,
+  )) {
+    return;
+  }
+
+  if (hasColumn(row, "first_name") || hasColumn(row, "last_name")) {
+    const [firstName = "", ...lastNameParts] = fullName.split(" ").filter(Boolean);
+
+    if (hasColumn(row, "first_name")) {
+      patch.first_name = firstName || null;
+    }
+
+    if (hasColumn(row, "last_name")) {
+      patch.last_name = lastNameParts.join(" ") || null;
+    }
+  }
+}
+
+function buildLeadUpdatePatch({
+  row,
+  fullName,
+  email,
+  phone,
+  program,
+  source,
+  status,
+  resolvedLocation,
+  location,
+  notes,
+  resumeFileUrl,
+  resumeFileName,
+  coverLetterFileUrl,
+  coverLetterFileName,
+  otherDocumentFileUrl,
+  otherDocumentFileName,
+  actionNote,
+}: {
+  row: AnyRow;
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  program?: string;
+  source?: string;
+  status?: string;
+  resolvedLocation?: ZipLocation & { zipCode: string };
+  location?: string;
+  notes?: string;
+  resumeFileUrl?: string;
+  resumeFileName?: string;
+  coverLetterFileUrl?: string;
+  coverLetterFileName?: string;
+  otherDocumentFileUrl?: string;
+  otherDocumentFileName?: string;
+  actionNote?: string;
+}) {
+  const patch: Record<string, unknown> = {};
+
+  if (fullName !== undefined) {
+    setNameColumns(patch, row, fullName);
+  }
+
+  if (email !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["email", "lead_email", "applicant_email", "candidate_email", "contact_email"],
+      email || null,
+    );
+  }
+
+  if (phone !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["phone", "phone_number", "mobile", "lead_phone", "applicant_phone"],
+      phone || null,
+    );
+  }
+
+  if (program !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["program", "program_name", "program_type", "lead_program"],
+      program || null,
+    );
+  }
+
+  if (source !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["source", "lead_source", "signup_source", "utm_source", "referral_source"],
+      source || null,
+    );
+  }
+
+  if (status !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["status", "lead_status", "application_status", "approval_status"],
+      status || "new",
+    );
+  }
+
+  if (location !== undefined) {
+    setFirstExistingColumn(patch, row, ["location", "market", "area"], location === "—" ? null : location);
+  }
+
+  if (resolvedLocation) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["zip_code", "postal_code", "zip", "postcode"],
+      resolvedLocation.zipCode || null,
+    );
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["city", "service_city", "location_city"],
+      resolvedLocation.city || null,
+    );
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["state", "service_state", "location_state"],
+      resolvedLocation.state || null,
+    );
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["county", "service_county", "location_county"],
+      resolvedLocation.county || null,
+    );
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["country", "service_country", "location_country"],
+      resolvedLocation.country || null,
+    );
+  }
+
+  if (notes !== undefined || actionNote) {
+    const nextNotes = actionNote ? concatNote(notes ?? getNotes(row), actionNote) : notes;
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["notes", "message", "comments", "description"],
+      nextNotes || null,
+    );
+  }
+
+  if (resumeFileUrl !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["resume_file_url", "resume_url", "resume_link", "resume"],
+      resumeFileUrl || null,
+    );
+  }
+
+  if (resumeFileName !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["resume_file_name", "resume_name"],
+      resumeFileName || null,
+    );
+  }
+
+  if (coverLetterFileUrl !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["cover_letter_file_url", "cover_letter_url", "cover_letter_link", "cover_letter"],
+      coverLetterFileUrl || null,
+    );
+  }
+
+  if (coverLetterFileName !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["cover_letter_file_name", "cover_letter_name"],
+      coverLetterFileName || null,
+    );
+  }
+
+  if (otherDocumentFileUrl !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      [
+        "other_document_file_url",
+        "other_document_url",
+        "supporting_document_url",
+        "supporting_documents_url",
+        "document_url",
+        "documents_url",
+      ],
+      otherDocumentFileUrl || null,
+    );
+  }
+
+  if (otherDocumentFileName !== undefined) {
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["other_document_file_name", "other_document_name", "document_name"],
+      otherDocumentFileName || null,
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  if (status !== undefined) {
+    if (hasColumn(row, "archived_at")) {
+      patch.archived_at = status === "archived" ? now : null;
+    }
+
+    if (hasColumn(row, "archived_reason")) {
+      patch.archived_reason =
+        status === "archived"
+          ? "Archived from Ambassador Leads page. Retained for applicant recordkeeping."
+          : null;
+    }
+
+    if (status === "contacted") {
+      if (hasColumn(row, "last_contacted_at")) {
+        patch.last_contacted_at = now;
+      }
+
+      if (hasColumn(row, "contacted_at")) {
+        patch.contacted_at = now;
+      }
+    }
+  }
+
+  if (hasColumn(row, "updated_at")) {
+    patch.updated_at = now;
+  }
+
+  return patch;
+}
+
 function getPipelineActionNote(status: string, leadName: string) {
   if (status === "contacted") {
     return `Pipeline update: ${leadName} was marked contacted from the Ambassador Leads page.`;
@@ -850,6 +1136,7 @@ async function updateAmbassadorLead(formData: FormData) {
   "use server";
 
   const leadId = asString(formData.get("lead_id"));
+  const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
   const fullName = asString(formData.get("full_name"));
   const email = asString(formData.get("email"));
   const phone = formatPhoneForStorage(asString(formData.get("phone")));
@@ -880,47 +1167,55 @@ async function updateAmbassadorLead(formData: FormData) {
     formData.get("other_document_file_name"),
   );
 
-  if (!leadId) {
+  if (!leadId || !isDeletableLeadTable(sourceTable)) {
     redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
   }
 
-  const statusPatch =
-    status === "archived"
-      ? {
-          archived_at: new Date().toISOString(),
-          archived_reason:
-            "Lead archived from the Ambassador Leads edit form.",
-        }
-      : {
-          archived_at: null,
-          archived_reason: null,
-        };
+  const { data: existingLead, error: fetchError } = await supabaseAdmin
+    .from(sourceTable)
+    .select("*")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (fetchError || !existingLead) {
+    console.warn("Unable to find ambassador lead for edit:", fetchError);
+    redirect(
+      `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
+        fetchError?.message || `Unable to find this row in ${sourceTable}.`,
+      )}`,
+    );
+  }
+
+  const leadPatch = buildLeadUpdatePatch({
+    row: existingLead as AnyRow,
+    fullName,
+    email,
+    phone,
+    program,
+    source,
+    status,
+    resolvedLocation,
+    location,
+    notes,
+    resumeFileUrl,
+    resumeFileName,
+    coverLetterFileUrl,
+    coverLetterFileName,
+    otherDocumentFileUrl,
+    otherDocumentFileName,
+  });
+
+  if (!Object.keys(leadPatch).length) {
+    redirect(
+      `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
+        `No editable columns were found on ${sourceTable} for this row.`,
+      )}`,
+    );
+  }
 
   const { error } = await supabaseAdmin
-    .from("ambassador_leads")
-    .update({
-      full_name: fullName || null,
-      email: email || null,
-      phone: phone || null,
-      program,
-      source,
-      status,
-      location: location === "—" ? null : location,
-      zip_code: resolvedLocation.zipCode || null,
-      city: resolvedLocation.city || null,
-      state: resolvedLocation.state || null,
-      county: resolvedLocation.county || null,
-      country: resolvedLocation.country || null,
-      notes: notes || null,
-      resume_file_url: resumeFileUrl || null,
-      resume_file_name: resumeFileName || null,
-      cover_letter_file_url: coverLetterFileUrl || null,
-      cover_letter_file_name: coverLetterFileName || null,
-      other_document_file_url: otherDocumentFileUrl || null,
-      other_document_file_name: otherDocumentFileName || null,
-      ...statusPatch,
-      updated_at: new Date().toISOString(),
-    })
+    .from(sourceTable)
+    .update(leadPatch)
     .eq("id", leadId);
 
   if (error) {
@@ -942,20 +1237,12 @@ async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
   const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
   const nextStatus = normalizeStatus(asString(formData.get("next_status")));
 
-  if (!leadId) {
+  if (!leadId || !isDeletableLeadTable(sourceTable)) {
     redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
   }
 
-  if (sourceTable !== "ambassador_leads") {
-    redirect(
-      `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
-        `Quick status updates are only supported for ambassador_leads rows right now. This row came from ${sourceTable}.`,
-      )}`,
-    );
-  }
-
   const { data: existingLead, error: fetchError } = await supabaseAdmin
-    .from("ambassador_leads")
+    .from(sourceTable)
     .select("*")
     .eq("id", leadId)
     .maybeSingle();
@@ -964,7 +1251,7 @@ async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
     console.warn("Unable to find ambassador lead for status update:", fetchError);
     redirect(
       `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
-        fetchError?.message || "Unable to find this ambassador lead.",
+        fetchError?.message || `Unable to find this row in ${sourceTable}.`,
       )}`,
     );
   }
@@ -973,39 +1260,24 @@ async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
   const leadName = getDisplayName(leadRow, "Ambassador Lead");
   const email = getEmail(leadRow);
   const referralCode = getText(leadRow, ["referral_code"]);
-  const now = new Date().toISOString();
   const actionNote = getPipelineActionNote(nextStatus, leadName);
 
-  const leadPatch: Record<string, unknown> = {
+  const leadPatch = buildLeadUpdatePatch({
+    row: leadRow,
     status: nextStatus,
-    updated_at: now,
-  };
+    actionNote,
+  });
 
-  if ("notes" in leadRow) {
-    leadPatch.notes = concatNote(getNotes(leadRow), actionNote);
-  }
-
-  if ("last_contacted_at" in leadRow && nextStatus === "contacted") {
-    leadPatch.last_contacted_at = now;
-  }
-
-  if ("contacted_at" in leadRow && nextStatus === "contacted") {
-    leadPatch.contacted_at = now;
-  }
-
-  if ("archived_at" in leadRow) {
-    leadPatch.archived_at = nextStatus === "archived" ? now : null;
-  }
-
-  if ("archived_reason" in leadRow) {
-    leadPatch.archived_reason =
-      nextStatus === "archived"
-        ? "Archived from Ambassador Leads quick action. Retained for applicant recordkeeping."
-        : null;
+  if (!Object.keys(leadPatch).length) {
+    redirect(
+      `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
+        `No editable status column was found on ${sourceTable} for this row.`,
+      )}`,
+    );
   }
 
   const { error: leadUpdateError } = await supabaseAdmin
-    .from("ambassador_leads")
+    .from(sourceTable)
     .update(leadPatch)
     .eq("id", leadId);
 
@@ -1022,7 +1294,7 @@ async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
 
   const ambassadorPatch: Record<string, unknown> = {
     status: ambassadorStatus,
-    updated_at: now,
+    updated_at: new Date().toISOString(),
   };
 
   const ambassadorFilters = [
@@ -2990,6 +3262,7 @@ function PipelineEditForm({ lead }: { lead: NormalizedLead }) {
 
       <form action={updateAmbassadorLead} className="mt-4 grid gap-4">
         <input type="hidden" name="lead_id" value={lead.id} />
+        <input type="hidden" name="source_table" value={lead.sourceTable} />
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <PipelineEditField label="Lead Name">
