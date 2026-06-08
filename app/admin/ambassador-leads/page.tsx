@@ -1186,13 +1186,19 @@ async function updateAmbassadorLead(formData: FormData) {
     );
   }
 
+  const isPrimaryAmbassadorLead = sourceTable === "ambassador_leads";
+
   const leadPatch = buildLeadUpdatePatch({
     row: existingLead as AnyRow,
     fullName,
     email,
     phone,
-    program,
-    source,
+    // Only the ambassador_leads table uses the SitGuru HR program labels
+    // like "Student Hire" and "Community Hire". Source tables such as
+    // program_applications can have their own database constraints, so do
+    // not overwrite their program/source fields from this HR pipeline view.
+    program: isPrimaryAmbassadorLead ? program : undefined,
+    source: isPrimaryAmbassadorLead ? source : undefined,
     status,
     resolvedLocation,
     location,
