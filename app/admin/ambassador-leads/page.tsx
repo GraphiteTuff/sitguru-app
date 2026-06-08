@@ -87,6 +87,8 @@ const adminRoutes = {
   referrals: "/admin/referrals",
   partners: "/admin/partners",
   ambassadorLeads: "/admin/ambassador-leads",
+  universityAssignments: "/admin/university-assignments",
+  ambassadors: "/admin/ambassadors",
 };
 
 const programOrder = ["Student Hire", "Community Hire", "Military Hire"];
@@ -119,29 +121,25 @@ const quickStatusActions = [
   {
     label: "Contacted",
     value: "contacted",
-    tone:
-      "bg-blue-50 text-blue-800 ring-blue-100 hover:bg-blue-100 hover:text-blue-900",
+    tone: "bg-blue-50 text-blue-800 ring-blue-100 hover:bg-blue-100 hover:text-blue-900",
     icon: <MessageCircle size={13} />,
   },
   {
     label: "Interested",
     value: "interested",
-    tone:
-      "bg-amber-50 text-amber-800 ring-amber-100 hover:bg-amber-100 hover:text-amber-900",
+    tone: "bg-amber-50 text-amber-800 ring-amber-100 hover:bg-amber-100 hover:text-amber-900",
     icon: <Star size={13} />,
   },
   {
     label: "Not Moving",
     value: "not_moving_forward",
-    tone:
-      "bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200 hover:text-slate-900",
+    tone: "bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200 hover:text-slate-900",
     icon: <FileText size={13} />,
   },
   {
     label: "Archive",
     value: "archived",
-    tone:
-      "bg-red-50 text-red-700 ring-red-100 hover:bg-red-100 hover:text-red-800",
+    tone: "bg-red-50 text-red-700 ring-red-100 hover:bg-red-100 hover:text-red-800",
     icon: <Archive size={13} />,
   },
 ];
@@ -248,7 +246,10 @@ function normalizeZipCode(value: string) {
 }
 
 function normalizeStateCode(value: string) {
-  return value.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase();
+  return value
+    .replace(/[^a-z]/gi, "")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 function resolveLeadLocation({
@@ -364,6 +365,520 @@ function mapLeadStatusToAmbassadorStatus(status: string) {
   return status;
 }
 
+function normalizeReferralCode(value: string) {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9-_]/g, "")
+    .replace(/--+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "")
+    .slice(0, 40);
+}
+
+function buildReferralCodeFromLead(row: AnyRow) {
+  const existingCode = getText(row, [
+    "referral_code",
+    "signup_code",
+    "referral_slug",
+    "code",
+  ]);
+
+  if (existingCode) return normalizeReferralCode(existingCode);
+
+  const nameSeed = getDisplayName(row, "Ambassador")
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(0, 16);
+  const fallbackSeed =
+    getEmail(row)
+      .split("@")[0]
+      ?.replace(/[^a-z0-9]/gi, "") || "AMBASSADOR";
+
+  return normalizeReferralCode(`${nameSeed || fallbackSeed}-AMB`);
+}
+
+function buildReferralLink(referralCode: string) {
+  return `https://www.sitguru.com/ambassador/signup?ref=${encodeURIComponent(
+    referralCode,
+  )}`;
+}
+
+function buildProfilePayloadFromLead(row: AnyRow, role = "ambassador") {
+  const now = new Date().toISOString();
+  const name = getDisplayName(row, "Ambassador");
+  const email = getEmail(row);
+  const phone = getPhone(row);
+
+  return {
+    email: email === "—" ? null : email,
+    full_name: name,
+    role,
+    phone: phone === "—" ? null : phone,
+    avatar_url: getText(row, ["avatar_url", "profile_photo_url", "photo_url"]),
+    city: getCity(row) || null,
+    state: normalizeStateCode(getState(row)) || null,
+    zip_code: normalizeZipCode(getZipCode(row)) || null,
+    source: getSourceLabel(row),
+    updated_at: now,
+    created_at: now,
+  };
+}
+
+function buildAmbassadorPayloadFromLead({
+  row,
+  profileId,
+  referralCode,
+}: {
+  row: AnyRow;
+  profileId: string;
+  referralCode: string;
+}) {
+  const now = new Date().toISOString();
+  const name = getDisplayName(row, "Ambassador");
+  const email = getEmail(row);
+  const phone = getPhone(row);
+  const resolvedLocation = resolveLeadLocation({
+    zipCode: getZipCode(row),
+    city: getCity(row),
+    state: getState(row),
+    county: getCounty(row),
+    country: getCountry(row),
+  });
+
+  return {
+    user_id: profileId,
+    profile_id: profileId,
+    full_name: name,
+    email: email === "—" ? null : email,
+    phone: phone === "—" ? null : phone,
+    program: getProgramLabel(row),
+    source: getSourceLabel(row),
+    status: "active",
+    dashboard_enabled: true,
+    referral_code: referralCode,
+    referral_link: buildReferralLink(referralCode),
+    city: resolvedLocation.city || null,
+    state: resolvedLocation.state || null,
+    zip_code: resolvedLocation.zipCode || null,
+    county: resolvedLocation.county || null,
+    country: resolvedLocation.country || "United States",
+    notes: concatNote(
+      getNotes(row),
+      "Converted from Ambassador Leads pipeline and assigned Ambassador Academy.",
+    ),
+    updated_at: now,
+    created_at: now,
+  };
+}
+
+function pickInsertPayload(
+  payload: Record<string, unknown>,
+  allowedKeys: string[],
+) {
+  return allowedKeys.reduce(
+    (acc, key) => {
+      if (Object.prototype.hasOwnProperty.call(payload, key)) {
+        acc[key] = payload[key];
+      }
+
+      return acc;
+    },
+    {} as Record<string, unknown>,
+  );
+}
+
+async function getExistingTableKeys(tableName: string) {
+  const { data } = await supabaseAdmin.from(tableName).select("*").limit(1);
+  const firstRow = Array.isArray(data)
+    ? (data[0] as AnyRow | undefined)
+    : undefined;
+
+  return firstRow ? Object.keys(firstRow) : [];
+}
+
+async function findOrCreateProfileFromLead(row: AnyRow) {
+  const email = getEmail(row);
+
+  if (!email || email === "—") {
+    throw new Error(
+      "Cannot convert this lead because no email is saved on the row.",
+    );
+  }
+
+  const { data: existingProfile, error: profileLookupError } =
+    await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
+
+  if (profileLookupError) {
+    throw new Error(`Profile lookup failed: ${profileLookupError.message}`);
+  }
+
+  if (existingProfile?.id) {
+    const profileRow = existingProfile as AnyRow;
+    const updatePatch = buildLeadUpdatePatch({
+      row: profileRow,
+      fullName: getDisplayName(row, "Ambassador"),
+      email,
+      phone: getPhone(row),
+      resolvedLocation: resolveLeadLocation({
+        zipCode: getZipCode(row),
+        city: getCity(row),
+        state: getState(row),
+        county: getCounty(row),
+        country: getCountry(row),
+      }),
+      notes: getNotes(profileRow),
+      actionNote: "Profile linked from Ambassador Lead conversion.",
+    });
+
+    if (hasColumn(profileRow, "role")) {
+      updatePatch.role = "ambassador";
+    }
+
+    if (hasColumn(profileRow, "account_type")) {
+      updatePatch.account_type = "ambassador";
+    }
+
+    await supabaseAdmin
+      .from("profiles")
+      .update(updatePatch)
+      .eq("id", existingProfile.id);
+
+    return existingProfile.id as string;
+  }
+
+  const basePayload = buildProfilePayloadFromLead(row);
+  const profileKeys = await getExistingTableKeys("profiles");
+  const profileFallbackKeys = [
+    "email",
+    "full_name",
+    "role",
+    "phone",
+    "avatar_url",
+    "city",
+    "state",
+    "zip_code",
+    "source",
+    "created_at",
+    "updated_at",
+  ];
+  const profileInsertPayload = pickInsertPayload(
+    basePayload,
+    profileKeys.length ? profileKeys : profileFallbackKeys,
+  );
+
+  const { data: insertedProfile, error: insertError } = await supabaseAdmin
+    .from("profiles")
+    .insert(profileInsertPayload)
+    .select("id")
+    .single();
+
+  if (!insertError && insertedProfile?.id) {
+    return insertedProfile.id as string;
+  }
+
+  const randomPassword = `SitGuru-${crypto.randomUUID()}!`;
+  const { data: createdUser, error: authCreateError } =
+    await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: randomPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: getDisplayName(row, "Ambassador"),
+        role: "ambassador",
+        source: "ambassador_lead_conversion",
+      },
+    });
+
+  if (
+    authCreateError &&
+    !authCreateError.message.toLowerCase().includes("already")
+  ) {
+    throw new Error(
+      `Profile insert failed: ${insertError?.message || "unknown"}. Auth user creation also failed: ${authCreateError.message}`,
+    );
+  }
+
+  const authUserId = createdUser.user?.id;
+
+  if (!authUserId) {
+    throw new Error(
+      `Profile insert failed: ${insertError?.message || "unknown"}. The auth user may already exist, but no matching profile was found. Have the user sign in once or create the profile manually, then convert again.`,
+    );
+  }
+
+  const authProfilePayload = pickInsertPayload(
+    {
+      ...basePayload,
+      id: authUserId,
+    },
+    profileKeys.length ? profileKeys : ["id", ...profileFallbackKeys],
+  );
+
+  const { data: authProfile, error: authProfileError } = await supabaseAdmin
+    .from("profiles")
+    .insert(authProfilePayload)
+    .select("id")
+    .single();
+
+  if (authProfileError || !authProfile?.id) {
+    throw new Error(
+      `Auth user was created, but profile insert failed: ${authProfileError?.message || "unknown"}`,
+    );
+  }
+
+  return authProfile.id as string;
+}
+
+async function upsertAmbassadorFromLead({
+  row,
+  profileId,
+  referralCode,
+}: {
+  row: AnyRow;
+  profileId: string;
+  referralCode: string;
+}) {
+  const email = getEmail(row);
+  const payload = buildAmbassadorPayloadFromLead({
+    row,
+    profileId,
+    referralCode,
+  });
+
+  const { data: existingAmbassador } = await supabaseAdmin
+    .from("ambassadors")
+    .select("*")
+    .or(`email.eq.${email},user_id.eq.${profileId},profile_id.eq.${profileId}`)
+    .maybeSingle();
+
+  if (existingAmbassador?.id) {
+    const patch = buildLeadUpdatePatch({
+      row: existingAmbassador as AnyRow,
+      fullName: getDisplayName(row, "Ambassador"),
+      email,
+      phone: getPhone(row),
+      program: getProgramLabel(row),
+      source: getSourceLabel(row),
+      status: "active",
+      resolvedLocation: resolveLeadLocation({
+        zipCode: getZipCode(row),
+        city: getCity(row),
+        state: getState(row),
+        county: getCounty(row),
+        country: getCountry(row),
+      }),
+      notes: getNotes(existingAmbassador as AnyRow),
+      actionNote: "Updated from Ambassador Lead conversion.",
+    });
+
+    for (const [key, value] of Object.entries(payload)) {
+      if (hasColumn(existingAmbassador as AnyRow, key)) {
+        patch[key] = value;
+      }
+    }
+
+    await supabaseAdmin
+      .from("ambassadors")
+      .update(patch)
+      .eq("id", existingAmbassador.id);
+    return existingAmbassador.id as string;
+  }
+
+  const ambassadorKeys = await getExistingTableKeys("ambassadors");
+  const fallbackKeys = [
+    "user_id",
+    "profile_id",
+    "full_name",
+    "email",
+    "phone",
+    "program",
+    "source",
+    "status",
+    "dashboard_enabled",
+    "referral_code",
+    "referral_link",
+    "city",
+    "state",
+    "zip_code",
+    "county",
+    "country",
+    "notes",
+    "created_at",
+    "updated_at",
+  ];
+  const insertPayload = pickInsertPayload(
+    payload,
+    ambassadorKeys.length ? ambassadorKeys : fallbackKeys,
+  );
+
+  const { data: insertedAmbassador, error } = await supabaseAdmin
+    .from("ambassadors")
+    .insert(insertPayload)
+    .select("id")
+    .single();
+
+  if (error || !insertedAmbassador?.id) {
+    throw new Error(
+      `Ambassador dashboard record could not be created: ${error?.message || "unknown"}`,
+    );
+  }
+
+  return insertedAmbassador.id as string;
+}
+
+async function assignAmbassadorAcademy(profileId: string, adminUserId: string) {
+  const now = new Date().toISOString();
+
+  const { data: existingAssignment, error: lookupError } = await supabaseAdmin
+    .from("academy_assignments")
+    .select("*")
+    .eq("user_id", profileId)
+    .eq("academy_type", "ambassador")
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new Error(`Academy assignment lookup failed: ${lookupError.message}`);
+  }
+
+  if (existingAssignment?.id) {
+    const patch: Record<string, unknown> = {};
+
+    if (hasColumn(existingAssignment as AnyRow, "is_active"))
+      patch.is_active = true;
+    if (hasColumn(existingAssignment as AnyRow, "assigned_by"))
+      patch.assigned_by = adminUserId;
+    if (hasColumn(existingAssignment as AnyRow, "assigned_at"))
+      patch.assigned_at = now;
+    if (hasColumn(existingAssignment as AnyRow, "updated_at"))
+      patch.updated_at = now;
+
+    if (Object.keys(patch).length) {
+      await supabaseAdmin
+        .from("academy_assignments")
+        .update(patch)
+        .eq("id", existingAssignment.id);
+    }
+
+    return existingAssignment.id as string;
+  }
+
+  const { error: insertError, data: insertedAssignment } = await supabaseAdmin
+    .from("academy_assignments")
+    .insert({
+      user_id: profileId,
+      academy_type: "ambassador",
+      assigned_by: adminUserId,
+      assigned_at: now,
+      is_active: true,
+      certificate_issued: false,
+      created_at: now,
+      updated_at: now,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !insertedAssignment?.id) {
+    throw new Error(
+      `Ambassador Academy could not be assigned: ${insertError?.message || "unknown"}`,
+    );
+  }
+
+  return insertedAssignment.id as string;
+}
+
+function hasSourceColumnSafe(row: AnyRow, key: string) {
+  return Object.prototype.hasOwnProperty.call(row, key);
+}
+
+async function convertAmbassadorLeadToAmbassador(formData: FormData) {
+  "use server";
+
+  const adminUser = await requireAdminUserForLeadConversion();
+  const leadId = asString(formData.get("lead_id"));
+  const sourceTable =
+    asString(formData.get("source_table")) || "ambassador_leads";
+
+  if (!leadId || !isDeletableLeadTable(sourceTable)) {
+    redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
+  }
+
+  try {
+    const { data: existingLead, error: fetchError } = await supabaseAdmin
+      .from(sourceTable)
+      .select("*")
+      .eq("id", leadId)
+      .maybeSingle();
+
+    if (fetchError || !existingLead) {
+      throw new Error(
+        fetchError?.message || `Unable to find this row in ${sourceTable}.`,
+      );
+    }
+
+    const leadRow = existingLead as AnyRow;
+    const profileId = await findOrCreateProfileFromLead(leadRow);
+    const referralCode = buildReferralCodeFromLead(leadRow);
+
+    await upsertAmbassadorFromLead({
+      row: leadRow,
+      profileId,
+      referralCode,
+    });
+
+    await assignAmbassadorAcademy(profileId, adminUser.id);
+
+    const approvedPatch = buildLeadUpdatePatch({
+      row: leadRow,
+      status: "approved",
+      actionNote: `Converted to Ambassador dashboard record and assigned Ambassador Academy. Referral code: ${referralCode}.`,
+    });
+
+    if (hasSourceColumnSafe(leadRow, "converted_to_ambassador_at")) {
+      approvedPatch.converted_to_ambassador_at = new Date().toISOString();
+    }
+
+    if (hasSourceColumnSafe(leadRow, "converted_profile_id")) {
+      approvedPatch.converted_profile_id = profileId;
+    }
+
+    if (Object.keys(approvedPatch).length) {
+      await supabaseAdmin
+        .from(sourceTable)
+        .update(approvedPatch)
+        .eq("id", leadId);
+    }
+
+    redirect(
+      `${adminRoutes.ambassadorLeads}?updated=converted&profile=${profileId}&academy=ambassador`,
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown conversion error";
+    console.warn("Ambassador lead conversion failed:", error);
+    redirect(
+      `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
+        message,
+      )}`,
+    );
+  }
+}
+
+async function requireAdminUserForLeadConversion() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    redirect("/admin/login");
+  }
+
+  return user;
+}
 
 function hasColumn(row: AnyRow, key: string) {
   return Object.prototype.hasOwnProperty.call(row, key);
@@ -392,25 +907,29 @@ function setNameColumns(
 ) {
   const cleanName = fullName || null;
 
-  if (setFirstExistingColumn(
-    patch,
-    row,
-    [
-      "full_name",
-      "display_name",
-      "name",
-      "lead_name",
-      "applicant_name",
-      "candidate_name",
-      "contact_name",
-    ],
-    cleanName,
-  )) {
+  if (
+    setFirstExistingColumn(
+      patch,
+      row,
+      [
+        "full_name",
+        "display_name",
+        "name",
+        "lead_name",
+        "applicant_name",
+        "candidate_name",
+        "contact_name",
+      ],
+      cleanName,
+    )
+  ) {
     return;
   }
 
   if (hasColumn(row, "first_name") || hasColumn(row, "last_name")) {
-    const [firstName = "", ...lastNameParts] = fullName.split(" ").filter(Boolean);
+    const [firstName = "", ...lastNameParts] = fullName
+      .split(" ")
+      .filter(Boolean);
 
     if (hasColumn(row, "first_name")) {
       patch.first_name = firstName || null;
@@ -469,7 +988,13 @@ function buildLeadUpdatePatch({
     setFirstExistingColumn(
       patch,
       row,
-      ["email", "lead_email", "applicant_email", "candidate_email", "contact_email"],
+      [
+        "email",
+        "lead_email",
+        "applicant_email",
+        "candidate_email",
+        "contact_email",
+      ],
       email || null,
     );
   }
@@ -496,7 +1021,13 @@ function buildLeadUpdatePatch({
     setFirstExistingColumn(
       patch,
       row,
-      ["source", "lead_source", "signup_source", "utm_source", "referral_source"],
+      [
+        "source",
+        "lead_source",
+        "signup_source",
+        "utm_source",
+        "referral_source",
+      ],
       source || null,
     );
   }
@@ -511,7 +1042,12 @@ function buildLeadUpdatePatch({
   }
 
   if (location !== undefined) {
-    setFirstExistingColumn(patch, row, ["location", "market", "area"], location === "—" ? null : location);
+    setFirstExistingColumn(
+      patch,
+      row,
+      ["location", "market", "area"],
+      location === "—" ? null : location,
+    );
   }
 
   if (resolvedLocation) {
@@ -548,7 +1084,9 @@ function buildLeadUpdatePatch({
   }
 
   if (notes !== undefined || actionNote) {
-    const nextNotes = actionNote ? concatNote(notes ?? getNotes(row), actionNote) : notes;
+    const nextNotes = actionNote
+      ? concatNote(notes ?? getNotes(row), actionNote)
+      : notes;
     setFirstExistingColumn(
       patch,
       row,
@@ -579,7 +1117,12 @@ function buildLeadUpdatePatch({
     setFirstExistingColumn(
       patch,
       row,
-      ["cover_letter_file_url", "cover_letter_url", "cover_letter_link", "cover_letter"],
+      [
+        "cover_letter_file_url",
+        "cover_letter_url",
+        "cover_letter_link",
+        "cover_letter",
+      ],
       coverLetterFileUrl || null,
     );
   }
@@ -939,7 +1482,8 @@ function getSourceLabel(row: AnyRow) {
     return "ZipRecruiter";
   }
   if (text.includes("handshake")) return "Handshake";
-  if (text.includes("linkedin") || text.includes("linked in")) return "LinkedIn";
+  if (text.includes("linkedin") || text.includes("linked in"))
+    return "LinkedIn";
   if (
     text.includes("college") ||
     text.includes("university") ||
@@ -1008,7 +1552,10 @@ async function safeAdminQuery(
     const result = await query;
 
     if (result.error) {
-      console.warn(`Ambassador leads query skipped for ${label}:`, result.error);
+      console.warn(
+        `Ambassador leads query skipped for ${label}:`,
+        result.error,
+      );
       return { data: [], error: null };
     }
 
@@ -1086,7 +1633,9 @@ async function createAmbassadorLead(formData: FormData) {
   const resumeFileName = asString(formData.get("resume_file_name"));
   const coverLetterFileUrl = asString(formData.get("cover_letter_file_url"));
   const coverLetterFileName = asString(formData.get("cover_letter_file_name"));
-  const otherDocumentFileUrl = asString(formData.get("other_document_file_url"));
+  const otherDocumentFileUrl = asString(
+    formData.get("other_document_file_url"),
+  );
   const otherDocumentFileName = asString(
     formData.get("other_document_file_name"),
   );
@@ -1136,7 +1685,8 @@ async function updateAmbassadorLead(formData: FormData) {
   "use server";
 
   const leadId = asString(formData.get("lead_id"));
-  const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
+  const sourceTable =
+    asString(formData.get("source_table")) || "ambassador_leads";
   const fullName = asString(formData.get("full_name"));
   const email = asString(formData.get("email"));
   const phone = formatPhoneForStorage(asString(formData.get("phone")));
@@ -1162,7 +1712,9 @@ async function updateAmbassadorLead(formData: FormData) {
   const resumeFileName = asString(formData.get("resume_file_name"));
   const coverLetterFileUrl = asString(formData.get("cover_letter_file_url"));
   const coverLetterFileName = asString(formData.get("cover_letter_file_name"));
-  const otherDocumentFileUrl = asString(formData.get("other_document_file_url"));
+  const otherDocumentFileUrl = asString(
+    formData.get("other_document_file_url"),
+  );
   const otherDocumentFileName = asString(
     formData.get("other_document_file_name"),
   );
@@ -1240,7 +1792,8 @@ async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
   "use server";
 
   const leadId = asString(formData.get("lead_id"));
-  const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
+  const sourceTable =
+    asString(formData.get("source_table")) || "ambassador_leads";
   const nextStatus = normalizeStatus(asString(formData.get("next_status")));
 
   if (!leadId || !isDeletableLeadTable(sourceTable)) {
@@ -1254,7 +1807,10 @@ async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
     .maybeSingle();
 
   if (fetchError || !existingLead) {
-    console.warn("Unable to find ambassador lead for status update:", fetchError);
+    console.warn(
+      "Unable to find ambassador lead for status update:",
+      fetchError,
+    );
     redirect(
       `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
         fetchError?.message || `Unable to find this row in ${sourceTable}.`,
@@ -1338,7 +1894,8 @@ async function deleteAmbassadorLead(formData: FormData) {
   "use server";
 
   const leadId = asString(formData.get("lead_id"));
-  const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
+  const sourceTable =
+    asString(formData.get("source_table")) || "ambassador_leads";
   const leadName = asString(formData.get("lead_name"));
 
   if (!leadId || !isDeletableLeadTable(sourceTable)) {
@@ -1381,7 +1938,10 @@ async function deleteAmbassadorLead(formData: FormData) {
     });
 
   if (archiveError) {
-    console.warn("Unable to archive ambassador lead before delete:", archiveError);
+    console.warn(
+      "Unable to archive ambassador lead before delete:",
+      archiveError,
+    );
     redirect(`${adminRoutes.ambassadorLeads}?deleted=archive_error`);
   }
 
@@ -1391,7 +1951,10 @@ async function deleteAmbassadorLead(formData: FormData) {
     .eq("id", leadId);
 
   if (deleteError) {
-    console.warn("Unable to delete ambassador lead after archive:", deleteError);
+    console.warn(
+      "Unable to delete ambassador lead after archive:",
+      deleteError,
+    );
     redirect(`${adminRoutes.ambassadorLeads}?deleted=error`);
   }
 
@@ -1466,9 +2029,9 @@ async function getAmbassadorLeadData() {
     ),
   ]);
 
-  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).filter(
-    Boolean,
-  );
+  const ambassadorLeads = (
+    (ambassadorLeadsResult.data || []) as AnyRow[]
+  ).filter(Boolean);
   const partnerApplications = (
     (partnerApplicationsResult.data || []) as AnyRow[]
   ).filter(Boolean);
@@ -1553,12 +2116,14 @@ async function getAmbassadorLeadData() {
 
   const metrics = {
     total: normalizedLeads.length,
-    careerLink: normalizedLeads.filter((lead) => lead.source === "PA CareerLink")
-      .length,
+    careerLink: normalizedLeads.filter(
+      (lead) => lead.source === "PA CareerLink",
+    ).length,
     student: normalizedLeads.filter((lead) => lead.program === "Student Hire")
       .length,
-    community: normalizedLeads.filter((lead) => lead.program === "Community Hire")
-      .length,
+    community: normalizedLeads.filter(
+      (lead) => lead.program === "Community Hire",
+    ).length,
     military: normalizedLeads.filter((lead) => lead.program === "Military Hire")
       .length,
     newCount: normalizedLeads.filter((lead) => lead.status === "New").length,
@@ -1568,11 +2133,13 @@ async function getAmbassadorLeadData() {
       .length,
     signedUp: normalizedLeads.filter((lead) => lead.status === "Signed Up")
       .length,
-    approved: normalizedLeads.filter((lead) => lead.status === "Approved").length,
+    approved: normalizedLeads.filter((lead) => lead.status === "Approved")
+      .length,
     notMovingForward: normalizedLeads.filter(
       (lead) => lead.status === "Not Moving Forward",
     ).length,
-    archived: normalizedLeads.filter((lead) => lead.status === "Archived").length,
+    archived: normalizedLeads.filter((lead) => lead.status === "Archived")
+      .length,
     recent: normalizedLeads.filter((lead) => isWithinLastDays(lead.date, 14))
       .length,
   };
@@ -1619,6 +2186,15 @@ function getNotice(
     return {
       title: "Lead updated",
       message: "The ambassador lead was updated successfully.",
+      tone: "success" as const,
+    };
+  }
+
+  if (updated === "converted") {
+    return {
+      title: "Lead converted",
+      message:
+        "The lead was approved, converted into an Ambassador dashboard record, and assigned Ambassador Academy.",
       tone: "success" as const,
     };
   }
@@ -1798,8 +2374,8 @@ export default async function AmbassadorLeadsPage({
 
           <p className="mt-2 max-w-4xl text-base font-semibold leading-7 text-slate-600">
             Track Student Hire, Community Hire, and Military Hire ambassador
-            applicants from Indeed, ZipRecruiter, PA CareerLink, social media, referrals,
-            events, and website interest forms.
+            applicants from Indeed, ZipRecruiter, PA CareerLink, social media,
+            referrals, events, and website interest forms.
           </p>
         </div>
 
@@ -1831,7 +2407,10 @@ export default async function AmbassadorLeadsPage({
       ) : null}
 
       <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-6">
-        <DataHealthTile label="Total Leads" value={number(data.metrics.total)} />
+        <DataHealthTile
+          label="Total Leads"
+          value={number(data.metrics.total)}
+        />
         <DataHealthTile
           label="PA CareerLink"
           value={number(data.metrics.careerLink)}
@@ -1908,8 +2487,8 @@ export default async function AmbassadorLeadsPage({
               </h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
                 Add hiring-focused ambassador applicants from PA CareerLink,
-                Indeed, ZipRecruiter, Handshake, LinkedIn, schools, military organizations,
-                referrals, and the SitGuru website.
+                Indeed, ZipRecruiter, Handshake, LinkedIn, schools, military
+                organizations, referrals, and the SitGuru website.
               </p>
             </div>
 
@@ -2137,10 +2716,10 @@ export default async function AmbassadorLeadsPage({
 
               <p className="rounded-2xl bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-900">
                 HR intake is connected to the{" "}
-                <span className="font-black">ambassador_leads</span> table.
-                Use quick buttons in the pipeline to move candidates to
-                Contacted, Interested, Not Moving, Archived, or Restored without
-                running SQL.
+                <span className="font-black">ambassador_leads</span> table. Use
+                quick buttons in the pipeline to move candidates to Contacted,
+                Interested, Not Moving, Archived, or Restored without running
+                SQL.
               </p>
 
               <AmbassadorLeadFormEnhancementScript />
@@ -2292,6 +2871,26 @@ export default async function AmbassadorLeadsPage({
 
                               <LeadQuickStatusButtons lead={lead} />
 
+                              <form action={convertAmbassadorLeadToAmbassador}>
+                                <input
+                                  type="hidden"
+                                  name="lead_id"
+                                  value={lead.id}
+                                />
+                                <input
+                                  type="hidden"
+                                  name="source_table"
+                                  value={lead.sourceTable}
+                                />
+                                <button
+                                  type="submit"
+                                  className="inline-flex w-full items-center justify-center gap-1 rounded-full bg-green-800 px-3 py-1 text-xs font-black text-white shadow-sm transition hover:bg-green-900"
+                                >
+                                  <GraduationCap size={13} />
+                                  Approve + Convert
+                                </button>
+                              </form>
+
                               <details className="group relative">
                                 <summary className="inline-flex cursor-pointer list-none items-center justify-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 transition hover:bg-red-100">
                                   <Trash2 size={12} />
@@ -2304,8 +2903,8 @@ export default async function AmbassadorLeadsPage({
                                   </p>
                                   <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
                                     For normal declined candidates, use Archive
-                                    instead. Delete should only be used for fake,
-                                    duplicate, or mistake records.
+                                    instead. Delete should only be used for
+                                    fake, duplicate, or mistake records.
                                   </p>
 
                                   <form
@@ -2362,8 +2961,8 @@ export default async function AmbassadorLeadsPage({
                             No matching ambassador leads found
                           </h3>
                           <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-green-900/70">
-                            Adjust the pipeline filters or clear them to view all
-                            ambassador leads.
+                            Adjust the pipeline filters or clear them to view
+                            all ambassador leads.
                           </p>
                         </div>
                       </td>
@@ -2926,7 +3525,9 @@ function ProgramMiniCard({
         <span className="text-xl font-black text-green-950">{value}</span>
       </div>
       <p className="text-sm font-black text-slate-950">{title}</p>
-      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">{detail}</p>
+      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+        {detail}
+      </p>
     </div>
   );
 }
