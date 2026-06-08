@@ -503,22 +503,29 @@ async function findOrCreateProfileFromLead(row: AnyRow) {
     );
   }
 
-  const { data: existingProfile, error: profileLookupError } =
-    await supabaseAdmin
-      .from("profiles")
-      .select("*")
-      .eq("email", email)
-      .maybeSingle();
+  const fullName = getDisplayName(row, "Ambassador");
+  const basePayload = buildProfilePayloadFromLead(row);
+  const profileKeys = await getExistingTableKeys("profiles");
+  const profileFallbackKeys = [
+    "id",
+    "email",
+    "full_name",
+    "role",
+    "phone",
+    "avatar_url",
+    "city",
+    "state",
+    "zip_code",
+    "source",
+    "created_at",
+    "updated_at",
+  ];
+  const allowedProfileKeys = profileKeys.length ? profileKeys : profileFallbackKeys;
 
-  if (profileLookupError) {
-    throw new Error(`Profile lookup failed: ${profileLookupError.message}`);
-  }
-
-  if (existingProfile?.id) {
-    const profileRow = existingProfile as AnyRow;
+  const buildProfileUpdatePatch = (profileRow: AnyRow) => {
     const updatePatch = buildLeadUpdatePatch({
       row: profileRow,
-      fullName: getDisplayName(row, "Ambassador"),
+      fullName,
       email,
       phone: getPhone(row),
       resolvedLocation: resolveLeadLocation({
@@ -540,44 +547,69 @@ async function findOrCreateProfileFromLead(row: AnyRow) {
       updatePatch.account_type = "ambassador";
     }
 
+    if (hasColumn(profileRow, "updated_at")) {
+      updatePatch.updated_at = new Date().toISOString();
+    }
+
+    return updatePatch;
+  };
+
+  const updateAndReturnExistingProfile = async (profileRow: AnyRow) => {
+    const profileId = asString(profileRow.id);
+
+    if (!profileId) return "";
+
+    const updatePatch = buildProfileUpdatePatch(profileRow);
+
+    if (Object.keys(updatePatch).length) {
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update(updatePatch)
+        .eq("id", profileId);
+
+      if (updateError) {
+        throw new Error(`Profile update failed: ${updateError.message}`);
+      }
+    }
+
+    return profileId;
+  };
+
+  const { data: existingProfile, error: profileLookupError } =
     await supabaseAdmin
       .from("profiles")
-      .update(updatePatch)
-      .eq("id", existingProfile.id);
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
 
-    return existingProfile.id as string;
+  if (profileLookupError) {
+    throw new Error(`Profile lookup failed: ${profileLookupError.message}`);
   }
 
-  const basePayload = buildProfilePayloadFromLead(row);
-  const profileKeys = await getExistingTableKeys("profiles");
-  const profileFallbackKeys = [
-    "email",
-    "full_name",
-    "role",
-    "phone",
-    "avatar_url",
-    "city",
-    "state",
-    "zip_code",
-    "source",
-    "created_at",
-    "updated_at",
-  ];
+  if (existingProfile?.id) {
+    return updateAndReturnExistingProfile(existingProfile as AnyRow);
+  }
+
+  // First try a normal profile insert. This supports databases where profiles.id
+  // has its own default UUID and no auth user is required yet.
   const profileInsertPayload = pickInsertPayload(
     basePayload,
-    profileKeys.length ? profileKeys : profileFallbackKeys,
+    allowedProfileKeys.filter((key) => key !== "id"),
   );
 
   const { data: insertedProfile, error: insertError } = await supabaseAdmin
     .from("profiles")
     .insert(profileInsertPayload)
-    .select("id")
+    .select("*")
     .single();
 
   if (!insertError && insertedProfile?.id) {
-    return insertedProfile.id as string;
+    return updateAndReturnExistingProfile(insertedProfile as AnyRow);
   }
 
+  // If the normal insert fails, create or reuse the Supabase Auth user.
+  // Some projects have an auth trigger that automatically inserts public.profiles.
+  // In that case, do NOT insert a second profile with the same id; re-query and update it.
   const randomPassword = `SitGuru-${crypto.randomUUID()}!`;
   const { data: createdUser, error: authCreateError } =
     await supabaseAdmin.auth.admin.createUser({
@@ -585,7 +617,7 @@ async function findOrCreateProfileFromLead(row: AnyRow) {
       password: randomPassword,
       email_confirm: true,
       user_metadata: {
-        full_name: getDisplayName(row, "Ambassador"),
+        full_name: fullName,
         role: "ambassador",
         source: "ambassador_lead_conversion",
       },
@@ -593,42 +625,101 @@ async function findOrCreateProfileFromLead(row: AnyRow) {
 
   if (
     authCreateError &&
-    !authCreateError.message.toLowerCase().includes("already")
+    !authCreateError.message.toLowerCase().includes("already") &&
+    !authCreateError.message.toLowerCase().includes("registered")
   ) {
     throw new Error(
       `Profile insert failed: ${insertError?.message || "unknown"}. Auth user creation also failed: ${authCreateError.message}`,
     );
   }
 
-  const authUserId = createdUser.user?.id;
+  const authUserId = createdUser.user?.id || "";
 
-  if (!authUserId) {
+  if (authUserId) {
+    const { data: profileById, error: profileByIdError } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", authUserId)
+      .maybeSingle();
+
+    if (profileByIdError) {
+      throw new Error(`Profile lookup by auth id failed: ${profileByIdError.message}`);
+    }
+
+    if (profileById?.id) {
+      return updateAndReturnExistingProfile(profileById as AnyRow);
+    }
+
+    const { data: profileByEmailAfterAuth, error: profileByEmailAfterAuthError } =
+      await supabaseAdmin
+        .from("profiles")
+        .select("*")
+        .eq("email", email)
+        .maybeSingle();
+
+    if (profileByEmailAfterAuthError) {
+      throw new Error(
+        `Profile lookup after auth creation failed: ${profileByEmailAfterAuthError.message}`,
+      );
+    }
+
+    if (profileByEmailAfterAuth?.id) {
+      return updateAndReturnExistingProfile(profileByEmailAfterAuth as AnyRow);
+    }
+
+    const authProfilePayload = pickInsertPayload(
+      {
+        ...basePayload,
+        id: authUserId,
+      },
+      allowedProfileKeys,
+    );
+
+    const { data: authProfile, error: authProfileError } = await supabaseAdmin
+      .from("profiles")
+      .upsert(authProfilePayload, { onConflict: "id" })
+      .select("*")
+      .single();
+
+    if (!authProfileError && authProfile?.id) {
+      return updateAndReturnExistingProfile(authProfile as AnyRow);
+    }
+
+    const { data: fallbackProfileById } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", authUserId)
+      .maybeSingle();
+
+    if (fallbackProfileById?.id) {
+      return updateAndReturnExistingProfile(fallbackProfileById as AnyRow);
+    }
+
     throw new Error(
-      `Profile insert failed: ${insertError?.message || "unknown"}. The auth user may already exist, but no matching profile was found. Have the user sign in once or create the profile manually, then convert again.`,
+      `Auth user was created, but profile upsert failed: ${authProfileError?.message || "unknown"}`,
     );
   }
 
-  const authProfilePayload = pickInsertPayload(
-    {
-      ...basePayload,
-      id: authUserId,
-    },
-    profileKeys.length ? profileKeys : ["id", ...profileFallbackKeys],
+  // Auth user already existed but admin.createUser did not return the id.
+  // Re-check by email before failing, because another trigger/process may have created the profile.
+  const { data: finalProfileByEmail, error: finalProfileError } =
+    await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
+
+  if (finalProfileError) {
+    throw new Error(`Final profile lookup failed: ${finalProfileError.message}`);
+  }
+
+  if (finalProfileByEmail?.id) {
+    return updateAndReturnExistingProfile(finalProfileByEmail as AnyRow);
+  }
+
+  throw new Error(
+    `Profile insert failed: ${insertError?.message || "unknown"}. Auth user may already exist, but no matching profile row could be found by email.`,
   );
-
-  const { data: authProfile, error: authProfileError } = await supabaseAdmin
-    .from("profiles")
-    .insert(authProfilePayload)
-    .select("id")
-    .single();
-
-  if (authProfileError || !authProfile?.id) {
-    throw new Error(
-      `Auth user was created, but profile insert failed: ${authProfileError?.message || "unknown"}`,
-    );
-  }
-
-  return authProfile.id as string;
 }
 
 async function upsertAmbassadorFromLead({
