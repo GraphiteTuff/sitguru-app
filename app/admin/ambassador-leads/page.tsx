@@ -925,7 +925,11 @@ async function updateAmbassadorLead(formData: FormData) {
 
   if (error) {
     console.warn("Unable to update ambassador lead:", error);
-    redirect(`${adminRoutes.ambassadorLeads}?updated=error`);
+    redirect(
+      `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
+        error.message,
+      )}`,
+    );
   }
 
   redirect(`${adminRoutes.ambassadorLeads}?updated=success`);
@@ -938,19 +942,31 @@ async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
   const sourceTable = asString(formData.get("source_table")) || "ambassador_leads";
   const nextStatus = normalizeStatus(asString(formData.get("next_status")));
 
-  if (!leadId || !isDeletableLeadTable(sourceTable)) {
+  if (!leadId) {
     redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
   }
 
+  if (sourceTable !== "ambassador_leads") {
+    redirect(
+      `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
+        `Quick status updates are only supported for ambassador_leads rows right now. This row came from ${sourceTable}.`,
+      )}`,
+    );
+  }
+
   const { data: existingLead, error: fetchError } = await supabaseAdmin
-    .from(sourceTable)
+    .from("ambassador_leads")
     .select("*")
     .eq("id", leadId)
     .maybeSingle();
 
   if (fetchError || !existingLead) {
     console.warn("Unable to find ambassador lead for status update:", fetchError);
-    redirect(`${adminRoutes.ambassadorLeads}?updated=error`);
+    redirect(
+      `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
+        fetchError?.message || "Unable to find this ambassador lead.",
+      )}`,
+    );
   }
 
   const leadRow = existingLead as AnyRow;
@@ -960,55 +976,56 @@ async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
   const now = new Date().toISOString();
   const actionNote = getPipelineActionNote(nextStatus, leadName);
 
-  const leadPatch =
-    nextStatus === "archived"
-      ? {
-          status: nextStatus,
-          notes: concatNote(getNotes(leadRow), actionNote),
-          archived_at: now,
-          archived_reason:
-            "Archived from Ambassador Leads quick action. Retained for applicant recordkeeping.",
-          updated_at: now,
-        }
-      : {
-          status: nextStatus,
-          notes: concatNote(getNotes(leadRow), actionNote),
-          archived_at: null,
-          archived_reason: null,
-          updated_at: now,
-        };
+  const leadPatch: Record<string, unknown> = {
+    status: nextStatus,
+    updated_at: now,
+  };
+
+  if ("notes" in leadRow) {
+    leadPatch.notes = concatNote(getNotes(leadRow), actionNote);
+  }
+
+  if ("last_contacted_at" in leadRow && nextStatus === "contacted") {
+    leadPatch.last_contacted_at = now;
+  }
+
+  if ("contacted_at" in leadRow && nextStatus === "contacted") {
+    leadPatch.contacted_at = now;
+  }
+
+  if ("archived_at" in leadRow) {
+    leadPatch.archived_at = nextStatus === "archived" ? now : null;
+  }
+
+  if ("archived_reason" in leadRow) {
+    leadPatch.archived_reason =
+      nextStatus === "archived"
+        ? "Archived from Ambassador Leads quick action. Retained for applicant recordkeeping."
+        : null;
+  }
 
   const { error: leadUpdateError } = await supabaseAdmin
-    .from(sourceTable)
+    .from("ambassador_leads")
     .update(leadPatch)
     .eq("id", leadId);
 
   if (leadUpdateError) {
     console.warn("Unable to update ambassador lead status:", leadUpdateError);
-    redirect(`${adminRoutes.ambassadorLeads}?updated=error`);
+    redirect(
+      `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
+        leadUpdateError.message,
+      )}`,
+    );
   }
 
   const ambassadorStatus = mapLeadStatusToAmbassadorStatus(nextStatus);
-  const ambassadorPatch =
-    ambassadorStatus === "archived"
-      ? {
-          status: ambassadorStatus,
-          notes: concatNote(getNotes(leadRow), actionNote),
-          archived_at: now,
-          archived_reason:
-            "Archived from Ambassador Leads quick action. Retained for applicant recordkeeping.",
-          updated_at: now,
-        }
-      : {
-          status: ambassadorStatus,
-          notes: concatNote(getNotes(leadRow), actionNote),
-          archived_at: null,
-          archived_reason: null,
-          updated_at: now,
-        };
 
-  const orFilters = [
-    `lead_id.eq.${leadId}`,
+  const ambassadorPatch: Record<string, unknown> = {
+    status: ambassadorStatus,
+    updated_at: now,
+  };
+
+  const ambassadorFilters = [
     referralCode ? `referral_code.eq.${referralCode}` : "",
     email && email !== "—" ? `email.eq.${email}` : "",
     leadName ? `full_name.eq.${leadName}` : "",
@@ -1016,15 +1033,15 @@ async function updateAmbassadorLeadPipelineStatus(formData: FormData) {
     .filter(Boolean)
     .join(",");
 
-  if (orFilters) {
+  if (ambassadorFilters) {
     const { error: ambassadorUpdateError } = await supabaseAdmin
       .from("ambassadors")
       .update(ambassadorPatch)
-      .or(orFilters);
+      .or(ambassadorFilters);
 
     if (ambassadorUpdateError) {
       console.warn(
-        "Ambassador status mirror update skipped:",
+        "Ambassador mirror update skipped after lead update succeeded:",
         ambassadorUpdateError,
       );
     }
@@ -1337,10 +1354,14 @@ function getNotice(
   }
 
   if (updated === "error") {
+    const message = searchParams?.message;
+    const readableMessage = Array.isArray(message) ? message[0] : message;
+
     return {
       title: "Lead not updated",
       message:
-        "The lead could not be updated. Confirm the status constraint and archive columns exist in Supabase.",
+        readableMessage ||
+        "The lead could not be updated. The exact Supabase error was not returned.",
       tone: "warning" as const,
     };
   }
