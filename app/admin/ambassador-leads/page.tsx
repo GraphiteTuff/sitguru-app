@@ -741,7 +741,6 @@ async function upsertAmbassadorFromLead({
   const ambassadorFilters = [
     email && email !== "—" ? `email.eq.${email}` : "",
     profileId ? `user_id.eq.${profileId}` : "",
-    profileId ? `profile_id.eq.${profileId}` : "",
     referralCode ? `referral_code.eq.${referralCode}` : "",
   ]
     .filter(Boolean)
