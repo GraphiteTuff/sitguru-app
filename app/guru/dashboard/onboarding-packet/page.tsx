@@ -34,9 +34,11 @@ export default async function GuruOnboardingPacketPage() {
           <p className="text-sm font-black uppercase tracking-[0.3em] !text-[#07132f]">
             SitGuru Guru Onboarding
           </p>
+
           <h1 className="mt-4 text-4xl font-black leading-tight tracking-[-0.045em] !text-[#07132f] sm:text-6xl">
             Complete Your Guru Onboarding Packet
           </h1>
+
           <p className="mt-4 max-w-3xl text-lg font-bold leading-8 !text-slate-700">
             This secure packet helps SitGuru document your Guru setup,
             contractor acknowledgment, W-9 tax information acknowledgment,
@@ -66,7 +68,7 @@ export default async function GuruOnboardingPacketPage() {
                 },
                 {
                   title: "Complete your Guru Onboarding Packet",
-                  body: "SitGuru will send your secure PandaDoc packet so you can review, complete, and sign it.",
+                  body: "SitGuru will send your secure PandaDoc packet directly to your email so you can review, complete, and sign it.",
                 },
               ].map((item, index) => (
                 <div
@@ -77,6 +79,7 @@ export default async function GuruOnboardingPacketPage() {
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-base font-black !text-white">
                       {index + 1}
                     </span>
+
                     <div>
                       <p className="text-lg font-black !text-slate-950">
                         {item.title}
@@ -107,16 +110,19 @@ export default async function GuruOnboardingPacketPage() {
               Packet Status
             </h2>
 
-            <div className="mt-4 rounded-[1.25rem] border border-rose-200 bg-rose-50 p-5">
-              <p className="text-xs font-black uppercase tracking-[0.18em] !text-rose-700">
+            <div className="mt-4 rounded-[1.25rem] border border-amber-200 bg-amber-50 p-5">
+              <p className="text-xs font-black uppercase tracking-[0.18em] !text-amber-700">
                 Current Status
               </p>
-              <p className="mt-2 text-2xl font-black !text-rose-900">
-                Needs Action
+
+              <p className="mt-2 text-2xl font-black !text-amber-900">
+                Packet Sent by SitGuru
               </p>
-              <p className="mt-2 text-sm font-bold leading-6 !text-rose-800">
-                Your Guru Onboarding Packet must be completed before final
-                approval.
+
+              <p className="mt-2 text-sm font-bold leading-6 !text-amber-900">
+                SitGuru will send your secure PandaDoc packet directly to the
+                email on your Guru account. Please check your inbox and spam
+                folder for a PandaDoc email from SitGuru.
               </p>
             </div>
 
@@ -130,12 +136,16 @@ export default async function GuruOnboardingPacketPage() {
                 Open Secure Packet →
               </a>
             ) : (
-              <Link
-                href="/guru/dashboard/messages"
-                className="mt-5 flex min-h-[54px] items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
-              >
-                Message SitGuru →
-              </Link>
+              <div className="mt-5 rounded-[1rem] border border-emerald-200 bg-emerald-50 p-5">
+                <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
+                  No action button needed
+                </p>
+                <p className="mt-2 text-sm font-bold leading-6 !text-emerald-900">
+                  Your packet is sent separately by SitGuru through PandaDoc.
+                  Once completed, SitGuru will review and update your onboarding
+                  status.
+                </p>
+              </div>
             )}
 
             <Link
@@ -150,6 +160,13 @@ export default async function GuruOnboardingPacketPage() {
               className="mt-3 flex min-h-[54px] items-center justify-center rounded-[1rem] border border-slate-200 bg-white px-6 py-3 text-base font-black !text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50"
             >
               Update My Profile
+            </Link>
+
+            <Link
+              href="/guru/dashboard"
+              className="mt-3 flex min-h-[54px] items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
+            >
+              Back to Dashboard
             </Link>
           </aside>
         </div>
