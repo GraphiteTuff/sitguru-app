@@ -895,6 +895,9 @@ async function convertAmbassadorLeadToAmbassador(formData: FormData) {
     redirect(`${adminRoutes.ambassadorLeads}?updated=missing`);
   }
 
+  let convertedProfileId = "";
+  let convertedReferralCode = "";
+
   try {
     const { data: existingLead, error: fetchError } = await supabaseAdmin
       .from(sourceTable)
@@ -935,25 +938,38 @@ async function convertAmbassadorLeadToAmbassador(formData: FormData) {
     }
 
     if (Object.keys(approvedPatch).length) {
-      await supabaseAdmin
+      const { error: leadUpdateError } = await supabaseAdmin
         .from(sourceTable)
         .update(approvedPatch)
         .eq("id", leadId);
+
+      if (leadUpdateError) {
+        throw new Error(
+          `Ambassador lead was converted, but the lead status could not be updated: ${leadUpdateError.message}`,
+        );
+      }
     }
 
-    redirect(
-      `${adminRoutes.ambassadorLeads}?updated=converted&profile=${profileId}&academy=ambassador`,
-    );
+    convertedProfileId = profileId;
+    convertedReferralCode = referralCode;
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown conversion error";
+
     console.warn("Ambassador lead conversion failed:", error);
+
     redirect(
       `${adminRoutes.ambassadorLeads}?updated=error&message=${encodeURIComponent(
         message,
       )}`,
     );
   }
+
+  redirect(
+    `${adminRoutes.ambassadorLeads}?updated=converted&profile=${convertedProfileId}&academy=ambassador&referral=${encodeURIComponent(
+      convertedReferralCode,
+    )}`,
+  );
 }
 
 async function requireAdminUserForLeadConversion() {
