@@ -738,15 +738,39 @@ async function upsertAmbassadorFromLead({
     referralCode,
   });
 
-  const { data: existingAmbassador } = await supabaseAdmin
-    .from("ambassadors")
-    .select("*")
-    .or(`email.eq.${email},user_id.eq.${profileId},profile_id.eq.${profileId}`)
-    .maybeSingle();
+  const ambassadorFilters = [
+    email && email !== "—" ? `email.eq.${email}` : "",
+    profileId ? `user_id.eq.${profileId}` : "",
+    profileId ? `profile_id.eq.${profileId}` : "",
+    referralCode ? `referral_code.eq.${referralCode}` : "",
+  ]
+    .filter(Boolean)
+    .join(",");
 
-  if (existingAmbassador?.id) {
+  const { data: existingAmbassador, error: existingAmbassadorError } =
+    ambassadorFilters
+      ? await supabaseAdmin
+          .from("ambassadors")
+          .select("*")
+          .or(ambassadorFilters)
+          .maybeSingle()
+      : { data: null, error: null };
+
+  if (existingAmbassadorError) {
+    throw new Error(
+      `Ambassador lookup failed before conversion: ${existingAmbassadorError.message}`,
+    );
+  }
+
+  const updateExistingAmbassador = async (ambassadorRow: AnyRow) => {
+    const ambassadorId = asString(ambassadorRow.id);
+
+    if (!ambassadorId) {
+      throw new Error("Existing Ambassador record is missing an ID.");
+    }
+
     const patch = buildLeadUpdatePatch({
-      row: existingAmbassador as AnyRow,
+      row: ambassadorRow,
       fullName: getDisplayName(row, "Ambassador"),
       email,
       phone: getPhone(row),
@@ -760,21 +784,32 @@ async function upsertAmbassadorFromLead({
         county: getCounty(row),
         country: getCountry(row),
       }),
-      notes: getNotes(existingAmbassador as AnyRow),
+      notes: getNotes(ambassadorRow),
       actionNote: "Updated from Ambassador Lead conversion.",
     });
 
     for (const [key, value] of Object.entries(payload)) {
-      if (hasColumn(existingAmbassador as AnyRow, key)) {
+      if (hasColumn(ambassadorRow, key)) {
         patch[key] = value;
       }
     }
 
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from("ambassadors")
       .update(patch)
-      .eq("id", existingAmbassador.id);
-    return existingAmbassador.id as string;
+      .eq("id", ambassadorId);
+
+    if (updateError) {
+      throw new Error(
+        `Existing Ambassador dashboard record could not be updated: ${updateError.message}`,
+      );
+    }
+
+    return ambassadorId;
+  };
+
+  if (existingAmbassador?.id) {
+    return updateExistingAmbassador(existingAmbassador as AnyRow);
   }
 
   const ambassadorKeys = await getExistingTableKeys("ambassadors");
@@ -810,13 +845,32 @@ async function upsertAmbassadorFromLead({
     .select("id")
     .single();
 
-  if (error || !insertedAmbassador?.id) {
-    throw new Error(
-      `Ambassador dashboard record could not be created: ${error?.message || "unknown"}`,
-    );
+  if (!error && insertedAmbassador?.id) {
+    return insertedAmbassador.id as string;
   }
 
-  return insertedAmbassador.id as string;
+  if (error?.message?.includes("ambassadors_referral_code_key")) {
+    const { data: duplicateReferralAmbassador, error: duplicateLookupError } =
+      await supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .eq("referral_code", referralCode)
+        .maybeSingle();
+
+    if (duplicateLookupError) {
+      throw new Error(
+        `Referral code already exists, and the matching Ambassador record could not be loaded: ${duplicateLookupError.message}`,
+      );
+    }
+
+    if (duplicateReferralAmbassador?.id) {
+      return updateExistingAmbassador(duplicateReferralAmbassador as AnyRow);
+    }
+  }
+
+  throw new Error(
+    `Ambassador dashboard record could not be created: ${error?.message || "unknown"}`,
+  );
 }
 
 async function assignAmbassadorAcademy(profileId: string, adminUserId: string) {
