@@ -799,16 +799,16 @@ function getBackgroundCheckDisplay(profile: GuruProfile | null) {
 function isPayoutConnected(profile: GuruProfile | null) {
   return Boolean(
     profile?.stripe_account_id &&
-    profile?.stripe_onboarding_complete === true &&
-    profile?.charges_enabled === true &&
-    profile?.payouts_enabled === true,
+      profile?.stripe_onboarding_complete === true &&
+      profile?.charges_enabled === true &&
+      profile?.payouts_enabled === true,
   );
 }
 
 function getGuruOnboardingPacketDisplay() {
   const packetUrl =
     process.env.NEXT_PUBLIC_GURU_ONBOARDING_PACKET_URL ||
-    "/guru/dashboard/messages";
+    "/guru/dashboard/onboarding-packet";
 
   return {
     label: "Needs Action",
@@ -823,9 +823,9 @@ function isCompletedStep(row: Record<string, unknown>) {
     .toLowerCase();
   return Boolean(
     row.completed_at ||
-    status === "completed" ||
-    status === "complete" ||
-    status === "done",
+      status === "completed" ||
+      status === "complete" ||
+      status === "done",
   );
 }
 
