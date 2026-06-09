@@ -738,28 +738,69 @@ async function upsertAmbassadorFromLead({
     referralCode,
   });
 
-  const ambassadorFilters = [
-    email && email !== "—" ? `email.eq.${email}` : "",
-    profileId ? `user_id.eq.${profileId}` : "",
-    referralCode ? `referral_code.eq.${referralCode}` : "",
-  ]
-    .filter(Boolean)
-    .join(",");
+  const findExistingAmbassador = async () => {
+    if (referralCode) {
+      const { data, error } = await supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .eq("referral_code", referralCode)
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(1);
 
-  const { data: existingAmbassador, error: existingAmbassadorError } =
-    ambassadorFilters
-      ? await supabaseAdmin
-          .from("ambassadors")
-          .select("*")
-          .or(ambassadorFilters)
-          .maybeSingle()
-      : { data: null, error: null };
+      if (error) {
+        throw new Error(
+          `Ambassador referral code lookup failed before conversion: ${error.message}`,
+        );
+      }
 
-  if (existingAmbassadorError) {
-    throw new Error(
-      `Ambassador lookup failed before conversion: ${existingAmbassadorError.message}`,
-    );
-  }
+      if (Array.isArray(data) && data[0]?.id) {
+        return data[0] as AnyRow;
+      }
+    }
+
+    if (profileId) {
+      const { data, error } = await supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .eq("user_id", profileId)
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(1);
+
+      if (error) {
+        throw new Error(
+          `Ambassador user lookup failed before conversion: ${error.message}`,
+        );
+      }
+
+      if (Array.isArray(data) && data[0]?.id) {
+        return data[0] as AnyRow;
+      }
+    }
+
+    if (email && email !== "—") {
+      const { data, error } = await supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .eq("email", email)
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(1);
+
+      if (error) {
+        throw new Error(
+          `Ambassador email lookup failed before conversion: ${error.message}`,
+        );
+      }
+
+      if (Array.isArray(data) && data[0]?.id) {
+        return data[0] as AnyRow;
+      }
+    }
+
+    return null;
+  };
 
   const updateExistingAmbassador = async (ambassadorRow: AnyRow) => {
     const ambassadorId = asString(ambassadorRow.id);
@@ -807,14 +848,15 @@ async function upsertAmbassadorFromLead({
     return ambassadorId;
   };
 
+  const existingAmbassador = await findExistingAmbassador();
+
   if (existingAmbassador?.id) {
-    return updateExistingAmbassador(existingAmbassador as AnyRow);
+    return updateExistingAmbassador(existingAmbassador);
   }
 
   const ambassadorKeys = await getExistingTableKeys("ambassadors");
   const fallbackKeys = [
     "user_id",
-    "profile_id",
     "full_name",
     "email",
     "phone",
@@ -844,32 +886,25 @@ async function upsertAmbassadorFromLead({
     .select("id")
     .single();
 
-  if (!error && insertedAmbassador?.id) {
-    return insertedAmbassador.id as string;
-  }
+  if (error || !insertedAmbassador?.id) {
+    if (
+      error?.message?.toLowerCase().includes("duplicate") &&
+      error.message.toLowerCase().includes("referral") &&
+      referralCode
+    ) {
+      const retryExistingAmbassador = await findExistingAmbassador();
 
-  if (error?.message?.includes("ambassadors_referral_code_key")) {
-    const { data: duplicateReferralAmbassador, error: duplicateLookupError } =
-      await supabaseAdmin
-        .from("ambassadors")
-        .select("*")
-        .eq("referral_code", referralCode)
-        .maybeSingle();
-
-    if (duplicateLookupError) {
-      throw new Error(
-        `Referral code already exists, and the matching Ambassador record could not be loaded: ${duplicateLookupError.message}`,
-      );
+      if (retryExistingAmbassador?.id) {
+        return updateExistingAmbassador(retryExistingAmbassador);
+      }
     }
 
-    if (duplicateReferralAmbassador?.id) {
-      return updateExistingAmbassador(duplicateReferralAmbassador as AnyRow);
-    }
+    throw new Error(
+      `Ambassador dashboard record could not be created: ${error?.message || "unknown"}`,
+    );
   }
 
-  throw new Error(
-    `Ambassador dashboard record could not be created: ${error?.message || "unknown"}`,
-  );
+  return insertedAmbassador.id as string;
 }
 
 async function assignAmbassadorAcademy(profileId: string, adminUserId: string) {
