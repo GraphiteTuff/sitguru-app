@@ -805,6 +805,18 @@ function isPayoutConnected(profile: GuruProfile | null) {
   );
 }
 
+function getGuruOnboardingPacketDisplay() {
+  const packetUrl =
+    process.env.NEXT_PUBLIC_GURU_ONBOARDING_PACKET_URL ||
+    "/guru/dashboard/messages";
+
+  return {
+    label: "Needs Action",
+    status: "needs_action" as const,
+    href: packetUrl,
+  };
+}
+
 function isCompletedStep(row: Record<string, unknown>) {
   const status = String(row.status || "")
     .trim()
@@ -1264,13 +1276,14 @@ function GuruSetupChecklist({
   serviceRatesReady: boolean;
 }) {
   const background = getBackgroundCheckDisplay(profile);
+  const onboardingPacket = getGuruOnboardingPacketDisplay();
   const payoutConnected = isPayoutConnected(profile);
   const hasProfile = profileCompletion >= 70;
   const hasServiceArea = Boolean(
     profile?.city ||
-    profile?.state ||
-    profile?.zip_code ||
-    profile?.postal_code,
+      profile?.state ||
+      profile?.zip_code ||
+      profile?.postal_code,
   );
   const hasServices =
     normalizeServices(profile?.services).length > 0 || serviceRatesReady;
@@ -1279,7 +1292,7 @@ function GuruSetupChecklist({
     {
       number: 1,
       title: "Complete your profile",
-      body: "Add your name, bio, and profile photo so pet parents know who you are.",
+      body: "Add your name, bio, profile photo, and experience so Pet Parents know who you are.",
       status: hasProfile ? "complete" : "needs_action",
       statusLabel: hasProfile ? "Complete" : "Needs Action",
       href: "/guru/dashboard/profile?step=1",
@@ -1287,7 +1300,7 @@ function GuruSetupChecklist({
     {
       number: 2,
       title: "Set your service area",
-      body: "Add your city, state, ZIP/address, and travel radius so local pet parents can find you.",
+      body: "Add your city, state, ZIP/address, and travel radius so local Pet Parents can find you.",
       status: hasServiceArea ? "complete" : "needs_action",
       statusLabel: hasServiceArea ? "Complete" : "Needs Action",
       href: "/guru/dashboard/profile?step=2",
@@ -1295,7 +1308,7 @@ function GuruSetupChecklist({
     {
       number: 3,
       title: "Add services, pricing, and public request",
-      body: "Choose your care services, confirm your rates, and request public visibility after Steps 1–3 are complete.",
+      body: "Choose your care services, confirm your rates, and request public visibility after your setup is ready.",
       status: hasServices ? "complete" : "needs_action",
       statusLabel: hasServices ? "Complete" : "Needs Action",
       href: "/guru/dashboard/profile?step=3",
@@ -1310,6 +1323,14 @@ function GuruSetupChecklist({
     },
     {
       number: 5,
+      title: "Complete Guru Onboarding Packet",
+      body: "Review and sign your SitGuru Guru Onboarding Packet so your contractor setup, W-9 acknowledgment, safety policies, and onboarding requirements are documented.",
+      status: onboardingPacket.status,
+      statusLabel: onboardingPacket.label,
+      href: onboardingPacket.href,
+    },
+    {
+      number: 6,
       title: "Connect payouts",
       body: "Connect Stripe payouts so SitGuru can pay you after completed bookings.",
       status: payoutConnected ? "complete" : "needs_action",
@@ -1349,26 +1370,26 @@ function GuruSetupChecklist({
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.28em] !text-white/85">
-              {allComplete ? "Setup Complete" : "Action Required"}
+              {allComplete ? "Onboarding Complete" : "Action Required"}
             </p>
             <h2 className="mt-3 text-4xl font-black leading-tight tracking-[-0.04em] !text-white sm:text-5xl">
               {allComplete
-                ? "Your Guru setup is complete"
-                : "Complete your Guru setup"}
+                ? "Your Guru onboarding is complete"
+                : "Complete your Guru onboarding"}
             </h2>
             <p className="mt-3 max-w-4xl text-lg font-bold leading-8 !text-white/90">
               {allComplete
-                ? "Great work. All 5 setup steps are complete. Complete Guru Academy and wait for approval before your profile becomes bookable."
-                : "Follow these steps in order so Pet Parents can find you, trust you, book your services, and SitGuru can pay you after completed care."}
+                ? "Great work. Your Guru onboarding steps are complete. SitGuru will review your profile before it becomes fully bookable."
+                : "Complete these steps so Pet Parents can find you, trust you, book your services, and SitGuru can support your payouts and approval process."}
             </p>
           </div>
 
           <div className="rounded-[1.5rem] bg-white/15 p-5 text-center ring-1 ring-white/30 backdrop-blur">
             <p className="text-sm font-black uppercase tracking-[0.18em] !text-white/80">
-              Setup Progress
+              Onboarding Progress
             </p>
             <p className="mt-1 text-5xl font-black !text-white">
-              {completedSteps}/5
+              {completedSteps}/{steps.length}
             </p>
             <p className="mt-1 text-sm font-bold !text-white/85">
               {allComplete ? "all steps complete" : "steps complete"}
@@ -1395,17 +1416,17 @@ function GuruSetupChecklist({
             </p>
             <p className="mt-1 text-2xl font-black !text-slate-950">
               {allComplete
-                ? "✓ All 5 setup steps are complete"
+                ? `✓ All ${steps.length} onboarding steps are complete`
                 : `Step ${nextStep.number} → ${nextStep.title}`}
             </p>
           </div>
 
-          {nextStep.number === 5 && !allComplete ? (
+          {nextStep.number === 6 && !allComplete ? (
             <a
               href={nextStep.href}
               className="inline-flex min-h-[54px] items-center justify-center rounded-[1rem] bg-[#07132f] px-7 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
             >
-              Continue Setup →
+              Continue Onboarding →
             </a>
           ) : (
             <Link
@@ -1416,12 +1437,12 @@ function GuruSetupChecklist({
                   : "bg-[#07132f] hover:bg-[#0b1436]"
               }`}
             >
-              {allComplete ? "View Profile ✓" : "Continue Setup →"}
+              {allComplete ? "View Profile ✓" : "Continue Onboarding →"}
             </Link>
           )}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {steps.map((step) => {
             const isComplete = step.status === "complete";
             const isPending = step.status === "pending";
@@ -1456,11 +1477,19 @@ function GuruSetupChecklist({
                         : isPending
                           ? "Check screening status"
                           : "Start screening"
-                      : isComplete
-                        ? "View details"
-                        : isPending
-                          ? "Check status"
-                          : "Click to complete"}
+                      : step.number === 5
+                        ? isComplete
+                          ? "View packet"
+                          : "Open packet"
+                        : step.number === 6
+                          ? isComplete
+                            ? "View payouts"
+                            : "Set up payouts"
+                          : isComplete
+                            ? "View details"
+                            : isPending
+                              ? "Check status"
+                              : "Click to complete"}
                   </span>
                   <span className="text-2xl font-black !text-white transition group-hover:translate-x-1">
                     →
@@ -1469,7 +1498,7 @@ function GuruSetupChecklist({
               </>
             );
 
-            if (step.number === 5 && !isComplete) {
+            if (step.number === 6 && !isComplete) {
               return (
                 <a
                   key={step.number}
