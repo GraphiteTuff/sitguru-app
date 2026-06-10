@@ -116,6 +116,16 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
 
 const GURU_SELECT_ATTEMPTS = ["*"];
 
+/**
+ * Public Guru profile routes must not live under /guru because that section is
+ * used for the protected Guru dashboard/login area.
+ *
+ * View Guru Profile = public browsing.
+ * Book This Guru = booking flow, which can require login later.
+ */
+const PUBLIC_GURU_PROFILE_BASE_PATH = "/gurus";
+const BOOK_GURU_BASE_PATH = "/book";
+
 function Card({
   children,
   className = "",
@@ -220,20 +230,28 @@ function getEnabledGuruRates(
 ) {
   return (serviceRatesByGuru[String(guru.id)] || [])
     .filter((rate) => rate.is_enabled !== false)
-    .filter((rate) => rate.rate_unit === "custom" || Number(rate.rate_amount) >= 0);
+    .filter(
+      (rate) => rate.rate_unit === "custom" || Number(rate.rate_amount) >= 0,
+    );
 }
 
 function formatServiceRate(rate: GuruServiceRate) {
   const unit = RATE_UNIT_LABELS[String(rate.rate_unit || "visit")] || "visit";
 
   if (rate.rate_unit === "custom") {
-    return { primary: "Custom quote", detail: rate.service_label || "Rates by service" };
+    return {
+      primary: "Custom quote",
+      detail: rate.service_label || "Rates by service",
+    };
   }
 
   const amount = formatCurrencyAmount(rate.rate_amount);
 
   if (!amount) {
-    return { primary: "Rate pending", detail: rate.service_label || "Rates by service" };
+    return {
+      primary: "Rate pending",
+      detail: rate.service_label || "Rates by service",
+    };
   }
 
   return {
@@ -275,7 +293,8 @@ function getGuruRateDisplay(
         detail: selectedRate
           ? `${fallbackRate.service_label || selectedService} ${formatted.detail}`
           : `Rates by service ${formatted.detail}`,
-        serviceLabel: fallbackRate.service_label || selectedService || "Rates by service",
+        serviceLabel:
+          fallbackRate.service_label || selectedService || "Rates by service",
         isFallback: false,
       };
     }
@@ -306,14 +325,16 @@ function getGuruPhotoUrl(guru: GuruRow) {
   );
 }
 
+function getGuruPublicIdentifier(guru: GuruRow) {
+  return encodeURIComponent(String(guru.slug || guru.id));
+}
+
 function getGuruHref(guru: GuruRow) {
-  if (guru.slug) return `/guru/${guru.slug}`;
-  return `/guru/${guru.id}`;
+  return `${PUBLIC_GURU_PROFILE_BASE_PATH}/${getGuruPublicIdentifier(guru)}`;
 }
 
 function getBookGuruHref(guru: GuruRow) {
-  if (guru.slug) return `/book/${guru.slug}`;
-  return getGuruHref(guru);
+  return `${BOOK_GURU_BASE_PATH}/${getGuruPublicIdentifier(guru)}`;
 }
 
 function getGuruRating(guru: GuruRow) {
@@ -482,15 +503,13 @@ function locationsMatchByText(guru: GuruRow, location: ZipLookupResult | null) {
   const guruCity = normalizeText(guru.city);
   const guruState = normalizeStateCode(guru.state);
   const locationCity = normalizeText(location.city);
-  const locationState = normalizeStateCode(
-    location.state || location.stateName,
-  );
+  const locationState = normalizeStateCode(location.state || location.stateName);
 
   return Boolean(
     guruCity &&
-    locationCity &&
-    guruCity === locationCity &&
-    (!guruState || !locationState || guruState === locationState),
+      locationCity &&
+      guruCity === locationCity &&
+      (!guruState || !locationState || guruState === locationState),
   );
 }
 
@@ -609,8 +628,12 @@ function enrichGuruWithDistance(
 
   return {
     ...guru,
-    service_latitude: getGuruLatitude(guru) ?? zipFallbackCoordinates?.[0] ?? guru.service_latitude,
-    service_longitude: getGuruLongitude(guru) ?? zipFallbackCoordinates?.[1] ?? guru.service_longitude,
+    service_latitude:
+      getGuruLatitude(guru) ?? zipFallbackCoordinates?.[0] ?? guru.service_latitude,
+    service_longitude:
+      getGuruLongitude(guru) ??
+      zipFallbackCoordinates?.[1] ??
+      guru.service_longitude,
     service_radius_miles: normalizedServiceRadiusMiles,
     service_radius_display: normalizedServiceRadiusMiles,
     distance_miles: distanceMiles,
@@ -672,13 +695,13 @@ function hasValidCoordinates(guru: GuruRow) {
 
   return Boolean(
     latitude !== null &&
-    longitude !== null &&
-    latitude >= -90 &&
-    latitude <= 90 &&
-    longitude >= -180 &&
-    longitude <= 180 &&
-    latitude !== 0 &&
-    longitude !== 0,
+      longitude !== null &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180 &&
+      latitude !== 0 &&
+      longitude !== 0,
   );
 }
 
@@ -722,10 +745,7 @@ function getSearchMapCenter({
     getGuruLatitude(firstExactGuru) !== null &&
     getGuruLongitude(firstExactGuru) !== null
   ) {
-    return [
-      getGuruLatitude(firstExactGuru)!,
-      getGuruLongitude(firstExactGuru)!,
-    ];
+    return [getGuruLatitude(firstExactGuru)!, getGuruLongitude(firstExactGuru)!];
   }
 
   const firstFallbackGuru = filteredGurus.find((guru) =>
@@ -773,7 +793,9 @@ function SearchPageContent() {
   const selectedGuruSlug = searchParams.get("slug") || "";
 
   const [gurus, setGurus] = useState<GuruRow[]>([]);
-  const [serviceRatesByGuru, setServiceRatesByGuru] = useState<Record<string, GuruServiceRate[]>>({});
+  const [serviceRatesByGuru, setServiceRatesByGuru] = useState<
+    Record<string, GuruServiceRate[]>
+  >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -784,7 +806,9 @@ function SearchPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [zipLookup, setZipLookup] = useState<ZipLookupResult | null>(null);
-  const [guruZipLookupsByZip, setGuruZipLookupsByZip] = useState<Record<string, ZipLookupResult>>({});
+  const [guruZipLookupsByZip, setGuruZipLookupsByZip] = useState<
+    Record<string, ZipLookupResult>
+  >({});
   const [zipLookupStatus, setZipLookupStatus] = useState<
     "idle" | "loading" | "found" | "not_found"
   >("idle");
@@ -873,11 +897,14 @@ function SearchPageContent() {
         .filter(Boolean);
 
       if (guruIds.length > 0) {
-        const { data: serviceRateRows, error: serviceRatesError } = await supabase
-          .from("guru_service_rates")
-          .select("id, guru_id, service_key, service_label, is_enabled, rate_amount, rate_unit, duration_minutes, notes")
-          .in("guru_id", guruIds)
-          .eq("is_enabled", true);
+        const { data: serviceRateRows, error: serviceRatesError } =
+          await supabase
+            .from("guru_service_rates")
+            .select(
+              "id, guru_id, service_key, service_label, is_enabled, rate_amount, rate_unit, duration_minutes, notes",
+            )
+            .in("guru_id", guruIds)
+            .eq("is_enabled", true);
 
         if (serviceRatesError) {
           console.warn(
@@ -1605,9 +1632,9 @@ function SearchPageContent() {
                       : "Distance calculated by service area";
                   const isSelectedGuru = Boolean(
                     (selectedGuruId && String(guru.id) === selectedGuruId) ||
-                    (selectedGuruSlug &&
-                      String(guru.slug || "").toLowerCase() ===
-                        selectedGuruSlug.toLowerCase()),
+                      (selectedGuruSlug &&
+                        String(guru.slug || "").toLowerCase() ===
+                          selectedGuruSlug.toLowerCase()),
                   );
 
                   return (
@@ -1822,11 +1849,11 @@ function SearchPageContent() {
 
                 <div className="min-h-[420px] sm:min-h-[520px] xl:min-h-[900px]">
                   <ProviderMap
-                    markers={
-                      filteredGurus as unknown as Record<string, unknown>[]
-                    }
+                    markers={filteredGurus as unknown as Record<string, unknown>[]}
                     center={
-                      cleanZip(zipFilter) || cityFilter.trim() || stateFilter.trim()
+                      cleanZip(zipFilter) ||
+                      cityFilter.trim() ||
+                      stateFilter.trim()
                         ? mapCenter
                         : undefined
                     }
