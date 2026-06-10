@@ -269,9 +269,10 @@ const tipOptions: {
   },
 ];
 
-const ESTIMATED_MARKETPLACE_FEE_PERCENT = 0;
-const MIN_MARKETPLACE_FEE_PERCENT = 0;
-const MAX_MARKETPLACE_FEE_PERCENT = 0;
+const MIN_MARKETPLACE_FEE_PERCENT = 0.1;
+const DEFAULT_MARKETPLACE_FEE_PERCENT = 0.125;
+const MAX_MARKETPLACE_FEE_PERCENT = 0.15;
+const MIN_MARKETPLACE_SUPPORT_FEE = 2.99;
 const DEFAULT_SERVICE_RADIUS_MILES = 25;
 const EARTH_RADIUS_MILES = 3958.8;
 
@@ -599,6 +600,59 @@ function getTipAmount({
   }
 
   return Number((servicePrice * (percentage / 100)).toFixed(2));
+}
+
+function getMarketplaceSupportPercentByLocality(state?: string | null) {
+  const normalizedState = normalizeStateForSelect(state);
+
+  const higherSupportStates = new Set([
+    "CA",
+    "CT",
+    "DC",
+    "HI",
+    "MA",
+    "MD",
+    "NJ",
+    "NY",
+    "VA",
+    "WA",
+  ]);
+
+  const standardSupportStates = new Set([
+    "PA",
+    "DE",
+    "FL",
+    "GA",
+    "NC",
+    "OH",
+    "SC",
+    "TN",
+    "TX",
+  ]);
+
+  if (higherSupportStates.has(normalizedState)) {
+    return MAX_MARKETPLACE_FEE_PERCENT;
+  }
+
+  if (standardSupportStates.has(normalizedState)) {
+    return MIN_MARKETPLACE_FEE_PERCENT;
+  }
+
+  return DEFAULT_MARKETPLACE_FEE_PERCENT;
+}
+
+function getMarketplaceSupportAmount({
+  servicePrice,
+  marketplaceSupportPercent,
+}: {
+  servicePrice: number;
+  marketplaceSupportPercent: number;
+}) {
+  const calculatedAmount = servicePrice * marketplaceSupportPercent;
+
+  return Number(
+    Math.max(MIN_MARKETPLACE_SUPPORT_FEE, calculatedAmount).toFixed(2),
+  );
 }
 
 function dollarsToCents(value: number) {
@@ -1091,9 +1145,19 @@ export default function BookGuruClient({
     [selectedService, visitLength],
   );
 
-  const marketplaceFeePercent = ESTIMATED_MARKETPLACE_FEE_PERCENT;
+  const marketplaceFeePercent = useMemo(
+    () => getMarketplaceSupportPercentByLocality(careState),
+    [careState],
+  );
 
-  const marketplaceFee = 0;
+  const marketplaceFee = useMemo(
+    () =>
+      getMarketplaceSupportAmount({
+        servicePrice,
+        marketplaceSupportPercent: marketplaceFeePercent,
+      }),
+    [servicePrice, marketplaceFeePercent],
+  );
 
   const tipAmount = useMemo(
     () =>
@@ -1113,7 +1177,7 @@ export default function BookGuruClient({
     (guruEstimatedBasePayout + tipAmount).toFixed(2),
   );
 
-  const total = Number((servicePrice + tipAmount).toFixed(2));
+  const total = Number((servicePrice + marketplaceFee + tipAmount).toFixed(2));
 
   const displayPreferredTime =
     timeWindow === "Specific time needed"
@@ -2116,7 +2180,9 @@ export default function BookGuruClient({
             ? `Emergency / special instructions: ${emergencyNotes.trim()}`
             : "",
           "",
-          "Internal SitGuru marketplace fee tracking amount: $0",
+          `Marketplace Support: ${formatMoney(
+            marketplaceFee,
+          )}. Helps keep SitGuru running for our Pet Care Community.`,
           `Guru tip selected: ${formatMoney(
             tipAmount,
           )}. 100% of the tip goes directly to the Guru.`,
@@ -3449,21 +3515,23 @@ export default function BookGuruClient({
 
                 <div className="mt-3 flex justify-between gap-4 text-sm">
                   <span className="inline-flex items-center gap-1 font-semibold text-slate-600">
-                    Secure Checkout
+                    Marketplace Support
                     <CircleHelp className="h-3.5 w-3.5" />
                   </span>
-                  <span className="font-black text-emerald-700">
-                    Included
+                  <span className="font-black text-slate-950">
+                    {formatMoney(marketplaceFee)}
                   </span>
                 </div>
 
                 <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
-                  Payment protection, booking details, and request tracking are
-                  built into the SitGuru checkout experience.
+                  A small support charge helps keep SitGuru running for our Pet
+                  Care Community. Varies by locality.
                 </p>
 
                 <div className="mt-3 flex justify-between gap-4 text-sm">
-                  <span className="font-semibold text-slate-600">Guru Tip</span>
+                  <span className="font-semibold text-slate-600">
+                    Guru Tip
+                  </span>
                   <span className="font-black text-slate-950">
                     {formatMoney(tipAmount)}
                   </span>
@@ -3487,8 +3555,8 @@ export default function BookGuruClient({
                 <p className="flex items-start gap-2 text-xs font-bold leading-5 text-slate-700">
                   <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
                   Secure checkout keeps payment protected, booking details
-                  organized, and care requests easy to manage from your
-                  SitGuru dashboard.
+                  organized, and care requests easy to manage. Marketplace
+                  Support helps keep SitGuru running for our Pet Care Community.
                 </p>
               </div>
 
