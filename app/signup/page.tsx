@@ -970,8 +970,8 @@ function SignupPageContent() {
                       autoComplete="off"
                     />
                     <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-                      Optional — enter this if a SitGuru Ambassador referred
-                      you.
+                      Optional — enter this if an Ambassador, Pet Parent, Guru,
+                      or SitGuru referral partner referred you.
                     </p>
                   </div>
 
@@ -1152,8 +1152,8 @@ function SignupPageContent() {
                       autoComplete="off"
                     />
                     <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-                      Optional — enter this if a SitGuru Ambassador referred
-                      you.
+                      Optional — enter this if an Ambassador, Pet Parent, Guru,
+                      or SitGuru referral partner referred you.
                     </p>
                   </div>
 
