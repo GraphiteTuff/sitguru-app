@@ -15,7 +15,8 @@ const openSans = Open_Sans({
 
 const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
-const sitGuruVideoEmbedUrl = "https://www.youtube.com/embed/Jk5vWCWvvKs?si=12529oKyk7IFLtAj";
+const sitGuruVideoEmbedUrl =
+  "https://www.youtube.com/embed/Jk5vWCWvvKs?si=12529oKyk7IFLtAj";
 
 const heroServiceOptions = [
   "Dog Walking",
@@ -402,7 +403,7 @@ const petParentPhoneSignupHref =
 const petParentLoginHref = "/login?role=pet_parent&next=/customer/dashboard";
 const guruSignupHref = "/signup?role=guru&next=/guru/dashboard";
 const bothSignupHref = "/signup?role=both&next=/customer/dashboard";
-
+const ambassadorLoginHref = "/ambassador/login";
 
 function GoogleIcon() {
   return (
@@ -707,9 +708,7 @@ function HeroSignupCard({
           onClick={() => onTrack("Both Signup Hero Card", bothSignupHref)}
           className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
-          <span className="block text-sm font-black text-slate-950">
-            Both
-          </span>
+          <span className="block text-sm font-black text-slate-950">Both</span>
           <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
             Use SitGuru as a Pet Parent and continue into Guru setup.
           </span>
@@ -733,6 +732,20 @@ function HeroSignupCard({
         >
           Log in
         </Link>
+      </p>
+
+      <Link
+        href={ambassadorLoginHref}
+        onClick={() =>
+          onTrack("Ambassador Login From Hero Card", ambassadorLoginHref)
+        }
+        className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+      >
+        Ambassador Login
+      </Link>
+
+      <p className="mt-2 text-center text-[11px] font-semibold leading-4 text-slate-500">
+        For Ambassador Candidates and SitGuru representatives.
       </p>
     </aside>
   );
@@ -911,7 +924,6 @@ function ProgramHeroCard({
   );
 }
 
-
 function PartnerNetworkSection({
   onTrack,
 }: {
@@ -958,7 +970,10 @@ function PartnerNetworkSection({
               target="_blank"
               rel="noopener noreferrer"
               onClick={() =>
-                onTrack(`Partner Logo ${featuredPartner.name}`, featuredPartner.href)
+                onTrack(
+                  `Partner Logo ${featuredPartner.name}`,
+                  featuredPartner.href,
+                )
               }
               className="group relative block overflow-hidden rounded-[28px] border border-amber-200 bg-gradient-to-br from-white via-amber-50/40 to-emerald-50/60 p-5 shadow-[0_16px_42px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-[0_20px_50px_rgba(15,23,42,0.12)] sm:p-6"
             >
@@ -1003,7 +1018,6 @@ function PartnerNetworkSection({
     </section>
   );
 }
-
 
 function HomeVideoSection({
   onTrack,
@@ -1119,7 +1133,10 @@ export default function HomePage() {
       if (!isMounted) return;
 
       if (error) {
-        console.warn("Could not load live Gurus for homepage carousel:", error.message);
+        console.warn(
+          "Could not load live Gurus for homepage carousel:",
+          error.message,
+        );
 
         setGuruCards(demoGuruCards);
 
@@ -1445,20 +1462,25 @@ export default function HomePage() {
               <div className="relative z-20 mt-4 lg:mt-6 lg:w-[640px] xl:w-[670px]">
                 <TrustRow />
 
-              <div className="mt-3 grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/90 p-3 shadow-sm sm:grid-cols-3">
-                {[
-                  ["Free", "Local signup"],
-                  ["Local", "Trusted care"],
-                  ["Flexible", "Independent Gurus"],
-                ].map(([value, label]) => (
-                  <div key={label} className="rounded-xl bg-white px-3 py-2 text-center">
-                    <p className="text-lg font-black text-emerald-700">{value}</p>
-                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-600">
-                      {label}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                <div className="mt-3 grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/90 p-3 shadow-sm sm:grid-cols-3">
+                  {[
+                    ["Free", "Local signup"],
+                    ["Local", "Trusted care"],
+                    ["Flexible", "Independent Gurus"],
+                  ].map(([value, label]) => (
+                    <div
+                      key={label}
+                      className="rounded-xl bg-white px-3 py-2 text-center"
+                    >
+                      <p className="text-lg font-black text-emerald-700">
+                        {value}
+                      </p>
+                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-600">
+                        {label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="relative z-20 mt-5 flex justify-center lg:hidden">
@@ -1496,7 +1518,8 @@ export default function HomePage() {
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
                 Pet Parents can find local care, Pet Gurus can apply to offer
                 services independently, and Ambassadors can help spread the word.
-                SitGuru keeps the experience simple, welcoming, and easy to start.
+                SitGuru keeps the experience simple, welcoming, and easy to
+                start.
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 {[
@@ -1508,7 +1531,9 @@ export default function HomePage() {
                     key={label}
                     className="rounded-2xl border border-white bg-white/90 p-4 text-center shadow-sm"
                   >
-                    <p className="text-xl font-black text-emerald-700">{value}</p>
+                    <p className="text-xl font-black text-emerald-700">
+                      {value}
+                    </p>
                     <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-slate-600">
                       {label}
                     </p>
@@ -1682,10 +1707,10 @@ export default function HomePage() {
                 </h2>
 
                 <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
-                  Pet Parents can find trusted local care. Gurus can apply
-                  as independent service providers and choose the requests
-                  that fit their availability. SitGuru keeps the experience
-                  simple with profiles, booking details, helpful support, and a
+                  Pet Parents can find trusted local care. Gurus can apply as
+                  independent service providers and choose the requests that fit
+                  their availability. SitGuru keeps the experience simple with
+                  profiles, booking details, helpful support, and a
                   community-first way to connect.
                 </p>
 
