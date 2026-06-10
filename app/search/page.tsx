@@ -116,14 +116,21 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
 
 const GURU_SELECT_ATTEMPTS = ["*"];
 
-/**
- * Public Guru profile route.
- *
- * View Guru Profile = public browsing.
- * Book This Guru = booking flow, which can require login later.
- */
 const PUBLIC_GURU_PROFILE_BASE_PATH = "/guru";
 const BOOK_GURU_BASE_PATH = "/book";
+
+const FILL_IN_GURU_NAMES = new Set([
+  "avery",
+  "caleb",
+  "darius",
+  "emma",
+  "jason",
+  "maya",
+  "nina",
+  "olivia",
+  "sofia",
+  "suzy",
+]);
 
 function Card({
   children,
@@ -312,6 +319,39 @@ function getGuruRateDisplay(
 
 function getGuruName(guru: GuruRow) {
   return guru.display_name || guru.full_name || "Guru";
+}
+
+function normalizeFillInMatchValue(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function isFillInGuru(guru: GuruRow) {
+  const values = [
+    guru.display_name,
+    guru.full_name,
+    guru.slug,
+    typeof guru.email === "string" ? guru.email.split("@")[0] : "",
+  ];
+
+  return values
+    .map((value) => normalizeFillInMatchValue(value))
+    .filter(Boolean)
+    .flatMap((value) => {
+      const firstName = value.split(" ")[0] || "";
+      const compact = value.replace(/\s+/g, "");
+      return [value, firstName, compact].filter(Boolean);
+    })
+    .some((candidate) => {
+      if (FILL_IN_GURU_NAMES.has(candidate)) return true;
+
+      return Array.from(FILL_IN_GURU_NAMES).some((name) =>
+        candidate.startsWith(name),
+      );
+    });
 }
 
 function getGuruPhotoUrl(guru: GuruRow) {
@@ -1635,6 +1675,7 @@ function SearchPageContent() {
                         String(guru.slug || "").toLowerCase() ===
                           selectedGuruSlug.toLowerCase()),
                   );
+                  const bookingDisabled = isFillInGuru(guru);
 
                   return (
                     <Card
@@ -1797,15 +1838,26 @@ function SearchPageContent() {
                               View Guru Profile
                             </Link>
 
-                            <Link
-                              href={getBookGuruHref(guru)}
-                              onClick={() => {
-                                trackBookingCtaClick(guru);
-                              }}
-                              className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                            >
-                              Book This Guru
-                            </Link>
+                            {bookingDisabled ? (
+                              <button
+                                type="button"
+                                disabled
+                                aria-disabled="true"
+                                className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white opacity-55"
+                              >
+                                Book This Guru
+                              </button>
+                            ) : (
+                              <Link
+                                href={getBookGuruHref(guru)}
+                                onClick={() => {
+                                  trackBookingCtaClick(guru);
+                                }}
+                                className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                              >
+                                Book This Guru
+                              </Link>
+                            )}
                           </div>
                         </div>
                       </div>

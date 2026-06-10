@@ -12,6 +12,19 @@ const SITE_FONT_STYLE = {
   fontWeight: 300,
 };
 
+const FILL_IN_GURU_NAMES = new Set([
+  "avery",
+  "caleb",
+  "darius",
+  "emma",
+  "jason",
+  "maya",
+  "nina",
+  "olivia",
+  "sofia",
+  "suzy",
+]);
+
 type GuruProfile = {
   id?: string | number | null;
   user_id?: string | null;
@@ -204,6 +217,43 @@ function normalizeRole(value?: string | null) {
 
 function cleanIdentifier(value?: string | null) {
   return decodeURIComponent(String(value || "").trim());
+}
+
+function normalizeFillInMatchValue(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function getFillInNameCandidates(profile: GuruProfile | null) {
+  const values = [
+    profile?.display_name,
+    profile?.full_name,
+    profile?.name,
+    profile?.slug,
+    profile?.email?.split("@")[0],
+  ];
+
+  return values
+    .map((value) => normalizeFillInMatchValue(value))
+    .filter(Boolean)
+    .flatMap((value) => {
+      const firstName = value.split(" ")[0] || "";
+      const compact = value.replace(/\s+/g, "");
+      return [value, firstName, compact].filter(Boolean);
+    });
+}
+
+function isFillInGuruProfile(profile: GuruProfile | null) {
+  return getFillInNameCandidates(profile).some((candidate) => {
+    if (FILL_IN_GURU_NAMES.has(candidate)) return true;
+
+    return Array.from(FILL_IN_GURU_NAMES).some((name) =>
+      candidate.startsWith(name),
+    );
+  });
 }
 
 function isLikelyUuid(value: string) {
@@ -1217,7 +1267,11 @@ function GuruAvatar({
     return (
       <div className="h-40 w-40 overflow-hidden rounded-full border-[7px] border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.16)] lg:h-48 lg:w-48">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
+        <img
+          src={imageUrl}
+          alt={name}
+          className="h-full w-full object-cover object-center"
+        />
       </div>
     );
   }
@@ -1238,15 +1292,19 @@ function PublicGuruHeroImage({
 }) {
   if (imageUrl) {
     return (
-      <div className="h-full min-h-[380px] w-full overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
+      <div className="h-[360px] w-full overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
+        <img
+          src={imageUrl}
+          alt={name}
+          className="h-full w-full object-cover object-center"
+        />
       </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-[380px] w-full items-center justify-center rounded-[2rem] border border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-7xl font-black text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
+    <div className="flex h-[360px] w-full items-center justify-center rounded-[2rem] border border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-7xl font-black text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]">
       {getInitials(name)}
     </div>
   );
@@ -1866,6 +1924,35 @@ function GuruAcademyCard({ progress }: { progress: GuruUniversityProgress }) {
   );
 }
 
+function PublicBookButton({
+  disabled,
+  href,
+  className,
+}: {
+  disabled: boolean;
+  href: string;
+  className: string;
+}) {
+  if (disabled) {
+    return (
+      <button
+        type="button"
+        disabled
+        aria-disabled="true"
+        className={`${className} cursor-not-allowed opacity-55`}
+      >
+        Book This Guru
+      </button>
+    );
+  }
+
+  return (
+    <Link href={href} className={className}>
+      Book This Guru
+    </Link>
+  );
+}
+
 function PublicGuruProfilePage({
   guruProfile,
   serviceRates,
@@ -1880,8 +1967,6 @@ function PublicGuruProfilePage({
   const imageUrl = getGuruImage(guruProfile);
   const location = getGuruLocation(guruProfile);
   const services = normalizeServices(guruProfile.services);
-  const profileCompletion = calculateProfileCompletion(guruProfile);
-  const bookable = isBookable(guruProfile);
   const baseRate = getBaseRate(guruProfile);
   const rating = getGuruRating(guruProfile);
   const reviewCount = getReviewCount(guruProfile);
@@ -1889,6 +1974,9 @@ function PublicGuruProfilePage({
   const serviceRadius = getGuruRadius(guruProfile);
   const bookHref = getBookHref(guruProfile, identifier);
   const messageHref = getMessageHref(guruProfile, identifier);
+  const bookable = isBookable(guruProfile);
+  const isFillInGuru = isFillInGuruProfile(guruProfile);
+  const disableBooking = isFillInGuru;
 
   return (
     <main
@@ -1935,17 +2023,16 @@ function PublicGuruProfilePage({
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
-                  {bookable ? "✅ Bookable" : "📝 Profile setup"}
+                  {bookable && !disableBooking ? "✅ Bookable" : "📝 Profile setup"}
                 </div>
               </div>
 
               <div className="mt-8 flex flex-wrap gap-4">
-                <Link
+                <PublicBookButton
+                  disabled={disableBooking}
                   href={bookHref}
                   className="rounded-[1.2rem] bg-[#07132f] px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
-                >
-                  Book This Guru
-                </Link>
+                />
 
                 <Link
                   href={messageHref}
@@ -1977,26 +2064,14 @@ function PublicGuruProfilePage({
             value={rating > 0 ? rating.toFixed(1) : "New"}
             icon="⭐"
           />
-          <StatCard
-            label="Reviews"
-            value={reviewCount}
-            icon="💬"
-          />
+          <StatCard label="Reviews" value={reviewCount} icon="💬" />
           <StatCard
             label="Experience"
             value={experienceYears > 0 ? `${experienceYears}+` : "Listed"}
             icon="🐕"
           />
-          <StatCard
-            label="Rate"
-            value={baseRate || "By service"}
-            icon="💚"
-          />
-          <StatCard
-            label="Service Area"
-            value={`${serviceRadius} mi`}
-            icon="📍"
-          />
+          <StatCard label="Rate" value={baseRate || "By service"} icon="💚" />
+          <StatCard label="Service Area" value={`${serviceRadius} mi`} icon="📍" />
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
@@ -2101,8 +2176,7 @@ function PublicGuruProfilePage({
               </h3>
 
               <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 !text-slate-700">
-                You can still start a booking request and confirm details with
-                this Guru.
+                Profile details are available while booking setup is finalized.
               </p>
             </div>
           )}
@@ -2116,21 +2190,20 @@ function PublicGuruProfilePage({
               </p>
 
               <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                Book trusted local pet care with {firstName}
+                View trusted local pet care with {firstName}
               </h2>
 
               <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
-                View the profile, check services, and start a care request when
-                you are ready.
+                View the profile, check services, and search more local Gurus
+                when you are ready.
               </p>
             </div>
 
-            <Link
+            <PublicBookButton
+              disabled={disableBooking}
               href={bookHref}
               className="flex min-h-[58px] items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-4 text-base font-black !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] hover:bg-[#0b1436]"
-            >
-              Book This Guru
-            </Link>
+            />
 
             <Link
               href="/search"
