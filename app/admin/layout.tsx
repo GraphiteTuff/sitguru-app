@@ -39,6 +39,7 @@ const adminRoutes = {
   bookings: "/admin/bookings",
   petParents: "/admin/customers",
   gurus: "/admin/gurus",
+  ambassadors: "/admin/ambassadors",
   messages: "/admin/messages",
   settings: "/admin/settings",
   trustSafety: "/admin/background-checks",
@@ -80,6 +81,7 @@ const navSections = [
       { label: "Bookings", href: adminRoutes.bookings, icon: CalendarDays },
       { label: "Pet Parents", href: adminRoutes.petParents, icon: Users },
       { label: "Gurus", href: adminRoutes.gurus, icon: PawPrint },
+      { label: "Ambassadors", href: adminRoutes.ambassadors, icon: UserPlus },
       { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
       {
         label: "SitGuru University",
@@ -181,6 +183,7 @@ const topHeaderLinks = [
   { label: "Bookings", href: adminRoutes.bookings },
   { label: "Pet Parents", href: adminRoutes.petParents },
   { label: "Gurus", href: adminRoutes.gurus },
+  { label: "Ambassadors", href: adminRoutes.ambassadors },
   { label: "Human Resources", href: adminRoutes.hr },
   { label: "SitGuru University", href: adminRoutes.universityTraining },
   { label: "Trust & Safety", href: adminRoutes.trustSafety },
@@ -201,6 +204,13 @@ const mobileQuickLinks = [
     href: adminRoutes.gurus,
     icon: PawPrint,
     description: "Applicants and profiles",
+    featured: true,
+  },
+  {
+    label: "Ambassadors",
+    href: adminRoutes.ambassadors,
+    icon: UserPlus,
+    description: "Referrals and onboarding",
     featured: true,
   },
   {
@@ -227,6 +237,7 @@ const mobileQuickLinks = [
 ];
 
 const mobileGrowthLinks = [
+  { label: "Ambassadors", href: adminRoutes.ambassadors, icon: UserPlus },
   { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
   {
     label: "SitGuru University",
@@ -502,6 +513,7 @@ function AdminFooter() {
         { label: "Bookings", href: adminRoutes.bookings },
         { label: "Pet Parents", href: adminRoutes.petParents },
         { label: "Gurus", href: adminRoutes.gurus },
+        { label: "Ambassadors", href: adminRoutes.ambassadors },
         { label: "Human Resources", href: adminRoutes.hr },
         { label: "SitGuru University", href: adminRoutes.universityTraining },
         {
@@ -578,9 +590,10 @@ function AdminFooter() {
           <AdminLogo />
 
           <p className="mt-4 max-w-md text-sm font-semibold leading-6 text-slate-600">
-            SitGuru Admin keeps bookings, Gurus, Pet Parents, messages,
-            financials, training, academies, programs, referrals, partners,
-            taxes, and reporting connected in one clean operating center.
+            SitGuru Admin keeps bookings, Gurus, Pet Parents, Ambassadors,
+            messages, financials, training, academies, programs, referrals,
+            partners, taxes, and reporting connected in one clean operating
+            center.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
@@ -711,9 +724,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </p>
 
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">
-                  Oversee Pet Parents, Gurus, approvals, bookings, payments,
-                  hiring, growth, training, academies, reporting, taxes, and
-                  messages.
+                  Oversee Pet Parents, Gurus, Ambassadors, approvals, bookings,
+                  payments, hiring, growth, training, academies, reporting,
+                  taxes, and messages.
                 </p>
               </div>
             </div>
