@@ -499,7 +499,7 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
                 </Link>
 
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-700 sm:text-xs">
-                  SitGuru Student Ambassador Training
+                  SitGuru Ambassador Training
                 </p>
                 <h1 className="mt-1 text-3xl font-black tracking-tight text-green-950 sm:text-5xl">
                   {firstName}, continue onboarding
