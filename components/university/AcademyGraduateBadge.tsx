@@ -26,35 +26,31 @@ export default function AcademyGraduateBadge({
 
   if (variant === "photo-overlay") {
     return (
-      <div
-        className={`inline-flex items-center justify-center rounded-3xl border border-white/90 bg-white/92 p-2.5 shadow-[0_12px_28px_rgba(15,23,42,0.24)] backdrop-blur ${className}`}
-      >
-        <Image
-          src={badge.imagePath}
-          alt={`${badge.shortLabel} badge`}
-          width={112}
-          height={112}
-          className="h-[112px] w-[112px] shrink-0 object-contain"
-          unoptimized
-        />
-      </div>
+      <Image
+        src={badge.imagePath}
+        alt={`${badge.shortLabel} badge`}
+        width={124}
+        height={124}
+        className={`h-[124px] w-[124px] shrink-0 object-contain drop-shadow-[0_14px_22px_rgba(0,0,0,0.32)] ${className}`}
+        unoptimized
+      />
     );
   }
 
   if (variant === "photo-strip") {
     return (
       <div
-        className={`inline-flex max-w-[315px] items-center gap-2.5 rounded-full border border-white/85 bg-white/94 px-3.5 py-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.18)] backdrop-blur ${className}`}
+        className={`inline-flex max-w-[360px] items-center gap-3 rounded-2xl border border-white/20 bg-slate-950/78 px-4 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.28)] backdrop-blur-md ${className}`}
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-lg text-white shadow-sm">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-xl text-white shadow-sm">
           🎓
         </span>
 
         <span className="min-w-0">
-          <span className="block truncate text-[12px] font-black leading-4 text-[#07132f]">
+          <span className="block text-[13px] font-black leading-4 text-white">
             {badge.label}
           </span>
-          <span className="block truncate text-[10.5px] font-black leading-4 text-slate-700">
+          <span className="mt-0.5 block text-[11px] font-black leading-4 text-emerald-50">
             {badge.completedThroughText}
           </span>
         </span>
