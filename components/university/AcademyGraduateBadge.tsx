@@ -27,20 +27,16 @@ export default function AcademyGraduateBadge({
   if (variant === "photo-overlay") {
     return (
       <div
-        className={`inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/92 px-2.5 py-1.5 shadow-[0_8px_18px_rgba(15,23,42,0.14)] backdrop-blur ${className}`}
+        className={`inline-flex items-center justify-center rounded-3xl border border-white/90 bg-white/92 p-2.5 shadow-[0_12px_28px_rgba(15,23,42,0.24)] backdrop-blur ${className}`}
       >
         <Image
           src={badge.imagePath}
           alt={`${badge.shortLabel} badge`}
-          width={30}
-          height={30}
-          className="h-[30px] w-[30px] shrink-0 object-contain"
+          width={112}
+          height={112}
+          className="h-[112px] w-[112px] shrink-0 object-contain"
           unoptimized
         />
-
-        <span className="max-w-[92px] text-[10px] font-black uppercase leading-[1.05] tracking-[0.08em] text-slate-950">
-          {badge.shortLabel}
-        </span>
       </div>
     );
   }
@@ -48,22 +44,17 @@ export default function AcademyGraduateBadge({
   if (variant === "photo-strip") {
     return (
       <div
-        className={`inline-flex max-w-[235px] items-center gap-2 rounded-full border border-white/80 bg-white/90 px-3 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.14)] backdrop-blur ${className}`}
+        className={`inline-flex max-w-[315px] items-center gap-2.5 rounded-full border border-white/85 bg-white/94 px-3.5 py-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.18)] backdrop-blur ${className}`}
       >
-        <Image
-          src={badge.imagePath}
-          alt={`${badge.shortLabel} badge`}
-          width={30}
-          height={30}
-          className="h-[30px] w-[30px] shrink-0 object-contain"
-          unoptimized
-        />
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-lg text-white shadow-sm">
+          🎓
+        </span>
 
         <span className="min-w-0">
-          <span className="block truncate text-xs font-black leading-4 text-[#07132f]">
+          <span className="block truncate text-[12px] font-black leading-4 text-[#07132f]">
             {badge.label}
           </span>
-          <span className="block truncate text-[10px] font-bold leading-4 text-slate-600">
+          <span className="block truncate text-[10.5px] font-black leading-4 text-slate-700">
             {badge.completedThroughText}
           </span>
         </span>
