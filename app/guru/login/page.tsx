@@ -262,6 +262,14 @@ export default function GuruLoginPage() {
               </Link>
 
               <Link
+                href="/ambassador/login"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3.5 text-center text-[#047857] shadow-sm transition hover:border-emerald-300 hover:bg-white hover:text-[#065f46] sm:col-span-2"
+              >
+                <ShieldCheck className="h-4 w-4 stroke-[2.5]" />
+                Ambassador Login
+              </Link>
+
+              <Link
                 href="/"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-center text-[#061525] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-[#047857] sm:col-span-2"
               >

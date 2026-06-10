@@ -176,6 +176,14 @@ function isValidZipCode(value: string) {
   return /^\d{5}$/.test(value.trim());
 }
 
+function normalizeAmbassadorReferralCode(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, "")
+    .slice(0, 32);
+}
+
 function getDefaultNextPath(intent: AccountIntent) {
   if (intent === "guru") return "/guru/dashboard/profile?step=1";
   if (intent === "both") return "/guru/dashboard/profile?step=1";
@@ -325,6 +333,16 @@ function SignupPageContent() {
 
   const nextPath = useMemo(() => searchParams.get("next") || "", [searchParams]);
 
+  const startingAmbassadorReferralCode = useMemo(() => {
+    return normalizeAmbassadorReferralCode(
+      searchParams.get("ambassador") ||
+        searchParams.get("ambassador_code") ||
+        searchParams.get("ref") ||
+        searchParams.get("referral") ||
+        "",
+    );
+  }, [searchParams]);
+
   const [mode, setMode] = useState<SignupMode>(startingMode);
   const [intent, setIntent] = useState<AccountIntent>(startingIntent);
 
@@ -332,6 +350,9 @@ function SignupPageContent() {
   const [email, setEmail] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [password, setPassword] = useState("");
+  const [ambassadorReferralCode, setAmbassadorReferralCode] = useState(
+    startingAmbassadorReferralCode,
+  );
   const [showPassword, setShowPassword] = useState(false);
 
   const [phone, setPhone] = useState("");
@@ -368,7 +389,9 @@ function SignupPageContent() {
         options: {
           redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(
             redirectPath,
-          )}&intent=${intent}`,
+          )}&intent=${intent}&ambassador_referral_code=${encodeURIComponent(
+            normalizeAmbassadorReferralCode(ambassadorReferralCode),
+          )}`,
           queryParams: {
             prompt: "select_account",
           },
@@ -395,6 +418,9 @@ function SignupPageContent() {
       const { cleanName, firstName, lastName } = getNameParts(fullName);
       const cleanEmail = email.trim().toLowerCase();
       const cleanZipCode = zipCode.trim();
+      const cleanAmbassadorReferralCode = normalizeAmbassadorReferralCode(
+        ambassadorReferralCode,
+      );
 
       if (!isValidFullName(cleanName)) {
         setError("Please enter your real first and last name.");
@@ -444,6 +470,7 @@ function SignupPageContent() {
             signup_source: "sitguru_signup_page",
             signup_status: "pending_email_verification",
             zip_code: cleanZipCode,
+            ambassador_referral_code: cleanAmbassadorReferralCode || null,
           },
         },
       });
@@ -499,6 +526,9 @@ function SignupPageContent() {
       const { cleanName, firstName, lastName } = getNameParts(fullName);
       const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
+      const cleanAmbassadorReferralCode = normalizeAmbassadorReferralCode(
+        ambassadorReferralCode,
+      );
 
       if (!isValidFullName(cleanName)) {
         setError("Please enter your real first and last name before requesting a phone code.");
@@ -534,6 +564,7 @@ function SignupPageContent() {
             signup_source: "sitguru_phone_signup",
             signup_status: "pending_phone_verification",
             zip_code: cleanZipCode,
+            ambassador_referral_code: cleanAmbassadorReferralCode || null,
           },
         },
       });
@@ -595,6 +626,12 @@ function SignupPageContent() {
       });
 
       if (verifyError) throw verifyError;
+
+      await supabase.auth.updateUser({
+        data: {
+          ambassador_referral_code: cleanAmbassadorReferralCode || null,
+        },
+      });
 
       const userId = data.user?.id;
 
@@ -907,6 +944,34 @@ function SignupPageContent() {
                     />
                   </div>
 
+
+                  <div>
+                    <label
+                      htmlFor="ambassador-referral-code"
+                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
+                    >
+                      Ambassador referral code
+                    </label>
+                    <input
+                      id="ambassador-referral-code"
+                      value={ambassadorReferralCode}
+                      onChange={(event) =>
+                        setAmbassadorReferralCode(
+                          normalizeAmbassadorReferralCode(event.target.value),
+                        )
+                      }
+                      inputMode="text"
+                      maxLength={32}
+                      className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold uppercase text-slate-950 outline-none transition placeholder:normal-case placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Example: KAMERINCOX"
+                      autoComplete="off"
+                    />
+                    <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+                      Optional — enter this if a SitGuru Ambassador referred
+                      you.
+                    </p>
+                  </div>
+
                   <div>
                     <label
                       htmlFor="password"
@@ -1061,6 +1126,34 @@ function SignupPageContent() {
                     />
                   </div>
 
+
+                  <div>
+                    <label
+                      htmlFor="phone-ambassador-referral-code"
+                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
+                    >
+                      Ambassador referral code
+                    </label>
+                    <input
+                      id="phone-ambassador-referral-code"
+                      value={ambassadorReferralCode}
+                      onChange={(event) =>
+                        setAmbassadorReferralCode(
+                          normalizeAmbassadorReferralCode(event.target.value),
+                        )
+                      }
+                      inputMode="text"
+                      maxLength={32}
+                      className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold uppercase text-slate-950 outline-none transition placeholder:normal-case placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Example: KAMERINCOX"
+                      autoComplete="off"
+                    />
+                    <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+                      Optional — enter this if a SitGuru Ambassador referred
+                      you.
+                    </p>
+                  </div>
+
                   {phoneCodeSent ? (
                     <div>
                       <label
@@ -1183,12 +1276,21 @@ function SignupPageContent() {
                   </Link>
                 </p>
 
-                <Link
-                  href="/"
-                  className="font-black text-emerald-700 hover:text-emerald-900"
-                >
-                  Back to SitGuru
-                </Link>
+                <div className="flex flex-col items-center gap-2 sm:items-end">
+                  <Link
+                    href="/ambassador/login"
+                    className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-5 py-2 text-sm font-black text-emerald-800 transition hover:border-emerald-300 hover:bg-white"
+                  >
+                    Ambassador Login
+                  </Link>
+
+                  <Link
+                    href="/"
+                    className="font-black text-emerald-700 hover:text-emerald-900"
+                  >
+                    Back to SitGuru
+                  </Link>
+                </div>
               </div>
             </div>
           </div>

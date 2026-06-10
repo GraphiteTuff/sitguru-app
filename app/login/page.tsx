@@ -363,6 +363,24 @@ function LoginPageContent() {
               </Link>
             </div>
 
+            <div className="mt-4 rounded-3xl border border-emerald-100 bg-white p-5">
+              <p className="text-sm font-black text-slate-950">
+                Ambassador Candidate?
+              </p>
+
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                Use the Ambassador portal if you are joining SitGuru as an
+                Ambassador Candidate or representative.
+              </p>
+
+              <Link
+                href="/ambassador/login"
+                className="mt-4 inline-flex min-h-[52px] w-full items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-black text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
+              >
+                Ambassador Login
+              </Link>
+            </div>
+
             <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-5">
               <p className="text-sm font-semibold leading-6 text-slate-700">
                 New to SitGuru? Create a free account to book trusted pet care,
