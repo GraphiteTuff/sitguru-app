@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
+import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +12,6 @@ const SITE_FONT_STYLE = {
     '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   fontWeight: 300,
 };
-
-const CERTIFIED_GURU_BADGE_PATH =
-  "/images/badges/sitguru-certified-guru-badge.png";
 
 const FILL_IN_GURU_NAMES = new Set([
   "avery",
@@ -512,7 +510,9 @@ function formatCurrencyAmount(value: number | string | null | undefined) {
 function getBaseRate(profile: GuruProfile | null) {
   if (!profile) return "";
 
-  return formatCurrencyAmount(profile.hourly_rate ?? profile.rate ?? profile.price);
+  return formatCurrencyAmount(
+    profile.hourly_rate ?? profile.rate ?? profile.price,
+  );
 }
 
 function getGuruRating(profile: GuruProfile | null) {
@@ -1287,26 +1287,18 @@ function GuruAvatar({
         )}
 
         {isAcademyGraduate ? (
-          <div className="absolute -left-3 top-2 flex h-16 w-16 items-center justify-center rounded-2xl border-4 border-white bg-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={CERTIFIED_GURU_BADGE_PATH}
-              alt="Certified Guru badge"
-              className="h-12 w-12 object-contain"
-            />
+          <div className="absolute -left-3 top-3 z-10">
+            <AcademyGraduateBadge academyType="guru" variant="mini" />
           </div>
         ) : null}
       </div>
 
       {isAcademyGraduate ? (
-        <div className="mt-3 rounded-2xl border border-white/80 bg-white/90 px-4 py-2 text-center shadow-sm">
-          <p className="text-sm font-black !text-emerald-800">
-            Guru Academy Graduate
-          </p>
-          <p className="text-xs font-bold !text-slate-600">
-            Completed through SitGuru University
-          </p>
-        </div>
+        <AcademyGraduateBadge
+          academyType="guru"
+          variant="photo-strip"
+          className="mt-3"
+        />
       ) : null}
     </div>
   );
@@ -1333,34 +1325,15 @@ function PublicGuruHeroImage({
 
         {isAcademyGraduate ? (
           <>
-            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-2xl border border-white/80 bg-white/92 px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.16)] backdrop-blur">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={CERTIFIED_GURU_BADGE_PATH}
-                alt="Certified Guru badge"
-                className="h-9 w-9 object-contain"
+            <div className="absolute left-4 top-4 z-10">
+              <AcademyGraduateBadge
+                academyType="guru"
+                variant="photo-overlay"
               />
-              <span className="text-xs font-black uppercase leading-4 tracking-[0.08em] !text-slate-950">
-                Certified
-                <br />
-                Guru
-              </span>
             </div>
 
-            <div className="absolute inset-x-4 bottom-4 z-10 rounded-[1.5rem] border border-white/80 bg-white/88 px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xl text-white shadow-sm">
-                  🎓
-                </div>
-                <div>
-                  <p className="text-sm font-black !text-[#07132f]">
-                    Guru Academy Graduate
-                  </p>
-                  <p className="mt-0.5 text-xs font-bold !text-slate-700">
-                    Completed Guru Academy through SitGuru University.
-                  </p>
-                </div>
-              </div>
+            <div className="absolute bottom-4 left-4 z-10">
+              <AcademyGraduateBadge academyType="guru" variant="photo-strip" />
             </div>
           </>
         ) : null}
@@ -1374,34 +1347,15 @@ function PublicGuruHeroImage({
 
       {isAcademyGraduate ? (
         <>
-          <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-2xl border border-white/80 bg-white/92 px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.16)] backdrop-blur">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={CERTIFIED_GURU_BADGE_PATH}
-              alt="Certified Guru badge"
-              className="h-9 w-9 object-contain"
+          <div className="absolute left-4 top-4 z-10">
+            <AcademyGraduateBadge
+              academyType="guru"
+              variant="photo-overlay"
             />
-            <span className="text-xs font-black uppercase leading-4 tracking-[0.08em] !text-slate-950">
-              Certified
-              <br />
-              Guru
-            </span>
           </div>
 
-          <div className="absolute inset-x-4 bottom-4 z-10 rounded-[1.5rem] border border-white/80 bg-white/88 px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xl text-white shadow-sm">
-                🎓
-              </div>
-              <div>
-                <p className="text-sm font-black !text-[#07132f]">
-                  Guru Academy Graduate
-                </p>
-                <p className="mt-0.5 text-xs font-bold !text-slate-700">
-                  Completed Guru Academy through SitGuru University.
-                </p>
-              </div>
-            </div>
+          <div className="absolute bottom-4 left-4 z-10">
+            <AcademyGraduateBadge academyType="guru" variant="photo-strip" />
           </div>
         </>
       ) : null}
@@ -2121,9 +2075,7 @@ function PublicGuruProfilePage({
                 </div>
 
                 {isAcademyGraduate ? (
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm">
-                    🎓 Guru Academy Graduate
-                  </div>
+                  <AcademyGraduateBadge academyType="guru" variant="chip" />
                 ) : null}
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
@@ -2608,12 +2560,7 @@ async function GuruDashboardView({
               <div className="rounded-[1.5rem] border border-cyan-200 bg-white/70 p-5 text-center">
                 <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-cyan-50 ring-1 ring-cyan-100">
                   {universityProgress.isComplete ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={CERTIFIED_GURU_BADGE_PATH}
-                      alt="Certified Guru badge"
-                      className="h-20 w-20 object-contain"
-                    />
+                    <AcademyGraduateBadge academyType="guru" variant="mini" />
                   ) : (
                     <span className="text-4xl">🛡️</span>
                   )}
