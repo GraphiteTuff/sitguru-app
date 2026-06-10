@@ -117,13 +117,12 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
 const GURU_SELECT_ATTEMPTS = ["*"];
 
 /**
- * Public Guru profile routes must not live under /guru because that section is
- * used for the protected Guru dashboard/login area.
+ * Public Guru profile route.
  *
  * View Guru Profile = public browsing.
  * Book This Guru = booking flow, which can require login later.
  */
-const PUBLIC_GURU_PROFILE_BASE_PATH = "/gurus";
+const PUBLIC_GURU_PROFILE_BASE_PATH = "/guru";
 const BOOK_GURU_BASE_PATH = "/book";
 
 function Card({
