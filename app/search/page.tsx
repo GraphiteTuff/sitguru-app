@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import ProviderMap from "@/components/ProviderMap";
+import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
@@ -87,6 +88,13 @@ type ZipLookupResult = {
   stateName?: string;
   latitude: number | null;
   longitude: number | null;
+};
+
+type AcademyCertificationRow = {
+  user_id: string | null;
+  badge_status?: string | null;
+  certificate_status?: string | null;
+  issued_at?: string | null;
 };
 
 const SERVICE_OPTIONS = [
@@ -392,6 +400,35 @@ function getGuruAnalyticsId(guru: GuruRow) {
   return String(guru.user_id || guru.id || "");
 }
 
+function getGuruCertificationUserId(guru: GuruRow) {
+  return String(guru.user_id || "").trim();
+}
+
+function certificationStatusMeansComplete(value?: string | null) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  return [
+    "issued",
+    "complete",
+    "completed",
+    "done",
+    "approved",
+    "certified",
+    "graduate",
+    "graduated",
+  ].includes(normalized);
+}
+
+function certificationRowMeansComplete(row: AcademyCertificationRow) {
+  return Boolean(
+    row.issued_at ||
+      certificationStatusMeansComplete(row.badge_status) ||
+      certificationStatusMeansComplete(row.certificate_status),
+  );
+}
+
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
 
@@ -682,15 +719,25 @@ function enrichGuruWithDistance(
 function GuruResultPhoto({
   photoUrl,
   guruName,
+  isAcademyCertified,
 }: {
   photoUrl: string;
   guruName: string;
+  isAcademyCertified: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showPhoto = Boolean(photoUrl) && !imageFailed;
 
   return (
-    <div className="h-80 w-full shrink-0 overflow-hidden bg-slate-100 md:h-full md:min-h-0 md:w-[300px] md:self-stretch xl:w-[320px]">
+    <div className="relative h-80 w-full shrink-0 overflow-hidden bg-slate-100 md:h-full md:min-h-0 md:w-[300px] md:self-stretch xl:w-[320px]">
+      {isAcademyCertified ? (
+        <AcademyGraduateBadge
+          academyType="guru"
+          variant="photo-overlay"
+          className="absolute left-5 top-5 z-10 h-[74px] w-[74px] md:h-[86px] md:w-[86px]"
+        />
+      ) : null}
+
       {showPhoto ? (
         <img
           src={photoUrl}
@@ -832,6 +879,9 @@ function SearchPageContent() {
   const selectedGuruSlug = searchParams.get("slug") || "";
 
   const [gurus, setGurus] = useState<GuruRow[]>([]);
+  const [certifiedGuruUserIds, setCertifiedGuruUserIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [serviceRatesByGuru, setServiceRatesByGuru] = useState<
     Record<string, GuruServiceRate[]>
   >({});
@@ -935,6 +985,14 @@ function SearchPageContent() {
         .map((guru) => String(guru.id || ""))
         .filter(Boolean);
 
+      const guruUserIds = Array.from(
+        new Set(
+          guruRows
+            .map((guru) => getGuruCertificationUserId(guru))
+            .filter(Boolean),
+        ),
+      );
+
       if (guruIds.length > 0) {
         const { data: serviceRateRows, error: serviceRatesError } =
           await supabase
@@ -968,6 +1026,34 @@ function SearchPageContent() {
         setServiceRatesByGuru({});
       }
 
+      if (guruUserIds.length > 0) {
+        const { data: certificationRows, error: certificationsError } =
+          await supabase
+            .from("academy_certifications")
+            .select("user_id, badge_status, certificate_status, issued_at")
+            .eq("academy_type", "guru")
+            .in("user_id", guruUserIds);
+
+        if (certificationsError) {
+          console.warn(
+            "Could not load Guru Academy certifications for search cards:",
+            certificationsError.message,
+          );
+          setCertifiedGuruUserIds(new Set());
+        } else {
+          const completedUserIds = new Set(
+            ((certificationRows || []) as AcademyCertificationRow[])
+              .filter(certificationRowMeansComplete)
+              .map((row) => String(row.user_id || "").trim())
+              .filter(Boolean),
+          );
+
+          setCertifiedGuruUserIds(completedUserIds);
+        }
+      } else {
+        setCertifiedGuruUserIds(new Set());
+      }
+
       setGurus(guruRows);
       setLoading(false);
 
@@ -978,6 +1064,9 @@ function SearchPageContent() {
         metadata: {
           guru_count: guruRows.length,
           guru_count_with_map_location: guruRows.filter(hasMapLocation).length,
+          guru_count_with_academy_badge: guruRows.filter((guru) =>
+            certifiedGuruUserIds.has(getGuruCertificationUserId(guru)),
+          ).length,
           has_initial_service: Boolean(initialService),
           has_initial_zip: Boolean(initialZip),
           has_initial_city: Boolean(initialCity),
@@ -1676,6 +1765,9 @@ function SearchPageContent() {
                           selectedGuruSlug.toLowerCase()),
                   );
                   const bookingDisabled = isFillInGuru(guru);
+                  const isAcademyCertified = certifiedGuruUserIds.has(
+                    getGuruCertificationUserId(guru),
+                  );
 
                   return (
                     <Card
@@ -1695,6 +1787,7 @@ function SearchPageContent() {
                         <GuruResultPhoto
                           photoUrl={photoUrl}
                           guruName={guruName}
+                          isAcademyCertified={isAcademyCertified}
                         />
 
                         <div className="flex min-w-0 flex-1 flex-col p-5 md:h-full md:min-h-0 lg:p-6">
@@ -1721,6 +1814,13 @@ function SearchPageContent() {
                                       Trusted
                                     </span>
                                   )}
+
+                                  {isAcademyCertified ? (
+                                    <AcademyGraduateBadge
+                                      academyType="guru"
+                                      variant="mini"
+                                    />
+                                  ) : null}
 
                                   {guruHasMapLocation ? (
                                     <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
