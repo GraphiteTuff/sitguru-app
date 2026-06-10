@@ -1,1 +1,141 @@
-<img src="/mnt/data/guru-certified-badge.svg" alt="Guru Certified Badge" />
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="outerGradient" x1="190" y1="110" x2="1010" y2="1090" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00D69F"/>
+      <stop offset="0.52" stop-color="#13BFAF"/>
+      <stop offset="1" stop-color="#7BCBFF"/>
+    </linearGradient>
+
+    <linearGradient id="innerGradient" x1="305" y1="220" x2="895" y2="980" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.48" stop-color="#ECFDF5"/>
+      <stop offset="1" stop-color="#E0F2FE"/>
+    </linearGradient>
+
+    <linearGradient id="ribbonGradient" x1="245" y1="646" x2="955" y2="744" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07132F"/>
+      <stop offset="1" stop-color="#063A5F"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="94" y="42" width="1012" height="1116" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#07132F" flood-opacity="0.18"/>
+    </filter>
+
+    <filter id="ribbonShadow" x="200" y="610" width="800" height="190" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#07132F" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#softShadow)">
+    <path
+      d="M600 76L945 275C1004.5 309.4 1041 372.9 1041 441.6V758.4C1041 827.1 1004.5 890.6 945 925L600 1124L255 925C195.5 890.6 159 827.1 159 758.4V441.6C159 372.9 195.5 309.4 255 275L600 76Z"
+      fill="url(#outerGradient)"
+    />
+
+    <path
+      d="M600 139L893 308.2C933.1 331.4 957.8 374.2 957.8 420.5V779.5C957.8 825.8 933.1 868.6 893 891.8L600 1061L307 891.8C266.9 868.6 242.2 825.8 242.2 779.5V420.5C242.2 374.2 266.9 331.4 307 308.2L600 139Z"
+      fill="white"
+      opacity="0.96"
+    />
+
+    <path
+      d="M600 187L854.5 334C878.6 347.9 893.5 373.7 893.5 401.5V798.5C893.5 826.3 878.6 852.1 854.5 866L600 1013L345.5 866C321.4 852.1 306.5 826.3 306.5 798.5V401.5C306.5 373.7 321.4 347.9 345.5 334L600 187Z"
+      fill="url(#innerGradient)"
+    />
+
+    <path
+      d="M600 225L822 353.2C834.4 360.3 842 373.6 842 387.9V812.1C842 826.4 834.4 839.7 822 846.8L600 975L378 846.8C365.6 839.7 358 826.4 358 812.1V387.9C358 373.6 365.6 360.3 378 353.2L600 225Z"
+      fill="#FFFFFF"
+      opacity="0.82"
+    />
+  </g>
+
+  <g>
+    <circle cx="600" cy="356" r="88" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="12"/>
+
+    <path
+      d="M600 282C616 297.4 639.2 304 661.3 305.5C665.5 305.8 668.8 309.1 669 313.3C672.8 378.5 649.1 424.4 604.1 449.1C601.5 450.5 598.5 450.5 595.9 449.1C550.9 424.4 527.2 378.5 531 313.3C531.2 309.1 534.5 305.8 538.7 305.5C560.8 304 584 297.4 600 282Z"
+      fill="#059669"
+    />
+
+    <path
+      d="M600 302C612.5 312.1 630 317.4 650 319.4C651.2 366.8 635.5 402.3 600 424.7C564.5 402.3 548.8 366.8 550 319.4C570 317.4 587.5 312.1 600 302Z"
+      fill="#D1FAE5"
+    />
+
+    <path
+      d="M571 365.5L590.5 385L631 337"
+      stroke="#047857"
+      stroke-width="16"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <text
+    x="600"
+    y="536"
+    text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="78"
+    font-weight="600"
+    letter-spacing="4"
+    fill="#07132F"
+  >
+    GURU
+  </text>
+
+  <g filter="url(#ribbonShadow)">
+    <path
+      d="M244 642C244 617.7 263.7 598 288 598H912C936.3 598 956 617.7 956 642V728C956 752.3 936.3 772 912 772H288C263.7 772 244 752.3 244 728V642Z"
+      fill="url(#ribbonGradient)"
+    />
+
+    <path d="M244 686H956" stroke="white" stroke-opacity="0.1" stroke-width="2"/>
+
+    <text
+      x="600"
+      y="721"
+      text-anchor="middle"
+      font-family="Arial, Helvetica, sans-serif"
+      font-size="92"
+      font-weight="900"
+      letter-spacing="12"
+      fill="#FFFFFF"
+    >
+      CERTIFIED
+    </text>
+  </g>
+
+  <g>
+    <path
+      d="M600 806C620.4 882.5 681.5 943.6 758 964C681.5 984.4 620.4 1045.5 600 1122C579.6 1045.5 518.5 984.4 442 964C518.5 943.6 579.6 882.5 600 806Z"
+      fill="#10B981"
+    />
+
+    <path
+      d="M805 788C819.1 840.9 861.1 882.9 914 897C861.1 911.1 819.1 953.1 805 1006C790.9 953.1 748.9 911.1 696 897C748.9 882.9 790.9 840.9 805 788Z"
+      fill="#38BDF8"
+      opacity="0.95"
+    />
+
+    <path
+      d="M600 842C615.5 900.3 661.7 946.5 720 962C661.7 977.5 615.5 1023.7 600 1082C584.5 1023.7 538.3 977.5 480 962C538.3 946.5 584.5 900.3 600 842Z"
+      fill="#FFFFFF"
+      opacity="0.96"
+    />
+
+    <path
+      d="M805 825C815 862.3 844.7 892 882 902C844.7 912 815 941.7 805 979C795 941.7 765.3 912 728 902C765.3 892 795 862.3 805 825Z"
+      fill="#FFFFFF"
+      opacity="0.95"
+    />
+  </g>
+
+  <path
+    d="M600 76L945 275C1004.5 309.4 1041 372.9 1041 441.6V758.4C1041 827.1 1004.5 890.6 945 925L600 1124L255 925C195.5 890.6 159 827.1 159 758.4V441.6C159 372.9 195.5 309.4 255 275L600 76Z"
+    stroke="#047857"
+    stroke-width="18"
+    opacity="0.28"
+  />
+</svg>
