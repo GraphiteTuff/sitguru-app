@@ -1706,7 +1706,12 @@ export default function HomePage() {
 
             <Link
               href="/search"
-              onClick={() => trackHomepageClick("View all Gurus", "/search")}
+              prefetch={false}
+              onClick={(event) => {
+                event.preventDefault();
+                trackHomepageClick("View all Gurus", "/search");
+                window.location.assign("/search");
+              }}
               className="text-xs font-black text-emerald-700 hover:text-emerald-800 hover:underline sm:text-sm"
             >
               View all Gurus
