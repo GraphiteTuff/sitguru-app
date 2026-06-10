@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
+import GuruRecognitionBadge from "@/components/guru/GuruRecognitionBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -1772,7 +1773,20 @@ export default async function GuruDashboardPage() {
               <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] !text-[#07132f]">
                 {name}
               </h2>
-              <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm">
+
+              {universityProgress.isComplete ? (
+                <div className="mt-3">
+                  <GuruRecognitionBadge
+                    label="Certified SitGuru Guru"
+                    sublabel="Guru Academy Graduate"
+                    size="md"
+                    showStars={false}
+                    className="max-w-full justify-center"
+                  />
+                </div>
+              ) : null}
+
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm">
                 <GuruPawCrest className="h-6 w-6" />
                 {guruTier.label}
               </div>
@@ -1915,9 +1929,20 @@ export default async function GuruDashboardPage() {
 
             <div className="mt-6 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
               <div className="rounded-[1.5rem] border border-cyan-200 bg-white/70 p-5 text-center">
-                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-cyan-50 text-4xl ring-1 ring-cyan-100">
-                  {universityProgress.isComplete ? "🎓" : "🛡️"}
-                </div>
+                {universityProgress.isComplete ? (
+                  <div className="flex justify-center">
+                    <GuruRecognitionBadge
+                      label="Certified SitGuru Guru"
+                      sublabel="Guru Academy Graduate"
+                      size="lg"
+                      showStars={false}
+                    />
+                  </div>
+                ) : (
+                  <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-cyan-50 text-4xl ring-1 ring-cyan-100">
+                    🛡️
+                  </div>
+                )}
                 <p className="mt-4 text-xl font-black !text-[#07132f]">
                   Current crest: {guruTier.label}
                 </p>
