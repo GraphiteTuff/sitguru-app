@@ -1,22 +1,86 @@
 "use client";
 
+import { Open_Sans } from "next/font/google";
 import Link from "next/link";
-import {
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type HTMLAttributes,
-  type ReactNode,
-} from "react";
-import { useSearchParams } from "next/navigation";
-import ProviderMap from "@/components/ProviderMap";
-import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
+import type { CSSProperties } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
-type GuruRow = {
+const openSans = Open_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
+const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
+const sitGuruVideoEmbedUrl =
+  "https://www.youtube.com/embed/Jk5vWCWvvKs?si=12529oKyk7IFLtAj";
+
+const heroServiceOptions = [
+  "Dog Walking",
+  "Pet Sitting",
+  "Boarding",
+  "Drop-In Visits",
+  "Doggy Day Care",
+  "Training Support",
+];
+
+const zipCodeFallbackMap: Record<
+  string,
+  { city: string; state: string; stateAbbreviation: string }
+> = {
+  "08030": {
+    city: "Camden",
+    state: "New Jersey",
+    stateAbbreviation: "NJ",
+  },
+  "18018": {
+    city: "Bethlehem",
+    state: "Pennsylvania",
+    stateAbbreviation: "PA",
+  },
+  "18101": {
+    city: "Allentown",
+    state: "Pennsylvania",
+    stateAbbreviation: "PA",
+  },
+  "18951": {
+    city: "Quakertown",
+    state: "Pennsylvania",
+    stateAbbreviation: "PA",
+  },
+  "19103": {
+    city: "Philadelphia",
+    state: "Pennsylvania",
+    stateAbbreviation: "PA",
+  },
+};
+
+type ZipLookupResult = {
+  city: string;
+  state: string;
+  stateAbbreviation: string;
+};
+
+type ZipLookupStatus = "idle" | "loading" | "found" | "not-found" | "error";
+
+type SearchFormState = {
+  service: string;
+  city: string;
+  state: string;
+  zipCode: string;
+};
+
+const initialSearchFormState: SearchFormState = {
+  service: "",
+  city: "",
+  state: "",
+  zipCode: "",
+};
+
+type Guru = {
   [key: string]: unknown;
   id: string | number;
   user_id?: string | null;
@@ -24,840 +88,357 @@ type GuruRow = {
   display_name?: string | null;
   full_name?: string | null;
   title?: string | null;
-  bio?: string | null;
   city?: string | null;
   state?: string | null;
-  zip_code?: string | null;
-  service_latitude?: number | string | null;
-  service_longitude?: number | string | null;
-  service_radius_miles?: number | string | null;
-  service_radius?: number | string | null;
-  radius_miles?: number | string | null;
-  radius?: number | string | null;
-  travel_radius_miles?: number | string | null;
-  travel_radius?: number | string | null;
-  service_area_enabled?: boolean | null;
-  latitude?: number | string | null;
-  longitude?: number | string | null;
-  lat?: number | string | null;
-  lng?: number | string | null;
   hourly_rate?: number | null;
   rate?: number | null;
-  experience_years?: number | null;
-  is_verified?: boolean | null;
   rating_avg?: number | null;
   rating?: number | null;
   review_count?: number | null;
+  is_verified?: boolean | null;
   profile_photo_url?: string | null;
   photo_url?: string | null;
   avatar_url?: string | null;
   image_url?: string | null;
+  services?: string[] | null;
   is_public?: boolean | null;
   is_active?: boolean | null;
-  is_accepting_bookings?: boolean | null;
-  accepting_bookings?: boolean | null;
-  services?: string[] | null;
-  distance_miles?: number | null;
-  service_radius_display?: number | null;
 };
 
-type GuruServiceRate = {
-  id?: string | null;
-  guru_id: string;
-  service_key: string;
-  service_label: string;
-  is_enabled: boolean;
-  rate_amount: number | string | null;
-  rate_unit: string | null;
-  duration_minutes?: number | string | null;
-  notes?: string | null;
+type GuruCard = {
+  id: string;
+  name: string;
+  role: string;
+  location: string;
+  rating: string;
+  reviewCount: number;
+  priceLabel: string;
+  image: string;
+  imagePosition?: string;
+  badge: string;
+  href: string;
 };
 
-type GuruRateDisplay = {
+type ProgramCard = {
+  title: string;
   eyebrow: string;
-  primary: string;
-  detail: string;
-  serviceLabel: string;
-  isFallback: boolean;
+  description: string;
+  href: string;
+  applyHref: string;
+  icon: string;
+  image: string;
+  imageAlt: string;
+  primaryCta: string;
+  secondaryCta: string;
+  featured: boolean;
 };
 
-type ZipLookupResult = {
-  zip: string;
-  city: string;
-  state: string;
-  stateName?: string;
-  latitude: number | null;
-  longitude: number | null;
+type PartnerCard = {
+  id: string;
+  name: string;
+  type: string;
+  location: string;
+  description: string;
+  href: string;
+  logo: string;
+  logoAlt: string;
 };
 
-type PublicAcademyCertificationResponse = {
-  academyType?: string;
-  certifiedUserIds?: string[];
-  error?: string;
-};
-
-const SERVICE_OPTIONS = [
-  "Dog Walking",
-  "Pet Sitting",
-  "Boarding",
-  "Doggy Day Care",
-  "Drop-In Visits",
-  "House Sitting",
-  "Training Support",
-  "Medication Help",
-  "Custom Care",
+const demoGuruCards: GuruCard[] = [
+  {
+    id: "demo-avery-johnson",
+    name: "Avery Johnson",
+    role: "Dog Walking Guru",
+    location: "Philadelphia, PA",
+    rating: "5.0",
+    reviewCount: 42,
+    priceLabel: "View care options",
+    image: "/images/demo/avery-johnson.png",
+    imagePosition: "center 38%",
+    badge: "Trusted",
+    href: "/search?service=Dog%20Walking&city=Philadelphia&state=PA",
+  },
+  {
+    id: "demo-brad-norway",
+    name: "Brad Norway",
+    role: "Boarding Guru",
+    location: "Bethlehem, PA",
+    rating: "4.9",
+    reviewCount: 36,
+    priceLabel: "View care options",
+    image: "/images/demo/brad-norway.png",
+    imagePosition: "center 40%",
+    badge: "Trusted",
+    href: "/search?service=Boarding&city=Bethlehem&state=PA",
+  },
+  {
+    id: "demo-caleb-brooks",
+    name: "Caleb Brooks",
+    role: "Drop-In Visit Guru",
+    location: "Allentown, PA",
+    rating: "4.8",
+    reviewCount: 29,
+    priceLabel: "View care options",
+    image: "/images/demo/caleb-brooks.png",
+    imagePosition: "center 42%",
+    badge: "Trusted",
+    href: "/search?service=Drop-In%20Visits&city=Allentown&state=PA",
+  },
+  {
+    id: "demo-darius-miller",
+    name: "Darius Miller",
+    role: "Doggy Day Care Guru",
+    location: "Camden, NJ",
+    rating: "5.0",
+    reviewCount: 31,
+    priceLabel: "View care options",
+    image: "/images/demo/darius-miller.png",
+    imagePosition: "center 38%",
+    badge: "Trusted",
+    href: "/search?service=Doggy%20Day%20Care&city=Camden&state=NJ",
+  },
+  {
+    id: "demo-emma-walsh",
+    name: "Emma Walsh",
+    role: "Pet Sitting Guru",
+    location: "Quakertown, PA",
+    rating: "4.9",
+    reviewCount: 27,
+    priceLabel: "View care options",
+    image: "/images/demo/emma-walsh.png",
+    imagePosition: "center 42%",
+    badge: "Trusted",
+    href: "/search?service=Pet%20Sitting&city=Quakertown&state=PA",
+  },
+  {
+    id: "demo-maya-reynolds",
+    name: "Maya Reynolds",
+    role: "Dog Walking Guru",
+    location: "Philadelphia, PA",
+    rating: "4.9",
+    reviewCount: 38,
+    priceLabel: "View care options",
+    image: "/images/demo/maya-reynolds.png",
+    imagePosition: "center 40%",
+    badge: "Trusted",
+    href: "/search?service=Dog%20Walking&city=Philadelphia&state=PA",
+  },
+  {
+    id: "demo-nina-patel",
+    name: "Nina Patel",
+    role: "Training Support Guru",
+    location: "Allentown, PA",
+    rating: "5.0",
+    reviewCount: 33,
+    priceLabel: "View care options",
+    image: "/images/demo/nina-patel.png",
+    imagePosition: "center 42%",
+    badge: "Trusted",
+    href: "/search?service=Training%20Support&city=Allentown&state=PA",
+  },
+  {
+    id: "demo-olivia-chen",
+    name: "Olivia Chen",
+    role: "Pet Sitting Guru",
+    location: "Bethlehem, PA",
+    rating: "4.8",
+    reviewCount: 25,
+    priceLabel: "View care options",
+    image: "/images/demo/olivia-chen.png",
+    imagePosition: "center 40%",
+    badge: "Trusted",
+    href: "/search?service=Pet%20Sitting&city=Bethlehem&state=PA",
+  },
+  {
+    id: "demo-sofia-martinez",
+    name: "Sofia Martinez",
+    role: "Boarding Guru",
+    location: "Quakertown, PA",
+    rating: "4.9",
+    reviewCount: 34,
+    priceLabel: "View care options",
+    image: "/images/demo/sofia-martinez.png",
+    imagePosition: "center 42%",
+    badge: "Trusted",
+    href: "/search?service=Boarding&city=Quakertown&state=PA",
+  },
+  {
+    id: "demo-suzy-q",
+    name: "Suzy Q",
+    role: "Drop-In Visit Guru",
+    location: "Camden, NJ",
+    rating: "New",
+    reviewCount: 0,
+    priceLabel: "View care options",
+    image: "/images/demo/suzy-q.png",
+    imagePosition: "center 40%",
+    badge: "Trusted",
+    href: "/search?service=Drop-In%20Visits&city=Camden&state=NJ",
+  },
 ];
 
-const DEFAULT_MAP_CENTER: [number, number] = [39.9526, -75.1652];
+const trustItems = [
+  "Free local signup",
+  "Trusted local Gurus",
+  "Easy booking flow",
+  "Community-first care",
+];
 
-const CITY_COORDINATES: Record<string, [number, number]> = {
-  "philadelphia,pa": [39.9526, -75.1652],
-  "philadelphia,pennsylvania": [39.9526, -75.1652],
-  "pittsburgh,pa": [40.4406, -79.9959],
-  "pittsburgh,pennsylvania": [40.4406, -79.9959],
-  "quakertown,pa": [40.4418, -75.3416],
-  "quakertown,pennsylvania": [40.4418, -75.3416],
-  "cromwell,mn": [46.6766, -92.8802],
-  "cromwell,minnesota": [46.6766, -92.8802],
-};
+const programPathways = [
+  {
+    title: "Pet Parents",
+    description: "Anyone can join SitGuru to find trusted local care",
+    href: "/search",
+    icon: "🐾",
+  },
+  {
+    title: "Gurus",
+    description: "Anyone can apply to offer care through SitGuru",
+    href: "/become-a-guru",
+    icon: "🦮",
+  },
+  {
+    title: "SitGuru Programs",
+    description: "Additional ways to refer, support, and grow the community",
+    href: "/affiliate-program",
+    icon: "🤝",
+  },
+];
 
-const GURU_SELECT_ATTEMPTS = ["*"];
+const homepagePrograms: ProgramCard[] = [
+  {
+    title: "Student Hire Program",
+    eyebrow: "Featured student pathway",
+    description:
+      "For students, recent grads, summer workers, and pet lovers who want a flexible way to build experience, help local pet families, and grow SitGuru after class, on weekends, during school breaks, or all summer.",
+    href: "/affiliate-program#student-hire",
+    applyHref: "/affiliate-program#student-hire",
+    icon: "🎓",
+    image: "/images/ambassadors/student-hire2.jpg",
+    imageAlt: "Student pet caregiver taking a selfie with a dog",
+    primaryCta: "Start Student Hire",
+    secondaryCta: "Student Details",
+    featured: true,
+  },
+  {
+    title: "Community Hire Program",
+    eyebrow: "Local neighborhood pathway",
+    description:
+      "For local pet lovers, parents, retirees, remote workers, and community members who want a flexible way to offer trusted care, refer neighbors, and help SitGuru grow locally.",
+    href: "/affiliate-program#community-hire",
+    applyHref: "/affiliate-program#community-hire",
+    icon: "🤝",
+    image: "/images/ambassadors/ambassador-program2.jpg",
+    imageAlt: "Community pet-care supporters smiling while caring for a pet",
+    primaryCta: "Start Community Hire",
+    secondaryCta: "Community Details",
+    featured: false,
+  },
+  {
+    title: "Military Hire Program",
+    eyebrow: "Military-connected pathway",
+    description:
+      "For veterans, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and approved SkillBridge applicants who want flexible local opportunities.",
+    href: "/affiliate-program#military-hire",
+    applyHref: "/affiliate-program#military-hire",
+    icon: "🎖️",
+    image: "/images/ambassadors/veteran-ambassador2.jpg",
+    imageAlt: "Veteran or military-connected pet caregiver relaxing with a dog",
+    primaryCta: "Start Military Hire",
+    secondaryCta: "Military Details",
+    featured: false,
+  },
+];
 
-const PUBLIC_GURU_PROFILE_BASE_PATH = "/guru";
-const BOOK_GURU_BASE_PATH = "/book";
+const homepagePartners: PartnerCard[] = [
+  {
+    id: "doylestown-animal-medical-clinic",
+    name: "Doylestown Animal Medical Clinic",
+    type: "Animal Medical Clinic",
+    location: "Doylestown, PA",
+    description:
+      "A local veterinary care connection helping SitGuru build stronger community relationships around safer, easier support for Pet Parents.",
+    href: "https://doylestownanimalmedicalclinic.com/",
+    logo: "/images/partners/doylestown-animal-medical-clinic.png",
+    logoAlt: "Doylestown Animal Medical Clinic logo",
+  },
+];
 
-const FILL_IN_GURU_NAMES = new Set([
-  "avery",
-  "caleb",
-  "darius",
-  "emma",
-  "jason",
-  "maya",
-  "nina",
-  "olivia",
-  "sofia",
-  "suzy",
-]);
+const popularServices = [
+  {
+    title: "Dog Walking",
+    icon: "🐕",
+    href: "/search?service=Dog%20Walking",
+  },
+  {
+    title: "Pet Sitting",
+    icon: "🏡",
+    href: "/search?service=Pet%20Sitting",
+  },
+  {
+    title: "Boarding",
+    icon: "🛏️",
+    href: "/search?service=Boarding",
+  },
+  {
+    title: "Drop-In Visits",
+    icon: "⏰",
+    href: "/search?service=Drop-In%20Visits",
+  },
+  {
+    title: "Doggy Day Care",
+    icon: "☀️",
+    href: "/search?service=Doggy%20Day%20Care",
+  },
+  {
+    title: "Training Support",
+    icon: "🎓",
+    href: "/search?service=Training%20Support",
+  },
+];
 
-function Card({
-  children,
-  className = "",
-  ...props
-}: HTMLAttributes<HTMLDivElement> & {
-  children: ReactNode;
-  className?: string;
-}) {
+const petParentSignupHref = "/signup?role=pet_parent&next=/customer/dashboard";
+const petParentPhoneSignupHref =
+  "/signup?role=pet_parent&mode=phone&next=/customer/dashboard";
+const petParentLoginHref = "/login?role=pet_parent&next=/customer/dashboard";
+const guruSignupHref = "/become-a-guru";
+const bothSignupHref = "/signup?role=both&next=/customer/dashboard";
+const ambassadorLoginHref = "/ambassador/login";
+
+function GoogleIcon() {
   return (
-    <div
-      className={`rounded-[28px] border border-slate-200 bg-white shadow-sm ${className}`}
-      {...props}
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0">
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"
+      />
+    </svg>
+  );
+}
+
+function AppleIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 shrink-0 fill-current"
     >
-      {children}
-    </div>
+      <path d="M16.37 1.51c0 1.08-.44 2.13-1.16 2.91-.77.84-2.04 1.48-3.09 1.39-.13-1.04.39-2.18 1.1-2.94.78-.85 2.15-1.48 3.15-1.36z" />
+      <path d="M20.62 17.47c-.55 1.27-.82 1.84-1.53 2.96-.99 1.51-2.38 3.39-4.11 3.4-1.54.01-1.94-1-4.02-.99-2.08.01-2.52 1-4.06.99-1.73-.01-3.05-1.71-4.04-3.22-2.76-4.22-3.05-9.18-1.35-11.82 1.2-1.87 3.1-2.97 4.88-2.97 1.81 0 2.95 1 4.45 1 1.45 0 2.34-1 4.44-1 1.59 0 3.27.87 4.47 2.36-3.93 2.16-3.29 7.78.87 9.29z" />
+    </svg>
   );
-}
-
-function formatLocation(city?: string | null, state?: string | null) {
-  if (city && state) return `${city}, ${state}`;
-  if (city) return city;
-  if (state) return state;
-  return "Location not listed";
-}
-
-const RATE_UNIT_LABELS: Record<string, string> = {
-  hour: "hour",
-  visit: "visit",
-  walk: "walk",
-  session: "session",
-  day: "day",
-  night: "night",
-  stay: "stay",
-  pet: "pet",
-  add_on: "add-on",
-  custom: "custom quote",
-};
-
-function formatCurrencyAmount(value: number | string | null | undefined) {
-  const amount = Number(value);
-
-  if (!Number.isFinite(amount) || amount < 0) return "";
-
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
-
-function normalizeServiceKey(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-function getServiceAliases(value: string) {
-  const normalized = normalizeServiceKey(value);
-  const aliases = new Set([normalized]);
-
-  if (normalized.includes("walk")) aliases.add("dog_walking");
-  if (normalized.includes("drop") || normalized.includes("visit")) {
-    aliases.add("drop_in_visit");
-    aliases.add("drop_in_visits");
-    aliases.add("drop_in_care");
-  }
-  if (normalized.includes("pet_sitting") || normalized === "sitting") {
-    aliases.add("pet_sitting");
-  }
-  if (normalized.includes("house")) aliases.add("house_sitting");
-  if (normalized.includes("board")) aliases.add("boarding");
-  if (normalized.includes("day_care") || normalized.includes("daycare")) {
-    aliases.add("doggy_day_care");
-    aliases.add("dog_day_care");
-  }
-  if (normalized.includes("train")) aliases.add("training_support");
-  if (normalized.includes("medication")) aliases.add("medication_help");
-  if (normalized.includes("taxi")) aliases.add("pet_taxi");
-  if (normalized.includes("custom")) aliases.add("custom_care");
-
-  return aliases;
-}
-
-function serviceRateMatches(rate: GuruServiceRate, selectedService: string) {
-  if (!selectedService) return false;
-
-  const selectedAliases = getServiceAliases(selectedService);
-  const rateAliases = new Set([
-    ...getServiceAliases(rate.service_key || ""),
-    ...getServiceAliases(rate.service_label || ""),
-  ]);
-
-  return Array.from(selectedAliases).some((alias) => rateAliases.has(alias));
-}
-
-function getEnabledGuruRates(
-  guru: GuruRow,
-  serviceRatesByGuru: Record<string, GuruServiceRate[]>,
-) {
-  return (serviceRatesByGuru[String(guru.id)] || [])
-    .filter((rate) => rate.is_enabled !== false)
-    .filter(
-      (rate) => rate.rate_unit === "custom" || Number(rate.rate_amount) >= 0,
-    );
-}
-
-function formatServiceRate(rate: GuruServiceRate) {
-  const unit = RATE_UNIT_LABELS[String(rate.rate_unit || "visit")] || "visit";
-
-  if (rate.rate_unit === "custom") {
-    return {
-      primary: "Custom quote",
-      detail: rate.service_label || "Rates by service",
-    };
-  }
-
-  const amount = formatCurrencyAmount(rate.rate_amount);
-
-  if (!amount) {
-    return {
-      primary: "Rate pending",
-      detail: rate.service_label || "Rates by service",
-    };
-  }
-
-  return {
-    primary: amount,
-    detail: `/${unit}${rate.duration_minutes ? ` · ${rate.duration_minutes} min` : ""}`,
-  };
-}
-
-function getLowestPricedRate(rates: GuruServiceRate[]) {
-  const customRate = rates.find((rate) => rate.rate_unit === "custom");
-  const pricedRates = rates
-    .filter((rate) => rate.rate_unit !== "custom")
-    .map((rate) => ({ rate, amount: Number(rate.rate_amount) }))
-    .filter((item) => Number.isFinite(item.amount) && item.amount >= 0)
-    .sort((a, b) => a.amount - b.amount);
-
-  return pricedRates[0]?.rate || customRate || null;
-}
-
-function getGuruRateDisplay(
-  guru: GuruRow,
-  selectedService: string,
-  serviceRatesByGuru: Record<string, GuruServiceRate[]>,
-): GuruRateDisplay {
-  const enabledRates = getEnabledGuruRates(guru, serviceRatesByGuru);
-
-  if (enabledRates.length > 0) {
-    const selectedRate = selectedService
-      ? enabledRates.find((rate) => serviceRateMatches(rate, selectedService))
-      : null;
-    const fallbackRate = selectedRate || getLowestPricedRate(enabledRates);
-
-    if (fallbackRate) {
-      const formatted = formatServiceRate(fallbackRate);
-
-      return {
-        eyebrow: selectedRate ? "Rate" : "From",
-        primary: formatted.primary,
-        detail: selectedRate
-          ? `${fallbackRate.service_label || selectedService} ${formatted.detail}`
-          : `Rates by service ${formatted.detail}`,
-        serviceLabel:
-          fallbackRate.service_label || selectedService || "Rates by service",
-        isFallback: false,
-      };
-    }
-  }
-
-  const fallbackRate = getGuruRate(guru);
-
-  return {
-    eyebrow: "Rate",
-    primary: fallbackRate === null ? "Rate pending" : `$${fallbackRate}`,
-    detail: fallbackRate === null ? "Rates not listed" : "/hr",
-    serviceLabel: "Base hourly rate",
-    isFallback: true,
-  };
-}
-
-function getGuruName(guru: GuruRow) {
-  return guru.display_name || guru.full_name || "Guru";
-}
-
-function normalizeFillInMatchValue(value?: string | null) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ");
-}
-
-function isFillInGuru(guru: GuruRow) {
-  const values = [
-    guru.display_name,
-    guru.full_name,
-    guru.slug,
-    typeof guru.email === "string" ? guru.email.split("@")[0] : "",
-  ];
-
-  return values
-    .map((value) => normalizeFillInMatchValue(value))
-    .filter(Boolean)
-    .flatMap((value) => {
-      const firstName = value.split(" ")[0] || "";
-      const compact = value.replace(/\s+/g, "");
-      return [value, firstName, compact].filter(Boolean);
-    })
-    .some((candidate) => {
-      if (FILL_IN_GURU_NAMES.has(candidate)) return true;
-
-      return Array.from(FILL_IN_GURU_NAMES).some((name) =>
-        candidate.startsWith(name),
-      );
-    });
-}
-
-function getGuruPhotoUrl(guru: GuruRow) {
-  return (
-    guru.profile_photo_url ||
-    guru.photo_url ||
-    guru.avatar_url ||
-    guru.image_url ||
-    ""
-  );
-}
-
-function getGuruPublicIdentifier(guru: GuruRow) {
-  return encodeURIComponent(String(guru.slug || guru.id));
-}
-
-function getGuruHref(guru: GuruRow) {
-  return `${PUBLIC_GURU_PROFILE_BASE_PATH}/${getGuruPublicIdentifier(guru)}`;
-}
-
-function getBookGuruHref(guru: GuruRow) {
-  return `${BOOK_GURU_BASE_PATH}/${getGuruPublicIdentifier(guru)}`;
-}
-
-function getGuruRating(guru: GuruRow) {
-  if (typeof guru.rating_avg === "number") return guru.rating_avg;
-  if (typeof guru.rating === "number") return guru.rating;
-  return 0;
-}
-
-function getGuruRate(guru: GuruRow) {
-  if (typeof guru.hourly_rate === "number") return guru.hourly_rate;
-  if (typeof guru.rate === "number") return guru.rate;
-  return null;
-}
-
-function getGuruAnalyticsId(guru: GuruRow) {
-  return String(guru.user_id || guru.id || "");
-}
-
-function getGuruCertificationUserId(guru: GuruRow) {
-  return String(guru.user_id || "").trim();
-}
-
-async function loadCertifiedGuruUserIds(guruUserIds: string[]) {
-  const safeUserIds = Array.from(
-    new Set(
-      guruUserIds
-        .map((userId) => String(userId || "").trim())
-        .filter(Boolean),
-    ),
-  );
-
-  if (!safeUserIds.length) return new Set<string>();
-
-  try {
-    const response = await fetch(
-      `/api/public/academy-certifications?academyType=guru&userIds=${encodeURIComponent(
-        safeUserIds.join(","),
-      )}`,
-      {
-        cache: "no-store",
-      },
-    );
-
-    if (!response.ok) {
-      console.warn("Could not load Guru Academy certifications for search cards.");
-      return new Set<string>();
-    }
-
-    const payload = (await response.json()) as PublicAcademyCertificationResponse;
-
-    return new Set(
-      (payload.certifiedUserIds || [])
-        .map((userId) => String(userId || "").trim())
-        .filter(Boolean),
-    );
-  } catch (error) {
-    console.warn("Could not load Guru Academy certifications for search cards:", error);
-    return new Set<string>();
-  }
-}
-
-function getInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-
-  if (!parts.length) return "SG";
-
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
-
-function cleanZip(value?: string | null) {
-  return String(value || "")
-    .replace(/\D/g, "")
-    .slice(0, 5);
-}
-
-function readNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return fallback;
-}
-
-function normalizeStateCode(value?: string | null) {
-  const state = String(value || "").trim();
-
-  if (!state) return "";
-
-  const normalized = state.toUpperCase();
-  const stateMap: Record<string, string> = {
-    PENNSYLVANIA: "PA",
-    "NEW JERSEY": "NJ",
-    DELAWARE: "DE",
-    MARYLAND: "MD",
-    "NEW YORK": "NY",
-    MINNESOTA: "MN",
-  };
-
-  return stateMap[normalized] || normalized.slice(0, 2);
-}
-
-function parseCoordinate(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function getGuruLatitude(guru: GuruRow) {
-  return parseCoordinate(guru.service_latitude ?? guru.latitude ?? guru.lat);
-}
-
-function getGuruLongitude(guru: GuruRow) {
-  return parseCoordinate(guru.service_longitude ?? guru.longitude ?? guru.lng);
-}
-
-function getGuruRadius(guru: GuruRow) {
-  const radiusCandidateKeys = [
-    "service_radius_miles",
-    "serviceRadiusMiles",
-    "service_area_radius_miles",
-    "serviceAreaRadiusMiles",
-    "service_area_radius",
-    "serviceAreaRadius",
-    "travel_radius_miles",
-    "travelRadiusMiles",
-    "travel_radius",
-    "travelRadius",
-    "willing_to_travel_miles",
-    "willingToTravelMiles",
-    "willing_to_travel",
-    "willingToTravel",
-    "max_travel_miles",
-    "maxTravelMiles",
-    "max_travel_distance_miles",
-    "maxTravelDistanceMiles",
-    "max_distance_miles",
-    "maxDistanceMiles",
-    "service_distance_miles",
-    "serviceDistanceMiles",
-    "coverage_radius_miles",
-    "coverageRadiusMiles",
-    "radius_miles",
-    "radiusMiles",
-    "service_radius",
-    "serviceRadius",
-    "radius",
-  ];
-
-  const explicitRadius = radiusCandidateKeys
-    .map((key) => readNumber(guru[key], Number.NaN))
-    .find((value) => Number.isFinite(value) && value > 0);
-
-  if (typeof explicitRadius === "number") {
-    return Math.min(Math.round(explicitRadius), 100);
-  }
-
-  const discoveredRadius = Object.entries(guru)
-    .filter(([key]) => {
-      const normalizedKey = key.toLowerCase();
-      return (
-        normalizedKey.includes("radius") ||
-        normalizedKey.includes("travel") ||
-        normalizedKey.includes("distance")
-      );
-    })
-    .map(([, value]) => readNumber(value, Number.NaN))
-    .find((value) => Number.isFinite(value) && value > 0 && value <= 100);
-
-  if (typeof discoveredRadius === "number") {
-    return Math.min(Math.round(discoveredRadius), 100);
-  }
-
-  return 25;
-}
-
-function calculateDistanceMiles(
-  fromLatitude: number,
-  fromLongitude: number,
-  toLatitude: number,
-  toLongitude: number,
-) {
-  const earthRadiusMiles = 3958.8;
-  const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
-
-  const latitudeDifference = degreesToRadians(toLatitude - fromLatitude);
-  const longitudeDifference = degreesToRadians(toLongitude - fromLongitude);
-
-  const a =
-    Math.sin(latitudeDifference / 2) ** 2 +
-    Math.cos(degreesToRadians(fromLatitude)) *
-      Math.cos(degreesToRadians(toLatitude)) *
-      Math.sin(longitudeDifference / 2) ** 2;
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return earthRadiusMiles * c;
-}
-
-function locationsMatchByText(guru: GuruRow, location: ZipLookupResult | null) {
-  if (!location) return false;
-
-  const guruZip = cleanZip(guru.zip_code);
-
-  if (guruZip && guruZip === location.zip) return true;
-
-  const guruCity = normalizeText(guru.city);
-  const guruState = normalizeStateCode(guru.state);
-  const locationCity = normalizeText(location.city);
-  const locationState = normalizeStateCode(location.state || location.stateName);
-
-  return Boolean(
-    guruCity &&
-      locationCity &&
-      guruCity === locationCity &&
-      (!guruState || !locationState || guruState === locationState),
-  );
-}
-
-function getGuruZipFallbackCoordinates(
-  guru: GuruRow,
-  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
-): [number, number] | null {
-  const zip = cleanZip(guru.zip_code);
-  const zipLookup = zip ? guruZipLookupsByZip[zip] : null;
-
-  if (
-    zipLookup &&
-    typeof zipLookup.latitude === "number" &&
-    typeof zipLookup.longitude === "number" &&
-    Number.isFinite(zipLookup.latitude) &&
-    Number.isFinite(zipLookup.longitude)
-  ) {
-    return [zipLookup.latitude, zipLookup.longitude];
-  }
-
-  return null;
-}
-
-function getGuruSearchCoordinates(
-  guru: GuruRow,
-  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
-): [number, number] | null {
-  const latitude = getGuruLatitude(guru);
-  const longitude = getGuruLongitude(guru);
-
-  if (latitude !== null && longitude !== null) {
-    return [latitude, longitude];
-  }
-
-  return (
-    getGuruZipFallbackCoordinates(guru, guruZipLookupsByZip) ||
-    getGuruFallbackCoordinates(guru)
-  );
-}
-
-function getDistanceFromSearchLocation(
-  guru: GuruRow,
-  searchLocation: ZipLookupResult | null,
-  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
-) {
-  if (
-    !searchLocation ||
-    typeof searchLocation.latitude !== "number" ||
-    typeof searchLocation.longitude !== "number" ||
-    !Number.isFinite(searchLocation.latitude) ||
-    !Number.isFinite(searchLocation.longitude)
-  ) {
-    return null;
-  }
-
-  const coordinates = getGuruSearchCoordinates(guru, guruZipLookupsByZip);
-
-  if (!coordinates) return null;
-
-  return calculateDistanceMiles(
-    searchLocation.latitude,
-    searchLocation.longitude,
-    coordinates[0],
-    coordinates[1],
-  );
-}
-
-function guruServesSearchLocation(
-  guru: GuruRow,
-  searchLocation: ZipLookupResult | null,
-  zipFilter: string,
-  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
-) {
-  const zip = cleanZip(zipFilter);
-
-  if (!zip) return true;
-
-  if (guru.service_area_enabled === false) return false;
-
-  const textLocationMatches = locationsMatchByText(guru, searchLocation);
-
-  if (textLocationMatches) return true;
-
-  const distanceMiles = getDistanceFromSearchLocation(
-    guru,
-    searchLocation,
-    guruZipLookupsByZip,
-  );
-
-  if (distanceMiles === null) {
-    return cleanZip(guru.zip_code) === zip;
-  }
-
-  return distanceMiles <= getGuruRadius(guru);
-}
-
-function enrichGuruWithDistance(
-  guru: GuruRow,
-  searchLocation: ZipLookupResult | null,
-  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
-): GuruRow {
-  const textLocationMatches = locationsMatchByText(guru, searchLocation);
-  const distanceMiles = textLocationMatches
-    ? 0
-    : getDistanceFromSearchLocation(
-        guru,
-        searchLocation,
-        guruZipLookupsByZip,
-      );
-
-  const normalizedServiceRadiusMiles = getGuruRadius(guru);
-  const zipFallbackCoordinates = getGuruZipFallbackCoordinates(
-    guru,
-    guruZipLookupsByZip,
-  );
-
-  return {
-    ...guru,
-    service_latitude:
-      getGuruLatitude(guru) ?? zipFallbackCoordinates?.[0] ?? guru.service_latitude,
-    service_longitude:
-      getGuruLongitude(guru) ??
-      zipFallbackCoordinates?.[1] ??
-      guru.service_longitude,
-    service_radius_miles: normalizedServiceRadiusMiles,
-    service_radius_display: normalizedServiceRadiusMiles,
-    distance_miles: distanceMiles,
-  };
-}
-
-function GuruResultPhoto({
-  photoUrl,
-  guruName,
-  isAcademyCertified,
-}: {
-  photoUrl: string;
-  guruName: string;
-  isAcademyCertified: boolean;
-}) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const showPhoto = Boolean(photoUrl) && !imageFailed;
-
-  return (
-    <div className="relative h-80 w-full shrink-0 overflow-hidden bg-slate-100 md:h-full md:min-h-0 md:w-[300px] md:self-stretch xl:w-[320px]">
-      {isAcademyCertified ? (
-        <AcademyGraduateBadge
-          academyType="guru"
-          variant="photo-overlay"
-          className="absolute left-5 top-5 z-10 h-[74px] w-[74px] md:h-[86px] md:w-[86px]"
-        />
-      ) : null}
-
-      {showPhoto ? (
-        <img
-          src={photoUrl}
-          alt={guruName}
-          className="h-full w-full object-cover object-center"
-          onError={() => setImageFailed(true)}
-        />
-      ) : (
-        <div className="flex h-full min-h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-slate-100">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full border border-emerald-200 bg-white text-2xl font-black text-emerald-700 shadow-sm">
-            {getInitials(guruName)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function matchesService(guru: GuruRow, selectedService: string) {
-  if (!selectedService) return true;
-
-  const services = guru.services || [];
-  if (!services.length) return false;
-
-  return services.some(
-    (service) => service.toLowerCase() === selectedService.toLowerCase(),
-  );
-}
-
-function normalizeText(value?: string | null) {
-  return (value || "").trim().toLowerCase();
-}
-
-function normalizeLocationKey(city?: string | null, state?: string | null) {
-  return `${city || ""},${state || ""}`.toLowerCase().replace(/\s+/g, "");
-}
-
-function hasValidCoordinates(guru: GuruRow) {
-  const latitude = getGuruLatitude(guru);
-  const longitude = getGuruLongitude(guru);
-
-  return Boolean(
-    latitude !== null &&
-      longitude !== null &&
-      latitude >= -90 &&
-      latitude <= 90 &&
-      longitude >= -180 &&
-      longitude <= 180 &&
-      latitude !== 0 &&
-      longitude !== 0,
-  );
-}
-
-function getGuruFallbackCoordinates(guru: GuruRow) {
-  return CITY_COORDINATES[normalizeLocationKey(guru.city, guru.state)] || null;
-}
-
-function hasMapLocation(guru: GuruRow) {
-  return hasValidCoordinates(guru) || Boolean(getGuruFallbackCoordinates(guru));
-}
-
-function getSearchMapCenter({
-  filteredGurus,
-  cityFilter,
-  stateFilter,
-  zipLookup,
-}: {
-  filteredGurus: GuruRow[];
-  cityFilter: string;
-  stateFilter: string;
-  zipLookup: ZipLookupResult | null;
-}): [number, number] {
-  if (
-    typeof zipLookup?.latitude === "number" &&
-    typeof zipLookup?.longitude === "number" &&
-    Number.isFinite(zipLookup.latitude) &&
-    Number.isFinite(zipLookup.longitude)
-  ) {
-    return [zipLookup.latitude, zipLookup.longitude];
-  }
-
-  const searchedLocation =
-    CITY_COORDINATES[normalizeLocationKey(cityFilter, stateFilter)];
-
-  if (searchedLocation) return searchedLocation;
-
-  const firstExactGuru = filteredGurus.find(hasValidCoordinates);
-
-  if (
-    firstExactGuru &&
-    getGuruLatitude(firstExactGuru) !== null &&
-    getGuruLongitude(firstExactGuru) !== null
-  ) {
-    return [getGuruLatitude(firstExactGuru)!, getGuruLongitude(firstExactGuru)!];
-  }
-
-  const firstFallbackGuru = filteredGurus.find((guru) =>
-    Boolean(getGuruFallbackCoordinates(guru)),
-  );
-
-  if (firstFallbackGuru) {
-    const fallback = getGuruFallbackCoordinates(firstFallbackGuru);
-
-    if (fallback) return fallback;
-  }
-
-  return DEFAULT_MAP_CENTER;
 }
 
 function detectSourceFromUrl() {
@@ -875,1210 +456,1616 @@ function detectSourceFromUrl() {
   if (normalized.includes("facebook") || normalized === "fb") return "facebook";
   if (normalized.includes("tiktok") || normalized === "tt") return "tiktok";
   if (normalized.includes("referral")) return "referral";
+  if (normalized.includes("indeed")) return "indeed";
+  if (normalized.includes("careerlink") || normalized.includes("pa-careerlink"))
+    return "careerlink";
+  if (normalized.includes("handshake")) return "handshake";
+  if (normalized.includes("ambassador")) return "ambassador";
   if (normalized.includes("email")) return "email";
 
   return normalized;
 }
 
-function SearchPageContent() {
-  const searchParams = useSearchParams();
+function normalizeZipCode(value: string) {
+  return value.replace(/\D/g, "").slice(0, 5);
+}
 
-  const initialService = searchParams.get("service") || "";
-  const initialCity = searchParams.get("city") || "";
-  const initialState = searchParams.get("state") || "";
-  const initialZip = cleanZip(searchParams.get("zip") || "");
-  const selectedGuruId =
-    searchParams.get("guru") || searchParams.get("guruId") || "";
-  const selectedGuruSlug = searchParams.get("slug") || "";
+function formatLocation(city?: string | null, state?: string | null) {
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  if (state) return state;
+  return "Local area";
+}
 
-  const [gurus, setGurus] = useState<GuruRow[]>([]);
-  const [certifiedGuruUserIds, setCertifiedGuruUserIds] = useState<Set<string>>(
-    new Set(),
+async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
+  const normalizedZip = normalizeZipCode(zipCode);
+
+  if (normalizedZip.length !== 5) return null;
+
+  const fallback = zipCodeFallbackMap[normalizedZip];
+
+  if (fallback) return fallback;
+
+  const response = await fetch(`https://api.zippopotam.us/us/${normalizedZip}`);
+
+  if (!response.ok) return null;
+
+  const payload = await response.json();
+  const place = payload?.places?.[0];
+
+  if (!place) return null;
+
+  return {
+    city: String(place["place name"] || "").trim(),
+    state: String(place.state || "").trim(),
+    stateAbbreviation: String(place["state abbreviation"] || "").trim(),
+  };
+}
+
+function getGuruName(guru: Guru) {
+  return guru.display_name || guru.full_name || "Trusted Guru";
+}
+
+function getGuruPhotoUrl(guru: Guru) {
+  const possiblePhoto =
+    guru.profile_photo_url ||
+    guru.photo_url ||
+    guru.avatar_url ||
+    guru.image_url ||
+    "";
+
+  const photoUrl = String(possiblePhoto || "").trim();
+
+  if (!photoUrl) return defaultGuruAvatarPath;
+
+  const lowerPhotoUrl = photoUrl.toLowerCase();
+
+  if (
+    lowerPhotoUrl.includes("sitguru-logo") ||
+    lowerPhotoUrl.includes("sitguru-admin-avatar")
+  ) {
+    return defaultGuruAvatarPath;
+  }
+
+  return photoUrl;
+}
+
+function getGuruHref(guru: Guru) {
+  if (guru.slug) return `/guru/${guru.slug}`;
+  return `/guru/${guru.id}`;
+}
+
+function getGuruRating(guru: Guru) {
+  if (typeof guru.rating_avg === "number") return guru.rating_avg;
+  if (typeof guru.rating === "number") return guru.rating;
+  return 0;
+}
+
+function getGuruRole(guru: Guru) {
+  if (guru.title) return guru.title;
+  const services = Array.isArray(guru.services) ? guru.services : [];
+  const firstService = services.find((service) => typeof service === "string");
+
+  if (firstService) return `${firstService} Guru`;
+
+  return "Pet Care Guru";
+}
+
+function mapGurusToCards(gurus: Guru[]): GuruCard[] {
+  return gurus.map((guru) => {
+    const photoUrl = getGuruPhotoUrl(guru);
+    const rating = getGuruRating(guru);
+    const reviews = Number(guru.review_count || 0);
+
+    return {
+      id: `live-${String(guru.id)}`,
+      name: getGuruName(guru),
+      role: getGuruRole(guru),
+      location: formatLocation(guru.city, guru.state),
+      rating: rating > 0 ? rating.toFixed(1) : "New",
+      reviewCount: reviews,
+      priceLabel: "View care options",
+      image: photoUrl,
+      imagePosition: "center 34%",
+      badge: guru.is_verified ? "Verified" : "Trusted",
+      href: getGuruHref(guru),
+    };
+  });
+}
+
+function mergeLiveAndDemoGuruCards(liveCards: GuruCard[], demoCards: GuruCard[]) {
+  const seenKeys = new Set<string>();
+
+  return [...liveCards, ...demoCards].filter((card) => {
+    const normalizedName = card.name.trim().toLowerCase();
+    const normalizedLocation = card.location.trim().toLowerCase();
+    const key = `${normalizedName}|${normalizedLocation}`;
+
+    if (seenKeys.has(key)) return false;
+
+    seenKeys.add(key);
+    return true;
+  });
+}
+
+function buildSearchHref(searchForm: SearchFormState) {
+  const params = new URLSearchParams();
+
+  if (searchForm.service) params.set("service", searchForm.service);
+  if (searchForm.zipCode) params.set("zip", searchForm.zipCode);
+  if (searchForm.city) params.set("city", searchForm.city);
+  if (searchForm.state) params.set("state", searchForm.state);
+
+  const queryString = params.toString();
+
+  return queryString ? `/search?${queryString}` : "/search";
+}
+
+function TrustRow() {
+  return (
+    <div className="grid grid-cols-4 gap-2 rounded-2xl border border-slate-100 bg-white/90 px-3 py-3 shadow-sm backdrop-blur">
+      {trustItems.map((item) => (
+        <div
+          key={item}
+          className="flex flex-col items-center gap-1 text-center text-[9px] font-black leading-tight text-slate-700 sm:flex-row sm:text-left sm:text-xs"
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            ✓
+          </span>
+          <span>{item}</span>
+        </div>
+      ))}
+    </div>
   );
-  const [serviceRatesByGuru, setServiceRatesByGuru] = useState<
-    Record<string, GuruServiceRate[]>
-  >({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+}
 
-  const [serviceFilter, setServiceFilter] = useState(initialService);
-  const [zipFilter, setZipFilter] = useState(initialZip);
-  const [cityFilter, setCityFilter] = useState(initialCity);
-  const [stateFilter, setStateFilter] = useState(initialState);
-  const [searchTerm, setSearchTerm] = useState("");
+function HeroSignupCard({
+  onGoogleSignup,
+  onTrack,
+}: {
+  onGoogleSignup: () => void;
+  onTrack: (label: string, destination: string) => void;
+}) {
+  return (
+    <aside className="w-full max-w-[360px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[370px]">
+      <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
+        Free account
+      </div>
 
-  const [zipLookup, setZipLookup] = useState<ZipLookupResult | null>(null);
-  const [guruZipLookupsByZip, setGuruZipLookupsByZip] = useState<
-    Record<string, ZipLookupResult>
-  >({});
-  const [zipLookupStatus, setZipLookupStatus] = useState<
-    "idle" | "loading" | "found" | "not_found"
-  >("idle");
+      <h2 className="mt-3 text-[2.05rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.55rem]">
+        Join SitGuru free
+      </h2>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+        Choose Pet Parent, Future Guru, or both. Sign up once and we will route
+        you to the right next step.
+      </p>
 
-  const [highlightedGuruId, setHighlightedGuruId] = useState<
-    string | undefined
-  >(undefined);
+      <div className="mt-5 grid gap-3">
+        <button
+          type="button"
+          onClick={onGoogleSignup}
+          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+          <GoogleIcon />
+          Continue with Google
+        </button>
 
-  const hasTrackedSearchPageVisit = useRef(false);
-  const lastTrackedSearchKey = useRef("");
-  const hoveredGuruIds = useRef<Set<string>>(new Set());
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          title="Apple login is coming soon"
+          className="flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-400 shadow-sm"
+        >
+          <AppleIcon />
+          Continue with Apple — Coming Soon
+        </button>
+
+        <Link
+          href={petParentPhoneSignupHref}
+          onClick={() => onTrack("Continue with phone", petParentPhoneSignupHref)}
+          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+          ☎ Continue with phone
+        </Link>
+      </div>
+
+      <div className="my-5 flex items-center gap-4">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs font-bold text-slate-400">or choose path</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <div className="grid gap-2">
+        <Link
+          href={petParentSignupHref}
+          onClick={() => onTrack("Pet Parent Signup Hero Card", petParentSignupHref)}
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+          <span className="block text-sm font-black text-emerald-900">
+            Pet Parent
+          </span>
+          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
+            Sign up free to find trusted local Gurus and book pet care.
+          </span>
+        </Link>
+
+        <Link
+          href={guruSignupHref}
+          onClick={() => onTrack("Future Guru Signup Hero Card", guruSignupHref)}
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+          <span className="block text-sm font-black text-slate-950">
+            Future Guru
+          </span>
+          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
+            Create your free Guru profile and go directly to the 5-step setup.
+          </span>
+        </Link>
+
+        <Link
+          href={bothSignupHref}
+          onClick={() => onTrack("Both Signup Hero Card", bothSignupHref)}
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+          <span className="block text-sm font-black text-slate-950">Both</span>
+          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
+            Use SitGuru as a Pet Parent and continue into Guru setup.
+          </span>
+        </Link>
+
+        <Link
+          href={petParentSignupHref}
+          onClick={() => onTrack("Start Free Signup Hero Card", petParentSignupHref)}
+          className="mt-2 rounded-xl bg-emerald-700 px-5 py-3 text-center text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+        >
+          Start Free as Pet Parent
+        </Link>
+      </div>
+
+      <p className="mt-4 text-center text-xs font-semibold text-slate-500">
+        Already have a SitGuru account?{" "}
+        <Link
+          href={petParentLoginHref}
+          onClick={() => onTrack("Login From Hero Card", petParentLoginHref)}
+          className="font-black text-emerald-700 hover:text-emerald-800 hover:underline"
+        >
+          Log in
+        </Link>
+      </p>
+
+      <Link
+        href={ambassadorLoginHref}
+        onClick={() =>
+          onTrack("Ambassador Login From Hero Card", ambassadorLoginHref)
+        }
+        className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+      >
+        Ambassador Login
+      </Link>
+
+      <p className="mt-2 text-center text-[11px] font-semibold leading-4 text-slate-500">
+        For Ambassador Candidates and SitGuru representatives.
+      </p>
+    </aside>
+  );
+}
+
+function HeroVisual() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,1)_0%,rgba(250,252,252,0.97)_42%,rgba(236,253,245,0.78)_100%)]" />
+
+      <img
+        src={heroImagePath}
+        alt=""
+        className="absolute right-[-190px] top-[54px] h-[360px] w-[570px] max-w-none object-cover object-center opacity-100 sm:right-[-150px] sm:top-[38px] sm:h-[470px] sm:w-[720px] lg:right-[13%] lg:top-[20px] lg:h-[585px] lg:w-[860px] xl:right-[14%] xl:top-[12px] xl:h-[640px] xl:w-[920px] 2xl:right-[15%]"
+        style={{
+          WebkitMaskImage:
+            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 8%, rgba(0,0,0,0.5) 20%, rgba(0,0,0,0.9) 36%, black 56%, rgba(0,0,0,0.92) 72%, rgba(0,0,0,0.5) 88%, transparent 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
+          maskImage:
+            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 8%, rgba(0,0,0,0.5) 20%, rgba(0,0,0,0.9) 36%, black 56%, rgba(0,0,0,0.92) 72%, rgba(0,0,0,0.5) 88%, transparent 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
+          WebkitMaskComposite: "source-in",
+          maskComposite: "intersect",
+        }}
+        loading="eager"
+      />
+
+      <div className="absolute inset-y-0 left-0 w-[62%] bg-gradient-to-r from-white via-white/76 to-white/0" />
+      <div className="absolute inset-y-0 left-[36%] w-[28%] bg-gradient-to-r from-white/30 via-white/12 to-transparent blur-3xl" />
+      <div className="absolute inset-y-0 right-0 w-[32%] bg-gradient-to-l from-emerald-50/70 via-emerald-50/18 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-[16%] bg-gradient-to-b from-white/76 via-white/28 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-[34%] bg-gradient-to-t from-emerald-50/82 via-white/8 to-transparent" />
+    </div>
+  );
+}
+
+function GuruCardView({
+  guru,
+  onTrack,
+}: {
+  guru: GuruCard;
+  onTrack: (label: string, destination: string) => void;
+}) {
+  return (
+    <Link
+      href={guru.href}
+      onClick={() => onTrack(`Guru Card ${guru.name}`, guru.href)}
+      className="group min-w-[270px] max-w-[270px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)] sm:min-w-[310px] sm:max-w-[310px] lg:min-w-[330px] lg:max-w-[330px]"
+    >
+      <div className="relative h-52 overflow-hidden bg-slate-100 sm:h-64 lg:h-72">
+        <img
+          src={guru.image}
+          alt={`${guru.name}, ${guru.role}`}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
+          style={{ objectPosition: guru.imagePosition || "center 40%" }}
+          loading="lazy"
+        />
+        <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-emerald-700 shadow-sm">
+          ♡
+        </span>
+      </div>
+
+      <div className="p-3 sm:p-4">
+        <h3 className="text-sm font-black text-slate-950 sm:text-base">
+          {guru.name}
+        </h3>
+        <p className="mt-1 text-[10px] font-bold text-emerald-700 sm:text-xs">
+          {guru.role}
+        </p>
+        <p className="mt-1 text-[10px] text-slate-600 sm:text-xs">
+          {guru.location}
+        </p>
+
+        <div className="mt-3 flex items-end justify-between gap-2 sm:mt-4">
+          <p className="text-[10px] font-black text-slate-900 sm:text-xs">
+            <span className="text-amber-500">★</span> {guru.rating}
+          </p>
+          <p className="text-[10px] font-black text-emerald-800 sm:text-xs">
+            {guru.priceLabel}
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function ProgramHeroCard({
+  program,
+  onTrack,
+}: {
+  program: ProgramCard;
+  onTrack: (label: string, destination: string) => void;
+}) {
+  return (
+    <article
+      className={`overflow-hidden rounded-[28px] border transition ${
+        program.featured
+          ? "border-amber-200 bg-amber-50 shadow-[0_18px_40px_rgba(245,158,11,0.12)]"
+          : "border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.07)]"
+      }`}
+    >
+      <div
+        className={`relative overflow-hidden ${
+          program.featured ? "h-72 bg-sky-100 lg:h-60" : "h-64 lg:h-60"
+        }`}
+      >
+        <img
+          src={program.image}
+          alt={program.imageAlt}
+          className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
+          loading="lazy"
+        />
+
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/48 via-slate-950/10 to-transparent" />
+
+        <div
+          className={`absolute bottom-4 left-4 flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-lg ${
+            program.featured
+              ? "bg-amber-400 text-amber-950 shadow-amber-900/10"
+              : "bg-emerald-700 text-white shadow-emerald-900/15"
+          }`}
+        >
+          {program.icon}
+        </div>
+      </div>
+
+      <div className="p-5">
+        <p
+          className={`text-xs font-black uppercase tracking-[0.16em] ${
+            program.featured ? "text-amber-700" : "text-emerald-700"
+          }`}
+        >
+          {program.eyebrow}
+        </p>
+
+        <h3 className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-950">
+          {program.title}
+        </h3>
+
+        <p className="mt-2 text-sm leading-6 text-slate-700">
+          {program.description}
+        </p>
+
+        <div className="mt-5 flex flex-col gap-2">
+          <Link
+            href={program.applyHref}
+            onClick={() =>
+              onTrack(
+                `${program.primaryCta} ${program.title}`,
+                program.applyHref,
+              )
+            }
+            className={`inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-black transition ${
+              program.featured
+                ? "bg-amber-400 text-amber-950 hover:bg-amber-300"
+                : "bg-emerald-700 text-white hover:bg-emerald-800"
+            }`}
+          >
+            {program.primaryCta}
+          </Link>
+
+          <Link
+            href={program.href}
+            onClick={() =>
+              onTrack(`${program.secondaryCta} ${program.title}`, program.href)
+            }
+            className={`inline-flex items-center justify-center rounded-full border bg-white px-4 py-2.5 text-sm font-black transition ${
+              program.featured
+                ? "border-amber-300 text-amber-900 hover:bg-amber-50"
+                : "border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+            }`}
+          >
+            {program.secondaryCta}
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function PartnerNetworkSection({
+  onTrack,
+}: {
+  onTrack: (label: string, destination: string) => void;
+}) {
+  const featuredPartner = homepagePartners[0];
+
+  if (!featuredPartner) return null;
+
+  return (
+    <section className="bg-gradient-to-br from-white via-emerald-50/30 to-white py-5 sm:py-10">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="overflow-hidden rounded-[30px] border border-emerald-100 bg-white/95 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-6 lg:p-7">
+          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 sm:text-xs">
+                SitGuru Partner Network
+              </p>
+
+              <h2 className="mt-2 text-2xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-3xl">
+                Growing with local pet care partners
+              </h2>
+
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
+                SitGuru is building a trusted local pet care network with animal
+                clinics, pet businesses, community organizations, and
+                pet-friendly partners who care about safer, easier support for
+                Pet Parents.
+              </p>
+
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Link
+                  href="/contact"
+                  onClick={() => onTrack("Become a Partner", "/contact")}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
+                >
+                  Become a Partner
+                </Link>
+              </div>
+            </div>
+
+            <a
+              href={featuredPartner.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                onTrack(
+                  `Partner Logo ${featuredPartner.name}`,
+                  featuredPartner.href,
+                )
+              }
+              className="group relative block overflow-hidden rounded-[28px] border border-amber-200 bg-gradient-to-br from-white via-amber-50/40 to-emerald-50/60 p-5 shadow-[0_16px_42px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-[0_20px_50px_rgba(15,23,42,0.12)] sm:p-6"
+            >
+              <div className="absolute right-4 top-4 z-10 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-100 px-4 py-2 text-[11px] font-black uppercase tracking-[0.12em] text-amber-900 shadow-sm">
+                <span aria-hidden="true">★</span>
+                Featured SitGuru Partner
+              </div>
+
+              <div className="flex min-h-[160px] items-center justify-center rounded-3xl border border-amber-100 bg-white p-5 pt-14 sm:min-h-[190px] sm:pt-12">
+                <img
+                  src={featuredPartner.logo}
+                  alt={featuredPartner.logoAlt}
+                  className="max-h-28 w-full object-contain sm:max-h-32"
+                  loading="lazy"
+                />
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div>
+                  <h3 className="text-xl font-black tracking-[-0.03em] text-slate-950 group-hover:text-emerald-800">
+                    {featuredPartner.name}
+                  </h3>
+                  <p className="mt-1 text-sm font-black text-emerald-700">
+                    {featuredPartner.type}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    {featuredPartner.location}
+                  </p>
+                  <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                    {featuredPartner.description}
+                  </p>
+                </div>
+
+                <span className="inline-flex rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white shadow-sm transition group-hover:bg-emerald-800">
+                  Visit Partner Website →
+                </span>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HomeVideoSection({
+  onTrack,
+}: {
+  onTrack: (label: string, destination: string) => void;
+}) {
+  return (
+    <section className="bg-white py-6 sm:py-10 lg:py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid min-w-0 gap-5 overflow-hidden rounded-[26px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-[0_16px_42px_rgba(15,23,42,0.08)] sm:gap-7 sm:rounded-[32px] sm:p-7 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center lg:p-8">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 sm:text-xs">
+              Quick overview
+            </p>
+            <h2 className="mt-2 text-[1.65rem] font-black leading-[1.05] tracking-[-0.045em] text-slate-950 sm:mt-3 sm:text-3xl lg:text-4xl">
+              See how SitGuru works.
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
+              Watch a short overview of how SitGuru helps Pet Parents find
+              trusted local care and helps Pet Gurus grow their bookings in one
+              simple pet care marketplace.
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
+              <Link
+                href="/search"
+                onClick={() => onTrack("Find Care Video Section", "/search")}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200 sm:w-auto"
+              >
+                Find Pet Care
+              </Link>
+
+              <Link
+                href={guruSignupHref}
+                onClick={() =>
+                  onTrack("Become a Guru Video Section", guruSignupHref)
+                }
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100 sm:w-auto"
+              >
+                Become a Guru
+              </Link>
+            </div>
+          </div>
+
+          <div className="relative min-w-0 overflow-hidden rounded-[22px] border border-slate-200 bg-slate-950 shadow-[0_16px_38px_rgba(15,23,42,0.14)] sm:rounded-[26px] lg:shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
+            <div className="relative aspect-video w-full">
+              <iframe
+                src={sitGuruVideoEmbedUrl}
+                title="SitGuru Trusted Local Pet Care"
+                className="absolute left-0 top-0 h-full w-full border-0"
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default function HomePage() {
+  const [searchForm, setSearchForm] = useState<SearchFormState>(
+    initialSearchFormState,
+  );
+  const [zipLookupStatus, setZipLookupStatus] =
+    useState<ZipLookupStatus>("idle");
+  const [zipLookupMessage, setZipLookupMessage] = useState("");
+  const [guruCards, setGuruCards] = useState<GuruCard[]>(demoGuruCards);
+  const [source, setSource] = useState("direct");
+
+  const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
+  const visibleGuruCards = useMemo(() => guruCards.slice(0, 10), [guruCards]);
 
   useEffect(() => {
-    if (hasTrackedSearchPageVisit.current) return;
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+  }, []);
 
-    hasTrackedSearchPageVisit.current = true;
+  useEffect(() => {
+    const detectedSource = detectSourceFromUrl();
+    setSource(detectedSource);
 
     trackEvent({
-      eventName: "search_page_visit",
+      eventName: "homepage_visit",
       eventType: "traffic",
-      source: detectSourceFromUrl(),
+      source: detectedSource,
       metadata: {
         referrer: document.referrer || "",
         url: window.location.href,
         search: window.location.search,
         pathname: window.location.pathname,
-        initial_service: initialService,
-        initial_zip: initialZip,
-        initial_city: initialCity,
-        initial_state: initialState,
-        selected_guru_id: selectedGuruId,
-        selected_guru_slug: selectedGuruSlug,
+        version: "easy_signup_trusted_local_launch",
       },
     });
-  }, [
-    initialService,
-    initialZip,
-    initialCity,
-    initialState,
-    selectedGuruId,
-    selectedGuruSlug,
-  ]);
+  }, []);
 
   useEffect(() => {
-    async function loadGurus() {
-      setLoading(true);
-      setError("");
+    let isMounted = true;
 
-      let guruRows: GuruRow[] = [];
-      let gurusErrorMessage = "";
+    async function loadHomepageGurus() {
+      const { data, error } = await supabase
+        .from("gurus")
+        .select("*")
+        .eq("is_active", true)
+        .eq("is_public", true)
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .limit(24);
 
-      for (const selectColumns of GURU_SELECT_ATTEMPTS) {
-        const { data, error: gurusError } = await supabase
-          .from("gurus")
-          .select(selectColumns)
-          .order("is_verified", { ascending: false })
-          .order("rating_avg", { ascending: false, nullsFirst: false });
+      if (!isMounted) return;
 
-        if (!gurusError) {
-          guruRows = ((data || []) as unknown) as GuruRow[];
-          gurusErrorMessage = "";
-          break;
-        }
+      if (error) {
+        console.warn(
+          "Could not load live Gurus for homepage carousel:",
+          error.message,
+        );
 
-        gurusErrorMessage = gurusError.message || gurusErrorMessage;
-      }
-
-      if (gurusErrorMessage) {
-        setError(gurusErrorMessage);
-        setLoading(false);
+        setGuruCards(demoGuruCards);
 
         trackEvent({
-          eventName: "search_gurus_load_failed",
+          eventName: "homepage_gurus_load_failed",
           eventType: "system",
           source: detectSourceFromUrl(),
           metadata: {
-            error: gurusErrorMessage,
+            error: error.message,
+            fallback_demo_guru_count: demoGuruCards.length,
+            version: "easy_signup_trusted_local_live_gurus",
           },
         });
 
         return;
       }
 
-      const guruIds = guruRows
-        .map((guru) => String(guru.id || ""))
-        .filter(Boolean);
-
-      const guruUserIds = Array.from(
-        new Set(
-          guruRows
-            .map((guru) => getGuruCertificationUserId(guru))
-            .filter(Boolean),
-        ),
+      const liveGuruRows = ((data || []) as Guru[]).filter(
+        (guru) => guru.is_active !== false && guru.is_public !== false,
+      );
+      const liveGuruCards = mapGurusToCards(liveGuruRows);
+      const mergedGuruCards = mergeLiveAndDemoGuruCards(
+        liveGuruCards,
+        demoGuruCards,
       );
 
-      let completedGuruUserIds = new Set<string>();
-
-      if (guruIds.length > 0) {
-        const { data: serviceRateRows, error: serviceRatesError } =
-          await supabase
-            .from("guru_service_rates")
-            .select(
-              "id, guru_id, service_key, service_label, is_enabled, rate_amount, rate_unit, duration_minutes, notes",
-            )
-            .in("guru_id", guruIds)
-            .eq("is_enabled", true);
-
-        if (serviceRatesError) {
-          console.warn(
-            "Could not load guru service rates for search cards:",
-            serviceRatesError.message,
-          );
-          setServiceRatesByGuru({});
-        } else {
-          const groupedRates = ((serviceRateRows || []) as GuruServiceRate[]).reduce<
-            Record<string, GuruServiceRate[]>
-          >((accumulator, rate) => {
-            const guruId = String(rate.guru_id || "");
-            if (!guruId) return accumulator;
-
-            accumulator[guruId] = [...(accumulator[guruId] || []), rate];
-            return accumulator;
-          }, {});
-
-          setServiceRatesByGuru(groupedRates);
-        }
-      } else {
-        setServiceRatesByGuru({});
-      }
-
-      completedGuruUserIds = await loadCertifiedGuruUserIds(guruUserIds);
-      setCertifiedGuruUserIds(completedGuruUserIds);
-
-      setGurus(guruRows);
-      setLoading(false);
+      setGuruCards(mergedGuruCards);
 
       trackEvent({
-        eventName: "search_gurus_loaded",
+        eventName: "homepage_gurus_loaded",
         eventType: "system",
         source: detectSourceFromUrl(),
         metadata: {
-          guru_count: guruRows.length,
-          guru_count_with_map_location: guruRows.filter(hasMapLocation).length,
-          guru_count_with_academy_badge: guruRows.filter((guru) =>
-            completedGuruUserIds.has(getGuruCertificationUserId(guru)),
-          ).length,
-          has_initial_service: Boolean(initialService),
-          has_initial_zip: Boolean(initialZip),
-          has_initial_city: Boolean(initialCity),
-          has_initial_state: Boolean(initialState),
+          live_guru_count: liveGuruCards.length,
+          demo_guru_count: demoGuruCards.length,
+          total_carousel_guru_count: mergedGuruCards.length,
+          using_live_gurus: liveGuruCards.length > 0,
+          version: "easy_signup_trusted_local_live_gurus",
         },
       });
     }
 
-    loadGurus();
-  }, [initialService, initialZip, initialCity, initialState]);
+    loadHomepageGurus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
-    const cleanedZip = cleanZip(zipFilter);
+    const normalizedZip = normalizeZipCode(searchForm.zipCode);
 
-    if (!cleanedZip) {
-      setZipLookup(null);
+    if (!normalizedZip) {
       setZipLookupStatus("idle");
-      setCityFilter("");
-      setStateFilter("");
+      setZipLookupMessage("");
       return;
     }
 
-    if (cleanedZip.length !== 5) {
-      setZipLookup(null);
+    if (normalizedZip.length < 5) {
       setZipLookupStatus("idle");
-      setCityFilter("");
-      setStateFilter("");
+      setZipLookupMessage("Enter a 5-digit ZIP code to autofill your area.");
       return;
     }
 
-    let cancelled = false;
+    let isMounted = true;
 
-    async function lookupZip() {
+    async function runLookup() {
+      setZipLookupStatus("loading");
+      setZipLookupMessage("Looking up ZIP code...");
+
       try {
-        setZipLookupStatus("loading");
+        const result = await lookupZipCode(normalizedZip);
 
-        const response = await fetch(`/api/geo/zip?zip=${cleanedZip}`, {
-          cache: "no-store",
-        });
+        if (!isMounted) return;
 
-        if (!response.ok) {
-          if (!cancelled) {
-            setZipLookup(null);
-            setZipLookupStatus("not_found");
-            setCityFilter("");
-            setStateFilter("");
-          }
-
+        if (!result?.city || !result?.state) {
+          setZipLookupStatus("not-found");
+          setZipLookupMessage(
+            "We could not autofill that ZIP code. You can still search.",
+          );
           return;
         }
 
-        const data = (await response.json()) as ZipLookupResult;
+        setSearchForm((prev) => ({
+          ...prev,
+          zipCode: normalizedZip,
+          city: result.city,
+          state: result.stateAbbreviation || result.state,
+        }));
 
-        if (cancelled) return;
-
-        setZipLookup(data);
         setZipLookupStatus("found");
-        setCityFilter(data.city || "");
-        setStateFilter(data.state || data.stateName || "");
+        setZipLookupMessage(
+          `Autofilled ${result.city}, ${
+            result.stateAbbreviation || result.state
+          }.`,
+        );
+      } catch (error) {
+        if (!isMounted) return;
 
-        trackEvent({
-          eventName: "search_zip_autofilled",
-          eventType: "search",
-          source: detectSourceFromUrl(),
-          role: "customer",
-          metadata: {
-            zip: data.zip,
-            city: data.city,
-            state: data.state,
-            latitude: data.latitude,
-            longitude: data.longitude,
-          },
-        });
-      } catch (lookupError) {
-        console.error("Find a Guru ZIP lookup failed:", lookupError);
-
-        if (!cancelled) {
-          setZipLookup(null);
-          setZipLookupStatus("not_found");
-          setCityFilter("");
-          setStateFilter("");
-        }
+        console.error("ZIP code lookup failed:", error);
+        setZipLookupStatus("error");
+        setZipLookupMessage(
+          "ZIP autofill is unavailable right now. You can still search.",
+        );
       }
     }
 
-    const timer = window.setTimeout(() => {
-      lookupZip();
-    }, 400);
+    const timeout = window.setTimeout(runLookup, 350);
 
     return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
+      isMounted = false;
+      window.clearTimeout(timeout);
     };
-  }, [zipFilter]);
+  }, [searchForm.zipCode]);
 
-  useEffect(() => {
-    if (!gurus.length) {
-      setGuruZipLookupsByZip({});
-      return;
-    }
-
-    const uniqueGuruZips = Array.from(
-      new Set(
-        gurus
-          .map((guru) => cleanZip(guru.zip_code))
-          .filter((zip) => zip.length === 5),
-      ),
-    );
-
-    const missingZips = uniqueGuruZips.filter(
-      (zip) => !guruZipLookupsByZip[zip],
-    );
-
-    if (!missingZips.length) return;
-
-    let cancelled = false;
-
-    async function lookupGuruZips() {
-      const lookupResults = await Promise.all(
-        missingZips.map(async (zip) => {
-          try {
-            const response = await fetch(`/api/geo/zip?zip=${zip}`, {
-              cache: "no-store",
-            });
-
-            if (!response.ok) return null;
-
-            const data = (await response.json()) as ZipLookupResult;
-
-            if (
-              typeof data.latitude !== "number" ||
-              typeof data.longitude !== "number" ||
-              !Number.isFinite(data.latitude) ||
-              !Number.isFinite(data.longitude)
-            ) {
-              return null;
-            }
-
-            return [zip, data] as const;
-          } catch (lookupError) {
-            console.warn(`Could not auto-map Guru ZIP ${zip}:`, lookupError);
-            return null;
-          }
-        }),
-      );
-
-      if (cancelled) return;
-
-      const nextLookupResults = lookupResults.filter(
-        (result): result is readonly [string, ZipLookupResult] =>
-          Boolean(result),
-      );
-
-      if (!nextLookupResults.length) return;
-
-      setGuruZipLookupsByZip((currentLookups) => ({
-        ...currentLookups,
-        ...Object.fromEntries(nextLookupResults),
-      }));
-    }
-
-    lookupGuruZips();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [gurus, guruZipLookupsByZip]);
-
-  const filteredGurus = useMemo(() => {
-    const query = normalizeText(searchTerm);
-    const city = normalizeText(cityFilter);
-    const state = normalizeText(stateFilter);
-    const zip = cleanZip(zipFilter);
-    const selectedId = String(selectedGuruId || "").trim();
-    const selectedSlug = String(selectedGuruSlug || "")
-      .trim()
-      .toLowerCase();
-
-    return gurus
-      .filter((guru) => guru.is_active !== false)
-      .filter((guru) => guru.is_public !== false)
-      .filter((guru) => guru.is_accepting_bookings !== false)
-      .filter((guru) => guru.accepting_bookings !== false)
-      .filter((guru) => {
-        const guruName = normalizeText(getGuruName(guru));
-        const guruCity = normalizeText(guru.city);
-        const guruState = normalizeText(guru.state);
-        const guruZip = cleanZip(guru.zip_code);
-        const guruBio = normalizeText(guru.bio);
-        const guruTitle = normalizeText(guru.title);
-        const guruServices = (guru.services || []).join(" ").toLowerCase();
-
-        const matchesText =
-          !query ||
-          [
-            guruName,
-            guruCity,
-            guruState,
-            guruZip,
-            guruBio,
-            guruTitle,
-            guruServices,
-          ]
-            .join(" ")
-            .includes(query);
-
-        const matchesCareRadius = guruServesSearchLocation(
-          guru,
-          zipLookup,
-          zip,
-          guruZipLookupsByZip,
-        );
-        const matchesManualCityFilter = zip
-          ? true
-          : !city || guruCity.includes(city);
-        const matchesManualStateFilter = zip
-          ? true
-          : !state || guruState.includes(state);
-        const matchesSelectedService = matchesService(guru, serviceFilter);
-
-        return (
-          matchesText &&
-          matchesCareRadius &&
-          matchesManualCityFilter &&
-          matchesManualStateFilter &&
-          matchesSelectedService
-        );
-      })
-      .map((guru) =>
-        enrichGuruWithDistance(guru, zipLookup, guruZipLookupsByZip),
-      )
-      .sort((a, b) => {
-        const aSelected =
-          (selectedId && String(a.id) === selectedId) ||
-          (selectedSlug && String(a.slug || "").toLowerCase() === selectedSlug);
-        const bSelected =
-          (selectedId && String(b.id) === selectedId) ||
-          (selectedSlug && String(b.slug || "").toLowerCase() === selectedSlug);
-
-        if (aSelected && !bSelected) return -1;
-        if (!aSelected && bSelected) return 1;
-
-        const aDistance =
-          typeof a.distance_miles === "number"
-            ? a.distance_miles
-            : Number.POSITIVE_INFINITY;
-        const bDistance =
-          typeof b.distance_miles === "number"
-            ? b.distance_miles
-            : Number.POSITIVE_INFINITY;
-
-        if (aDistance !== bDistance) return aDistance - bDistance;
-
-        return getGuruName(a).localeCompare(getGuruName(b));
-      });
-  }, [
-    gurus,
-    searchTerm,
-    zipFilter,
-    cityFilter,
-    stateFilter,
-    serviceFilter,
-    zipLookup,
-    guruZipLookupsByZip,
-    selectedGuruId,
-    selectedGuruSlug,
-  ]);
-
-  const mapReadyGuruCount = useMemo(
-    () => filteredGurus.filter(hasMapLocation).length,
-    [filteredGurus],
-  );
-
-  const mapMissingLocationCount = filteredGurus.length - mapReadyGuruCount;
-
-  useEffect(() => {
-    if (loading) return;
-
-    const searchKey = JSON.stringify({
-      serviceFilter,
-      zipFilter: cleanZip(zipFilter),
-      cityFilter: cityFilter.trim(),
-      stateFilter: stateFilter.trim(),
-      searchTerm: searchTerm.trim(),
-      resultCount: filteredGurus.length,
-    });
-
-    const hasSearchInput =
-      Boolean(serviceFilter) ||
-      Boolean(cleanZip(zipFilter)) ||
-      Boolean(cityFilter.trim()) ||
-      Boolean(stateFilter.trim()) ||
-      Boolean(searchTerm.trim());
-
-    if (!hasSearchInput) return;
-    if (lastTrackedSearchKey.current === searchKey) return;
-
-    const timer = window.setTimeout(() => {
-      lastTrackedSearchKey.current = searchKey;
-
-      trackEvent({
-        eventName: "search_started",
-        eventType: "search",
-        source: detectSourceFromUrl(),
-        role: "customer",
-        metadata: {
-          location: "search_page",
-          service: serviceFilter,
-          zip: cleanZip(zipFilter),
-          city: cityFilter.trim(),
-          state: stateFilter.trim(),
-          query: searchTerm.trim(),
-          result_count: filteredGurus.length,
-          map_ready_result_count: mapReadyGuruCount,
-          total_gurus_loaded: gurus.length,
-        },
-      });
-    }, 700);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    loading,
-    serviceFilter,
-    zipFilter,
-    cityFilter,
-    stateFilter,
-    searchTerm,
-    filteredGurus.length,
-    mapReadyGuruCount,
-    gurus.length,
-  ]);
-
-  const mapCenter = useMemo(
-    () =>
-      getSearchMapCenter({
-        filteredGurus,
-        cityFilter,
-        stateFilter,
-        zipLookup,
-      }),
-    [filteredGurus, cityFilter, stateFilter, zipLookup],
-  );
-
-  const activeFilterCount = [
-    serviceFilter,
-    cleanZip(zipFilter),
-    cityFilter.trim(),
-    stateFilter.trim(),
-    searchTerm.trim(),
-  ].filter(Boolean).length;
-
-  function handleZipChange(value: string) {
-    const cleanedZip = cleanZip(value);
-
-    setZipFilter(cleanedZip);
-
-    if (!cleanedZip) {
-      setZipLookup(null);
-      setZipLookupStatus("idle");
-      setCityFilter("");
-      setStateFilter("");
-    }
+  function updateSearchField<K extends keyof SearchFormState>(
+    key: K,
+    value: SearchFormState[K],
+  ) {
+    setSearchForm((prev) => ({
+      ...prev,
+      [key]: key === "zipCode" ? normalizeZipCode(String(value)) : value,
+    }));
   }
 
-  function clearFilters(location: string) {
+  function trackHomepageClick(label: string, destination: string) {
     trackEvent({
-      eventName: "search_filters_cleared",
-      eventType: "search",
-      source: detectSourceFromUrl(),
-      role: "customer",
-      metadata: {
-        location,
-        previous_service: serviceFilter,
-        previous_zip: cleanZip(zipFilter),
-        previous_city: cityFilter.trim(),
-        previous_state: stateFilter.trim(),
-        previous_query: searchTerm.trim(),
-        previous_result_count: filteredGurus.length,
-      },
-    });
-
-    setServiceFilter("");
-    setZipFilter("");
-    setZipLookup(null);
-    setZipLookupStatus("idle");
-    setCityFilter("");
-    setStateFilter("");
-    setSearchTerm("");
-  }
-
-  function trackGuruHover(guru: GuruRow) {
-    const guruId = String(guru.id);
-
-    if (hoveredGuruIds.current.has(guruId)) return;
-
-    hoveredGuruIds.current.add(guruId);
-
-    trackEvent({
-      eventName: "search_result_hovered",
-      eventType: "engagement",
-      source: detectSourceFromUrl(),
-      guruId: getGuruAnalyticsId(guru),
-      metadata: {
-        location: "search_results",
-        guru_id: guru.id,
-        guru_name: getGuruName(guru),
-        guru_city: guru.city || "",
-        guru_state: guru.state || "",
-        guru_zip: guru.zip_code || "",
-        guru_has_map_location: hasMapLocation(guru),
-        selected_service: serviceFilter,
-        result_count: filteredGurus.length,
-      },
-    });
-  }
-
-  function trackGuruProfileClick(guru: GuruRow, label: string) {
-    trackEvent({
-      eventName: "search_result_clicked",
-      eventType: "profile",
-      source: detectSourceFromUrl(),
-      role: "customer",
-      guruId: getGuruAnalyticsId(guru),
+      eventName: "homepage_cta_clicked",
+      eventType: "navigation",
+      source,
       metadata: {
         label,
-        location: "search_results",
-        destination: getGuruHref(guru),
-        guru_id: guru.id,
-        guru_name: getGuruName(guru),
-        guru_city: guru.city || "",
-        guru_state: guru.state || "",
-        guru_zip: guru.zip_code || "",
-        selected_service: serviceFilter,
-        zip_filter: cleanZip(zipFilter),
-        city_filter: cityFilter.trim(),
-        state_filter: stateFilter.trim(),
-        query: searchTerm.trim(),
-        result_count: filteredGurus.length,
-      },
-    });
-
-    trackEvent({
-      eventName: "guru_profile_view_clicked",
-      eventType: "profile",
-      source: detectSourceFromUrl(),
-      role: "customer",
-      guruId: getGuruAnalyticsId(guru),
-      metadata: {
-        location: "search_results",
-        destination: getGuruHref(guru),
-        guru_name: getGuruName(guru),
+        destination,
+        version: "easy_signup_trusted_local_launch",
       },
     });
   }
 
-  function trackBookingCtaClick(guru: GuruRow) {
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     trackEvent({
-      eventName: "booking_cta_clicked",
-      eventType: "booking",
-      source: detectSourceFromUrl(),
+      eventName: "search_started",
+      eventType: "search",
+      source,
       role: "customer",
-      guruId: getGuruAnalyticsId(guru),
       metadata: {
-        location: "search_results",
-        destination: getBookGuruHref(guru),
-        guru_id: guru.id,
-        guru_name: getGuruName(guru),
-        selected_service: serviceFilter,
-        zip_filter: cleanZip(zipFilter),
-        city_filter: cityFilter.trim(),
-        state_filter: stateFilter.trim(),
-        query: searchTerm.trim(),
-        result_count: filteredGurus.length,
+        location: "homepage_hero_search",
+        service: searchForm.service,
+        city: searchForm.city,
+        state: searchForm.state,
+        zip_code: searchForm.zipCode,
+        destination: searchHref,
+        version: "easy_signup_trusted_local_launch",
+      },
+    });
+
+    if (
+      !searchForm.service &&
+      !searchForm.zipCode &&
+      !searchForm.city &&
+      !searchForm.state
+    ) {
+      event.preventDefault();
+      window.location.href = "/search";
+    }
+  }
+
+  async function handleOAuthSignup() {
+    const callbackUrl =
+      typeof window !== "undefined"
+        ? new URL("/auth/callback", window.location.origin)
+        : null;
+
+    if (callbackUrl) {
+      callbackUrl.searchParams.set("next", "/customer/dashboard");
+      callbackUrl.searchParams.set("role", "pet_parent");
+      callbackUrl.searchParams.set("source", "homepage");
+    }
+
+    trackEvent({
+      eventName: "homepage_social_signup_clicked",
+      eventType: "auth",
+      source,
+      role: "customer",
+      metadata: {
+        provider: "google",
+        location: "homepage_launch_signup_card",
+        selected_next_path: "/customer/dashboard",
+        version: "easy_signup_trusted_local_launch",
+      },
+    });
+
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: callbackUrl?.toString(),
+        queryParams: {
+          prompt: "select_account",
+        },
       },
     });
   }
 
   return (
-    <main className="min-h-screen bg-[#f8fcfd] text-slate-900">
-      <section className="relative overflow-hidden border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#f8fcfd_48%,#ecfdf5_100%)]">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
-          <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-slate-200/40 blur-3xl" />
-        </div>
+    <main
+      className={`${openSans.className} min-h-screen bg-white text-slate-950`}
+      style={{ fontWeight: 300 } as CSSProperties}
+    >
+      <section className="relative overflow-hidden border-b border-slate-100 bg-white">
+        <HeroVisual />
 
-        <div className="relative mx-auto max-w-[1500px] px-5 py-10 sm:px-6 sm:py-12 lg:px-8">
-          <div className="max-w-5xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-700">
-              Find a Guru
-            </p>
-
-            <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              Search trusted local pet care by ZIP code
-            </h1>
-
-            <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
-              Enter your care ZIP code to find SitGuru providers who accept
-              bookings inside their service radius. City and state will
-              auto-fill and the map will center around your search area.
-            </p>
-          </div>
-
-          <Card className="mt-8 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.85fr_1fr_0.85fr_1.15fr_auto]">
+        <div className="relative z-10 mx-auto grid max-w-7xl gap-6 px-4 pb-5 pt-10 sm:px-6 sm:py-10 lg:min-h-[690px] lg:grid-cols-[minmax(0,690px)_minmax(240px,1fr)_350px] lg:items-center lg:gap-7 lg:px-8 lg:py-12 xl:grid-cols-[minmax(0,720px)_minmax(270px,1fr)_370px] xl:gap-8">
+          <div className="lg:py-8">
+            <div className="grid gap-4 lg:block">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  Service
-                </label>
-                <select
-                  value={serviceFilter}
-                  onChange={(event) => setServiceFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                >
-                  <option value="">All services</option>
-                  {SERVICE_OPTIONS.map((service) => (
-                    <option key={service} value={service}>
-                      {service}
-                    </option>
-                  ))}
-                </select>
+                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50/95 px-3 py-1 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur sm:text-xs">
+                  Local Trusted Marketplace
+                </div>
+
+                <div className="mt-4 max-w-[76%] sm:max-w-[590px] lg:max-w-[640px] xl:max-w-[680px]">
+                  <h1 className="text-[2.1rem] font-black leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-[4rem] lg:text-[4.25rem] xl:text-[4.75rem]">
+                    Trusted pet care.
+                    <br />
+                    Made <span className="text-emerald-600">simple.</span>
+                  </h1>
+
+                  <div className="mt-3 max-w-xl lg:max-w-[610px]">
+                    <p className="text-sm font-bold uppercase tracking-[0.14em] text-emerald-700 sm:text-[0.8rem]">
+                      Trusted local pet care marketplace
+                    </p>
+
+                    <p className="mt-2 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
+                      SitGuru connects Pet Parents with trusted independent
+                      local Gurus for walks, sitting, boarding, training, and
+                      more.
+                    </p>
+
+                    <p className="mt-3 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
+                      Create an account in minutes, explore trusted profiles,
+                      keep booking details organized, and book local care with
+                      confidence.
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  ZIP Code
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={5}
-                  value={zipFilter}
-                  onChange={(event) => handleZipChange(event.target.value)}
-                  placeholder="18951"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                />
-              </div>
+              <form
+                action="/search"
+                onSubmit={handleSearchSubmit}
+                className="relative z-20 mt-9 rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.13)] backdrop-blur sm:mt-8 lg:mt-7 lg:w-[690px] xl:w-[720px]"
+              >
+                <input type="hidden" name="city" value={searchForm.city} />
+                <input type="hidden" name="state" value={searchForm.state} />
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  City
-                </label>
-                <input
-                  type="text"
-                  value={cityFilter}
-                  onChange={(event) => setCityFilter(event.target.value)}
-                  placeholder="Quakertown"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  State
-                </label>
-                <input
-                  type="text"
-                  value={stateFilter}
-                  onChange={(event) => setStateFilter(event.target.value)}
-                  placeholder="PA"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-800">
-                  Search profile details
-                </label>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Name, bio, title, services"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                />
-              </div>
-
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={() => clearFilters("top_filter_bar")}
-                  className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 xl:w-auto"
-                >
-                  Clear filters
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-                {filteredGurus.length} Guru
-                {filteredGurus.length === 1 ? "" : "s"} found
-              </span>
-
-              {cleanZip(zipFilter) ? (
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
-                  Radius-matched care area
-                </span>
-              ) : null}
-
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-                {mapReadyGuruCount} map pin
-                {mapReadyGuruCount === 1 ? "" : "s"} ready
-              </span>
-
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-                {activeFilterCount} active filter
-                {activeFilterCount === 1 ? "" : "s"}
-              </span>
-
-              {zipLookupStatus === "loading" ? (
-                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 font-medium text-sky-700">
-                  Looking up ZIP...
-                </span>
-              ) : null}
-
-              {zipLookupStatus === "found" && zipLookup ? (
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
-                  ZIP found: {zipLookup.city}, {zipLookup.state}
-                </span>
-              ) : null}
-
-              {zipLookupStatus === "not_found" ? (
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-medium text-amber-700">
-                  ZIP not found
-                </span>
-              ) : null}
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 sm:py-10 lg:px-8">
-        {error ? (
-          <Card className="mb-6 p-6">
-            <p className="font-medium text-red-600">{error}</p>
-          </Card>
-        ) : null}
-
-        {loading ? (
-          <Card className="p-6">
-            <p className="text-slate-600">Loading Gurus...</p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.18fr_0.82fr]">
-            <div className="space-y-5">
-              {filteredGurus.length === 0 ? (
-                <Card className="p-7">
-                  <h2 className="text-xl font-bold text-slate-900">
-                    No Gurus found
-                  </h2>
-
-                  <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                    Try changing the ZIP code, service, or profile search. ZIP
-                    searches now show only Gurus who accept care inside their
-                    service radius for that location.
-                  </p>
-
-                  <div className="mt-5">
-                    <button
-                      type="button"
-                      onClick={() => clearFilters("no_results_reset")}
-                      className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                <div className="grid gap-3 md:grid-cols-[1.45fr_1fr_auto]">
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      What service do you need?
+                    </span>
+                    <select
+                      name="service"
+                      value={searchForm.service}
+                      onChange={(event) =>
+                        updateSearchField("service", event.target.value)
+                      }
+                      className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
                     >
-                      Reset Search
+                      <option value="">All services</option>
+                      {heroServiceOptions.map((service) => (
+                        <option key={service} value={service}>
+                          {service}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">
+                      ZIP code
+                    </span>
+                    <div className="relative">
+                      <input
+                        name="zip"
+                        value={searchForm.zipCode}
+                        onChange={(event) =>
+                          updateSearchField("zipCode", event.target.value)
+                        }
+                        className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        inputMode="numeric"
+                        maxLength={5}
+                        placeholder="19511"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+                        ⌖
+                      </span>
+                    </div>
+                  </label>
+
+                  <div className="flex items-end">
+                    <button
+                      type="submit"
+                      className="h-12 w-full rounded-xl bg-emerald-700 px-7 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 md:w-auto"
+                    >
+                      Search Gurus
                     </button>
                   </div>
-                </Card>
-              ) : (
-                filteredGurus.map((guru) => {
-                  const photoUrl = getGuruPhotoUrl(guru);
-                  const guruName = getGuruName(guru);
-                  const guruRateDisplay = getGuruRateDisplay(
-                    guru,
-                    serviceFilter,
-                    serviceRatesByGuru,
-                  );
-                  const guruRating = getGuruRating(guru);
-                  const services = guru.services || [];
-                  const visibleServices = services.slice(0, 4);
-                  const extraServiceCount = Math.max(
-                    services.length - visibleServices.length,
-                    0,
-                  );
-                  const guruHasMapLocation = hasMapLocation(guru);
-                  const guruRadius = Math.round(
-                    guru.service_radius_display || getGuruRadius(guru),
-                  );
-                  const guruDistance =
-                    typeof guru.distance_miles === "number"
-                      ? `${guru.distance_miles.toFixed(1)} mi away`
-                      : "Distance calculated by service area";
-                  const isSelectedGuru = Boolean(
-                    (selectedGuruId && String(guru.id) === selectedGuruId) ||
-                      (selectedGuruSlug &&
-                        String(guru.slug || "").toLowerCase() ===
-                          selectedGuruSlug.toLowerCase()),
-                  );
-                  const bookingDisabled = isFillInGuru(guru);
-                  const isAcademyCertified = certifiedGuruUserIds.has(
-                    getGuruCertificationUserId(guru),
-                  );
+                </div>
 
-                  return (
-                    <Card
-                      key={guru.id}
-                      className={`overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md md:h-[380px] ${
-                        isSelectedGuru
-                          ? "border-emerald-400 ring-4 ring-emerald-100"
-                          : ""
-                      }`}
-                      onMouseEnter={() => {
-                        setHighlightedGuruId(String(guru.id));
-                        trackGuruHover(guru);
-                      }}
-                      onMouseLeave={() => setHighlightedGuruId(undefined)}
+                {zipLookupMessage ? (
+                  <p
+                    className={`mt-3 text-xs font-bold ${
+                      zipLookupStatus === "found"
+                        ? "text-emerald-700"
+                        : zipLookupStatus === "loading"
+                          ? "text-slate-500"
+                          : "text-amber-700"
+                    }`}
+                  >
+                    {zipLookupMessage}
+                  </p>
+                ) : null}
+              </form>
+
+              <div className="relative z-20 mt-4 lg:mt-6 lg:w-[640px] xl:w-[670px]">
+                <TrustRow />
+
+                <div className="mt-3 grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/90 p-3 shadow-sm sm:grid-cols-3">
+                  {[
+                    ["Free", "Local signup"],
+                    ["Local", "Trusted care"],
+                    ["Flexible", "Independent Gurus"],
+                  ].map(([value, label]) => (
+                    <div
+                      key={label}
+                      className="rounded-xl bg-white px-3 py-2 text-center"
                     >
-                      <div className="flex min-h-[380px] flex-col md:h-full md:min-h-0 md:flex-row md:items-stretch">
-                        <GuruResultPhoto
-                          photoUrl={photoUrl}
-                          guruName={guruName}
-                          isAcademyCertified={isAcademyCertified}
-                        />
+                      <p className="text-lg font-black text-emerald-700">
+                        {value}
+                      </p>
+                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-600">
+                        {label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-                        <div className="flex min-w-0 flex-1 flex-col p-5 md:h-full md:min-h-0 lg:p-6">
-                          <div className="min-h-0 flex-1 overflow-hidden">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <h2 className="line-clamp-2 text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">
-                                    {guruName}
-                                  </h2>
+              <div className="relative z-20 mt-5 flex justify-center lg:hidden">
+                <HeroSignupCard
+                  onGoogleSignup={handleOAuthSignup}
+                  onTrack={trackHomepageClick}
+                />
+              </div>
+            </div>
+          </div>
 
-                                  {isSelectedGuru ? (
-                                    <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
-                                      Selected
-                                    </span>
-                                  ) : null}
+          <div className="hidden min-h-[500px] lg:block" />
 
-                                  {guru.is_verified ? (
-                                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                      Verified
-                                    </span>
-                                  ) : (
-                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                                      Trusted
-                                    </span>
-                                  )}
+          <div className="relative z-20 hidden lg:block">
+            <HeroSignupCard
+              onGoogleSignup={handleOAuthSignup}
+              onTrack={trackHomepageClick}
+            />
+          </div>
+        </div>
+      </section>
 
-                                  {isAcademyCertified ? (
-                                    <AcademyGraduateBadge
-                                      academyType="guru"
-                                      variant="mini"
-                                    />
-                                  ) : null}
+      <HomeVideoSection onTrack={trackHomepageClick} />
 
-                                  {guruHasMapLocation ? (
-                                    <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                                      Map ready
-                                    </span>
-                                  ) : (
-                                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                                      Location pending
-                                    </span>
-                                  )}
-                                </div>
-
-                                <p className="mt-1 line-clamp-1 text-sm text-slate-600 sm:text-base">
-                                  {guru.title || "Pet Care Guru"}
-                                </p>
-
-                                <p className="mt-1 line-clamp-1 text-sm text-slate-500">
-                                  {formatLocation(guru.city, guru.state)}
-                                  {guru.zip_code ? ` · ${guru.zip_code}` : ""}
-                                </p>
-
-                                <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
-                                  {guruRadius}-mile service radius
-                                </p>
-
-                                {cleanZip(zipFilter) ? (
-                                  <p className="mt-1 text-xs font-bold text-slate-500">
-                                    {guruDistance}
-                                  </p>
-                                ) : null}
-                              </div>
-
-                              <div className="grid shrink-0 grid-cols-2 gap-2 sm:min-w-[160px]">
-                                <div className="rounded-2xl bg-slate-50 px-3 py-2.5 text-center">
-                                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    Rating
-                                  </div>
-                                  <div className="mt-1 text-lg font-bold text-slate-900">
-                                    {guruRating > 0
-                                      ? guruRating.toFixed(1)
-                                      : "New"}
-                                  </div>
-                                </div>
-
-                                <div className="rounded-2xl bg-slate-50 px-3 py-2.5 text-center">
-                                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                    Reviews
-                                  </div>
-                                  <div className="mt-1 text-lg font-bold text-slate-900">
-                                    {guru.review_count || 0}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 flex max-h-[66px] flex-wrap gap-2 overflow-hidden text-sm text-slate-700">
-                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-bold text-emerald-800">
-                                {guruRateDisplay.primary}
-                                <span className="ml-1 font-semibold text-emerald-700">
-                                  {guruRateDisplay.detail}
-                                </span>
-                              </span>
-
-                              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-medium">
-                                {guru.experience_years
-                                  ? `${guru.experience_years}+ years experience`
-                                  : "Experience not listed"}
-                              </span>
-
-                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-bold text-emerald-800">
-                                Accepts care within {guruRadius} mi
-                              </span>
-                            </div>
-
-                            {services.length > 0 ? (
-                              <div className="mt-4 flex max-h-[62px] flex-wrap gap-2 overflow-hidden">
-                                {visibleServices.map((service) => (
-                                  <span
-                                    key={service}
-                                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
-                                  >
-                                    {service}
-                                  </span>
-                                ))}
-
-                                {extraServiceCount > 0 ? (
-                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                                    +{extraServiceCount} more
-                                  </span>
-                                ) : null}
-                              </div>
-                            ) : null}
-
-                            <div className="mt-4">
-                              {guru.bio ? (
-                                <p className="line-clamp-2 text-sm leading-6 text-slate-600 sm:text-base">
-                                  {guru.bio}
-                                </p>
-                              ) : (
-                                <p className="line-clamp-2 text-sm leading-6 text-slate-500 sm:text-base">
-                                  This Guru has not added a bio yet.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                            <Link
-                              href={getGuruHref(guru)}
-                              onClick={() =>
-                                trackGuruProfileClick(guru, "View Guru Profile")
-                              }
-                              className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-                            >
-                              View Guru Profile
-                            </Link>
-
-                            {bookingDisabled ? (
-                              <button
-                                type="button"
-                                disabled
-                                aria-disabled="true"
-                                className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white opacity-55"
-                              >
-                                Book This Guru
-                              </button>
-                            ) : (
-                              <Link
-                                href={getBookGuruHref(guru)}
-                                onClick={() => {
-                                  trackBookingCtaClick(guru);
-                                }}
-                                className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                              >
-                                Book This Guru
-                              </Link>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })
-              )}
+      <section className="bg-white py-5 sm:py-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-stretch">
+            <div className="rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_16px_42px_rgba(15,23,42,0.07)] sm:p-7">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 sm:text-xs">
+                Easy local signup
+              </p>
+              <h2 className="mt-2 text-2xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-3xl">
+                Built for Pet Parents, Pet Gurus, and local communities.
+              </h2>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
+                Pet Parents can find local care, Pet Gurus can apply to offer
+                services independently, and Ambassadors can help spread the word.
+                SitGuru keeps the experience simple, welcoming, and easy to
+                start.
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {[
+                  ["Free", "Local signup"],
+                  ["Local", "Neighborhood care"],
+                  ["Simple", "Easy next steps"],
+                ].map(([value, label]) => (
+                  <div
+                    key={label}
+                    className="rounded-2xl border border-white bg-white/90 p-4 text-center shadow-sm"
+                  >
+                    <p className="text-xl font-black text-emerald-700">
+                      {value}
+                    </p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-slate-600">
+                      {label}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="xl:sticky xl:top-28 xl:self-start">
-              <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
-                <div className="border-b border-slate-200 px-5 py-4">
-                  <h2 className="text-lg font-bold text-slate-900">Map view</h2>
-
-                  <p className="mt-1 text-sm text-slate-600">
-                    Enter a ZIP code or hover over a Guru card to highlight
-                    nearby care.
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[
+                {
+                  title: "For Pet Parents",
+                  body: "Create an account, search local Gurus, keep care details organized, and rebook trusted care with less back-and-forth.",
+                  cta: "Create Pet Parent Account",
+                  href: petParentSignupHref,
+                },
+                {
+                  title: "For Pet Gurus",
+                  body: "Apply as an independent Pet Guru, choose your services and local area, and accept requests that fit your availability.",
+                  cta: "Start Guru Signup",
+                  href: guruSignupHref,
+                },
+              ].map((card) => (
+                <Link
+                  key={card.title}
+                  href={card.href}
+                  onClick={() =>
+                    trackHomepageClick(`${card.title} Signup Card`, card.href)
+                  }
+                  className="group rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_18px_44px_rgba(15,23,42,0.11)] sm:p-6"
+                >
+                  <h3 className="text-lg font-black tracking-[-0.03em] text-slate-950 group-hover:text-emerald-800">
+                    {card.title}
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                    {card.body}
                   </p>
+                  <span className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition group-hover:bg-emerald-800">
+                    {card.cta}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                      {mapReadyGuruCount} map pin
-                      {mapReadyGuruCount === 1 ? "" : "s"}
+      <section className="bg-white py-5 sm:py-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black tracking-[-0.035em] text-slate-950 sm:text-3xl">
+                Meet local Gurus Pet Parents love
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-slate-600 sm:text-sm">
+                Real people. Real care. On-platform reviews and booking records.
+              </p>
+            </div>
+
+            <Link
+              href="/search"
+              onClick={() => trackHomepageClick("View all Gurus", "/search")}
+              className="text-xs font-black text-emerald-700 hover:text-emerald-800 hover:underline sm:text-sm"
+            >
+              View all Gurus
+            </Link>
+          </div>
+
+          {visibleGuruCards.length > 0 ? (
+            <div
+              className="sitguru-guru-carousel relative mt-5 overflow-hidden pb-5"
+              aria-label="Featured local Gurus carousel"
+            >
+              <style>{`
+                .sitguru-guru-carousel {
+                  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 4%, #000 96%, transparent 100%);
+                  mask-image: linear-gradient(to right, transparent 0%, #000 4%, #000 96%, transparent 100%);
+                  -webkit-transform: translateZ(0);
+                  transform: translateZ(0);
+                }
+
+                .sitguru-guru-carousel-track {
+                  display: flex;
+                  width: max-content;
+                  animation: sitguruGuruMarquee 52s linear infinite;
+                  -webkit-animation: sitguruGuruMarquee 52s linear infinite;
+                  transform: translate3d(0, 0, 0);
+                  -webkit-transform: translate3d(0, 0, 0);
+                  will-change: transform;
+                }
+
+                .sitguru-guru-carousel:hover .sitguru-guru-carousel-track,
+                .sitguru-guru-carousel:focus-within .sitguru-guru-carousel-track {
+                  animation-play-state: paused;
+                  -webkit-animation-play-state: paused;
+                }
+
+                @keyframes sitguruGuruMarquee {
+                  0% {
+                    transform: translate3d(0, 0, 0);
+                  }
+                  100% {
+                    transform: translate3d(-50%, 0, 0);
+                  }
+                }
+
+                @-webkit-keyframes sitguruGuruMarquee {
+                  0% {
+                    -webkit-transform: translate3d(0, 0, 0);
+                  }
+                  100% {
+                    -webkit-transform: translate3d(-50%, 0, 0);
+                  }
+                }
+
+                @media (max-width: 640px) {
+                  .sitguru-guru-carousel-track {
+                    animation-duration: 46s;
+                    -webkit-animation-duration: 46s;
+                  }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                  .sitguru-guru-carousel-track {
+                    animation: none;
+                    -webkit-animation: none;
+                  }
+                }
+              `}</style>
+
+              <div className="sitguru-guru-carousel-track">
+                {[0, 1].map((loopIndex) => (
+                  <div
+                    key={`guru-carousel-loop-${loopIndex}`}
+                    aria-hidden={loopIndex === 1}
+                    className="flex shrink-0 gap-4 pr-4 sm:gap-5 sm:pr-5"
+                  >
+                    {visibleGuruCards.map((guru) => (
+                      <GuruCardView
+                        key={`${guru.id}-${loopIndex}`}
+                        guru={guru}
+                        onTrack={trackHomepageClick}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50/50 p-5 text-sm font-semibold text-slate-700">
+              Featured Guru profiles are loading. Visit Find Care to view all
+              available Gurus while the homepage carousel syncs.
+            </div>
+          )}
+        </div>
+      </section>
+
+      <PartnerNetworkSection onTrack={trackHomepageClick} />
+
+      <section className="bg-gradient-to-br from-white via-emerald-50/30 to-white pb-8 sm:pb-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-[34px] border border-emerald-100 bg-white/90 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
+            <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
+              <div>
+                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-emerald-800">
+                  SitGuru Programs
+                </div>
+
+                <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-slate-950 sm:text-4xl">
+                  Anyone can join. Anyone can apply.
+                </h2>
+
+                <p className="mt-4 text-base leading-8 text-slate-700 sm:text-lg">
+                  Pet Parents can find trusted local care. Gurus can apply as
+                  independent service providers and choose the requests that fit
+                  their availability. SitGuru keeps the experience simple with
+                  profiles, booking details, helpful support, and a
+                  community-first way to connect.
+                </p>
+
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <Link
+                    href="/search"
+                    onClick={() =>
+                      trackHomepageClick(
+                        "Find Care Programs Section",
+                        "/search",
+                      )
+                    }
+                    className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-sky-400 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:brightness-105 sm:w-auto"
+                  >
+                    Find Care
+                  </Link>
+
+                  <Link
+                    href={guruSignupHref}
+                    onClick={() =>
+                      trackHomepageClick(
+                        "Become a Guru Programs Section",
+                        guruSignupHref,
+                      )
+                    }
+                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
+                  >
+                    Become a Guru
+                  </Link>
+
+                  <Link
+                    href="/affiliate-program"
+                    onClick={() =>
+                      trackHomepageClick("Explore Programs", "/affiliate-program")
+                    }
+                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
+                  >
+                    Explore Programs
+                  </Link>
+                </div>
+
+                <div className="mt-7 flex flex-wrap gap-3">
+                  {[
+                    "Student Hire",
+                    "Community Hire",
+                    "Military Hire",
+                    "SkillBridge applicants",
+                    "Ambassador referrals",
+                    "Easy signup",
+                    "Trusted profiles",
+                    "Organized booking records",
+                    "Community-first care",
+                  ].map((chip) => (
+                    <span
+                      key={chip}
+                      className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-800"
+                    >
+                      {chip}
                     </span>
+                  ))}
+                </div>
+              </div>
 
-                    {zipLookupStatus === "found" && zipLookup ? (
-                      <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
-                        Centered on {zipLookup.zip}
-                      </span>
-                    ) : null}
+              <div className="grid gap-5 md:grid-cols-3">
+                {homepagePrograms.map((program) => (
+                  <ProgramHeroCard
+                    key={program.title}
+                    program={program}
+                    onTrack={trackHomepageClick}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-                    {mapMissingLocationCount > 0 ? (
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
-                        {mapMissingLocationCount} missing location
-                        {mapMissingLocationCount === 1 ? "" : "s"}
-                      </span>
-                    ) : null}
+      <section id="how-sitguru-works" className="bg-white pb-7 sm:pb-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid overflow-hidden rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50 shadow-[0_18px_45px_rgba(15,23,42,0.08)] lg:grid-cols-3">
+            <div className="border-b border-emerald-100 p-5 lg:border-b-0 lg:border-r lg:p-6">
+              <h2 className="text-lg font-black tracking-[-0.03em] text-slate-950 lg:text-xl">
+                Share SitGuru. Grow PetPerks.
+              </h2>
+
+              <div className="mt-5 grid gap-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xl">
+                    🐾
+                  </span>
+                  <div>
+                    <p className="font-black text-slate-950">
+                      Invite Pet Parents
+                    </p>
+                    <p className="text-sm font-semibold text-slate-600">
+                      share trusted local care
+                    </p>
                   </div>
                 </div>
 
-                <div className="min-h-[420px] sm:min-h-[520px] xl:min-h-[900px]">
-                  <ProviderMap
-                    markers={filteredGurus as unknown as Record<string, unknown>[]}
-                    center={
-                      cleanZip(zipFilter) ||
-                      cityFilter.trim() ||
-                      stateFilter.trim()
-                        ? mapCenter
-                        : undefined
-                    }
-                    highlightedMarkerId={highlightedGuruId}
-                  />
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-xl">
+                    🤝
+                  </span>
+                  <div>
+                    <p className="font-black text-slate-950">
+                      Invite future Gurus
+                    </p>
+                    <p className="text-sm font-semibold text-slate-600">
+                      help grow the SitGuru community
+                    </p>
+                  </div>
                 </div>
               </div>
+
+              <Link
+                href="/petperks"
+                onClick={() =>
+                  trackHomepageClick("PetPerks Learn More", "/petperks")
+                }
+                className="mt-6 inline-flex rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
+              >
+                Learn more
+              </Link>
             </div>
-          </div>
-        )}
-      </section>
-    </main>
-  );
-}
 
-function SearchPageFallback() {
-  return (
-    <main className="min-h-screen bg-[#f8fcfd] text-slate-900">
-      <section className="relative overflow-hidden border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#f8fcfd_48%,#ecfdf5_100%)]">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
-          <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-slate-200/40 blur-3xl" />
-        </div>
+            <div className="border-b border-emerald-100 p-5 lg:border-b-0 lg:border-r lg:p-6">
+              <h2 className="text-lg font-black tracking-[-0.03em] text-slate-950 lg:text-xl">
+                Anyone can join. Anyone can apply.
+              </h2>
 
-        <div className="relative mx-auto max-w-[1500px] px-5 py-10 sm:px-6 sm:py-12 lg:px-8">
-          <div className="max-w-5xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-700">
-              Find a Guru
-            </p>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
+                Pet Parents can find trusted local care. Gurus can apply as
+                independent service providers, choose their services and local
+                service areas, and accept requests that fit their availability.
+                SitGuru Programs create additional ways to refer, support, and
+                help grow the SitGuru Pet Community.
+              </p>
 
-            <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              Search trusted local pet care by ZIP code
-            </h1>
-
-            <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
-              Enter your care ZIP code to find SitGuru providers who accept
-              bookings inside their service radius. City and state will
-              auto-fill and the map will center around your search area.
-            </p>
-          </div>
-
-          <Card className="mt-8 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.85fr_1fr_0.85fr_1.15fr_auto]">
-              <div className="h-[72px] rounded-2xl bg-slate-100" />
-              <div className="h-[72px] rounded-2xl bg-slate-100" />
-              <div className="h-[72px] rounded-2xl bg-slate-100" />
-              <div className="h-[72px] rounded-2xl bg-slate-100" />
-              <div className="h-[72px] rounded-2xl bg-slate-100" />
-              <div className="h-[72px] rounded-2xl bg-slate-100" />
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.18fr_0.82fr]">
-          <div className="space-y-5">
-            <Card className="p-7">
-              <p className="text-slate-600">Loading Gurus...</p>
-            </Card>
-          </div>
-
-          <div className="xl:sticky xl:top-28 xl:self-start">
-            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
-              <div className="border-b border-slate-200 px-5 py-4">
-                <h2 className="text-lg font-bold text-slate-900">Map view</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Loading locations...
-                </p>
+              <div className="mt-5 grid gap-4">
+                {programPathways.map((program) => (
+                  <Link
+                    key={program.title}
+                    href={program.href}
+                    onClick={() =>
+                      trackHomepageClick(program.title, program.href)
+                    }
+                    className="group flex items-start gap-3 rounded-2xl p-2 transition hover:bg-white"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-xl shadow-sm">
+                      {program.icon}
+                    </span>
+                    <div>
+                      <p className="font-black text-slate-950 group-hover:text-emerald-800">
+                        {program.title}
+                      </p>
+                      <p className="text-sm font-semibold leading-5 text-slate-600">
+                        {program.description}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
               </div>
 
-              <div className="min-h-[420px] bg-slate-100 sm:min-h-[520px] xl:min-h-[900px]" />
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link
+                  href="/search"
+                  onClick={() => trackHomepageClick("Find Care", "/search")}
+                  className="inline-flex rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-800"
+                >
+                  Find Care
+                </Link>
+
+                <Link
+                  href={guruSignupHref}
+                  onClick={() =>
+                    trackHomepageClick("Become a Guru", guruSignupHref)
+                  }
+                  className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  Become a Guru
+                </Link>
+
+                <Link
+                  href="/affiliate-program"
+                  onClick={() =>
+                    trackHomepageClick("Explore Programs", "/affiliate-program")
+                  }
+                  className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  Explore Programs
+                </Link>
+              </div>
+            </div>
+
+            <div className="p-5 lg:p-6">
+              <h2 className="text-lg font-black tracking-[-0.03em] text-slate-950 lg:text-xl">
+                How SitGuru works
+              </h2>
+
+              <div className="mt-5 grid gap-4">
+                {[
+                  [
+                    "1",
+                    "Find a Guru",
+                    "Search local care by service & location",
+                  ],
+                  ["2", "Choose a service", "Pick the right care for your pet"],
+                  [
+                    "3",
+                    "Book on-platform",
+                    "Keep service details, payment records, reviews, and support history documented",
+                  ],
+                ].map(([number, title, description]) => (
+                  <div key={title} className="flex items-start gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
+                      {number}
+                    </span>
+                    <div>
+                      <p className="font-black text-slate-950">{title}</p>
+                      <p className="text-sm font-semibold text-slate-600">
+                        {description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Link
+                href="/search"
+                onClick={() =>
+                  trackHomepageClick("See how it works", "/search")
+                }
+                className="mt-6 inline-flex items-center gap-2 text-sm font-black text-emerald-700 hover:text-emerald-800 hover:underline"
+              >
+                See how it works →
+              </Link>
             </div>
           </div>
         </div>
       </section>
-    </main>
-  );
-}
 
-export default function SearchPage() {
-  return (
-    <Suspense fallback={<SearchPageFallback />}>
-      <SearchPageContent />
-    </Suspense>
+      <section className="bg-white pb-8 sm:pb-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950 sm:text-2xl">
+              Popular services
+            </h2>
+
+            <Link
+              href="/search"
+              onClick={() =>
+                trackHomepageClick("Browse all services", "/search")
+              }
+              className="text-sm font-black text-emerald-700 hover:text-emerald-800 hover:underline"
+            >
+              Browse all services
+            </Link>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-6 sm:gap-4">
+            {popularServices.map((service) => (
+              <Link
+                key={service.title}
+                href={service.href}
+                onClick={() => trackHomepageClick(service.title, service.href)}
+                className="group rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-sm transition hover:-translate-y-1 hover:border-emerald-200 hover:bg-emerald-50/40 hover:shadow-md"
+              >
+                <div className="text-2xl">{service.icon}</div>
+                <p className="mt-2 text-xs font-black text-slate-800 group-hover:text-emerald-800">
+                  {service.title}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white pb-10 sm:pb-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[30px] bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 p-6 text-center text-white shadow-[0_24px_70px_rgba(6,78,59,0.28)] sm:p-9">
+            <h2
+              className="text-2xl font-black tracking-[-0.04em] sm:text-3xl"
+              style={{
+                color: "#ffffff",
+                WebkitTextFillColor: "#ffffff",
+                opacity: 1,
+                textShadow: "0 2px 18px rgba(0, 0, 0, 0.2)",
+              }}
+            >
+              Ready to get started?
+            </h2>
+            <p
+              className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 sm:text-base"
+              style={{
+                color: "#ecfdf5",
+                WebkitTextFillColor: "#ecfdf5",
+                opacity: 1,
+              }}
+            >
+              Find trusted pet care or join SitGuru as part of a local,
+              community-first pet care marketplace built around easy signup,
+              trusted profiles, and independent Pet Gurus.
+            </p>
+
+            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+              <Link
+                href="/search"
+                onClick={() =>
+                  trackHomepageClick("Find Care Near Me Final CTA", "/search")
+                }
+                className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-400"
+              >
+                ⌖ Find Care Near Me
+              </Link>
+
+              <Link
+                href={guruSignupHref}
+                onClick={() =>
+                  trackHomepageClick("Become a Guru Final CTA", guruSignupHref)
+                }
+                className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
+              >
+                Become a Guru
+              </Link>
+
+              <Link
+                href="/affiliate-program"
+                onClick={() =>
+                  trackHomepageClick("Explore Programs Final CTA", "/affiliate-program")
+                }
+                className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
+              >
+                Explore Programs
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-7 grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
+            {[
+              "Easy signup",
+              "Reviewed profiles",
+              "Simple signup",
+              "On-platform booking records",
+            ].map((item) => (
+              <div key={item} className="text-xs font-black text-slate-600">
+                <span className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 text-emerald-700">
+                  ⛨
+                </span>
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

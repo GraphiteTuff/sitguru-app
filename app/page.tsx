@@ -4,6 +4,7 @@ import { Open_Sans } from "next/font/google";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
@@ -107,6 +108,7 @@ type Guru = {
 
 type GuruCard = {
   id: string;
+  userId?: string;
   name: string;
   role: string;
   location: string;
@@ -117,6 +119,7 @@ type GuruCard = {
   imagePosition?: string;
   badge: string;
   href: string;
+  isAcademyCertified?: boolean;
 };
 
 type ProgramCard = {
@@ -144,6 +147,12 @@ type PartnerCard = {
   logoAlt: string;
 };
 
+type PublicAcademyCertificationResponse = {
+  academyType?: string;
+  certifiedUserIds?: string[];
+  error?: string;
+};
+
 const demoGuruCards: GuruCard[] = [
   {
     id: "demo-avery-johnson",
@@ -157,6 +166,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 38%",
     badge: "Trusted",
     href: "/search?service=Dog%20Walking&city=Philadelphia&state=PA",
+    isAcademyCertified: false,
   },
   {
     id: "demo-brad-norway",
@@ -170,6 +180,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 40%",
     badge: "Trusted",
     href: "/search?service=Boarding&city=Bethlehem&state=PA",
+    isAcademyCertified: false,
   },
   {
     id: "demo-caleb-brooks",
@@ -183,6 +194,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 42%",
     badge: "Trusted",
     href: "/search?service=Drop-In%20Visits&city=Allentown&state=PA",
+    isAcademyCertified: false,
   },
   {
     id: "demo-darius-miller",
@@ -196,6 +208,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 38%",
     badge: "Trusted",
     href: "/search?service=Doggy%20Day%20Care&city=Camden&state=NJ",
+    isAcademyCertified: false,
   },
   {
     id: "demo-emma-walsh",
@@ -209,6 +222,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 42%",
     badge: "Trusted",
     href: "/search?service=Pet%20Sitting&city=Quakertown&state=PA",
+    isAcademyCertified: false,
   },
   {
     id: "demo-maya-reynolds",
@@ -222,6 +236,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 40%",
     badge: "Trusted",
     href: "/search?service=Dog%20Walking&city=Philadelphia&state=PA",
+    isAcademyCertified: false,
   },
   {
     id: "demo-nina-patel",
@@ -235,6 +250,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 42%",
     badge: "Trusted",
     href: "/search?service=Training%20Support&city=Allentown&state=PA",
+    isAcademyCertified: false,
   },
   {
     id: "demo-olivia-chen",
@@ -248,6 +264,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 40%",
     badge: "Trusted",
     href: "/search?service=Pet%20Sitting&city=Bethlehem&state=PA",
+    isAcademyCertified: false,
   },
   {
     id: "demo-sofia-martinez",
@@ -261,6 +278,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 42%",
     badge: "Trusted",
     href: "/search?service=Boarding&city=Quakertown&state=PA",
+    isAcademyCertified: false,
   },
   {
     id: "demo-suzy-q",
@@ -274,6 +292,7 @@ const demoGuruCards: GuruCard[] = [
     imagePosition: "center 40%",
     badge: "Trusted",
     href: "/search?service=Drop-In%20Visits&city=Camden&state=NJ",
+    isAcademyCertified: false,
   },
 ];
 
@@ -551,14 +570,70 @@ function getGuruRole(guru: Guru) {
   return "Pet Care Guru";
 }
 
-function mapGurusToCards(gurus: Guru[]): GuruCard[] {
+function getGuruCertificationUserId(guru: Guru) {
+  return String(guru.user_id || "").trim();
+}
+
+async function loadCertifiedHomepageGuruUserIds(guruUserIds: string[]) {
+  const safeUserIds = Array.from(
+    new Set(
+      guruUserIds
+        .map((userId) => String(userId || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (!safeUserIds.length) return new Set<string>();
+
+  try {
+    const response = await fetch(
+      `/api/public/academy-certifications?academyType=guru&userIds=${encodeURIComponent(
+        safeUserIds.join(","),
+      )}`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      console.warn(
+        "Could not load Guru Academy certifications for homepage carousel.",
+      );
+      return new Set<string>();
+    }
+
+    const payload = (await response.json()) as PublicAcademyCertificationResponse;
+
+    return new Set(
+      (payload.certifiedUserIds || [])
+        .map((userId) => String(userId || "").trim())
+        .filter(Boolean),
+    );
+  } catch (error) {
+    console.warn(
+      "Could not load Guru Academy certifications for homepage carousel:",
+      error,
+    );
+    return new Set<string>();
+  }
+}
+
+function mapGurusToCards(
+  gurus: Guru[],
+  certifiedGuruUserIds: Set<string>,
+): GuruCard[] {
   return gurus.map((guru) => {
     const photoUrl = getGuruPhotoUrl(guru);
     const rating = getGuruRating(guru);
     const reviews = Number(guru.review_count || 0);
+    const userId = getGuruCertificationUserId(guru);
+    const isAcademyCertified = userId
+      ? certifiedGuruUserIds.has(userId)
+      : false;
 
     return {
       id: `live-${String(guru.id)}`,
+      userId,
       name: getGuruName(guru),
       role: getGuruRole(guru),
       location: formatLocation(guru.city, guru.state),
@@ -569,6 +644,7 @@ function mapGurusToCards(gurus: Guru[]): GuruCard[] {
       imagePosition: "center 34%",
       badge: guru.is_verified ? "Verified" : "Trusted",
       href: getGuruHref(guru),
+      isAcademyCertified,
     };
   });
 }
@@ -801,15 +877,33 @@ function GuruCardView({
           style={{ objectPosition: guru.imagePosition || "center 40%" }}
           loading="lazy"
         />
-        <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-emerald-700 shadow-sm">
+
+        {guru.isAcademyCertified ? (
+          <div className="pointer-events-none absolute left-3 top-3 z-30 sm:left-4 sm:top-4">
+            <AcademyGraduateBadge
+              academyType="guru"
+              variant="photo-overlay"
+              className="h-[66px] w-[66px] sm:h-[78px] sm:w-[78px] lg:h-[84px] lg:w-[84px]"
+            />
+          </div>
+        ) : null}
+
+        <span className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-emerald-700 shadow-sm">
           ♡
         </span>
       </div>
 
       <div className="p-3 sm:p-4">
-        <h3 className="text-sm font-black text-slate-950 sm:text-base">
-          {guru.name}
-        </h3>
+        <div className="flex items-start gap-2">
+          <h3 className="min-w-0 flex-1 text-sm font-black text-slate-950 sm:text-base">
+            {guru.name}
+          </h3>
+
+          {guru.isAcademyCertified ? (
+            <AcademyGraduateBadge academyType="guru" variant="mini" />
+          ) : null}
+        </div>
+
         <p className="mt-1 text-[10px] font-bold text-emerald-700 sm:text-xs">
           {guru.role}
         </p>
@@ -1157,7 +1251,21 @@ export default function HomePage() {
       const liveGuruRows = ((data || []) as Guru[]).filter(
         (guru) => guru.is_active !== false && guru.is_public !== false,
       );
-      const liveGuruCards = mapGurusToCards(liveGuruRows);
+
+      const liveGuruUserIds = Array.from(
+        new Set(
+          liveGuruRows
+            .map((guru) => getGuruCertificationUserId(guru))
+            .filter(Boolean),
+        ),
+      );
+
+      const certifiedGuruUserIds =
+        await loadCertifiedHomepageGuruUserIds(liveGuruUserIds);
+
+      if (!isMounted) return;
+
+      const liveGuruCards = mapGurusToCards(liveGuruRows, certifiedGuruUserIds);
       const mergedGuruCards = mergeLiveAndDemoGuruCards(
         liveGuruCards,
         demoGuruCards,
@@ -1171,6 +1279,9 @@ export default function HomePage() {
         source: detectSourceFromUrl(),
         metadata: {
           live_guru_count: liveGuruCards.length,
+          live_certified_guru_count: liveGuruCards.filter(
+            (guru) => guru.isAcademyCertified,
+          ).length,
           demo_guru_count: demoGuruCards.length,
           total_carousel_guru_count: mergedGuruCards.length,
           using_live_gurus: liveGuruCards.length > 0,
