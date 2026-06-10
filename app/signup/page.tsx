@@ -591,6 +591,9 @@ function SignupPageContent() {
       const { cleanName, firstName, lastName } = getNameParts(fullName);
       const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
+      const cleanAmbassadorReferralCode = normalizeAmbassadorReferralCode(
+        ambassadorReferralCode,
+      );
 
       if (!isValidFullName(cleanName)) {
         setError("Please enter your real first and last name.");
