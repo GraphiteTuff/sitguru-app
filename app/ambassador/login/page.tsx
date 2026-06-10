@@ -79,7 +79,7 @@ function getLoginErrorMessage(errorCode: string) {
   }
 
   if (errorCode === "not_found") {
-    return "We could not find an active Ambassador dashboard for that code.";
+    return "We could not find an active Ambassador dashboard for that code or email.";
   }
 
   if (errorCode === "not_enabled") {
@@ -390,13 +390,13 @@ export default async function AmbassadorLoginPage({
             <form action={ambassadorLoginAction} className="grid gap-4">
               <label className="grid gap-2">
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Ambassador Code
+                  Ambassador Code or Email
                 </span>
                 <div className="flex min-h-14 items-center gap-3 rounded-2xl border border-[#dfe9e2] bg-white px-4 py-3 transition focus-within:border-green-500 focus-within:ring-4 focus-within:ring-green-100">
                   <KeyRound size={18} className="shrink-0 text-slate-400" />
                   <input
                     name="ambassador_code"
-                    placeholder="SKYLER-SG2026"
+                    placeholder="KAMERINCOX"
                     autoCapitalize="characters"
                     autoComplete="username"
                     className="w-full bg-transparent text-base font-black uppercase tracking-wide text-slate-900 outline-none placeholder:text-slate-400 sm:text-sm"
@@ -458,7 +458,7 @@ export default async function AmbassadorLoginPage({
                     <KeyRound size={17} className="shrink-0 text-green-700" />
                     <input
                       name="reset_ambassador_code"
-                      placeholder="SKYLER-SG2026"
+                      placeholder="KAMERINCOX"
                       autoCapitalize="characters"
                       autoComplete="username"
                       className="w-full bg-transparent text-sm font-black uppercase tracking-wide text-slate-900 outline-none placeholder:text-slate-400"

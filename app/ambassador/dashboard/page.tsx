@@ -132,10 +132,11 @@ function getReferralUrl({
   referralCode: string;
   type: "pet-parent" | "guru";
 }) {
+  const encodedCode = encodeURIComponent(referralCode);
   const fallbackPath =
     type === "pet-parent"
-      ? `/signup?ref=${encodeURIComponent(referralCode)}`
-      : `/become-a-guru?ref=${encodeURIComponent(referralCode)}`;
+      ? `/signup?role=pet_parent&ambassador_code=${encodedCode}&ref=${encodedCode}&next=/customer/dashboard`
+      : `/signup?role=guru&ambassador_code=${encodedCode}&ref=${encodedCode}&next=/guru/dashboard`;
 
   return normalizeUrl(asString(storedUrl), fallbackPath);
 }
@@ -168,6 +169,43 @@ async function safeCount(table: string, filters: Record<string, string>) {
   } catch {
     return 0;
   }
+}
+
+async function safeReferralCount({
+  table,
+  referralCode,
+  referralColumns,
+  extraFilters = {},
+}: {
+  table: string;
+  referralCode: string;
+  referralColumns: string[];
+  extraFilters?: Record<string, string>;
+}) {
+  const matchingIds = new Set<string>();
+
+  for (const column of referralColumns) {
+    try {
+      let query = supabaseAdmin.from(table).select("id").eq(column, referralCode);
+
+      Object.entries(extraFilters).forEach(([key, value]) => {
+        query = query.eq(key, value);
+      });
+
+      const { data, error } = await query.limit(1000);
+
+      if (error || !Array.isArray(data)) continue;
+
+      data.forEach((row: AnyRow) => {
+        const id = asString(row.id);
+        if (id) matchingIds.add(id);
+      });
+    } catch {
+      // Some live tables may not have every referral column yet. Skip safely.
+    }
+  }
+
+  return matchingIds.size;
 }
 
 async function safeRewardSum(referralCode: string, status: string) {
@@ -203,11 +241,21 @@ async function getReferralStats(referralCode: string): Promise<ReferralStats> {
     approvedRewards,
     paidRewards,
   ] = await Promise.all([
-    safeCount("profiles", { referral_code: referralCode }),
-    safeCount("guru_applications", { referral_code: referralCode }),
-    safeCount("bookings", {
-      referral_code: referralCode,
-      status: "completed",
+    safeReferralCount({
+      table: "profiles",
+      referralCode,
+      referralColumns: ["ambassador_referral_code", "referral_code"],
+    }),
+    safeReferralCount({
+      table: "guru_applications",
+      referralCode,
+      referralColumns: ["ambassador_referral_code", "referral_code"],
+    }),
+    safeReferralCount({
+      table: "bookings",
+      referralCode,
+      referralColumns: ["ambassador_referral_code", "referral_code"],
+      extraFilters: { status: "completed" },
     }),
     safeRewardSum(referralCode, "pending"),
     safeRewardSum(referralCode, "approved"),

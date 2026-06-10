@@ -791,7 +791,7 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
           href={`/admin/ambassadors/${ambassador.ambassador_id}`}
           className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
         >
-          View Ambassador
+          View Dashboard
           <ChevronRight className="ml-1 h-4 w-4" />
         </Link>
       </div>

@@ -1798,10 +1798,14 @@ export default async function AdminAmbassadorDetailPage({
   });
   const cards = buildDetailCards(referrals, rewards, trainingPercent);
 
+  const encodedReferralCode = ambassadorRow.referral_code
+    ? encodeURIComponent(ambassadorRow.referral_code)
+    : "";
+
   const referralLink =
     ambassadorRow.referral_link ||
-    (ambassadorRow.referral_code
-      ? `https://www.sitguru.com/sign-up?ref=${ambassadorRow.referral_code}`
+    (encodedReferralCode
+      ? `https://www.sitguru.com/signup?role=pet_parent&ambassador_code=${encodedReferralCode}&ref=${encodedReferralCode}&next=/customer/dashboard`
       : "Referral link not generated yet");
 
   const hasQueryError =
