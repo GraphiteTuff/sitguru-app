@@ -80,6 +80,15 @@ type AmbassadorDetailRow = {
   archived_reason: string | null;
 };
 
+type AmbassadorRegistryFilters = {
+  q: string;
+  status: string;
+  type: string;
+  training: string;
+  photo: string;
+  rewards: string;
+};
+
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
 
 const ambassadorQuickActions = [
@@ -832,6 +841,139 @@ function getNotice(
   return null;
 }
 
+
+function getSingleSearchParam(
+  searchParams: Record<string, string | string[] | undefined> | undefined,
+  key: string,
+) {
+  const value = searchParams?.[key];
+
+  if (Array.isArray(value)) {
+    return asString(value[0]);
+  }
+
+  return asString(value);
+}
+
+function buildRegistryFilters(
+  searchParams: Record<string, string | string[] | undefined> | undefined,
+): AmbassadorRegistryFilters {
+  return {
+    q: getSingleSearchParam(searchParams, "q"),
+    status: getSingleSearchParam(searchParams, "status"),
+    type: getSingleSearchParam(searchParams, "type"),
+    training: getSingleSearchParam(searchParams, "training"),
+    photo: getSingleSearchParam(searchParams, "photo"),
+    rewards: getSingleSearchParam(searchParams, "rewards"),
+  };
+}
+
+function hasActiveRegistryFilters(filters: AmbassadorRegistryFilters) {
+  return Boolean(
+    filters.q ||
+      filters.status ||
+      filters.type ||
+      filters.training ||
+      filters.photo ||
+      filters.rewards,
+  );
+}
+
+function uniqueSorted(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
+
+function getTrainingFilterMatch(ambassador: AmbassadorSummaryRow, filter: string) {
+  const percent = numberValue(ambassador.training_percent);
+  const status = normalizeText(ambassador.training_status);
+
+  if (!filter) return true;
+  if (filter === "not_started") return percent === 0 || status.includes("not started");
+  if (filter === "in_progress") return percent > 0 && percent < 100;
+  if (filter === "complete") return percent >= 100 || status.includes("complete");
+
+  return true;
+}
+
+function getPhotoFilterMatch(ambassador: AmbassadorSummaryRow, filter: string) {
+  const hasPhoto = Boolean(ambassador.ambassador_photo_url);
+
+  if (!filter) return true;
+  if (filter === "missing") return !hasPhoto;
+  if (filter === "pending") return hasPhoto && ambassador.photo_approved !== true;
+  if (filter === "approved") return hasPhoto && ambassador.photo_approved === true;
+
+  return true;
+}
+
+function getRewardsFilterMatch(ambassador: AmbassadorSummaryRow, filter: string) {
+  const pending = numberValue(ambassador.pending_rewards);
+  const approved = numberValue(ambassador.approved_rewards);
+  const ready = numberValue(ambassador.ready_for_payout_rewards);
+  const paid = numberValue(ambassador.paid_rewards);
+  const total = pending + approved + ready + paid;
+
+  if (!filter) return true;
+  if (filter === "none") return total === 0;
+  if (filter === "pending") return pending > 0 || approved > 0;
+  if (filter === "ready") return ready > 0;
+  if (filter === "paid") return paid > 0;
+
+  return true;
+}
+
+function filterAmbassadorsForRegistry(
+  ambassadors: AmbassadorSummaryRow[],
+  filters: AmbassadorRegistryFilters,
+) {
+  const query = normalizeText(filters.q);
+
+  return ambassadors.filter((ambassador) => {
+    const status = isArchivedAmbassador(ambassador)
+      ? "archived"
+      : normalizeText(ambassador.status);
+    const typeLabel = getAmbassadorTypeLabel(ambassador);
+
+    const searchableText = [
+      getAmbassadorName(ambassador),
+      ambassador.email,
+      ambassador.phone,
+      ambassador.referral_code,
+      ambassador.city,
+      ambassador.state,
+      ambassador.county,
+      ambassador.country,
+      ambassador.source,
+      ambassador.program,
+      ambassador.internal_role,
+      typeLabel,
+      getSourceLabel(ambassador),
+      getAmbassadorCategory(ambassador),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    const matchesQuery = !query || searchableText.includes(query);
+    const matchesStatus = !filters.status || status === filters.status;
+    const matchesType = !filters.type || typeLabel === filters.type;
+    const matchesTraining = getTrainingFilterMatch(ambassador, filters.training);
+    const matchesPhoto = getPhotoFilterMatch(ambassador, filters.photo);
+    const matchesRewards = getRewardsFilterMatch(ambassador, filters.rewards);
+
+    return (
+      matchesQuery &&
+      matchesStatus &&
+      matchesType &&
+      matchesTraining &&
+      matchesPhoto &&
+      matchesRewards
+    );
+  });
+}
+
 function DashboardStatCard({
   label,
   value,
@@ -974,6 +1116,12 @@ export default async function AdminAmbassadorsPage({
       archived_reason: detail?.archived_reason || null,
     };
   });
+
+  const registryFilters = buildRegistryFilters(resolvedSearchParams);
+  const registryAmbassadors = filterAmbassadorsForRegistry(
+    ambassadors,
+    registryFilters,
+  );
 
   const cards = buildAdminCards(ambassadors);
   const pipelineCards = cards.filter((card) => card.group === "Pipeline");
@@ -1191,7 +1339,11 @@ export default async function AdminAmbassadorsPage({
           </div>
         </section>
 
-        <AmbassadorRegistryTable ambassadors={ambassadors} />
+        <AmbassadorRegistryTable
+          ambassadors={registryAmbassadors}
+          allAmbassadors={ambassadors}
+          filters={registryFilters}
+        />
 
         {ambassadors.length === 0 ? (
           <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-8 text-center shadow-sm">
@@ -1259,9 +1411,23 @@ export default async function AdminAmbassadorsPage({
 
 function AmbassadorRegistryTable({
   ambassadors,
+  allAmbassadors,
+  filters,
 }: {
   ambassadors: AmbassadorSummaryRow[];
+  allAmbassadors: AmbassadorSummaryRow[];
+  filters: AmbassadorRegistryFilters;
 }) {
+  const activeFilters = hasActiveRegistryFilters(filters);
+  const typeOptions = uniqueSorted(allAmbassadors.map(getAmbassadorTypeLabel));
+  const statusOptions = uniqueSorted(
+    allAmbassadors.map((ambassador) =>
+      isArchivedAmbassador(ambassador)
+        ? "archived"
+        : normalizeText(ambassador.status) || "not_started",
+    ),
+  );
+
   const totalReferrals = ambassadors.reduce(
     (sum, ambassador) =>
       sum +
@@ -1311,6 +1477,135 @@ function AmbassadorRegistryTable({
           </div>
         </div>
 
+        <form
+          action="/admin/ambassadors"
+          className="mt-5 rounded-[1.5rem] border border-[#e2ecd9] bg-[#f8fbf6] p-4"
+        >
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+            <label className="block flex-1">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                Search Ambassadors
+              </span>
+              <input
+                name="q"
+                defaultValue={filters.q}
+                placeholder="Name, email, phone, referral code, city, source..."
+                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+              />
+            </label>
+
+            <label className="block min-w-[160px]">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                Status
+              </span>
+              <select
+                name="status"
+                defaultValue={filters.status}
+                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+              >
+                <option value="">All Statuses</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {prettyStatus(status)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block min-w-[190px]">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                Type
+              </span>
+              <select
+                name="type"
+                defaultValue={filters.type}
+                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+              >
+                <option value="">All Types</option>
+                {typeOptions.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block min-w-[160px]">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                Training
+              </span>
+              <select
+                name="training"
+                defaultValue={filters.training}
+                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+              >
+                <option value="">All Training</option>
+                <option value="not_started">Not Started</option>
+                <option value="in_progress">In Progress</option>
+                <option value="complete">Complete</option>
+              </select>
+            </label>
+
+            <label className="block min-w-[150px]">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                Photo
+              </span>
+              <select
+                name="photo"
+                defaultValue={filters.photo}
+                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+              >
+                <option value="">All Photos</option>
+                <option value="missing">Missing</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+              </select>
+            </label>
+
+            <label className="block min-w-[150px]">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                Rewards
+              </span>
+              <select
+                name="rewards"
+                defaultValue={filters.rewards}
+                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+              >
+                <option value="">All Rewards</option>
+                <option value="none">No Rewards</option>
+                <option value="pending">Pending/Approved</option>
+                <option value="ready">Ready for Payout</option>
+                <option value="paid">Paid</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-bold text-slate-600">
+              Showing {ambassadors.length} of {allAmbassadors.length} Ambassador
+              records.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {activeFilters ? (
+                <Link
+                  href="/admin/ambassadors"
+                  className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+                >
+                  Clear Filters
+                </Link>
+              ) : null}
+
+              <button
+                type="submit"
+                className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </form>
+
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
@@ -1318,6 +1613,11 @@ function AmbassadorRegistryTable({
             </p>
             <p className="mt-2 text-2xl font-black text-[#102819]">
               {ambassadors.length}
+              {ambassadors.length !== allAmbassadors.length ? (
+                <span className="ml-1 text-sm font-extrabold text-slate-400">
+                  / {allAmbassadors.length}
+                </span>
+              ) : null}
             </p>
           </div>
           <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
@@ -1360,7 +1660,9 @@ function AmbassadorRegistryTable({
 
       {ambassadors.length === 0 ? (
         <div className="p-6 text-sm font-semibold text-slate-600">
-          No Ambassador records are available yet.
+          {allAmbassadors.length === 0
+            ? "No Ambassador records are available yet."
+            : "No Ambassador records match the current filters."}
         </div>
       ) : (
         <div className="overflow-x-auto">
