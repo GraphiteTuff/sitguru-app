@@ -272,16 +272,16 @@ function getAmbassadorTypeLabel(ambassador: AmbassadorSummaryRow) {
     return "Community Ambassador";
   }
 
-  if (combined.includes("student")) {
-    return "Student Ambassador";
+  if (combined.includes("military")) {
+    return "Military Ambassador";
   }
 
   if (combined.includes("veteran")) {
     return "Veteran Ambassador";
   }
 
-  if (combined.includes("military")) {
-    return "Military Ambassador";
+  if (combined.includes("student")) {
+    return "Student Ambassador";
   }
 
   if (combined.includes("vet tech") || combined.includes("veterinary")) {
