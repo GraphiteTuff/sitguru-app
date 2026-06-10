@@ -319,7 +319,7 @@ const programPathways = [
   {
     title: "SitGuru Programs",
     description: "Additional ways to refer, support, and grow the community",
-    href: "/affiliate-program",
+    href: "/ambassadors",
     icon: "🤝",
   },
 ];
@@ -330,8 +330,8 @@ const homepagePrograms: ProgramCard[] = [
     eyebrow: "Featured student pathway",
     description:
       "For students, recent grads, summer workers, and pet lovers who want a flexible way to build experience, help local pet families, and grow SitGuru after class, on weekends, during school breaks, or all summer.",
-    href: "/affiliate-program#student-hire",
-    applyHref: "/affiliate-program#student-hire",
+    href: "/ambassadors",
+    applyHref: "/ambassadors",
     icon: "🎓",
     image: "/images/ambassadors/student-hire2.jpg",
     imageAlt: "Student pet caregiver taking a selfie with a dog",
@@ -344,8 +344,8 @@ const homepagePrograms: ProgramCard[] = [
     eyebrow: "Local neighborhood pathway",
     description:
       "For local pet lovers, parents, retirees, remote workers, and community members who want a flexible way to offer trusted care, refer neighbors, and help SitGuru grow locally.",
-    href: "/affiliate-program#community-hire",
-    applyHref: "/affiliate-program#community-hire",
+    href: "/ambassadors",
+    applyHref: "/ambassadors",
     icon: "🤝",
     image: "/images/ambassadors/ambassador-program2.jpg",
     imageAlt: "Community pet-care supporters smiling while caring for a pet",
@@ -358,8 +358,8 @@ const homepagePrograms: ProgramCard[] = [
     eyebrow: "Military-connected pathway",
     description:
       "For veterans, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and approved SkillBridge applicants who want flexible local opportunities.",
-    href: "/affiliate-program#military-hire",
-    applyHref: "/affiliate-program#military-hire",
+    href: "/ambassadors",
+    applyHref: "/ambassadors",
     icon: "🎖️",
     image: "/images/ambassadors/veteran-ambassador2.jpg",
     imageAlt: "Veteran or military-connected pet caregiver relaxing with a dog",
@@ -1858,9 +1858,9 @@ export default function HomePage() {
                   </Link>
 
                   <Link
-                    href="/affiliate-program"
+                    href="/ambassadors"
                     onClick={() =>
-                      trackHomepageClick("Explore Programs", "/affiliate-program")
+                      trackHomepageClick("Explore Programs", "/ambassadors")
                     }
                     className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
                   >
@@ -2011,9 +2011,9 @@ export default function HomePage() {
                 </Link>
 
                 <Link
-                  href="/affiliate-program"
+                  href="/ambassadors"
                   onClick={() =>
-                    trackHomepageClick("Explore Programs", "/affiliate-program")
+                    trackHomepageClick("Explore Programs", "/ambassadors")
                   }
                   className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
                 >
@@ -2154,9 +2154,9 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="/affiliate-program"
+                href="/ambassadors"
                 onClick={() =>
-                  trackHomepageClick("Explore Programs Final CTA", "/affiliate-program")
+                  trackHomepageClick("Explore Programs Final CTA", "/ambassadors")
                 }
                 className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
               >
