@@ -76,9 +76,15 @@ type NavLink = {
   href: string;
 };
 
+/**
+ * Public visitors should be able to browse/search Gurus without being forced to log in.
+ * Booking, messaging, and checkout can still require login later in the flow.
+ */
+const PUBLIC_GURU_SEARCH_HREF = "/search";
+
 const publicNavLinks: NavLink[] = [
   { label: "Home", href: "/" },
-  { label: "Find Care", href: "/pet-parents" },
+  { label: "Find Care", href: PUBLIC_GURU_SEARCH_HREF },
   { label: "Become a Guru", href: "/become-a-guru" },
   { label: "Programs", href: "/programs" },
   { label: "Ambassadors", href: "/ambassadors" },
@@ -88,7 +94,7 @@ const publicNavLinks: NavLink[] = [
 
 const customerNavLinks: NavLink[] = [
   { label: "Dashboard", href: "/customer/dashboard" },
-  { label: "Find a Guru", href: "/search" },
+  { label: "Find a Guru", href: PUBLIC_GURU_SEARCH_HREF },
   { label: "Bookings", href: "/customer/dashboard/bookings" },
   { label: "Messages", href: "/messages" },
   { label: "My Pets", href: "/customer/pets" },
@@ -299,15 +305,15 @@ function getActiveAliases(href: string) {
   }
 
   if (href === "/pet-parents") {
-    return ["/pet-parents", "/find-care"];
+    return ["/pet-parents"];
   }
 
   if (href === "/become-a-guru") {
     return ["/become-a-guru", "/pet-gurus"];
   }
 
-  if (href === "/search") {
-    return ["/search", "/find-care", "/customer/find-guru"];
+  if (href === PUBLIC_GURU_SEARCH_HREF) {
+    return [PUBLIC_GURU_SEARCH_HREF, "/find-care", "/customer/find-guru"];
   }
 
   if (href === "/customer/dashboard/bookings") {
@@ -544,14 +550,13 @@ export default function Header({ user = null }: HeaderProps) {
           allRoleSignals.some(isCustomerRole) ||
           allRoleSignals.some(isBothRole);
 
-        const rawRole =
-          hasAdminAccess
-            ? "admin"
-            : hasGuruAccess && hasCustomerAccess
-              ? "both"
-              : hasGuruAccess
-                ? "guru"
-                : "customer";
+        const rawRole = hasAdminAccess
+          ? "admin"
+          : hasGuruAccess && hasCustomerAccess
+            ? "both"
+            : hasGuruAccess
+              ? "guru"
+              : "customer";
 
         setLoadedUser({
           id: activeUser.id,
@@ -1067,7 +1072,8 @@ export default function Header({ user = null }: HeaderProps) {
                   Join SitGuru free
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                  Find trusted local pet care, become a Pet Guru, or explore Student, Community, and Military programs.
+                  Find trusted local pet care, become a Pet Guru, or explore
+                  Student, Community, and Military programs.
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <Link
@@ -1078,11 +1084,11 @@ export default function Header({ user = null }: HeaderProps) {
                     Sign Up Free
                   </Link>
                   <Link
-                    href="/programs"
+                    href={PUBLIC_GURU_SEARCH_HREF}
                     onClick={() => setMobileOpen(false)}
                     className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
                   >
-                    View Programs
+                    Search Gurus
                   </Link>
                 </div>
               </div>
