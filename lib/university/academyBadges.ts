@@ -18,7 +18,7 @@ export const ACADEMY_BADGES: Record<AcademyType, AcademyBadgeConfig> = {
     chipLabel: "Academy Graduate",
     description: "Completed Guru Academy through SitGuru University.",
     completedThroughText: "Completed through SitGuru University",
-    imagePath: "/images/badges/sitguru-certified-guru-badge.png",
+    imagePath: "/images/badges/guru-certified-badge.svg",
   },
   pet_parent: {
     academyType: "pet_parent",
@@ -27,7 +27,7 @@ export const ACADEMY_BADGES: Record<AcademyType, AcademyBadgeConfig> = {
     chipLabel: "Academy Graduate",
     description: "Completed Pet Parent Academy through SitGuru University.",
     completedThroughText: "Completed through SitGuru University",
-    imagePath: "/images/badges/sitguru-certified-pet-parent-badge.png",
+    imagePath: "/images/badges/pet-parent-certified.svg",
   },
   ambassador: {
     academyType: "ambassador",
@@ -36,7 +36,7 @@ export const ACADEMY_BADGES: Record<AcademyType, AcademyBadgeConfig> = {
     chipLabel: "Academy Graduate",
     description: "Completed Ambassador Academy through SitGuru University.",
     completedThroughText: "Completed through SitGuru University",
-    imagePath: "/images/badges/sitguru-certified-ambassador-badge.png",
+    imagePath: "/images/badges/ambassador-certified.svg",
   },
 };
 
