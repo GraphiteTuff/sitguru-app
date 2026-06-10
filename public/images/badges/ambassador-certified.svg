@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200">
+<rect width="1200" height="1200" fill="#101112"/>
+<defs>
+<linearGradient id="red" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c95f47"/><stop offset="1" stop-color="#df8169"/></linearGradient>
+<linearGradient id="cream" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffe4bd"/><stop offset="1" stop-color="#f4cda0"/></linearGradient>
+<linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff3e7"/><stop offset="1" stop-color="#fff"/></linearGradient>
+</defs>
+<path d="M600 45 1025 285Q1100 328 1100 415v370q0 87-75 130L600 1155 175 915q-75-43-75-130V415q0-87 75-130Z" fill="url(#red)"/>
+<path d="M600 105 980 320q60 35 60 105v350q0 70-60 105L600 1095 220 880q-60-35-60-105V425q0-70 60-105Z" fill="url(#cream)"/>
+<path d="M600 145 945 340q55 32 55 95v330q0 63-55 95L600 1055 255 860q-55-32-55-95V435q0-63 55-95Z" fill="#fff"/>
+<path d="M600 170 910 345q45 26 45 78v92H245v-92q0-52 45-78Z" fill="url(#panel)" opacity=".9"/>
+<rect x="180" y="705" width="840" height="95" fill="#f5dec8" opacity=".75"/>
+<text x="600" y="520" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="86" fill="#050505">Ambassador</text>
+<text x="600" y="665" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="128" font-weight="900" letter-spacing="2" fill="#050505">CERTIFIED</text>
+<path d="M600 710C600 860 690 910 825 910C690 910 600 960 600 1115C600 960 510 910 375 910C510 910 600 860 600 710Z" fill="none" stroke="#ffb300" stroke-width="28" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M790 660C805 720 835 750 895 765C835 780 805 810 790 870C775 810 745 780 685 765C745 750 775 720 790 660Z" fill="#ffb300"/>
+</svg>
