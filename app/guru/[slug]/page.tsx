@@ -12,6 +12,9 @@ const SITE_FONT_STYLE = {
   fontWeight: 300,
 };
 
+const CERTIFIED_GURU_BADGE_PATH =
+  "/images/badges/sitguru-certified-guru-badge.png";
+
 const FILL_IN_GURU_NAMES = new Set([
   "avery",
   "caleb",
@@ -1259,26 +1262,52 @@ async function getGuruUniversityProgress(
 function GuruAvatar({
   name,
   imageUrl,
+  isAcademyGraduate = false,
 }: {
   name: string;
   imageUrl?: string | null;
+  isAcademyGraduate?: boolean;
 }) {
-  if (imageUrl) {
-    return (
-      <div className="h-40 w-40 overflow-hidden rounded-full border-[7px] border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.16)] lg:h-48 lg:w-48">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageUrl}
-          alt={name}
-          className="h-full w-full object-cover object-center"
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-40 w-40 items-center justify-center rounded-full border-[7px] border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-6xl font-black text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.16)] lg:h-48 lg:w-48">
-      {getFirstName(name).charAt(0).toUpperCase()}
+    <div className="flex flex-col items-center">
+      <div className="relative">
+        {imageUrl ? (
+          <div className="h-40 w-40 overflow-hidden rounded-full border-[7px] border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.16)] lg:h-48 lg:w-48">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={name}
+              className="h-full w-full object-cover object-center"
+            />
+          </div>
+        ) : (
+          <div className="flex h-40 w-40 items-center justify-center rounded-full border-[7px] border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-6xl font-black text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.16)] lg:h-48 lg:w-48">
+            {getFirstName(name).charAt(0).toUpperCase()}
+          </div>
+        )}
+
+        {isAcademyGraduate ? (
+          <div className="absolute -left-3 top-2 flex h-16 w-16 items-center justify-center rounded-2xl border-4 border-white bg-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={CERTIFIED_GURU_BADGE_PATH}
+              alt="Certified Guru badge"
+              className="h-12 w-12 object-contain"
+            />
+          </div>
+        ) : null}
+      </div>
+
+      {isAcademyGraduate ? (
+        <div className="mt-3 rounded-2xl border border-white/80 bg-white/90 px-4 py-2 text-center shadow-sm">
+          <p className="text-sm font-black !text-emerald-800">
+            Guru Academy Graduate
+          </p>
+          <p className="text-xs font-bold !text-slate-600">
+            Completed through SitGuru University
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1286,26 +1315,96 @@ function GuruAvatar({
 function PublicGuruHeroImage({
   name,
   imageUrl,
+  isAcademyGraduate = false,
 }: {
   name: string;
   imageUrl?: string | null;
+  isAcademyGraduate?: boolean;
 }) {
   if (imageUrl) {
     return (
-      <div className="h-[360px] w-full overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]">
+      <div className="relative h-[360px] w-full overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
           alt={name}
           className="h-full w-full object-cover object-center"
         />
+
+        {isAcademyGraduate ? (
+          <>
+            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-2xl border border-white/80 bg-white/92 px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.16)] backdrop-blur">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={CERTIFIED_GURU_BADGE_PATH}
+                alt="Certified Guru badge"
+                className="h-9 w-9 object-contain"
+              />
+              <span className="text-xs font-black uppercase leading-4 tracking-[0.08em] !text-slate-950">
+                Certified
+                <br />
+                Guru
+              </span>
+            </div>
+
+            <div className="absolute inset-x-4 bottom-4 z-10 rounded-[1.5rem] border border-white/80 bg-white/88 px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xl text-white shadow-sm">
+                  🎓
+                </div>
+                <div>
+                  <p className="text-sm font-black !text-[#07132f]">
+                    Guru Academy Graduate
+                  </p>
+                  <p className="mt-0.5 text-xs font-bold !text-slate-700">
+                    Completed Guru Academy through SitGuru University.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
     );
   }
 
   return (
-    <div className="flex h-[360px] w-full items-center justify-center rounded-[2rem] border border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-7xl font-black text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]">
+    <div className="relative flex h-[360px] w-full items-center justify-center rounded-[2rem] border border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-7xl font-black text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.14)] sm:h-[420px] lg:h-[520px]">
       {getInitials(name)}
+
+      {isAcademyGraduate ? (
+        <>
+          <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-2xl border border-white/80 bg-white/92 px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.16)] backdrop-blur">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={CERTIFIED_GURU_BADGE_PATH}
+              alt="Certified Guru badge"
+              className="h-9 w-9 object-contain"
+            />
+            <span className="text-xs font-black uppercase leading-4 tracking-[0.08em] !text-slate-950">
+              Certified
+              <br />
+              Guru
+            </span>
+          </div>
+
+          <div className="absolute inset-x-4 bottom-4 z-10 rounded-[1.5rem] border border-white/80 bg-white/88 px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xl text-white shadow-sm">
+                🎓
+              </div>
+              <div>
+                <p className="text-sm font-black !text-[#07132f]">
+                  Guru Academy Graduate
+                </p>
+                <p className="mt-0.5 text-xs font-bold !text-slate-700">
+                  Completed Guru Academy through SitGuru University.
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -1957,10 +2056,12 @@ function PublicGuruProfilePage({
   guruProfile,
   serviceRates,
   identifier,
+  universityProgress,
 }: {
   guruProfile: GuruProfile;
   serviceRates: GuruServiceRateRow[];
   identifier: string;
+  universityProgress: GuruUniversityProgress;
 }) {
   const name = getGuruName(guruProfile);
   const firstName = getFirstName(name);
@@ -1977,6 +2078,7 @@ function PublicGuruProfilePage({
   const bookable = isBookable(guruProfile);
   const isFillInGuru = isFillInGuruProfile(guruProfile);
   const disableBooking = isFillInGuru;
+  const isAcademyGraduate = universityProgress.isComplete;
 
   return (
     <main
@@ -1993,7 +2095,11 @@ function PublicGuruProfilePage({
 
         <section className="overflow-hidden rounded-[2.3rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)]">
           <div className="grid gap-8 p-8 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:p-10">
-            <PublicGuruHeroImage name={name} imageUrl={imageUrl} />
+            <PublicGuruHeroImage
+              name={name}
+              imageUrl={imageUrl}
+              isAcademyGraduate={isAcademyGraduate}
+            />
 
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.34em] !text-[#07132f]">
@@ -2013,6 +2119,12 @@ function PublicGuruProfilePage({
                   <GuruPawCrest className="h-6 w-6" />
                   {guruProfile.is_verified ? "Verified Guru" : "Trusted Guru"}
                 </div>
+
+                {isAcademyGraduate ? (
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm">
+                    🎓 Guru Academy Graduate
+                  </div>
+                ) : null}
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
                   📍 {location}
@@ -2289,7 +2401,9 @@ async function GuruDashboardView({
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2">
                   <span className="text-lg">🎓</span>
                   <span className="text-sm font-black !text-slate-900">
-                    {universityProgress.certificationLabel}
+                    {universityProgress.isComplete
+                      ? "Guru Academy Graduate"
+                      : universityProgress.certificationLabel}
                   </span>
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2">
@@ -2341,7 +2455,11 @@ async function GuruDashboardView({
             </div>
 
             <div className="flex flex-col items-center text-center">
-              <GuruAvatar name={name} imageUrl={imageUrl} />
+              <GuruAvatar
+                name={name}
+                imageUrl={imageUrl}
+                isAcademyGraduate={universityProgress.isComplete}
+              />
               <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] !text-[#07132f]">
                 {name}
               </h2>
@@ -2477,19 +2595,28 @@ async function GuruDashboardView({
             </p>
             <h2 className="mt-1 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
               {universityProgress.isComplete
-                ? "Certified Guru badge issued 🎓"
-                : "Become a Certified Guru 🎓"}
+                ? "Guru Academy Graduate badge issued 🎓"
+                : "Become a Guru Academy Graduate 🎓"}
             </h2>
             <p className="mt-2 max-w-4xl text-sm font-bold leading-7 !text-slate-700">
               {universityProgress.isComplete
-                ? "Your Guru Academy badge is active. Keep your profile polished, respond quickly, and deliver trusted care to move toward Elite Guru."
-                : "Complete Guru Academy to unlock your Certified Guru badge. This badge helps Pet Parents understand that you completed SitGuru University onboarding."}
+                ? "Your Guru Academy Graduate badge is active. Keep your profile polished, respond quickly, and deliver trusted care to move toward Elite Guru."
+                : "Complete Guru Academy to unlock your Guru Academy Graduate badge. This badge helps Pet Parents understand that you completed SitGuru University onboarding."}
             </p>
 
             <div className="mt-6 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
               <div className="rounded-[1.5rem] border border-cyan-200 bg-white/70 p-5 text-center">
-                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-cyan-50 text-4xl ring-1 ring-cyan-100">
-                  {universityProgress.isComplete ? "🎓" : "🛡️"}
+                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-cyan-50 ring-1 ring-cyan-100">
+                  {universityProgress.isComplete ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={CERTIFIED_GURU_BADGE_PATH}
+                      alt="Certified Guru badge"
+                      className="h-20 w-20 object-contain"
+                    />
+                  ) : (
+                    <span className="text-4xl">🛡️</span>
+                  )}
                 </div>
                 <p className="mt-4 text-xl font-black !text-[#07132f]">
                   Current crest: {guruTier.label}
@@ -2524,10 +2651,10 @@ async function GuruDashboardView({
                   label="Complete Guru Academy"
                   value={
                     universityProgress.isComplete
-                      ? "Certified"
+                      ? "Graduate"
                       : "Not certified yet"
                   }
-                  goal="Certified Guru"
+                  goal="Guru Academy Graduate"
                   percent={
                     universityProgress.isComplete
                       ? 100
@@ -2682,13 +2809,33 @@ export default async function GuruSlugPage({ params }: PageProps) {
     );
   }
 
-  const serviceRates = await getGuruServiceRates(publicGuruProfile);
+  const [serviceRates, universityProgress] = await Promise.all([
+    getGuruServiceRates(publicGuruProfile),
+    publicGuruProfile.user_id
+      ? getGuruUniversityProgress(publicGuruProfile.user_id)
+      : Promise.resolve({
+          totalSteps: 1,
+          completedSteps: 0,
+          totalMaterials: 0,
+          acknowledgedMaterials: 0,
+          requiredMaterials: 0,
+          progressPercent: 0,
+          isStarted: false,
+          isComplete: false,
+          certificationLabel: "Certified Guru: Not started",
+          badgeStatus: "Locked",
+          progressHelper:
+            "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion.",
+          academyButtonLabel: "Start Guru Academy",
+        } satisfies GuruUniversityProgress),
+  ]);
 
   return (
     <PublicGuruProfilePage
       guruProfile={publicGuruProfile}
       serviceRates={serviceRates}
       identifier={identifier}
+      universityProgress={universityProgress}
     />
   );
 }

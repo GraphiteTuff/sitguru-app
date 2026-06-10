@@ -110,6 +110,9 @@ type ServiceRateState = {
   notes: string;
 };
 
+const CERTIFIED_GURU_BADGE_PATH =
+  "/images/badges/sitguru-certified-guru-badge.png";
+
 const RATE_UNIT_OPTIONS: { value: RateUnit; label: string }[] = [
   { value: "hour", label: "Per hour" },
   { value: "visit", label: "Per visit" },
@@ -445,6 +448,40 @@ async function loadGuruServiceRates(guruId: string, enabledServices: string[]) {
   });
 }
 
+async function loadGuruAcademyGraduate(userId: string) {
+  if (!userId) return false;
+
+  try {
+    const { data, error } = await supabase
+      .from("academy_certifications")
+      .select("badge_status, certificate_status, issued_at")
+      .eq("academy_type", "guru")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("Could not load Guru Academy certification:", error.message);
+      return false;
+    }
+
+    const badgeStatus = String(data?.badge_status || "").toLowerCase();
+    const certificateStatus = String(data?.certificate_status || "").toLowerCase();
+
+    return Boolean(
+      data?.issued_at ||
+        badgeStatus === "issued" ||
+        badgeStatus === "completed" ||
+        badgeStatus === "complete" ||
+        certificateStatus === "issued" ||
+        certificateStatus === "completed" ||
+        certificateStatus === "complete",
+    );
+  } catch (error) {
+    console.warn("Could not load Guru Academy certification:", error);
+    return false;
+  }
+}
+
 async function saveGuruServiceRates(guruId: string, serviceRates: ServiceRateState[]) {
   if (!guruId) return;
 
@@ -689,6 +726,7 @@ function GuruDashboardProfilePageContent() {
     buildDefaultServiceRates(),
   );
   const [isPublic, setIsPublic] = useState(false);
+  const [isGuruAcademyGraduate, setIsGuruAcademyGraduate] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -727,6 +765,7 @@ function GuruDashboardProfilePageContent() {
 
         setUserId(user.id);
         setSignedInEmail(user.email ?? "");
+        setIsGuruAcademyGraduate(await loadGuruAcademyGraduate(user.id));
 
         const { data, error } = await supabase
           .from("gurus")
@@ -1466,6 +1505,12 @@ function GuruDashboardProfilePageContent() {
                       ? "Step 2 Service Area"
                       : "Step 3 Services & Public Request"}
                 </span>
+
+                {isGuruAcademyGraduate ? (
+                  <span className="inline-flex items-center gap-2 rounded-2xl bg-white/90 px-4 py-2 text-sm font-extrabold text-emerald-800 shadow-sm ring-1 ring-white/70">
+                    🎓 Guru Academy Graduate
+                  </span>
+                ) : null}
               </div>
 
               <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.2em] text-emerald-800 shadow-sm ring-1 ring-white/70">
@@ -1541,10 +1586,35 @@ function GuruDashboardProfilePageContent() {
                     publicPreviewName.charAt(0).toUpperCase()
                   )}
                 </div>
+
+                {isGuruAcademyGraduate ? (
+                  <div className="absolute -left-3 top-2 z-20 flex h-16 w-16 items-center justify-center rounded-2xl border-4 border-white bg-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
+                    <Image
+                      src={CERTIFIED_GURU_BADGE_PATH}
+                      alt="Certified Guru badge"
+                      width={48}
+                      height={48}
+                      className="h-12 w-12 object-contain"
+                      unoptimized
+                    />
+                  </div>
+                ) : null}
+
                 <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
                   🐾
                 </div>
               </div>
+
+              {isGuruAcademyGraduate ? (
+                <div className="mt-4 rounded-2xl border border-white/80 bg-white/90 px-4 py-2 text-center shadow-sm">
+                  <p className="text-sm font-black text-emerald-800">
+                    Guru Academy Graduate
+                  </p>
+                  <p className="text-xs font-bold text-slate-600">
+                    Completed through SitGuru University
+                  </p>
+                </div>
+              ) : null}
 
               <h2
                 className="mt-6 text-3xl font-extrabold tracking-tight !text-slate-950 md:text-4xl"
@@ -1813,11 +1883,29 @@ function GuruDashboardProfilePageContent() {
                                   className="object-cover"
                                   unoptimized
                                 />
+                                {isGuruAcademyGraduate ? (
+                                  <div className="absolute left-1 top-1 z-10 flex h-9 w-9 items-center justify-center rounded-xl border-2 border-white bg-white shadow-sm">
+                                    <Image
+                                      src={CERTIFIED_GURU_BADGE_PATH}
+                                      alt="Certified Guru badge"
+                                      width={28}
+                                      height={28}
+                                      className="h-7 w-7 object-contain"
+                                      unoptimized
+                                    />
+                                  </div>
+                                ) : null}
                               </div>
                               <div>
                                 <p className="text-sm font-extrabold !text-slate-950">
                                   Profile photo ready
                                 </p>
+                                {isGuruAcademyGraduate ? (
+                                  <p className="mt-1 text-sm font-extrabold !text-emerald-800">
+                                    Guru Academy Graduate badge will display on
+                                    profile photos.
+                                  </p>
+                                ) : null}
                                 <p className="mt-1 break-all text-sm font-semibold leading-6 !text-slate-700">
                                   {profilePhotoUrl}
                                 </p>
@@ -2441,6 +2529,19 @@ function GuruDashboardProfilePageContent() {
                         <UserCircle2 className="h-9 w-9 text-emerald-600" />
                       </div>
                     )}
+
+                    {isGuruAcademyGraduate ? (
+                      <div className="absolute left-0.5 top-0.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg border-2 border-white bg-white shadow-sm">
+                        <Image
+                          src={CERTIFIED_GURU_BADGE_PATH}
+                          alt="Certified Guru badge"
+                          width={22}
+                          height={22}
+                          className="h-[22px] w-[22px] object-contain"
+                          unoptimized
+                        />
+                      </div>
+                    ) : null}
                   </div>
 
                   <div>
@@ -2453,6 +2554,11 @@ function GuruDashboardProfilePageContent() {
                     <p className="mt-1 text-sm font-semibold !text-slate-500">
                       {publicPreviewLocation}
                     </p>
+                    {isGuruAcademyGraduate ? (
+                      <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-100">
+                        🎓 Guru Academy Graduate
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
