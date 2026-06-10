@@ -1346,498 +1346,171 @@ export default async function AdminAmbassadorsPage({
         />
 
         {ambassadors.length === 0 ? (
-          <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-8 text-center shadow-sm">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#e8f5e9] text-[#2f6f3e]">
-              <GraduationCap className="h-7 w-7" />
-            </div>
-            <h3 className="mt-4 text-xl font-extrabold text-[#102819]">
-              No Ambassadors yet
-            </h3>
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-              Your database is ready. Next, add candidates to the ambassadors
-              table and wire their dashboard records.
-            </p>
-          </section>
-        ) : (
-          <div className="space-y-6">
-            <AmbassadorGroupSection
-              title="Active Ambassadors"
-              description="Ambassadors currently active in referral and growth activity."
-              ambassadors={activeAmbassadors}
-              icon={PlayCircle}
-            />
-
-            <AmbassadorGroupSection
-              title="Onboarding"
-              description="New and onboarding Ambassadors who need setup, follow-up, training, or first outreach."
-              ambassadors={onboardingAmbassadors}
-              icon={Send}
-            />
-
-            <AmbassadorGroupSection
-              title="PA CareerLink / Community Hire"
-              description="Community Ambassador and future Guru candidates sourced from PA CareerLink."
-              ambassadors={paCareerLinkAmbassadors}
-              icon={Users}
-            />
-
-            <AmbassadorGroupSection
-              title="Student Ambassadors"
-              description="Student Ambassador candidates and approved student referral partners."
-              ambassadors={studentAmbassadors}
-              icon={GraduationCap}
-            />
-
-            <AmbassadorGroupSection
-              title="Other Ambassadors"
-              description="Veteran, Military, Vet Tech, Trainer, Groomer, Pet Care Professional, business, and general Ambassador records."
-              ambassadors={otherAmbassadors}
-              icon={BriefcaseBusiness}
-            />
-
-            <AmbassadorGroupSection
-              title="Archived Ambassadors"
-              description="Retained applicant and Ambassador records that are no longer active."
-              ambassadors={archivedAmbassadors}
-              icon={Archive}
-            />
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
-
-
-function AmbassadorRegistryTable({
-  ambassadors,
-  allAmbassadors,
-  filters,
-}: {
-  ambassadors: AmbassadorSummaryRow[];
-  allAmbassadors: AmbassadorSummaryRow[];
-  filters: AmbassadorRegistryFilters;
-}) {
-  const activeFilters = hasActiveRegistryFilters(filters);
-  const typeOptions = uniqueSorted(allAmbassadors.map(getAmbassadorTypeLabel));
-  const statusOptions = uniqueSorted(
-    allAmbassadors.map((ambassador) =>
-      isArchivedAmbassador(ambassador)
-        ? "archived"
-        : normalizeText(ambassador.status) || "not_started",
-    ),
-  );
-
-  const totalReferrals = ambassadors.reduce(
-    (sum, ambassador) =>
-      sum +
-      numberValue(ambassador.pet_parent_signups) +
-      numberValue(ambassador.guru_signups) +
-      numberValue(ambassador.business_signups),
-    0,
-  );
-
-  return (
-    <section className="overflow-hidden rounded-[2rem] border border-[#dbe8d5] bg-white shadow-sm">
-      <div className="border-b border-[#e2ecd9] p-4 sm:p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#2f6f3e]">
-              Super Admin Ambassador Registry
-            </p>
-            <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#102819] sm:text-3xl">
-              Click into each Ambassador dashboard
-            </h2>
-            <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
-              View each Ambassador profile, onboarding status, referral code,
-              Pet Parent and Guru referral activity, rewards, messages, and
-              admin controls from one registry.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/admin/ambassador-leads"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
-            >
-              View Leads
-            </Link>
-            <Link
-              href="/admin/ambassador-training"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
-            >
-              Training Manager
-            </Link>
-            <Link
-              href="/admin/financials/commissions"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
-            >
-              Commissions
-            </Link>
-          </div>
-        </div>
-
-        <form
-          action="/admin/ambassadors"
-          className="mt-5 rounded-[1.5rem] border border-[#e2ecd9] bg-[#f8fbf6] p-4"
-        >
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-            <label className="block flex-1">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                Search Ambassadors
-              </span>
-              <input
-                name="q"
-                defaultValue={filters.q}
-                placeholder="Name, email, phone, referral code, city, source..."
-                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
-              />
-            </label>
-
-            <label className="block min-w-[160px]">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                Status
-              </span>
-              <select
-                name="status"
-                defaultValue={filters.status}
-                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
-              >
-                <option value="">All Statuses</option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {prettyStatus(status)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block min-w-[190px]">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                Type
-              </span>
-              <select
-                name="type"
-                defaultValue={filters.type}
-                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
-              >
-                <option value="">All Types</option>
-                {typeOptions.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block min-w-[160px]">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                Training
-              </span>
-              <select
-                name="training"
-                defaultValue={filters.training}
-                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
-              >
-                <option value="">All Training</option>
-                <option value="not_started">Not Started</option>
-                <option value="in_progress">In Progress</option>
-                <option value="complete">Complete</option>
-              </select>
-            </label>
-
-            <label className="block min-w-[150px]">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                Photo
-              </span>
-              <select
-                name="photo"
-                defaultValue={filters.photo}
-                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
-              >
-                <option value="">All Photos</option>
-                <option value="missing">Missing</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-              </select>
-            </label>
-
-            <label className="block min-w-[150px]">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                Rewards
-              </span>
-              <select
-                name="rewards"
-                defaultValue={filters.rewards}
-                className="min-h-11 w-full rounded-2xl border border-[#cfe4c8] bg-white px-3 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
-              >
-                <option value="">All Rewards</option>
-                <option value="none">No Rewards</option>
-                <option value="pending">Pending/Approved</option>
-                <option value="ready">Ready for Payout</option>
-                <option value="paid">Paid</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-bold text-slate-600">
-              Showing {ambassadors.length} of {allAmbassadors.length} Ambassador
-              records.
-            </p>
-
-            <div className="flex flex-wrap gap-2">
-              {activeFilters ? (
-                <Link
-                  href="/admin/ambassadors"
-                  className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
-                >
-                  Clear Filters
-                </Link>
-              ) : null}
-
-              <button
-                type="submit"
-                className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-[#2f6f3e] px-5 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
-              >
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </form>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Ambassador Records
-            </p>
-            <p className="mt-2 text-2xl font-black text-[#102819]">
-              {ambassadors.length}
-              {ambassadors.length !== allAmbassadors.length ? (
-                <span className="ml-1 text-sm font-extrabold text-slate-400">
-                  / {allAmbassadors.length}
-                </span>
-              ) : null}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Total Referrals
-            </p>
-            <p className="mt-2 text-2xl font-black text-[#102819]">
-              {totalReferrals}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Ready for Payout
-            </p>
-            <p className="mt-2 text-2xl font-black text-[#102819]">
-              {currency(
-                ambassadors.reduce(
-                  (sum, ambassador) =>
-                    sum + numberValue(ambassador.ready_for_payout_rewards),
-                  0,
-                ),
-              )}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Paid Rewards
-            </p>
-            <p className="mt-2 text-2xl font-black text-[#102819]">
-              {currency(
-                ambassadors.reduce(
-                  (sum, ambassador) => sum + numberValue(ambassador.paid_rewards),
-                  0,
-                ),
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {ambassadors.length === 0 ? (
         <div className="p-6 text-sm font-semibold text-slate-600">
           {allAmbassadors.length === 0
             ? "No Ambassador records are available yet."
             : "No Ambassador records match the current filters."}
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-[1120px] w-full divide-y divide-[#e2ecd9]">
-            <thead className="bg-[#f8fbf6]">
-              <tr>
-                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Ambassador
-                </th>
-                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Program
-                </th>
-                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Referral Code
-                </th>
-                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Status
-                </th>
-                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Training
-                </th>
-                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Referrals
-                </th>
-                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Rewards
-                </th>
-                <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Views / Controls
-                </th>
-              </tr>
-            </thead>
+        <div className="grid gap-4 p-4 sm:p-5">
+          {ambassadors.map((ambassador) => {
+            const ambassadorName = getAmbassadorName(ambassador);
+            const archived = isArchivedAmbassador(ambassador);
+            const hasPhoto = Boolean(ambassador.ambassador_photo_url);
+            const trainingPercent = numberValue(ambassador.training_percent);
+            const referralTotal =
+              numberValue(ambassador.pet_parent_signups) +
+              numberValue(ambassador.guru_signups) +
+              numberValue(ambassador.business_signups);
+            const rewardsTotal =
+              numberValue(ambassador.pending_rewards) +
+              numberValue(ambassador.approved_rewards) +
+              numberValue(ambassador.ready_for_payout_rewards) +
+              numberValue(ambassador.paid_rewards);
 
-            <tbody className="divide-y divide-[#edf3e8] bg-white">
-              {ambassadors.map((ambassador) => {
-                const ambassadorName = getAmbassadorName(ambassador);
-                const archived = isArchivedAmbassador(ambassador);
-                const hasPhoto = Boolean(ambassador.ambassador_photo_url);
-                const trainingPercent = numberValue(ambassador.training_percent);
-                const referralTotal =
-                  numberValue(ambassador.pet_parent_signups) +
-                  numberValue(ambassador.guru_signups) +
-                  numberValue(ambassador.business_signups);
-                const rewardsTotal =
-                  numberValue(ambassador.pending_rewards) +
-                  numberValue(ambassador.approved_rewards) +
-                  numberValue(ambassador.ready_for_payout_rewards) +
-                  numberValue(ambassador.paid_rewards);
+            return (
+              <article
+                key={ambassador.ambassador_id}
+                className="rounded-[1.6rem] border border-[#e2ecd9] bg-white p-4 shadow-sm transition hover:border-[#b9d5b7] hover:shadow-md sm:p-5"
+              >
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.85fr)] xl:items-start">
+                  <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
+                    <AmbassadorPhoto ambassador={ambassador} />
 
-                return (
-                  <tr key={ambassador.ambassador_id} className="align-top">
-                    <td className="px-5 py-4">
-                      <div className="flex min-w-[240px] items-start gap-3">
-                        <AmbassadorPhoto ambassador={ambassador} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0">
-                          <p className="truncate font-black text-[#102819]">
+                          <p className="text-lg font-black leading-tight text-[#102819] sm:text-xl">
                             {ambassadorName}
                           </p>
-                          <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                          <p className="mt-1 break-words text-sm font-semibold text-slate-600">
                             {ambassador.email || "No email saved"}
                           </p>
-                          <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                          <p className="mt-1 text-sm font-semibold text-slate-600">
                             {ambassador.phone || "No phone saved"}
                           </p>
-                          <p className="mt-1 truncate text-xs font-bold text-[#2f6f3e]">
+                          <p className="mt-1 text-sm font-bold text-[#2f6f3e]">
                             {getLocationLabel(ambassador)}
                           </p>
                         </div>
-                      </div>
-                    </td>
 
-                    <td className="px-5 py-4">
-                      <div className="min-w-[160px]">
-                        <p className="text-sm font-black text-[#102819]">
-                          {getAmbassadorTypeLabel(ambassador)}
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          {getSourceLabel(ambassador)}
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          {ambassador.program || ambassador.internal_role || "Program not saved"}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="min-w-[150px]">
-                        <p className="rounded-xl bg-[#f0f7ed] px-3 py-2 text-xs font-black text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
-                          {ambassador.referral_code || "Not saved"}
-                        </p>
                         <span
-                          className={`mt-2 inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${photoStatusClass(
-                            hasPhoto,
-                            ambassador.photo_approved,
+                          className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-black ring-1 ${statusClass(
+                            archived ? "archived" : ambassador.status,
                           )}`}
                         >
-                          {getPhotoStatusLabel(hasPhoto, ambassador.photo_approved)}
+                          {archived ? "Archived" : prettyStatus(ambassador.status)}
                         </span>
                       </div>
-                    </td>
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-black ring-1 ${statusClass(
-                          archived ? "archived" : ambassador.status,
-                        )}`}
-                      >
-                        {archived ? "Archived" : prettyStatus(ambassador.status)}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="min-w-[150px]">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-black text-[#102819]">
-                            {trainingPercent}%
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-500">
-                            {prettyStatus(ambassador.training_status)}
-                          </span>
-                        </div>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className={`h-full rounded-full ${trainingClass(
-                              trainingPercent,
-                            )}`}
-                            style={{ width: `${trainingPercent}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="min-w-[160px] text-xs font-bold text-slate-600">
-                        <p>{numberValue(ambassador.pet_parent_signups)} Pet Parents</p>
-                        <p className="mt-1">{numberValue(ambassador.guru_signups)} Gurus</p>
-                        <p className="mt-1">{numberValue(ambassador.business_signups)} Businesses</p>
-                        <p className="mt-2 font-black text-[#102819]">
-                          {referralTotal} total
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="min-w-[140px] text-xs font-bold text-slate-600">
-                        <p>Pending: {currency(ambassador.pending_rewards)}</p>
-                        <p className="mt-1">Ready: {currency(ambassador.ready_for_payout_rewards)}</p>
-                        <p className="mt-1">Paid: {currency(ambassador.paid_rewards)}</p>
-                        <p className="mt-2 font-black text-[#102819]">
-                          {currency(rewardsTotal)}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex min-w-[210px] flex-col gap-2">
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
                         <Link
                           href={`/admin/ambassadors/${ambassador.ambassador_id}`}
-                          className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-[#2f6f3e] px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#255b33]"
+                          className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#255b33]"
                         >
                           View Dashboard
                         </Link>
                         <Link
                           href={buildAmbassadorDirectMessageHref(ambassador)}
-                          className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-xs font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+                          className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
                         >
                           Message
                         </Link>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                    <div className="rounded-2xl border border-[#edf3e8] bg-[#f8fbf6] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                        Ambassador Type
+                      </p>
+                      <p className="mt-2 text-sm font-black text-[#102819]">
+                        {getAmbassadorTypeLabel(ambassador)}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {getSourceLabel(ambassador)}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {ambassador.program ||
+                          ambassador.internal_role ||
+                          "Program not saved"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#edf3e8] bg-[#f8fbf6] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                        Referral Code
+                      </p>
+                      <p className="mt-2 break-words rounded-xl bg-[#f0f7ed] px-3 py-2 text-sm font-black text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
+                        {ambassador.referral_code || "Not saved"}
+                      </p>
+                      <span
+                        className={`mt-3 inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${photoStatusClass(
+                          hasPhoto,
+                          ambassador.photo_approved,
+                        )}`}
+                      >
+                        {getPhotoStatusLabel(hasPhoto, ambassador.photo_approved)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                    <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                          Training
+                        </p>
+                        <span className="text-xs font-black text-[#102819]">
+                          {trainingPercent}%
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs font-bold text-slate-500">
+                        {prettyStatus(ambassador.training_status)}
+                      </p>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={`h-full rounded-full ${trainingClass(
+                            trainingPercent,
+                          )}`}
+                          style={{ width: `${trainingPercent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                        Referrals
+                      </p>
+                      <div className="mt-2 text-xs font-bold leading-5 text-slate-600">
+                        <p>{numberValue(ambassador.pet_parent_signups)} Pet Parents</p>
+                        <p>{numberValue(ambassador.guru_signups)} Gurus</p>
+                        <p>{numberValue(ambassador.business_signups)} Businesses</p>
+                        <p className="mt-1 font-black text-[#102819]">
+                          {referralTotal} total
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                        Rewards
+                      </p>
+                      <div className="mt-2 text-xs font-bold leading-5 text-slate-600">
+                        <p>Pending: {currency(ambassador.pending_rewards)}</p>
+                        <p>Ready: {currency(ambassador.ready_for_payout_rewards)}</p>
+                        <p>Paid: {currency(ambassador.paid_rewards)}</p>
+                        <p className="mt-1 font-black text-[#102819]">
+                          {currency(rewardsTotal)} total
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>
