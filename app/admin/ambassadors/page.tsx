@@ -1031,16 +1031,15 @@ export default async function AdminAmbassadorsPage({
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-[#2f6f3e]">
-                SitGuru Growth
+                Admin / Ambassador Intelligence
               </p>
               <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#102819] sm:text-4xl">
-                Ambassador Dashboard
+                Ambassador Intelligence
               </h1>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-                Track all SitGuru Ambassadors, including Student, Community, PA
-                CareerLink, Veteran, Military, Vet Tech, Trainer, Groomer, Pet
-                Care Professional, and business referral partners from one admin
-                view.
+                View every Ambassador in one clean registry. Track onboarding,
+                training, referral codes, Pet Parent and Guru referrals, rewards,
+                payout readiness, direct messages, and admin dashboard access.
               </p>
             </div>
 
@@ -1168,12 +1167,13 @@ export default async function AdminAmbassadorsPage({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-xl font-extrabold text-[#102819]">
-                Ambassador Pipeline
+                Ambassador Pipeline Cards
               </h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Organized card-based admin view for all Ambassador types.
-                Existing status buttons, archive controls, rewards, training,
-                photos, messenger access, and detail links remain wired.
+                Card-based follow-up view for active, onboarding, PA CareerLink,
+                student, other, and archived Ambassador records. Existing status
+                buttons, archive controls, rewards, training, photos, messenger
+                access, and dashboard links remain wired.
               </p>
             </div>
 
@@ -1190,6 +1190,8 @@ export default async function AdminAmbassadorsPage({
             </div>
           </div>
         </section>
+
+        <AmbassadorRegistryTable ambassadors={ambassadors} />
 
         {ambassadors.length === 0 ? (
           <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-8 text-center shadow-sm">
@@ -1251,6 +1253,292 @@ export default async function AdminAmbassadorsPage({
         )}
       </div>
     </main>
+  );
+}
+
+
+function AmbassadorRegistryTable({
+  ambassadors,
+}: {
+  ambassadors: AmbassadorSummaryRow[];
+}) {
+  const totalReferrals = ambassadors.reduce(
+    (sum, ambassador) =>
+      sum +
+      numberValue(ambassador.pet_parent_signups) +
+      numberValue(ambassador.guru_signups) +
+      numberValue(ambassador.business_signups),
+    0,
+  );
+
+  return (
+    <section className="overflow-hidden rounded-[2rem] border border-[#dbe8d5] bg-white shadow-sm">
+      <div className="border-b border-[#e2ecd9] p-4 sm:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#2f6f3e]">
+              Super Admin Ambassador Registry
+            </p>
+            <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#102819] sm:text-3xl">
+              Click into each Ambassador dashboard
+            </h2>
+            <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
+              View each Ambassador profile, onboarding status, referral code,
+              Pet Parent and Guru referral activity, rewards, messages, and
+              admin controls from one registry.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin/ambassador-leads"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+            >
+              View Leads
+            </Link>
+            <Link
+              href="/admin/ambassador-training"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-extrabold text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+            >
+              Training Manager
+            </Link>
+            <Link
+              href="/admin/financials/commissions"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#255b33]"
+            >
+              Commissions
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              Ambassador Records
+            </p>
+            <p className="mt-2 text-2xl font-black text-[#102819]">
+              {ambassadors.length}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              Total Referrals
+            </p>
+            <p className="mt-2 text-2xl font-black text-[#102819]">
+              {totalReferrals}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              Ready for Payout
+            </p>
+            <p className="mt-2 text-2xl font-black text-[#102819]">
+              {currency(
+                ambassadors.reduce(
+                  (sum, ambassador) =>
+                    sum + numberValue(ambassador.ready_for_payout_rewards),
+                  0,
+                ),
+              )}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              Paid Rewards
+            </p>
+            <p className="mt-2 text-2xl font-black text-[#102819]">
+              {currency(
+                ambassadors.reduce(
+                  (sum, ambassador) => sum + numberValue(ambassador.paid_rewards),
+                  0,
+                ),
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {ambassadors.length === 0 ? (
+        <div className="p-6 text-sm font-semibold text-slate-600">
+          No Ambassador records are available yet.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-[1120px] w-full divide-y divide-[#e2ecd9]">
+            <thead className="bg-[#f8fbf6]">
+              <tr>
+                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Ambassador
+                </th>
+                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Program
+                </th>
+                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Referral Code
+                </th>
+                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Status
+                </th>
+                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Training
+                </th>
+                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Referrals
+                </th>
+                <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Rewards
+                </th>
+                <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Views / Controls
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-[#edf3e8] bg-white">
+              {ambassadors.map((ambassador) => {
+                const ambassadorName = getAmbassadorName(ambassador);
+                const archived = isArchivedAmbassador(ambassador);
+                const hasPhoto = Boolean(ambassador.ambassador_photo_url);
+                const trainingPercent = numberValue(ambassador.training_percent);
+                const referralTotal =
+                  numberValue(ambassador.pet_parent_signups) +
+                  numberValue(ambassador.guru_signups) +
+                  numberValue(ambassador.business_signups);
+                const rewardsTotal =
+                  numberValue(ambassador.pending_rewards) +
+                  numberValue(ambassador.approved_rewards) +
+                  numberValue(ambassador.ready_for_payout_rewards) +
+                  numberValue(ambassador.paid_rewards);
+
+                return (
+                  <tr key={ambassador.ambassador_id} className="align-top">
+                    <td className="px-5 py-4">
+                      <div className="flex min-w-[240px] items-start gap-3">
+                        <AmbassadorPhoto ambassador={ambassador} />
+                        <div className="min-w-0">
+                          <p className="truncate font-black text-[#102819]">
+                            {ambassadorName}
+                          </p>
+                          <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                            {ambassador.email || "No email saved"}
+                          </p>
+                          <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                            {ambassador.phone || "No phone saved"}
+                          </p>
+                          <p className="mt-1 truncate text-xs font-bold text-[#2f6f3e]">
+                            {getLocationLabel(ambassador)}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <div className="min-w-[160px]">
+                        <p className="text-sm font-black text-[#102819]">
+                          {getAmbassadorTypeLabel(ambassador)}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          {getSourceLabel(ambassador)}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          {ambassador.program || ambassador.internal_role || "Program not saved"}
+                        </p>
+                      </div>
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <div className="min-w-[150px]">
+                        <p className="rounded-xl bg-[#f0f7ed] px-3 py-2 text-xs font-black text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
+                          {ambassador.referral_code || "Not saved"}
+                        </p>
+                        <span
+                          className={`mt-2 inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${photoStatusClass(
+                            hasPhoto,
+                            ambassador.photo_approved,
+                          )}`}
+                        >
+                          {getPhotoStatusLabel(hasPhoto, ambassador.photo_approved)}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-black ring-1 ${statusClass(
+                          archived ? "archived" : ambassador.status,
+                        )}`}
+                      >
+                        {archived ? "Archived" : prettyStatus(ambassador.status)}
+                      </span>
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <div className="min-w-[150px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-black text-[#102819]">
+                            {trainingPercent}%
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-500">
+                            {prettyStatus(ambassador.training_status)}
+                          </span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={`h-full rounded-full ${trainingClass(
+                              trainingPercent,
+                            )}`}
+                            style={{ width: `${trainingPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <div className="min-w-[160px] text-xs font-bold text-slate-600">
+                        <p>{numberValue(ambassador.pet_parent_signups)} Pet Parents</p>
+                        <p className="mt-1">{numberValue(ambassador.guru_signups)} Gurus</p>
+                        <p className="mt-1">{numberValue(ambassador.business_signups)} Businesses</p>
+                        <p className="mt-2 font-black text-[#102819]">
+                          {referralTotal} total
+                        </p>
+                      </div>
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <div className="min-w-[140px] text-xs font-bold text-slate-600">
+                        <p>Pending: {currency(ambassador.pending_rewards)}</p>
+                        <p className="mt-1">Ready: {currency(ambassador.ready_for_payout_rewards)}</p>
+                        <p className="mt-1">Paid: {currency(ambassador.paid_rewards)}</p>
+                        <p className="mt-2 font-black text-[#102819]">
+                          {currency(rewardsTotal)}
+                        </p>
+                      </div>
+                    </td>
+
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex min-w-[210px] flex-col gap-2">
+                        <Link
+                          href={`/admin/ambassadors/${ambassador.ambassador_id}`}
+                          className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-[#2f6f3e] px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#255b33]"
+                        >
+                          View Dashboard
+                        </Link>
+                        <Link
+                          href={buildAmbassadorDirectMessageHref(ambassador)}
+                          className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-xs font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+                        >
+                          Message
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
