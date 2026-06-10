@@ -90,10 +90,11 @@ type ZipLookupResult = {
   longitude: number | null;
 };
 
-type PublicAcademyCertificationResponse = {
-  academyType?: string;
-  certifiedUserIds?: string[];
-  error?: string;
+type AcademyCertificationRow = {
+  user_id: string | null;
+  badge_status?: string | null;
+  certificate_status?: string | null;
+  issued_at?: string | null;
 };
 
 const SERVICE_OPTIONS = [
@@ -403,43 +404,29 @@ function getGuruCertificationUserId(guru: GuruRow) {
   return String(guru.user_id || "").trim();
 }
 
-async function loadCertifiedGuruUserIds(guruUserIds: string[]) {
-  const safeUserIds = Array.from(
-    new Set(
-      guruUserIds
-        .map((userId) => String(userId || "").trim())
-        .filter(Boolean),
-    ),
+function certificationStatusMeansComplete(value?: string | null) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  return [
+    "issued",
+    "complete",
+    "completed",
+    "done",
+    "approved",
+    "certified",
+    "graduate",
+    "graduated",
+  ].includes(normalized);
+}
+
+function certificationRowMeansComplete(row: AcademyCertificationRow) {
+  return Boolean(
+    row.issued_at ||
+      certificationStatusMeansComplete(row.badge_status) ||
+      certificationStatusMeansComplete(row.certificate_status),
   );
-
-  if (!safeUserIds.length) return new Set<string>();
-
-  try {
-    const response = await fetch(
-      `/api/public/academy-certifications?academyType=guru&userIds=${encodeURIComponent(
-        safeUserIds.join(","),
-      )}`,
-      {
-        cache: "no-store",
-      },
-    );
-
-    if (!response.ok) {
-      console.warn("Could not load Guru Academy certifications for search cards.");
-      return new Set<string>();
-    }
-
-    const payload = (await response.json()) as PublicAcademyCertificationResponse;
-
-    return new Set(
-      (payload.certifiedUserIds || [])
-        .map((userId) => String(userId || "").trim())
-        .filter(Boolean),
-    );
-  } catch (error) {
-    console.warn("Could not load Guru Academy certifications for search cards:", error);
-    return new Set<string>();
-  }
 }
 
 function getInitials(name: string) {
@@ -1006,8 +993,6 @@ function SearchPageContent() {
         ),
       );
 
-      let completedGuruUserIds = new Set<string>();
-
       if (guruIds.length > 0) {
         const { data: serviceRateRows, error: serviceRatesError } =
           await supabase
@@ -1041,8 +1026,33 @@ function SearchPageContent() {
         setServiceRatesByGuru({});
       }
 
-      completedGuruUserIds = await loadCertifiedGuruUserIds(guruUserIds);
-      setCertifiedGuruUserIds(completedGuruUserIds);
+      if (guruUserIds.length > 0) {
+        const { data: certificationRows, error: certificationsError } =
+          await supabase
+            .from("academy_certifications")
+            .select("user_id, badge_status, certificate_status, issued_at")
+            .eq("academy_type", "guru")
+            .in("user_id", guruUserIds);
+
+        if (certificationsError) {
+          console.warn(
+            "Could not load Guru Academy certifications for search cards:",
+            certificationsError.message,
+          );
+          setCertifiedGuruUserIds(new Set());
+        } else {
+          const completedUserIds = new Set(
+            ((certificationRows || []) as AcademyCertificationRow[])
+              .filter(certificationRowMeansComplete)
+              .map((row) => String(row.user_id || "").trim())
+              .filter(Boolean),
+          );
+
+          setCertifiedGuruUserIds(completedUserIds);
+        }
+      } else {
+        setCertifiedGuruUserIds(new Set());
+      }
 
       setGurus(guruRows);
       setLoading(false);
@@ -1055,7 +1065,7 @@ function SearchPageContent() {
           guru_count: guruRows.length,
           guru_count_with_map_location: guruRows.filter(hasMapLocation).length,
           guru_count_with_academy_badge: guruRows.filter((guru) =>
-            completedGuruUserIds.has(getGuruCertificationUserId(guru)),
+            certifiedGuruUserIds.has(getGuruCertificationUserId(guru)),
           ).length,
           has_initial_service: Boolean(initialService),
           has_initial_zip: Boolean(initialZip),
