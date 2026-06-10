@@ -1,4 +1,3 @@
-"use client";
 
 import { Open_Sans } from "next/font/google";
 import Link from "next/link";
@@ -300,7 +299,7 @@ const programPathways = [
   {
     title: "SitGuru Programs",
     description: "Additional ways to refer, support, and grow the community",
-    href: "/programs",
+    href: "/affiliate-program",
     icon: "🤝",
   },
 ];
@@ -311,8 +310,8 @@ const homepagePrograms: ProgramCard[] = [
     eyebrow: "Featured student pathway",
     description:
       "For students, recent grads, summer workers, and pet lovers who want a flexible way to build experience, help local pet families, and grow SitGuru after class, on weekends, during school breaks, or all summer.",
-    href: "/programs#student-hire",
-    applyHref: "/programs/apply?program=student-hire",
+    href: "/affiliate-program#student-hire",
+    applyHref: "/affiliate-program#student-hire",
     icon: "🎓",
     image: "/images/ambassadors/student-hire2.jpg",
     imageAlt: "Student pet caregiver taking a selfie with a dog",
@@ -325,8 +324,8 @@ const homepagePrograms: ProgramCard[] = [
     eyebrow: "Local neighborhood pathway",
     description:
       "For local pet lovers, parents, retirees, remote workers, and community members who want a flexible way to offer trusted care, refer neighbors, and help SitGuru grow locally.",
-    href: "/programs#community-hire",
-    applyHref: "/programs/apply?program=community-hire",
+    href: "/affiliate-program#community-hire",
+    applyHref: "/affiliate-program#community-hire",
     icon: "🤝",
     image: "/images/ambassadors/ambassador-program2.jpg",
     imageAlt: "Community pet-care supporters smiling while caring for a pet",
@@ -339,8 +338,8 @@ const homepagePrograms: ProgramCard[] = [
     eyebrow: "Military-connected pathway",
     description:
       "For veterans, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and approved SkillBridge applicants who want flexible local opportunities.",
-    href: "/programs#military-hire",
-    applyHref: "/programs/apply?program=military-hire",
+    href: "/affiliate-program#military-hire",
+    applyHref: "/affiliate-program#military-hire",
     icon: "🎖️",
     image: "/images/ambassadors/veteran-ambassador2.jpg",
     imageAlt: "Veteran or military-connected pet caregiver relaxing with a dog",
@@ -401,7 +400,7 @@ const petParentSignupHref = "/signup?role=pet_parent&next=/customer/dashboard";
 const petParentPhoneSignupHref =
   "/signup?role=pet_parent&mode=phone&next=/customer/dashboard";
 const petParentLoginHref = "/login?role=pet_parent&next=/customer/dashboard";
-const guruSignupHref = "/signup?role=guru&next=/guru/dashboard";
+const guruSignupHref = "/become-a-guru";
 const bothSignupHref = "/signup?role=both&next=/customer/dashboard";
 const ambassadorLoginHref = "/ambassador/login";
 
@@ -1742,9 +1741,9 @@ export default function HomePage() {
                   </Link>
 
                   <Link
-                    href="/programs"
+                    href="/affiliate-program"
                     onClick={() =>
-                      trackHomepageClick("Explore Programs", "/programs")
+                      trackHomepageClick("Explore Programs", "/affiliate-program")
                     }
                     className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 sm:w-auto"
                   >
@@ -1827,9 +1826,9 @@ export default function HomePage() {
               </div>
 
               <Link
-                href={petParentSignupHref}
+                href="/petperks"
                 onClick={() =>
-                  trackHomepageClick("PetPerks Learn More", petParentSignupHref)
+                  trackHomepageClick("PetPerks Learn More", "/petperks")
                 }
                 className="mt-6 inline-flex rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
               >
@@ -1895,9 +1894,9 @@ export default function HomePage() {
                 </Link>
 
                 <Link
-                  href="/programs"
+                  href="/affiliate-program"
                   onClick={() =>
-                    trackHomepageClick("Explore Programs", "/programs")
+                    trackHomepageClick("Explore Programs", "/affiliate-program")
                   }
                   className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
                 >
@@ -1940,9 +1939,9 @@ export default function HomePage() {
               </div>
 
               <Link
-                href="/#how-sitguru-works"
+                href="/search"
                 onClick={() =>
-                  trackHomepageClick("See how it works", "/#how-sitguru-works")
+                  trackHomepageClick("See how it works", "/search")
                 }
                 className="mt-6 inline-flex items-center gap-2 text-sm font-black text-emerald-700 hover:text-emerald-800 hover:underline"
               >
@@ -2038,9 +2037,9 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="/programs"
+                href="/affiliate-program"
                 onClick={() =>
-                  trackHomepageClick("Explore Programs Final CTA", "/programs")
+                  trackHomepageClick("Explore Programs Final CTA", "/affiliate-program")
                 }
                 className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
               >
