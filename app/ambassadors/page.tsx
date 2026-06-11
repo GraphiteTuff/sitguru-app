@@ -538,6 +538,85 @@ export default function AmbassadorProgramPage() {
         </div>
       </section>
 
+
+      <section className="bg-[#fbfaf6] px-5 py-14 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-xl shadow-emerald-950/5 sm:p-7 lg:p-8">
+            <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+              <div>
+                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-emerald-800 shadow-sm">
+                  <Radio size={15} />
+                  Ambassador video
+                </div>
+
+                <h2 className="mt-5 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                  Help Pets, Help Neighbors — Become a SitGuru Ambassador Today
+                </h2>
+
+                <p className="mt-5 text-base font-semibold leading-7 text-slate-600 sm:text-lg sm:leading-8">
+                  SitGuru Ambassadors help grow trusted local pet care by
+                  connecting Pet Parents, future Gurus, community partners,
+                  students, military-connected families, and local pet lovers
+                  with the SitGuru Pet Community.
+                </p>
+
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href="#join-ambassador-program"
+                    className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-6 py-4 text-sm font-black text-white shadow-lg shadow-emerald-950/15 transition hover:bg-emerald-900"
+                  >
+                    Apply as an Ambassador
+                    <ArrowRight size={17} />
+                  </Link>
+
+                  <Link
+                    href="#ambassador-paths"
+                    className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-6 py-4 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+                  >
+                    Explore Ambassador Programs
+                    <ArrowRight size={17} />
+                  </Link>
+                </div>
+
+                <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                  {[
+                    "Promote trusted local pet care",
+                    "Support Pet Parents and Gurus",
+                    "Build community connections",
+                    "Help grow the SitGuru Pet Community",
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white/90 px-4 py-3 text-sm font-black text-slate-700 shadow-sm"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                        ✓
+                      </span>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-950 shadow-2xl shadow-emerald-950/10">
+                <video
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="aspect-video w-full bg-slate-950 object-cover"
+                >
+                  <source
+                    src="/videos/sitguru-ambassador-promo.mp4"
+                    type="video/mp4"
+                  />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section
         className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10"
         id="ambassador-paths"
