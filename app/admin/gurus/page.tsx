@@ -1559,7 +1559,9 @@ async function getGuruManagementData(searchParams: SearchParams) {
       setupStep,
       setupStepLabel: getSetupStepLabel(setupStep),
       joined: formatDateShort(asTrimmedString(guru.created_at)),
-      href: id ? `/admin/gurus/${encodeURIComponent(id)}` : "/admin/gurus",
+      href: id
+        ? `/admin/gurus?guru=${encodeURIComponent(id)}`
+        : "/admin/gurus",
       publicHref,
     };
   });
