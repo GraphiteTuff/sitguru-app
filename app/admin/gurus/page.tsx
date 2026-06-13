@@ -761,7 +761,13 @@ function needsProfileUpdate(guru: GuruRow) {
 
   const hasBio = Boolean(asTrimmedString(guru.bio));
   const hasLocation = Boolean(
-    asTrimmedString(guru.city) || asTrimmedString(guru.state),
+    asTrimmedString(guru.city) ||
+      asTrimmedString(guru.state) ||
+      asTrimmedString(guru.service_city) ||
+      asTrimmedString(guru.service_state) ||
+      asTrimmedString(guru.zip_code) ||
+      asTrimmedString(guru.service_zip) ||
+      asTrimmedString(guru.service_zip_code),
   );
 
   const hasServices =
@@ -1457,7 +1463,7 @@ function buildGuruRecordFromProfile(profile: ProfileRow): GuruRow {
 }
 
 async function getGuruManagementData(searchParams: SearchParams) {
-  const [gurus, profiles, backgroundChecks, authUsers] = await Promise.all([
+  const [gurus, profiles, backgroundChecks] = await Promise.all([
     safeRows<GuruRow>(
       supabaseAdmin
         .from("gurus")
@@ -1482,7 +1488,6 @@ async function getGuruManagementData(searchParams: SearchParams) {
         .limit(1000),
       "guru_background_checks",
     ),
-    getAllAuthUsersForAdminGurus(),
   ]);
 
   const profileMap = new Map<string, ProfileRow>();
@@ -1505,47 +1510,10 @@ async function getGuruManagementData(searchParams: SearchParams) {
     }
   }
 
-  const existingGuruKeys = new Set<string>();
-
-  gurus.forEach((guru) => {
-    getGuruRecordIdentityKeys(guru).forEach((key) => existingGuruKeys.add(key));
-  });
-
-  const profileBackedGuruRows = profiles
-    .filter((profile) => isGuruProfile(profile))
-    .filter((profile) => {
-      const profileKeys = [
-        asTrimmedString(profile.id),
-        asTrimmedString(profile.user_id),
-        asTrimmedString(profile.profile_id),
-        asTrimmedString(profile.email).toLowerCase(),
-      ].filter(Boolean);
-
-      return !profileKeys.some((key) => existingGuruKeys.has(key));
-    })
-    .map((profile) => buildGuruRecordFromProfile(profile));
-
-  const profileAndGuruKeys = new Set<string>();
-
-  [...gurus, ...profileBackedGuruRows].forEach((guru) => {
-    getGuruRecordIdentityKeys(guru).forEach((key) =>
-      profileAndGuruKeys.add(key),
-    );
-  });
-
-  const authBackedGuruRows = authUsers
-    .filter((authUser) => isGuruAuthUser(authUser))
-    .filter((authUser) => {
-      const authKeys = [
-        asTrimmedString(authUser.id),
-        asTrimmedString(authUser.email).toLowerCase(),
-      ].filter(Boolean);
-
-      return !authKeys.some((key) => profileAndGuruKeys.has(key));
-    })
-    .map((authUser) => buildGuruRecordFromAuthUser(authUser));
-
-  const liveGuruRows = [...gurus, ...profileBackedGuruRows, ...authBackedGuruRows];
+  // Admin Guru counts and records should reflect actual rows in the `gurus` table.
+  // Profiles are still loaded above to enrich names, photos, location, and profile readiness.
+  // Auth/profile-only users should be synced into `gurus` before they are counted here.
+  const liveGuruRows = gurus;
 
   const rows: GuruDisplayRow[] = liveGuruRows.map((guru) => {
     const profile = profileMap.get(getGuruProfileKey(guru));
@@ -1612,9 +1580,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       setupStep,
       setupStepLabel: getSetupStepLabel(setupStep),
       joined: formatDateShort(asTrimmedString(guru.created_at)),
-      href: id
-        ? `/admin/gurus?guru=${encodeURIComponent(id)}`
-        : "/admin/gurus",
+      href: id ? `/admin/gurus/${encodeURIComponent(id)}` : "/admin/gurus",
       publicHref,
     };
   });
@@ -2377,7 +2343,7 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
             icon={<Users size={22} />}
             label="Total Gurus"
             value={number(guruData.totals.all)}
-            detail={`${number(guruData.totals.shown)} visible with current filters`}
+            detail={`${number(guruData.totals.shown)} shown from actual Guru records`}
             href={adminRoutes.gurus}
           />
 
@@ -2672,7 +2638,8 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
             Supabase coordination:
           </span>{" "}
           this page reads `gurus`, `profiles`, and `guru_background_checks`.
-          New Guru signups from `profiles` and Guru-role Auth metadata are automatically included even before a full `gurus` row exists.
+          Admin totals are counted from actual `gurus` rows only, while `profiles` enrich names, photos, locations, and readiness data.
+          New Guru signups should be synced into `gurus` before they are counted as active Gurus.
           Guru avatars, setup step, missing-step queues, application status,
           profile quality, identity status, background status, safety status,
           bookable visibility, services, location, experience, joined dates,
