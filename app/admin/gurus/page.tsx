@@ -522,8 +522,51 @@ function getGuruAvatarUrl(guru: GuruRow, profile?: ProfileRow) {
   );
 }
 
-function getGuruSlug(guru: GuruRow) {
-  return asTrimmedString(guru.slug);
+function getGuruSlug(guru: GuruRow, profile?: ProfileRow) {
+  return (
+    asTrimmedString(guru.slug) ||
+    asTrimmedString(guru.public_slug) ||
+    asTrimmedString(guru.profile_slug) ||
+    asTrimmedString(guru.username) ||
+    asTrimmedString(profile?.slug) ||
+    asTrimmedString(profile?.public_slug) ||
+    asTrimmedString(profile?.profile_slug) ||
+    asTrimmedString(profile?.username)
+  );
+}
+
+function slugifyGuruName(value: string) {
+  return asTrimmedString(value)
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function getGuruPublicIdentifier({
+  guru,
+  profile,
+  id,
+  userId,
+  name,
+  email,
+}: {
+  guru: GuruRow;
+  profile?: ProfileRow;
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+}) {
+  return (
+    getGuruSlug(guru, profile) ||
+    asTrimmedString(guru.public_id) ||
+    asTrimmedString(profile?.public_id) ||
+    asTrimmedString(userId) ||
+    asTrimmedString(id) ||
+    slugifyGuruName(name) ||
+    slugifyGuruName(email.split("@")[0] || "")
+  );
 }
 
 function getGuruServices(guru: GuruRow) {
@@ -1508,7 +1551,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
     const profile = profileMap.get(getGuruProfileKey(guru));
     const id = getGuruId(guru);
     const check = backgroundCheckMap.get(id);
-    const slug = getGuruSlug(guru);
+    const slug = getGuruSlug(guru, profile);
     const applicationStatus = normalizeApplicationStatus(guru);
     const backgroundStatus = getCredentialStatus(guru.background_check_status);
     const identityStatus = getCredentialStatus(
@@ -1516,7 +1559,17 @@ async function getGuruManagementData(searchParams: SearchParams) {
     );
     const safetyStatus = getCredentialStatus(guru.safety_cert_status);
     const setupStep = getGuruSetupStep({ guru, profile, check });
-    const publicHref = slug ? `/guru/${slug}` : "/search";
+    const publicIdentifier = getGuruPublicIdentifier({
+      guru,
+      profile,
+      id,
+      userId: getGuruUserId(guru, profile),
+      name: getGuruName(guru, profile),
+      email: getGuruEmail(guru, profile),
+    });
+    const publicHref = publicIdentifier
+      ? `/guru/${encodeURIComponent(publicIdentifier)}`
+      : "/search";
     const flaggedForReview =
       applicationStatus === "suspended" ||
       applicationStatus === "rejected" ||
