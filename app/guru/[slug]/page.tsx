@@ -33,10 +33,14 @@ type GuruProfile = {
   full_name?: string | null;
   display_name?: string | null;
   name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   title?: string | null;
   bio?: string | null;
   city?: string | null;
   state?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
   slug?: string | null;
   headline?: string | null;
   zip_code?: string | null;
@@ -57,6 +61,8 @@ type GuruProfile = {
   services?: string[] | string | null;
   application_status?: string | null;
   status?: string | null;
+  role?: string | null;
+  account_type?: string | null;
   is_public?: boolean | null;
   is_active?: boolean | null;
   is_bookable?: boolean | null;
@@ -270,12 +276,15 @@ function isLikelyNumericId(value: string) {
 function getDisplayNameFromEmail(email?: string | null) {
   if (!email) return "Guru";
 
-  return email
+  const cleaned = email
     .split("@")[0]
-    .split(/[._-]/g)
+    .replace(/\d+/g, " ")
+    .split(/[._\-\s]+/g)
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(" ");
+
+  return cleaned || "Guru";
 }
 
 function getFirstName(name?: string | null) {
@@ -322,10 +331,15 @@ function getGuruName(
   profile: GuruProfile | null,
   fallbackEmail?: string | null,
 ) {
+  const firstName = String(profile?.first_name || "").trim();
+  const lastName = String(profile?.last_name || "").trim();
+  const combinedName = `${firstName} ${lastName}`.trim();
+
   return (
     profile?.full_name ||
     profile?.display_name ||
     profile?.name ||
+    combinedName ||
     getDisplayNameFromEmail(profile?.email || fallbackEmail)
   );
 }
@@ -335,8 +349,8 @@ function getGuruTitle(profile: GuruProfile | null) {
 }
 
 function getGuruLocation(profile: GuruProfile | null) {
-  const city = String(profile?.city || "").trim();
-  const state = String(profile?.state || "").trim();
+  const city = String(profile?.city || profile?.service_city || "").trim();
+  const state = String(profile?.state || profile?.service_state || "").trim();
 
   if (city && state) return `${city}, ${state}`;
   if (city) return city;
@@ -691,32 +705,197 @@ function getEliteProgress({
   return Math.round((bookingProgress + profileProgress + bookableProgress) / 3);
 }
 
+function isGuruRole(value?: string | null) {
+  return normalizeRole(value) === "guru";
+}
+
+function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfile {
+  const firstName = String(profile.first_name || "").trim();
+  const lastName = String(profile.last_name || "").trim();
+  const fullName =
+    String(
+      profile.full_name ||
+        profile.display_name ||
+        profile.name ||
+        `${firstName} ${lastName}`.trim() ||
+        getDisplayNameFromEmail(profile.email),
+    ).trim() || "Guru";
+
+  return {
+    id: profile.id,
+    user_id: profile.user_id || profile.id,
+    email: profile.email || null,
+    full_name: fullName,
+    display_name: profile.display_name || fullName,
+    name: profile.name || fullName,
+    first_name: firstName || null,
+    last_name: lastName || null,
+    title: profile.title || profile.headline || "Trusted Pet Care Guru",
+    headline: profile.headline || profile.title || "Trusted Pet Care Guru",
+    bio:
+      profile.bio ||
+      "This Guru is building their SitGuru profile. More details about their care style, experience, and pet preferences will appear here soon.",
+    city: profile.city || profile.service_city || null,
+    state: profile.state || profile.service_state || null,
+    service_city: profile.service_city || profile.city || null,
+    service_state: profile.service_state || profile.state || null,
+    slug: profile.slug || null,
+    zip_code: profile.zip_code || profile.service_zip || profile.postal_code || null,
+    postal_code: profile.postal_code || profile.zip_code || profile.service_zip || null,
+    service_radius_miles:
+      profile.service_radius_miles ||
+      profile.service_radius ||
+      profile.radius_miles ||
+      25,
+    service_radius: profile.service_radius || profile.service_radius_miles || 25,
+    radius_miles: profile.radius_miles || profile.service_radius_miles || 25,
+    image_url: profile.image_url || profile.profile_photo_url || profile.avatar_url || null,
+    avatar_url: profile.avatar_url || profile.profile_photo_url || profile.image_url || null,
+    photo_url: profile.photo_url || profile.profile_photo_url || profile.avatar_url || null,
+    profile_photo_url:
+      profile.profile_photo_url || profile.avatar_url || profile.image_url || null,
+    rate: profile.rate || null,
+    hourly_rate: profile.hourly_rate || null,
+    price: profile.price || null,
+    services: Array.isArray(profile.services) ? profile.services : null,
+    application_status:
+      profile.approval_status ||
+      profile.application_status ||
+      profile.account_status ||
+      "profile_incomplete",
+    status:
+      profile.account_status ||
+      profile.status ||
+      profile.approval_status ||
+      "profile_incomplete",
+    role: "guru",
+    account_type: "guru",
+    is_public: true,
+    is_active: profile.account_status === "suspended" ? false : true,
+    is_bookable: false,
+    is_verified: false,
+    profile_completion: null,
+    rating_avg: 0,
+    rating: 0,
+    review_count: 0,
+    experience_years: profile.experience_years || null,
+  };
+}
+
+async function getProfileGuruByIdentifier(identifier: string) {
+  const cleanedIdentifier = cleanIdentifier(identifier);
+  if (!cleanedIdentifier) return null;
+
+  const profileQueries = [
+    supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", cleanedIdentifier)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("user_id", cleanedIdentifier)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("email", cleanedIdentifier)
+      .maybeSingle(),
+  ];
+
+  for (const query of profileQueries) {
+    try {
+      const result = await query;
+
+      if (!result.error && result.data) {
+        const profile = result.data as Record<string, any>;
+        const role = normalizeRole(profile.role || profile.account_type);
+
+        if (role === "guru") {
+          return buildGuruProfileFromProfileRow(profile);
+        }
+      }
+    } catch {
+      // Continue through fallback lookups.
+    }
+  }
+
+  const allProfiles = await supabaseAdmin.from("profiles").select("*");
+
+  if (!allProfiles.error && Array.isArray(allProfiles.data)) {
+    const normalizedIdentifier = cleanedIdentifier
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+
+    const match = (allProfiles.data as Record<string, any>[]).find((profile) => {
+      const role = normalizeRole(profile.role || profile.account_type);
+      if (role !== "guru") return false;
+
+      const firstName = String(profile.first_name || "").trim();
+      const lastName = String(profile.last_name || "").trim();
+      const profileName = String(
+        profile.full_name ||
+          profile.display_name ||
+          profile.name ||
+          `${firstName} ${lastName}`.trim() ||
+          profile.email?.split("@")[0] ||
+          "",
+      )
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
+
+      return profileName === normalizedIdentifier;
+    });
+
+    if (match) {
+      return buildGuruProfileFromProfileRow(match);
+    }
+  }
+
+  return null;
+}
+
 async function getPublicGuruProfile(
   identifier: string,
 ): Promise<GuruProfile | null> {
   const cleanedIdentifier = cleanIdentifier(identifier);
   if (!cleanedIdentifier) return null;
 
-  if (isLikelyUuid(cleanedIdentifier) || isLikelyNumericId(cleanedIdentifier)) {
-    const byId = await supabaseAdmin
+  const guruQueries = [
+    supabaseAdmin.from("gurus").select("*").eq("id", cleanedIdentifier).maybeSingle(),
+    supabaseAdmin
       .from("gurus")
       .select("*")
-      .eq("id", cleanedIdentifier)
-      .maybeSingle();
+      .eq("user_id", cleanedIdentifier)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .eq("profile_id", cleanedIdentifier)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .eq("slug", cleanedIdentifier)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .eq("email", cleanedIdentifier)
+      .maybeSingle(),
+  ];
 
-    if (!byId.error && byId.data) {
-      return byId.data as GuruProfile;
+  for (const query of guruQueries) {
+    try {
+      const result = await query;
+
+      if (!result.error && result.data) {
+        return result.data as GuruProfile;
+      }
+    } catch {
+      // Continue through fallback lookups.
     }
-  }
-
-  const bySlug = await supabaseAdmin
-    .from("gurus")
-    .select("*")
-    .eq("slug", cleanedIdentifier)
-    .maybeSingle();
-
-  if (!bySlug.error && bySlug.data) {
-    return bySlug.data as GuruProfile;
   }
 
   const allGurus = await supabaseAdmin.from("gurus").select("*");
@@ -737,9 +916,8 @@ async function getPublicGuruProfile(
     if (match) return match;
   }
 
-  return null;
+  return getProfileGuruByIdentifier(cleanedIdentifier);
 }
-
 async function getGuruProfile(
   userId: string,
   email?: string | null,
