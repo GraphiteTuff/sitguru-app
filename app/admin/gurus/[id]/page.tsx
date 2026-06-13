@@ -333,19 +333,54 @@ function getGuruId(guru: GuruRow) {
 }
 
 function getGuruUserId(guru: GuruRow) {
-  return asTrimmedString(guru.user_id) || asTrimmedString(guru.profile_id);
+  return (
+    asTrimmedString(guru.user_id) ||
+    asTrimmedString(guru.profile_id) ||
+    asTrimmedString(guru.id)
+  );
+}
+
+function getCleanEmailNameFallback(email: string) {
+  const localPart = asTrimmedString(email).split("@")[0];
+
+  if (!localPart) return "";
+
+  const cleaned = localPart
+    .replace(/[._-]+/g, " ")
+    .replace(/\d+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) return "";
+
+  return cleaned
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function getGuruName(guru: GuruRow, profile?: ProfileRow | null) {
-  return (
+  const firstName =
+    asTrimmedString(guru.first_name) || asTrimmedString(profile?.first_name);
+  const lastName =
+    asTrimmedString(guru.last_name) || asTrimmedString(profile?.last_name);
+  const combinedName = `${firstName} ${lastName}`.trim();
+
+  const directName =
     asTrimmedString(guru.display_name) ||
     asTrimmedString(guru.full_name) ||
     asTrimmedString(guru.name) ||
     asTrimmedString(profile?.display_name) ||
     asTrimmedString(profile?.full_name) ||
     asTrimmedString(profile?.name) ||
-    asTrimmedString(guru.email).split("@")[0] ||
-    asTrimmedString(profile?.email).split("@")[0] ||
+    combinedName;
+
+  if (directName) return directName;
+
+  return (
+    getCleanEmailNameFallback(asTrimmedString(guru.email)) ||
+    getCleanEmailNameFallback(asTrimmedString(profile?.email)) ||
     "Guru"
   );
 }
@@ -367,14 +402,16 @@ function getGuruPhone(guru: GuruRow, profile?: ProfileRow | null) {
 function getGuruLocation(guru: GuruRow, profile?: ProfileRow | null) {
   const city =
     asTrimmedString(guru.city) ||
+    asTrimmedString(guru.service_city) ||
     asTrimmedString(profile?.city) ||
-    asTrimmedString(guru.service_city);
+    asTrimmedString(profile?.service_city);
 
   const state =
     asTrimmedString(guru.state) ||
-    asTrimmedString(profile?.state) ||
     asTrimmedString(guru.service_state) ||
     asTrimmedString(guru.state_code) ||
+    asTrimmedString(profile?.state) ||
+    asTrimmedString(profile?.service_state) ||
     asTrimmedString(profile?.state_code);
 
   return [city, state].filter(Boolean).join(", ") || "Location not listed";
@@ -441,8 +478,16 @@ function getProfileCompletion(guru: GuruRow) {
 }
 
 function getPublicHref(guru: GuruRow) {
-  const slug = asTrimmedString(guru.slug);
-  return slug ? `/guru/${slug}` : "/search";
+  const identifier =
+    asTrimmedString(guru.slug) ||
+    asTrimmedString(guru.public_slug) ||
+    asTrimmedString(guru.profile_slug) ||
+    asTrimmedString(guru.username) ||
+    asTrimmedString(guru.user_id) ||
+    asTrimmedString(guru.profile_id) ||
+    asTrimmedString(guru.id);
+
+  return identifier ? `/guru/${encodeURIComponent(identifier)}` : "/search";
 }
 
 function getActionLabel(action: AdminAction) {
@@ -805,6 +850,124 @@ async function sendGuruStatusEmail(payload: GuruStatusEmailPayload) {
   }
 }
 
+function normalizeProfileRole(profile: ProfileRow) {
+  const role = asTrimmedString(profile.role).toLowerCase();
+
+  if (
+    role === "guru" ||
+    role === "sitter" ||
+    role === "provider" ||
+    role === "walker" ||
+    role === "dog_walker" ||
+    role === "dog walker"
+  ) {
+    return "guru";
+  }
+
+  return role;
+}
+
+function isGuruProfile(profile: ProfileRow) {
+  return normalizeProfileRole(profile) === "guru";
+}
+
+function buildGuruRecordFromProfile(profile: ProfileRow): GuruRow {
+  const id =
+    asTrimmedString(profile.id) ||
+    asTrimmedString(profile.user_id) ||
+    asTrimmedString(profile.profile_id);
+
+  const firstName = asTrimmedString(profile.first_name);
+  const lastName = asTrimmedString(profile.last_name);
+  const fullName =
+    asTrimmedString(profile.full_name) ||
+    asTrimmedString(profile.display_name) ||
+    asTrimmedString(profile.name) ||
+    `${firstName} ${lastName}`.trim() ||
+    getCleanEmailNameFallback(asTrimmedString(profile.email)) ||
+    "Guru";
+
+  const approvalStatus =
+    asTrimmedString(profile.approval_status) ||
+    asTrimmedString(profile.account_status) ||
+    "new";
+
+  return {
+    id,
+    user_id: id,
+    profile_id: id,
+    email: asTrimmedString(profile.email),
+    display_name: fullName,
+    full_name: fullName,
+    first_name: firstName,
+    last_name: lastName,
+    name: fullName,
+    role: "guru",
+    status: asTrimmedString(profile.account_status) || "new",
+    approval_status: approvalStatus,
+    application_status:
+      approvalStatus === "active" || approvalStatus === "approved"
+        ? "approved"
+        : "new",
+    avatar_url: asTrimmedString(profile.avatar_url),
+    profile_photo_url: asTrimmedString(profile.profile_photo_url),
+    photo_url: asTrimmedString(profile.photo_url),
+    bio: asTrimmedString(profile.bio),
+    city:
+      asTrimmedString(profile.city) || asTrimmedString(profile.service_city),
+    state:
+      asTrimmedString(profile.state) || asTrimmedString(profile.service_state),
+    service_city: asTrimmedString(profile.service_city),
+    service_state: asTrimmedString(profile.service_state),
+    service_zip: asTrimmedString(profile.service_zip),
+    services: Array.isArray(profile.services) ? profile.services : [],
+    service: asTrimmedString(profile.service) || "Pet Care",
+    created_at: asTrimmedString(profile.created_at),
+    updated_at: asTrimmedString(profile.updated_at),
+    source: "profiles",
+  };
+}
+
+async function getProfileByIdentifier(id: string) {
+  const cleanId = decodeURIComponent(id).trim();
+
+  if (!cleanId) return null;
+
+  const queries = [
+    supabaseAdmin.from("profiles").select("*").eq("id", cleanId).maybeSingle(),
+    supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("user_id", cleanId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("profile_id", cleanId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("email", cleanId)
+      .maybeSingle(),
+  ];
+
+  for (const query of queries) {
+    try {
+      const result = (await query) as SafeQueryResponse;
+
+      if (!result.error && result.data) {
+        const profile = result.data as ProfileRow;
+        return isGuruProfile(profile) ? profile : null;
+      }
+    } catch {
+      // Keep trying fallback lookups.
+    }
+  }
+
+  return null;
+}
+
 async function getGuruById(id: string) {
   const cleanId = decodeURIComponent(id).trim();
 
@@ -817,6 +980,12 @@ async function getGuruById(id: string) {
       .select("*")
       .eq("user_id", cleanId)
       .maybeSingle(),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .eq("profile_id", cleanId)
+      .maybeSingle(),
+    supabaseAdmin.from("gurus").select("*").eq("slug", cleanId).maybeSingle(),
     supabaseAdmin.from("gurus").select("*").eq("email", cleanId).maybeSingle(),
   ];
 
@@ -832,12 +1001,19 @@ async function getGuruById(id: string) {
     }
   }
 
+  const profile = await getProfileByIdentifier(cleanId);
+
+  if (profile) {
+    return buildGuruRecordFromProfile(profile);
+  }
+
   return null;
 }
-
 async function getProfileForGuru(guru: GuruRow) {
   const userId =
-    asTrimmedString(guru.user_id) || asTrimmedString(guru.profile_id);
+    asTrimmedString(guru.user_id) ||
+    asTrimmedString(guru.profile_id) ||
+    asTrimmedString(guru.id);
   const email = getGuruEmail(guru);
 
   const queries = [
@@ -853,6 +1029,13 @@ async function getProfileForGuru(guru: GuruRow) {
           .from("profiles")
           .select("*")
           .eq("user_id", userId)
+          .maybeSingle()
+      : null,
+    userId
+      ? supabaseAdmin
+          .from("profiles")
+          .select("*")
+          .eq("profile_id", userId)
           .maybeSingle()
       : null,
     email && email !== "—"
@@ -958,9 +1141,12 @@ async function updateGuruStatusAction(formData: FormData) {
     note,
   });
 
+  const updateTable = asTrimmedString(guru.source) === "profiles" ? "profiles" : "gurus";
+  const updateIdColumn = asTrimmedString(guru.source) === "profiles" ? "id" : "id";
+
   const updateError = await updateWithColumnFallback({
-    table: "gurus",
-    idColumn: "id",
+    table: updateTable,
+    idColumn: updateIdColumn,
     idValue: realGuruId,
     payload,
     requiredColumns: [],
