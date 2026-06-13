@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type PublicAmbassador = {
-  id: string;
-  fullName: string;
+  id?: string | null;
+  fullName?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   city?: string | null;
@@ -18,6 +18,30 @@ type PublicAmbassador = {
   bio?: string | null;
 };
 
+type AmbassadorResponse = {
+  ambassadors?: PublicAmbassador[];
+};
+
+const MAX_VISIBLE_AMBASSADORS = 6;
+
+function cleanText(value?: string | null) {
+  return String(value || "").trim();
+}
+
+function getAmbassadorName(ambassador: PublicAmbassador) {
+  const fullName = cleanText(ambassador.fullName);
+
+  if (fullName) return fullName;
+
+  const joinedName = [ambassador.firstName, ambassador.lastName]
+    .map(cleanText)
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return joinedName || "SitGuru Ambassador";
+}
+
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
 
@@ -29,9 +53,9 @@ function getInitials(name: string) {
     .join("");
 }
 
-function formatLocation(ambassador: PublicAmbassador) {
-  const city = ambassador.city || ambassador.serviceCity || "";
-  const state = ambassador.state || ambassador.serviceState || "";
+function getLocationLabel(ambassador: PublicAmbassador) {
+  const city = cleanText(ambassador.serviceCity) || cleanText(ambassador.city);
+  const state = cleanText(ambassador.serviceState) || cleanText(ambassador.state);
 
   if (city && state) return `${city}, ${state}`;
   if (city) return city;
@@ -40,204 +64,219 @@ function formatLocation(ambassador: PublicAmbassador) {
   return "Service area coming soon";
 }
 
-function getAmbassadorTypeLabel(value?: string | null) {
-  const normalized = String(value || "").trim();
+function getAmbassadorType(ambassador: PublicAmbassador) {
+  return cleanText(ambassador.ambassadorType) || "SitGuru Ambassador";
+}
 
-  if (!normalized) return "SitGuru Ambassador";
+function getReferralHref(referralCode?: string | null) {
+  const code = cleanText(referralCode);
 
-  return normalized
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  if (!code) return "/ambassadors";
+
+  return `/signup?ref=${encodeURIComponent(code)}`;
+}
+
+function AmbassadorPhoto({
+  photoUrl,
+  name,
+}: {
+  photoUrl?: string | null;
+  name: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const showPhoto = Boolean(cleanText(photoUrl)) && !failed;
+
+  if (showPhoto) {
+    return (
+      <img
+        src={cleanText(photoUrl)}
+        alt={name}
+        className="h-20 w-20 rounded-3xl object-cover ring-1 ring-emerald-100"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border border-emerald-100 bg-emerald-50 text-xl font-black text-emerald-800">
+      {getInitials(name)}
+    </div>
+  );
 }
 
 export default function AmbassadorSearchBlock() {
   const [ambassadors, setAmbassadors] = useState<PublicAmbassador[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    let isMounted = true;
+    let cancelled = false;
 
     async function loadAmbassadors() {
-      setIsLoading(true);
-
       try {
+        setLoading(true);
+        setError("");
+
         const response = await fetch("/api/ambassadors/public", {
           cache: "no-store",
         });
 
         if (!response.ok) {
-          throw new Error("Unable to load public Ambassadors.");
+          throw new Error("Ambassador profiles could not be loaded.");
         }
 
-        const payload = (await response.json()) as {
-          ambassadors?: PublicAmbassador[];
-        };
+        const data = (await response.json()) as AmbassadorResponse;
 
-        if (!isMounted) return;
+        if (cancelled) return;
 
-        setAmbassadors(Array.isArray(payload.ambassadors) ? payload.ambassadors : []);
-      } catch (error) {
-        console.warn("Could not load Ambassador block:", error);
+        setAmbassadors(Array.isArray(data.ambassadors) ? data.ambassadors : []);
+      } catch (loadError) {
+        console.error("Could not load public Ambassador profiles:", loadError);
 
-        if (isMounted) {
+        if (!cancelled) {
+          setError("Ambassador profiles are coming soon.");
           setAmbassadors([]);
         }
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadAmbassadors();
 
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
   }, []);
 
   const visibleAmbassadors = useMemo(
-    () => ambassadors.slice(0, 4),
+    () => ambassadors.slice(0, MAX_VISIBLE_AMBASSADORS),
     [ambassadors],
   );
 
-  if (!isLoading && visibleAmbassadors.length === 0) {
-    return null;
-  }
+  if (!loading && !visibleAmbassadors.length && !error) return null;
 
   return (
-    <section className="border-t border-slate-200 bg-white">
-      <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <div className="rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f8fcfd_45%,#ecfdf5_100%)] p-5 shadow-sm sm:p-6 lg:p-7">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
-                SitGuru community
-              </p>
+    <section className="mx-auto max-w-[1500px] px-5 pb-10 sm:px-6 lg:px-8">
+      <div className="rounded-[32px] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/40 to-white p-6 shadow-sm sm:p-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.32em] text-emerald-700">
+              SitGuru Community
+            </p>
 
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                Meet SitGuru Ambassadors
-              </h2>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
+              Meet SitGuru Ambassadors
+            </h2>
 
-              <p className="mt-3 text-sm leading-7 text-slate-700 sm:text-base">
-                Ambassadors help Pet Parents, Gurus, partners, students, and
-                local communities get started with SitGuru. They are separate
-                from bookable Gurus and do not replace the care providers above.
-              </p>
-            </div>
+            <p className="mt-3 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
+              Ambassadors help Pet Parents, Gurus, partners, students, and local
+              communities get started with SitGuru.
+            </p>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/ambassadors"
-                className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
-              >
-                View Ambassadors
-              </Link>
-
-              <Link
-                href="/ambassadors"
-                className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
-              >
-                Become an Ambassador
-              </Link>
-            </div>
+            <p className="mt-2 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
+              They are separate from bookable Gurus and do not replace the care
+              providers above.
+            </p>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {isLoading
-              ? Array.from({ length: 4 }).map((_, index) => (
-                  <div
-                    key={`ambassador-skeleton-${index}`}
-                    className="min-h-[210px] animate-pulse rounded-[24px] border border-slate-200 bg-white/80 p-4"
-                  >
-                    <div className="h-14 w-14 rounded-2xl bg-slate-100" />
-                    <div className="mt-4 h-5 w-2/3 rounded-full bg-slate-100" />
-                    <div className="mt-3 h-4 w-1/2 rounded-full bg-slate-100" />
-                    <div className="mt-5 h-16 rounded-2xl bg-slate-100" />
-                  </div>
-                ))
-              : visibleAmbassadors.map((ambassador) => {
-                  const name = ambassador.fullName || "SitGuru Ambassador";
-                  const photoUrl = ambassador.photoUrl || "";
-                  const referralCode = String(ambassador.referralCode || "")
-                    .trim()
-                    .toUpperCase();
+          <div className="flex flex-col gap-3 sm:flex-row lg:shrink-0">
+            <Link
+              href="/ambassadors"
+              className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+            >
+              View Ambassadors
+            </Link>
 
-                  return (
-                    <div
-                      key={ambassador.id}
-                      className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50">
-                          {photoUrl ? (
-                            <img
-                              src={photoUrl}
-                              alt={name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-lg font-black text-emerald-800">
-                              {getInitials(name)}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <h3 className="truncate text-lg font-black text-slate-950">
-                            {name}
-                          </h3>
-
-                          <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
-                            {getAmbassadorTypeLabel(ambassador.ambassadorType)}
-                          </p>
-
-                          <p className="mt-1 text-sm font-semibold text-slate-600">
-                            {formatLocation(ambassador)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <p className="mt-4 line-clamp-3 min-h-[72px] text-sm leading-6 text-slate-600">
-                        {ambassador.bio ||
-                          "This SitGuru Ambassador can help local Pet Parents and Gurus learn how to get started."}
-                      </p>
-
-                      {referralCode ? (
-                        <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2">
-                          <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-800">
-                            Referral code
-                          </p>
-                          <p className="mt-1 text-sm font-black text-emerald-950">
-                            {referralCode}
-                          </p>
-                        </div>
-                      ) : null}
-
-                      <div className="mt-4 flex flex-col gap-2">
-                        <Link
-                          href="/ambassadors"
-                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-800 transition hover:bg-slate-50"
-                        >
-                          View Ambassador
-                        </Link>
-
-                        {referralCode ? (
-                          <Link
-                            href={`/signup?ref=${encodeURIComponent(referralCode)}`}
-                            className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
-                          >
-                            Use Referral Code
-                          </Link>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
+            <Link
+              href="/ambassador/signup"
+              className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
+            >
+              Become an Ambassador
+            </Link>
           </div>
         </div>
+
+        {loading ? (
+          <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-72 animate-pulse rounded-[24px] border border-slate-200 bg-white/80"
+              />
+            ))}
+          </div>
+        ) : error && !visibleAmbassadors.length ? (
+          <div className="mt-8 rounded-[24px] border border-amber-200 bg-amber-50 p-5 text-sm font-bold text-amber-800">
+            {error}
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3">
+            {visibleAmbassadors.map((ambassador) => {
+              const name = getAmbassadorName(ambassador);
+              const referralCode = cleanText(ambassador.referralCode);
+
+              return (
+                <article
+                  key={ambassador.id || `${name}-${referralCode}`}
+                  className="flex min-h-[300px] flex-col rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm"
+                >
+                  <div className="flex items-start gap-4">
+                    <AmbassadorPhoto photoUrl={ambassador.photoUrl} name={name} />
+
+                    <div className="min-w-0">
+                      <h3 className="line-clamp-2 text-2xl font-black leading-tight text-slate-950">
+                        {name}
+                      </h3>
+
+                      <p className="mt-1 text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+                        {getAmbassadorType(ambassador)}
+                      </p>
+
+                      <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-600">
+                        {getLocationLabel(ambassador)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 line-clamp-3 text-sm leading-7 text-slate-600">
+                    {cleanText(ambassador.bio) ||
+                      "This SitGuru Ambassador can help local Pet Parents and Gurus learn how to get started."}
+                  </p>
+
+                  {referralCode ? (
+                    <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+                        Referral Code
+                      </p>
+                      <p className="mt-1 break-words text-base font-black text-slate-950">
+                        {referralCode}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-auto flex flex-col gap-3 pt-5">
+                    <Link
+                      href="/ambassadors"
+                      className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-900 transition hover:bg-slate-50"
+                    >
+                      View Ambassador
+                    </Link>
+
+                    {referralCode ? (
+                      <Link
+                        href={getReferralHref(referralCode)}
+                        className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
+                      >
+                        Use Referral Code
+                      </Link>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );
