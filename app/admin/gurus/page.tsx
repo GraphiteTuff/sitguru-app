@@ -410,21 +410,92 @@ function getGuruAdminMessageHref({
 }
 
 function getGuruName(guru: GuruRow, profile?: ProfileRow) {
-  return (
+  const firstName =
+    asTrimmedString(guru.first_name) || asTrimmedString(profile?.first_name);
+  const lastName =
+    asTrimmedString(guru.last_name) || asTrimmedString(profile?.last_name);
+  const combinedName = `${firstName} ${lastName}`.trim();
+
+  const directName =
     asTrimmedString(guru.display_name) ||
     asTrimmedString(guru.full_name) ||
     asTrimmedString(guru.name) ||
     asTrimmedString(profile?.display_name) ||
     asTrimmedString(profile?.full_name) ||
     asTrimmedString(profile?.name) ||
-    asTrimmedString(guru.email).split("@")[0] ||
-    asTrimmedString(profile?.email).split("@")[0] ||
-    "Guru"
-  );
+    combinedName;
+
+  if (directName) return directName;
+
+  const emailFallback =
+    getCleanEmailNameFallback(asTrimmedString(guru.email)) ||
+    getCleanEmailNameFallback(asTrimmedString(profile?.email));
+
+  return emailFallback || "Guru";
 }
 
 function getGuruEmail(guru: GuruRow, profile?: ProfileRow) {
   return asTrimmedString(guru.email) || asTrimmedString(profile?.email) || "—";
+}
+
+function getCleanEmailNameFallback(email: string) {
+  const localPart = asTrimmedString(email).split("@")[0];
+
+  if (!localPart) return "";
+
+  const cleaned = localPart
+    .replace(/[._-]+/g, " ")
+    .replace(/\d+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) return "";
+
+  return cleaned
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function normalizeProfileRole(profile: ProfileRow) {
+  const role = asTrimmedString(profile.role).toLowerCase();
+
+  if (
+    role === "guru" ||
+    role === "sitter" ||
+    role === "provider" ||
+    role === "walker" ||
+    role === "dog_walker" ||
+    role === "dog walker"
+  ) {
+    return "guru";
+  }
+
+  if (
+    role === "ambassador" ||
+    role === "sitguru_rep" ||
+    role === "sitguru rep" ||
+    role === "representative"
+  ) {
+    return "ambassador";
+  }
+
+  if (
+    role === "customer" ||
+    role === "pet_parent" ||
+    role === "pet parent" ||
+    role === "parent" ||
+    role === "client"
+  ) {
+    return "customer";
+  }
+
+  return role;
+}
+
+function isGuruProfile(profile: ProfileRow) {
+  return normalizeProfileRole(profile) === "guru";
 }
 
 function getGuruAvatarUrl(guru: GuruRow, profile?: ProfileRow) {
@@ -469,14 +540,16 @@ function getGuruServices(guru: GuruRow) {
 function getGuruLocation(guru: GuruRow, profile?: ProfileRow) {
   const city =
     asTrimmedString(guru.city) ||
+    asTrimmedString(guru.service_city) ||
     asTrimmedString(profile?.city) ||
-    asTrimmedString(guru.service_city);
+    asTrimmedString(profile?.service_city);
 
   const state =
     asTrimmedString(guru.state) ||
-    asTrimmedString(profile?.state) ||
     asTrimmedString(guru.service_state) ||
     asTrimmedString(guru.state_code) ||
+    asTrimmedString(profile?.state) ||
+    asTrimmedString(profile?.service_state) ||
     asTrimmedString(profile?.state_code);
 
   return [city, state].filter(Boolean).join(", ") || "Location not listed";
@@ -1164,6 +1237,70 @@ async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
   };
 }
 
+function getGuruRecordIdentityKeys(guru: GuruRow) {
+  return [
+    asTrimmedString(guru.id),
+    asTrimmedString(guru.user_id),
+    asTrimmedString(guru.profile_id),
+    asTrimmedString(guru.email).toLowerCase(),
+  ].filter(Boolean);
+}
+
+function buildGuruRecordFromProfile(profile: ProfileRow): GuruRow {
+  const id =
+    asTrimmedString(profile.id) ||
+    asTrimmedString(profile.user_id) ||
+    asTrimmedString(profile.profile_id);
+
+  const firstName = asTrimmedString(profile.first_name);
+  const lastName = asTrimmedString(profile.last_name);
+  const fullName =
+    asTrimmedString(profile.full_name) ||
+    asTrimmedString(profile.display_name) ||
+    asTrimmedString(profile.name) ||
+    `${firstName} ${lastName}`.trim();
+
+  const approvalStatus =
+    asTrimmedString(profile.approval_status) ||
+    asTrimmedString(profile.account_status) ||
+    "new";
+
+  return {
+    id,
+    user_id: id,
+    profile_id: id,
+    email: asTrimmedString(profile.email),
+    display_name: fullName,
+    full_name: fullName,
+    first_name: firstName,
+    last_name: lastName,
+    name: fullName,
+    role: "guru",
+    status: asTrimmedString(profile.account_status) || "new",
+    approval_status: approvalStatus,
+    application_status:
+      approvalStatus === "active" || approvalStatus === "approved"
+        ? "approved"
+        : "new",
+    avatar_url: asTrimmedString(profile.avatar_url),
+    profile_photo_url: asTrimmedString(profile.profile_photo_url),
+    photo_url: asTrimmedString(profile.photo_url),
+    bio: asTrimmedString(profile.bio),
+    city:
+      asTrimmedString(profile.city) || asTrimmedString(profile.service_city),
+    state:
+      asTrimmedString(profile.state) || asTrimmedString(profile.service_state),
+    service_city: asTrimmedString(profile.service_city),
+    service_state: asTrimmedString(profile.service_state),
+    service_zip: asTrimmedString(profile.service_zip),
+    services: Array.isArray(profile.services) ? profile.services : [],
+    service: asTrimmedString(profile.service) || "Pet Care",
+    created_at: asTrimmedString(profile.created_at),
+    updated_at: asTrimmedString(profile.updated_at),
+    source: "profiles",
+  };
+}
+
 async function getGuruManagementData(searchParams: SearchParams) {
   const [gurus, profiles, backgroundChecks] = await Promise.all([
     safeRows<GuruRow>(
@@ -1212,7 +1349,29 @@ async function getGuruManagementData(searchParams: SearchParams) {
     }
   }
 
-  const rows: GuruDisplayRow[] = gurus.map((guru) => {
+  const existingGuruKeys = new Set<string>();
+
+  gurus.forEach((guru) => {
+    getGuruRecordIdentityKeys(guru).forEach((key) => existingGuruKeys.add(key));
+  });
+
+  const profileBackedGuruRows = profiles
+    .filter((profile) => isGuruProfile(profile))
+    .filter((profile) => {
+      const profileKeys = [
+        asTrimmedString(profile.id),
+        asTrimmedString(profile.user_id),
+        asTrimmedString(profile.profile_id),
+        asTrimmedString(profile.email).toLowerCase(),
+      ].filter(Boolean);
+
+      return !profileKeys.some((key) => existingGuruKeys.has(key));
+    })
+    .map((profile) => buildGuruRecordFromProfile(profile));
+
+  const liveGuruRows = [...gurus, ...profileBackedGuruRows];
+
+  const rows: GuruDisplayRow[] = liveGuruRows.map((guru) => {
     const profile = profileMap.get(getGuruProfileKey(guru));
     const id = getGuruId(guru);
     const check = backgroundCheckMap.get(id);
@@ -2325,6 +2484,7 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
             Supabase coordination:
           </span>{" "}
           this page reads `gurus`, `profiles`, and `guru_background_checks`.
+          New Guru signups from `profiles` are automatically included even before a full `gurus` row exists.
           Guru avatars, setup step, missing-step queues, application status,
           profile quality, identity status, background status, safety status,
           bookable visibility, services, location, experience, joined dates,
