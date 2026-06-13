@@ -3,101 +3,295 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-type ProfileRow = Record<string, unknown>;
+type Row = Record<string, unknown>;
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getFullName(profile: ProfileRow) {
-  const firstName = asString(profile.first_name);
-  const lastName = asString(profile.last_name);
+function normalized(value: unknown) {
+  return asString(value).toLowerCase();
+}
+
+function getRowId(row: Row) {
+  return asString(row.id) || asString(row.user_id) || asString(row.profile_id);
+}
+
+function getEmail(row: Row) {
+  return asString(row.email) || asString(row.contact_email);
+}
+
+function getFirstName(row: Row) {
+  return asString(row.first_name) || asString(row.firstName);
+}
+
+function getLastName(row: Row) {
+  return asString(row.last_name) || asString(row.lastName);
+}
+
+function getFullName(row: Row) {
+  const firstName = getFirstName(row);
+  const lastName = getLastName(row);
   const combinedName = `${firstName} ${lastName}`.trim();
 
   return (
-    asString(profile.full_name) ||
-    asString(profile.display_name) ||
-    asString(profile.name) ||
+    asString(row.full_name) ||
+    asString(row.display_name) ||
+    asString(row.name) ||
+    asString(row.candidate_name) ||
+    asString(row.contact_name) ||
     combinedName ||
     "SitGuru Ambassador"
   );
 }
 
-function getPhotoUrl(profile: ProfileRow) {
+function getPhotoUrl(row: Row) {
   return (
-    asString(profile.profile_photo_url) ||
-    asString(profile.avatar_url) ||
-    asString(profile.image_url) ||
+    asString(row.profile_photo_url) ||
+    asString(row.avatar_url) ||
+    asString(row.image_url) ||
+    asString(row.photo_url) ||
     ""
   );
 }
 
-function getAmbassadorType(profile: ProfileRow) {
+function getCity(row: Row) {
   return (
-    asString(profile.ambassador_type) ||
-    asString(profile.program_type) ||
-    asString(profile.hire_type) ||
-    asString(profile.community_type) ||
+    asString(row.city) ||
+    asString(row.service_city) ||
+    asString(row.location_city) ||
+    asString(row.home_city) ||
+    ""
+  );
+}
+
+function getState(row: Row) {
+  return (
+    asString(row.state) ||
+    asString(row.service_state) ||
+    asString(row.location_state) ||
+    asString(row.home_state) ||
+    ""
+  );
+}
+
+function getServiceCity(row: Row) {
+  return (
+    asString(row.service_city) ||
+    asString(row.city) ||
+    asString(row.location_city) ||
+    asString(row.home_city) ||
+    ""
+  );
+}
+
+function getServiceState(row: Row) {
+  return (
+    asString(row.service_state) ||
+    asString(row.state) ||
+    asString(row.location_state) ||
+    asString(row.home_state) ||
+    ""
+  );
+}
+
+function getAmbassadorType(row: Row) {
+  return (
+    asString(row.ambassador_type) ||
+    asString(row.program_type) ||
+    asString(row.hire_type) ||
+    asString(row.type) ||
+    asString(row.community_type) ||
     "SitGuru Ambassador"
   );
 }
 
-function getReferralCode(profile: ProfileRow) {
+function getReferralCode(row: Row) {
   return (
-    asString(profile.referral_code) ||
-    asString(profile.ambassador_code) ||
-    asString(profile.code) ||
+    asString(row.referral_code) ||
+    asString(row.ambassador_code) ||
+    asString(row.code) ||
     ""
   );
 }
 
-function isPublicAmbassador(profile: ProfileRow) {
-  const accountStatus = asString(profile.account_status).toLowerCase();
-  const status = asString(profile.status).toLowerCase();
-  const approvalStatus = asString(profile.approval_status).toLowerCase();
+function getBio(row: Row) {
+  return (
+    asString(row.bio) ||
+    asString(row.about) ||
+    asString(row.notes_public) ||
+    asString(row.public_bio) ||
+    ""
+  );
+}
 
-  if (profile.is_public === false) return false;
-  if (accountStatus === "deleted" || accountStatus === "suspended") return false;
-  if (status === "deleted" || status === "suspended") return false;
-  if (approvalStatus === "rejected") return false;
+function getMergeKey(row: Row) {
+  const email = getEmail(row).toLowerCase();
+  if (email) return `email:${email}`;
 
-  return true;
+  const id = getRowId(row);
+  if (id) return `id:${id}`;
+
+  const name = getFullName(row).toLowerCase();
+  return `name:${name}`;
+}
+
+function isNegativeStatus(value: unknown) {
+  const status = normalized(value);
+
+  return [
+    "deleted",
+    "suspended",
+    "deactivated",
+    "archived",
+    "rejected",
+    "not moving forward",
+    "not_moving_forward",
+    "inactive",
+    "cancelled",
+    "canceled",
+  ].includes(status);
+}
+
+function isPositiveActiveStatus(value: unknown) {
+  const status = normalized(value);
+
+  return [
+    "active",
+    "approved",
+    "signed up",
+    "signed_up",
+    "converted",
+    "ready",
+    "live",
+  ].includes(status);
+}
+
+function isActiveAmbassador(row: Row) {
+  const statusFields = [
+    row.account_status,
+    row.status,
+    row.ambassador_status,
+    row.profile_status,
+    row.approval_status,
+    row.lead_status,
+  ];
+
+  if (statusFields.some(isNegativeStatus)) return false;
+  if (row.is_active === false) return false;
+  if (row.is_public === false) return false;
+
+  if (statusFields.some(isPositiveActiveStatus)) return true;
+
+  // Existing SitGuru profiles with role=ambassador are treated as active
+  // unless a negative status above says otherwise.
+  return normalized(row.role) === "ambassador";
+}
+
+function mergeRows(base: Row, incoming: Row): Row {
+  return {
+    ...base,
+    ...incoming,
+    id: getRowId(base) || getRowId(incoming),
+    email: getEmail(base) || getEmail(incoming),
+    full_name:
+      getFullName(base) !== "SitGuru Ambassador"
+        ? getFullName(base)
+        : getFullName(incoming),
+    first_name: getFirstName(base) || getFirstName(incoming),
+    last_name: getLastName(base) || getLastName(incoming),
+    city: getCity(base) || getCity(incoming),
+    state: getState(base) || getState(incoming),
+    service_city: getServiceCity(base) || getServiceCity(incoming),
+    service_state: getServiceState(base) || getServiceState(incoming),
+    profile_photo_url: getPhotoUrl(base) || getPhotoUrl(incoming),
+    avatar_url: asString(base.avatar_url) || asString(incoming.avatar_url),
+    image_url: asString(base.image_url) || asString(incoming.image_url),
+    referral_code: getReferralCode(base) || getReferralCode(incoming),
+    ambassador_type: getAmbassadorType(base) || getAmbassadorType(incoming),
+    bio: getBio(base) || getBio(incoming),
+  };
+}
+
+async function safeRows(tableName: string) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from(tableName)
+      .select("*")
+      .limit(1000);
+
+    if (error) {
+      console.warn(`Public Ambassador route skipped ${tableName}:`, error);
+      return [] as Row[];
+    }
+
+    return ((data || []) as Row[]).map((row) => ({
+      ...row,
+      __source_table: tableName,
+    }));
+  } catch (error) {
+    console.warn(`Public Ambassador route skipped ${tableName}:`, error);
+    return [] as Row[];
+  }
+}
+
+function toPublicAmbassador(row: Row) {
+  return {
+    id: getRowId(row),
+    fullName: getFullName(row),
+    firstName: getFirstName(row) || null,
+    lastName: getLastName(row) || null,
+    city: getCity(row) || null,
+    state: getState(row) || null,
+    serviceCity: getServiceCity(row) || null,
+    serviceState: getServiceState(row) || null,
+    photoUrl: getPhotoUrl(row) || null,
+    referralCode: getReferralCode(row) || null,
+    ambassadorType: getAmbassadorType(row) || null,
+    bio: getBio(row) || null,
+  };
 }
 
 export async function GET() {
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select("*")
-    .eq("role", "ambassador")
-    .order("updated_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false, nullsFirst: false })
-    .limit(12);
+  const [profileRows, ambassadorRows, ambassadorLeadRows] = await Promise.all([
+    safeRows("profiles"),
+    safeRows("ambassadors"),
+    safeRows("ambassador_leads"),
+  ]);
 
-  if (error) {
-    console.error("Public Ambassador block load failed:", error);
+  const activeProfiles = profileRows.filter(
+    (row) => normalized(row.role) === "ambassador" && isActiveAmbassador(row),
+  );
 
-    return NextResponse.json(
-      { ambassadors: [], error: "Unable to load Ambassadors." },
-      { status: 200 },
-    );
-  }
+  const activeAmbassadors = ambassadorRows.filter(isActiveAmbassador);
 
-  const ambassadors = ((data || []) as ProfileRow[])
-    .filter(isPublicAmbassador)
-    .map((profile) => ({
-      id: asString(profile.id),
-      fullName: getFullName(profile),
-      firstName: asString(profile.first_name) || null,
-      lastName: asString(profile.last_name) || null,
-      city: asString(profile.city) || null,
-      state: asString(profile.state) || null,
-      serviceCity: asString(profile.service_city) || null,
-      serviceState: asString(profile.service_state) || null,
-      photoUrl: getPhotoUrl(profile) || null,
-      referralCode: getReferralCode(profile) || null,
-      ambassadorType: getAmbassadorType(profile) || null,
-      bio: asString(profile.bio) || null,
-    }));
+  const activeAmbassadorLeads = ambassadorLeadRows.filter((row) => {
+    const isAmbassador =
+      normalized(row.role) === "ambassador" ||
+      normalized(row.lead_type) === "ambassador" ||
+      normalized(row.candidate_type) === "ambassador" ||
+      normalized(row.pipeline_type) === "ambassador";
+
+    return isAmbassador && isActiveAmbassador(row);
+  });
+
+  const mergedByKey = new Map<string, Row>();
+
+  // Registry rows first so active Ambassador registry city/state wins.
+  [...activeAmbassadorLeads, ...activeAmbassadors, ...activeProfiles].forEach(
+    (row) => {
+      const key = getMergeKey(row);
+      const current = mergedByKey.get(key);
+
+      mergedByKey.set(key, current ? mergeRows(current, row) : row);
+    },
+  );
+
+  const ambassadors = Array.from(mergedByKey.values())
+    .map(toPublicAmbassador)
+    .filter((ambassador) => ambassador.id || ambassador.fullName)
+    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+    .slice(0, 12);
 
   return NextResponse.json({ ambassadors });
 }
