@@ -20,6 +20,15 @@ type PageProps = {
 
 type GuruRow = Record<string, unknown>;
 type ProfileRow = Record<string, unknown>;
+type AuthUserRow = {
+  id: string;
+  email?: string | null;
+  created_at?: string | null;
+  last_sign_in_at?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+  app_metadata?: Record<string, unknown> | null;
+};
+
 
 type ApplicationStatus =
   | "new"
@@ -417,12 +426,20 @@ function getGuruLocation(guru: GuruRow, profile?: ProfileRow | null) {
   return [city, state].filter(Boolean).join(", ") || "Location not listed";
 }
 
-function getGuruServices(guru: GuruRow) {
-  const services = guru.services;
+function getGuruServices(guru: GuruRow, profile?: ProfileRow | null) {
+  const services = firstAvailable(guru.services, profile?.services);
 
   if (Array.isArray(services) && services.length > 0) {
     return services
       .map((service) => String(service).trim())
+      .filter(Boolean)
+      .slice(0, 6);
+  }
+
+  if (typeof services === "string" && services.trim()) {
+    return services
+      .split(",")
+      .map((service) => service.trim())
       .filter(Boolean)
       .slice(0, 6);
   }
@@ -432,6 +449,10 @@ function getGuruServices(guru: GuruRow) {
     asTrimmedString(guru.service_name) ||
     asTrimmedString(guru.specialty) ||
     asTrimmedString(guru.title) ||
+    asTrimmedString(profile?.service) ||
+    asTrimmedString(profile?.service_name) ||
+    asTrimmedString(profile?.specialty) ||
+    asTrimmedString(profile?.title) ||
     "Pet Care";
 
   return [fallback];
@@ -450,8 +471,9 @@ function getGuruExperience(guru: GuruRow) {
   return "Not listed";
 }
 
-function getProfileCompletion(guru: GuruRow) {
-  const direct = toNumber(guru.profile_completion);
+function getProfileCompletion(guru: GuruRow, profile?: ProfileRow | null) {
+  const direct =
+    toNumber(guru.profile_completion) || toNumber(profile?.profile_completion);
 
   if (direct > 0) return Math.min(100, Math.max(0, direct));
 
@@ -459,18 +481,39 @@ function getProfileCompletion(guru: GuruRow) {
     Boolean(
       asTrimmedString(guru.display_name) ||
       asTrimmedString(guru.full_name) ||
-      asTrimmedString(guru.name),
+      asTrimmedString(guru.name) ||
+      asTrimmedString(profile?.display_name) ||
+      asTrimmedString(profile?.full_name) ||
+      asTrimmedString(profile?.name),
     ),
-    Boolean(asTrimmedString(guru.bio)),
-    Boolean(asTrimmedString(guru.city) || asTrimmedString(guru.state)),
-    getGuruServices(guru).length > 0,
+    Boolean(asTrimmedString(guru.bio) || asTrimmedString(profile?.bio)),
+    Boolean(
+      asTrimmedString(guru.city) ||
+        asTrimmedString(guru.state) ||
+        asTrimmedString(guru.service_city) ||
+        asTrimmedString(guru.service_state) ||
+        asTrimmedString(profile?.city) ||
+        asTrimmedString(profile?.state) ||
+        asTrimmedString(profile?.service_city) ||
+        asTrimmedString(profile?.service_state),
+    ),
+    getGuruServices(guru, profile).length > 0,
     Boolean(
       asTrimmedString(guru.avatar_url) ||
       asTrimmedString(guru.photo_url) ||
       asTrimmedString(guru.image_url) ||
-      asTrimmedString(guru.profile_photo_url),
+      asTrimmedString(guru.profile_photo_url) ||
+      asTrimmedString(profile?.avatar_url) ||
+      asTrimmedString(profile?.photo_url) ||
+      asTrimmedString(profile?.image_url) ||
+      asTrimmedString(profile?.profile_photo_url),
     ),
-    toNumber(guru.hourly_rate) > 0 || toNumber(guru.price) > 0,
+    toNumber(guru.hourly_rate) > 0 ||
+      toNumber(guru.rate) > 0 ||
+      toNumber(guru.price) > 0 ||
+      toNumber(profile?.hourly_rate) > 0 ||
+      toNumber(profile?.rate) > 0 ||
+      toNumber(profile?.price) > 0,
   ];
 
   const complete = checks.filter(Boolean).length;
@@ -850,6 +893,133 @@ async function sendGuruStatusEmail(payload: GuruStatusEmailPayload) {
   }
 }
 
+function getMetadataString(
+  source: Record<string, unknown> | null | undefined,
+  key: string,
+) {
+  return asTrimmedString(source?.[key]);
+}
+
+function getAuthFullName(authUser?: AuthUserRow | null) {
+  if (!authUser) return "";
+
+  const firstName =
+    getMetadataString(authUser.user_metadata, "first_name") ||
+    getMetadataString(authUser.app_metadata, "first_name");
+  const lastName =
+    getMetadataString(authUser.user_metadata, "last_name") ||
+    getMetadataString(authUser.app_metadata, "last_name");
+
+  return (
+    getMetadataString(authUser.user_metadata, "full_name") ||
+    getMetadataString(authUser.user_metadata, "display_name") ||
+    getMetadataString(authUser.user_metadata, "name") ||
+    getMetadataString(authUser.app_metadata, "full_name") ||
+    getMetadataString(authUser.app_metadata, "display_name") ||
+    getMetadataString(authUser.app_metadata, "name") ||
+    `${firstName} ${lastName}`.trim() ||
+    getCleanEmailNameFallback(authUser.email || "")
+  );
+}
+
+function getAuthPhotoUrl(authUser?: AuthUserRow | null) {
+  if (!authUser) return "";
+
+  return (
+    getMetadataString(authUser.user_metadata, "picture") ||
+    getMetadataString(authUser.user_metadata, "avatar_url") ||
+    getMetadataString(authUser.user_metadata, "profile_photo_url") ||
+    getMetadataString(authUser.user_metadata, "photo_url") ||
+    getMetadataString(authUser.app_metadata, "picture") ||
+    getMetadataString(authUser.app_metadata, "avatar_url") ||
+    getMetadataString(authUser.app_metadata, "profile_photo_url") ||
+    getMetadataString(authUser.app_metadata, "photo_url")
+  );
+}
+
+function firstAvailable(...values: unknown[]) {
+  return values.find((value) => {
+    if (typeof value === "string") return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return value !== null && value !== undefined && value !== false;
+  });
+}
+
+function firstBoolean(...values: unknown[]) {
+  const found = values.find((value) => typeof value === "boolean");
+  return typeof found === "boolean" ? found : undefined;
+}
+
+function mergeGuruProfileAndAuthData({
+  guru,
+  profile,
+  authUser,
+}: {
+  guru: GuruRow;
+  profile?: ProfileRow | null;
+  authUser?: AuthUserRow | null;
+}) {
+  const authName = getAuthFullName(authUser);
+  const authPhotoUrl = getAuthPhotoUrl(authUser);
+  const profileName =
+    asTrimmedString(profile?.display_name) ||
+    asTrimmedString(profile?.full_name) ||
+    asTrimmedString(profile?.name) ||
+    `${asTrimmedString(profile?.first_name)} ${asTrimmedString(profile?.last_name)}`.trim();
+
+  const merged: GuruRow = {
+    ...guru,
+    id: firstAvailable(guru.id, profile?.id, authUser?.id),
+    user_id: firstAvailable(guru.user_id, guru.profile_id, profile?.user_id, profile?.id, authUser?.id),
+    profile_id: firstAvailable(guru.profile_id, profile?.profile_id, profile?.id, authUser?.id),
+    email: firstAvailable(guru.email, profile?.email, authUser?.email),
+    display_name: firstAvailable(guru.display_name, profile?.display_name, profile?.full_name, profile?.name, authName),
+    full_name: firstAvailable(guru.full_name, profile?.full_name, profile?.display_name, profile?.name, authName),
+    name: firstAvailable(guru.name, profile?.name, profileName, authName),
+    first_name: firstAvailable(guru.first_name, profile?.first_name),
+    last_name: firstAvailable(guru.last_name, profile?.last_name),
+    phone: firstAvailable(guru.phone, guru.phone_number, profile?.phone, profile?.phone_number),
+    phone_number: firstAvailable(guru.phone_number, guru.phone, profile?.phone_number, profile?.phone),
+    avatar_url: firstAvailable(guru.avatar_url, guru.profile_photo_url, guru.photo_url, guru.image_url, profile?.avatar_url, profile?.profile_photo_url, profile?.photo_url, profile?.image_url, authPhotoUrl),
+    profile_photo_url: firstAvailable(guru.profile_photo_url, guru.avatar_url, guru.photo_url, guru.image_url, profile?.profile_photo_url, profile?.avatar_url, profile?.photo_url, profile?.image_url, authPhotoUrl),
+    photo_url: firstAvailable(guru.photo_url, guru.profile_photo_url, guru.avatar_url, guru.image_url, profile?.photo_url, profile?.profile_photo_url, profile?.avatar_url, profile?.image_url, authPhotoUrl),
+    image_url: firstAvailable(guru.image_url, guru.profile_photo_url, guru.avatar_url, guru.photo_url, profile?.image_url, profile?.profile_photo_url, profile?.avatar_url, profile?.photo_url, authPhotoUrl),
+    bio: firstAvailable(guru.bio, profile?.bio),
+    title: firstAvailable(guru.title, guru.service, profile?.title, profile?.headline),
+    service: firstAvailable(guru.service, guru.service_name, guru.specialty, profile?.service, "Pet Care"),
+    services: firstAvailable(guru.services, profile?.services, ["Pet Care"]),
+    city: firstAvailable(guru.city, guru.service_city, profile?.city, profile?.service_city),
+    state: firstAvailable(guru.state, guru.service_state, guru.state_code, profile?.state, profile?.service_state, profile?.state_code),
+    zip_code: firstAvailable(guru.zip_code, guru.service_zip_code, guru.service_zip, profile?.zip_code, profile?.service_zip_code, profile?.service_zip),
+    service_city: firstAvailable(guru.service_city, guru.city, profile?.service_city, profile?.city),
+    service_state: firstAvailable(guru.service_state, guru.state, guru.state_code, profile?.service_state, profile?.state, profile?.state_code),
+    service_zip: firstAvailable(guru.service_zip, guru.service_zip_code, guru.zip_code, profile?.service_zip, profile?.service_zip_code, profile?.zip_code),
+    service_radius_miles: firstAvailable(guru.service_radius_miles, guru.radius_miles, guru.travel_radius, guru.max_travel_miles, profile?.service_radius_miles, profile?.radius_miles, profile?.travel_radius, profile?.max_travel_miles, 25),
+    radius_miles: firstAvailable(guru.radius_miles, guru.service_radius_miles, profile?.radius_miles, profile?.service_radius_miles, 25),
+    experience_years: firstAvailable(guru.experience_years, guru.years_experience, guru.years_of_experience, profile?.experience_years, profile?.years_experience, profile?.years_of_experience),
+    years_experience: firstAvailable(guru.years_experience, guru.experience_years, profile?.years_experience, profile?.experience_years),
+    hourly_rate: firstAvailable(guru.hourly_rate, guru.rate, guru.price, guru.base_rate, profile?.hourly_rate, profile?.rate, profile?.price, profile?.base_rate),
+    rate: firstAvailable(guru.rate, guru.hourly_rate, guru.price, guru.base_rate, profile?.rate, profile?.hourly_rate, profile?.price, profile?.base_rate),
+    price: firstAvailable(guru.price, guru.hourly_rate, guru.rate, guru.base_rate, profile?.price, profile?.hourly_rate, profile?.rate, profile?.base_rate),
+    status: firstAvailable(guru.status, profile?.account_status, profile?.status),
+    approval_status: firstAvailable(guru.approval_status, profile?.approval_status),
+    application_status: firstAvailable(guru.application_status, profile?.application_status, profile?.approval_status),
+    is_bookable: firstBoolean(guru.is_bookable, profile?.is_bookable) ?? (
+      asTrimmedString(guru.application_status).toLowerCase() === "bookable" ||
+      asTrimmedString(profile?.approval_status).toLowerCase() === "bookable"
+    ),
+    is_active: firstBoolean(guru.is_active, profile?.is_active) ?? (
+      asTrimmedString(guru.status).toLowerCase() === "active" ||
+      asTrimmedString(profile?.account_status).toLowerCase() === "active"
+    ),
+    is_public: firstBoolean(guru.is_public, profile?.is_public) ?? true,
+    created_at: firstAvailable(guru.created_at, profile?.created_at, authUser?.created_at),
+    updated_at: firstAvailable(guru.updated_at, profile?.updated_at, authUser?.last_sign_in_at, authUser?.created_at),
+  };
+
+  return merged;
+}
+
 function normalizeProfileRole(profile: ProfileRow) {
   const role = asTrimmedString(profile.role).toLowerCase();
 
@@ -968,6 +1138,75 @@ async function getProfileByIdentifier(id: string) {
   return null;
 }
 
+async function getAuthUserByIdentifier(identifier: string) {
+  const cleanId = decodeURIComponent(identifier).trim();
+
+  if (!cleanId) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(cleanId);
+
+    if (!error && data?.user) {
+      return data.user as AuthUserRow;
+    }
+  } catch {
+    // Continue through fallback lookups.
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    if (error || !Array.isArray(data?.users)) return null;
+
+    const normalized = cleanId.toLowerCase();
+
+    const match = (data.users as AuthUserRow[]).find((user) => {
+      const fullName = getAuthFullName(user).toLowerCase();
+      const email = String(user.email || "").toLowerCase();
+
+      return (
+        String(user.id || "").toLowerCase() === normalized ||
+        email === normalized ||
+        fullName === normalized ||
+        email.includes(normalized) ||
+        fullName.includes(normalized)
+      );
+    });
+
+    return match || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getAuthUserForGuru(guru: GuruRow, profile?: ProfileRow | null) {
+  const possibleIds = [
+    asTrimmedString(guru.user_id),
+    asTrimmedString(guru.profile_id),
+    asTrimmedString(profile?.user_id),
+    asTrimmedString(profile?.id),
+    asTrimmedString(guru.id),
+  ].filter(Boolean);
+
+  for (const possibleId of possibleIds) {
+    const authUser = await getAuthUserByIdentifier(possibleId);
+    if (authUser) return authUser;
+  }
+
+  const email =
+    asTrimmedString(guru.email) || asTrimmedString(profile?.email);
+
+  if (email) {
+    const authUser = await getAuthUserByIdentifier(email);
+    if (authUser) return authUser;
+  }
+
+  return null;
+}
+
 async function getGuruById(id: string) {
   const cleanId = decodeURIComponent(id).trim();
 
@@ -994,7 +1233,11 @@ async function getGuruById(id: string) {
       const result = (await query) as SafeQueryResponse;
 
       if (!result.error && result.data) {
-        return result.data as GuruRow;
+        const guru = result.data as GuruRow;
+        const profile = await getProfileForGuru(guru);
+        const authUser = await getAuthUserForGuru(guru, profile);
+
+        return mergeGuruProfileAndAuthData({ guru, profile, authUser });
       }
     } catch {
       // Keep trying fallback lookups.
@@ -1004,7 +1247,39 @@ async function getGuruById(id: string) {
   const profile = await getProfileByIdentifier(cleanId);
 
   if (profile) {
-    return buildGuruRecordFromProfile(profile);
+    const authUser = await getAuthUserForGuru(buildGuruRecordFromProfile(profile), profile);
+
+    return mergeGuruProfileAndAuthData({
+      guru: buildGuruRecordFromProfile(profile),
+      profile,
+      authUser,
+    });
+  }
+
+  const authUser = await getAuthUserByIdentifier(cleanId);
+
+  if (authUser) {
+    return mergeGuruProfileAndAuthData({
+      guru: {
+        id: authUser.id,
+        user_id: authUser.id,
+        profile_id: authUser.id,
+        email: authUser.email || "",
+        display_name: getAuthFullName(authUser),
+        full_name: getAuthFullName(authUser),
+        avatar_url: getAuthPhotoUrl(authUser),
+        profile_photo_url: getAuthPhotoUrl(authUser),
+        role: "guru",
+        service: "Pet Care",
+        services: ["Pet Care"],
+        status: "new",
+        application_status: "new",
+        created_at: authUser.created_at,
+        updated_at: authUser.last_sign_in_at || authUser.created_at,
+      },
+      profile: null,
+      authUser,
+    });
   }
 
   return null;
@@ -1396,11 +1671,11 @@ export default async function AdminGuruDetailPage({
   const email = getGuruEmail(guru, profile);
   const phone = getGuruPhone(guru, profile);
   const location = getGuruLocation(guru, profile);
-  const services = getGuruServices(guru);
+  const services = getGuruServices(guru, profile);
   const experience = getGuruExperience(guru);
   const status = normalizeApplicationStatus(guru);
   const statusLabel = getApplicationStatusLabel(status);
-  const profileCompletion = getProfileCompletion(guru);
+  const profileCompletion = getProfileCompletion(guru, profile);
   const publicHref = getPublicHref(guru);
   const events = await getApplicationEvents(guruId);
 
