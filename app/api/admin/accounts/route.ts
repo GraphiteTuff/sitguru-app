@@ -6,6 +6,7 @@ type AuthUserSummary = {
   created_at: string | null;
   last_sign_in_at: string | null;
   email_confirmed_at: string | null;
+  user_metadata?: Record<string, any> | null;
 };
 
 type AnyRow = Record<string, any>;
@@ -64,17 +65,62 @@ function getAccountStatus(profile: AnyRow) {
   return "active";
 }
 
-function getDisplayName(profile: AnyRow, email: string) {
+function toTitleCase(value: string) {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function getCleanEmailFallback(email: string) {
+  const localPart = normalizeText(email).split("@")[0];
+
+  if (!localPart) return "";
+
+  const cleaned = localPart
+    .replace(/[._-]+/g, " ")
+    .replace(/\d+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) return "";
+
+  return toTitleCase(cleaned);
+}
+
+function getDisplayName(
+  profile: AnyRow,
+  email: string,
+  userMetadata?: Record<string, any> | null,
+) {
   const fullName = normalizeText(profile.full_name);
   const firstName = normalizeText(profile.first_name);
   const lastName = normalizeText(profile.last_name);
-  const name = normalizeText(profile.name);
+  const profileName = normalizeText(profile.name);
+  const profileDisplayName = normalizeText(profile.display_name);
+
+  const metadataDisplayName = normalizeText(userMetadata?.display_name);
+  const metadataFullName = normalizeText(userMetadata?.full_name);
+  const metadataName = normalizeText(userMetadata?.name);
+  const metadataFirstName = normalizeText(userMetadata?.first_name);
+  const metadataLastName = normalizeText(userMetadata?.last_name);
+  const metadataLegalName = normalizeText(userMetadata?.legal_name);
 
   if (fullName) return fullName;
-  if (name) return name;
+  if (profileDisplayName) return profileDisplayName;
+  if (profileName) return profileName;
   if (firstName || lastName) return `${firstName} ${lastName}`.trim();
 
-  return email ? email.split("@")[0] : "SitGuru User";
+  if (metadataFullName) return metadataFullName;
+  if (metadataDisplayName) return metadataDisplayName;
+  if (metadataName) return metadataName;
+  if (metadataLegalName) return metadataLegalName;
+  if (metadataFirstName || metadataLastName) {
+    return `${metadataFirstName} ${metadataLastName}`.trim();
+  }
+
+  return getCleanEmailFallback(email) || "SitGuru User";
 }
 
 function calculateCustomerSetupPercent(profile: AnyRow, petCount: number) {
@@ -129,6 +175,8 @@ function includesSearch(account: AnyRow, loweredQuery: string) {
     normalizeText(account.id).toLowerCase().includes(loweredQuery) ||
     normalizeText(account.full_name).toLowerCase().includes(loweredQuery) ||
     normalizeText(account.first_name).toLowerCase().includes(loweredQuery) ||
+    normalizeText(account.last_name).toLowerCase().includes(loweredQuery) ||
+    normalizeText(account.name).toLowerCase().includes(loweredQuery) ||
     normalizeText(account.display_name).toLowerCase().includes(loweredQuery) ||
     normalizeText(account.phone).toLowerCase().includes(loweredQuery) ||
     normalizeText(account.service_city).toLowerCase().includes(loweredQuery) ||
@@ -279,6 +327,7 @@ export async function GET(request: NextRequest) {
           created_at: user.created_at || null,
           last_sign_in_at: user.last_sign_in_at || null,
           email_confirmed_at: user.email_confirmed_at || null,
+          user_metadata: user.user_metadata || null,
         },
       ]),
     );
@@ -401,7 +450,7 @@ export async function GET(request: NextRequest) {
         account_status: accountStatus,
         approval_status: normalizeText(profile.approval_status) || accountStatus,
         email,
-        display_name: getDisplayName(profile, email),
+        display_name: getDisplayName(profile, email, authUser?.user_metadata),
         auth_created_at: authUser?.created_at || null,
         last_sign_in_at: authUser?.last_sign_in_at || null,
         email_confirmed_at: authUser?.email_confirmed_at || null,

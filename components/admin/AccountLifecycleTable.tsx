@@ -135,11 +135,26 @@ function getLocation(account: AccountRecord) {
 }
 
 function getAccountName(account: AccountRecord) {
-  return (
-    account.display_name?.trim() ||
-    account.email?.split("@")[0] ||
-    "Deleted auth user"
-  );
+  const profileName = account.display_name?.trim();
+
+  if (profileName) return profileName;
+
+  const emailName = account.email
+    ?.split("@")[0]
+    ?.replace(/[._-]+/g, " ")
+    ?.replace(/\d+/g, " ")
+    ?.replace(/\s+/g, " ")
+    ?.trim();
+
+  if (emailName) {
+    return emailName
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ");
+  }
+
+  return "Deleted auth user";
 }
 
 export default function AccountLifecycleTable({
@@ -187,8 +202,8 @@ export default function AccountLifecycleTable({
     const setupIncomplete = accounts.filter(
       (account) => numberValue(account.setup_completion_percent) < 100,
     ).length;
-    const recoveryEmails = accounts.filter((account) =>
-      Boolean(account.recovery_email),
+    const recoveryEmails = accounts.filter(
+      (account) => Boolean(account.recovery_email),
     ).length;
 
     return {
@@ -316,11 +331,11 @@ export default function AccountLifecycleTable({
             Admin tracking
           </p>
 
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950">
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-5xl">
             {title}
           </h1>
 
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
             {description}
           </p>
         </div>
@@ -328,15 +343,21 @@ export default function AccountLifecycleTable({
         <button
           type="button"
           onClick={loadAccounts}
-          className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+          className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50"
         >
           Refresh
         </button>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div
+        className={`mt-6 grid gap-3 ${
+          isCustomerMode
+            ? "sm:grid-cols-2 lg:grid-cols-4"
+            : "sm:grid-cols-2 lg:grid-cols-5"
+        }`}
+      >
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.15em] text-slate-400">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
             Total
           </p>
           <p className="mt-2 text-2xl font-black text-slate-950">
@@ -345,39 +366,30 @@ export default function AccountLifecycleTable({
         </div>
 
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-500">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
             Active
           </p>
-          <p className="mt-2 text-2xl font-black text-emerald-700">
+          <p className="mt-2 text-2xl font-black text-slate-950">
             {filteredSummary.active}
           </p>
         </div>
 
         {isCustomerMode ? (
           <>
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-500">
-                Setup Complete
-              </p>
-              <p className="mt-2 text-2xl font-black text-emerald-700">
-                {filteredSummary.setupComplete}
-              </p>
-            </div>
-
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.15em] text-amber-500">
-                Needs Setup
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
+                Setup incomplete
               </p>
-              <p className="mt-2 text-2xl font-black text-amber-700">
+              <p className="mt-2 text-2xl font-black text-slate-950">
                 {filteredSummary.setupIncomplete}
               </p>
             </div>
 
             <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.15em] text-sky-500">
-                Recovery Emails
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
+                Recovery emails
               </p>
-              <p className="mt-2 text-2xl font-black text-sky-700">
+              <p className="mt-2 text-2xl font-black text-slate-950">
                 {filteredSummary.recoveryEmails}
               </p>
             </div>
@@ -385,79 +397,72 @@ export default function AccountLifecycleTable({
         ) : (
           <>
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.15em] text-rose-400">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-700">
                 Deleted
               </p>
-              <p className="mt-2 text-2xl font-black text-rose-700">
+              <p className="mt-2 text-2xl font-black text-slate-950">
                 {filteredSummary.deleted}
               </p>
             </div>
 
             <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.15em] text-orange-400">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">
                 Suspended
               </p>
-              <p className="mt-2 text-2xl font-black text-orange-700">
+              <p className="mt-2 text-2xl font-black text-slate-950">
                 {filteredSummary.suspended}
               </p>
             </div>
 
-            {isGuruMode || effectiveRole === "all" ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.15em] text-slate-400">
-                  Guru Cancelled
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  {filteredSummary.cancelledGurus}
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.15em] text-amber-400">
-                  Deactivated
-                </p>
-                <p className="mt-2 text-2xl font-black text-amber-700">
-                  {filteredSummary.deactivated}
-                </p>
-              </div>
-            )}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-700">
+                Guru cancelled
+              </p>
+              <p className="mt-2 text-2xl font-black text-slate-950">
+                {filteredSummary.cancelledGurus}
+              </p>
+            </div>
           </>
         )}
       </div>
 
-      <div className="mt-6 grid gap-3 lg:grid-cols-[1fr_180px_180px_auto]">
+      <div className="mt-6 grid gap-3 lg:grid-cols-[1fr_160px_160px_auto]">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          className="input w-full"
-          placeholder={
-            isCustomerMode
-              ? "Search by email, name, phone, city, ZIP, or user ID"
-              : "Search by email, user ID, or reason"
-          }
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              void loadAccounts();
+            }
+          }}
+          className="input"
+          placeholder="Search by name, email, user ID, or reason"
         />
+
+        {!lockedRole ? (
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value as LifecycleRole)}
+            className="input"
+          >
+            {roleOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div />
+        )}
 
         <select
           value={status}
           onChange={(event) => setStatus(event.target.value)}
-          className="input w-full"
+          className="input"
         >
-          {statusOptions.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={lockedRole || role}
-          onChange={(event) => setRole(event.target.value as LifecycleRole)}
-          className="input w-full"
-          disabled={Boolean(lockedRole)}
-        >
-          {roleOptions.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -567,11 +572,8 @@ export default function AccountLifecycleTable({
                         <p className="font-black text-slate-950">
                           {getAccountName(account)}
                         </p>
-                        <p className="mt-1 break-all text-xs font-semibold text-slate-600">
-                          {account.email || "Deleted auth user"}
-                        </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {account.id}
+                          User ID: {account.id}
                         </p>
                         {!account.auth_user_exists ? (
                           <p className="mt-1 text-xs font-bold text-rose-600">
@@ -666,10 +668,10 @@ export default function AccountLifecycleTable({
                   <tr key={account.id}>
                     <td className="px-4 py-4 align-top">
                       <p className="font-black text-slate-950">
-                        {account.email || "Deleted auth user"}
+                        {getAccountName(account)}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {account.id}
+                        User ID: {account.id}
                       </p>
                       {!account.auth_user_exists ? (
                         <p className="mt-1 text-xs font-bold text-rose-600">
@@ -761,7 +763,7 @@ export default function AccountLifecycleTable({
                   Manage account
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">
-                  {selectedAccount.email || selectedAccount.id}
+                  {getAccountName(selectedAccount)}
                 </h2>
               </div>
 
