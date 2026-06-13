@@ -127,6 +127,27 @@ function getInitials(name: string) {
     .join("");
 }
 
+function getSafeReviewHref(guru: GuruDisplayRow) {
+  const existingHref = String(guru.href || "").trim();
+
+  if (
+    existingHref.startsWith("/admin/gurus/") &&
+    existingHref !== "/admin/gurus/"
+  ) {
+    return existingHref;
+  }
+
+  const fallbackId = String(
+    guru.id || guru.guruUserId || guru.userId || guru.email || "",
+  ).trim();
+
+  if (fallbackId) {
+    return `/admin/gurus/${encodeURIComponent(fallbackId)}`;
+  }
+
+  return "/admin/gurus";
+}
+
 function getGuruMessageHref(guru: GuruDisplayRow) {
   if (guru.messageHref) return guru.messageHref;
 
@@ -447,6 +468,7 @@ function GuruRecordCard({ guru }: { guru: GuruDisplayRow }) {
     (guru.setupStep ? `Step ${guru.setupStep}` : "Not Started");
   const nextAction = getNextNeededAction(guru);
   const messageHref = getGuruMessageHref(guru);
+  const reviewHref = getSafeReviewHref(guru);
 
   return (
     <article className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
@@ -540,13 +562,13 @@ function GuruRecordCard({ guru }: { guru: GuruDisplayRow }) {
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <Link
-              href={guru.href}
+            <a
+              href={reviewHref}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
             >
               <Eye size={16} />
               Review Guru
-            </Link>
+            </a>
 
             <Link
               href={messageHref}
