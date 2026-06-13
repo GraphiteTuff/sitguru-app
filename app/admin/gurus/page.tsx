@@ -24,6 +24,15 @@ type ProfileRow = Record<string, unknown>;
 type BackgroundCheckRow = Record<string, unknown>;
 type GuruLeadRow = Record<string, unknown>;
 
+type AuthUserRow = {
+  id: string;
+  email?: string;
+  created_at?: string | null;
+  last_sign_in_at?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+  app_metadata?: Record<string, unknown> | null;
+};
+
 type GuruLeadPipelineData = {
   total: number;
   new: number;
@@ -1237,6 +1246,109 @@ async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
   };
 }
 
+function getMetadataString(
+  source: Record<string, unknown> | null | undefined,
+  key: string,
+) {
+  return asTrimmedString(source?.[key]);
+}
+
+function getAuthUserRole(user: AuthUserRow) {
+  const role =
+    getMetadataString(user.user_metadata, "role") ||
+    getMetadataString(user.user_metadata, "user_role") ||
+    getMetadataString(user.user_metadata, "account_role") ||
+    getMetadataString(user.app_metadata, "role") ||
+    getMetadataString(user.app_metadata, "user_role") ||
+    getMetadataString(user.app_metadata, "account_role");
+
+  return role.toLowerCase();
+}
+
+function isGuruAuthUser(user: AuthUserRow) {
+  const role = getAuthUserRole(user);
+
+  return (
+    role === "guru" ||
+    role === "sitter" ||
+    role === "provider" ||
+    role === "walker" ||
+    role === "dog_walker" ||
+    role === "dog walker"
+  );
+}
+
+function buildGuruRecordFromAuthUser(user: AuthUserRow): GuruRow {
+  const firstName =
+    getMetadataString(user.user_metadata, "first_name") ||
+    getMetadataString(user.app_metadata, "first_name");
+  const lastName =
+    getMetadataString(user.user_metadata, "last_name") ||
+    getMetadataString(user.app_metadata, "last_name");
+
+  const fullName =
+    getMetadataString(user.user_metadata, "full_name") ||
+    getMetadataString(user.user_metadata, "display_name") ||
+    getMetadataString(user.user_metadata, "name") ||
+    getMetadataString(user.app_metadata, "full_name") ||
+    getMetadataString(user.app_metadata, "display_name") ||
+    getMetadataString(user.app_metadata, "name") ||
+    `${firstName} ${lastName}`.trim() ||
+    getCleanEmailNameFallback(user.email || "");
+
+  return {
+    id: user.id,
+    user_id: user.id,
+    profile_id: user.id,
+    email: user.email || "",
+    display_name: fullName,
+    full_name: fullName,
+    first_name: firstName,
+    last_name: lastName,
+    name: fullName,
+    role: "guru",
+    status: "new",
+    approval_status: "new",
+    application_status: "new",
+    service: "Pet Care",
+    services: [],
+    created_at: user.created_at || "",
+    updated_at: user.last_sign_in_at || user.created_at || "",
+    source: "auth.users",
+  };
+}
+
+async function getAllAuthUsersForAdminGurus() {
+  const users: AuthUserRow[] = [];
+  let page = 1;
+  const perPage = 1000;
+
+  try {
+    while (page <= 10) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+
+      if (error) {
+        console.warn("Admin gurus auth user query skipped:", error);
+        break;
+      }
+
+      const pageUsers = Array.isArray(data?.users) ? data.users : [];
+      users.push(...(pageUsers as AuthUserRow[]));
+
+      if (pageUsers.length < perPage) break;
+
+      page += 1;
+    }
+  } catch (error) {
+    console.warn("Admin gurus auth user query skipped:", error);
+  }
+
+  return users;
+}
+
 function getGuruRecordIdentityKeys(guru: GuruRow) {
   return [
     asTrimmedString(guru.id),
@@ -1302,7 +1414,7 @@ function buildGuruRecordFromProfile(profile: ProfileRow): GuruRow {
 }
 
 async function getGuruManagementData(searchParams: SearchParams) {
-  const [gurus, profiles, backgroundChecks] = await Promise.all([
+  const [gurus, profiles, backgroundChecks, authUsers] = await Promise.all([
     safeRows<GuruRow>(
       supabaseAdmin
         .from("gurus")
@@ -1327,6 +1439,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
         .limit(1000),
       "guru_background_checks",
     ),
+    getAllAuthUsersForAdminGurus(),
   ]);
 
   const profileMap = new Map<string, ProfileRow>();
@@ -1369,7 +1482,27 @@ async function getGuruManagementData(searchParams: SearchParams) {
     })
     .map((profile) => buildGuruRecordFromProfile(profile));
 
-  const liveGuruRows = [...gurus, ...profileBackedGuruRows];
+  const profileAndGuruKeys = new Set<string>();
+
+  [...gurus, ...profileBackedGuruRows].forEach((guru) => {
+    getGuruRecordIdentityKeys(guru).forEach((key) =>
+      profileAndGuruKeys.add(key),
+    );
+  });
+
+  const authBackedGuruRows = authUsers
+    .filter((authUser) => isGuruAuthUser(authUser))
+    .filter((authUser) => {
+      const authKeys = [
+        asTrimmedString(authUser.id),
+        asTrimmedString(authUser.email).toLowerCase(),
+      ].filter(Boolean);
+
+      return !authKeys.some((key) => profileAndGuruKeys.has(key));
+    })
+    .map((authUser) => buildGuruRecordFromAuthUser(authUser));
+
+  const liveGuruRows = [...gurus, ...profileBackedGuruRows, ...authBackedGuruRows];
 
   const rows: GuruDisplayRow[] = liveGuruRows.map((guru) => {
     const profile = profileMap.get(getGuruProfileKey(guru));
@@ -2484,7 +2617,7 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
             Supabase coordination:
           </span>{" "}
           this page reads `gurus`, `profiles`, and `guru_background_checks`.
-          New Guru signups from `profiles` are automatically included even before a full `gurus` row exists.
+          New Guru signups from `profiles` and Guru-role Auth metadata are automatically included even before a full `gurus` row exists.
           Guru avatars, setup step, missing-step queues, application status,
           profile quality, identity status, background status, safety status,
           bookable visibility, services, location, experience, joined dates,
