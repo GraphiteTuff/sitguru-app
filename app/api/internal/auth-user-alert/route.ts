@@ -167,10 +167,20 @@ async function sendSmsAlert(message: string) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const fromNumber = process.env.TWILIO_FROM_NUMBER;
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
   const recipients = getAdminSmsNumbers();
 
-  if (!accountSid || !authToken || !fromNumber || recipients.length === 0) {
-    return { skipped: true, reason: "Missing Twilio env values or ADMIN_ALERT_SMS_TO" };
+  if (
+    !accountSid ||
+    !authToken ||
+    (!fromNumber && !messagingServiceSid) ||
+    recipients.length === 0
+  ) {
+    return {
+      skipped: true,
+      reason:
+        "Missing Twilio env values, TWILIO_FROM_NUMBER/TWILIO_MESSAGING_SERVICE_SID, or ADMIN_ALERT_SMS_TO",
+    };
   }
 
   const authHeader = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
@@ -179,9 +189,14 @@ async function sendSmsAlert(message: string) {
     recipients.map(async (to) => {
       const body = new URLSearchParams({
         To: to,
-        From: fromNumber,
         Body: message,
       });
+
+      if (messagingServiceSid) {
+        body.set("MessagingServiceSid", messagingServiceSid);
+      } else if (fromNumber) {
+        body.set("From", fromNumber);
+      }
 
       const response = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
