@@ -205,6 +205,26 @@ async function sendSmsAlert(message: string) {
   return { skipped: false };
 }
 
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    route: "auth-user-alert",
+    accepts: ["POST"],
+    message: "SitGuru signup alert endpoint is deployed. Send POST requests from Supabase webhooks.",
+  });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      Allow: "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, x-sitguru-alert-secret",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const configuredSecret = process.env.SIGNUP_ALERT_SECRET;
   const providedSecret = request.headers.get("x-sitguru-alert-secret") || "";
