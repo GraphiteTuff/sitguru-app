@@ -1263,7 +1263,7 @@ function getSafeFirstName(
 
 function getCustomerInitials(profile: CustomerProfile | null) {
   const name =
-    profile?.full_name || profile?.first_name || profile?.email || "Customer";
+    profile?.full_name || profile?.first_name || profile?.email || "Pet Parent";
   const parts = name
     .replace(/@.*/, "")
     .split(/[\s._-]+/)
@@ -1276,7 +1276,7 @@ function getCustomerInitials(profile: CustomerProfile | null) {
 }
 
 function getDisplayValue(value: string | null | undefined) {
-  return value?.trim() || "Not added yet";
+  return value?.trim() || "Can be added when ready";
 }
 
 function normalizeBookingRow(row: RawBookingRow): Booking {
@@ -2417,6 +2417,8 @@ export default function CustomerDashboardPage() {
     return buildGuruReferralLink(referralProfile.referral_code);
   }, [referralProfile]);
 
+  const referralCode = referralProfile?.referral_code || "COMMUNITY";
+
   const profileCompletion = useMemo(() => {
     const fields = [
       customerProfile?.full_name || customerProfile?.first_name,
@@ -2781,7 +2783,7 @@ export default function CustomerDashboardPage() {
       setProfileMessage(
         savedLevel === "basic"
           ? "Basic profile saved. Contact and preference fields will appear once your profiles table includes those columns."
-          : "Customer profile saved.",
+          : "Pet Parent profile saved.",
       );
     } catch (error) {
       setProfileError(
@@ -2909,7 +2911,7 @@ export default function CustomerDashboardPage() {
               🐾
             </div>
             <p className="text-base font-semibold text-slate-700">
-              Loading your customer dashboard...
+              Loading your Pet Parent dashboard...
             </p>
           </div>
         </div>
@@ -2985,7 +2987,7 @@ export default function CustomerDashboardPage() {
             <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.35fr_0.65fr] lg:items-center">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-900/80 md:text-sm">
-                  SitGuru Customer Dashboard
+                  SitGuru Pet Parent Dashboard
                 </p>
 
                 <h1 className="mt-4 max-w-4xl text-4xl font-extrabold tracking-[-0.045em] text-slate-950 md:text-6xl lg:text-7xl">
@@ -3008,12 +3010,14 @@ export default function CustomerDashboardPage() {
 
                   <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
                     <GraduationCap className="h-4 w-4 text-emerald-700" />
-                    {universityProgress.certificationLabel}
+                    {universityProgress.isComplete
+                      ? "Certified Pet Parent"
+                      : "Pet Parent Academy"}
                   </span>
 
                   <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
-                    <span className="text-amber-400">★ ★ ★</span>
-                    {profileCompletion}% profile ready
+                    <Star className="h-4 w-4 text-amber-500" />
+                    PawPerks code: {referralCode}
                   </span>
 
                   {latestBooking ? (
@@ -3162,10 +3166,10 @@ export default function CustomerDashboardPage() {
                   icon: <ShieldCheck className="h-5 w-5" />,
                 },
                 {
-                  label: "Tips Given",
-                  value: formatMoney(stats.totalTips),
-                  helper: "Guru appreciation",
-                  href: routes.allBookings,
+                  label: "PawPerks Referrals",
+                  value: String(referralProfile?.completed_referrals ?? 0),
+                  helper: "Invite friends",
+                  href: routes.pawPerks,
                   icon: <HeartHandshake className="h-5 w-5" />,
                 },
                 {
@@ -3206,6 +3210,129 @@ export default function CustomerDashboardPage() {
                   </div>
                 </Link>
               ))}
+            </div>
+          </section>
+
+          <section className="mt-6 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
+            <div className="grid gap-6 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#fff7ed_100%)] p-6 md:p-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
+                  PawPerks Rewards
+                </p>
+
+                <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
+                  Share SitGuru and earn rewards.
+                </h2>
+
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700 md:text-base">
+                  Invite Pet Parents who need trusted care or future Gurus who
+                  love pets. Your referral code is ready to share right from
+                  your dashboard.
+                </p>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                      Referral code
+                    </p>
+                    <p className="mt-2 break-all text-xl font-black text-slate-950">
+                      {referralCode}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                      Available credit
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-slate-950">
+                      {formatMoney(referralProfile?.available_credit ?? 0)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-sky-100">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
+                      Completed referrals
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-slate-950">
+                      {referralProfile?.completed_referrals ?? 0}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyReferralLink(
+                        customerReferralLink,
+                        "Pet Parent referral link",
+                      )
+                    }
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-lg"
+                  >
+                    Copy Pet Parent Invite
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyReferralLink(guruReferralLink, "Guru invite link")
+                    }
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+                  >
+                    Copy Guru Invite
+                  </button>
+
+                  <Link
+                    href={routes.pawPerks}
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+                  >
+                    View PawPerks
+                  </Link>
+                </div>
+
+                {referralMessage ? (
+                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-emerald-800">
+                    {referralMessage}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-[1.7rem] border border-emerald-100 bg-white/85 p-5 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-2xl text-white shadow-sm">
+                    🎁
+                  </div>
+
+                  <div>
+                    <p className="text-lg font-black text-slate-950">
+                      Help more pet families find SitGuru.
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Pet Parents get a simple way to find trusted local care,
+                      and new Gurus help expand SitGuru in your community.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-3">
+                  {[
+                    "Share your Pet Parent invite with friends and neighbors.",
+                    "Refer future Gurus who love pets and want flexible work.",
+                    "Track rewards and SitGuru credit inside PawPerks.",
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100"
+                    >
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                      <p className="text-sm font-bold leading-6 text-slate-700">
+                        {item}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 
@@ -3351,7 +3478,7 @@ export default function CustomerDashboardPage() {
                         PawPerks Rewards
                       </p>
                       <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                        Grow SitGuru with PawPerks.
+                        Invite friends with PawPerks.
                       </h3>
                       <p className="mt-3 text-sm leading-6 text-slate-700">
                         Invite Pet Parents and Gurus, earn rewards, and help
@@ -3383,6 +3510,15 @@ export default function CustomerDashboardPage() {
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
+                        Referral code
+                      </p>
+                      <p className="mt-2 break-all text-xl font-black text-slate-950">
+                        {referralCode}
+                      </p>
+                    </div>
+
                     <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
                       <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
                         Available credit
@@ -3424,12 +3560,12 @@ export default function CustomerDashboardPage() {
                       onClick={() =>
                         copyReferralLink(
                           customerReferralLink,
-                          "Customer referral link",
+                          "Pet Parent referral link",
                         )
                       }
                       className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
                     >
-                      Copy Customer Invite
+                      Copy Pet Parent Invite
                     </button>
 
                     <button
@@ -3458,10 +3594,10 @@ export default function CustomerDashboardPage() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-600">
-                      Customer profile
+                      Pet Parent profile
                     </p>
                     <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                      Your care account details
+                      Your pet family care details
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
                       Keep household notes, emergency contacts, and preferences
@@ -3487,7 +3623,7 @@ export default function CustomerDashboardPage() {
                 <div className="mt-5 rounded-[1.5rem] bg-emerald-50 p-4 ring-1 ring-emerald-100">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-black text-slate-950">
-                      Profile completion
+                      Care details
                     </p>
                     <p className="text-sm font-black text-emerald-700">
                       {profileCompletion}%
@@ -3669,7 +3805,7 @@ export default function CustomerDashboardPage() {
                     >
                       {savingProfile
                         ? "Saving profile..."
-                        : "Save customer profile"}
+                        : "Save Pet Parent profile"}
                     </button>
                   </form>
                 ) : null}
@@ -3747,7 +3883,7 @@ export default function CustomerDashboardPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <p className="text-sm font-black text-slate-950">
-                        A calmer customer experience, built for trust
+                        A calmer Pet Parent experience, built for trust
                       </p>
                       <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
                         Plans can change. If timing, notes, or details need an
@@ -3994,11 +4130,10 @@ export default function CustomerDashboardPage() {
                 {pets.length === 0 ? (
                   <div className="mt-5 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-5">
                     <p className="text-sm font-semibold text-slate-900">
-                      No pet profiles yet.
+                      Add your first pet when ready.
                     </p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Add your first pet profile so booking and Guru
-                      communication feel easier.
+                      Pet profiles help Gurus understand routines, care notes, photos, and preferences before a booking.
                     </p>
                   </div>
                 ) : (
