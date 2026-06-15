@@ -2,16 +2,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  CalendarDays,
-  CheckCircle2,
-  HeartHandshake,
-  Mail,
+  CalendarHeart,
   MapPin,
-  MessageSquare,
   PawPrint,
   ShieldCheck,
-  Sparkles,
-  Star,
   UserRound,
 } from "lucide-react";
 
@@ -48,7 +42,11 @@ function isUuid(value: string) {
   );
 }
 
-function getText(row: AnyRow | null | undefined, keys: string[], fallback = "") {
+function getText(
+  row: AnyRow | null | undefined,
+  keys: string[],
+  fallback = "",
+) {
   if (!row) return fallback;
 
   for (const key of keys) {
@@ -129,7 +127,10 @@ function getAuthName(authUser: AnyRow | null | undefined) {
   return getText(metadata, ["full_name", "name", "display_name"], "");
 }
 
-function getRawDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+function getRawDisplayName(
+  row: AnyRow | null | undefined,
+  authUser?: AnyRow | null,
+) {
   const firstName = getText(row, ["first_name", "firstName"]);
   const lastName = getText(row, ["last_name", "lastName"]);
 
@@ -156,15 +157,30 @@ function getRawDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | n
   return "";
 }
 
-function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+function getDisplayName(
+  row: AnyRow | null | undefined,
+  authUser?: AnyRow | null,
+) {
   const rawName = getRawDisplayName(row, authUser);
 
   if (rawName) return rawName;
 
-  const profileEmail = getText(row, ["email", "customer_email", "pet_parent_email"]);
+  const profileEmail = getText(row, [
+    "email",
+    "customer_email",
+    "pet_parent_email",
+  ]);
   const authEmail = getText(authUser, ["email"]);
 
   return profileEmail || authEmail || "Pet Parent";
+}
+
+function getPublicFirstName(name: string) {
+  const cleanName = name.replace(/@.*/, "").trim();
+
+  if (!cleanName || cleanName === "Pet Parent") return "this Pet Parent";
+
+  return cleanName.split(/\s+/)[0] || cleanName;
 }
 
 function getInitials(name: string) {
@@ -198,12 +214,10 @@ function getPhone(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
 function getLocation(row: AnyRow | null | undefined) {
   const city = getText(row, ["city", "customer_city", "location_city"]);
   const state = getText(row, ["state", "state_code", "customer_state"]);
-  const zip = getText(row, ["zip", "zipcode", "zip_code", "postal_code"]);
 
   const cityState = [city, state].filter(Boolean).join(", ");
-  const location = [cityState, zip].filter(Boolean).join(" ");
 
-  return location || "Location not added yet";
+  return cityState || "General location not shared yet";
 }
 
 function getServiceAddress(row: AnyRow | null | undefined) {
@@ -234,12 +248,41 @@ function getCarePreferences(row: AnyRow | null | undefined) {
   );
 }
 
-function getAvatarUrl(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+function getPetParentBio(row: AnyRow | null | undefined) {
+  return getText(
+    row,
+    [
+      "bio",
+      "about",
+      "about_me",
+      "profile_bio",
+      "public_bio",
+      "pet_parent_bio",
+      "household_intro",
+    ],
+    "",
+  );
+}
+
+function getAvatarUrl(
+  row: AnyRow | null | undefined,
+  authUser?: AnyRow | null,
+) {
   const metadata = getAuthMetadata(authUser);
 
   return (
-    getText(row, ["avatar_url", "profile_photo_url", "photo_url", "image_url"]) ||
-    getText(metadata, ["avatar_url", "profile_photo_url", "photo_url", "picture"]) ||
+    getText(row, [
+      "avatar_url",
+      "profile_photo_url",
+      "photo_url",
+      "image_url",
+    ]) ||
+    getText(metadata, [
+      "avatar_url",
+      "profile_photo_url",
+      "photo_url",
+      "picture",
+    ]) ||
     ""
   );
 }
@@ -254,15 +297,18 @@ function getPetDescription(row: AnyRow) {
       getText(row, ["type", "species", "pet_type"]),
       getText(row, ["breed"]),
       getText(row, ["age"]),
-      getText(row, ["weight"]),
     ]
       .filter(Boolean)
-      .join(" • ") || "Pet details not completed yet"
+      .join(" • ") || "Pet details can be added before care"
   );
 }
 
 function getPetNotes(row: AnyRow) {
-  return getText(row, ["notes", "care_notes", "temperament", "medications"], "");
+  return getText(
+    row,
+    ["notes", "care_notes", "temperament", "medications"],
+    "",
+  );
 }
 
 function getPetPhoto(row: AnyRow) {
@@ -283,11 +329,21 @@ function getBookingAmount(row: AnyRow) {
 }
 
 function getBookingDate(row: AnyRow) {
-  return getText(row, ["booking_date", "start_time", "start_date", "created_at", "updated_at"]);
+  return getText(row, [
+    "booking_date",
+    "start_time",
+    "start_date",
+    "created_at",
+    "updated_at",
+  ]);
 }
 
 function getBookingStatus(row: AnyRow) {
-  return getText(row, ["status", "booking_status", "payment_status"], "Unknown");
+  return getText(
+    row,
+    ["status", "booking_status", "payment_status"],
+    "Unknown",
+  );
 }
 
 function getAuthProvider(authUser: AnyRow | null) {
@@ -351,10 +407,9 @@ function buildMessageSenderFilters(customerId: string) {
 }
 
 function buildMessageRecipientFilters(customerId: string) {
-  return [
-    `recipient_id.eq.${customerId}`,
-    `to_user_id.eq.${customerId}`,
-  ].join(",");
+  return [`recipient_id.eq.${customerId}`, `to_user_id.eq.${customerId}`].join(
+    ",",
+  );
 }
 
 async function safeSelect(
@@ -472,7 +527,7 @@ function getProfileCompleteness({
       value &&
       value !== "No email found" &&
       value !== "No phone found" &&
-      value !== "Location not added yet"
+      value !== "General location not shared yet"
     );
   }).length;
 
@@ -519,7 +574,9 @@ function getTrustReadiness({
     {
       label: "Pet profiles",
       complete: hasPets,
-      detail: hasPets ? `${petsCount} pet profile${petsCount === 1 ? "" : "s"}` : "No pets yet",
+      detail: hasPets
+        ? `${petsCount} pet profile${petsCount === 1 ? "" : "s"}`
+        : "No pets yet",
     },
     {
       label: "Care preferences",
@@ -562,14 +619,18 @@ export default async function AdminCustomerPublicProfilePreviewPage({
     authUser,
   });
 
-  const canLoadRelatedRows = Boolean(relatedCustomerId && isUuid(relatedCustomerId));
+  const canLoadRelatedRows = Boolean(
+    relatedCustomerId && isUuid(relatedCustomerId),
+  );
 
   const [bookings, pets, sentMessages, receivedMessages] = canLoadRelatedRows
     ? await Promise.all([
         safeSelect("bookings", "*", (query) =>
-          query.or(buildRelatedIdFilters(relatedCustomerId)).order("created_at", {
-            ascending: false,
-          }),
+          query
+            .or(buildRelatedIdFilters(relatedCustomerId))
+            .order("created_at", {
+              ascending: false,
+            }),
         ),
         safeSelect("pets", "*", (query) =>
           query.or(buildPetIdFilters(relatedCustomerId)).order("created_at", {
@@ -577,14 +638,18 @@ export default async function AdminCustomerPublicProfilePreviewPage({
           }),
         ),
         safeSelect("messages", "*", (query) =>
-          query.or(buildMessageSenderFilters(relatedCustomerId)).order("created_at", {
-            ascending: false,
-          }),
+          query
+            .or(buildMessageSenderFilters(relatedCustomerId))
+            .order("created_at", {
+              ascending: false,
+            }),
         ),
         safeSelect("messages", "*", (query) =>
-          query.or(buildMessageRecipientFilters(relatedCustomerId)).order("created_at", {
-            ascending: false,
-          }),
+          query
+            .or(buildMessageRecipientFilters(relatedCustomerId))
+            .order("created_at", {
+              ascending: false,
+            }),
         ),
       ])
     : [[], [], [], []];
@@ -597,34 +662,11 @@ export default async function AdminCustomerPublicProfilePreviewPage({
   });
 
   const name = getDisplayName(profile, authUser);
-  const email = getEmail(profile, authUser);
-  const phone = getPhone(profile, authUser);
+  const publicFirstName = getPublicFirstName(name);
   const location = getLocation(profile);
-  const serviceAddress = getServiceAddress(profile);
   const carePreferences = getCarePreferences(profile);
+  const petParentBio = getPetParentBio(profile);
   const avatarUrl = getAvatarUrl(profile, authUser);
-  const profileCompletion = getProfileCompleteness({
-    profile,
-    petsCount: pets.length,
-  });
-  const trustChecks = getTrustReadiness({
-    profile,
-    authUser,
-    petsCount: pets.length,
-    bookingsCount: bookings.length,
-    messagesCount: messages.length,
-  });
-
-  const totalSpend = bookings.reduce(
-    (sum, booking) => sum + getBookingAmount(booking),
-    0,
-  );
-  const completedBookings = bookings.filter((booking) =>
-    ["completed", "complete", "finished", "closed"].includes(
-      getBookingStatus(booking).toLowerCase(),
-    ),
-  ).length;
-  const latestBooking = bookings[0] ?? null;
 
   const certifiedPetParent = false;
 
@@ -641,9 +683,12 @@ export default async function AdminCustomerPublicProfilePreviewPage({
           </Link>
 
           <div className="mt-6 rounded-3xl border border-red-100 bg-red-50 p-5">
-            <h1 className="text-3xl font-black">Public profile preview unavailable</h1>
+            <h1 className="text-3xl font-black">
+              Public profile preview unavailable
+            </h1>
             <p className="mt-2 text-sm font-semibold text-red-800">
-              No matching Supabase Auth user or profile row was found for this ID or email.
+              No matching Supabase Auth user or profile row was found for this
+              ID or email.
             </p>
             <p className="mt-3 break-all text-xs font-black text-red-900">
               Lookup: {lookupKey || "Missing route value"}
@@ -656,7 +701,7 @@ export default async function AdminCustomerPublicProfilePreviewPage({
 
   return (
     <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
-      <section className="mx-auto max-w-7xl space-y-5">
+      <section className="mx-auto max-w-6xl space-y-5">
         <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap gap-3">
             <Link
@@ -675,27 +720,48 @@ export default async function AdminCustomerPublicProfilePreviewPage({
             </Link>
           </div>
 
-          <div className="mt-5 rounded-[2rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-4">
+          <div className="mt-5 rounded-[1.75rem] border border-dashed border-emerald-200 bg-emerald-50/70 p-4">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
               Super Admin Preview
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-emerald-950">
-              This is a read-only preview of what a Guru or internal reviewer
-              should understand about this Pet Parent. It does not impersonate
-              the user and does not change their account.
+              This previews the simplified Pet Parent profile experience. Admin
+              tools, private contact details, account history, and technical
+              records stay in the admin record.
             </p>
           </div>
         </div>
 
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+          <div className="grid gap-8 bg-[radial-gradient(circle_at_76%_18%,rgba(255,255,255,0.92),transparent_20%),linear-gradient(135deg,#d9fff2_0%,#bff7ea_46%,#eaf8ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+              <div className="relative">
+                <div className="absolute -inset-4 rounded-full bg-white/40 blur-xl" />
+                <div className="relative flex h-40 w-40 items-center justify-center overflow-hidden rounded-full border-[8px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl md:h-52 md:w-52">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatarUrl}
+                      alt={`${name} profile photo`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    getInitials(name)
+                  )}
+                </div>
+                <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
+                  🐾
+                </div>
+              </div>
+            </div>
+
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-900/80 md:text-sm">
-                SitGuru Pet Parent Public Profile Preview
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-900/70 md:text-sm">
+                SitGuru Pet Parent
               </p>
 
               <h1 className="mt-4 max-w-4xl text-4xl font-extrabold tracking-[-0.045em] text-slate-950 md:text-6xl">
-                {name}
+                Meet {publicFirstName}
               </h1>
 
               <p className="mt-4 flex flex-wrap items-center gap-2 text-base font-black text-slate-900/80">
@@ -704,43 +770,30 @@ export default async function AdminCustomerPublicProfilePreviewPage({
               </p>
 
               <p className="mt-5 max-w-3xl text-base leading-8 text-slate-900/75 md:text-lg">
-                This Pet Parent profile helps Gurus understand booking readiness,
-                pet profile quality, care preferences, communication history, and
-                SitGuru trust signals before accepting or supporting care.
+                {petParentBio ||
+                  `${publicFirstName.charAt(0).toUpperCase()}${publicFirstName.slice(
+                    1,
+                  )} is part of the SitGuru pet care community and can share pet details with Gurus when booking care.`}
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <TrustBadge
+                <SoftPill
                   icon={<PawPrint className="h-4 w-4" />}
                   label="Pet Parent"
                   tone="emerald"
                 />
 
-                <TrustBadge
-                  icon={<Star className="h-4 w-4" />}
-                  label={`${profileCompletion}% profile ready`}
+                <SoftPill
+                  icon={<CalendarHeart className="h-4 w-4" />}
+                  label="Private booking details"
                   tone="white"
                 />
 
                 {certifiedPetParent ? (
-                  <TrustBadge
+                  <SoftPill
                     icon={<ShieldCheck className="h-4 w-4" />}
                     label="Certified Pet Parent"
                     tone="emerald"
-                  />
-                ) : (
-                  <TrustBadge
-                    icon={<ShieldCheck className="h-4 w-4" />}
-                    label="Certified Pet Parent: Not completed"
-                    tone="white"
-                  />
-                )}
-
-                {latestBooking ? (
-                  <TrustBadge
-                    icon={<CalendarDays className="h-4 w-4" />}
-                    label={`Last booking: ${formatDate(getBookingDate(latestBooking))}`}
-                    tone="white"
                   />
                 ) : null}
               </div>
@@ -761,194 +814,118 @@ export default async function AdminCustomerPublicProfilePreviewPage({
                 </Link>
               </div>
             </div>
-
-            <div className="flex flex-col items-center text-center">
-              <div className="relative">
-                <div className="absolute -inset-4 rounded-full bg-white/30 blur-xl" />
-                <div className="relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full border-[8px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl md:h-56 md:w-56">
-                  {avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={avatarUrl}
-                      alt={`${name} profile photo`}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    getInitials(name)
-                  )}
-                </div>
-                <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
-                  🐾
-                </div>
-              </div>
-
-              <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-950">
-                {name}
-              </h2>
-              <p className="mt-2 text-lg font-semibold text-slate-700">
-                SitGuru Pet Parent
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-600">
-                {pets.length > 0
-                  ? `${pets.length} pet profile${pets.length === 1 ? "" : "s"} ready for review`
-                  : "No pet profiles added yet"}
-              </p>
-            </div>
           </div>
 
-          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-2 lg:grid-cols-4 md:px-8">
-            <PublicStatCard
+          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-3 md:px-8">
+            <WarmSummaryCard
               icon={<PawPrint className="h-5 w-5" />}
               label="Pets"
-              value={String(pets.length)}
-              detail="Pet profiles connected"
+              value={
+                pets.length > 0
+                  ? `${pets.length} connected`
+                  : "Ready for pet profiles"
+              }
+              detail="Pet details can be shared when booking."
             />
-            <PublicStatCard
-              icon={<CalendarDays className="h-5 w-5" />}
-              label="Bookings"
-              value={String(bookings.length)}
-              detail={`${completedBookings} completed`}
+            <WarmSummaryCard
+              icon={<MapPin className="h-5 w-5" />}
+              label="General area"
+              value={location}
+              detail="Exact address is kept private."
             />
-            <PublicStatCard
-              icon={<MessageSquare className="h-5 w-5" />}
-              label="Messages"
-              value={String(messages.length)}
-              detail="Communication activity"
-            />
-            <PublicStatCard
-              icon={<HeartHandshake className="h-5 w-5" />}
-              label="Spend"
-              value={formatMoney(totalSpend)}
-              detail="Lifetime customer spend"
+            <WarmSummaryCard
+              icon={<UserRound className="h-5 w-5" />}
+              label="Privacy"
+              value="Contact details protected"
+              detail="Email and phone stay off this page."
             />
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="space-y-5">
-            <PreviewCard>
-              <SectionHeader
-                eyebrow="Public Contact Snapshot"
-                title="Pet Parent details"
-                description="Information a Guru or internal reviewer may use to understand the Pet Parent before care."
+        <section className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+          <PreviewCard>
+            <SectionHeader
+              eyebrow="About"
+              title="A simple profile for Gurus"
+              description="This public-style view gives Gurus just enough context without exposing private account information."
+            />
+
+            <div className="mt-5 space-y-3">
+              <FriendlyInfoRow
+                icon={<UserRound className="h-5 w-5 text-emerald-700" />}
+                label="Pet Parent"
+                value={publicFirstName}
               />
-
-              <div className="mt-5 space-y-3">
-                <InfoRow
-                  icon={<UserRound className="h-5 w-5 text-emerald-700" />}
-                  label="Display name"
-                  value={name}
-                />
-                <InfoRow
-                  icon={<Mail className="h-5 w-5 text-emerald-700" />}
-                  label="Email"
-                  value={email}
-                />
-                <InfoRow
-                  icon={<UserRound className="h-5 w-5 text-emerald-700" />}
-                  label="Phone"
-                  value={phone}
-                />
-                <InfoRow
-                  icon={<MapPin className="h-5 w-5 text-emerald-700" />}
-                  label="Location"
-                  value={location}
-                />
-              </div>
-            </PreviewCard>
-
-            <PreviewCard>
-              <SectionHeader
-                eyebrow="Care Location"
-                title="Service address and preferences"
-                description="Use this as a readiness preview only. Public display can be limited later for privacy."
+              <FriendlyInfoRow
+                icon={<MapPin className="h-5 w-5 text-emerald-700" />}
+                label="General area"
+                value={location}
               />
-
-              <div className="mt-5 space-y-3">
-                <InfoBox
-                  label="Service address"
-                  value={serviceAddress || "Service address not added yet"}
-                />
-                <InfoBox
-                  label="Care preferences"
-                  value={carePreferences || "Care preferences not added yet"}
-                />
-              </div>
-            </PreviewCard>
-          </div>
-
-          <div className="space-y-5">
-            <PreviewCard>
-              <SectionHeader
-                eyebrow="Trust Readiness"
-                title="Profile quality and safety signals"
-                description="These checks help decide whether the Pet Parent is ready for smooth bookings with Gurus."
+              <FriendlyInfoRow
+                icon={<PawPrint className="h-5 w-5 text-emerald-700" />}
+                label="Pets"
+                value={
+                  pets.length > 0
+                    ? `${pets.length} pet profile${pets.length === 1 ? "" : "s"} connected`
+                    : "Pet profiles can be added before booking"
+                }
               />
+            </div>
+          </PreviewCard>
 
-              <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-emerald-700"
-                  style={{ width: `${profileCompletion}%` }}
+          <PreviewCard>
+            <SectionHeader
+              eyebrow="Care"
+              title="Care preferences"
+              description="Care notes are optional and can stay simple. Pet Parents should not feel pressured to overshare."
+            />
+
+            <div className="mt-5">
+              {carePreferences ? (
+                <FriendlyInfoBox
+                  label="Shared care notes"
+                  value={carePreferences}
                 />
-              </div>
+              ) : (
+                <GentleEmptyState>
+                  Care preferences can be shared when the Pet Parent is ready.
+                </GentleEmptyState>
+              )}
+            </div>
+          </PreviewCard>
+        </section>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {trustChecks.map((check) => (
-                  <div
-                    key={check.label}
-                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-black text-slate-900">
-                        {check.label}
-                      </p>
-                      {check.complete ? (
-                        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-700" />
-                      ) : (
-                        <Sparkles className="h-5 w-5 shrink-0 text-amber-600" />
-                      )}
-                    </div>
-                    <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-                      {check.detail}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </PreviewCard>
+        {certifiedPetParent ? (
+          <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
+            <SectionHeader
+              eyebrow="SitGuru University"
+              title="Certified Pet Parent"
+              description="This achievement appears only after the Pet Parent completes the SitGuru Pet Parent Academy."
+            />
 
-            <PreviewCard>
-              <SectionHeader
-                eyebrow="SitGuru University"
-                title="Certified Pet Parent badge"
-                description="This will auto-populate once Pet Parent Academy completion and user badges are wired."
-              />
-
-              <div className="mt-5 rounded-[1.6rem] border border-amber-200 bg-amber-50 p-5">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-amber-700 ring-1 ring-amber-100">
-                    <ShieldCheck className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="text-base font-black text-amber-950">
-                      Certified Pet Parent: Not completed
-                    </p>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-amber-900">
-                      After the 9-step Pet Parent Academy is completed, this
-                      area should show the Certified Pet Parent badge,
-                      certificate ID, and completion date.
-                    </p>
-                  </div>
+            <div className="mt-5 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 ring-1 ring-emerald-100">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-base font-black text-emerald-950">
+                    Certified Pet Parent
+                  </p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-emerald-900">
+                    Completed through SitGuru University.
+                  </p>
                 </div>
               </div>
-            </PreviewCard>
-          </div>
-        </section>
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
           <SectionHeader
-            eyebrow="Pet Profiles"
-            title="Pets connected to this Pet Parent"
-            description="These are the pet profiles Gurus should be able to review before care."
+            eyebrow="Pets"
+            title="Pets connected to this profile"
+            description="Pet profiles are the heart of the experience. Gurus can use them to understand care needs before a booking."
           />
 
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -985,83 +962,19 @@ export default async function AdminCustomerPublicProfilePreviewPage({
                       </p>
                     ) : (
                       <p className="mt-3 rounded-2xl bg-white p-3 text-sm font-semibold leading-6 text-slate-500">
-                        No care notes added yet.
+                        Care notes can be added when the Pet Parent is ready.
                       </p>
                     )}
                   </div>
                 </article>
               ))
             ) : (
-              <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-sm font-bold leading-6 text-slate-600 md:col-span-2 xl:col-span-3">
-                No pet profiles found for this Pet Parent yet.
-              </div>
+              <GentleEmptyState className="md:col-span-2 xl:col-span-3">
+                Pet profiles will appear here once added. New Pet Parents can
+                still browse SitGuru without filling out every detail right
+                away.
+              </GentleEmptyState>
             )}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <SectionHeader
-            eyebrow="Booking Activity"
-            title="Recent booking signals"
-            description="Read-only summary of booking history connected to this Pet Parent."
-          />
-
-          <div className="mt-5 overflow-hidden rounded-3xl border border-slate-100">
-            {bookings.length === 0 ? (
-              <div className="bg-slate-50 p-5 text-sm font-bold text-slate-600">
-                No bookings found for this Pet Parent.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Pet</th>
-                      <th className="px-4 py-3 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {bookings.slice(0, 12).map((booking) => (
-                      <tr key={String(booking.id)}>
-                        <td className="px-4 py-3 font-bold">
-                          {formatDate(getBookingDate(booking))}
-                        </td>
-                        <td className="px-4 py-3 font-bold">
-                          {getBookingStatus(booking)}
-                        </td>
-                        <td className="px-4 py-3 font-bold">
-                          {getText(booking, ["pet_name", "animal_name"], "—")}
-                        </td>
-                        <td className="px-4 py-3 text-right font-black">
-                          {formatMoney(getBookingAmount(booking))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <SectionHeader
-            eyebrow="Record Source"
-            title="Admin-only technical details"
-            description="Visible to Super Admin only. This confirms which account record this preview is using."
-          />
-
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MiniBox label="Lookup Value" value={lookupKey} />
-            <MiniBox label="Resolved ID" value={relatedCustomerId || "—"} />
-            <MiniBox label="Auth User" value={authUser ? "Found" : "Missing"} />
-            <MiniBox label="Profile Row" value={profile ? "Found" : "Missing"} />
-            <MiniBox label="Auth Provider" value={getAuthProvider(authUser)} />
-            <MiniBox label="Auth Created" value={formatDateTime(authUser?.created_at)} />
-            <MiniBox label="Profile Created" value={formatDateTime(profile?.created_at)} />
-            <MiniBox label="Profile Updated" value={formatDateTime(profile?.updated_at)} />
           </div>
         </section>
       </section>
@@ -1069,7 +982,7 @@ export default async function AdminCustomerPublicProfilePreviewPage({
   );
 }
 
-function TrustBadge({
+function SoftPill({
   icon,
   label,
   tone,
@@ -1093,7 +1006,7 @@ function TrustBadge({
   );
 }
 
-function PublicStatCard({
+function WarmSummaryCard({
   icon,
   label,
   value,
@@ -1106,16 +1019,18 @@ function PublicStatCard({
 }) {
   return (
     <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-500">{label}</p>
-          <p className="mt-2 truncate text-2xl font-extrabold text-slate-950">
-            {value}
-          </p>
-          <p className="mt-3 text-sm font-bold text-emerald-700">{detail}</p>
-        </div>
+      <div className="flex items-start gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
           {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-500">{label}</p>
+          <p className="mt-1 break-words text-base font-extrabold text-slate-950">
+            {value}
+          </p>
+          <p className="mt-2 text-sm font-bold leading-6 text-emerald-700">
+            {detail}
+          </p>
         </div>
       </div>
     </div>
@@ -1154,7 +1069,7 @@ function SectionHeader({
   );
 }
 
-function InfoRow({
+function FriendlyInfoRow({
   icon,
   label,
   value,
@@ -1176,7 +1091,7 @@ function InfoRow({
   );
 }
 
-function InfoBox({ label, value }: { label: string; value: string }) {
+function FriendlyInfoBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
       <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
@@ -1189,13 +1104,21 @@ function InfoBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MiniBox({ label, value }: { label: string; value: string }) {
+function GentleEmptyState({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-      <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 break-words text-sm font-black">{value || "—"}</p>
+    <div
+      className={[
+        "rounded-[1.75rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-sm font-bold leading-6 text-slate-600",
+        className,
+      ].join(" ")}
+    >
+      {children}
     </div>
   );
 }
