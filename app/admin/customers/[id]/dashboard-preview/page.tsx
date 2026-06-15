@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   CalendarDays,
+  GraduationCap,
   HeartHandshake,
   Mail,
   MapPin,
@@ -45,7 +46,11 @@ function isUuid(value: string) {
   );
 }
 
-function getText(row: AnyRow | null | undefined, keys: string[], fallback = "") {
+function getText(
+  row: AnyRow | null | undefined,
+  keys: string[],
+  fallback = "",
+) {
   if (!row) return fallback;
 
   for (const key of keys) {
@@ -56,6 +61,40 @@ function getText(row: AnyRow | null | undefined, keys: string[], fallback = "") 
   return fallback;
 }
 
+function getBoolean(row: AnyRow | null | undefined, keys: string[]) {
+  if (!row) return false;
+
+  for (const key of keys) {
+    const value = row[key];
+
+    if (typeof value === "boolean") return value;
+
+    if (typeof value === "string") {
+      const cleanValue = value.trim().toLowerCase();
+      if (
+        ["true", "yes", "complete", "completed", "earned"].includes(cleanValue)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function formatPhoneNumber(value: string) {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+
+  return value;
+}
 function getAmount(row: AnyRow | null | undefined, keys: string[]) {
   if (!row) return 0;
 
@@ -213,6 +252,49 @@ function getLocation(row: AnyRow | null | undefined) {
   return location || "Location not added yet";
 }
 
+function getCityStateLocation(row: AnyRow | null | undefined) {
+  const city = getText(row, [
+    "city",
+    "customer_city",
+    "location_city",
+    "service_city",
+    "home_city",
+  ]);
+  const state = getText(row, [
+    "state",
+    "state_code",
+    "customer_state",
+    "service_state",
+    "home_state",
+  ]);
+
+  return [city, state].filter(Boolean).join(", ");
+}
+
+function getFirstNameFromDisplayName(name: string) {
+  const firstName = name.trim().split(/\s+/)[0];
+  return firstName || "there";
+}
+
+function generateReferralCode(userId: string, name: string) {
+  const cleanName = getFirstNameFromDisplayName(name)
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase();
+  const cleanId = userId
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 8)
+    .toUpperCase();
+
+  return `${cleanName || "SITGURU"}-${cleanId || "COMMUNITY"}`;
+}
+
+function buildCustomerReferralLink(referralCode: string) {
+  return `/signup?ref=${encodeURIComponent(referralCode)}&type=customer&source=pawperks`;
+}
+
+function buildGuruReferralLink(referralCode: string) {
+  return `/become-a-guru?ref=${encodeURIComponent(referralCode)}&type=guru&source=pawperks`;
+}
 function getServiceAddress(row: AnyRow | null | undefined) {
   return getText(
     row,
@@ -248,7 +330,12 @@ function getAvatarUrl(
   const metadata = getAuthMetadata(authUser);
 
   return (
-    getText(row, ["avatar_url", "profile_photo_url", "photo_url", "image_url"]) ||
+    getText(row, [
+      "avatar_url",
+      "profile_photo_url",
+      "photo_url",
+      "image_url",
+    ]) ||
     getText(metadata, [
       "avatar_url",
       "profile_photo_url",
@@ -277,7 +364,11 @@ function getPetDescription(row: AnyRow) {
 }
 
 function getPetNotes(row: AnyRow) {
-  return getText(row, ["notes", "care_notes", "temperament", "medications"], "");
+  return getText(
+    row,
+    ["notes", "care_notes", "temperament", "medications"],
+    "",
+  );
 }
 
 function getPetPhoto(row: AnyRow) {
@@ -308,7 +399,11 @@ function getBookingDate(row: AnyRow) {
 }
 
 function getBookingStatus(row: AnyRow) {
-  return getText(row, ["status", "booking_status", "payment_status"], "Unknown");
+  return getText(
+    row,
+    ["status", "booking_status", "payment_status"],
+    "Unknown",
+  );
 }
 
 function getAuthProvider(authUser: AnyRow | null) {
@@ -544,18 +639,13 @@ async function resolvePetParentRecord(lookupKey: string) {
   };
 }
 
-function getVerifiedFields(
-  profile: AnyRow | null,
-  authUser: AnyRow | null,
-) {
+function getVerifiedFields(profile: AnyRow | null, authUser: AnyRow | null) {
   const hasEmail = Boolean(getEmail(profile, authUser) !== "No email found");
   const hasPhone = Boolean(getPhone(profile, authUser) !== "No phone found");
   const hasConfirmedEmail = Boolean(
     getText(authUser, ["email_confirmed_at", "confirmed_at"]),
   );
-  const hasConfirmedPhone = Boolean(
-    getText(authUser, ["phone_confirmed_at"]),
-  );
+  const hasConfirmedPhone = Boolean(getText(authUser, ["phone_confirmed_at"]));
 
   return {
     hasEmail,
@@ -565,6 +655,24 @@ function getVerifiedFields(
   };
 }
 
+function getCertifiedPetParent(
+  profile: AnyRow | null,
+  authUser: AnyRow | null,
+) {
+  const metadata = getAuthMetadata(authUser);
+  const certifiedKeys = [
+    "certified_pet_parent",
+    "pet_parent_certified",
+    "pet_parent_academy_completed",
+    "academy_completed",
+    "is_certified_pet_parent",
+    "completed_pet_parent_academy",
+  ];
+
+  return (
+    getBoolean(profile, certifiedKeys) || getBoolean(metadata, certifiedKeys)
+  );
+}
 function hasRealName(profile: AnyRow | null, authUser: AnyRow | null) {
   const name = getRawDisplayName(profile, authUser).trim().toLowerCase();
 
@@ -660,32 +768,38 @@ export default async function AdminCustomerDashboardPreviewPage({
     authUser,
   });
 
-  const canLoadRelatedRows = Boolean(relatedCustomerId && isUuid(relatedCustomerId));
+  const canLoadRelatedRows = Boolean(
+    relatedCustomerId && isUuid(relatedCustomerId),
+  );
 
-  const [bookings, pets, sentMessages, receivedMessages] = canLoadRelatedRows
-    ? await Promise.all([
-        safeSelect("bookings", "*", (query) =>
-          query
-            .or(buildRelatedIdFilters(relatedCustomerId))
-            .order("created_at", { ascending: false }),
-        ),
-        safeSelect("pets", "*", (query) =>
-          query
-            .or(buildPetIdFilters(relatedCustomerId))
-            .order("created_at", { ascending: false }),
-        ),
-        safeSelect("messages", "*", (query) =>
-          query
-            .or(buildMessageSenderFilters(relatedCustomerId))
-            .order("created_at", { ascending: false }),
-        ),
-        safeSelect("messages", "*", (query) =>
-          query
-            .or(buildMessageRecipientFilters(relatedCustomerId))
-            .order("created_at", { ascending: false }),
-        ),
-      ])
-    : [[], [], [], []];
+  const [bookings, pets, sentMessages, receivedMessages, referralProfiles] =
+    canLoadRelatedRows
+      ? await Promise.all([
+          safeSelect("bookings", "*", (query) =>
+            query
+              .or(buildRelatedIdFilters(relatedCustomerId))
+              .order("created_at", { ascending: false }),
+          ),
+          safeSelect("pets", "*", (query) =>
+            query
+              .or(buildPetIdFilters(relatedCustomerId))
+              .order("created_at", { ascending: false }),
+          ),
+          safeSelect("messages", "*", (query) =>
+            query
+              .or(buildMessageSenderFilters(relatedCustomerId))
+              .order("created_at", { ascending: false }),
+          ),
+          safeSelect("messages", "*", (query) =>
+            query
+              .or(buildMessageRecipientFilters(relatedCustomerId))
+              .order("created_at", { ascending: false }),
+          ),
+          safeSelect("referral_profiles", "*", (query) =>
+            query.eq("user_id", relatedCustomerId).limit(1),
+          ),
+        ])
+      : [[], [], [], [], []];
 
   const messages = [...sentMessages, ...receivedMessages].sort((a, b) => {
     const aTime = new Date(getText(a, ["created_at"])).getTime() || 0;
@@ -696,46 +810,52 @@ export default async function AdminCustomerDashboardPreviewPage({
 
   const hasAnyPreviewData = Boolean(
     profile ||
-      authUser ||
-      bookings.length > 0 ||
-      pets.length > 0 ||
-      messages.length > 0,
+    authUser ||
+    bookings.length > 0 ||
+    pets.length > 0 ||
+    messages.length > 0,
   );
   const previewIsIncomplete = !profile || !authUser;
 
   const name = hasAnyPreviewData
     ? getDisplayName(profile, authUser)
     : "Incomplete Pet Parent Preview";
-  const email = hasAnyPreviewData ? getEmail(profile, authUser) : "No email found";
-  const phone = hasAnyPreviewData ? getPhone(profile, authUser) : "No phone found";
+  const firstName = getFirstNameFromDisplayName(name);
+  const email = hasAnyPreviewData
+    ? getEmail(profile, authUser)
+    : "No email found";
+  const phone = hasAnyPreviewData
+    ? formatPhoneNumber(getPhone(profile, authUser))
+    : "No phone found";
   const location = hasAnyPreviewData
     ? getLocation(profile)
     : "Location not added yet";
+  const cityStateLocation = hasAnyPreviewData
+    ? getCityStateLocation(profile)
+    : "";
   const avatarUrl = getAvatarUrl(profile, authUser);
-  const profileCompletion = getProfileCompletion({
-    profile,
-    authUser,
-    petsCount: pets.length,
-    bookingsCount: bookings.length,
-    messagesCount: messages.length,
-  });
-
-  const totalSpend = bookings.reduce(
-    (sum, booking) => sum + getBookingAmount(booking),
-    0,
-  );
-  const totalTips = bookings.reduce(
-    (sum, booking) =>
-      sum +
-      getAmount(booking, [
-        "tip_amount",
-        "guru_tip_amount",
-        "customer_tip_amount",
-      ]),
-    0,
-  );
   const nextBooking = getNextBooking(bookings);
-  const certifiedPetParent = false;
+  const certifiedPetParent = getCertifiedPetParent(profile, authUser);
+  const referralProfile = Array.isArray(referralProfiles)
+    ? referralProfiles[0]
+    : null;
+  const referralCode =
+    getText(referralProfile, ["referral_code"]) ||
+    (relatedCustomerId
+      ? generateReferralCode(relatedCustomerId, name)
+      : "COMMUNITY");
+  const customerReferralLink = buildCustomerReferralLink(referralCode);
+  const guruReferralLink = buildGuruReferralLink(referralCode);
+  const availableCredit = getAmount(referralProfile, [
+    "available_credit",
+    "credit",
+    "available_rewards",
+  ]);
+  const completedReferrals = getAmount(referralProfile, [
+    "completed_referrals",
+    "completed",
+    "referrals_completed",
+  ]);
 
   return (
     <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
@@ -764,12 +884,12 @@ export default async function AdminCustomerDashboardPreviewPage({
 
           <div className="mt-5 rounded-[2rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-4">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-              Super Admin Dashboard Preview
+              Super Admin Pet Parent Dashboard Preview
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-emerald-950">
-              This is a read-only Super Admin preview of the Pet Parent dashboard
-              data. It does not impersonate the user and does not modify their
-              account.
+              This is a read-only Super Admin preview of the Pet Parent
+              dashboard data. It does not impersonate the user and does not
+              modify their account.
             </p>
           </div>
 
@@ -779,8 +899,8 @@ export default async function AdminCustomerDashboardPreviewPage({
                 Incomplete Pet Parent Record
               </p>
               <p className="mt-1 text-sm font-semibold leading-6 text-amber-950">
-                This preview is using the available customer lookup value and any
-                related pets, bookings, or messages that can be found. The
+                This preview is using the available Pet Parent lookup value and
+                any related pets, bookings, or messages that can be found. The
                 Supabase profile row or Auth user may still need cleanup,
                 linking, or completion.
               </p>
@@ -795,18 +915,17 @@ export default async function AdminCustomerDashboardPreviewPage({
           <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.35fr_0.65fr] lg:items-center">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-900/80 md:text-sm">
-                SitGuru Customer Dashboard Preview
+                SitGuru Pet Parent Dashboard Preview
               </p>
 
               <h1 className="mt-4 max-w-4xl text-4xl font-extrabold tracking-[-0.045em] text-slate-950 md:text-6xl lg:text-7xl">
-                Welcome back, {name.split(" ")[0] || name}{" "}
-                <span aria-hidden="true">👋</span>
+                Welcome back, {firstName} <span aria-hidden="true">👋</span>
               </h1>
 
               <p className="mt-5 max-w-3xl text-base leading-8 text-slate-900/75 md:text-xl">
-                This preview shows the customer dashboard signals connected to
-                this Pet Parent: pets, bookings, messages, profile readiness,
-                and SitGuru University status.
+                This preview mirrors the updated Pet Parent dashboard
+                experience: pets, bookings, PawPerks rewards, referrals,
+                messages, and SitGuru University.
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -818,19 +937,17 @@ export default async function AdminCustomerDashboardPreviewPage({
 
                 <TrustBadge
                   icon={<Star className="h-4 w-4" />}
-                  label={`${profileCompletion}% profile ready`}
+                  label={`PawPerks code: ${referralCode}`}
                   tone="white"
                 />
 
-                <TrustBadge
-                  icon={<ShieldCheck className="h-4 w-4" />}
-                  label={
-                    certifiedPetParent
-                      ? "Certified Pet Parent"
-                      : "Certified Pet Parent: Not started"
-                  }
-                  tone="white"
-                />
+                {certifiedPetParent ? (
+                  <TrustBadge
+                    icon={<ShieldCheck className="h-4 w-4" />}
+                    label="Certified Pet Parent"
+                    tone="white"
+                  />
+                ) : null}
 
                 {nextBooking ? (
                   <TrustBadge
@@ -870,55 +987,135 @@ export default async function AdminCustomerDashboardPreviewPage({
               <p className="mt-2 text-lg font-semibold text-slate-700">
                 SitGuru Pet Parent
               </p>
-              <p className="mt-1 text-base font-black text-slate-800">
-                {location}
-              </p>
+              {cityStateLocation ? (
+                <p className="mt-1 text-base font-black text-slate-800">
+                  {cityStateLocation}
+                </p>
+              ) : null}
               <p className="mt-1 max-w-xs text-sm font-semibold leading-6 text-slate-600">
                 {pets.length > 0
                   ? `${pets.length} pet profile${
                       pets.length === 1 ? "" : "s"
                     } ready for care`
-                  : "No pet profiles added yet"}
+                  : "Pet profiles can be added anytime"}
               </p>
             </div>
           </div>
 
-          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-2 lg:grid-cols-5 md:px-8">
+          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-2 lg:grid-cols-6 md:px-8">
             <DashboardStatCard
               icon={<CalendarDays className="h-5 w-5" />}
               label="Upcoming Booking"
-              value={nextBooking ? formatDate(getBookingDate(nextBooking)) : "None"}
-              detail={nextBooking ? "Booking found" : "No upcoming booking"}
+              value={
+                nextBooking ? formatDate(getBookingDate(nextBooking)) : "None"
+              }
+              detail={nextBooking ? "View care details" : "Book care"}
             />
 
             <DashboardStatCard
               icon={<PawPrint className="h-5 w-5" />}
-              label="Pets"
-              value={String(pets.length)}
-              detail="Pet profiles"
+              label="My Pets"
+              value={`${pets.length} ${pets.length === 1 ? "Pet" : "Pets"}`}
+              detail="Manage pets"
             />
 
             <DashboardStatCard
               icon={<ShieldCheck className="h-5 w-5" />}
               label="Bookings"
               value={String(bookings.length)}
-              detail="Total bookings"
-            />
-
-            <DashboardStatCard
-              icon={<HeartHandshake className="h-5 w-5" />}
-              label="Tips Given"
-              value={formatMoney(totalTips)}
-              detail="Guru appreciation"
+              detail="View history"
             />
 
             <DashboardStatCard
               icon={<Star className="h-5 w-5" />}
+              label="PawPerks"
+              value={formatMoney(availableCredit)}
+              detail="Invite friends"
+            />
+
+            <DashboardStatCard
+              icon={<HeartHandshake className="h-5 w-5" />}
+              label="Referrals"
+              value={String(completedReferrals)}
+              detail="Completed"
+            />
+
+            <DashboardStatCard
+              icon={<GraduationCap className="h-5 w-5" />}
               label="University"
-              value="0 of 9"
-              detail="Pet Parent Academy"
+              value={certifiedPetParent ? "Certified" : "Start"}
+              detail={
+                certifiedPetParent
+                  ? "Certified Pet Parent"
+                  : "Earn certification"
+              }
             />
           </div>
+        </section>
+
+        <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+          <PreviewCard>
+            <SectionHeader
+              eyebrow="PawPerks Rewards"
+              title="Share SitGuru and earn rewards"
+              description={`Admin preview of ${firstName}'s Pet Parent referral center.`}
+            />
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <MiniBox label="Referral Code" value={referralCode} />
+              <MiniBox
+                label="Available Credit"
+                value={formatMoney(availableCredit)}
+              />
+              <MiniBox
+                label="Completed Referrals"
+                value={String(completedReferrals)}
+              />
+            </div>
+
+            <div className="mt-5 rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-4">
+              <p className="text-sm font-black text-emerald-950">
+                Pet Parent invite
+              </p>
+              <p className="mt-2 break-all text-sm font-bold leading-6 text-emerald-800">
+                {customerReferralLink}
+              </p>
+              <p className="mt-4 text-sm font-black text-emerald-950">
+                Guru invite
+              </p>
+              <p className="mt-2 break-all text-sm font-bold leading-6 text-emerald-800">
+                {guruReferralLink}
+              </p>
+            </div>
+          </PreviewCard>
+
+          <PreviewCard>
+            <SectionHeader
+              eyebrow="Pet Parent Academy"
+              title="SitGuru University"
+              description="Pet Parents can review short lessons and earn their Certified Pet Parent badge."
+            />
+
+            <div className="mt-5 rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 ring-1 ring-emerald-100">
+                  <GraduationCap className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-base font-black text-emerald-950">
+                    {certifiedPetParent
+                      ? "Certified Pet Parent"
+                      : "Pet Parent Academy available"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-emerald-900">
+                    {certifiedPetParent
+                      ? `${firstName} has completed the Pet Parent Academy.`
+                      : `${firstName} can complete Pet Parent Academy anytime to learn SitGuru best practices.`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </PreviewCard>
         </section>
 
         <section className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
@@ -926,8 +1123,8 @@ export default async function AdminCustomerDashboardPreviewPage({
             <PreviewCard>
               <SectionHeader
                 eyebrow="Pet Parent Profile"
-                title="Customer profile details"
-                description="Read-only account fields connected to this Pet Parent."
+                title="Pet Parent profile details"
+                description="Admin-only account fields connected to this Pet Parent."
               />
 
               <div className="mt-5 space-y-3">
@@ -953,37 +1150,6 @@ export default async function AdminCustomerDashboardPreviewPage({
                 />
               </div>
             </PreviewCard>
-
-            <PreviewCard>
-              <SectionHeader
-                eyebrow="SitGuru University"
-                title="Pet Parent Academy"
-                description="This is the future dashboard area for Pet Parent Academy progress and certification."
-              />
-
-              <div className="mt-5 rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 ring-1 ring-emerald-100">
-                    <ShieldCheck className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="text-base font-black text-emerald-950">
-                      Certified Pet Parent: Not started
-                    </p>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-emerald-900">
-                      Progress is currently a placeholder until academy step
-                      completion and badge records are wired.
-                    </p>
-                    <div className="mt-4 h-3 overflow-hidden rounded-full bg-white">
-                      <div className="h-full w-0 rounded-full bg-emerald-700" />
-                    </div>
-                    <p className="mt-2 text-xs font-black text-emerald-800">
-                      0 of 9 steps completed
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </PreviewCard>
           </div>
 
           <div className="space-y-5">
@@ -991,7 +1157,7 @@ export default async function AdminCustomerDashboardPreviewPage({
               <SectionHeader
                 eyebrow="Care Activity"
                 title="Upcoming and recent bookings"
-                description="Dashboard-style booking summary for Super Admin review."
+                description="Upcoming and recent care activity connected to this Pet Parent."
               />
 
               <div className="mt-5 space-y-3">
@@ -1023,7 +1189,8 @@ export default async function AdminCustomerDashboardPreviewPage({
                   ))
                 ) : (
                   <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-bold leading-6 text-slate-600">
-                    No bookings found for this Pet Parent.
+                    No bookings yet. Care activity will appear here once this
+                    Pet Parent books a Guru.
                   </div>
                 )}
               </div>
@@ -1033,7 +1200,7 @@ export default async function AdminCustomerDashboardPreviewPage({
               <SectionHeader
                 eyebrow="Pets"
                 title="Pet profiles"
-                description="Pets connected to this Pet Parent dashboard preview."
+                description={`Pets connected to ${firstName}'s Pet Parent dashboard preview.`}
               />
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -1073,7 +1240,7 @@ export default async function AdminCustomerDashboardPreviewPage({
                   ))
                 ) : (
                   <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-bold leading-6 text-slate-600 md:col-span-2">
-                    No pet profiles found.
+                    Pet profiles will appear here once added.
                   </div>
                 )}
               </div>
@@ -1114,7 +1281,8 @@ export default async function AdminCustomerDashboardPreviewPage({
               ))
             ) : (
               <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-bold leading-6 text-slate-600">
-                No messages found for this Pet Parent.
+                No messages yet. Message activity will appear here when this Pet
+                Parent connects with Gurus or support.
               </div>
             )}
           </div>
@@ -1131,7 +1299,10 @@ export default async function AdminCustomerDashboardPreviewPage({
             <MiniBox label="Lookup Value" value={lookupKey} />
             <MiniBox label="Resolved ID" value={relatedCustomerId || "—"} />
             <MiniBox label="Auth User" value={authUser ? "Found" : "Missing"} />
-            <MiniBox label="Profile Row" value={profile ? "Found" : "Missing"} />
+            <MiniBox
+              label="Profile Row"
+              value={profile ? "Found" : "Missing"}
+            />
             <MiniBox label="Auth Provider" value={getAuthProvider(authUser)} />
             <MiniBox
               label="Auth Created"
