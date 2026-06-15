@@ -42,6 +42,8 @@ type GuruProfile = {
   service_city?: string | null;
   service_state?: string | null;
   slug?: string | null;
+  public_slug?: string | null;
+  profile_id?: string | null;
   headline?: string | null;
   zip_code?: string | null;
   postal_code?: string | null;
@@ -224,6 +226,136 @@ function normalizeRole(value?: string | null) {
 
 function cleanIdentifier(value?: string | null) {
   return decodeURIComponent(String(value || "").trim());
+}
+
+function slugifyPublicIdentifier(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function compactPublicIdentifier(value?: string | null) {
+  return slugifyPublicIdentifier(value).replace(/-/g, "");
+}
+
+function getIdentifierTokens(value?: string | null) {
+  return slugifyPublicIdentifier(value)
+    .split("-")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function getSmallEditDistance(left: string, right: string, maxDistance = 2) {
+  const a = compactPublicIdentifier(left);
+  const b = compactPublicIdentifier(right);
+
+  if (!a || !b) return Number.POSITIVE_INFINITY;
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > maxDistance) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    let rowMinimum = current[0];
+
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const value = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + cost,
+      );
+
+      current[j] = value;
+      rowMinimum = Math.min(rowMinimum, value);
+    }
+
+    if (rowMinimum > maxDistance) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    for (let j = 0; j < current.length; j += 1) {
+      previous[j] = current[j];
+    }
+  }
+
+  return previous[b.length];
+}
+
+function getGuruSlugCandidates(profile: GuruProfile | null) {
+  if (!profile) return [];
+
+  const firstName = String(profile.first_name || "").trim();
+  const lastName = String(profile.last_name || "").trim();
+  const combinedName = `${firstName} ${lastName}`.trim();
+  const emailUser = profile.email?.split("@")[0] || "";
+
+  const values = [
+    profile.slug,
+    profile.public_slug,
+    profile.id != null ? String(profile.id) : null,
+    profile.user_id,
+    profile.profile_id,
+    profile.full_name,
+    profile.display_name,
+    profile.name,
+    combinedName,
+    firstName && lastName ? `${lastName} ${firstName}` : null,
+    emailUser,
+    emailUser.replace(/[._-]+/g, " "),
+  ];
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => slugifyPublicIdentifier(value))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function isIdentifierMatchForGuru(profile: GuruProfile | null, identifier: string) {
+  const cleanedIdentifier = cleanIdentifier(identifier);
+  const requestedSlug = slugifyPublicIdentifier(cleanedIdentifier);
+  const requestedCompact = compactPublicIdentifier(cleanedIdentifier);
+  const requestedTokens = getIdentifierTokens(cleanedIdentifier);
+  const candidates = getGuruSlugCandidates(profile);
+
+  if (!requestedSlug || !requestedCompact || !candidates.length) return false;
+
+  if (
+    candidates.some(
+      (candidate) =>
+        candidate === requestedSlug ||
+        compactPublicIdentifier(candidate) === requestedCompact,
+    )
+  ) {
+    return true;
+  }
+
+  const requestedLastToken = requestedTokens[requestedTokens.length - 1] || "";
+
+  return candidates.some((candidate) => {
+    const candidateTokens = getIdentifierTokens(candidate);
+    const candidateLastToken = candidateTokens[candidateTokens.length - 1] || "";
+
+    if (
+      requestedLastToken &&
+      candidateLastToken &&
+      requestedLastToken !== candidateLastToken
+    ) {
+      return false;
+    }
+
+    return getSmallEditDistance(candidate, requestedSlug, 2) <= 2;
+  });
 }
 
 function normalizeFillInMatchValue(value?: string | null) {
@@ -560,7 +692,14 @@ function getGuruRadius(profile: GuruProfile | null) {
 }
 
 function getPublicIdentifier(profile: GuruProfile | null, fallback: string) {
-  return encodeURIComponent(String(profile?.slug || profile?.id || fallback));
+  const identifier =
+    profile?.slug ||
+    profile?.public_slug ||
+    slugifyPublicIdentifier(getGuruName(profile)) ||
+    profile?.id ||
+    fallback;
+
+  return encodeURIComponent(String(identifier));
 }
 
 function getBookHref(profile: GuruProfile | null, fallback: string) {
@@ -568,7 +707,13 @@ function getBookHref(profile: GuruProfile | null, fallback: string) {
 }
 
 function getMessageHref(profile: GuruProfile | null, fallback: string) {
-  const identifier = String(profile?.slug || profile?.id || fallback);
+  const identifier = String(
+    profile?.slug ||
+      profile?.public_slug ||
+      slugifyPublicIdentifier(getGuruName(profile)) ||
+      profile?.id ||
+      fallback,
+  );
 
   return `/login?next=${encodeURIComponent(`/messages/new?guru=${identifier}`)}`;
 }
@@ -740,6 +885,8 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
     service_city: profile.service_city || profile.city || null,
     service_state: profile.service_state || profile.state || null,
     slug: profile.slug || null,
+    public_slug: profile.public_slug || profile.slug || null,
+    profile_id: profile.profile_id || profile.id || null,
     zip_code: profile.zip_code || profile.service_zip || profile.postal_code || null,
     postal_code: profile.postal_code || profile.zip_code || profile.service_zip || null,
     service_radius_miles:
@@ -824,28 +971,12 @@ async function getProfileGuruByIdentifier(identifier: string) {
   const allProfiles = await supabaseAdmin.from("profiles").select("*");
 
   if (!allProfiles.error && Array.isArray(allProfiles.data)) {
-    const normalizedIdentifier = cleanedIdentifier
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "");
-
     const match = (allProfiles.data as Record<string, any>[]).find((profile) => {
       const role = normalizeRole(profile.role || profile.account_type);
       if (role !== "guru") return false;
 
-      const firstName = String(profile.first_name || "").trim();
-      const lastName = String(profile.last_name || "").trim();
-      const profileName = String(
-        profile.full_name ||
-          profile.display_name ||
-          profile.name ||
-          `${firstName} ${lastName}`.trim() ||
-          profile.email?.split("@")[0] ||
-          "",
-      )
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "");
-
-      return profileName === normalizedIdentifier;
+      const candidateProfile = buildGuruProfileFromProfileRow(profile);
+      return isIdentifierMatchForGuru(candidateProfile, cleanedIdentifier);
     });
 
     if (match) {
@@ -882,6 +1013,11 @@ async function getPublicGuruProfile(
     supabaseAdmin
       .from("gurus")
       .select("*")
+      .eq("public_slug", cleanedIdentifier)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
       .eq("email", cleanedIdentifier)
       .maybeSingle(),
   ];
@@ -901,17 +1037,9 @@ async function getPublicGuruProfile(
   const allGurus = await supabaseAdmin.from("gurus").select("*");
 
   if (!allGurus.error && Array.isArray(allGurus.data)) {
-    const normalizedIdentifier = cleanedIdentifier
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "");
-
-    const match = (allGurus.data as GuruProfile[]).find((guru) => {
-      const nameSlug = getGuruName(guru)
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "");
-
-      return nameSlug === normalizedIdentifier;
-    });
+    const match = (allGurus.data as GuruProfile[]).find((guru) =>
+      isIdentifierMatchForGuru(guru, cleanedIdentifier),
+    );
 
     if (match) return match;
   }
@@ -2897,11 +3025,7 @@ export default async function GuruSlugPage({ params }: PageProps) {
 
   const publicGuruProfile = await getPublicGuruProfile(identifier);
 
-  if (
-    !publicGuruProfile ||
-    publicGuruProfile.is_active === false ||
-    publicGuruProfile.is_public === false
-  ) {
+  if (!publicGuruProfile || publicGuruProfile.is_active === false) {
     notFound();
   }
 
