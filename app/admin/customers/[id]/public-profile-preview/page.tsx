@@ -1,13 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  CalendarHeart,
-  MapPin,
-  PawPrint,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react";
+import { ArrowLeft, MapPin, PawPrint, ShieldCheck } from "lucide-react";
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
 
@@ -23,17 +16,6 @@ type AnyRow = Record<string, unknown>;
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function asNumber(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-
-  if (typeof value === "string") {
-    const parsed = Number(value.replace(/[$,]/g, ""));
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  return 0;
 }
 
 function isUuid(value: string) {
@@ -57,37 +39,23 @@ function getText(
   return fallback;
 }
 
-function getAmount(row: AnyRow | null | undefined, keys: string[]) {
-  if (!row) return 0;
+function getBoolean(row: AnyRow | null | undefined, keys: string[]) {
+  if (!row) return false;
 
   for (const key of keys) {
-    const value = asNumber(row[key]);
-    if (value > 0) return value;
+    const value = row[key];
+
+    if (typeof value === "boolean") return value;
+
+    if (typeof value === "string") {
+      const cleanValue = value.trim().toLowerCase();
+      if (["true", "yes", "complete", "completed", "earned"].includes(cleanValue)) {
+        return true;
+      }
+    }
   }
 
-  return 0;
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0);
-}
-
-function formatDate(value: unknown) {
-  const text = asString(value);
-  if (!text) return "Not available";
-
-  const parsed = new Date(text);
-  if (Number.isNaN(parsed.getTime())) return "Not available";
-
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return false;
 }
 
 function formatDateTime(value: unknown) {
@@ -195,43 +163,28 @@ function getInitials(name: string) {
   return `${firstInitial}${secondInitial}`.toUpperCase();
 }
 
-function getEmail(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
-  return (
-    getText(row, ["email", "customer_email", "pet_parent_email"]) ||
-    getText(authUser, ["email"]) ||
-    "No email found"
-  );
-}
-
-function getPhone(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
-  return (
-    getText(row, ["phone", "phone_number", "mobile", "mobile_phone"]) ||
-    getText(authUser, ["phone"]) ||
-    "No phone found"
-  );
-}
-
 function getLocation(row: AnyRow | null | undefined) {
-  const city = getText(row, ["city", "customer_city", "location_city"]);
-  const state = getText(row, ["state", "state_code", "customer_state"]);
+  const city = getText(row, [
+    "city",
+    "customer_city",
+    "location_city",
+    "service_city",
+    "address_city",
+    "home_city",
+  ]);
+  const state = getText(row, [
+    "state",
+    "state_code",
+    "customer_state",
+    "location_state",
+    "service_state",
+    "address_state",
+    "home_state",
+  ]);
 
-  const cityState = [city, state].filter(Boolean).join(", ");
+  const normalizedState = state.length === 2 ? state.toUpperCase() : state;
 
-  return cityState || "General location not shared yet";
-}
-
-function getServiceAddress(row: AnyRow | null | undefined) {
-  return getText(
-    row,
-    [
-      "service_address",
-      "street_address",
-      "address",
-      "home_address",
-      "customer_address",
-    ],
-    "",
-  );
+  return [city, normalizedState].filter(Boolean).join(", ");
 }
 
 function getCarePreferences(row: AnyRow | null | undefined) {
@@ -292,15 +245,13 @@ function getPetName(row: AnyRow) {
 }
 
 function getPetDescription(row: AnyRow) {
-  return (
-    [
-      getText(row, ["type", "species", "pet_type"]),
-      getText(row, ["breed"]),
-      getText(row, ["age"]),
-    ]
-      .filter(Boolean)
-      .join(" • ") || "Pet details can be added before care"
-  );
+  return [
+    getText(row, ["type", "species", "pet_type"]),
+    getText(row, ["breed"]),
+    getText(row, ["age"]),
+  ]
+    .filter(Boolean)
+    .join(" • ");
 }
 
 function getPetNotes(row: AnyRow) {
@@ -315,51 +266,22 @@ function getPetPhoto(row: AnyRow) {
   return getText(row, ["photo_url", "image_url", "avatar_url"], "");
 }
 
-function getBookingAmount(row: AnyRow) {
-  return getAmount(row, [
-    "total_customer_paid",
-    "customer_total_amount",
-    "total_amount",
-    "amount",
-    "price",
-    "subtotal",
-    "service_total",
-    "total_paid",
-  ]);
-}
-
-function getBookingDate(row: AnyRow) {
-  return getText(row, [
-    "booking_date",
-    "start_time",
-    "start_date",
-    "created_at",
-    "updated_at",
-  ]);
-}
-
-function getBookingStatus(row: AnyRow) {
-  return getText(
-    row,
-    ["status", "booking_status", "payment_status"],
-    "Unknown",
-  );
-}
-
-function getAuthProvider(authUser: AnyRow | null) {
-  const appMetadata = authUser?.app_metadata as AnyRow | undefined;
+function getCertifiedPetParent(
+  profile: AnyRow | null | undefined,
+  authUser: AnyRow | null | undefined,
+) {
   const metadata = getAuthMetadata(authUser);
 
-  const provider =
-    getText(appMetadata, ["provider"]) ||
-    getText(metadata, ["provider"]) ||
-    getText(authUser, ["provider"]);
+  const certifiedKeys = [
+    "certified_pet_parent",
+    "pet_parent_certified",
+    "pet_parent_academy_completed",
+    "academy_completed",
+    "is_certified_pet_parent",
+    "completed_pet_parent_academy",
+  ];
 
-  const providers = Array.isArray(appMetadata?.providers)
-    ? appMetadata.providers.filter(Boolean).join(", ")
-    : "";
-
-  return provider || providers || "Unknown";
+  return getBoolean(profile, certifiedKeys) || getBoolean(metadata, certifiedKeys);
 }
 
 function getRelatedRecordId({
@@ -378,15 +300,6 @@ function getRelatedRecordId({
   );
 }
 
-function buildRelatedIdFilters(customerId: string) {
-  return [
-    `customer_id.eq.${customerId}`,
-    `pet_owner_id.eq.${customerId}`,
-    `user_id.eq.${customerId}`,
-    `pet_parent_id.eq.${customerId}`,
-  ].join(",");
-}
-
 function buildPetIdFilters(customerId: string) {
   return [
     `owner_profile_id.eq.${customerId}`,
@@ -395,21 +308,6 @@ function buildPetIdFilters(customerId: string) {
     `pet_parent_id.eq.${customerId}`,
     `user_id.eq.${customerId}`,
   ].join(",");
-}
-
-function buildMessageSenderFilters(customerId: string) {
-  return [
-    `sender_id.eq.${customerId}`,
-    `from_user_id.eq.${customerId}`,
-    `customer_id.eq.${customerId}`,
-    `user_id.eq.${customerId}`,
-  ].join(",");
-}
-
-function buildMessageRecipientFilters(customerId: string) {
-  return [`recipient_id.eq.${customerId}`, `to_user_id.eq.${customerId}`].join(
-    ",",
-  );
 }
 
 async function safeSelect(
@@ -504,100 +402,6 @@ async function getProfileByLookupKey(lookupKey: string) {
   }
 }
 
-function getProfileCompleteness({
-  profile,
-  petsCount,
-}: {
-  profile: AnyRow | null;
-  petsCount: number;
-}) {
-  const fields = [
-    getDisplayName(profile),
-    getEmail(profile),
-    getPhone(profile),
-    getLocation(profile),
-    getServiceAddress(profile),
-    getCarePreferences(profile),
-    petsCount > 0 ? "pets" : "",
-  ];
-
-  const completed = fields.filter((field) => {
-    const value = String(field || "").trim();
-    return (
-      value &&
-      value !== "No email found" &&
-      value !== "No phone found" &&
-      value !== "General location not shared yet"
-    );
-  }).length;
-
-  return Math.round((completed / fields.length) * 100);
-}
-
-function getTrustReadiness({
-  profile,
-  authUser,
-  petsCount,
-  bookingsCount,
-  messagesCount,
-}: {
-  profile: AnyRow | null;
-  authUser: AnyRow | null;
-  petsCount: number;
-  bookingsCount: number;
-  messagesCount: number;
-}) {
-  const emailConfirmed = Boolean(
-    getText(authUser, ["email_confirmed_at", "confirmed_at"]),
-  );
-  const phoneConfirmed = Boolean(getText(authUser, ["phone_confirmed_at"]));
-  const hasPhoto = Boolean(getAvatarUrl(profile, authUser));
-  const hasPets = petsCount > 0;
-  const hasCarePreferences = Boolean(getCarePreferences(profile));
-  const hasActivity = bookingsCount > 0 || messagesCount > 0;
-
-  const checks = [
-    {
-      label: "Contact verified",
-      complete: emailConfirmed || phoneConfirmed,
-      detail: emailConfirmed
-        ? "Email verified"
-        : phoneConfirmed
-          ? "Phone verified"
-          : "Verification not found",
-    },
-    {
-      label: "Profile photo",
-      complete: hasPhoto,
-      detail: hasPhoto ? "Photo added" : "No photo yet",
-    },
-    {
-      label: "Pet profiles",
-      complete: hasPets,
-      detail: hasPets
-        ? `${petsCount} pet profile${petsCount === 1 ? "" : "s"}`
-        : "No pets yet",
-    },
-    {
-      label: "Care preferences",
-      complete: hasCarePreferences,
-      detail: hasCarePreferences ? "Added" : "Not added yet",
-    },
-    {
-      label: "Platform activity",
-      complete: hasActivity,
-      detail:
-        bookingsCount > 0
-          ? `${bookingsCount} booking${bookingsCount === 1 ? "" : "s"}`
-          : messagesCount > 0
-            ? `${messagesCount} message${messagesCount === 1 ? "" : "s"}`
-            : "No activity yet",
-    },
-  ];
-
-  return checks;
-}
-
 export default async function AdminCustomerPublicProfilePreviewPage({
   params,
 }: PageProps) {
@@ -623,52 +427,21 @@ export default async function AdminCustomerPublicProfilePreviewPage({
     relatedCustomerId && isUuid(relatedCustomerId),
   );
 
-  const [bookings, pets, sentMessages, receivedMessages] = canLoadRelatedRows
-    ? await Promise.all([
-        safeSelect("bookings", "*", (query) =>
-          query
-            .or(buildRelatedIdFilters(relatedCustomerId))
-            .order("created_at", {
-              ascending: false,
-            }),
-        ),
-        safeSelect("pets", "*", (query) =>
-          query.or(buildPetIdFilters(relatedCustomerId)).order("created_at", {
-            ascending: false,
-          }),
-        ),
-        safeSelect("messages", "*", (query) =>
-          query
-            .or(buildMessageSenderFilters(relatedCustomerId))
-            .order("created_at", {
-              ascending: false,
-            }),
-        ),
-        safeSelect("messages", "*", (query) =>
-          query
-            .or(buildMessageRecipientFilters(relatedCustomerId))
-            .order("created_at", {
-              ascending: false,
-            }),
-        ),
-      ])
-    : [[], [], [], []];
-
-  const messages = [...sentMessages, ...receivedMessages].sort((a, b) => {
-    const aTime = new Date(getText(a, ["created_at"])).getTime() || 0;
-    const bTime = new Date(getText(b, ["created_at"])).getTime() || 0;
-
-    return bTime - aTime;
-  });
+  const pets = canLoadRelatedRows
+    ? await safeSelect("pets", "*", (query) =>
+        query.or(buildPetIdFilters(relatedCustomerId)).order("created_at", {
+          ascending: false,
+        }),
+      )
+    : [];
 
   const name = getDisplayName(profile, authUser);
-  const publicFirstName = getPublicFirstName(name);
+  const firstName = getPublicFirstName(name);
   const location = getLocation(profile);
   const carePreferences = getCarePreferences(profile);
   const petParentBio = getPetParentBio(profile);
   const avatarUrl = getAvatarUrl(profile, authUser);
-
-  const certifiedPetParent = false;
+  const certifiedPetParent = getCertifiedPetParent(profile, authUser);
 
   if (!profile && !authUser) {
     return (
@@ -720,20 +493,20 @@ export default async function AdminCustomerPublicProfilePreviewPage({
             </Link>
           </div>
 
-          <div className="mt-5 rounded-[1.75rem] border border-dashed border-emerald-200 bg-emerald-50/70 p-4">
+          <div className="mt-5 rounded-[2rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-4">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
               Super Admin Preview
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-emerald-950">
-              This previews the simplified Pet Parent profile experience. Admin
-              tools, private contact details, account history, and technical
-              records stay in the admin record.
+              This preview shows the simple Pet Parent view without exposing
+              private contact details, internal metrics, or profile completion
+              status.
             </p>
           </div>
         </div>
 
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-8 bg-[radial-gradient(circle_at_76%_18%,rgba(255,255,255,0.92),transparent_20%),linear-gradient(135deg,#d9fff2_0%,#bff7ea_46%,#eaf8ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#d8fff2_0%,#bff7ea_48%,#eaf7ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
               <div className="relative">
                 <div className="absolute -inset-4 rounded-full bg-white/40 blur-xl" />
@@ -761,40 +534,31 @@ export default async function AdminCustomerPublicProfilePreviewPage({
               </p>
 
               <h1 className="mt-4 max-w-4xl text-4xl font-extrabold tracking-[-0.045em] text-slate-950 md:text-6xl">
-                Meet {publicFirstName}
+                Meet {firstName}
               </h1>
 
-              <p className="mt-4 flex flex-wrap items-center gap-2 text-base font-black text-slate-900/80">
-                <MapPin className="h-5 w-5" />
-                {location}
-              </p>
+              {location ? (
+                <p className="mt-4 flex flex-wrap items-center gap-2 text-base font-black text-slate-900/80">
+                  <MapPin className="h-5 w-5" />
+                  {location}
+                </p>
+              ) : null}
 
-              <p className="mt-5 max-w-3xl text-base leading-8 text-slate-900/75 md:text-lg">
-                {petParentBio ||
-                  `${publicFirstName.charAt(0).toUpperCase()}${publicFirstName.slice(
-                    1,
-                  )} is part of the SitGuru pet care community and can share pet details with Gurus when booking care.`}
-              </p>
+              {petParentBio ? (
+                <p className="mt-5 max-w-3xl whitespace-pre-wrap text-base leading-8 text-slate-900/75 md:text-lg">
+                  {petParentBio}
+                </p>
+              ) : null}
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <SoftPill
-                  icon={<PawPrint className="h-4 w-4" />}
-                  label="Pet Parent"
-                  tone="emerald"
-                />
-
-                <SoftPill
-                  icon={<CalendarHeart className="h-4 w-4" />}
-                  label="Private booking details"
-                  tone="white"
-                />
+                <ProfilePill icon={<PawPrint className="h-4 w-4" />}>
+                  Pet Parent
+                </ProfilePill>
 
                 {certifiedPetParent ? (
-                  <SoftPill
-                    icon={<ShieldCheck className="h-4 w-4" />}
-                    label="Certified Pet Parent"
-                    tone="emerald"
-                  />
+                  <ProfilePill icon={<ShieldCheck className="h-4 w-4" />}>
+                    Certified Pet Parent
+                  </ProfilePill>
                 ) : null}
               </div>
 
@@ -815,92 +579,77 @@ export default async function AdminCustomerPublicProfilePreviewPage({
               </div>
             </div>
           </div>
-
-          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-3 md:px-8">
-            <WarmSummaryCard
-              icon={<PawPrint className="h-5 w-5" />}
-              label="Pets"
-              value={
-                pets.length > 0
-                  ? `${pets.length} connected`
-                  : "Ready for pet profiles"
-              }
-              detail="Pet details can be shared when booking."
-            />
-            <WarmSummaryCard
-              icon={<MapPin className="h-5 w-5" />}
-              label="General area"
-              value={location}
-              detail="Exact address is kept private."
-            />
-            <WarmSummaryCard
-              icon={<UserRound className="h-5 w-5" />}
-              label="Privacy"
-              value="Contact details protected"
-              detail="Email and phone stay off this page."
-            />
-          </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-          <PreviewCard>
-            <SectionHeader
-              eyebrow="About"
-              title="A simple profile for Gurus"
-              description="This public-style view gives Gurus just enough context without exposing private account information."
-            />
+        {pets.length > 0 ? (
+          <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <SectionHeader eyebrow="Pets" title="Our Pets" />
 
-            <div className="mt-5 space-y-3">
-              <FriendlyInfoRow
-                icon={<UserRound className="h-5 w-5 text-emerald-700" />}
-                label="Pet Parent"
-                value={publicFirstName}
-              />
-              <FriendlyInfoRow
-                icon={<MapPin className="h-5 w-5 text-emerald-700" />}
-                label="General area"
-                value={location}
-              />
-              <FriendlyInfoRow
-                icon={<PawPrint className="h-5 w-5 text-emerald-700" />}
-                label="Pets"
-                value={
-                  pets.length > 0
-                    ? `${pets.length} pet profile${pets.length === 1 ? "" : "s"} connected`
-                    : "Pet profiles can be added before booking"
-                }
-              />
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {pets.map((pet) => {
+                const petDescription = getPetDescription(pet);
+                const petNotes = getPetNotes(pet);
+                const petPhoto = getPetPhoto(pet);
+
+                return (
+                  <article
+                    key={String(pet.id || getPetName(pet))}
+                    className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-50"
+                  >
+                    <div className="flex h-44 items-center justify-center overflow-hidden bg-emerald-50">
+                      {petPhoto ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={petPhoto}
+                          alt={getPetName(pet)}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <PawPrint className="h-12 w-12 text-emerald-600" />
+                      )}
+                    </div>
+
+                    <div className="p-5">
+                      <h3 className="text-xl font-black text-slate-950">
+                        {getPetName(pet)}
+                      </h3>
+
+                      {petDescription ? (
+                        <p className="mt-1 text-sm font-bold leading-6 text-slate-600">
+                          {petDescription}
+                        </p>
+                      ) : null}
+
+                      {petNotes ? (
+                        <p className="mt-3 whitespace-pre-wrap rounded-2xl bg-white p-3 text-sm font-semibold leading-6 text-slate-600">
+                          {petNotes}
+                        </p>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-          </PreviewCard>
+          </section>
+        ) : null}
 
-          <PreviewCard>
-            <SectionHeader
-              eyebrow="Care"
-              title="Care preferences"
-              description="Care notes are optional and can stay simple. Pet Parents should not feel pressured to overshare."
-            />
+        {carePreferences ? (
+          <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <SectionHeader eyebrow="Care Notes" title="Care Preferences" />
 
-            <div className="mt-5">
-              {carePreferences ? (
-                <FriendlyInfoBox
-                  label="Shared care notes"
-                  value={carePreferences}
-                />
-              ) : (
-                <GentleEmptyState>
-                  Care preferences can be shared when the Pet Parent is ready.
-                </GentleEmptyState>
-              )}
+            <div className="mt-5 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5">
+              <p className="whitespace-pre-wrap text-sm font-semibold leading-7 text-slate-700">
+                {carePreferences}
+              </p>
             </div>
-          </PreviewCard>
-        </section>
+          </section>
+        ) : null}
 
         {certifiedPetParent ? (
-          <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
+          <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
             <SectionHeader
               eyebrow="SitGuru University"
               title="Certified Pet Parent"
-              description="This achievement appears only after the Pet Parent completes the SitGuru Pet Parent Academy."
             />
 
             <div className="mt-5 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 p-5">
@@ -921,139 +670,50 @@ export default async function AdminCustomerPublicProfilePreviewPage({
           </section>
         ) : null}
 
-        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
-          <SectionHeader
-            eyebrow="Pets"
-            title="Pets connected to this profile"
-            description="Pet profiles are the heart of the experience. Gurus can use them to understand care needs before a booking."
-          />
+        <section className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
+          <details>
+            <summary className="cursor-pointer text-sm font-black text-slate-700">
+              Super Admin record details
+            </summary>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {pets.length ? (
-              pets.map((pet) => (
-                <article
-                  key={String(pet.id)}
-                  className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-50"
-                >
-                  <div className="flex h-44 items-center justify-center overflow-hidden bg-emerald-50">
-                    {getPetPhoto(pet) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={getPetPhoto(pet)}
-                        alt={getPetName(pet)}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <PawPrint className="h-12 w-12 text-emerald-600" />
-                    )}
-                  </div>
-
-                  <div className="p-5">
-                    <h3 className="text-xl font-black text-slate-950">
-                      {getPetName(pet)}
-                    </h3>
-                    <p className="mt-1 text-sm font-bold leading-6 text-slate-600">
-                      {getPetDescription(pet)}
-                    </p>
-
-                    {getPetNotes(pet) ? (
-                      <p className="mt-3 line-clamp-4 rounded-2xl bg-white p-3 text-sm font-semibold leading-6 text-slate-600">
-                        {getPetNotes(pet)}
-                      </p>
-                    ) : (
-                      <p className="mt-3 rounded-2xl bg-white p-3 text-sm font-semibold leading-6 text-slate-500">
-                        Care notes can be added when the Pet Parent is ready.
-                      </p>
-                    )}
-                  </div>
-                </article>
-              ))
-            ) : (
-              <GentleEmptyState className="md:col-span-2 xl:col-span-3">
-                Pet profiles will appear here once added. New Pet Parents can
-                still browse SitGuru without filling out every detail right
-                away.
-              </GentleEmptyState>
-            )}
-          </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MiniBox label="Lookup Value" value={lookupKey} />
+              <MiniBox label="Resolved ID" value={relatedCustomerId || "—"} />
+              <MiniBox label="Auth User" value={authUser ? "Found" : "Missing"} />
+              <MiniBox
+                label="Profile Row"
+                value={profile ? "Found" : "Missing"}
+              />
+              <MiniBox
+                label="Auth Created"
+                value={formatDateTime(authUser?.created_at)}
+              />
+              <MiniBox
+                label="Profile Created"
+                value={formatDateTime(profile?.created_at)}
+              />
+              <MiniBox
+                label="Profile Updated"
+                value={formatDateTime(profile?.updated_at)}
+              />
+            </div>
+          </details>
         </section>
       </section>
     </main>
   );
 }
 
-function SoftPill({
-  icon,
-  label,
-  tone,
-}: {
-  icon: ReactNode;
-  label: string;
-  tone: "emerald" | "white";
-}) {
+function ProfilePill({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <span
-      className={[
-        "inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold shadow-sm ring-1",
-        tone === "emerald"
-          ? "bg-emerald-700 text-white ring-emerald-600/20"
-          : "bg-white/85 text-slate-800 ring-white/70",
-      ].join(" ")}
-    >
+    <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
       {icon}
-      {label}
+      {children}
     </span>
   );
 }
 
-function WarmSummaryCard({
-  icon,
-  label,
-  value,
-  detail,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
-      <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-500">{label}</p>
-          <p className="mt-1 break-words text-base font-extrabold text-slate-950">
-            {value}
-          </p>
-          <p className="mt-2 text-sm font-bold leading-6 text-emerald-700">
-            {detail}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PreviewCard({ children }: { children: ReactNode }) {
-  return (
-    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
-      {children}
-    </section>
-  );
-}
-
-function SectionHeader({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
+function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div>
       <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
@@ -1062,63 +722,17 @@ function SectionHeader({
       <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
         {title}
       </h2>
-      <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-        {description}
-      </p>
     </div>
   );
 }
 
-function FriendlyInfoRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-      {icon}
-      <div className="min-w-0">
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-          {label}
-        </p>
-        <p className="break-words text-sm font-black">{value || "—"}</p>
-      </div>
-    </div>
-  );
-}
-
-function FriendlyInfoBox({ label, value }: { label: string; value: string }) {
+function MiniBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
       <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
         {label}
       </p>
-      <p className="mt-1 whitespace-pre-wrap break-words text-sm font-black leading-6 text-slate-900">
-        {value || "—"}
-      </p>
-    </div>
-  );
-}
-
-function GentleEmptyState({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={[
-        "rounded-[1.75rem] border border-dashed border-slate-200 bg-slate-50 p-6 text-sm font-bold leading-6 text-slate-600",
-        className,
-      ].join(" ")}
-    >
-      {children}
+      <p className="mt-1 break-words text-sm font-black">{value || "—"}</p>
     </div>
   );
 }
