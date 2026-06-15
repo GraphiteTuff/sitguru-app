@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, MapPin, PawPrint, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  MapPin,
+  PawPrint,
+  ShieldCheck,
+} from "lucide-react";
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
 
@@ -49,7 +55,9 @@ function getBoolean(row: AnyRow | null | undefined, keys: string[]) {
 
     if (typeof value === "string") {
       const cleanValue = value.trim().toLowerCase();
-      if (["true", "yes", "complete", "completed", "earned"].includes(cleanValue)) {
+      if (
+        ["true", "yes", "complete", "completed", "earned"].includes(cleanValue)
+      ) {
         return true;
       }
     }
@@ -71,6 +79,19 @@ function formatDateTime(value: unknown) {
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+  });
+}
+
+function formatMonthYear(value: unknown) {
+  const text = asString(value);
+  if (!text) return "";
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
   });
 }
 
@@ -151,6 +172,16 @@ function getPublicFirstName(name: string) {
   return cleanName.split(/\s+/)[0] || cleanName;
 }
 
+function getPossessiveName(firstName: string) {
+  if (!firstName || firstName === "this Pet Parent") {
+    return "this Pet Parent's";
+  }
+
+  return firstName.toLowerCase().endsWith("s")
+    ? `${firstName}'`
+    : `${firstName}'s`;
+}
+
 function getInitials(name: string) {
   const parts = name
     .replace(/@.*/, "")
@@ -164,27 +195,10 @@ function getInitials(name: string) {
 }
 
 function getLocation(row: AnyRow | null | undefined) {
-  const city = getText(row, [
-    "city",
-    "customer_city",
-    "location_city",
-    "service_city",
-    "address_city",
-    "home_city",
-  ]);
-  const state = getText(row, [
-    "state",
-    "state_code",
-    "customer_state",
-    "location_state",
-    "service_state",
-    "address_state",
-    "home_state",
-  ]);
+  const city = getText(row, ["city", "customer_city", "location_city"]);
+  const state = getText(row, ["state", "state_code", "customer_state"]);
 
-  const normalizedState = state.length === 2 ? state.toUpperCase() : state;
-
-  return [city, normalizedState].filter(Boolean).join(", ");
+  return [city, state].filter(Boolean).join(", ");
 }
 
 function getCarePreferences(row: AnyRow | null | undefined) {
@@ -281,7 +295,9 @@ function getCertifiedPetParent(
     "completed_pet_parent_academy",
   ];
 
-  return getBoolean(profile, certifiedKeys) || getBoolean(metadata, certifiedKeys);
+  return (
+    getBoolean(profile, certifiedKeys) || getBoolean(metadata, certifiedKeys)
+  );
 }
 
 function getRelatedRecordId({
@@ -442,6 +458,13 @@ export default async function AdminCustomerPublicProfilePreviewPage({
   const petParentBio = getPetParentBio(profile);
   const avatarUrl = getAvatarUrl(profile, authUser);
   const certifiedPetParent = getCertifiedPetParent(profile, authUser);
+  const possessiveFirstName = getPossessiveName(firstName);
+  const memberSince =
+    formatMonthYear(profile?.created_at) ||
+    formatMonthYear(authUser?.created_at);
+  const publicBio =
+    petParentBio ||
+    `${firstName} is part of the SitGuru pet care community and uses SitGuru to connect with trusted local pet care providers.`;
 
   if (!profile && !authUser) {
     return (
@@ -495,11 +518,11 @@ export default async function AdminCustomerPublicProfilePreviewPage({
 
           <div className="mt-5 rounded-[2rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-4">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-              Super Admin Preview
+              Pet Parent Public Profile Preview
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-emerald-950">
-              This preview shows the simple Pet Parent view without exposing
-              private contact details, internal metrics, or profile completion
+              This preview shows the Pet Parent public profile without exposing
+              email, phone, full address, internal metrics, or completion
               status.
             </p>
           </div>
@@ -544,16 +567,21 @@ export default async function AdminCustomerPublicProfilePreviewPage({
                 </p>
               ) : null}
 
-              {petParentBio ? (
-                <p className="mt-5 max-w-3xl whitespace-pre-wrap text-base leading-8 text-slate-900/75 md:text-lg">
-                  {petParentBio}
-                </p>
-              ) : null}
+              <p className="mt-5 max-w-3xl text-base leading-8 text-slate-900/75 md:text-lg">
+                {firstName} is a SitGuru Pet Parent connected to the SitGuru pet
+                care community.
+              </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <ProfilePill icon={<PawPrint className="h-4 w-4" />}>
                   Pet Parent
                 </ProfilePill>
+
+                {memberSince ? (
+                  <ProfilePill icon={<CalendarDays className="h-4 w-4" />}>
+                    Joined SitGuru {memberSince}
+                  </ProfilePill>
+                ) : null}
 
                 {certifiedPetParent ? (
                   <ProfilePill icon={<ShieldCheck className="h-4 w-4" />}>
@@ -581,9 +609,49 @@ export default async function AdminCustomerPublicProfilePreviewPage({
           </div>
         </section>
 
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+          <SectionHeader
+            eyebrow="Pet Family"
+            title={`About ${possessiveFirstName} Pet Family`}
+          />
+
+          <div className="mt-5 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5">
+            <p className="whitespace-pre-wrap text-sm font-semibold leading-7 text-slate-700 md:text-base">
+              {publicBio}
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <FriendlyFactCard
+              icon={<PawPrint className="h-5 w-5" />}
+              label="Pet Parent"
+              value="SitGuru community member"
+            />
+
+            {location ? (
+              <FriendlyFactCard
+                icon={<MapPin className="h-5 w-5" />}
+                label="General Area"
+                value={location}
+              />
+            ) : null}
+
+            {memberSince ? (
+              <FriendlyFactCard
+                icon={<CalendarDays className="h-5 w-5" />}
+                label="Member Since"
+                value={memberSince}
+              />
+            ) : null}
+          </div>
+        </section>
+
         {pets.length > 0 ? (
           <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <SectionHeader eyebrow="Pets" title="Our Pets" />
+            <SectionHeader
+              eyebrow="Pets"
+              title={`${possessiveFirstName} Pets`}
+            />
 
             <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {pets.map((pet) => {
@@ -635,7 +703,10 @@ export default async function AdminCustomerPublicProfilePreviewPage({
 
         {carePreferences ? (
           <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <SectionHeader eyebrow="Care Notes" title="Care Preferences" />
+            <SectionHeader
+              eyebrow="Care Notes"
+              title={`Care Notes for ${possessiveFirstName} Pets`}
+            />
 
             <div className="mt-5 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5">
               <p className="whitespace-pre-wrap text-sm font-semibold leading-7 text-slate-700">
@@ -649,7 +720,7 @@ export default async function AdminCustomerPublicProfilePreviewPage({
           <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
             <SectionHeader
               eyebrow="SitGuru University"
-              title="Certified Pet Parent"
+              title={`${possessiveFirstName} SitGuru Achievements`}
             />
 
             <div className="mt-5 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 p-5">
@@ -662,7 +733,8 @@ export default async function AdminCustomerPublicProfilePreviewPage({
                     Certified Pet Parent
                   </p>
                   <p className="mt-1 text-sm font-semibold leading-6 text-emerald-900">
-                    Completed through SitGuru University.
+                    {firstName} completed the Pet Parent Academy through SitGuru
+                    University.
                   </p>
                 </div>
               </div>
@@ -679,7 +751,10 @@ export default async function AdminCustomerPublicProfilePreviewPage({
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MiniBox label="Lookup Value" value={lookupKey} />
               <MiniBox label="Resolved ID" value={relatedCustomerId || "—"} />
-              <MiniBox label="Auth User" value={authUser ? "Found" : "Missing"} />
+              <MiniBox
+                label="Auth User"
+                value={authUser ? "Found" : "Missing"}
+              />
               <MiniBox
                 label="Profile Row"
                 value={profile ? "Found" : "Missing"}
@@ -704,7 +779,13 @@ export default async function AdminCustomerPublicProfilePreviewPage({
   );
 }
 
-function ProfilePill({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+function ProfilePill({
+  icon,
+  children,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
       {icon}
@@ -722,6 +803,34 @@ function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
       <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
         {title}
       </h2>
+    </div>
+  );
+}
+
+function FriendlyFactCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100">
+          {icon}
+        </div>
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+            {label}
+          </p>
+          <p className="mt-1 text-sm font-black leading-6 text-slate-900">
+            {value}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
