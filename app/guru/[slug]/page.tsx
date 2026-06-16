@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -27,6 +28,7 @@ const FILL_IN_GURU_NAMES = new Set([
 ]);
 
 type GuruProfile = {
+  [key: string]: unknown;
   id?: string | number | null;
   user_id?: string | null;
   email?: string | null;
@@ -929,14 +931,179 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
   };
 }
 
-async function hydrateGuruProfilePhotoFields(
-  guruProfile: GuruProfile | null,
-): Promise<GuruProfile | null> {
-  if (!guruProfile) return null;
+function getImageUrlFromRecord(record: Record<string, any> | null) {
+  if (!record) return null;
 
-  const currentImage = getGuruImage(guruProfile);
-  if (currentImage) return guruProfile;
+  const candidates = [
+    record.profile_photo_url,
+    record.avatar_url,
+    record.image_url,
+    record.photo_url,
+    record.public_url,
+    record.url,
+    record.file_url,
+    record.media_url,
+    record.picture_url,
+    record.profile_image_url,
+    record.headshot_url,
+  ];
 
+  const imageUrl = candidates
+    .map((value) => String(value || "").trim())
+    .find((value) => Boolean(value));
+
+  return imageUrl || null;
+}
+
+function mergeGuruProfilePhoto(
+  guruProfile: GuruProfile,
+  imageUrl: string | null,
+): GuruProfile {
+  if (!imageUrl) return guruProfile;
+
+  return {
+    ...guruProfile,
+    profile_photo_url: guruProfile.profile_photo_url || imageUrl,
+    avatar_url: guruProfile.avatar_url || imageUrl,
+    image_url: guruProfile.image_url || imageUrl,
+    photo_url: guruProfile.photo_url || imageUrl,
+  };
+}
+
+function isSameGuruIdentity(
+  left: GuruProfile | null,
+  right: GuruProfile | null,
+  identifier?: string | null,
+) {
+  if (!left || !right) return false;
+
+  const leftValues = [
+    left.id != null ? String(left.id) : "",
+    left.user_id || "",
+    left.profile_id || "",
+    left.email || "",
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  const rightValues = [
+    right.id != null ? String(right.id) : "",
+    right.user_id || "",
+    right.profile_id || "",
+    right.email || "",
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  if (leftValues.some((value) => rightValues.includes(value))) return true;
+
+  if (identifier && isIdentifierMatchForGuru(right, identifier)) return true;
+
+  const leftName = slugifyPublicIdentifier(getGuruName(left));
+  const rightName = slugifyPublicIdentifier(getGuruName(right));
+
+  return Boolean(leftName && rightName && leftName === rightName);
+}
+
+async function findGuruUploadedPhotoFromSitGuruRows(
+  guruProfile: GuruProfile,
+  identifier?: string | null,
+) {
+  try {
+    const { data, error } = await supabaseAdmin.from("gurus").select("*");
+
+    if (error || !Array.isArray(data)) return null;
+
+    const matches = (data as GuruProfile[])
+      .filter((candidate) =>
+        isSameGuruIdentity(guruProfile, candidate, identifier),
+      )
+      .map((candidate) => ({
+        candidate,
+        imageUrl: getImageUrlFromRecord(candidate as Record<string, any>),
+      }))
+      .filter((candidate) => Boolean(candidate.imageUrl));
+
+    if (!matches.length) return null;
+
+    const exactSlug = slugifyPublicIdentifier(identifier || "");
+
+    matches.sort((left, right) => {
+      const leftExact =
+        exactSlug && isIdentifierMatchForGuru(left.candidate, exactSlug) ? 1 : 0;
+      const rightExact =
+        exactSlug && isIdentifierMatchForGuru(right.candidate, exactSlug) ? 1 : 0;
+      const leftBookable = isBookable(left.candidate) ? 1 : 0;
+      const rightBookable = isBookable(right.candidate) ? 1 : 0;
+
+      return rightExact - leftExact || rightBookable - leftBookable;
+    });
+
+    return matches[0]?.imageUrl || null;
+  } catch {
+    return null;
+  }
+}
+
+async function findGuruUploadedPhotoFromMediaTables(guruProfile: GuruProfile) {
+  const guruIds = Array.from(
+    new Set(
+      [guruProfile.id, guruProfile.user_id, guruProfile.profile_id]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (!guruIds.length) return null;
+
+  const mediaTables = [
+    "guru_media",
+    "guru_photos",
+    "guru_profile_photos",
+    "profile_media",
+    "user_media",
+  ];
+
+  const idColumns = ["guru_id", "user_id", "profile_id"];
+
+  for (const table of mediaTables) {
+    for (const column of idColumns) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from(table)
+          .select("*")
+          .in(column, guruIds)
+          .limit(25);
+
+        if (error || !Array.isArray(data)) continue;
+
+        const imageRow = (data as Record<string, any>[]).find((row) => {
+          const typeText = String(
+            row.media_type || row.type || row.kind || row.category || "",
+          ).toLowerCase();
+
+          const hasImageType =
+            !typeText ||
+            typeText.includes("image") ||
+            typeText.includes("photo") ||
+            typeText.includes("avatar") ||
+            typeText.includes("profile");
+
+          return hasImageType && Boolean(getImageUrlFromRecord(row));
+        });
+
+        const imageUrl = getImageUrlFromRecord(imageRow || null);
+        if (imageUrl) return imageUrl;
+      } catch {
+        // Continue through optional media-table fallbacks.
+      }
+    }
+  }
+
+  return null;
+}
+
+async function findGuruPhotoFromProfiles(guruProfile: GuruProfile) {
   const profileSelect =
     "id, user_id, email, profile_photo_url, avatar_url, image_url, full_name, display_name, name, first_name, last_name";
 
@@ -979,58 +1146,83 @@ async function hydrateGuruProfilePhotoFields(
 
       if (!result.error && result.data) {
         const profile = result.data as Record<string, any>;
+        const imageUrl = getImageUrlFromRecord(profile);
 
         return {
-          ...guruProfile,
-          full_name:
-            guruProfile.full_name ||
-            profile.full_name ||
-            profile.display_name ||
-            profile.name ||
-            null,
-          display_name:
-            guruProfile.display_name ||
-            profile.display_name ||
-            profile.full_name ||
-            profile.name ||
-            null,
-          name:
-            guruProfile.name ||
-            profile.name ||
-            profile.full_name ||
-            profile.display_name ||
-            null,
-          first_name: guruProfile.first_name || profile.first_name || null,
-          last_name: guruProfile.last_name || profile.last_name || null,
-          image_url:
-            guruProfile.image_url ||
-            profile.image_url ||
-            profile.profile_photo_url ||
-            profile.avatar_url ||
-            null,
-          avatar_url:
-            guruProfile.avatar_url ||
-            profile.avatar_url ||
-            profile.profile_photo_url ||
-            profile.image_url ||
-            null,
-          photo_url:
-            guruProfile.photo_url ||
-            profile.profile_photo_url ||
-            profile.avatar_url ||
-            profile.image_url ||
-            null,
-          profile_photo_url:
-            guruProfile.profile_photo_url ||
-            profile.profile_photo_url ||
-            profile.avatar_url ||
-            profile.image_url ||
-            null,
+          profile,
+          imageUrl,
         };
       }
     } catch {
-      // Continue through photo fallback lookups.
+      // Continue through profile fallback lookups.
     }
+  }
+
+  return {
+    profile: null,
+    imageUrl: null,
+  };
+}
+
+async function hydrateGuruProfilePhotoFields(
+  guruProfile: GuruProfile | null,
+  identifier?: string | null,
+): Promise<GuruProfile | null> {
+  if (!guruProfile) return null;
+
+  const sitGuruPageImage = getGuruImage(guruProfile);
+  if (sitGuruPageImage) {
+    return mergeGuruProfilePhoto(guruProfile, sitGuruPageImage);
+  }
+
+  const sitGuruDuplicateRowImage = await findGuruUploadedPhotoFromSitGuruRows(
+    guruProfile,
+    identifier,
+  );
+
+  if (sitGuruDuplicateRowImage) {
+    return mergeGuruProfilePhoto(guruProfile, sitGuruDuplicateRowImage);
+  }
+
+  const sitGuruMediaImage = await findGuruUploadedPhotoFromMediaTables(
+    guruProfile,
+  );
+
+  if (sitGuruMediaImage) {
+    return mergeGuruProfilePhoto(guruProfile, sitGuruMediaImage);
+  }
+
+  const profileFallback = await findGuruPhotoFromProfiles(guruProfile);
+
+  if (profileFallback.profile) {
+    const profile = profileFallback.profile;
+
+    return mergeGuruProfilePhoto(
+      {
+        ...guruProfile,
+        full_name:
+          guruProfile.full_name ||
+          profile.full_name ||
+          profile.display_name ||
+          profile.name ||
+          null,
+        display_name:
+          guruProfile.display_name ||
+          profile.display_name ||
+          profile.full_name ||
+          profile.name ||
+          null,
+        name:
+          guruProfile.name ||
+          profile.name ||
+          profile.full_name ||
+          profile.display_name ||
+          null,
+        first_name: guruProfile.first_name || profile.first_name || null,
+        last_name: guruProfile.last_name || profile.last_name || null,
+      },
+      profileFallback.imageUrl,
+    );
   }
 
   return guruProfile;
@@ -1095,11 +1287,149 @@ async function getProfileGuruByIdentifier(identifier: string) {
   return null;
 }
 
+
+async function getPublicSearchApiBaseUrl() {
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.SITE_URL ||
+    "";
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/$/, "");
+  }
+
+  try {
+    const requestHeaders = await headers();
+    const host =
+      requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "";
+
+    if (!host) return "";
+
+    const forwardedProtocol = requestHeaders.get("x-forwarded-proto");
+    const protocol = forwardedProtocol || (host.includes("localhost") ? "http" : "https");
+
+    return `${protocol}://${host}`;
+  } catch {
+    if (process.env.VERCEL_URL) {
+      return `https://${process.env.VERCEL_URL}`;
+    }
+
+    return "";
+  }
+}
+
+function buildGuruProfileFromPublicSearchRow(row: Record<string, any>): GuruProfile {
+  const firstName = String(row.first_name || "").trim();
+  const lastName = String(row.last_name || "").trim();
+  const fullName = String(
+    row.full_name ||
+      row.display_name ||
+      row.name ||
+      `${firstName} ${lastName}`.trim() ||
+      getDisplayNameFromEmail(row.email),
+  ).trim();
+
+  return {
+    ...row,
+    id: row.id,
+    user_id: row.user_id || row.guru_user_id || row.profile_id || null,
+    email: row.email || null,
+    full_name: fullName || "Guru",
+    display_name: row.display_name || fullName || "Guru",
+    name: row.name || fullName || "Guru",
+    first_name: firstName || null,
+    last_name: lastName || null,
+    title: row.title || row.headline || "Trusted Pet Care Guru",
+    headline: row.headline || row.title || "Trusted Pet Care Guru",
+    bio: row.bio || null,
+    city: row.city || row.service_city || null,
+    state: row.state || row.service_state || null,
+    service_city: row.service_city || row.city || null,
+    service_state: row.service_state || row.state || null,
+    slug: row.slug || null,
+    public_slug: row.public_slug || row.slug || null,
+    profile_id: row.profile_id || row.user_id || null,
+    zip_code: row.zip_code || row.service_zip || row.postal_code || null,
+    postal_code: row.postal_code || row.zip_code || row.service_zip || null,
+    service_radius_miles:
+      row.service_radius_miles ||
+      row.service_radius ||
+      row.radius_miles ||
+      row.radius ||
+      25,
+    service_radius: row.service_radius || row.service_radius_miles || 25,
+    radius_miles: row.radius_miles || row.service_radius_miles || 25,
+    image_url: row.image_url || row.profile_photo_url || row.photo_url || row.avatar_url || null,
+    avatar_url: row.avatar_url || row.profile_photo_url || row.photo_url || row.image_url || null,
+    photo_url: row.photo_url || row.profile_photo_url || row.avatar_url || row.image_url || null,
+    profile_photo_url:
+      row.profile_photo_url || row.photo_url || row.avatar_url || row.image_url || null,
+    rate: row.rate || null,
+    hourly_rate: row.hourly_rate || null,
+    price: row.price || null,
+    services: Array.isArray(row.services) ? row.services : null,
+    application_status:
+      row.application_status || row.approval_status || row.status || null,
+    status: row.status || row.application_status || row.approval_status || null,
+    role: "guru",
+    account_type: "guru",
+    is_public: row.is_public !== false,
+    is_active: row.is_active !== false,
+    is_bookable: Boolean(row.is_bookable),
+    is_verified: Boolean(row.is_verified),
+    profile_completion: row.profile_completion || null,
+    rating_avg: row.rating_avg || 0,
+    rating: row.rating || 0,
+    review_count: row.review_count || 0,
+    experience_years: row.experience_years || null,
+  };
+}
+
+async function getPublicSearchGuruProfileByIdentifier(
+  identifier: string,
+): Promise<GuruProfile | null> {
+  const cleanedIdentifier = cleanIdentifier(identifier);
+  if (!cleanedIdentifier) return null;
+
+  try {
+    const baseUrl = await getPublicSearchApiBaseUrl();
+    if (!baseUrl) return null;
+
+    const response = await fetch(`${baseUrl}/api/gurus/public-search`, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as { gurus?: Record<string, any>[] };
+    const guruRows = Array.isArray(payload.gurus) ? payload.gurus : [];
+
+    const match = guruRows
+      .map((row) => buildGuruProfileFromPublicSearchRow(row))
+      .find((guru) => isIdentifierMatchForGuru(guru, cleanedIdentifier));
+
+    if (!match) return null;
+
+    return hydrateGuruProfilePhotoFields(match, cleanedIdentifier);
+  } catch (error) {
+    console.warn("Unable to load public Guru profile from public-search API:", error);
+    return null;
+  }
+}
+
 async function getPublicGuruProfile(
   identifier: string,
 ): Promise<GuruProfile | null> {
   const cleanedIdentifier = cleanIdentifier(identifier);
   if (!cleanedIdentifier) return null;
+
+  const publicSearchProfile =
+    await getPublicSearchGuruProfileByIdentifier(cleanedIdentifier);
+
+  if (publicSearchProfile && getGuruImage(publicSearchProfile)) {
+    return publicSearchProfile;
+  }
 
   const guruQueries = [
     supabaseAdmin.from("gurus").select("*").eq("id", cleanedIdentifier).maybeSingle(),
@@ -1135,7 +1465,10 @@ async function getPublicGuruProfile(
       const result = await query;
 
       if (!result.error && result.data) {
-        return hydrateGuruProfilePhotoFields(result.data as GuruProfile);
+        return hydrateGuruProfilePhotoFields(
+          result.data as GuruProfile,
+          cleanedIdentifier,
+        );
       }
     } catch {
       // Continue through fallback lookups.
@@ -1150,12 +1483,12 @@ async function getPublicGuruProfile(
     );
 
     if (match) {
-      return hydrateGuruProfilePhotoFields(match);
+      return hydrateGuruProfilePhotoFields(match, cleanedIdentifier);
     }
   }
 
   const profileFallback = await getProfileGuruByIdentifier(cleanedIdentifier);
-  return hydrateGuruProfilePhotoFields(profileFallback);
+  return hydrateGuruProfilePhotoFields(profileFallback, cleanedIdentifier);
 }
 
 async function getGuruProfile(
@@ -1169,7 +1502,10 @@ async function getGuruProfile(
     .maybeSingle();
 
   if (!byUserId.error && byUserId.data) {
-    return hydrateGuruProfilePhotoFields(byUserId.data as GuruProfile);
+    return hydrateGuruProfilePhotoFields(
+      byUserId.data as GuruProfile,
+      userId,
+    );
   }
 
   if (email) {
@@ -1180,7 +1516,10 @@ async function getGuruProfile(
       .maybeSingle();
 
     if (!byEmail.error && byEmail.data) {
-      return hydrateGuruProfilePhotoFields(byEmail.data as GuruProfile);
+      return hydrateGuruProfilePhotoFields(
+        byEmail.data as GuruProfile,
+        userId,
+      );
     }
   }
 
