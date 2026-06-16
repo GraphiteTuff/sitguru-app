@@ -15,20 +15,11 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminPeopleDirectory } from "@/lib/admin/peopleResolver";
 
 export const dynamic = "force-dynamic";
 
 type AcademyType = "pet_parent" | "guru" | "ambassador";
-
-type ProfileRow = {
-  id: string;
-  email?: string | null;
-  full_name?: string | null;
-  first_name?: string | null;
-  last_name?: string | null;
-  role?: string | null;
-  created_at?: string | null;
-};
 
 type AcademyAssignment = {
   id: string;
@@ -120,26 +111,6 @@ function formatDate(value?: string | null) {
     day: "numeric",
     year: "numeric",
   });
-}
-
-function getDisplayName(profile: ProfileRow) {
-  const fullName = asString(profile.full_name);
-  const firstName = asString(profile.first_name);
-  const lastName = asString(profile.last_name);
-
-  if (fullName) return fullName;
-  if (firstName || lastName) return `${firstName} ${lastName}`.trim();
-  return asString(profile.email) || "Unnamed user";
-}
-
-function getInitials(profile: ProfileRow) {
-  const name = getDisplayName(profile);
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 }
 
 function getNotice(
@@ -259,36 +230,29 @@ export default async function UniversityAssignmentsPage({
   const query = asString(resolvedSearchParams?.q);
   const selectedUserId = asString(resolvedSearchParams?.user);
 
-  let profilesQuery = supabaseAdmin
-    .from("profiles")
-    .select("id,email,full_name,first_name,last_name,role,created_at")
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const [{ data: assignmentsResult }, { data: stepsResult }] = await Promise.all([
+    supabaseAdmin
+      .from("academy_assignments")
+      .select("*")
+      .order("assigned_at", { ascending: false }),
+    supabaseAdmin
+      .from("ambassador_training_steps")
+      .select("id,academy_type,is_active,is_required"),
+  ]);
 
-  if (query) {
-    profilesQuery = profilesQuery.or(
-      `email.ilike.%${query}%,full_name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%`,
-    );
-  }
-
-  const [{ data: profilesResult }, { data: assignmentsResult }, { data: stepsResult }] =
-    await Promise.all([
-      profilesQuery,
-      supabaseAdmin
-        .from("academy_assignments")
-        .select("*")
-        .order("assigned_at", { ascending: false }),
-      supabaseAdmin
-        .from("ambassador_training_steps")
-        .select("id,academy_type,is_active,is_required"),
-    ]);
-
-  const profiles = (profilesResult || []) as ProfileRow[];
   const assignments = (assignmentsResult || []) as AcademyAssignment[];
   const trainingSteps = (stepsResult || []) as TrainingStep[];
+  const assignedUserIds = assignments
+    .map((assignment) => asString(assignment.user_id))
+    .filter(Boolean);
+  const people = await getAdminPeopleDirectory({
+    query,
+    limit: 75,
+    includeUserIds: selectedUserId ? [selectedUserId, ...assignedUserIds] : assignedUserIds,
+  });
 
-  const selectedProfile =
-    profiles.find((profile) => profile.id === selectedUserId) || profiles[0] || null;
+  const selectedPerson =
+    people.find((person) => person.userId === selectedUserId) || people[0] || null;
 
   const assignmentsByUser = new Map<string, AcademyAssignment[]>();
 
@@ -313,8 +277,8 @@ export default async function UniversityAssignmentsPage({
     {} as Record<AcademyType, number>,
   );
 
-  const selectedAssignments = selectedProfile
-    ? assignmentsByUser.get(selectedProfile.id) || []
+  const selectedAssignments = selectedPerson
+    ? assignmentsByUser.get(selectedPerson.userId) || []
     : [];
 
   const selectedAssignedAcademies = new Set(
@@ -401,7 +365,7 @@ export default async function UniversityAssignmentsPage({
           <MetricCard
             icon={<Users size={20} />}
             label="Users Loaded"
-            value={profiles.length.toString()}
+            value={people.length.toString()}
             detail="Current search results"
           />
           <MetricCard
@@ -454,16 +418,16 @@ export default async function UniversityAssignmentsPage({
             </form>
 
             <div className="grid gap-3">
-              {profiles.length ? (
-                profiles.map((profile) => {
-                  const active = selectedProfile?.id === profile.id;
+              {people.length ? (
+                people.map((person) => {
+                  const active = selectedPerson?.userId === person.userId;
                   const userAssignments =
-                    assignmentsByUser.get(profile.id) || [];
+                    assignmentsByUser.get(person.userId) || [];
 
                   return (
                     <Link
-                      key={profile.id}
-                      href={`${adminRoutes.universityAssignments}?user=${profile.id}${
+                      key={person.userId}
+                      href={`${adminRoutes.universityAssignments}?user=${person.userId}${
                         query ? `&q=${encodeURIComponent(query)}` : ""
                       }`}
                       className={`rounded-[22px] border p-4 transition ${
@@ -474,18 +438,18 @@ export default async function UniversityAssignmentsPage({
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-sm font-black text-white">
-                          {getInitials(profile)}
+                          {person.initials}
                         </div>
 
                         <div className="min-w-0">
                           <h3 className="truncate text-base font-black text-green-950">
-                            {getDisplayName(profile)}
+                            {person.displayName}
                           </h3>
                           <p className="truncate text-xs font-bold text-slate-500">
-                            {profile.email || "No email saved"}
+                            {person.email || "No email saved"}
                           </p>
                           <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-green-700">
-                            {profile.role || "No role saved"}
+                            {person.roleLabel || "No role saved"}
                           </p>
 
                           <div className="mt-3 flex flex-wrap gap-1">
@@ -530,7 +494,7 @@ export default async function UniversityAssignmentsPage({
           </DashboardCard>
 
           <DashboardCard>
-            {selectedProfile ? (
+            {selectedPerson ? (
               <div className="space-y-5">
                 <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
                   <div>
@@ -538,14 +502,14 @@ export default async function UniversityAssignmentsPage({
                       Selected User
                     </p>
                     <h2 className="mt-2 text-3xl font-black tracking-tight text-green-950">
-                      {getDisplayName(selectedProfile)}
+                      {selectedPerson.displayName}
                     </h2>
                     <p className="mt-1 text-sm font-bold text-slate-500">
-                      {selectedProfile.email || "No email saved"}
+                      {selectedPerson.email || "No email saved"}
                     </p>
                     <p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                      Role: {selectedProfile.role || "Not saved"} · Joined{" "}
-                      {formatDate(selectedProfile.created_at)}
+                      Role: {selectedPerson.roleLabel || "Not saved"} · Joined{" "}
+                      {formatDate(selectedPerson.joinedAt)}
                     </p>
                   </div>
 
@@ -558,7 +522,7 @@ export default async function UniversityAssignmentsPage({
                   <input
                     type="hidden"
                     name="user_id"
-                    value={selectedProfile.id}
+                    value={selectedPerson.userId}
                   />
 
                   <div className="grid gap-4 lg:grid-cols-3">
