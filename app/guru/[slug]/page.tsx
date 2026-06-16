@@ -493,10 +493,10 @@ function getGuruLocation(profile: GuruProfile | null) {
 
 function getGuruImage(profile: GuruProfile | null) {
   return (
-    profile?.image_url ||
-    profile?.avatar_url ||
-    profile?.photo_url ||
     profile?.profile_photo_url ||
+    profile?.avatar_url ||
+    profile?.image_url ||
+    profile?.photo_url ||
     null
   );
 }
@@ -929,6 +929,114 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
   };
 }
 
+async function hydrateGuruProfilePhotoFields(
+  guruProfile: GuruProfile | null,
+): Promise<GuruProfile | null> {
+  if (!guruProfile) return null;
+
+  const currentImage = getGuruImage(guruProfile);
+  if (currentImage) return guruProfile;
+
+  const profileSelect =
+    "id, user_id, email, profile_photo_url, avatar_url, image_url, full_name, display_name, name, first_name, last_name";
+
+  const profileLookups = [
+    guruProfile.user_id
+      ? supabaseAdmin
+          .from("profiles")
+          .select(profileSelect)
+          .eq("id", guruProfile.user_id)
+          .maybeSingle()
+      : null,
+    guruProfile.profile_id
+      ? supabaseAdmin
+          .from("profiles")
+          .select(profileSelect)
+          .eq("id", guruProfile.profile_id)
+          .maybeSingle()
+      : null,
+    guruProfile.email
+      ? supabaseAdmin
+          .from("profiles")
+          .select(profileSelect)
+          .eq("email", guruProfile.email)
+          .maybeSingle()
+      : null,
+    guruProfile.id != null
+      ? supabaseAdmin
+          .from("profiles")
+          .select(profileSelect)
+          .eq("id", String(guruProfile.id))
+          .maybeSingle()
+      : null,
+  ];
+
+  for (const lookup of profileLookups) {
+    if (!lookup) continue;
+
+    try {
+      const result = await lookup;
+
+      if (!result.error && result.data) {
+        const profile = result.data as Record<string, any>;
+
+        return {
+          ...guruProfile,
+          full_name:
+            guruProfile.full_name ||
+            profile.full_name ||
+            profile.display_name ||
+            profile.name ||
+            null,
+          display_name:
+            guruProfile.display_name ||
+            profile.display_name ||
+            profile.full_name ||
+            profile.name ||
+            null,
+          name:
+            guruProfile.name ||
+            profile.name ||
+            profile.full_name ||
+            profile.display_name ||
+            null,
+          first_name: guruProfile.first_name || profile.first_name || null,
+          last_name: guruProfile.last_name || profile.last_name || null,
+          image_url:
+            guruProfile.image_url ||
+            profile.image_url ||
+            profile.profile_photo_url ||
+            profile.avatar_url ||
+            null,
+          avatar_url:
+            guruProfile.avatar_url ||
+            profile.avatar_url ||
+            profile.profile_photo_url ||
+            profile.image_url ||
+            null,
+          photo_url:
+            guruProfile.photo_url ||
+            profile.profile_photo_url ||
+            profile.avatar_url ||
+            profile.image_url ||
+            null,
+          profile_photo_url:
+            guruProfile.profile_photo_url ||
+            profile.profile_photo_url ||
+            profile.avatar_url ||
+            profile.image_url ||
+            null,
+        };
+      }
+    } catch {
+      // Continue through photo fallback lookups.
+    }
+  }
+
+  return guruProfile;
+}
+
+
 async function getProfileGuruByIdentifier(identifier: string) {
   const cleanedIdentifier = cleanIdentifier(identifier);
   if (!cleanedIdentifier) return null;
@@ -1027,7 +1135,7 @@ async function getPublicGuruProfile(
       const result = await query;
 
       if (!result.error && result.data) {
-        return result.data as GuruProfile;
+        return hydrateGuruProfilePhotoFields(result.data as GuruProfile);
       }
     } catch {
       // Continue through fallback lookups.
@@ -1041,11 +1149,15 @@ async function getPublicGuruProfile(
       isIdentifierMatchForGuru(guru, cleanedIdentifier),
     );
 
-    if (match) return match;
+    if (match) {
+      return hydrateGuruProfilePhotoFields(match);
+    }
   }
 
-  return getProfileGuruByIdentifier(cleanedIdentifier);
+  const profileFallback = await getProfileGuruByIdentifier(cleanedIdentifier);
+  return hydrateGuruProfilePhotoFields(profileFallback);
 }
+
 async function getGuruProfile(
   userId: string,
   email?: string | null,
@@ -1057,7 +1169,7 @@ async function getGuruProfile(
     .maybeSingle();
 
   if (!byUserId.error && byUserId.data) {
-    return byUserId.data as GuruProfile;
+    return hydrateGuruProfilePhotoFields(byUserId.data as GuruProfile);
   }
 
   if (email) {
@@ -1068,7 +1180,7 @@ async function getGuruProfile(
       .maybeSingle();
 
     if (!byEmail.error && byEmail.data) {
-      return byEmail.data as GuruProfile;
+      return hydrateGuruProfilePhotoFields(byEmail.data as GuruProfile);
     }
   }
 
