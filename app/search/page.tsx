@@ -13,6 +13,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import ProviderMap from "@/components/ProviderMap";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
+import AmbassadorSearchBlock from "@/components/AmbassadorSearchBlock";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
@@ -28,6 +29,13 @@ type GuruRow = {
   city?: string | null;
   state?: string | null;
   zip_code?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  service_zip?: string | null;
+  service_zip_code?: string | null;
+  status?: string | null;
+  application_status?: string | null;
+  is_bookable?: boolean | null;
   service_latitude?: number | string | null;
   service_longitude?: number | string | null;
   service_radius_miles?: number | string | null;
@@ -329,6 +337,56 @@ function getGuruName(guru: GuruRow) {
   return guru.display_name || guru.full_name || "Guru";
 }
 
+function getGuruCity(guru: GuruRow) {
+  return String(guru.service_city || guru.city || "").trim();
+}
+
+function getGuruState(guru: GuruRow) {
+  return String(guru.service_state || guru.state || "").trim();
+}
+
+function getGuruZip(guru: GuruRow) {
+  return cleanZip(guru.service_zip || guru.service_zip_code || guru.zip_code || "");
+}
+
+function isNegativeGuruStatus(value?: string | null) {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  return [
+    "inactive",
+    "suspended",
+    "rejected",
+    "paused",
+    "deleted",
+    "archived",
+    "not_approved",
+    "not approved",
+  ].includes(normalized);
+}
+
+function isBookableSearchGuru(guru: GuruRow) {
+  const status = String(guru.status || "").trim().toLowerCase();
+  const applicationStatus = String(guru.application_status || "")
+    .trim()
+    .toLowerCase();
+
+  if (guru.is_public === false) return false;
+  if (guru.is_active === false) return false;
+  if (guru.is_bookable === false) return false;
+  if (guru.is_accepting_bookings === false) return false;
+  if (guru.accepting_bookings === false) return false;
+  if (isNegativeGuruStatus(status) || isNegativeGuruStatus(applicationStatus)) {
+    return false;
+  }
+
+  return (
+    guru.is_bookable === true ||
+    applicationStatus === "bookable" ||
+    status === "bookable" ||
+    status === "active"
+  );
+}
+
 function normalizeFillInMatchValue(value?: string | null) {
   return String(value || "")
     .trim()
@@ -572,12 +630,12 @@ function calculateDistanceMiles(
 function locationsMatchByText(guru: GuruRow, location: ZipLookupResult | null) {
   if (!location) return false;
 
-  const guruZip = cleanZip(guru.zip_code);
+  const guruZip = getGuruZip(guru);
 
   if (guruZip && guruZip === location.zip) return true;
 
-  const guruCity = normalizeText(guru.city);
-  const guruState = normalizeStateCode(guru.state);
+  const guruCity = normalizeText(getGuruCity(guru));
+  const guruState = normalizeStateCode(getGuruState(guru));
   const locationCity = normalizeText(location.city);
   const locationState = normalizeStateCode(location.state || location.stateName);
 
@@ -593,7 +651,7 @@ function getGuruZipFallbackCoordinates(
   guru: GuruRow,
   guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
 ): [number, number] | null {
-  const zip = cleanZip(guru.zip_code);
+  const zip = getGuruZip(guru);
   const zipLookup = zip ? guruZipLookupsByZip[zip] : null;
 
   if (
@@ -792,7 +850,7 @@ function hasValidCoordinates(guru: GuruRow) {
 }
 
 function getGuruFallbackCoordinates(guru: GuruRow) {
-  return CITY_COORDINATES[normalizeLocationKey(guru.city, guru.state)] || null;
+  return CITY_COORDINATES[normalizeLocationKey(getGuruCity(guru), getGuruState(guru))] || null;
 }
 
 function hasMapLocation(guru: GuruRow) {
@@ -949,36 +1007,44 @@ function SearchPageContent() {
       let guruRows: GuruRow[] = [];
       let gurusErrorMessage = "";
 
-      for (const selectColumns of GURU_SELECT_ATTEMPTS) {
-        const { data, error: gurusError } = await supabase
-          .from("gurus")
-          .select(selectColumns)
-          .order("is_verified", { ascending: false })
-          .order("rating_avg", { ascending: false, nullsFirst: false });
+      try {
+        const response = await fetch("/api/gurus/public-search", {
+          cache: "no-store",
+        });
 
-        if (!gurusError) {
-          guruRows = ((data || []) as unknown) as GuruRow[];
-          gurusErrorMessage = "";
-          break;
+        if (response.ok) {
+          const payload = (await response.json()) as { gurus?: GuruRow[] };
+          guruRows = Array.isArray(payload.gurus) ? payload.gurus : [];
+        } else {
+          gurusErrorMessage = `Public Guru API returned ${response.status}`;
         }
-
-        gurusErrorMessage = gurusError.message || gurusErrorMessage;
+      } catch (apiError) {
+        gurusErrorMessage =
+          apiError instanceof Error
+            ? apiError.message
+            : "Public Guru API could not be reached.";
       }
 
       if (gurusErrorMessage) {
-        setError(gurusErrorMessage);
-        setLoading(false);
+        for (const selectColumns of GURU_SELECT_ATTEMPTS) {
+          const { data, error: gurusError } = await supabase
+            .from("gurus")
+            .select(selectColumns)
+            .order("is_verified", { ascending: false })
+            .order("rating_avg", { ascending: false, nullsFirst: false });
 
-        trackEvent({
-          eventName: "search_gurus_load_failed",
-          eventType: "system",
-          source: detectSourceFromUrl(),
-          metadata: {
-            error: gurusErrorMessage,
-          },
-        });
+          if (!gurusError) {
+            guruRows = (((data || []) as unknown) as GuruRow[]).filter(
+              isBookableSearchGuru,
+            );
+            gurusErrorMessage = "";
+            break;
+          }
 
-        return;
+          gurusErrorMessage = gurusError.message || gurusErrorMessage;
+        }
+      } else {
+        guruRows = guruRows.filter(isBookableSearchGuru);
       }
 
       const guruIds = guruRows
@@ -1164,14 +1230,16 @@ function SearchPageContent() {
 
   useEffect(() => {
     if (!gurus.length) {
-      setGuruZipLookupsByZip({});
+      setGuruZipLookupsByZip((currentLookups) =>
+        Object.keys(currentLookups).length ? {} : currentLookups,
+      );
       return;
     }
 
     const uniqueGuruZips = Array.from(
       new Set(
         gurus
-          .map((guru) => cleanZip(guru.zip_code))
+          .map((guru) => getGuruZip(guru))
           .filter((zip) => zip.length === 5),
       ),
     );
@@ -1246,15 +1314,16 @@ function SearchPageContent() {
       .toLowerCase();
 
     return gurus
+      .filter(isBookableSearchGuru)
       .filter((guru) => guru.is_active !== false)
       .filter((guru) => guru.is_public !== false)
       .filter((guru) => guru.is_accepting_bookings !== false)
       .filter((guru) => guru.accepting_bookings !== false)
       .filter((guru) => {
         const guruName = normalizeText(getGuruName(guru));
-        const guruCity = normalizeText(guru.city);
-        const guruState = normalizeText(guru.state);
-        const guruZip = cleanZip(guru.zip_code);
+        const guruCity = normalizeText(getGuruCity(guru));
+        const guruState = normalizeText(getGuruState(guru));
+        const guruZip = getGuruZip(guru);
         const guruBio = normalizeText(guru.bio);
         const guruTitle = normalizeText(guru.title);
         const guruServices = (guru.services || []).join(" ").toLowerCase();
@@ -1473,9 +1542,9 @@ function SearchPageContent() {
         location: "search_results",
         guru_id: guru.id,
         guru_name: getGuruName(guru),
-        guru_city: guru.city || "",
-        guru_state: guru.state || "",
-        guru_zip: guru.zip_code || "",
+        guru_city: getGuruCity(guru),
+        guru_state: getGuruState(guru),
+        guru_zip: getGuruZip(guru),
         guru_has_map_location: hasMapLocation(guru),
         selected_service: serviceFilter,
         result_count: filteredGurus.length,
@@ -1496,9 +1565,9 @@ function SearchPageContent() {
         destination: getGuruHref(guru),
         guru_id: guru.id,
         guru_name: getGuruName(guru),
-        guru_city: guru.city || "",
-        guru_state: guru.state || "",
-        guru_zip: guru.zip_code || "",
+        guru_city: getGuruCity(guru),
+        guru_state: getGuruState(guru),
+        guru_zip: getGuruZip(guru),
         selected_service: serviceFilter,
         zip_filter: cleanZip(zipFilter),
         city_filter: cityFilter.trim(),
@@ -1838,8 +1907,8 @@ function SearchPageContent() {
                                 </p>
 
                                 <p className="mt-1 line-clamp-1 text-sm text-slate-500">
-                                  {formatLocation(guru.city, guru.state)}
-                                  {guru.zip_code ? ` · ${guru.zip_code}` : ""}
+                                  {formatLocation(getGuruCity(guru), getGuruState(guru))}
+                                  {getGuruZip(guru) ? ` · ${getGuruZip(guru)}` : ""}
                                 </p>
 
                                 <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
@@ -2016,6 +2085,8 @@ function SearchPageContent() {
           </div>
         )}
       </section>
+
+      <AmbassadorSearchBlock />
     </main>
   );
 }

@@ -169,9 +169,11 @@ function getGuruMessageHref(guru: GuruDisplayRow) {
     params.set("email", email);
   }
 
+  params.set("threadType", "direct_guru");
+  params.set("recipientRole", "guru");
   params.set("source", "admin-gurus");
 
-  return `/messages/admin?${params.toString()}`;
+  return `/admin/messages?${params.toString()}`;
 }
 
 function Avatar({ name, src }: { name: string; src?: string }) {
@@ -687,6 +689,55 @@ export default function GuruRecordsTable({
         </div>
       </div>
 
+      <div className="mb-5 rounded-[28px] border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+              Record queue
+            </p>
+            <p className="mt-1 text-xs font-bold text-emerald-900">
+              All shows real Gurus only. Fill-in, demo, test, fake, bot, and deleted placeholder rows are excluded before this table renders.
+            </p>
+          </div>
+          <p className="text-xs font-bold text-emerald-700">
+            Real Guru rows: {number(gurus.length)}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/gurus"
+            className="inline-flex items-center rounded-2xl bg-emerald-700 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
+          >
+            All Real Gurus
+          </Link>
+          <Link
+            href="/admin/gurus?queue=pending-reviews"
+            className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
+          >
+            Pending Review
+          </Link>
+          <Link
+            href="/admin/gurus?status=bookable"
+            className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
+          >
+            Bookable
+          </Link>
+          <Link
+            href="/admin/gurus?filter=profile-updates"
+            className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
+          >
+            Profile Updates
+          </Link>
+          <Link
+            href="/admin/gurus?queue=flagged-review"
+            className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
+          >
+            Flagged Review
+          </Link>
+        </div>
+      </div>
+
       <div className="mb-5 rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#fbfefc_0%,#f8fafc_100%)] p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
@@ -730,9 +781,8 @@ export default function GuruRecordsTable({
       )}
 
       <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-semibold leading-5 text-emerald-900">
-        This section only renders the Guru rows passed from{" "}
-        <span className="font-black">app/admin/gurus/page.tsx</span>, so
-        reached-step and missing-step queues stay filtered.
+        This section renders the All Real Gurus queue passed from{" "}
+        <span className="font-black">app/admin/gurus/page.tsx</span>. Demo, fill-in, test, fake, bot, and deleted placeholder rows are removed before sorting and filtering.
       </div>
     </div>
   );
