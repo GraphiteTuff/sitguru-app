@@ -2383,6 +2383,32 @@ function GuruDashboardProfilePageContent() {
                             Steps 1, 2, and 3 are complete. If you request
                             public visibility and save, this profile can be
                             marked public. Booking eligibility may still depend
+                            on Step 4 Trust & Safety Screening, Step 5 Stripe
+                            payouts, and Admin approval.
+                          </p>
+                        ) : (
+                          <>
+                            <p className="font-extrabold">
+                              This profile will stay private until the missing
+                              setup items are completed.
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {missingItems.map((item) => (
+                                <span
+                                  key={item}
+                                  className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-rose-800 ring-1 ring-rose-200"
+                                >
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </section>
+                  </section>
+                ) : null}
+
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <button
                     type="submit"
@@ -2463,34 +2489,6 @@ function GuruDashboardProfilePageContent() {
                         }}
                       >
                         Go to Step {nextStepNumber} without saving
-                      </span>
-                    </Link>
-                  ) : null}
-                </div>
-              </form>an
-                      className="font-extrabold"
-                      style={{
-                        color: "#0f172a",
-                        WebkitTextFillColor: "#0f172a",
-                      }}
-                    >
-                      Return to Dashboard
-                    </span>
-                  </Link>
-
-                  {activeStep !== "3" ? (
-                    <Link
-                      href={`/guru/dashboard/profile?step=${Number(activeStep) + 1}`}
-                      className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 px-6 py-4 text-sm font-extrabold shadow-sm transition hover:bg-emerald-100"
-                    >
-                      <span
-                        className="font-extrabold"
-                        style={{
-                          color: "#065f46",
-                          WebkitTextFillColor: "#065f46",
-                        }}
-                      >
-                        Preview Step {Number(activeStep) + 1} →
                       </span>
                     </Link>
                   ) : null}
