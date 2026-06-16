@@ -425,24 +425,32 @@ function mergeGuruRecords(existing: GuruRow, incoming: GuruRow) {
 }
 
 function addGuruRecordToMap(map: Map<string, GuruRow>, guru: GuruRow) {
-  const keys = getGuruRecordIdentityKeys(guru);
-  const primaryKey = keys[0];
+  const incomingKeys = getGuruRecordIdentityKeys(guru);
+  const primaryKey = incomingKeys[0];
 
   if (!primaryKey) return;
 
-  const matchedKey = keys.find((key) => map.has(key));
+  const matchedKey = incomingKeys.find((key) => map.has(key));
 
   if (matchedKey) {
-    const merged = mergeGuruRecords(map.get(matchedKey) || {}, guru);
+    const existing = map.get(matchedKey) || {};
+    const merged = mergeGuruRecords(existing, guru);
+    const mergedKeys = Array.from(
+      new Set([
+        ...getGuruRecordIdentityKeys(existing),
+        ...incomingKeys,
+        ...getGuruRecordIdentityKeys(merged),
+      ]),
+    );
 
-    for (const key of keys) {
+    for (const key of mergedKeys) {
       map.set(key, merged);
     }
 
     return;
   }
 
-  for (const key of keys) {
+  for (const key of incomingKeys) {
     map.set(key, guru);
   }
 }
