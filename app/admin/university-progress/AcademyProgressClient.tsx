@@ -55,6 +55,116 @@ function unique(values: string[]) {
   );
 }
 
+
+function normalizeText(value?: string | null) {
+  return (value || "").trim().toLowerCase();
+}
+
+function isUnknownName(value?: string | null) {
+  const normalized = normalizeText(value);
+
+  return (
+    !normalized ||
+    normalized === "unknown" ||
+    normalized === "unknown user" ||
+    normalized === "unnamed user" ||
+    normalized === "no name saved"
+  );
+}
+
+function deriveNameFromEmail(email?: string | null) {
+  const localPart = (email || "").split("@")[0] || "";
+
+  return localPart
+    .replace(/[._-]+/g, " ")
+    .replace(/\d+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function getCleanRecordName(record: AcademyProgressRecord) {
+  if (!isUnknownName(record.name)) return record.name;
+
+  const emailName = deriveNameFromEmail(record.email);
+  if (emailName) return emailName;
+
+  return record.name || "Unknown User";
+}
+
+function getRecordIdentity(record: AcademyProgressRecord) {
+  const email = normalizeText(record.email);
+  const name = normalizeText(getCleanRecordName(record));
+  const rawKey = normalizeText(record.key);
+
+  return email || name || rawKey || "unknown-user";
+}
+
+function recordScore(record: AcademyProgressRecord) {
+  let score = 0;
+
+  if (!isUnknownName(record.name)) score += 50;
+  if (record.email && record.email !== "—") score += 25;
+  if (record.avatarUrl) score += 15;
+  if (record.status === "Completed") score += 15;
+  if (record.progress >= 100) score += 15;
+  score += Math.min(100, Math.max(0, record.progress || 0)) / 10;
+  score += dateValue(record.updatedAt || record.completedAt || record.assignedAt) / 10000000000000;
+
+  return score;
+}
+
+function mergeAcademyRecord(
+  existing: AcademyProgressRecord,
+  incoming: AcademyProgressRecord,
+) {
+  const preferred = recordScore(incoming) > recordScore(existing) ? incoming : existing;
+  const fallback = preferred === incoming ? existing : incoming;
+
+  return {
+    ...fallback,
+    ...preferred,
+    key: preferred.key || fallback.key,
+    name: getCleanRecordName(preferred) || getCleanRecordName(fallback),
+    email:
+      preferred.email && preferred.email !== "—"
+        ? preferred.email
+        : fallback.email || preferred.email,
+    avatarUrl: preferred.avatarUrl || fallback.avatarUrl,
+    completedAt: preferred.completedAt || fallback.completedAt,
+    updatedAt: preferred.updatedAt || fallback.updatedAt,
+    assignedAt: preferred.assignedAt || fallback.assignedAt,
+    progress: Math.max(preferred.progress || 0, fallback.progress || 0),
+    status:
+      preferred.status === "Completed" || fallback.status === "Completed"
+        ? "Completed"
+        : preferred.status || fallback.status,
+  } satisfies AcademyProgressRecord;
+}
+
+function dedupeAcademyRecords(records: AcademyProgressRecord[]) {
+  const map = new Map<string, AcademyProgressRecord>();
+
+  for (const record of records) {
+    const cleanRecord = {
+      ...record,
+      name: getCleanRecordName(record),
+    } satisfies AcademyProgressRecord;
+    const dedupeKey = `${getRecordIdentity(cleanRecord)}::${normalizeText(cleanRecord.academy)}`;
+    const existing = map.get(dedupeKey);
+
+    map.set(
+      dedupeKey,
+      existing ? mergeAcademyRecord(existing, cleanRecord) : cleanRecord,
+    );
+  }
+
+  return Array.from(map.values());
+}
+
 function getSortedRecords(records: AcademyProgressRecord[], sortBy: SortOption) {
   const cloned = [...records];
 
@@ -110,22 +220,31 @@ export default function AcademyProgressClient({
   const [sortBy, setSortBy] = useState<SortOption>("academy-az");
   const [showAcademyGroups, setShowAcademyGroups] = useState(true);
 
-  const roles = useMemo(() => unique(records.map((record) => record.role)), [records]);
+  const cleanRecords = useMemo(() => dedupeAcademyRecords(records), [records]);
+  const cleanCompletedRecords = useMemo(
+    () => dedupeAcademyRecords(completedRecords),
+    [completedRecords],
+  );
+
+  const roles = useMemo(
+    () => unique(cleanRecords.map((record) => record.role)),
+    [cleanRecords],
+  );
 
   const academies = useMemo(
-    () => unique(records.map((record) => record.academy)),
-    [records],
+    () => unique(cleanRecords.map((record) => record.academy)),
+    [cleanRecords],
   );
 
   const statuses = useMemo(
-    () => unique(records.map((record) => record.status)),
-    [records],
+    () => unique(cleanRecords.map((record) => record.status)),
+    [cleanRecords],
   );
 
   const filteredRecords = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    const filtered = records.filter((record) => {
+    const filtered = cleanRecords.filter((record) => {
       const searchableText = [
         record.name,
         record.email,
@@ -149,7 +268,7 @@ export default function AcademyProgressClient({
     });
 
     return getSortedRecords(filtered, sortBy);
-  }, [academyFilter, records, roleFilter, search, sortBy, statusFilter]);
+  }, [academyFilter, cleanRecords, roleFilter, search, sortBy, statusFilter]);
 
   const groupedAcademies = useMemo(
     () => getAcademyGroups(filteredRecords),
@@ -262,7 +381,7 @@ export default function AcademyProgressClient({
             <div className="mt-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-green-900">
                 <Filter size={14} />
-                Showing {filteredRecords.length} of {records.length}
+                Showing {filteredRecords.length} of {cleanRecords.length}
               </div>
 
               {activeFilterCount > 0 ? (
@@ -425,8 +544,8 @@ export default function AcademyProgressClient({
           </div>
 
           <div className="grid max-h-[720px] gap-3 overflow-y-auto pr-1">
-            {completedRecords.length ? (
-              completedRecords.slice(0, 50).map((record) => (
+            {cleanCompletedRecords.length ? (
+              cleanCompletedRecords.slice(0, 50).map((record) => (
                 <div
                   key={`completed-${record.key}`}
                   className="rounded-2xl border border-green-100 bg-green-50/70 p-4"
