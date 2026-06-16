@@ -1077,6 +1077,21 @@ function GuruDashboardProfilePageContent() {
     event.preventDefault();
     if (saving || !userId) return;
 
+    const submitter = (event.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
+    const saveIntent =
+      submitter?.value === "continue" && activeStep !== "3"
+        ? "continue"
+        : "dashboard";
+    const nextStepHref =
+      activeStep === "1"
+        ? "/guru/dashboard/profile?step=2"
+        : activeStep === "2"
+          ? "/guru/dashboard/profile?step=3"
+          : routes.dashboard;
+    const nextStepNumber =
+      activeStep === "1" ? "2" : activeStep === "2" ? "3" : "";
+
     setSaving(true);
     setJustSaved(false);
     setErrorMessage("");
@@ -1358,18 +1373,23 @@ function GuruDashboardProfilePageContent() {
         setProfileExists(true);
       }
 
+      const destination =
+        saveIntent === "continue" && nextStepNumber ? nextStepHref : routes.dashboard;
+
       setSuccessMessage(
-        safeIsPublic
-          ? "Saved. Returning to your dashboard so you can see Steps 1, 2, and 3 marked complete."
-          : isPublic
-            ? "Saved. Returning to your dashboard so you can see what still needs to be completed before going public."
-            : "Saved. Returning to your dashboard so you can see your setup progress.",
+        saveIntent === "continue" && nextStepNumber
+          ? `Saved. Continuing to Step ${nextStepNumber}.`
+          : safeIsPublic
+            ? "Saved. Returning to your dashboard so you can see Steps 1, 2, and 3 marked complete."
+            : isPublic
+              ? "Saved. Returning to your dashboard so you can see what still needs to be completed before going public."
+              : "Saved. Returning to your dashboard so you can see your setup progress.",
       );
       setJustSaved(true);
 
       window.setTimeout(() => {
         router.refresh();
-        router.push(routes.dashboard);
+        router.push(destination);
       }, 700);
     } catch (error) {
       setErrorMessage(
@@ -1470,6 +1490,14 @@ function GuruDashboardProfilePageContent() {
       : "Rate pending";
 
   const publicProfileHref = `/guru/${publicPreviewSlug}`;
+  const hasNextStep = activeStep !== "3";
+  const nextStepNumber = activeStep === "1" ? "2" : activeStep === "2" ? "3" : "";
+  const nextStepHref = nextStepNumber
+    ? `/guru/dashboard/profile?step=${nextStepNumber}`
+    : routes.dashboard;
+  const primarySaveLabel = hasNextStep
+    ? `Save Step ${activeStep} & Continue to Step ${nextStepNumber}`
+    : `Save Step ${activeStep} & Return to Dashboard`;
 
   if (loading) {
     return <GuruProfileLoadingFallback />;
@@ -1533,9 +1561,9 @@ function GuruDashboardProfilePageContent() {
                 className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-slate-800 md:text-xl"
                 style={{ color: "#1f2937" }}
               >
-                Only this step is shown so you can focus. Save when finished, and
-                SitGuru will return you to the dashboard so you can see this step
-                turn green and know exactly what to do next.
+                Only this step is shown so you can focus. Save when finished,
+                then continue to the next step or return to the dashboard to see
+                this step turn green and know exactly what to do next.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -1727,9 +1755,9 @@ function GuruDashboardProfilePageContent() {
                         : "Add services, pricing, and public request"}
                   </h2>
                   <p className="mt-2 text-sm font-semibold leading-6 !text-slate-600">
-                    Complete the fields on this single step, save, then return to
-                    the dashboard to see your progress and continue to the next
-                    action.
+                    Complete the fields on this single step, then save and
+                    continue to the next step or return to the dashboard to see
+                    your progress.
                   </p>
                 </div>
 
@@ -2355,35 +2383,11 @@ function GuruDashboardProfilePageContent() {
                             Steps 1, 2, and 3 are complete. If you request
                             public visibility and save, this profile can be
                             marked public. Booking eligibility may still depend
-                            on Step 4 Trust & Safety Screening, Step 5 Stripe
-                            payouts, and Admin approval.
-                          </p>
-                        ) : (
-                          <>
-                            <p className="font-extrabold">
-                              This profile will stay private until the missing
-                              setup items are completed.
-                            </p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {missingItems.map((item) => (
-                                <span
-                                  key={item}
-                                  className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-rose-800 ring-1 ring-rose-200"
-                                >
-                                  {item}
-                                </span>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </section>
-                  </section>
-                ) : null}
-
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <button
                     type="submit"
+                    name="saveAction"
+                    value={hasNextStep ? "continue" : "dashboard"}
                     disabled={saving}
                     className={[
                       "inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-extrabold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-70",
@@ -2407,19 +2411,63 @@ function GuruDashboardProfilePageContent() {
                         WebkitTextFillColor: "#ffffff",
                       }}
                     >
-                      {saving
-                        ? "Saving..."
-                        : justSaved
-                          ? "Saved"
-                          : `Save Step ${activeStep} & Return to Dashboard`}
+                      {saving ? "Saving..." : justSaved ? "Saved" : primarySaveLabel}
                     </span>
                   </button>
+
+                  {hasNextStep ? (
+                    <button
+                      type="submit"
+                      name="saveAction"
+                      value="dashboard"
+                      disabled={saving}
+                      className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 px-6 py-4 text-sm font-extrabold shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <span
+                        className="font-extrabold"
+                        style={{
+                          color: "#065f46",
+                          WebkitTextFillColor: "#065f46",
+                        }}
+                      >
+                        Save & Return to Dashboard
+                      </span>
+                    </button>
+                  ) : null}
 
                   <Link
                     href={routes.dashboard}
                     className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-6 py-4 text-sm font-extrabold shadow-sm transition hover:bg-slate-50"
                   >
                     <span
+                      className="font-extrabold"
+                      style={{
+                        color: "#0f172a",
+                        WebkitTextFillColor: "#0f172a",
+                      }}
+                    >
+                      Return to Dashboard
+                    </span>
+                  </Link>
+
+                  {hasNextStep ? (
+                    <Link
+                      href={nextStepHref}
+                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-extrabold shadow-sm transition hover:bg-slate-50"
+                    >
+                      <span
+                        className="font-extrabold"
+                        style={{
+                          color: "#0f172a",
+                          WebkitTextFillColor: "#0f172a",
+                        }}
+                      >
+                        Go to Step {nextStepNumber} without saving
+                      </span>
+                    </Link>
+                  ) : null}
+                </div>
+              </form>an
                       className="font-extrabold"
                       style={{
                         color: "#0f172a",
