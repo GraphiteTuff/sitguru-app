@@ -1288,6 +1288,227 @@ async function getProfileGuruByIdentifier(identifier: string) {
 }
 
 
+
+function titleFromPublicSlug(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function normalizeGuruProfileFromBookingLookupRow(
+  row: Record<string, any>,
+): GuruProfile | null {
+  const id = String(row.id || "").trim();
+
+  if (!id) return null;
+
+  const firstName = String(row.first_name || "").trim();
+  const lastName = String(row.last_name || "").trim();
+  const fullName = String(
+    row.full_name ||
+      row.display_name ||
+      row.name ||
+      `${firstName} ${lastName}`.trim() ||
+      getDisplayNameFromEmail(row.email),
+  ).trim();
+
+  return {
+    ...row,
+    id,
+    user_id: row.user_id || row.profile_id || null,
+    email: row.email || null,
+    full_name: fullName || "Guru",
+    display_name: row.display_name || fullName || "Guru",
+    name: row.name || fullName || "Guru",
+    first_name: firstName || null,
+    last_name: lastName || null,
+    title: row.title || row.headline || "Trusted Pet Care Guru",
+    headline: row.headline || row.title || "Trusted Pet Care Guru",
+    bio: row.bio || null,
+    city: row.city || row.service_city || null,
+    state: row.state || row.service_state || null,
+    service_city: row.service_city || row.city || null,
+    service_state: row.service_state || row.state || null,
+    slug: row.slug || null,
+    public_slug: row.public_slug || row.slug || null,
+    profile_id: row.profile_id || row.user_id || null,
+    zip_code: row.zip_code || row.service_zip || row.postal_code || null,
+    postal_code: row.postal_code || row.zip_code || row.service_zip || null,
+    service_radius_miles:
+      row.service_radius_miles ||
+      row.service_radius ||
+      row.radius_miles ||
+      row.radius ||
+      25,
+    service_radius: row.service_radius || row.service_radius_miles || 25,
+    radius_miles: row.radius_miles || row.service_radius_miles || 25,
+    profile_photo_url:
+      row.profile_photo_url || row.photo_url || row.avatar_url || row.image_url || null,
+    photo_url: row.photo_url || row.profile_photo_url || row.avatar_url || row.image_url || null,
+    avatar_url: row.avatar_url || row.profile_photo_url || row.photo_url || row.image_url || null,
+    image_url: row.image_url || row.profile_photo_url || row.photo_url || row.avatar_url || null,
+    rate: row.rate || null,
+    hourly_rate: row.hourly_rate || null,
+    price: row.price || null,
+    services: Array.isArray(row.services) ? row.services : null,
+    application_status:
+      row.application_status || row.approval_status || row.status || null,
+    status: row.status || row.application_status || row.approval_status || null,
+    role: "guru",
+    account_type: "guru",
+    is_public: row.is_public !== false,
+    is_active: row.is_active !== false,
+    is_bookable: row.is_bookable !== false,
+    is_verified: Boolean(row.is_verified),
+    stripe_account_id: row.stripe_account_id || null,
+    stripe_onboarding_complete: row.stripe_onboarding_complete || null,
+    payouts_enabled: row.payouts_enabled || null,
+    charges_enabled: row.charges_enabled || null,
+    background_check_status: row.background_check_status || null,
+    background_check_fee_status: row.background_check_fee_status || null,
+    background_check_fee_payment_option:
+      row.background_check_fee_payment_option || null,
+    background_check_payment_plan_status:
+      row.background_check_payment_plan_status || null,
+    background_check_reimbursement_status:
+      row.background_check_reimbursement_status || null,
+    checkr_status: row.checkr_status || null,
+    checkr_invitation_id: row.checkr_invitation_id || null,
+    checkr_candidate_id: row.checkr_candidate_id || null,
+    profile_completion: row.profile_completion || null,
+    rating_avg: row.rating_avg || row.rating || 0,
+    rating: row.rating || row.rating_avg || 0,
+    review_count: row.review_count || 0,
+    experience_years: row.experience_years || row.years_experience || null,
+  };
+}
+
+function scoreGuruProfileForPublicDisplay(guru: GuruProfile, identifier: string) {
+  let score = 0;
+
+  if (getGuruImage(guru)) score += 1000;
+  if (isIdentifierMatchForGuru(guru, identifier)) score += 300;
+  if (String(guru.slug || "").trim()) score += 50;
+  if (String(guru.email || "").trim()) score += 25;
+  if (String(guru.bio || "").trim()) score += 25;
+  if (normalizeServices(guru.services).length > 0) score += 20;
+  if (isBookable(guru)) score += 20;
+  if (guru.is_public !== false) score += 10;
+  if (guru.is_active !== false) score += 10;
+
+  return score;
+}
+
+function selectBestGuruProfileForPublicDisplay(
+  gurus: GuruProfile[],
+  identifier: string,
+) {
+  return [...gurus].sort(
+    (left, right) =>
+      scoreGuruProfileForPublicDisplay(right, identifier) -
+      scoreGuruProfileForPublicDisplay(left, identifier),
+  )[0] || null;
+}
+
+async function getPublicGuruProfileFromBookingLookup(
+  identifier: string,
+): Promise<GuruProfile | null> {
+  const cleanedIdentifier = cleanIdentifier(identifier);
+  if (!cleanedIdentifier) return null;
+
+  const normalizedIdentifier = slugifyPublicIdentifier(cleanedIdentifier);
+  const displayNameFromSlug = titleFromPublicSlug(cleanedIdentifier);
+
+  const lookupQueries = [
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .ilike("slug", cleanedIdentifier)
+      .limit(10),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .ilike("slug", normalizedIdentifier)
+      .limit(10),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .ilike("public_slug", cleanedIdentifier)
+      .limit(10),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .ilike("public_slug", normalizedIdentifier)
+      .limit(10),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .ilike("display_name", displayNameFromSlug)
+      .limit(10),
+    supabaseAdmin
+      .from("gurus")
+      .select("*")
+      .ilike("full_name", displayNameFromSlug)
+      .limit(10),
+  ];
+
+  const directMatches: GuruProfile[] = [];
+
+  for (const query of lookupQueries) {
+    try {
+      const result = await query;
+
+      if (!result.error && Array.isArray(result.data)) {
+        result.data.forEach((row) => {
+          const guru = normalizeGuruProfileFromBookingLookupRow(
+            row as Record<string, any>,
+          );
+
+          if (guru && isIdentifierMatchForGuru(guru, cleanedIdentifier)) {
+            directMatches.push(guru);
+          }
+        });
+      }
+    } catch {
+      // Continue through booking-style public profile lookups.
+    }
+  }
+
+  if (directMatches.length) {
+    return hydrateGuruProfilePhotoFields(
+      selectBestGuruProfileForPublicDisplay(directMatches, cleanedIdentifier),
+      cleanedIdentifier,
+    );
+  }
+
+  try {
+    const allGurusResult = await supabaseAdmin.from("gurus").select("*").limit(1000);
+
+    if (!allGurusResult.error && Array.isArray(allGurusResult.data)) {
+      const matches = allGurusResult.data
+        .map((row) =>
+          normalizeGuruProfileFromBookingLookupRow(row as Record<string, any>),
+        )
+        .filter((guru): guru is GuruProfile =>
+          Boolean(guru && isIdentifierMatchForGuru(guru, cleanedIdentifier)),
+        );
+
+      if (matches.length) {
+        return hydrateGuruProfilePhotoFields(
+          selectBestGuruProfileForPublicDisplay(matches, cleanedIdentifier),
+          cleanedIdentifier,
+        );
+      }
+    }
+  } catch {
+    // Continue to remaining public profile lookup fallbacks.
+  }
+
+  return null;
+}
+
 async function getPublicSearchApiBaseUrl() {
   const configuredUrl =
     process.env.NEXT_PUBLIC_SITE_URL ||
@@ -1423,6 +1644,13 @@ async function getPublicGuruProfile(
 ): Promise<GuruProfile | null> {
   const cleanedIdentifier = cleanIdentifier(identifier);
   if (!cleanedIdentifier) return null;
+
+  const bookingLookupProfile =
+    await getPublicGuruProfileFromBookingLookup(cleanedIdentifier);
+
+  if (bookingLookupProfile) {
+    return bookingLookupProfile;
+  }
 
   const publicSearchProfile =
     await getPublicSearchGuruProfileByIdentifier(cleanedIdentifier);
