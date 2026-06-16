@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminPeopleDirectory, type AdminPerson } from "@/lib/admin/peopleResolver";
 import AcademyProgressClient from "./AcademyProgressClient";
 
 export const dynamic = "force-dynamic";
@@ -463,19 +464,22 @@ function resolvePerson(row: AnyRow, personMap: Map<string, AnyRow>) {
 }
 
 function getUserId(row: AnyRow) {
-  return (
-    getId(row, [
-      "user_id",
-      "profile_id",
-      "student_id",
-      "participant_id",
-      "guru_id",
-      "ambassador_id",
-      "pet_parent_id",
-      "customer_id",
-      "owner_id",
-    ]) || getEmail(row).toLowerCase()
-  );
+  const directId = getId(row, [
+    "user_id",
+    "profile_id",
+    "student_id",
+    "participant_id",
+    "guru_id",
+    "ambassador_id",
+    "pet_parent_id",
+    "customer_id",
+    "owner_id",
+  ]);
+
+  if (directId) return directId;
+
+  const email = getEmail(row).toLowerCase();
+  return email && email !== "—" ? email : "";
 }
 
 function getTrainingStepId(row: AnyRow) {
@@ -488,6 +492,39 @@ function getMaterialId(row: AnyRow) {
 
 function getSource(row: AnyRow) {
   return getText(row, ["__source_table"], "unknown");
+}
+
+
+function getAdminPersonKeys(person: AdminPerson) {
+  return Array.from(
+    new Set(
+      [
+        person.userId,
+        person.profileId,
+        person.guruId,
+        person.ambassadorId,
+        person.email.toLowerCase(),
+      ].filter(Boolean),
+    ),
+  );
+}
+
+function buildAdminPersonMap(people: AdminPerson[]) {
+  const map = new Map<string, AdminPerson>();
+
+  for (const person of people) {
+    for (const key of getAdminPersonKeys(person)) {
+      map.set(key, person);
+    }
+  }
+
+  return map;
+}
+
+function getProgressSourceUserIds(rows: AnyRow[]) {
+  return Array.from(
+    new Set(rows.map((row) => getUserId(row)).filter(Boolean)),
+  );
 }
 
 function createRequirement(academyType: string): AcademyRequirement {
@@ -754,7 +791,7 @@ function getReadableStatus(progress: number, bucket: ProgressBucket) {
 
 function normalizeRecord(
   bucket: ProgressBucket,
-  personMap: Map<string, AnyRow>,
+  personMap: Map<string, AdminPerson>,
   requirements: Map<string, AcademyRequirement>,
 ): AcademyProgressRecord {
   const person =
@@ -762,17 +799,10 @@ function normalizeRecord(
 
   const progress = calculateProgress(bucket, requirements.get(bucket.academyType));
 
-  const name = person ? getDisplayName(person) : "Unknown User";
-  const email = person ? getEmail(person) : bucket.userId;
-  const avatarUrl = person ? getAvatarUrl(person) : "";
-  const role = person
-    ? getRole(
-        {
-          role: getText(person, ["role", "account_type", "type", "segment"], ""),
-        },
-        bucket.academyType,
-      )
-    : getRole({}, bucket.academyType);
+  const name = person?.displayName || "Unknown User";
+  const email = person?.email || bucket.userId;
+  const avatarUrl = person?.avatarUrl || "";
+  const role = person?.roleLabel || getRole({}, bucket.academyType);
 
   return {
     key: getBucketKey(bucket.userId, bucket.academyType),
@@ -792,10 +822,6 @@ function normalizeRecord(
 
 async function getUniversityProgressData() {
   const [
-    profilesResult,
-    gurusResult,
-    ambassadorsResult,
-    petParentsResult,
     academyAssignmentsResult,
     universityAssignmentsResult,
     academyStepProgressResult,
@@ -804,22 +830,6 @@ async function getUniversityProgressData() {
     ambassadorTrainingStepsResult,
     academyCertificationsResult,
   ] = await Promise.all([
-    safeAdminQuery(
-      supabaseAdmin.from("profiles").select("*").limit(5000),
-      "profiles",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("gurus").select("*").limit(5000),
-      "gurus",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("ambassadors").select("*").limit(5000),
-      "ambassadors",
-    ),
-    safeAdminQuery(
-      supabaseAdmin.from("pet_parents").select("*").limit(5000),
-      "pet_parents",
-    ),
     safeAdminQuery(
       supabaseAdmin.from("academy_assignments").select("*").limit(5000),
       "academy_assignments",
@@ -850,21 +860,6 @@ async function getUniversityProgressData() {
     ),
   ]);
 
-  const personRows = [
-    ...(((profilesResult.data || []) as AnyRow[]).map((row) =>
-      withSourceTable(row, "profiles"),
-    )),
-    ...(((gurusResult.data || []) as AnyRow[]).map((row) =>
-      withSourceTable(row, "gurus"),
-    )),
-    ...(((ambassadorsResult.data || []) as AnyRow[]).map((row) =>
-      withSourceTable(row, "ambassadors"),
-    )),
-    ...(((petParentsResult.data || []) as AnyRow[]).map((row) =>
-      withSourceTable(row, "pet_parents"),
-    )),
-  ];
-
   const academyAssignments = ((academyAssignmentsResult.data || []) as AnyRow[]).map(
     (row) => withSourceTable(row, "academy_assignments"),
   );
@@ -887,7 +882,19 @@ async function getUniversityProgressData() {
     (academyCertificationsResult.data || []) as AnyRow[]
   ).map((row) => withSourceTable(row, "academy_certifications"));
 
-  const personMap = buildPersonMap(personRows);
+  const progressSourceRows = [
+    ...academyAssignments,
+    ...universityAssignments,
+    ...academyStepProgress,
+    ...academyMaterialProgress,
+    ...academyCertifications,
+  ];
+  const progressUserIds = getProgressSourceUserIds(progressSourceRows);
+  const people = await getAdminPeopleDirectory({
+    limit: 5000,
+    includeUserIds: progressUserIds,
+  });
+  const personMap = buildAdminPersonMap(people);
   const requirements = buildAcademyRequirements(
     ambassadorTrainingSteps,
     academyStepMaterials,
