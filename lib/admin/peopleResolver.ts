@@ -8,9 +8,10 @@ export type AdminPersonRole =
   | "unknown";
 
 export type AdminPersonSource =
-  | "gurus"
   | "profiles"
+  | "gurus"
   | "ambassadors"
+  | "pet_parents"
   | "auth.users"
   | "merged";
 
@@ -19,6 +20,7 @@ export type AdminPerson = {
   profileId: string;
   guruId: string;
   ambassadorId: string;
+  petParentId: string;
   email: string;
   displayName: string;
   firstName: string;
@@ -40,9 +42,8 @@ type SourceRow = Record<string, unknown>;
 
 type AuthUserRow = {
   id: string;
-  email?: string;
+  email?: string | null;
   created_at?: string | null;
-  last_sign_in_at?: string | null;
   user_metadata?: Record<string, unknown> | null;
   app_metadata?: Record<string, unknown> | null;
 };
@@ -51,12 +52,12 @@ export function adminString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function lower(value: unknown) {
-  return adminString(value).toLowerCase();
-}
-
 function firstNonEmpty(...values: unknown[]) {
   return values.map(adminString).find(Boolean) || "";
+}
+
+function lower(value: unknown) {
+  return adminString(value).toLowerCase();
 }
 
 function normalizeRole(value: unknown): AdminPersonRole {
@@ -70,7 +71,7 @@ function normalizeRole(value: unknown): AdminPersonRole {
     return "ambassador";
   }
 
-  if (["pet_parent", "customer", "client", "parent"].includes(role)) {
+  if (["pet_parent", "customer", "client", "parent", "petparent"].includes(role)) {
     return "pet_parent";
   }
 
@@ -96,10 +97,10 @@ function roleLabel(role: AdminPersonRole) {
   }
 }
 
-function cleanEmailNameFallback(email: string) {
-  const local = adminString(email).split("@")[0] || "";
+function cleanNameFromEmail(email: string) {
+  const localPart = adminString(email).split("@")[0] || "";
 
-  return local
+  return localPart
     .replace(/[._-]+/g, " ")
     .replace(/\d+/g, " ")
     .replace(/\s+/g, " ")
@@ -110,36 +111,48 @@ function cleanEmailNameFallback(email: string) {
     .join(" ");
 }
 
-function initialsFromName(name: string, email: string) {
-  const candidate = adminString(name) || cleanEmailNameFallback(email) || "SG";
+function isIdLike(value: string) {
+  const normalized = adminString(value);
 
-  return candidate
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("") || "SG";
-}
-
-function getMetadataString(
-  source: Record<string, unknown> | null | undefined,
-  key: string,
-) {
-  return adminString(source?.[key]);
-}
-
-function getAuthRole(user: AuthUserRow) {
-  return firstNonEmpty(
-    getMetadataString(user.user_metadata, "role"),
-    getMetadataString(user.user_metadata, "user_role"),
-    getMetadataString(user.user_metadata, "account_role"),
-    getMetadataString(user.app_metadata, "role"),
-    getMetadataString(user.app_metadata, "user_role"),
-    getMetadataString(user.app_metadata, "account_role"),
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized) ||
+    /^[0-9a-f]{24,}$/i.test(normalized)
   );
 }
 
-function getPersonIdentityKeys(person: AdminPerson) {
+function getInitials(name: string, email: string) {
+  const source = adminString(name) || cleanNameFromEmail(email) || "SitGuru";
+
+  return (
+    source
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("") || "SG"
+  );
+}
+
+function metadataValue(
+  metadata: Record<string, unknown> | null | undefined,
+  key: string,
+) {
+  return adminString(metadata?.[key]);
+}
+
+function authMetadataValue(user: AuthUserRow, keys: string[]) {
+  for (const key of keys) {
+    const userValue = metadataValue(user.user_metadata, key);
+    if (userValue) return userValue;
+
+    const appValue = metadataValue(user.app_metadata, key);
+    if (appValue) return appValue;
+  }
+
+  return "";
+}
+
+function getKeys(person: AdminPerson) {
   return Array.from(
     new Set(
       [
@@ -147,6 +160,7 @@ function getPersonIdentityKeys(person: AdminPerson) {
         person.profileId,
         person.guruId,
         person.ambassadorId,
+        person.petParentId,
         person.email.toLowerCase(),
       ].filter(Boolean),
     ),
@@ -165,15 +179,37 @@ function chooseRole(current: AdminPersonRole, incoming: AdminPersonRole) {
   return rank[incoming] > rank[current] ? incoming : current;
 }
 
+function finalizePerson(person: AdminPerson): AdminPerson {
+  const fallbackName = cleanNameFromEmail(person.email);
+  const candidateName = firstNonEmpty(
+    person.displayName,
+    `${person.firstName} ${person.lastName}`.trim(),
+    fallbackName,
+    person.email,
+  );
+  const displayName = candidateName && !isIdLike(candidateName) ? candidateName : "Needs Cleanup";
+  const isUnknown = displayName === "Needs Cleanup";
+
+  return {
+    ...person,
+    displayName,
+    roleLabel: roleLabel(person.role),
+    initials: getInitials(displayName, person.email),
+    isUnknown,
+    isIncomplete: isUnknown || !person.email,
+  };
+}
+
 function mergePeople(existing: AdminPerson, incoming: AdminPerson): AdminPerson {
   const role = chooseRole(existing.role, incoming.role);
   const source = existing.source === incoming.source ? existing.source : "merged";
 
-  const merged: AdminPerson = {
+  return finalizePerson({
     userId: firstNonEmpty(existing.userId, incoming.userId),
     profileId: firstNonEmpty(existing.profileId, incoming.profileId),
     guruId: firstNonEmpty(existing.guruId, incoming.guruId),
     ambassadorId: firstNonEmpty(existing.ambassadorId, incoming.ambassadorId),
+    petParentId: firstNonEmpty(existing.petParentId, incoming.petParentId),
     email: firstNonEmpty(existing.email, incoming.email),
     displayName: firstNonEmpty(existing.displayName, incoming.displayName),
     firstName: firstNonEmpty(existing.firstName, incoming.firstName),
@@ -185,36 +221,18 @@ function mergePeople(existing: AdminPerson, incoming: AdminPerson): AdminPerson 
     state: firstNonEmpty(existing.state, incoming.state),
     joinedAt: firstNonEmpty(existing.joinedAt, incoming.joinedAt),
     source,
-    sourceLabel: source === "merged" ? "Merged" : incoming.sourceLabel || existing.sourceLabel,
+    sourceLabel: source === "merged" ? "Merged" : firstNonEmpty(incoming.sourceLabel, existing.sourceLabel),
     isIncomplete: false,
     isUnknown: false,
     initials: "",
-  };
-
-  const fallbackName = cleanEmailNameFallback(merged.email);
-  merged.displayName = firstNonEmpty(
-    merged.displayName,
-    `${merged.firstName} ${merged.lastName}`.trim(),
-    fallbackName,
-    merged.email,
-    merged.userId,
-    "Unknown User",
-  );
-  merged.initials = initialsFromName(merged.displayName, merged.email);
-  merged.isUnknown =
-    !merged.email &&
-    !merged.firstName &&
-    !merged.lastName &&
-    (!merged.displayName || merged.displayName === merged.userId || merged.displayName === "Unknown User");
-  merged.isIncomplete = !merged.email || merged.isUnknown;
-
-  return merged;
+  });
 }
 
-function addPersonToMap(map: Map<string, AdminPerson>, person: AdminPerson) {
-  const keys = getPersonIdentityKeys(person);
-  const primaryKey = keys[0];
+function addPerson(map: Map<string, AdminPerson>, person: AdminPerson | null) {
+  if (!person) return;
 
+  const keys = getKeys(person);
+  const primaryKey = keys[0];
   if (!primaryKey) return;
 
   const matchedKey = keys.find((key) => map.has(key));
@@ -223,11 +241,7 @@ function addPersonToMap(map: Map<string, AdminPerson>, person: AdminPerson) {
     const existing = map.get(matchedKey) || person;
     const merged = mergePeople(existing, person);
     const mergedKeys = Array.from(
-      new Set([
-        ...getPersonIdentityKeys(existing),
-        ...keys,
-        ...getPersonIdentityKeys(merged),
-      ]),
+      new Set([...getKeys(existing), ...keys, ...getKeys(merged)]),
     );
 
     for (const key of mergedKeys) {
@@ -242,189 +256,154 @@ function addPersonToMap(map: Map<string, AdminPerson>, person: AdminPerson) {
   }
 }
 
-function buildPersonFromProfile(row: SourceRow): AdminPerson | null {
+function basePerson(source: AdminPersonSource, sourceLabel: string): AdminPerson {
+  return {
+    userId: "",
+    profileId: "",
+    guruId: "",
+    ambassadorId: "",
+    petParentId: "",
+    email: "",
+    displayName: "",
+    firstName: "",
+    lastName: "",
+    role: "unknown",
+    roleLabel: "Unknown",
+    avatarUrl: "",
+    city: "",
+    state: "",
+    joinedAt: "",
+    source,
+    sourceLabel,
+    isIncomplete: false,
+    isUnknown: false,
+    initials: "SG",
+  };
+}
+
+function buildProfilePerson(row: SourceRow): AdminPerson | null {
   const profileId = firstNonEmpty(row.id, row.user_id, row.profile_id);
   if (!profileId) return null;
 
   const firstName = adminString(row.first_name);
   const lastName = adminString(row.last_name);
-  const email = adminString(row.email);
-  const role = normalizeRole(firstNonEmpty(row.role, row.account_type));
-  const displayName = firstNonEmpty(
-    row.full_name,
-    row.display_name,
-    row.name,
-    `${firstName} ${lastName}`.trim(),
-    cleanEmailNameFallback(email),
-    email,
-    profileId,
-  );
+  const role = normalizeRole(firstNonEmpty(row.role, row.account_type, row.type));
 
-  const person: AdminPerson = {
+  return finalizePerson({
+    ...basePerson("profiles", "Profile"),
     userId: profileId,
     profileId,
-    guruId: "",
-    ambassadorId: "",
-    email,
-    displayName,
+    email: adminString(row.email),
+    displayName: firstNonEmpty(row.full_name, row.display_name, row.name),
     firstName,
     lastName,
     role,
-    roleLabel: roleLabel(role),
-    avatarUrl: firstNonEmpty(row.profile_photo_url, row.photo_url, row.avatar_url, row.image_url),
+    avatarUrl: firstNonEmpty(row.profile_photo_url, row.photo_url, row.avatar_url, row.image_url, row.picture, row.picture_url),
     city: firstNonEmpty(row.city, row.service_city),
     state: firstNonEmpty(row.state, row.service_state, row.state_code),
     joinedAt: adminString(row.created_at),
-    source: "profiles",
-    sourceLabel: "Profile",
-    isIncomplete: false,
-    isUnknown: false,
-    initials: "",
-  };
-
-  return mergePeople(person, person);
+  });
 }
 
-function buildPersonFromGuru(row: SourceRow): AdminPerson | null {
+function buildGuruPerson(row: SourceRow): AdminPerson | null {
   const guruId = adminString(row.id);
   const userId = firstNonEmpty(row.user_id, row.profile_id, guruId);
   if (!userId && !guruId) return null;
 
   const firstName = adminString(row.first_name);
   const lastName = adminString(row.last_name);
-  const email = adminString(row.email);
-  const displayName = firstNonEmpty(
-    row.display_name,
-    row.full_name,
-    row.name,
-    `${firstName} ${lastName}`.trim(),
-    cleanEmailNameFallback(email),
-    email,
-    userId,
-  );
 
-  const person: AdminPerson = {
+  return finalizePerson({
+    ...basePerson("gurus", "Guru"),
     userId,
     profileId: firstNonEmpty(row.profile_id, row.user_id),
     guruId,
-    ambassadorId: "",
-    email,
-    displayName,
+    email: adminString(row.email),
+    displayName: firstNonEmpty(row.display_name, row.full_name, row.name),
     firstName,
     lastName,
     role: "guru",
-    roleLabel: "Guru",
-    avatarUrl: firstNonEmpty(row.profile_photo_url, row.photo_url, row.avatar_url, row.image_url, row.headshot_url),
+    avatarUrl: firstNonEmpty(row.profile_photo_url, row.photo_url, row.avatar_url, row.image_url, row.headshot_url, row.picture, row.picture_url),
     city: firstNonEmpty(row.city, row.service_city),
     state: firstNonEmpty(row.state, row.service_state, row.state_code),
     joinedAt: adminString(row.created_at),
-    source: "gurus",
-    sourceLabel: "Guru",
-    isIncomplete: false,
-    isUnknown: false,
-    initials: "",
-  };
-
-  return mergePeople(person, person);
+  });
 }
 
-function buildPersonFromAmbassador(row: SourceRow): AdminPerson | null {
+function buildAmbassadorPerson(row: SourceRow): AdminPerson | null {
   const ambassadorId = adminString(row.id);
   const userId = firstNonEmpty(row.user_id, row.profile_id, ambassadorId);
   if (!userId && !ambassadorId) return null;
 
   const firstName = adminString(row.first_name);
   const lastName = adminString(row.last_name);
-  const email = adminString(row.email);
-  const displayName = firstNonEmpty(
-    row.display_name,
-    row.full_name,
-    row.name,
-    `${firstName} ${lastName}`.trim(),
-    cleanEmailNameFallback(email),
-    email,
-    userId,
-  );
 
-  const person: AdminPerson = {
+  return finalizePerson({
+    ...basePerson("ambassadors", "Ambassador"),
     userId,
     profileId: firstNonEmpty(row.profile_id, row.user_id),
-    guruId: "",
     ambassadorId,
-    email,
-    displayName,
+    email: adminString(row.email),
+    displayName: firstNonEmpty(row.display_name, row.full_name, row.name),
     firstName,
     lastName,
     role: "ambassador",
-    roleLabel: "Ambassador",
-    avatarUrl: firstNonEmpty(row.profile_photo_url, row.photo_url, row.avatar_url, row.image_url),
+    avatarUrl: firstNonEmpty(row.profile_photo_url, row.photo_url, row.avatar_url, row.image_url, row.picture, row.picture_url),
     city: firstNonEmpty(row.city, row.service_city),
     state: firstNonEmpty(row.state, row.service_state, row.state_code),
     joinedAt: adminString(row.created_at),
-    source: "ambassadors",
-    sourceLabel: "Ambassador",
-    isIncomplete: false,
-    isUnknown: false,
-    initials: "",
-  };
-
-  return mergePeople(person, person);
+  });
 }
 
-function buildPersonFromAuthUser(user: AuthUserRow): AdminPerson | null {
+function buildPetParentPerson(row: SourceRow): AdminPerson | null {
+  const petParentId = adminString(row.id);
+  const userId = firstNonEmpty(row.user_id, row.profile_id, petParentId);
+  if (!userId && !petParentId) return null;
+
+  const firstName = adminString(row.first_name);
+  const lastName = adminString(row.last_name);
+
+  return finalizePerson({
+    ...basePerson("pet_parents", "Pet Parent"),
+    userId,
+    profileId: firstNonEmpty(row.profile_id, row.user_id),
+    petParentId,
+    email: adminString(row.email),
+    displayName: firstNonEmpty(row.display_name, row.full_name, row.name, row.parent_name, row.customer_name),
+    firstName,
+    lastName,
+    role: "pet_parent",
+    avatarUrl: firstNonEmpty(row.profile_photo_url, row.photo_url, row.avatar_url, row.image_url, row.picture, row.picture_url),
+    city: firstNonEmpty(row.city, row.service_city),
+    state: firstNonEmpty(row.state, row.service_state, row.state_code),
+    joinedAt: adminString(row.created_at),
+  });
+}
+
+function buildAuthPerson(user: AuthUserRow): AdminPerson | null {
   if (!user.id) return null;
 
-  const firstName = firstNonEmpty(
-    getMetadataString(user.user_metadata, "first_name"),
-    getMetadataString(user.app_metadata, "first_name"),
-  );
-  const lastName = firstNonEmpty(
-    getMetadataString(user.user_metadata, "last_name"),
-    getMetadataString(user.app_metadata, "last_name"),
-  );
-  const email = adminString(user.email);
-  const role = normalizeRole(getAuthRole(user));
-  const displayName = firstNonEmpty(
-    getMetadataString(user.user_metadata, "full_name"),
-    getMetadataString(user.user_metadata, "display_name"),
-    getMetadataString(user.user_metadata, "name"),
-    getMetadataString(user.app_metadata, "full_name"),
-    getMetadataString(user.app_metadata, "display_name"),
-    getMetadataString(user.app_metadata, "name"),
-    `${firstName} ${lastName}`.trim(),
-    cleanEmailNameFallback(email),
-    email,
-    user.id,
-  );
+  const firstName = authMetadataValue(user, ["first_name", "firstName"]);
+  const lastName = authMetadataValue(user, ["last_name", "lastName"]);
+  const role = normalizeRole(authMetadataValue(user, ["role", "user_role", "account_type"]));
 
-  const person: AdminPerson = {
+  return finalizePerson({
+    ...basePerson("auth.users", "Auth User"),
     userId: user.id,
     profileId: user.id,
-    guruId: "",
-    ambassadorId: "",
-    email,
-    displayName,
+    email: adminString(user.email),
+    displayName: firstNonEmpty(
+      authMetadataValue(user, ["full_name", "display_name", "name"]),
+      `${firstName} ${lastName}`.trim(),
+    ),
     firstName,
     lastName,
     role,
-    roleLabel: roleLabel(role),
     avatarUrl: firstNonEmpty(
-      getMetadataString(user.user_metadata, "picture"),
-      getMetadataString(user.user_metadata, "avatar_url"),
-      getMetadataString(user.app_metadata, "picture"),
-      getMetadataString(user.app_metadata, "avatar_url"),
+      authMetadataValue(user, ["avatar_url", "picture", "profile_photo_url", "photo_url"]),
     ),
-    city: "",
-    state: "",
     joinedAt: adminString(user.created_at),
-    source: "auth.users",
-    sourceLabel: "Auth User",
-    isIncomplete: false,
-    isUnknown: false,
-    initials: "",
-  };
-
-  return mergePeople(person, person);
+  });
 }
 
 async function safeRows<T>(
@@ -479,11 +458,12 @@ async function getAuthUsers() {
 function personMatchesQuery(person: AdminPerson, query: string) {
   if (!query) return true;
 
-  const searchable = [
+  const haystack = [
     person.userId,
     person.profileId,
     person.guruId,
     person.ambassadorId,
+    person.petParentId,
     person.displayName,
     person.email,
     person.roleLabel,
@@ -494,82 +474,80 @@ function personMatchesQuery(person: AdminPerson, query: string) {
     .join(" ")
     .toLowerCase();
 
-  return searchable.includes(query.toLowerCase());
+  return haystack.includes(query.toLowerCase());
 }
 
 function sortPeople(people: AdminPerson[]) {
-  return [...people].sort((left, right) => {
-    const leftIncomplete = left.isIncomplete ? 1 : 0;
-    const rightIncomplete = right.isIncomplete ? 1 : 0;
+  return [...people].sort((a, b) => {
+    const aCleanup = a.isIncomplete ? 1 : 0;
+    const bCleanup = b.isIncomplete ? 1 : 0;
 
     return (
-      leftIncomplete - rightIncomplete ||
-      left.displayName.localeCompare(right.displayName, undefined, {
+      aCleanup - bCleanup ||
+      a.displayName.localeCompare(b.displayName, undefined, {
         sensitivity: "base",
       })
     );
   });
 }
 
+export function buildAdminPersonLookup(people: AdminPerson[]) {
+  const map = new Map<string, AdminPerson>();
+
+  for (const person of people) {
+    for (const key of getKeys(person)) {
+      map.set(key, person);
+      map.set(key.toLowerCase(), person);
+    }
+  }
+
+  return map;
+}
+
 export async function getAdminPeopleDirectory({
   query = "",
-  limit = 75,
+  limit = 5000,
   includeUserIds = [],
 }: {
   query?: string;
   limit?: number;
   includeUserIds?: string[];
 } = {}) {
-  const [profiles, gurus, ambassadors, authUsers] = await Promise.all([
-    safeRows<SourceRow>(
-      supabaseAdmin.from("profiles").select("*").limit(2000),
-      "profiles",
-    ),
-    safeRows<SourceRow>(
-      supabaseAdmin.from("gurus").select("*").limit(2000),
-      "gurus",
-    ),
-    safeRows<SourceRow>(
-      supabaseAdmin.from("ambassadors").select("*").limit(2000),
-      "ambassadors",
-    ),
+  const [profiles, gurus, ambassadors, petParents, authUsers] = await Promise.all([
+    safeRows<SourceRow>(supabaseAdmin.from("profiles").select("*").limit(5000), "profiles"),
+    safeRows<SourceRow>(supabaseAdmin.from("gurus").select("*").limit(5000), "gurus"),
+    safeRows<SourceRow>(supabaseAdmin.from("ambassadors").select("*").limit(5000), "ambassadors"),
+    safeRows<SourceRow>(supabaseAdmin.from("pet_parents").select("*").limit(5000), "pet_parents"),
     getAuthUsers(),
   ]);
 
   const map = new Map<string, AdminPerson>();
 
-  profiles.forEach((row) => {
-    const person = buildPersonFromProfile(row);
-    if (person) addPersonToMap(map, person);
-  });
+  profiles.forEach((row) => addPerson(map, buildProfilePerson(row)));
+  gurus.forEach((row) => addPerson(map, buildGuruPerson(row)));
+  ambassadors.forEach((row) => addPerson(map, buildAmbassadorPerson(row)));
+  petParents.forEach((row) => addPerson(map, buildPetParentPerson(row)));
+  authUsers.forEach((user) => addPerson(map, buildAuthPerson(user)));
 
-  gurus.forEach((row) => {
-    const person = buildPersonFromGuru(row);
-    if (person) addPersonToMap(map, person);
-  });
-
-  ambassadors.forEach((row) => {
-    const person = buildPersonFromAmbassador(row);
-    if (person) addPersonToMap(map, person);
-  });
-
-  authUsers.forEach((user) => {
-    const person = buildPersonFromAuthUser(user);
-    if (person) addPersonToMap(map, person);
-  });
-
-  const seenObjects = new Set<AdminPerson>();
+  const seen = new Set<AdminPerson>();
   const people = Array.from(map.values()).filter((person) => {
-    if (seenObjects.has(person)) return false;
-    seenObjects.add(person);
+    if (seen.has(person)) return false;
+    seen.add(person);
     return true;
   });
 
-  const includeSet = new Set(includeUserIds.map((id) => adminString(id)).filter(Boolean));
-  const normalizedQuery = adminString(query);
+  const includeSet = new Set(includeUserIds.map(adminString).filter(Boolean));
+  const search = adminString(query);
 
   const filtered = people.filter(
-    (person) => includeSet.has(person.userId) || personMatchesQuery(person, normalizedQuery),
+    (person) =>
+      includeSet.has(person.userId) ||
+      includeSet.has(person.profileId) ||
+      includeSet.has(person.guruId) ||
+      includeSet.has(person.ambassadorId) ||
+      includeSet.has(person.petParentId) ||
+      includeSet.has(person.email.toLowerCase()) ||
+      personMatchesQuery(person, search),
   );
 
   return sortPeople(filtered).slice(0, Math.max(limit, includeSet.size));
