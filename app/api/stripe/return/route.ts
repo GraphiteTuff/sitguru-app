@@ -43,18 +43,22 @@ function getStripeStatusSearchParams(params: {
   const searchParams = new URLSearchParams();
 
   searchParams.set("stripe", params.connected ? "connected" : "needs_attention");
+
   searchParams.set(
     "stripe_details_submitted",
     params.detailsSubmitted ? "true" : "false",
   );
+
   searchParams.set(
     "stripe_charges_enabled",
     params.chargesEnabled ? "true" : "false",
   );
+
   searchParams.set(
     "stripe_payouts_enabled",
     params.payoutsEnabled ? "true" : "false",
   );
+
   searchParams.set("stripe_requirements_due", String(params.currentlyDueCount));
 
   if (params.disabledReason) {
@@ -199,13 +203,6 @@ export async function GET(req: NextRequest) {
     const pastDue = account.requirements?.past_due ?? [];
     const disabledReason = account.requirements?.disabled_reason ?? null;
 
-    /*
-     * Stripe can show a success/Link-complete screen before charges_enabled and
-     * payouts_enabled are both true. For SitGuru onboarding Step 6, the Guru has
-     * completed the payout connection step once Stripe has accepted/submitted the
-     * connected-account details. If Stripe later requires more information, the
-     * stored requirement fields and query params still show that clearly.
-     */
     const connected = detailsSubmitted || chargesEnabled || payoutsEnabled;
 
     await updateGuruStripeReturnStatus({

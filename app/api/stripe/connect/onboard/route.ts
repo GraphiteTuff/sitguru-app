@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
 
   const returnUrl = buildRedirectUrl(
     baseUrl,
-    "/api/stripe/connect/return",
+    "/api/stripe/return",
     { role: "guru" },
   );
 
