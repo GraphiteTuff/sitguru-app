@@ -340,15 +340,22 @@ function getBookingService(booking: BookingRow) {
 
 function getBookingTotal(booking: BookingRow) {
   return (
-    asNumber(booking.total_amount) ||
-    asNumber(booking.amount_total) ||
     asNumber(booking.customer_total_amount) ||
+    asNumber(booking.total_customer_paid) ||
+    asNumber(booking.amount_total) ||
+    asNumber(booking.total) ||
+    asNumber(booking.total_amount) ||
     asNumber(booking.subtotal_amount)
   );
 }
 
 function getBookingPlatformFee(booking: BookingRow) {
-  return asNumber(booking.platform_fee) || asNumber(booking.marketplace_fee);
+  return (
+    asNumber(booking.marketplace_fee_amount) ||
+    asNumber(booking.sitguru_fee_amount) ||
+    asNumber(booking.platform_fee) ||
+    asNumber(booking.marketplace_fee)
+  );
 }
 
 function getBookingGuruPayout(booking: BookingRow) {
