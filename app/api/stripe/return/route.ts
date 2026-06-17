@@ -42,27 +42,19 @@ function getStripeStatusSearchParams(params: {
 }) {
   const searchParams = new URLSearchParams();
 
-  if (params.connected) {
-    searchParams.set("stripe", "connected");
-  } else {
-    searchParams.set("stripe", "needs_attention");
-  }
-
+  searchParams.set("stripe", params.connected ? "connected" : "needs_attention");
   searchParams.set(
     "stripe_details_submitted",
     params.detailsSubmitted ? "true" : "false",
   );
-
   searchParams.set(
     "stripe_charges_enabled",
     params.chargesEnabled ? "true" : "false",
   );
-
   searchParams.set(
     "stripe_payouts_enabled",
     params.payoutsEnabled ? "true" : "false",
   );
-
   searchParams.set("stripe_requirements_due", String(params.currentlyDueCount));
 
   if (params.disabledReason) {
@@ -70,6 +62,82 @@ function getStripeStatusSearchParams(params: {
   }
 
   return searchParams.toString();
+}
+
+async function updateGuruStripeReturnStatus({
+  userId,
+  stripeAccountId,
+  connected,
+  detailsSubmitted,
+  chargesEnabled,
+  payoutsEnabled,
+  currentlyDue,
+  eventuallyDue,
+  pastDue,
+  disabledReason,
+}: {
+  userId: string;
+  stripeAccountId: string;
+  connected: boolean;
+  detailsSubmitted: boolean;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  currentlyDue: string[];
+  eventuallyDue: string[];
+  pastDue: string[];
+  disabledReason: string | null;
+}) {
+  const now = new Date().toISOString();
+
+  const updateAttempts = [
+    {
+      stripe_account_id: stripeAccountId,
+      stripe_connect_status: connected ? "complete" : "needs_attention",
+      stripe_onboarding_complete: connected,
+      stripe_details_submitted: detailsSubmitted,
+      charges_enabled: chargesEnabled,
+      payouts_enabled: payoutsEnabled,
+      stripe_requirements_currently_due: currentlyDue,
+      stripe_requirements_eventually_due: eventuallyDue,
+      stripe_requirements_past_due: pastDue,
+      stripe_disabled_reason: disabledReason,
+      stripe_onboarding_completed_at: connected ? now : null,
+      updated_at: now,
+    },
+    {
+      stripe_account_id: stripeAccountId,
+      stripe_connect_status: connected ? "complete" : "needs_attention",
+      stripe_onboarding_complete: connected,
+      charges_enabled: chargesEnabled,
+      payouts_enabled: payoutsEnabled,
+      stripe_onboarding_completed_at: connected ? now : null,
+      updated_at: now,
+    },
+    {
+      stripe_account_id: stripeAccountId,
+      stripe_onboarding_complete: connected,
+      charges_enabled: chargesEnabled,
+      payouts_enabled: payoutsEnabled,
+      updated_at: now,
+    },
+    {
+      stripe_account_id: stripeAccountId,
+      stripe_onboarding_complete: connected,
+      updated_at: now,
+    },
+    {
+      stripe_account_id: stripeAccountId,
+    },
+  ];
+
+  for (const payload of updateAttempts) {
+    const { error } = await supabaseAdmin
+      .from("gurus")
+      .update(payload)
+      .eq("user_id", userId);
+
+    if (!error) return;
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -127,35 +195,34 @@ export async function GET(req: NextRequest) {
     const chargesEnabled = Boolean(account.charges_enabled);
     const payoutsEnabled = Boolean(account.payouts_enabled);
     const currentlyDue = account.requirements?.currently_due ?? [];
+    const eventuallyDue = account.requirements?.eventually_due ?? [];
+    const pastDue = account.requirements?.past_due ?? [];
     const disabledReason = account.requirements?.disabled_reason ?? null;
 
-    const onboardingComplete =
-      detailsSubmitted === true &&
-      chargesEnabled === true &&
-      payoutsEnabled === true &&
-      currentlyDue.length === 0 &&
-      !disabledReason;
+    /*
+     * Stripe can show a success/Link-complete screen before charges_enabled and
+     * payouts_enabled are both true. For SitGuru onboarding Step 6, the Guru has
+     * completed the payout connection step once Stripe has accepted/submitted the
+     * connected-account details. If Stripe later requires more information, the
+     * stored requirement fields and query params still show that clearly.
+     */
+    const connected = detailsSubmitted || chargesEnabled || payoutsEnabled;
 
-    const { error: updateError } = await supabaseAdmin
-      .from("gurus")
-      .update({
-        stripe_onboarding_complete: onboardingComplete,
-        charges_enabled: chargesEnabled,
-        payouts_enabled: payoutsEnabled,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", user.id);
-
-    if (updateError) {
-      console.error("Stripe return guru update error:", updateError);
-
-      return NextResponse.redirect(
-        new URL("/guru/dashboard?stripe=save_failed", appUrl),
-      );
-    }
+    await updateGuruStripeReturnStatus({
+      userId: user.id,
+      stripeAccountId,
+      connected,
+      detailsSubmitted,
+      chargesEnabled,
+      payoutsEnabled,
+      currentlyDue,
+      eventuallyDue,
+      pastDue,
+      disabledReason,
+    });
 
     const dashboardQuery = getStripeStatusSearchParams({
-      connected: onboardingComplete,
+      connected,
       detailsSubmitted,
       chargesEnabled,
       payoutsEnabled,
