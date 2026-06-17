@@ -16,7 +16,11 @@ function getBaseUrl(request: NextRequest) {
   return (configuredUrl || fallbackUrl).replace(/\/+$/, "");
 }
 
-function buildRedirectUrl(baseUrl: string, path: string, params?: Record<string, string>) {
+function buildRedirectUrl(
+  baseUrl: string,
+  path: string,
+  params?: Record<string, string>,
+) {
   const url = new URL(path, baseUrl);
 
   if (params) {
@@ -96,7 +100,7 @@ export async function GET(request: NextRequest) {
 
   if (role !== "guru") {
     return NextResponse.redirect(
-      buildRedirectUrl(baseUrl, "/guru/dashboard/earnings", {
+      buildRedirectUrl(baseUrl, "/guru/dashboard", {
         stripe_error: "invalid_role",
       }),
     );
@@ -106,7 +110,7 @@ export async function GET(request: NextRequest) {
 
   if (!stripeSecretKey) {
     return NextResponse.redirect(
-      buildRedirectUrl(baseUrl, "/guru/dashboard/earnings", {
+      buildRedirectUrl(baseUrl, "/guru/dashboard", {
         stripe_error: "missing_stripe_secret",
       }),
     );
@@ -155,6 +159,7 @@ export async function GET(request: NextRequest) {
     });
 
     stripeAccountId = account.id;
+
     await updateGuruStripeAccount({
       userId: user.id,
       stripeAccountId,
@@ -167,9 +172,11 @@ export async function GET(request: NextRequest) {
     { role: "guru" },
   );
 
-  const returnUrl = buildRedirectUrl(baseUrl, "/guru/dashboard/earnings", {
-    stripe: "returned",
-  });
+  const returnUrl = buildRedirectUrl(
+    baseUrl,
+    "/api/stripe/connect/return",
+    { role: "guru" },
+  );
 
   const accountLink = await stripe.accountLinks.create({
     account: stripeAccountId,
