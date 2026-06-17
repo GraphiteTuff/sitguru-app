@@ -703,6 +703,7 @@ export async function POST(req: NextRequest) {
     }
 
     const guruId = getBodyString(body, ["guru_id", "guruId"]);
+    const guruSlug = getBodyString(body, ["guru_slug", "guruSlug", "slug"]);
     const petName = getBodyString(body, ["pet_name", "petName"]);
     const dateSelectionMode = normalizeDateSelectionMode(
       getBodyString(
@@ -783,8 +784,8 @@ export async function POST(req: NextRequest) {
         "petImageUrl",
       ]) || getPetPhotoUrl(matchedPet);
 
-    if (!guruId) {
-      return jsonError("Guru ID is required.", 400, {
+    if (!guruId && !guruSlug) {
+      return jsonError("Guru ID or Guru slug is required.", 400, {
         receivedBodyKeys: Object.keys(body),
       });
     }
@@ -817,22 +818,71 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { data: guru, error: guruError } = await supabaseAdmin
-      .from("gurus")
-      .select("*")
-      .or(`profile_id.eq.${guruId},id.eq.${guruId}`)
-      .maybeSingle();
+    let guru: Record<string, unknown> | null = null;
+    let guruError: unknown = null;
 
-    if (guruError || !guru) {
+    if (guruId) {
+      const guruByIdResult = await supabaseAdmin
+        .from("gurus")
+        .select("*")
+        .eq("id", guruId)
+        .limit(1)
+        .maybeSingle();
+
+      if (guruByIdResult.error) {
+        guruError = guruByIdResult.error;
+      }
+
+      if (guruByIdResult.data) {
+        guru = guruByIdResult.data as Record<string, unknown>;
+      }
+    }
+
+    if (!guru && guruId) {
+      const guruByProfileResult = await supabaseAdmin
+        .from("gurus")
+        .select("*")
+        .eq("profile_id", guruId)
+        .limit(1)
+        .maybeSingle();
+
+      if (guruByProfileResult.error) {
+        guruError = guruByProfileResult.error;
+      }
+
+      if (guruByProfileResult.data) {
+        guru = guruByProfileResult.data as Record<string, unknown>;
+      }
+    }
+
+    if (!guru && guruSlug) {
+      const guruBySlugResult = await supabaseAdmin
+        .from("gurus")
+        .select("*")
+        .eq("slug", guruSlug)
+        .limit(1)
+        .maybeSingle();
+
+      if (guruBySlugResult.error) {
+        guruError = guruBySlugResult.error;
+      }
+
+      if (guruBySlugResult.data) {
+        guru = guruBySlugResult.data as Record<string, unknown>;
+      }
+    }
+
+    if (!guru) {
       console.error("Guru lookup failed:", {
         guruId,
+        guruSlug,
         guruError,
       });
 
       return jsonError(
         guruError
           ? getSupabaseErrorMessage(guruError)
-          : `Guru not found for ID: ${guruId}`,
+          : `Guru not found for ID or slug: ${guruId || guruSlug}`,
         404,
         guruError,
       );
@@ -874,12 +924,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // bookings.sitter_id has a foreign key to gurus.id.
+    // Always use the actual gurus.id for sitter_id and guru_id.
     const resolvedGuruId =
-      typeof guru.profile_id === "string" && guru.profile_id.trim()
-        ? guru.profile_id
-        : typeof guru.id === "string" && guru.id.trim()
-          ? guru.id
-          : guruId;
+      typeof guru.id === "string" && guru.id.trim() ? guru.id.trim() : guruId;
 
     const resolvedGuruName =
       getBodyString(body, [
@@ -976,6 +1024,7 @@ export async function POST(req: NextRequest) {
       customer_id: user.id,
       user_id: user.id,
 
+      sitter_id: resolvedGuruId,
       guru_id: resolvedGuruId,
       guru_name: resolvedGuruName,
       guru_avatar_url: resolvedGuruAvatarUrl || null,
@@ -1072,6 +1121,7 @@ export async function POST(req: NextRequest) {
       customer_id: user.id,
       user_id: user.id,
 
+      sitter_id: resolvedGuruId,
       guru_id: resolvedGuruId,
 
       status: "pending",
@@ -1181,6 +1231,7 @@ export async function POST(req: NextRequest) {
       tipAmount,
       tipChoice,
       checkoutMetadata: {
+        sitter_id: resolvedGuruId,
         guru_id: resolvedGuruId,
         guru_name: resolvedGuruName,
         guru_avatar_url: resolvedGuruAvatarUrl || "",
