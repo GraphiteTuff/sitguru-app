@@ -742,7 +742,7 @@ function HeroSignupCard({
           Multiple roles? No problem.
         </p>
         <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-          Access Pet Parent, Guru, and Ambassador dashboards from one account.
+          Switch between dashboards from one account.
         </p>
       </div>
 
@@ -765,10 +765,6 @@ function HeroSignupCard({
           Ambassador access
         </Link>
       </div>
-
-      <p className="mt-4 text-center text-[11px] font-semibold leading-4 text-slate-500">
-        New here? We’ll create your account after verification.
-      </p>
     </aside>
   );
 }
