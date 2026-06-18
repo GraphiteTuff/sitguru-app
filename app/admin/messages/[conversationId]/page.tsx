@@ -339,6 +339,172 @@ function buildThreadUrl(conversationId: string) {
   return `${getBaseUrl()}/messages/${conversationId}`;
 }
 
+
+function getDirectMessageIdFromThreadKey(threadKey: string) {
+  const decodedThreadKey = decodeURIComponent(safeString(threadKey));
+
+  if (!decodedThreadKey.startsWith("direct-message-")) return "";
+
+  return decodedThreadKey.replace(/^direct-message-/, "").trim();
+}
+
+function getConversationRoleId(params: {
+  message: MessageRow;
+  role: "customer" | "guru";
+}) {
+  const senderRole = normalizeRole(
+    params.message.sender_role || params.message.sender_role_snapshot,
+  );
+  const recipientRole = normalizeRole(
+    params.message.recipient_role || params.message.recipient_role_snapshot,
+  );
+
+  if (senderRole === params.role) return safeString(params.message.sender_id);
+  if (recipientRole === params.role) return safeString(params.message.recipient_id);
+
+  return "";
+}
+
+async function recoverOrphanMessageThread(params: {
+  threadKey: string;
+  adminUserId: string;
+}) {
+  const messageId = getDirectMessageIdFromThreadKey(params.threadKey);
+
+  if (!messageId) return "";
+
+  const { data: orphanMessage, error: orphanMessageError } = await supabaseAdmin
+    .from("messages")
+    .select("*")
+    .eq("id", messageId)
+    .maybeSingle<MessageRow>();
+
+  if (orphanMessageError) {
+    console.error("Admin message orphan lookup failed:", orphanMessageError.message);
+    return "";
+  }
+
+  if (!orphanMessage?.id) return "";
+
+  const existingConversationId = safeString(orphanMessage.conversation_id);
+
+  if (existingConversationId) return existingConversationId;
+
+  const now = new Date().toISOString();
+  const bodyPreview = getMessageBody(orphanMessage).slice(0, 240);
+  const senderRole = normalizeRole(
+    orphanMessage.sender_role || orphanMessage.sender_role_snapshot,
+  );
+  const recipientRole = normalizeRole(
+    orphanMessage.recipient_role || orphanMessage.recipient_role_snapshot,
+  );
+  const topic =
+    safeString(orphanMessage.topic) ||
+    safeString(orphanMessage.message_type) ||
+    getDirectMessageTypeForRole(senderRole === "admin" ? recipientRole : senderRole);
+
+  const conversationPayload: Record<string, unknown> = {
+    subject: "SitGuru Message Thread",
+    status: "open",
+    topic,
+    started_by_user_id: safeString(orphanMessage.sender_id) || params.adminUserId,
+    last_message_at: orphanMessage.created_at || now,
+    last_message_preview: bodyPreview || "SitGuru message thread",
+    created_at: orphanMessage.created_at || now,
+    updated_at: now,
+  };
+
+  const customerId = getConversationRoleId({
+    message: orphanMessage,
+    role: "customer",
+  });
+  const guruId = getConversationRoleId({ message: orphanMessage, role: "guru" });
+
+  if (customerId) conversationPayload.customer_id = customerId;
+  if (guruId) conversationPayload.guru_id = guruId;
+
+  const { data: createdConversation, error: conversationError } = await supabaseAdmin
+    .from("conversations")
+    .insert(conversationPayload)
+    .select("id")
+    .single();
+
+  if (conversationError || !createdConversation?.id) {
+    console.error("Admin message orphan conversation recovery failed:", conversationError);
+    return "";
+  }
+
+  const recoveredConversationId = String(createdConversation.id);
+
+  const participantRows: ParticipantRow[] = [];
+
+  if (orphanMessage.sender_id) {
+    participantRows.push({
+      conversation_id: recoveredConversationId,
+      user_id: orphanMessage.sender_id,
+      role: senderRole || "user",
+      created_at: now,
+      updated_at: now,
+    });
+  }
+
+  if (orphanMessage.recipient_id && orphanMessage.recipient_id !== orphanMessage.sender_id) {
+    participantRows.push({
+      conversation_id: recoveredConversationId,
+      user_id: orphanMessage.recipient_id,
+      role: recipientRole || "user",
+      created_at: now,
+      updated_at: now,
+    });
+  }
+
+  if (
+    params.adminUserId &&
+    !participantRows.some((participant) => participant.user_id === params.adminUserId)
+  ) {
+    participantRows.push({
+      conversation_id: recoveredConversationId,
+      user_id: params.adminUserId,
+      role: "admin",
+      created_at: now,
+      updated_at: now,
+    });
+  }
+
+  if (participantRows.length > 0) {
+    const { error: participantError } = await supabaseAdmin
+      .from("conversation_participants")
+      .upsert(participantRows, {
+        onConflict: "conversation_id,user_id",
+        ignoreDuplicates: false,
+      });
+
+    if (participantError) {
+      console.warn(
+        "Admin message orphan participant recovery skipped:",
+        participantError.message,
+      );
+    }
+  }
+
+  const { error: messageUpdateError } = await supabaseAdmin
+    .from("messages")
+    .update({
+      conversation_id: recoveredConversationId,
+      updated_at: now,
+    })
+    .eq("id", orphanMessage.id);
+
+  if (messageUpdateError) {
+    console.error("Admin message orphan update failed:", messageUpdateError.message);
+  }
+
+  revalidatePath("/admin/messages");
+  revalidatePath(`/admin/messages/${recoveredConversationId}`);
+
+  return recoveredConversationId;
+}
+
 async function sendRecipientEmail(params: {
   toEmail: string;
   recipientName: string;
@@ -976,7 +1142,16 @@ export default async function AdminMessageThreadPage({
   ]);
 
   if (!conversation) {
-    redirect("/admin/messages");
+    const recoveredConversationId = await recoverOrphanMessageThread({
+      threadKey: conversationId,
+      adminUserId: user.id,
+    });
+
+    if (recoveredConversationId) {
+      redirect(`/admin/messages/${encodeURIComponent(recoveredConversationId)}`);
+    }
+
+    redirect("/admin/messages?error=thread_not_found");
   }
 
   const participantRows = (participants || []) as ParticipantRow[];
