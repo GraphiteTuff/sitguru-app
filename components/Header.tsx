@@ -826,9 +826,7 @@ export default function Header({ user = null }: HeaderProps) {
             </>
           ) : (
             <>
-              <Link href="/login?role=guru&mode=phone" className="rounded-full border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Guru Login</Link>
-              <Link href="/login?role=pet_parent&mode=phone" className="rounded-full border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Pet Parent Login</Link>
-              <Link href="/login?role=ambassador&mode=email" className="rounded-full border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Ambassador Login</Link>
+              <Link href="/login?mode=phone" className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Log In</Link>
               <Link href="/signup" className="rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-white shadow-md transition hover:bg-emerald-700">Sign Up Free</Link>
             </>
           )}
@@ -899,28 +897,12 @@ export default function Header({ user = null }: HeaderProps) {
                 </button>
               </>
             ) : (
-              <div className="mt-4 rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-slate-50 p-3 shadow-sm">
-                <p className="px-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Log in</p>
-                <p className="px-2 pb-3 pt-1 text-xs font-semibold leading-5 text-slate-600">Choose where you want to start. SitGuru will still route existing multi-role accounts correctly after login.</p>
+              <div className="mt-4 grid gap-2 rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-slate-50 p-3 shadow-sm">
+                <Link href="/login?mode=phone" onClick={() => setMobileOpen(false)} className="flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black tracking-[-0.01em] text-emerald-900 shadow-sm transition hover:bg-emerald-50">
+                  Log In
+                </Link>
 
-                <div className="grid gap-2">
-                  <Link href="/login?role=pet_parent&mode=phone" onClick={() => setMobileOpen(false)} className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black tracking-[-0.01em] text-emerald-900 shadow-sm transition hover:bg-emerald-50">
-                    <span className="inline-flex items-center gap-3"><span aria-hidden="true">🐾</span>Pet Parent Login</span>
-                    <span aria-hidden="true" className="text-emerald-700">→</span>
-                  </Link>
-
-                  <Link href="/login?role=guru&mode=phone" onClick={() => setMobileOpen(false)} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black tracking-[-0.01em] text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50">
-                    <span className="inline-flex items-center gap-3"><span aria-hidden="true">🦮</span>Guru Login</span>
-                    <span aria-hidden="true" className="text-emerald-700">→</span>
-                  </Link>
-
-                  <Link href="/login?role=ambassador&mode=email" onClick={() => setMobileOpen(false)} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black tracking-[-0.01em] text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50">
-                    <span className="inline-flex items-center gap-3"><span aria-hidden="true">🤝</span>Ambassador Login</span>
-                    <span aria-hidden="true" className="text-emerald-700">→</span>
-                  </Link>
-                </div>
-
-                <Link href="/signup" onClick={() => setMobileOpen(false)} className="mt-3 flex min-h-12 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black tracking-[-0.01em] text-white shadow-md transition hover:bg-emerald-700">
+                <Link href="/signup" onClick={() => setMobileOpen(false)} className="flex min-h-12 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black tracking-[-0.01em] text-white shadow-md transition hover:bg-emerald-700">
                   Sign Up Free
                 </Link>
               </div>
