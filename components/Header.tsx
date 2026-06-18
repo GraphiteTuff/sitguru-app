@@ -19,18 +19,20 @@ import {
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
 
-type HeaderMode = "public" | "customer" | "guru" | "admin";
+type HeaderMode = "public" | "customer" | "guru" | "ambassador" | "admin";
 
 type HeaderUser = {
   id?: string | null;
   name?: string | null;
   email?: string | null;
   avatarUrl?: string | null;
-  role?: "customer" | "guru" | "admin" | "both" | string | null;
+  role?: "customer" | "guru" | "ambassador" | "admin" | "both" | string | null;
   hasCustomerAccess?: boolean;
   hasGuruAccess?: boolean;
+  hasAmbassadorAccess?: boolean;
   hasAdminAccess?: boolean;
   guruStatus?: string | null;
+  ambassadorStatus?: string | null;
 };
 
 type HeaderProps = {
@@ -55,6 +57,7 @@ type ProfileRow = {
   is_customer?: boolean | null;
   is_guru?: boolean | null;
   is_guru_interested?: boolean | null;
+  is_ambassador?: boolean | null;
 };
 
 type GuruRow = {
@@ -67,6 +70,16 @@ type GuruRow = {
   is_public?: boolean | null;
 };
 
+type AmbassadorRow = {
+  id?: string | null;
+  user_id?: string | null;
+  status?: string | null;
+  onboarding_status?: string | null;
+  referral_status?: string | null;
+  dashboard_enabled?: boolean | null;
+  login_enabled?: boolean | null;
+};
+
 type UserRoleRow = {
   role?: string | null;
 };
@@ -76,10 +89,12 @@ type NavLink = {
   href: string;
 };
 
-/**
- * Public visitors should be able to browse/search Gurus without being forced to log in.
- * Booking, messaging, and checkout can still require login later in the flow.
- */
+type RoleSwitchLink = {
+  label: string;
+  href: string;
+  mode: HeaderMode;
+};
+
 const PUBLIC_GURU_SEARCH_HREF = "/search";
 
 const publicNavLinks: NavLink[] = [
@@ -112,11 +127,20 @@ const guruNavLinks: NavLink[] = [
   { label: "Earnings", href: "/guru/dashboard/earnings" },
 ];
 
+const ambassadorNavLinks: NavLink[] = [
+  { label: "Dashboard", href: "/ambassador/dashboard" },
+  { label: "Referrals", href: "/ambassador/dashboard" },
+  { label: "Messages", href: "/ambassador/messages" },
+  { label: "Training", href: "/ambassador/training" },
+  { label: "Onboarding", href: "/ambassador/dashboard/onboarding-packet" },
+];
+
 const adminNavLinks: NavLink[] = [
   { label: "Admin", href: "/admin" },
   { label: "Messages", href: "/admin/messages" },
   { label: "Pet Parents", href: "/admin/customers" },
   { label: "Gurus", href: "/admin/gurus" },
+  { label: "Ambassadors", href: "/admin/ambassadors" },
   { label: "Referrals", href: "/admin/referrals" },
 ];
 
@@ -126,7 +150,6 @@ function normalizeRole(value?: string | null) {
 
 function isAdminRole(value?: string | null) {
   const role = normalizeRole(value);
-
   return (
     role.includes("admin") ||
     role.includes("super") ||
@@ -138,7 +161,6 @@ function isAdminRole(value?: string | null) {
 
 function isGuruRole(value?: string | null) {
   const role = normalizeRole(value);
-
   return (
     role.includes("guru") ||
     role.includes("sitter") ||
@@ -150,9 +172,21 @@ function isGuruRole(value?: string | null) {
   );
 }
 
+function isAmbassadorRole(value?: string | null) {
+  const role = normalizeRole(value);
+  return (
+    role.includes("ambassador") ||
+    role.includes("sitguru_rep") ||
+    role.includes("sitguru rep") ||
+    role.includes("representative") ||
+    role.includes("community_hire") ||
+    role.includes("student_hire") ||
+    role.includes("military_hire")
+  );
+}
+
 function isCustomerRole(value?: string | null) {
   const role = normalizeRole(value);
-
   return (
     role.includes("customer") ||
     role.includes("pet_parent") ||
@@ -164,7 +198,6 @@ function isCustomerRole(value?: string | null) {
 
 function isBothRole(value?: string | null) {
   const role = normalizeRole(value);
-
   return (
     role === "both" ||
     role.includes("both") ||
@@ -177,12 +210,11 @@ function isBothRole(value?: string | null) {
 
 function normalizeStoredRole(value?: string | null) {
   const role = normalizeRole(value);
-
   if (isAdminRole(role)) return "admin";
+  if (isAmbassadorRole(role)) return "ambassador";
   if (isBothRole(role)) return "both";
   if (isGuruRole(role)) return "guru";
   if (isCustomerRole(role)) return "customer";
-
   return "customer";
 }
 
@@ -196,11 +228,9 @@ function getHeaderMode({
   storedRole: string;
 }): HeaderMode {
   const path = pathname || "";
-
   if (!isLoggedIn) return "public";
-
   if (path.startsWith("/admin")) return "admin";
-
+  if (path.startsWith("/ambassador")) return "ambassador";
   if (
     path.startsWith("/guru") ||
     path.startsWith("/guru-dashboard") ||
@@ -208,7 +238,6 @@ function getHeaderMode({
   ) {
     return "guru";
   }
-
   if (
     path.startsWith("/customer") ||
     path.startsWith("/pets") ||
@@ -221,18 +250,14 @@ function getHeaderMode({
   ) {
     return "customer";
   }
-
   if (storedRole === "admin") return "admin";
+  if (storedRole === "ambassador") return "ambassador";
   if (storedRole === "guru") return "guru";
-
   return "customer";
 }
 
 function getProfileName(profile: ProfileRow | null, email?: string | null) {
-  const firstLast = `${profile?.first_name || ""} ${
-    profile?.last_name || ""
-  }`.trim();
-
+  const firstLast = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim();
   return (
     profile?.display_name ||
     profile?.full_name ||
@@ -247,7 +272,6 @@ function isOAuthProviderAvatarUrl(value: string) {
   try {
     const url = new URL(value);
     const hostname = url.hostname.toLowerCase();
-
     return (
       hostname.includes("googleusercontent.com") ||
       hostname.includes("ggpht.com") ||
@@ -264,12 +288,9 @@ function isOAuthProviderAvatarUrl(value: string) {
 
 function normalizeAvatarUrl(value?: string | null) {
   if (!value) return "";
-
   const cleanValue = value.trim();
-
   if (!cleanValue) return "";
   if (isOAuthProviderAvatarUrl(cleanValue)) return "";
-
   return cleanValue;
 }
 
@@ -286,111 +307,58 @@ function getProfileAvatar(profile: ProfileRow | null) {
 function getInitials(name?: string | null, email?: string | null) {
   const value = (name || email || "Pet Parent").replace(/@.*/, "");
   const parts = value.split(/[\s._-]+/).filter(Boolean);
-
   const first = parts[0]?.charAt(0) || "P";
   const second = parts[1]?.charAt(0) || "";
-
   return `${first}${second}`.toUpperCase();
 }
 
 function pathMatches(pathname: string | null, targetPath: string) {
   const path = pathname || "";
-
   return path === targetPath || path.startsWith(`${targetPath}/`);
 }
 
 function getActiveAliases(href: string) {
-  if (href === "/customer/dashboard") {
-    return ["/customer/dashboard"];
-  }
-
-  if (href === "/pet-parents") {
-    return ["/pet-parents"];
-  }
-
-  if (href === "/become-a-guru") {
-    return ["/become-a-guru", "/pet-gurus"];
-  }
-
+  if (href === "/customer/dashboard") return ["/customer/dashboard"];
+  if (href === "/pet-parents") return ["/pet-parents"];
+  if (href === "/become-a-guru") return ["/become-a-guru", "/pet-gurus"];
   if (href === PUBLIC_GURU_SEARCH_HREF) {
     return [PUBLIC_GURU_SEARCH_HREF, "/find-care", "/customer/find-guru"];
   }
-
   if (href === "/customer/dashboard/bookings") {
-    return [
-      "/customer/dashboard/bookings",
-      "/customer/bookings",
-      "/bookings",
-      "/bookings/new",
-    ];
+    return ["/customer/dashboard/bookings", "/customer/bookings", "/bookings", "/bookings/new"];
   }
-
   if (href === "/messages" || href === "/customer/dashboard/messages") {
     return ["/messages", "/customer/messages", "/customer/dashboard/messages"];
   }
-
   if (href === "/customer/pets" || href === "/customer/dashboard/pets") {
     return ["/customer/pets", "/customer/dashboard/pets", "/pets"];
   }
-
   if (href === "/customer/dashboard/profile") {
     return ["/customer/dashboard/profile", "/customer/profile", "/profile"];
   }
-
-  if (
-    href === "/customer/dashboard/pawperks" ||
-    href === "/customer/dashboard/referrals"
-  ) {
-    return [
-      "/customer/dashboard/pawperks",
-      "/customer/dashboard/referrals",
-      "/referrals",
-      "/pawperks",
-    ];
+  if (href === "/customer/dashboard/pawperks" || href === "/customer/dashboard/referrals") {
+    return ["/customer/dashboard/pawperks", "/customer/dashboard/referrals", "/referrals", "/pawperks"];
   }
-
-  if (href === "/guru/dashboard") {
-    return ["/guru/dashboard"];
+  if (href === "/guru/dashboard") return ["/guru/dashboard"];
+  if (href === "/guru/dashboard/referrals") return ["/guru/dashboard/referrals", "/guru/referrals"];
+  if (href === "/guru/dashboard/messages") return ["/guru/dashboard/messages", "/guru/messages"];
+  if (href === "/guru/dashboard/bookings") return ["/guru/dashboard/bookings", "/guru/bookings"];
+  if (href === "/guru/dashboard/profile") return ["/guru/dashboard/profile", "/guru/profile"];
+  if (href === "/guru/dashboard/availability") return ["/guru/dashboard/availability", "/guru/availability"];
+  if (href === "/guru/dashboard/earnings") return ["/guru/dashboard/earnings", "/guru/earnings"];
+  if (href === "/guru/success-center") return ["/guru/success-center", "/guru/dashboard/resources"];
+  if (href === "/ambassador/dashboard") return ["/ambassador/dashboard"];
+  if (href === "/ambassador/messages") return ["/ambassador/messages", "/ambassador/dashboard/messages"];
+  if (href === "/ambassador/training") return ["/ambassador/training", "/ambassador/dashboard/training"];
+  if (href === "/ambassador/dashboard/onboarding-packet") {
+    return ["/ambassador/dashboard/onboarding-packet"];
   }
-
-  if (href === "/guru/dashboard/referrals") {
-    return ["/guru/dashboard/referrals", "/guru/referrals"];
-  }
-
-  if (href === "/guru/dashboard/messages") {
-    return ["/guru/dashboard/messages", "/guru/messages"];
-  }
-
-  if (href === "/guru/dashboard/bookings") {
-    return ["/guru/dashboard/bookings", "/guru/bookings"];
-  }
-
-  if (href === "/guru/dashboard/profile") {
-    return ["/guru/dashboard/profile", "/guru/profile"];
-  }
-
-  if (href === "/guru/dashboard/availability") {
-    return ["/guru/dashboard/availability", "/guru/availability"];
-  }
-
-  if (href === "/guru/dashboard/earnings") {
-    return ["/guru/dashboard/earnings", "/guru/earnings"];
-  }
-
-  if (href === "/guru/success-center") {
-    return ["/guru/success-center", "/guru/dashboard/resources"];
-  }
-
-  if (href === "/admin") {
-    return ["/admin"];
-  }
-
+  if (href === "/admin") return ["/admin"];
   return [href];
 }
 
 function clearSitGuruAuthStorage() {
   if (typeof window === "undefined") return;
-
   const keysToRemove = [
     "sitguru_pending_role",
     "sitguru_selected_role",
@@ -400,7 +368,6 @@ function clearSitGuruAuthStorage() {
     "sitguru_pending_phone",
     "sitguru_phone_login_started",
   ];
-
   keysToRemove.forEach((key) => {
     window.localStorage.removeItem(key);
     window.sessionStorage.removeItem(key);
@@ -408,52 +375,59 @@ function clearSitGuruAuthStorage() {
 }
 
 function getGuruStatus(guru: GuruRow | null) {
-  return (
-    guru?.approval_status ||
-    guru?.onboarding_status ||
-    guru?.status ||
-    (guru?.is_active ? "approved" : null)
-  );
+  return guru?.approval_status || guru?.onboarding_status || guru?.status || (guru?.is_active ? "approved" : null);
 }
 
-function getSwitchHref(headerMode: HeaderMode) {
-  if (headerMode === "guru") return "/customer/dashboard/profile";
-  if (headerMode === "customer") return "/guru/dashboard/profile";
-  return "";
+function getAmbassadorStatus(ambassador: AmbassadorRow | null) {
+  return ambassador?.onboarding_status || ambassador?.referral_status || ambassador?.status || null;
 }
 
-function getSwitchLabel(headerMode: HeaderMode, guruStatus?: string | null) {
-  if (headerMode === "guru") {
-    return "Switch to Pet Parent";
+function buildRoleSwitchLinks({
+  headerMode,
+  hasCustomerAccess,
+  hasGuruAccess,
+  hasAmbassadorAccess,
+  hasAdminAccess,
+  guruStatus,
+}: {
+  headerMode: HeaderMode;
+  hasCustomerAccess: boolean;
+  hasGuruAccess: boolean;
+  hasAmbassadorAccess: boolean;
+  hasAdminAccess: boolean;
+  guruStatus?: string | null;
+}): RoleSwitchLink[] {
+  const links: RoleSwitchLink[] = [];
+  if (hasCustomerAccess && headerMode !== "customer") {
+    links.push({ label: "Switch to Pet Parent", href: "/customer/dashboard", mode: "customer" });
   }
-
-  if (headerMode === "customer") {
+  if (hasGuruAccess && headerMode !== "guru") {
     const status = normalizeRole(guruStatus);
-
-    if (
-      status.includes("pending") ||
-      status.includes("review") ||
-      status.includes("started") ||
-      status.includes("setup")
-    ) {
-      return "Switch to Guru Setup";
-    }
-
-    return "Switch to Guru";
+    links.push({
+      label:
+        status.includes("pending") || status.includes("review") || status.includes("started") || status.includes("setup")
+          ? "Switch to Guru Setup"
+          : "Switch to Guru",
+      href: "/guru/dashboard",
+      mode: "guru",
+    });
   }
-
-  return "";
+  if (hasAmbassadorAccess && headerMode !== "ambassador") {
+    links.push({ label: "Switch to Ambassador", href: "/ambassador/dashboard", mode: "ambassador" });
+  }
+  if (hasAdminAccess && headerMode !== "admin") {
+    links.push({ label: "Admin Dashboard", href: "/admin", mode: "admin" });
+  }
+  return links;
 }
 
 export default function Header({ user = null }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-
   const [loadedUser, setLoadedUser] = useState<HeaderUser | null>(user);
   const [loadingUser, setLoadingUser] = useState(!user);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
-
   const avatarMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -462,18 +436,19 @@ export default function Header({ user = null }: HeaderProps) {
     async function loadActiveUser() {
       try {
         setLoadingUser(true);
-
         const {
           data: { user: activeUser },
           error: userError,
         } = await supabase.auth.getUser();
 
         if (!mounted) return;
-
         if (userError || !activeUser) {
           setLoadedUser(null);
           return;
         }
+
+        const activeEmail = activeUser.email || activeUser.phone || "";
+        const cleanEmail = activeEmail.toLowerCase();
 
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
@@ -488,25 +463,37 @@ export default function Header({ user = null }: HeaderProps) {
 
         const { data: guruData, error: guruError } = await supabase
           .from("gurus")
-          .select(
-            "id,user_id,status,approval_status,onboarding_status,is_active,is_public",
-          )
+          .select("id,user_id,status,approval_status,onboarding_status,is_active,is_public")
           .eq("user_id", activeUser.id)
           .maybeSingle();
 
+        const ambassadorQuery = cleanEmail
+          ? supabase
+              .from("ambassadors")
+              .select("id,user_id,status,onboarding_status,referral_status,dashboard_enabled,login_enabled")
+              .or(`user_id.eq.${activeUser.id},login_email.eq.${cleanEmail},contact_email.eq.${cleanEmail},email.eq.${cleanEmail}`)
+              .eq("dashboard_enabled", true)
+              .eq("login_enabled", true)
+              .neq("status", "archived")
+              .maybeSingle()
+          : supabase
+              .from("ambassadors")
+              .select("id,user_id,status,onboarding_status,referral_status,dashboard_enabled,login_enabled")
+              .eq("user_id", activeUser.id)
+              .eq("dashboard_enabled", true)
+              .eq("login_enabled", true)
+              .neq("status", "archived")
+              .maybeSingle();
+
+        const { data: ambassadorData, error: ambassadorError } = await ambassadorQuery;
         if (!mounted) return;
 
-        const profile = !profileError
-          ? ((profileData || null) as ProfileRow | null)
-          : null;
-
+        const profile = !profileError ? ((profileData || null) as ProfileRow | null) : null;
         const roles = !roleError
-          ? (((roleRows || []) as UserRoleRow[])
-              .map((row) => row.role)
-              .filter(Boolean) as string[])
+          ? (((roleRows || []) as UserRoleRow[]).map((row) => row.role).filter(Boolean) as string[])
           : [];
-
         const guru = !guruError ? ((guruData || null) as GuruRow | null) : null;
+        const ambassador = !ambassadorError ? ((ambassadorData || null) as AmbassadorRow | null) : null;
 
         const metadataRole =
           typeof activeUser.user_metadata?.role === "string"
@@ -514,7 +501,6 @@ export default function Header({ user = null }: HeaderProps) {
             : typeof activeUser.app_metadata?.role === "string"
               ? activeUser.app_metadata.role
               : null;
-
         const metadataAccountType =
           typeof activeUser.user_metadata?.account_type === "string"
             ? activeUser.user_metadata.account_type
@@ -522,63 +508,40 @@ export default function Header({ user = null }: HeaderProps) {
               ? activeUser.app_metadata.account_type
               : null;
 
-        const allRoleSignals = [
-          profile?.role,
-          profile?.account_type,
-          metadataRole,
-          metadataAccountType,
-          ...roles,
-        ].filter(Boolean) as string[];
-
+        const allRoleSignals = [profile?.role, profile?.account_type, metadataRole, metadataAccountType, ...roles].filter(Boolean) as string[];
         const hasAdminAccess = allRoleSignals.some(isAdminRole);
-
-        const hasGuruAccess =
-          Boolean(guru?.id) ||
-          Boolean(profile?.is_guru) ||
-          Boolean(profile?.is_guru_interested) ||
-          allRoleSignals.some(isGuruRole) ||
-          allRoleSignals.some(isBothRole);
-
-        /**
-         * Every signed-in SitGuru user can use the Pet Parent side.
-         * Guru-only users can still book care as Pet Parents without creating a second account.
-         */
-        const hasCustomerAccess =
-          !hasAdminAccess ||
-          Boolean(profile?.is_pet_parent) ||
-          Boolean(profile?.is_customer) ||
-          allRoleSignals.some(isCustomerRole) ||
-          allRoleSignals.some(isBothRole);
+        const hasGuruAccess = Boolean(guru?.id) || Boolean(profile?.is_guru) || Boolean(profile?.is_guru_interested) || allRoleSignals.some(isGuruRole) || allRoleSignals.some(isBothRole);
+        const hasAmbassadorAccess = Boolean(ambassador?.id) || Boolean(profile?.is_ambassador) || allRoleSignals.some(isAmbassadorRole);
+        const hasCustomerAccess = Boolean(profile?.is_pet_parent) || Boolean(profile?.is_customer) || allRoleSignals.some(isCustomerRole) || allRoleSignals.some(isBothRole) || (!hasAdminAccess && !hasAmbassadorAccess);
 
         const rawRole = hasAdminAccess
           ? "admin"
           : hasGuruAccess && hasCustomerAccess
             ? "both"
-            : hasGuruAccess
-              ? "guru"
-              : "customer";
+            : hasAmbassadorAccess
+              ? "ambassador"
+              : hasGuruAccess
+                ? "guru"
+                : "customer";
 
         setLoadedUser({
           id: activeUser.id,
-          email: activeUser.email || profile?.email || activeUser.phone || "",
-          name: getProfileName(profile, activeUser.email || activeUser.phone),
+          email: activeEmail,
+          name: getProfileName(profile, activeEmail),
           avatarUrl: getProfileAvatar(profile),
           role: rawRole,
           hasCustomerAccess,
           hasGuruAccess,
+          hasAmbassadorAccess,
           hasAdminAccess,
           guruStatus: getGuruStatus(guru),
+          ambassadorStatus: getAmbassadorStatus(ambassador),
         });
       } catch (error) {
         console.error("Header user load failed:", error);
-
-        if (mounted) {
-          setLoadedUser(null);
-        }
+        if (mounted) setLoadedUser(null);
       } finally {
-        if (mounted) {
-          setLoadingUser(false);
-        }
+        if (mounted) setLoadingUser(false);
       }
     }
 
@@ -589,13 +552,10 @@ export default function Header({ user = null }: HeaderProps) {
     }
 
     loadActiveUser();
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      window.setTimeout(() => {
-        loadActiveUser();
-      }, 0);
+      window.setTimeout(() => loadActiveUser(), 0);
     });
 
     return () => {
@@ -606,24 +566,18 @@ export default function Header({ user = null }: HeaderProps) {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        avatarMenuRef.current &&
-        !avatarMenuRef.current.contains(event.target as Node)
-      ) {
+      if (avatarMenuRef.current && !avatarMenuRef.current.contains(event.target as Node)) {
         setAvatarOpen(false);
       }
     }
-
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setAvatarOpen(false);
         setMobileOpen(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
@@ -642,46 +596,44 @@ export default function Header({ user = null }: HeaderProps) {
 
   const isCustomer = headerMode === "customer";
   const isGuru = headerMode === "guru";
+  const isAmbassador = headerMode === "ambassador";
   const isAdmin = headerMode === "admin";
 
   const hasCustomerAccess = Boolean(activeUser?.hasCustomerAccess);
   const hasGuruAccess = Boolean(activeUser?.hasGuruAccess);
+  const hasAmbassadorAccess = Boolean(activeUser?.hasAmbassadorAccess);
   const hasAdminAccess = Boolean(activeUser?.hasAdminAccess);
 
-  const showPortalSwitch =
-    isLoggedIn &&
-    !isAdmin &&
-    !hasAdminAccess &&
-    ((isGuru && hasCustomerAccess) || (isCustomer && hasGuruAccess));
-
-  const switchHref = showPortalSwitch ? getSwitchHref(headerMode) : "";
-  const switchLabel = showPortalSwitch
-    ? getSwitchLabel(headerMode, activeUser?.guruStatus)
-    : "";
+  const roleSwitchLinks = buildRoleSwitchLinks({
+    headerMode,
+    hasCustomerAccess,
+    hasGuruAccess,
+    hasAmbassadorAccess,
+    hasAdminAccess,
+    guruStatus: activeUser?.guruStatus,
+  });
+  const primarySwitchLink = roleSwitchLinks[0] || null;
 
   const navLinks = useMemo(() => {
     if (isAdmin) return adminNavLinks;
+    if (isAmbassador) return ambassadorNavLinks;
     if (isGuru) return guruNavLinks;
     if (isCustomer) return customerNavLinks;
     return publicNavLinks;
-  }, [isAdmin, isCustomer, isGuru]);
+  }, [isAdmin, isAmbassador, isCustomer, isGuru]);
 
-  const bookingsHref = isGuru
-    ? "/guru/dashboard/bookings"
-    : "/customer/dashboard/bookings";
-
-  const resourcesHref = isGuru
-    ? "/guru/success-center"
-    : "/customer/dashboard/pawperks";
+  const bookingsHref = isGuru ? "/guru/dashboard/bookings" : "/customer/dashboard/bookings";
+  const resourcesHref = isGuru ? "/guru/success-center" : "/customer/dashboard/pawperks";
 
   const displayRole = isGuru
     ? "SitGuru Guru"
     : isAdmin
       ? "SitGuru Admin"
-      : "SitGuru Pet Parent";
+      : isAmbassador
+        ? "SitGuru Ambassador"
+        : "SitGuru Pet Parent";
 
   const logoHref = "/";
-
   const userName = activeUser?.name || (isAdmin ? "Admin HQ" : "My Account");
   const userEmail = activeUser?.email || "";
   const userAvatarUrl = normalizeAvatarUrl(activeUser?.avatarUrl);
@@ -698,48 +650,41 @@ export default function Header({ user = null }: HeaderProps) {
         { label: "Earnings", href: "/guru/dashboard/earnings" },
         { label: "Guru Success Center", href: "/guru/success-center" },
       ]
-    : isAdmin
+    : isAmbassador
       ? [
-          { label: "Dashboard", href: "/admin" },
-          { label: "Update Profile", href: "/admin/profile" },
-          { label: "Messages", href: "/admin/messages" },
-          { label: "Pet Parents", href: "/admin/customers" },
-          { label: "Gurus", href: "/admin/gurus" },
-          { label: "Referrals", href: "/admin/referrals" },
+          { label: "Dashboard", href: "/ambassador/dashboard" },
+          { label: "Onboarding", href: "/ambassador/dashboard/onboarding-packet" },
+          { label: "Training", href: "/ambassador/training" },
+          { label: "Messages", href: "/ambassador/messages" },
+          { label: "Ambassador Program", href: "/ambassadors" },
         ]
-      : [
-          { label: "Dashboard", href: "/customer/dashboard" },
-          {
-            label: "Update Pet Parent Profile",
-            href: "/customer/dashboard/profile",
-          },
-          { label: "My Care", href: "/customer/dashboard/bookings" },
-          { label: "My Pets", href: "/customer/pets" },
-          { label: "Messages", href: "/messages" },
-          { label: "PawPerks", href: "/customer/dashboard/pawperks" },
-        ];
+      : isAdmin
+        ? [
+            { label: "Dashboard", href: "/admin" },
+            { label: "Update Profile", href: "/admin/profile" },
+            { label: "Messages", href: "/admin/messages" },
+            { label: "Pet Parents", href: "/admin/customers" },
+            { label: "Gurus", href: "/admin/gurus" },
+            { label: "Ambassadors", href: "/admin/ambassadors" },
+            { label: "Referrals", href: "/admin/referrals" },
+          ]
+        : [
+            { label: "Dashboard", href: "/customer/dashboard" },
+            { label: "Update Pet Parent Profile", href: "/customer/dashboard/profile" },
+            { label: "My Care", href: "/customer/dashboard/bookings" },
+            { label: "My Pets", href: "/customer/pets" },
+            { label: "Messages", href: "/messages" },
+            { label: "PawPerks", href: "/customer/dashboard/pawperks" },
+          ];
 
   const isActive = (href: string) => {
     const path = pathname || "";
-
-    if (href === "/") {
-      return path === "/";
-    }
-
-    if (href === "/customer/dashboard") {
-      return path === "/customer/dashboard";
-    }
-
-    if (href === "/guru/dashboard") {
-      return path === "/guru/dashboard";
-    }
-
-    if (href === "/admin") {
-      return path === "/admin";
-    }
-
+    if (href === "/") return path === "/";
+    if (href === "/customer/dashboard") return path === "/customer/dashboard";
+    if (href === "/guru/dashboard") return path === "/guru/dashboard";
+    if (href === "/ambassador/dashboard") return path === "/ambassador/dashboard";
+    if (href === "/admin") return path === "/admin";
     const aliases = getActiveAliases(href);
-
     return aliases.some((alias) => pathMatches(path, alias));
   };
 
@@ -748,25 +693,17 @@ export default function Header({ user = null }: HeaderProps) {
     setAvatarOpen(false);
     setMobileOpen(false);
     clearSitGuruAuthStorage();
-
     try {
       const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        console.error("Supabase logout failed:", error.message);
-      }
+      if (error) console.error("Supabase logout failed:", error.message);
     } catch (error) {
       console.error("Logout failed:", error);
     }
-
     try {
-      await fetch("/auth/signout", {
-        method: "POST",
-      });
+      await fetch("/auth/signout", { method: "POST" });
     } catch {
       // Optional endpoint. Continue even if it does not exist.
     }
-
     router.replace("/");
     router.refresh();
   }
@@ -774,34 +711,15 @@ export default function Header({ user = null }: HeaderProps) {
   function renderAvatar(sizeClass = "h-11 w-11") {
     if (isAdmin) {
       return (
-        <span
-          className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-sm ring-1 ring-emerald-100`}
-        >
-          <Image
-            src="/images/sitguru-admin-avatar.jpg"
-            alt="SitGuru Admin Avatar"
-            fill
-            priority
-            sizes="96px"
-            className="object-cover"
-          />
+        <span className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-sm ring-1 ring-emerald-100`}>
+          <Image src="/images/sitguru-admin-avatar.jpg" alt="SitGuru Admin Avatar" fill priority sizes="96px" className="object-cover" />
         </span>
       );
     }
-
     return (
-      <span
-        className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-100`}
-      >
+      <span className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-100`}>
         {userAvatarUrl ? (
-          <Image
-            src={userAvatarUrl}
-            alt={`${userName} profile photo`}
-            width={64}
-            height={64}
-            className="h-full w-full object-cover"
-            unoptimized
-          />
+          <Image src={userAvatarUrl} alt={`${userName} profile photo`} width={64} height={64} className="h-full w-full object-cover" unoptimized />
         ) : (
           userInitials || <UserRound className="h-5 w-5" />
         )}
@@ -812,40 +730,17 @@ export default function Header({ user = null }: HeaderProps) {
   return (
     <header className="sg-site-header sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 shadow-[0_6px_22px_rgba(15,23,42,0.04)] backdrop-blur">
       <div className="mx-auto flex h-[84px] max-w-[1500px] items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
-        <Link
-          href={logoHref}
-          className="inline-flex h-14 w-[200px] shrink-0 items-center justify-start rounded-2xl transition hover:opacity-90 sm:w-[230px] lg:h-16 lg:w-[260px]"
-          aria-label="Go to SitGuru homepage"
-        >
-          <Image
-            src="/images/sitguru-logo-cropped.png"
-            alt="SitGuru"
-            width={260}
-            height={90}
-            priority
-            className="h-auto max-h-12 w-auto object-contain lg:max-h-14"
-          />
+        <Link href={logoHref} className="inline-flex h-14 w-[200px] shrink-0 items-center justify-start rounded-2xl transition hover:opacity-90 sm:w-[230px] lg:h-16 lg:w-[260px]" aria-label="Go to SitGuru homepage">
+          <Image src="/images/sitguru-logo-cropped.png" alt="SitGuru" width={260} height={90} priority className="h-auto max-h-12 w-auto object-contain lg:max-h-14" />
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-3 xl:flex 2xl:gap-5">
           {navLinks.map((link) => {
             const active = isActive(link.href);
-
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`relative pb-5 text-[13px] font-semibold tracking-[-0.015em] transition 2xl:text-[15px] ${
-                  active
-                    ? "text-slate-950"
-                    : "text-slate-700 hover:text-emerald-700"
-                }`}
-              >
+              <Link key={link.href} href={link.href} className={`relative pb-5 text-[13px] font-semibold tracking-[-0.015em] transition 2xl:text-[15px] ${active ? "text-slate-950" : "text-slate-700 hover:text-emerald-700"}`}>
                 {link.label}
-
-                {active ? (
-                  <span className="absolute bottom-0 left-0 h-[3px] w-full rounded-full bg-emerald-500" />
-                ) : null}
+                {active ? <span className="absolute bottom-0 left-0 h-[3px] w-full rounded-full bg-emerald-500" /> : null}
               </Link>
             );
           })}
@@ -856,118 +751,69 @@ export default function Header({ user = null }: HeaderProps) {
             <div className="h-11 w-48 animate-pulse rounded-full bg-slate-100" />
           ) : isLoggedIn ? (
             <>
-              {showPortalSwitch ? (
-                <Link
-                  href={switchHref}
-                  className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100 xl:inline-flex"
-                >
+              {primarySwitchLink ? (
+                <Link href={primarySwitchLink.href} className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100 xl:inline-flex">
                   <Repeat2 className="h-4 w-4" />
-                  {switchLabel}
+                  {primarySwitchLink.label}
                 </Link>
               ) : null}
 
               {isGuru ? (
-                <Link
-                  href={resourcesHref}
-                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 xl:inline-flex"
-                >
+                <Link href={resourcesHref} className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 xl:inline-flex">
                   <BookOpen className="h-4 w-4 text-sky-500" />
                   Guru Success Center
                 </Link>
               ) : null}
 
               {isCustomer ? (
-                <Link
-                  href={bookingsHref}
-                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 xl:inline-flex"
-                >
+                <Link href={bookingsHref} className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 xl:inline-flex">
                   <CalendarDays className="h-4 w-4 text-emerald-600" />
                   My Care
                 </Link>
               ) : null}
 
               <div ref={avatarMenuRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setAvatarOpen((current) => !current)}
-                  className="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1.5 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-                  aria-haspopup="menu"
-                  aria-expanded={avatarOpen}
-                  aria-label="Open account menu"
-                >
+                <button type="button" onClick={() => setAvatarOpen((current) => !current)} className="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1.5 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100" aria-haspopup="menu" aria-expanded={avatarOpen} aria-label="Open account menu">
                   {renderAvatar()}
-
-                  <span className="hidden max-w-[120px] truncate text-sm font-semibold tracking-[-0.01em] text-slate-950 xl:block">
-                    {userName}
-                  </span>
-
+                  <span className="hidden max-w-[120px] truncate text-sm font-semibold tracking-[-0.01em] text-slate-950 xl:block">{userName}</span>
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
-                    {avatarOpen ? (
-                      <ChevronUp className="h-5 w-5" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5" />
-                    )}
+                    {avatarOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                   </span>
                 </button>
 
                 {avatarOpen ? (
-                  <div
-                    role="menu"
-                    className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] w-80 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)]"
-                  >
+                  <div role="menu" className="absolute right-0 top-[calc(100%+0.75rem)] z-[999] w-80 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white text-left shadow-[0_22px_55px_rgba(15,23,42,0.18)]">
                     <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_100%)] p-5">
                       <div className="flex items-center gap-4">
                         {renderAvatar("h-16 w-16")}
-
                         <div className="min-w-0">
-                          <p className="truncate text-xl font-semibold leading-tight tracking-[-0.025em] text-slate-950">
-                            {userName}
-                          </p>
-
-                          {userEmail ? (
-                            <p className="mt-1 truncate text-sm font-medium text-slate-500">
-                              {userEmail}
-                            </p>
-                          ) : null}
-
-                          <p className="mt-1 text-base font-semibold tracking-[-0.01em] text-emerald-700">
-                            {displayRole}
-                          </p>
+                          <p className="truncate text-xl font-semibold leading-tight tracking-[-0.025em] text-slate-950">{userName}</p>
+                          {userEmail ? <p className="mt-1 truncate text-sm font-medium text-slate-500">{userEmail}</p> : null}
+                          <p className="mt-1 text-base font-semibold tracking-[-0.01em] text-emerald-700">{displayRole}</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="grid gap-1 p-3">
-                      {showPortalSwitch ? (
-                        <Link
-                          href={switchHref}
-                          role="menuitem"
-                          onClick={() => setAvatarOpen(false)}
-                          className="mb-1 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-100"
-                        >
-                          <Repeat2 className="h-4 w-4" />
-                          {switchLabel}
-                        </Link>
+                      {roleSwitchLinks.length ? (
+                        <div className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2">
+                          <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Switch Portal</p>
+                          {roleSwitchLinks.map((link) => (
+                            <Link key={link.href} href={link.href} role="menuitem" onClick={() => setAvatarOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-semibold tracking-[-0.01em] text-emerald-900 transition hover:bg-white">
+                              <Repeat2 className="h-4 w-4" />
+                              {link.label}
+                            </Link>
+                          ))}
+                        </div>
                       ) : null}
 
                       {accountMenuLinks.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          role="menuitem"
-                          onClick={() => setAvatarOpen(false)}
-                          className="rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-                        >
+                        <Link key={item.href} href={item.href} role="menuitem" onClick={() => setAvatarOpen(false)} className="rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700">
                           {item.label}
                         </Link>
                       ))}
 
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={handleLogout}
-                        className="mt-2 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
-                      >
+                      <button type="button" role="menuitem" onClick={handleLogout} className="mt-2 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700">
                         <LogOut className="h-5 w-5" />
                         Log Out
                       </button>
@@ -980,37 +826,14 @@ export default function Header({ user = null }: HeaderProps) {
             </>
           ) : (
             <>
-              <Link
-                href="/guru/login"
-                className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50"
-              >
-                Guru Login
-              </Link>
-
-              <Link
-                href="/login"
-                className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50"
-              >
-                Pet Parent Login
-              </Link>
-
-              <Link
-                href="/signup"
-                className="rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-white shadow-md transition hover:bg-emerald-700"
-              >
-                Sign Up Free
-              </Link>
+              <Link href="/guru/login" className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Guru Login</Link>
+              <Link href="/login" className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Pet Parent Login</Link>
+              <Link href="/signup" className="rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-white shadow-md transition hover:bg-emerald-700">Sign Up Free</Link>
             </>
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setMobileOpen((value) => !value)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 xl:hidden"
-          aria-label="Toggle menu"
-          aria-expanded={mobileOpen}
-        >
+        <button type="button" onClick={() => setMobileOpen((value) => !value)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 xl:hidden" aria-label="Toggle menu" aria-expanded={mobileOpen}>
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
@@ -1023,73 +846,41 @@ export default function Header({ user = null }: HeaderProps) {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                     {renderAvatar("h-12 w-12")}
-
                     <div className="min-w-0">
-                      <p className="truncate text-base font-semibold tracking-[-0.01em] text-slate-950">
-                        {userName}
-                      </p>
-
-                      <p className="text-sm font-semibold tracking-[-0.01em] text-emerald-700">
-                        {displayRole}
-                      </p>
+                      <p className="truncate text-base font-semibold tracking-[-0.01em] text-slate-950">{userName}</p>
+                      <p className="text-sm font-semibold tracking-[-0.01em] text-emerald-700">{displayRole}</p>
                     </div>
                   </div>
-
                   <NotificationBell />
                 </div>
               </div>
             ) : null}
 
-            {showPortalSwitch ? (
-              <Link
-                href={switchHref}
-                onClick={() => setMobileOpen(false)}
-                className="mb-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-100"
-              >
-                <Repeat2 className="h-4 w-4" />
-                {switchLabel}
-              </Link>
+            {roleSwitchLinks.length ? (
+              <div className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2">
+                <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Switch Portal</p>
+                {roleSwitchLinks.map((link) => (
+                  <Link key={`mobile-switch-${link.href}`} href={link.href} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-white">
+                    <Repeat2 className="h-4 w-4" />
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
             ) : null}
 
             {navLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`rounded-xl px-4 py-3 text-sm font-semibold tracking-[-0.01em] transition ${
-                  isActive(item.href)
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
-                }`}
-              >
+              <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={`rounded-xl px-4 py-3 text-sm font-semibold tracking-[-0.01em] transition ${isActive(item.href) ? "bg-emerald-50 text-emerald-700" : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"}`}>
                 {item.label}
               </Link>
             ))}
 
             {!isLoggedIn ? (
               <div className="my-2 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-slate-50 p-4 shadow-sm">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                  Join SitGuru free
-                </p>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                  Find trusted local pet care, become a Pet Guru, or explore
-                  Student, Community, and Military programs.
-                </p>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Join SitGuru free</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">Find trusted local pet care, become a Pet Guru, or explore Student, Community, and Military programs.</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <Link
-                    href="/signup"
-                    onClick={() => setMobileOpen(false)}
-                    className="rounded-xl bg-emerald-600 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-emerald-700"
-                  >
-                    Sign Up Free
-                  </Link>
-                  <Link
-                    href={PUBLIC_GURU_SEARCH_HREF}
-                    onClick={() => setMobileOpen(false)}
-                    className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
-                  >
-                    Search Gurus
-                  </Link>
+                  <Link href="/signup" onClick={() => setMobileOpen(false)} className="rounded-xl bg-emerald-600 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-emerald-700">Sign Up Free</Link>
+                  <Link href={PUBLIC_GURU_SEARCH_HREF} onClick={() => setMobileOpen(false)} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-bold text-emerald-800 transition hover:bg-emerald-50">Search Gurus</Link>
                 </div>
               </div>
             ) : null}
@@ -1097,50 +888,20 @@ export default function Header({ user = null }: HeaderProps) {
             {isLoggedIn ? (
               <>
                 {accountMenuLinks.map((item) => (
-                  <Link
-                    key={`mobile-${item.href}`}
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="rounded-xl px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
-                  >
+                  <Link key={`mobile-${item.href}`} href={item.href} onClick={() => setMobileOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-700 transition hover:bg-slate-50 hover:text-slate-950">
                     {item.label}
                   </Link>
                 ))}
-
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700"
-                >
+                <button type="button" onClick={handleLogout} className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-left text-sm font-semibold tracking-[-0.01em] text-white transition hover:bg-emerald-700">
                   <LogOut className="h-4 w-4" />
                   Log Out
                 </button>
               </>
             ) : (
               <div className="mt-2 grid gap-2">
-                <Link
-                  href="/guru/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800"
-                >
-                  Guru Login
-                </Link>
-
-                <Link
-                  href="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800"
-                >
-                  Pet Parent Login
-                </Link>
-
-                <Link
-                  href="/signup"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-white"
-                >
-                  Sign Up Free
-                </Link>
+                <Link href="/guru/login" onClick={() => setMobileOpen(false)} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800">Guru Login</Link>
+                <Link href="/login" onClick={() => setMobileOpen(false)} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800">Pet Parent Login</Link>
+                <Link href="/signup" onClick={() => setMobileOpen(false)} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-white">Sign Up Free</Link>
               </div>
             )}
           </div>
@@ -1158,7 +919,6 @@ export default function Header({ user = null }: HeaderProps) {
             "Segoe UI",
             sans-serif;
         }
-
         .sg-site-header *,
         .sg-site-header a,
         .sg-site-header button,
@@ -1176,7 +936,6 @@ export default function Header({ user = null }: HeaderProps) {
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
         }
-
         .sg-site-header a:hover {
           text-decoration: none;
         }
