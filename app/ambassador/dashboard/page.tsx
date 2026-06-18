@@ -61,6 +61,14 @@ type ProfileRow = {
   profile_photo_url?: string | null;
   photo_url?: string | null;
   image_url?: string | null;
+  role?: string | null;
+  account_type?: string | null;
+};
+
+type DashboardAccess = {
+  petParent: boolean;
+  guru: boolean;
+  ambassador: boolean;
 };
 
 type ReferralStats = {
@@ -138,7 +146,10 @@ async function getAmbassadorOnboardingPacketDisplay(
     const { data, error } = await query.maybeSingle();
 
     if (error) {
-      console.warn("Unable to load Ambassador onboarding packet status:", error);
+      console.warn(
+        "Unable to load Ambassador onboarding packet status:",
+        error,
+      );
       return {
         label: "Needs Action",
         status: "needs_action",
@@ -263,6 +274,53 @@ function getInitials(name: string) {
   );
 }
 
+function normalizeRoleValue(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function hasPetParentRole(value: unknown) {
+  const role = normalizeRoleValue(value);
+
+  return (
+    role === "customer" ||
+    role === "pet_parent" ||
+    role === "pet-parent" ||
+    role === "pet_owner" ||
+    role === "pet-owner" ||
+    role === "parent" ||
+    role === "both"
+  );
+}
+
+function hasGuruRole(value: unknown) {
+  const role = normalizeRoleValue(value);
+
+  return (
+    role === "guru" ||
+    role === "future_guru" ||
+    role === "future-guru" ||
+    role === "provider" ||
+    role === "sitter" ||
+    role === "walker" ||
+    role === "caretaker" ||
+    role === "both"
+  );
+}
+
+function hasAmbassadorRole(value: unknown) {
+  const role = normalizeRoleValue(value);
+
+  return (
+    role === "ambassador" ||
+    role === "ambassadors" ||
+    role === "rep" ||
+    role === "representative" ||
+    role === "sitguru_rep"
+  );
+}
+
 function getSiteUrl() {
   const configuredUrl =
     process.env.NEXT_PUBLIC_SITE_URL ||
@@ -271,7 +329,10 @@ function getSiteUrl() {
     process.env.VERCEL_URL ||
     "https://www.sitguru.com";
 
-  if (configuredUrl.startsWith("http://") || configuredUrl.startsWith("https://")) {
+  if (
+    configuredUrl.startsWith("http://") ||
+    configuredUrl.startsWith("https://")
+  ) {
     return configuredUrl.replace(/\/+$/, "");
   }
 
@@ -394,7 +455,10 @@ async function safeReferralCount({
 
   for (const column of referralColumns) {
     try {
-      let query = supabaseAdmin.from(table).select("id").eq(column, referralCode);
+      let query = supabaseAdmin
+        .from(table)
+        .select("id")
+        .eq(column, referralCode);
 
       Object.entries(extraFilters).forEach(([key, value]) => {
         query = query.eq(key, value);
@@ -510,14 +574,38 @@ export default async function AmbassadorDashboardPage() {
     redirect("/ambassador/login?error=restricted");
   }
 
-  const { data: profileData } = await supabaseAdmin
-    .from("profiles")
-    .select("avatar_url,profile_photo_url,photo_url,image_url")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [profileResult, roleRowsResult, guruAccessResult] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select(
+        "avatar_url,profile_photo_url,photo_url,image_url,role,account_type",
+      )
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
+    supabaseAdmin.from("gurus").select("id").eq("user_id", user.id).limit(1),
+  ]);
 
   const ambassadorRecord = ambassador as AmbassadorRecord;
-  const profile = (profileData || null) as ProfileRow | null;
+  const profile = (profileResult.data || null) as ProfileRow | null;
+  const roleValues = new Set<string>();
+
+  if (profile?.role) roleValues.add(profile.role);
+  if (profile?.account_type) roleValues.add(profile.account_type);
+
+  (roleRowsResult.data || []).forEach((row: AnyRow) => {
+    const role = asString(row.role);
+    if (role) roleValues.add(role);
+  });
+
+  const roleList = Array.from(roleValues);
+
+  const dashboardAccess: DashboardAccess = {
+    petParent: roleList.some(hasPetParentRole),
+    guru: roleList.some(hasGuruRole) || Boolean(guruAccessResult.data?.length),
+    ambassador:
+      roleList.some(hasAmbassadorRole) || Boolean(ambassadorRecord.id),
+  };
   const fullName = asString(ambassadorRecord.full_name) || "SitGuru Ambassador";
   const firstName = getFirstName(fullName);
   const referralCode = asString(ambassadorRecord.referral_code);
@@ -600,13 +688,16 @@ export default async function AmbassadorDashboardPage() {
                     Hi, {firstName}
                   </h1>
                   <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                    Your command center for referral links, Ambassador onboarding,
-                    training, rewards, and SitGuru support.
+                    Your command center for referral links, Ambassador
+                    onboarding, training, rewards, and SitGuru support.
                   </p>
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Pill>{asString(ambassadorRecord.status) || "active"}</Pill>
-                    <Pill>{asString(ambassadorRecord.referral_status) || "Referral Code Active"}</Pill>
+                    <Pill>
+                      {asString(ambassadorRecord.referral_status) ||
+                        "Referral Code Active"}
+                    </Pill>
                     <Pill>{onboardingPacket.label}</Pill>
                   </div>
 
@@ -618,7 +709,9 @@ export default async function AmbassadorDashboardPage() {
                       {referralCode}
                     </p>
                     <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                      Share this code with every Pet Parent, future Guru, local partner, or social media referral so SitGuru can track activity back to you.
+                      Share this code with every Pet Parent, future Guru, local
+                      partner, or social media referral so SitGuru can track
+                      activity back to you.
                     </p>
                   </div>
                 </div>
@@ -627,6 +720,11 @@ export default async function AmbassadorDashboardPage() {
 
             <div className="border-t border-green-100 bg-white p-5 sm:p-7 lg:border-l lg:border-t-0">
               <div className="grid gap-3">
+                <DashboardSwitcherPanel
+                  access={dashboardAccess}
+                  current="ambassador"
+                />
+
                 <Link
                   href={onboardingPacket.href}
                   className="flex min-h-14 items-center justify-between rounded-2xl bg-green-800 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
@@ -659,7 +757,9 @@ export default async function AmbassadorDashboardPage() {
 
         <AmbassadorProgressPanel
           onboardingPacket={onboardingPacket}
-          trainingStatus={asString(ambassadorRecord.training_status) || "Not Started"}
+          trainingStatus={
+            asString(ambassadorRecord.training_status) || "Not Started"
+          }
           referralCode={referralCode}
           stats={stats}
         />
@@ -740,7 +840,8 @@ export default async function AmbassadorDashboardPage() {
             </div>
 
             <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-950">
-              Rewards are reviewed by SitGuru. Fake, duplicate, self-created, canceled, refunded, or unverifiable activity does not qualify.
+              Rewards are reviewed by SitGuru. Fake, duplicate, self-created,
+              canceled, refunded, or unverifiable activity does not qualify.
             </div>
           </DashboardCard>
 
@@ -752,14 +853,27 @@ export default async function AmbassadorDashboardPage() {
             />
 
             <div className="mt-5 grid gap-3">
-              <ReminderItem>Pack Leaders mentor direct Ambassadors and help grow verified local activity.</ReminderItem>
-              <ReminderItem>One level only: rewards are tied to direct Ambassadors, not a recruiting chain.</ReminderItem>
-              <ReminderItem>Pack Leader rewards are based on verified SitGuru activity and SitGuru share.</ReminderItem>
-              <ReminderItem>Founding Pack Leaders may support a city, school, military community, or service area.</ReminderItem>
+              <ReminderItem>
+                Pack Leaders mentor direct Ambassadors and help grow verified
+                local activity.
+              </ReminderItem>
+              <ReminderItem>
+                One level only: rewards are tied to direct Ambassadors, not a
+                recruiting chain.
+              </ReminderItem>
+              <ReminderItem>
+                Pack Leader rewards are based on verified SitGuru activity and
+                SitGuru share.
+              </ReminderItem>
+              <ReminderItem>
+                Founding Pack Leaders may support a city, school, military
+                community, or service area.
+              </ReminderItem>
             </div>
 
             <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-950">
-              Pack Leader participation is reviewed and approved by SitGuru. No earnings are guaranteed.
+              Pack Leader participation is reviewed and approved by SitGuru. No
+              earnings are guaranteed.
             </div>
           </DashboardCard>
         </section>
@@ -823,9 +937,16 @@ export default async function AmbassadorDashboardPage() {
                 {onboardingPacket.label}: {onboardingPacket.helper}
               </Link>
 
-              <ReminderItem>Share your Pet Parent link with one local pet family.</ReminderItem>
-              <ReminderItem>Share your Guru link with one potential sitter, walker, or pet professional.</ReminderItem>
-              <ReminderItem>Message SitGuru if a referral is missing from tracking.</ReminderItem>
+              <ReminderItem>
+                Share your Pet Parent link with one local pet family.
+              </ReminderItem>
+              <ReminderItem>
+                Share your Guru link with one potential sitter, walker, or pet
+                professional.
+              </ReminderItem>
+              <ReminderItem>
+                Message SitGuru if a referral is missing from tracking.
+              </ReminderItem>
             </div>
           </DashboardCard>
         </section>
@@ -839,7 +960,8 @@ export default async function AmbassadorDashboardPage() {
             />
             <div className="mt-4 grid gap-3">
               <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
-                {stats.petParentSignups + stats.guruSignups} total referred signups
+                {stats.petParentSignups + stats.guruSignups} total referred
+                signups
               </div>
               <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
                 {stats.completedBookings} completed referral bookings
@@ -873,9 +995,15 @@ export default async function AmbassadorDashboardPage() {
               detail="Referral-first. Commission-based. Hourly only by exception."
             />
             <div className="mt-4 grid gap-3">
-              <ReminderItem>Do not promise guaranteed bookings or earnings.</ReminderItem>
-              <ReminderItem>Use approved SitGuru messaging when sharing.</ReminderItem>
-              <ReminderItem>Hourly work must be separately approved in writing.</ReminderItem>
+              <ReminderItem>
+                Do not promise guaranteed bookings or earnings.
+              </ReminderItem>
+              <ReminderItem>
+                Use approved SitGuru messaging when sharing.
+              </ReminderItem>
+              <ReminderItem>
+                Hourly work must be separately approved in writing.
+              </ReminderItem>
             </div>
           </DashboardCard>
         </section>
@@ -888,10 +1016,20 @@ export default async function AmbassadorDashboardPage() {
               detail="Quick actions an Ambassador can do while walking, talking, or sharing from a phone."
             />
             <div className="mt-4 grid gap-3">
-              <ReminderItem>Send your Pet Parent link to 3 local pet families.</ReminderItem>
-              <ReminderItem>Send your Guru link to 1 potential sitter, walker, groomer, trainer, or pet professional.</ReminderItem>
-              <ReminderItem>Invite 5 people to follow @SitGuruOfficial.</ReminderItem>
-              <ReminderItem>Message SitGuru if a referral, flyer, or QR code support item is needed.</ReminderItem>
+              <ReminderItem>
+                Send your Pet Parent link to 3 local pet families.
+              </ReminderItem>
+              <ReminderItem>
+                Send your Guru link to 1 potential sitter, walker, groomer,
+                trainer, or pet professional.
+              </ReminderItem>
+              <ReminderItem>
+                Invite 5 people to follow @SitGuruOfficial.
+              </ReminderItem>
+              <ReminderItem>
+                Message SitGuru if a referral, flyer, or QR code support item is
+                needed.
+              </ReminderItem>
             </div>
           </DashboardCard>
 
@@ -902,10 +1040,22 @@ export default async function AmbassadorDashboardPage() {
               detail="Weekly goals to keep local growth moving."
             />
             <div className="mt-4 grid gap-3">
-              <ReminderItem>Post or share SitGuru in 2 approved local groups or community pages.</ReminderItem>
-              <ReminderItem>Talk to 1 local pet business, rescue, groomer, trainer, or apartment community.</ReminderItem>
-              <ReminderItem>Follow up with every person who asked for the link but has not signed up yet.</ReminderItem>
-              <ReminderItem>Check your dashboard for verified signups, rewards, and next milestone.</ReminderItem>
+              <ReminderItem>
+                Post or share SitGuru in 2 approved local groups or community
+                pages.
+              </ReminderItem>
+              <ReminderItem>
+                Talk to 1 local pet business, rescue, groomer, trainer, or
+                apartment community.
+              </ReminderItem>
+              <ReminderItem>
+                Follow up with every person who asked for the link but has not
+                signed up yet.
+              </ReminderItem>
+              <ReminderItem>
+                Check your dashboard for verified signups, rewards, and next
+                milestone.
+              </ReminderItem>
             </div>
           </DashboardCard>
 
@@ -916,10 +1066,19 @@ export default async function AmbassadorDashboardPage() {
               detail="Monthly Ambassador focus for stronger growth and better rewards."
             />
             <div className="mt-4 grid gap-3">
-              <ReminderItem>Work toward the next verified social signup milestone.</ReminderItem>
-              <ReminderItem>Identify 3 new potential Gurus in your city or service area.</ReminderItem>
-              <ReminderItem>Ask SitGuru for updated flyers, QR codes, or event support before local outreach.</ReminderItem>
-              <ReminderItem>Review rewards and request help if anything looks missing.</ReminderItem>
+              <ReminderItem>
+                Work toward the next verified social signup milestone.
+              </ReminderItem>
+              <ReminderItem>
+                Identify 3 new potential Gurus in your city or service area.
+              </ReminderItem>
+              <ReminderItem>
+                Ask SitGuru for updated flyers, QR codes, or event support
+                before local outreach.
+              </ReminderItem>
+              <ReminderItem>
+                Review rewards and request help if anything looks missing.
+              </ReminderItem>
             </div>
           </DashboardCard>
         </section>
@@ -935,16 +1094,35 @@ export default async function AmbassadorDashboardPage() {
                 />
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <SupportOption icon={<FileText size={18} />} title="Flyers" detail="Updated local flyers or print-ready handouts." />
-                  <SupportOption icon={<QrCode size={18} />} title="QR Codes" detail="Fresh QR codes for Pet Parent, Guru, or social outreach." />
-                  <SupportOption icon={<MessageCircle size={18} />} title="Missing Referral" detail="A signup or booking is not showing on your dashboard." />
-                  <SupportOption icon={<BookOpenCheck size={18} />} title="Talking Points" detail="Help with wording, local outreach, or social media posts." />
+                  <SupportOption
+                    icon={<FileText size={18} />}
+                    title="Flyers"
+                    detail="Updated local flyers or print-ready handouts."
+                  />
+                  <SupportOption
+                    icon={<QrCode size={18} />}
+                    title="QR Codes"
+                    detail="Fresh QR codes for Pet Parent, Guru, or social outreach."
+                  />
+                  <SupportOption
+                    icon={<MessageCircle size={18} />}
+                    title="Missing Referral"
+                    detail="A signup or booking is not showing on your dashboard."
+                  />
+                  <SupportOption
+                    icon={<BookOpenCheck size={18} />}
+                    title="Talking Points"
+                    detail="Help with wording, local outreach, or social media posts."
+                  />
                 </div>
               </div>
 
               <div className="rounded-[24px] border border-green-100 bg-green-50 p-4 sm:p-5">
                 <div className="mb-4 rounded-2xl bg-white px-4 py-3 text-sm font-black leading-6 text-green-950 ring-1 ring-green-100">
-                  Ambassador goal: encourage people to follow @SitGuruOfficial and sign up using your referral link or code. Verified social signups may count toward social growth bonuses after SitGuru review.
+                  Ambassador goal: encourage people to follow @SitGuruOfficial
+                  and sign up using your referral link or code. Verified social
+                  signups may count toward social growth bonuses after SitGuru
+                  review.
                 </div>
 
                 <form
@@ -953,7 +1131,11 @@ export default async function AmbassadorDashboardPage() {
                   encType="text/plain"
                   className="grid gap-3"
                 >
-                  <input type="hidden" name="Ambassador referral code" value={referralCode} />
+                  <input
+                    type="hidden"
+                    name="Ambassador referral code"
+                    value={referralCode}
+                  />
 
                   <label className="grid gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.16em] text-green-900">
@@ -964,13 +1146,25 @@ export default async function AmbassadorDashboardPage() {
                       defaultValue="flyers"
                       className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-950 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
                     >
-                      <option value="flyers">Request flyers / print-ready handouts</option>
+                      <option value="flyers">
+                        Request flyers / print-ready handouts
+                      </option>
                       <option value="qr-codes">Request QR codes</option>
-                      <option value="missing-referral">Referral or booking is missing</option>
-                      <option value="talking-points">Need talking points or local outreach wording</option>
-                      <option value="social-media-support">Need help growing @SitGuruOfficial</option>
-                      <option value="event-support">Need event, table, or community outreach support</option>
-                      <option value="other-support">Other Ambassador support request</option>
+                      <option value="missing-referral">
+                        Referral or booking is missing
+                      </option>
+                      <option value="talking-points">
+                        Need talking points or local outreach wording
+                      </option>
+                      <option value="social-media-support">
+                        Need help growing @SitGuruOfficial
+                      </option>
+                      <option value="event-support">
+                        Need event, table, or community outreach support
+                      </option>
+                      <option value="other-support">
+                        Other Ambassador support request
+                      </option>
                     </select>
                   </label>
 
@@ -995,7 +1189,8 @@ export default async function AmbassadorDashboardPage() {
                   </button>
 
                   <p className="text-xs font-bold leading-5 text-green-900/75">
-                    This opens an email to support@sitguru.com with the request type, referral code, and optional note.
+                    This opens an email to support@sitguru.com with the request
+                    type, referral code, and optional note.
                   </p>
                 </form>
               </div>
@@ -1013,23 +1208,39 @@ export default async function AmbassadorDashboardPage() {
 
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                <p className="text-sm font-black text-green-950">PawPerks for Pet Parents</p>
+                <p className="text-sm font-black text-green-950">
+                  PawPerks for Pet Parents
+                </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Mention PawPerks when talking with Pet Parents who want trusted care, rewards, local pet resources, and reasons to keep using SitGuru.
+                  Mention PawPerks when talking with Pet Parents who want
+                  trusted care, rewards, local pet resources, and reasons to
+                  keep using SitGuru.
                 </p>
               </div>
               <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                <p className="text-sm font-black text-green-950">PetPerks for partners</p>
+                <p className="text-sm font-black text-green-950">
+                  PetPerks for partners
+                </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Mention PetPerks when talking with groomers, trainers, rescues, vets, apartments, and local pet-friendly businesses.
+                  Mention PetPerks when talking with groomers, trainers,
+                  rescues, vets, apartments, and local pet-friendly businesses.
                 </p>
               </div>
             </div>
 
             <div className="mt-4 grid gap-3">
-              <ReminderItem>Use PawPerks/PetPerks as a softer way to start the SitGuru conversation.</ReminderItem>
-              <ReminderItem>Tell people to sign up with your Ambassador code so activity can be verified.</ReminderItem>
-              <ReminderItem>Ask SitGuru for updated flyers or QR codes before local outreach.</ReminderItem>
+              <ReminderItem>
+                Use PawPerks/PetPerks as a softer way to start the SitGuru
+                conversation.
+              </ReminderItem>
+              <ReminderItem>
+                Tell people to sign up with your Ambassador code so activity can
+                be verified.
+              </ReminderItem>
+              <ReminderItem>
+                Ask SitGuru for updated flyers or QR codes before local
+                outreach.
+              </ReminderItem>
             </div>
           </DashboardCard>
 
@@ -1050,7 +1261,8 @@ export default async function AmbassadorDashboardPage() {
                     className="aspect-video w-full bg-black"
                   >
                     <source src={ambassadorPromoVideoUrl} type="video/mp4" />
-                    Your browser does not support the SitGuru Ambassador promo video.
+                    Your browser does not support the SitGuru Ambassador promo
+                    video.
                   </video>
                 ) : (
                   <iframe
@@ -1065,7 +1277,9 @@ export default async function AmbassadorDashboardPage() {
             ) : (
               <div className="mt-5 rounded-[24px] border border-dashed border-green-200 bg-green-50 p-5 text-sm font-bold leading-6 text-green-950">
                 Add a promo video at
-                <span className="mx-1 rounded-lg bg-white px-2 py-1 font-black">public/videos/sitguru-ambassador-promo.mp4</span>
+                <span className="mx-1 rounded-lg bg-white px-2 py-1 font-black">
+                  public/videos/sitguru-ambassador-promo.mp4
+                </span>
                 and this card will automatically show the video here.
               </div>
             )}
@@ -1113,7 +1327,6 @@ export default async function AmbassadorDashboardPage() {
   );
 }
 
-
 function AmbassadorProgressPanel({
   onboardingPacket,
   trainingStatus,
@@ -1141,7 +1354,10 @@ function AmbassadorProgressPanel({
       value: onboardingPacket.label,
       complete: onboardingPacket.status === "complete",
       pending: onboardingPacket.status === "pending",
-      helper: onboardingPacket.status === "complete" ? "Reviewed by SitGuru." : onboardingPacket.helper,
+      helper:
+        onboardingPacket.status === "complete"
+          ? "Reviewed by SitGuru."
+          : onboardingPacket.helper,
     },
     {
       label: "Training",
@@ -1214,7 +1430,9 @@ function AmbassadorProgressPanel({
                 }`}
               />
             </div>
-            <p className="mt-2 text-lg font-black text-slate-950">{step.value}</p>
+            <p className="mt-2 text-lg font-black text-slate-950">
+              {step.value}
+            </p>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
               {step.helper}
             </p>
@@ -1222,6 +1440,103 @@ function AmbassadorProgressPanel({
         ))}
       </div>
     </section>
+  );
+}
+
+function DashboardSwitcherPanel({
+  access,
+  current,
+}: {
+  access: DashboardAccess;
+  current: "pet_parent" | "guru" | "ambassador";
+}) {
+  const dashboardLinks = [
+    access.petParent
+      ? {
+          key: "pet_parent",
+          label: "Pet Parent Dashboard",
+          href: "/customer/dashboard/profile",
+          helper: "Pets, bookings, PawPerks, and care details",
+        }
+      : null,
+    access.guru
+      ? {
+          key: "guru",
+          label: "Guru Dashboard",
+          href: "/guru/dashboard",
+          helper: "Services, bookings, messages, and earnings",
+        }
+      : null,
+    access.ambassador
+      ? {
+          key: "ambassador",
+          label: "Ambassador Dashboard",
+          href: "/ambassador/dashboard",
+          helper: "Referrals, training, rewards, and outreach",
+        }
+      : null,
+  ].filter(Boolean) as {
+    key: "pet_parent" | "guru" | "ambassador";
+    label: string;
+    href: string;
+    helper: string;
+  }[];
+
+  if (dashboardLinks.length <= 1) return null;
+
+  return (
+    <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-800">
+        Switch Dashboard
+      </p>
+      <div className="mt-3 grid gap-2">
+        {dashboardLinks.map((dashboard) => {
+          const isCurrent = dashboard.key === current;
+
+          if (isCurrent) {
+            return (
+              <div
+                key={dashboard.key}
+                className="rounded-2xl border border-green-200 bg-white px-4 py-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-green-950">
+                    {dashboard.label}
+                  </p>
+                  <span className="rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-green-800">
+                    Current
+                  </span>
+                </div>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
+                  {dashboard.helper}
+                </p>
+              </div>
+            );
+          }
+
+          return (
+            <Link
+              key={dashboard.key}
+              href={dashboard.href}
+              className="group rounded-2xl border border-green-100 bg-white px-4 py-3 transition hover:border-green-200 hover:bg-green-100/50"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-black text-green-950">
+                  {dashboard.label}
+                </p>
+                <ArrowRight
+                  size={15}
+                  className="text-green-800 transition group-hover:translate-x-0.5"
+                />
+              </div>
+              <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
+                {dashboard.helper}
+              </p>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1294,7 +1609,9 @@ function StatCard({
         {label}
       </p>
       <p className="mt-1 text-2xl font-black text-green-950">{value}</p>
-      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">{detail}</p>
+      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+        {detail}
+      </p>
     </div>
   );
 }
@@ -1322,7 +1639,6 @@ function SectionHeader({
     </div>
   );
 }
-
 
 function SupportOption({
   icon,
