@@ -507,7 +507,25 @@ async function saveGuruServiceRates(guruId: string, serviceRates: ServiceRateSta
     .from("guru_service_rates")
     .upsert(payload, { onConflict: "guru_id,service_key" });
 
-  if (error) throw error;
+  if (!error) return;
+
+  console.warn(
+    "Guru service rate upsert failed. Trying replace save:",
+    error.message,
+  );
+
+  const { error: deleteError } = await supabase
+    .from("guru_service_rates")
+    .delete()
+    .eq("guru_id", guruId);
+
+  if (deleteError) throw deleteError;
+
+  const { error: insertError } = await supabase
+    .from("guru_service_rates")
+    .insert(payload);
+
+  if (insertError) throw insertError;
 }
 
 function getFileExtension(file: File) {
@@ -651,13 +669,36 @@ async function saveGuruPayload({
   const attempts = [payload, mapPayload, latLngPayload, leanPayload, basicPayload];
   let lastError = "Could not save your guru profile.";
 
-  for (const attempt of attempts) {
-    const response = profileExists
-      ? await supabase.from("gurus").update(attempt).eq("user_id", userId)
-      : await supabase.from("gurus").insert(attempt);
+  if (profileExists) {
+    for (const attempt of attempts) {
+      const response = await supabase
+        .from("gurus")
+        .update(attempt)
+        .eq("user_id", userId)
+        .select("*")
+        .limit(1);
 
-    if (!response.error) return;
-    lastError = response.error.message || lastError;
+      if (!response.error && response.data?.[0]) {
+        return response.data[0] as GuruProfile;
+      }
+
+      if (response.error) {
+        lastError = response.error.message || lastError;
+      } else {
+        lastError =
+          "No matching Guru profile row was updated. SitGuru will try creating the missing Guru row.";
+      }
+    }
+  }
+
+  for (const attempt of attempts) {
+    const response = await supabase.from("gurus").insert(attempt).select("*").limit(1);
+
+    if (!response.error && response.data?.[0]) {
+      return response.data[0] as GuruProfile;
+    }
+
+    if (response.error) lastError = response.error.message || lastError;
   }
 
   throw new Error(lastError);
@@ -1268,7 +1309,7 @@ function GuruDashboardProfilePageContent() {
     };
 
     try {
-      await saveGuruPayload({ userId, profileExists, payload });
+      const savedProfile = await saveGuruPayload({ userId, profileExists, payload });
 
       const { data: freshRows } = await supabase
         .from("gurus")
@@ -1276,11 +1317,14 @@ function GuruDashboardProfilePageContent() {
         .eq("user_id", userId)
         .limit(1);
 
-      const refreshed = (freshRows?.[0] as GuruProfile | undefined) ?? null;
+      const refreshed =
+        ((freshRows?.[0] as GuruProfile | undefined) ?? savedProfile ?? null);
       const savedGuruId = refreshed?.id || existingProfileId;
+      let savedServiceRates = serviceRates;
 
       if (savedGuruId) {
         await saveGuruServiceRates(savedGuruId, serviceRates);
+        savedServiceRates = await loadGuruServiceRates(savedGuruId, cleanServices);
       }
 
       if (refreshed) {
@@ -1351,24 +1395,13 @@ function GuruDashboardProfilePageContent() {
             refreshed.avatar_url,
           ]),
         );
-        const refreshedServices = normalizeServices(refreshed.services);
-        setServices(refreshedServices);
-        setServiceRates((current) =>
-          current.map((service) => ({
-            ...service,
-            is_enabled: refreshedServices.includes(service.service_label),
-          })),
-        );
+        setServices(cleanServices);
+        setServiceRates(savedServiceRates);
         setIsPublic(Boolean(refreshed.is_public));
       } else {
         setSlug(cleanSlug);
         setServices(cleanServices);
-        setServiceRates((current) =>
-          current.map((service) => ({
-            ...service,
-            is_enabled: cleanServices.includes(service.service_label),
-          })),
-        );
+        setServiceRates(savedServiceRates);
         setIsPublic(safeIsPublic);
         setProfileExists(true);
       }
