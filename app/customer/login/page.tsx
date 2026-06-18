@@ -38,17 +38,7 @@ export default async function CustomerLoginRedirectPage({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const params = new URLSearchParams();
 
-  params.set("role", "pet_parent");
   params.set("mode", getLoginMode(resolvedSearchParams.mode));
-
-  const errorMessage =
-    getFirstParam(resolvedSearchParams.error) ||
-    getFirstParam(resolvedSearchParams.message) ||
-    getFirstParam(resolvedSearchParams.auth_error);
-
-  if (errorMessage) {
-    params.set("error", errorMessage);
-  }
 
   redirect(`/login?${params.toString()}`);
 }
