@@ -2325,6 +2325,18 @@ function GuruLeadPipelineCard({
 }: {
   pipeline: GuruLeadPipelineData;
 }) {
+  const statusItems: ChartItem[] = [
+    { label: "New", value: pipeline.new, helper: "Fresh leads" },
+    { label: "Contacted", value: pipeline.contacted, helper: "Follow-up started" },
+    { label: "Interested", value: pipeline.interested, helper: "Warm prospects" },
+    { label: "Application Sent", value: pipeline.applicationSent, helper: "Packet sent" },
+    { label: "Applied", value: pipeline.applied, helper: "Application submitted" },
+    { label: "Approved", value: pipeline.approvedGuru, helper: "Converted Gurus" },
+  ].filter((item) => item.value > 0 || item.label === "New");
+
+  const topSources = pipeline.sourceChart.slice(0, 3);
+  const topReferralCodes = pipeline.referralCodeChart.slice(0, 4);
+
   return (
     <DashboardCard>
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
@@ -2332,12 +2344,11 @@ function GuruLeadPipelineCard({
           <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
             Guru Recruiting Pipeline
           </p>
-          <h2 className="mt-1 text-xl font-black text-slate-950">
-            Guru Lead Pipeline
+          <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+            Lead Snapshot
           </h2>
-          <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-            Live Guru Lead data from `guru_leads`, including where prospects are
-            coming from and which referral codes are creating future Guru opportunities.
+          <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
+            Compact view of Guru leads, source performance, and referral activity.
           </p>
         </div>
 
@@ -2346,20 +2357,15 @@ function GuruLeadPipelineCard({
           className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
         >
           <UserPlus size={17} />
-          Manage Guru Leads
+          Manage Leads
         </Link>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MiniMetric
           icon={<Users size={18} />}
           label="Total Leads"
           value={number(pipeline.total)}
-        />
-        <MiniMetric
-          icon={<UserPlus size={18} />}
-          label="New"
-          value={number(pipeline.new)}
         />
         <MiniMetric
           icon={<FileSearch size={18} />}
@@ -2367,24 +2373,9 @@ function GuruLeadPipelineCard({
           value={number(pipeline.contacted)}
         />
         <MiniMetric
-          icon={<Sparkles size={18} />}
-          label="Interested"
-          value={number(pipeline.interested)}
-        />
-        <MiniMetric
-          icon={<ClipboardCheck size={18} />}
-          label="Application Sent"
-          value={number(pipeline.applicationSent)}
-        />
-        <MiniMetric
           icon={<BadgeCheck size={18} />}
           label="Applied"
           value={number(pipeline.applied)}
-        />
-        <MiniMetric
-          icon={<CheckCircle2 size={18} />}
-          label="Approved Guru"
-          value={number(pipeline.approvedGuru)}
         />
         <MiniMetric
           icon={<Star size={18} />}
@@ -2393,87 +2384,83 @@ function GuruLeadPipelineCard({
         />
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-12">
-        <div className="xl:col-span-4">
-          <div className="rounded-[24px] border border-emerald-100 bg-emerald-50 p-5">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-              Top Lead Source
-            </p>
-            <p className="mt-2 text-2xl font-black text-emerald-950">
-              {pipeline.topSource}
-            </p>
-            <p className="mt-3 text-sm font-semibold leading-6 text-emerald-800">
-              Use this to see whether Facebook groups, events, referrals, partners,
-              job boards, or website traffic are producing the most Guru interest.
-            </p>
-          </div>
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <HorizontalBarChart
+          title="Lead Status"
+          valueLabel="Leads"
+          items={statusItems}
+          emptyLabel="No Guru Lead status data found yet."
+        />
 
-          <div className="mt-4 rounded-[24px] border border-purple-100 bg-purple-50 p-5">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-purple-700">
-              Top Referral Code
-            </p>
-            <p className="mt-2 text-2xl font-black text-purple-950">
-              {pipeline.topReferralCode}
-            </p>
-            <p className="mt-3 text-sm font-semibold leading-6 text-purple-800">
-              Referral codes help SitGuru credit people and campaigns that are
-              bringing future Gurus into the platform.
-            </p>
-          </div>
-        </div>
-
-        <div className="xl:col-span-4">
-          <HorizontalBarChart
-            title="Guru Lead Sources"
-            valueLabel="Leads"
-            items={pipeline.sourceChart}
-            emptyLabel="No Guru Lead source data found yet."
-          />
-        </div>
-
-        <div className="xl:col-span-4">
-          <div className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-4">
-            <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="grid gap-4">
+          <div className="rounded-[24px] border border-emerald-100 bg-emerald-50 p-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-black text-slate-950">
-                  Top Referral Codes
-                </h3>
-                <p className="mt-1 text-xs font-bold text-slate-500">
-                  Showing top 5 only to keep this dashboard compact.
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                  Top Source
+                </p>
+                <p className="mt-1 text-xl font-black text-emerald-950">
+                  {pipeline.topSource}
                 </p>
               </div>
-              <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-                Leads
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-200">
+                {number(topSources[0]?.value || 0)} leads
               </span>
             </div>
 
-            <div className="max-h-[360px] overflow-y-auto pr-1">
-              <HorizontalBarChart
-                title="Referral Codes"
-                valueLabel="Leads"
-                items={pipeline.referralCodeChart}
-                emptyLabel="No Guru Lead referral code data found yet."
-              />
+            <div className="mt-4 grid gap-2">
+              {topSources.length ? (
+                topSources.map((source) => (
+                  <div
+                    key={source.label}
+                    className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-800 ring-1 ring-emerald-100"
+                  >
+                    <span>{source.label}</span>
+                    <span>{number(source.value)}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-500 ring-1 ring-emerald-100">
+                  No source data yet.
+                </div>
+              )}
             </div>
+          </div>
 
-            {pipeline.hiddenReferralCodes > 0 ? (
-              <div className="mt-4 rounded-2xl border border-purple-100 bg-purple-50 p-4">
-                <p className="text-sm font-black text-purple-950">
-                  + {number(pipeline.hiddenReferralCodes)} more referral code
-                  {pipeline.hiddenReferralCodes === 1 ? "" : "s"}
+          <div className="rounded-[24px] border border-purple-100 bg-purple-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-purple-700">
+                  Top Referral Codes
                 </p>
-                <p className="mt-1 text-xs font-bold leading-5 text-purple-700">
-                  Manage the full referral list from Guru Leads so this page stays short.
+                <p className="mt-1 text-xl font-black text-purple-950">
+                  {pipeline.topReferralCode}
                 </p>
               </div>
-            ) : null}
+              <Link
+                href={adminRoutes.guruLeads}
+                className="rounded-full bg-white px-3 py-1 text-xs font-black text-purple-800 ring-1 ring-purple-200 transition hover:bg-purple-100"
+              >
+                View All
+              </Link>
+            </div>
 
-            <Link
-              href={adminRoutes.guruLeads}
-              className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-purple-200 bg-white px-4 py-3 text-sm font-black text-purple-800 transition hover:bg-purple-50"
-            >
-              View All Referral Codes
-            </Link>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {topReferralCodes.length ? (
+                topReferralCodes.map((code) => (
+                  <span
+                    key={code.label}
+                    className="rounded-full bg-white px-3 py-2 text-xs font-black text-purple-900 ring-1 ring-purple-100"
+                  >
+                    {code.label}: {number(code.value)}
+                  </span>
+                ))
+              ) : (
+                <span className="rounded-full bg-white px-3 py-2 text-xs font-bold text-purple-700 ring-1 ring-purple-100">
+                  No referral code data yet
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -2586,6 +2573,98 @@ function GuruOnboardingPacketReviewCard({
         </div>
       </div>
     </DashboardCard>
+  );
+}
+
+function GuruCompactSnapshot({
+  guruData,
+}: {
+  guruData: Awaited<ReturnType<typeof getGuruManagementData>>;
+}) {
+  const topLocations = guruData.chartData.locationChart.slice(0, 5);
+  const topServices = guruData.chartData.serviceChart.slice(0, 5);
+
+  return (
+    <section className="grid gap-5 xl:grid-cols-3">
+      <DashboardCard>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+          Guru KPI Snapshot
+        </p>
+        <h2 className="mt-1 text-xl font-black text-slate-950">
+          Review Workload
+        </h2>
+        <div className="mt-4 grid gap-3">
+          <WorkflowTile
+            href="/admin/gurus?status=pending"
+            label="Pending Admin Action"
+            value={guruData.totals.pending}
+            detail="Needs review or follow-up"
+          />
+          <WorkflowTile
+            href="/admin/gurus?filter=profile-updates"
+            label="Profile Updates"
+            value={guruData.totals.profileUpdates}
+            detail="Needs profile cleanup"
+          />
+          <WorkflowTile
+            href="/admin/gurus?queue=flagged-review"
+            label="Flagged Review"
+            value={guruData.totals.flaggedReview}
+            detail="Trust or risk review"
+          />
+        </div>
+      </DashboardCard>
+
+      <DashboardCard>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+          Readiness
+        </p>
+        <h2 className="mt-1 text-xl font-black text-slate-950">
+          Bookable Status
+        </h2>
+        <div className="mt-4 grid gap-3">
+          <WorkflowTile
+            href="/admin/gurus?status=bookable"
+            label="Bookable"
+            value={guruData.totals.bookable}
+            detail="Visible / ready"
+          />
+          <WorkflowTile
+            href="/admin/gurus?status=approved"
+            label="Approved"
+            value={guruData.totals.approved}
+            detail="Approved, not bookable"
+          />
+          <WorkflowTile
+            href="/admin/gurus?status=new"
+            label="New"
+            value={guruData.totals.new}
+            detail="Fresh applicants"
+          />
+        </div>
+      </DashboardCard>
+
+      <DashboardCard>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+          Supply
+        </p>
+        <h2 className="mt-1 text-xl font-black text-slate-950">
+          Top Markets & Services
+        </h2>
+        <div className="mt-4 grid gap-4">
+          <HorizontalBarChart
+            title="Top Locations"
+            valueLabel="Gurus"
+            items={topLocations}
+          />
+          <HorizontalBarChart
+            title="Top Services"
+            valueLabel="Gurus"
+            items={topServices}
+          />
+        </div>
+      </DashboardCard>
+    </section>
   );
 }
 
@@ -2810,218 +2889,7 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
           />
         </section>
 
-        <section className="grid items-start gap-5 xl:grid-cols-12">
-          <div className="xl:col-span-4">
-            <DashboardCard>
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Guru Setup Chart
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Setup step distribution from live Guru rows.
-                </p>
-              </div>
-
-              <DonutChart
-                title="Gurus"
-                total={guruData.totals.all}
-                items={guruData.chartData.setupChart}
-              />
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                <MiniMetric
-                  icon={<BadgeCheck size={18} />}
-                  label="Profile Updates"
-                  value={number(guruData.totals.profileUpdates)}
-                />
-                <MiniMetric
-                  icon={<Sparkles size={18} />}
-                  label="Flagged Review"
-                  value={number(guruData.totals.flaggedReview)}
-                />
-              </div>
-            </DashboardCard>
-          </div>
-
-          <div className="xl:col-span-8">
-            <DashboardCard>
-              <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <div>
-                  <h2 className="text-xl font-black text-slate-950">
-                    Guru Readiness Charts
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Visualize bookable visibility, profile quality, and trust
-                    check readiness.
-                  </p>
-                </div>
-
-                <Link
-                  href={adminRoutes.guruExport}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white transition hover:bg-green-900"
-                >
-                  <Download size={16} />
-                  Export
-                </Link>
-              </div>
-
-              <div className="grid gap-5 lg:grid-cols-3">
-                <HorizontalBarChart
-                  title="Bookable Visibility"
-                  valueLabel="Gurus"
-                  items={guruData.chartData.visibilityChart}
-                />
-
-                <HorizontalBarChart
-                  title="Profile Quality"
-                  valueLabel="Gurus"
-                  items={guruData.chartData.profileChart}
-                />
-
-                <HorizontalBarChart
-                  title="Trust Checks"
-                  valueLabel="Ready"
-                  items={guruData.chartData.trustChart}
-                />
-              </div>
-            </DashboardCard>
-          </div>
-        </section>
-
-        <section className="grid items-start gap-5 xl:grid-cols-12">
-          <div className="xl:col-span-8">
-            <DashboardCard>
-              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <div>
-                  <h2 className="text-xl font-black text-slate-950">
-                    Guru Review Workflow
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Move Gurus through application, profile, verification, and
-                    bookable readiness.
-                  </p>
-                </div>
-
-                <span className="rounded-2xl border border-green-100 bg-[#f7faf4] px-4 py-3 text-sm font-black text-green-900">
-                  {number(guruData.totals.pending)} pending admin action
-                </span>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <WorkflowTile
-                  href="/admin/gurus?status=new"
-                  label="New Applications"
-                  value={guruData.totals.new}
-                  detail="Fresh applicants"
-                />
-                <WorkflowTile
-                  href="/admin/gurus?status=reviewing"
-                  label="Under Review"
-                  value={guruData.totals.reviewing}
-                  detail="Admin review needed"
-                />
-                <WorkflowTile
-                  href="/admin/gurus?status=pre-approved"
-                  label="Pre-Approved"
-                  value={guruData.totals.preApproved}
-                  detail="Ready for next checks"
-                />
-                <WorkflowTile
-                  href="/admin/gurus?status=approved"
-                  label="Approved"
-                  value={guruData.totals.approved}
-                  detail="Approved but not bookable"
-                />
-              </div>
-            </DashboardCard>
-          </div>
-
-          <div className="xl:col-span-4">
-            <DashboardCard>
-              <div className="mb-5 flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
-                  <CheckCircle2 size={20} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black text-slate-950">
-                    Bookable Checklist
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Gurus should only be customer-visible after these checks.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2.5">
-                {[
-                  "Public profile is complete and customer-ready",
-                  "City, state, services, pricing, and availability are valid",
-                  "Experience, specialties, and bio are clear",
-                  "Payout readiness is confirmed when enabled",
-                  "Identity verification is approved",
-                  "Background check is clear or approved",
-                  "Admin has made the Guru bookable",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] px-4 py-3 text-sm font-bold text-slate-700"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </DashboardCard>
-          </div>
-        </section>
-
-        <section className="grid items-start gap-5 xl:grid-cols-12">
-          <div className="xl:col-span-7">
-            <DashboardCard>
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Guru Supply Charts
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Visualize where Gurus are located and which services are most
-                  represented.
-                </p>
-              </div>
-
-              <div className="grid gap-5 lg:grid-cols-2">
-                <HorizontalBarChart
-                  title="Top Guru Locations"
-                  valueLabel="Gurus"
-                  items={guruData.chartData.locationChart}
-                />
-
-                <HorizontalBarChart
-                  title="Top Guru Services"
-                  valueLabel="Gurus"
-                  items={guruData.chartData.serviceChart}
-                />
-              </div>
-            </DashboardCard>
-          </div>
-
-          <div className="xl:col-span-5">
-            <DashboardCard>
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Experience Mix
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Distribution of Guru experience levels.
-                </p>
-              </div>
-
-              <HorizontalBarChart
-                title="Experience Buckets"
-                valueLabel="Gurus"
-                items={guruData.chartData.experienceChart}
-              />
-            </DashboardCard>
-          </div>
-        </section>
+        {!hasFocusedQueue ? <GuruCompactSnapshot guruData={guruData} /> : null}
 
         <section>
           <DashboardCard>
@@ -3031,46 +2899,9 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
             />
           </DashboardCard>
         </section>
-
-        <section className="grid gap-5 lg:grid-cols-3">
-          <QuickLinkCard
-            href={adminRoutes.approvals}
-            icon={<ClipboardCheck size={22} />}
-            title="Guru Approvals"
-            description="Review the full approval workflow for new Guru applicants and profile readiness."
-          />
-
-          <QuickLinkCard
-            href={adminRoutes.guruOnboardingPackets}
-            icon={<FileText size={22} />}
-            title="Onboarding Packets"
-            description="Review Guru Step 5 submissions, approve packets, request fixes, and check document counts."
-          />
-
-          <QuickLinkCard
-            href={adminRoutes.backgroundChecks}
-            icon={<ShieldCheck size={22} />}
-            title="Background Checks"
-            description="Monitor identity, Checkr, safety, and trust verification before making Gurus bookable."
-          />
-
-          <QuickLinkCard
-            href={adminRoutes.performance}
-            icon={<Star size={22} />}
-            title="Guru Performance"
-            description="Review ratings, bookings, customer feedback, and operational performance."
-          />
-        </section>
-
         <div className="rounded-[26px] border border-green-100 bg-white p-4 text-sm font-semibold text-slate-500 shadow-sm">
-          <span className="font-black text-green-900">
-            Supabase coordination:
-          </span>{" "}
-          this page reads `gurus`, `profiles`, and `guru_background_checks`.
-          Guru avatars, setup step, missing-step queues, application status,
-          profile quality, identity status, background status, safety status,
-          bookable visibility, services, location, experience, joined dates,
-          charts, filters, sorting, and CSV export are calculated from live rows.
+          <span className="font-black text-green-900">Admin note:</span>{" "}
+          This simplified Guru page keeps the key KPIs, onboarding packet review, and Guru Records table visible without the extra scroll-heavy dashboard sections.
         </div>
       </div>
     </main>
