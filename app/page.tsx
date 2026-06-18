@@ -690,7 +690,7 @@ function HeroSignupCard({
   return (
     <aside className="w-full max-w-[360px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[370px]">
       <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
-        Simple access
+        SitGuru One Access
       </div>
 
       <h2 className="mt-3 text-[2.05rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.45rem]">
@@ -698,7 +698,7 @@ function HeroSignupCard({
       </h2>
 
       <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-        Use one SitGuru account for all your dashboards.
+        One account. All your dashboards.
       </p>
 
       <div className="mt-5 grid gap-3">
@@ -732,7 +732,7 @@ function HeroSignupCard({
 
       <div className="my-5 flex items-center gap-4">
         <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-bold text-slate-400">one account</span>
+        <span className="text-xs font-bold text-slate-400">one access</span>
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 
@@ -1370,20 +1370,19 @@ export default function HomePage() {
         : null;
 
     if (callbackUrl) {
-      callbackUrl.searchParams.set("next", "/customer/dashboard");
-      callbackUrl.searchParams.set("role", "pet_parent");
-      callbackUrl.searchParams.set("source", "homepage");
+      callbackUrl.searchParams.set("next", "/login/route");
+      callbackUrl.searchParams.set("source", "homepage_login");
     }
 
     trackEvent({
       eventName: "homepage_social_login_clicked",
       eventType: "auth",
       source,
-      role: "customer",
+      role: "sitguru_one",
       metadata: {
         provider: "google",
         location: "homepage_login_card",
-        selected_next_path: "/customer/dashboard",
+        selected_next_path: "/login/route",
         version: "easy_signup_trusted_local_launch",
       },
     });
