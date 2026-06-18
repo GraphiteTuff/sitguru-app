@@ -448,176 +448,83 @@ export default async function AmbassadorDashboardPage() {
     ),
   ]);
 
+  const onboardingCtaLabel =
+    onboardingPacket.status === "complete"
+      ? "Review Onboarding"
+      : onboardingPacket.status === "pending"
+        ? "View Submitted Packet"
+        : "Complete Onboarding";
+
   return (
     <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-6 sm:py-8 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6">
-        <section className="rounded-[28px] border border-green-100 bg-white p-5 shadow-sm sm:rounded-[32px] sm:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex min-w-0 items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-green-50 text-xl font-black text-green-800 ring-1 ring-green-100 sm:h-20 sm:w-20">
-                {getInitials(fullName)}
-              </div>
+        <section className="overflow-hidden rounded-[28px] border border-green-100 bg-white shadow-sm sm:rounded-[34px]">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+            <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.16),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-7">
+              <div className="flex min-w-0 items-start gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-green-100 text-xl font-black text-green-900 ring-1 ring-green-200 sm:h-20 sm:w-20">
+                  {getInitials(fullName)}
+                </div>
 
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-700 sm:text-xs">
-                  SitGuru Student Ambassador
-                </p>
-                <h1 className="mt-1 text-3xl font-black tracking-tight text-green-950 sm:text-5xl">
-                  Hi, {firstName}
-                </h1>
-                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                  Welcome to your private Ambassador dashboard. Track your
-                  referral code, share your signup links, follow training, and
-                  monitor referral activity as SitGuru verifies it.
-                </p>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-700 sm:text-xs">
+                    SitGuru Ambassador Dashboard
+                  </p>
+                  <h1 className="mt-1 text-3xl font-black tracking-tight text-green-950 sm:text-5xl">
+                    Hi, {firstName}
+                  </h1>
+                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
+                    Your command center for referral links, Ambassador onboarding,
+                    training, rewards, and SitGuru support.
+                  </p>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Pill>{asString(ambassadorRecord.status) || "interested"}</Pill>
-                  <Pill>{asString(ambassadorRecord.referral_status) || "Early Referral Approved"}</Pill>
-                  <Pill>{asString(ambassadorRecord.training_status) || "Not Started"}</Pill>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Pill>{asString(ambassadorRecord.status) || "active"}</Pill>
+                    <Pill>{asString(ambassadorRecord.referral_status) || "Referral Code Active"}</Pill>
+                    <Pill>{onboardingPacket.label}</Pill>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50 lg:w-auto"
-              >
-                <LogOut size={17} />
-                Sign Out
-              </button>
-            </form>
+            <div className="border-t border-green-100 bg-white p-5 sm:p-7 lg:border-l lg:border-t-0">
+              <div className="grid gap-3">
+                <Link
+                  href={onboardingPacket.href}
+                  className="flex min-h-14 items-center justify-between rounded-2xl bg-green-800 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+                >
+                  {onboardingCtaLabel}
+                  <ArrowRight size={17} />
+                </Link>
+
+                <Link
+                  href={`/ambassador/messages?ref=${encodeURIComponent(referralCode)}`}
+                  className="flex min-h-14 items-center justify-between rounded-2xl border border-green-200 bg-white px-5 py-4 text-sm font-black text-green-900 transition hover:bg-green-50"
+                >
+                  Message SitGuru
+                  <ArrowRight size={17} />
+                </Link>
+
+                <form action={signOutAction}>
+                  <button
+                    type="submit"
+                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-100"
+                  >
+                    <LogOut size={17} />
+                    Sign Out
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-          <DashboardCard>
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-                <KeyRound size={22} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Ambassador Code
-                </p>
-                <h2 className="mt-1 break-all text-3xl font-black text-green-950">
-                  {referralCode}
-                </h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Ask people to use your code when they sign up so SitGuru can
-                  connect referral activity to your Ambassador dashboard.
-                </p>
-              </div>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-                <ShieldCheck size={22} />
-              </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Portal Access
-                </p>
-                <h2 className="mt-1 text-2xl font-black text-green-950">
-                  Ambassador Only
-                </h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  This login is separate from Pet Parent, Guru, and Admin portal
-                  access.
-                </p>
-              </div>
-            </div>
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-          <DashboardCard>
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-                <FileText size={22} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                    Ambassador Onboarding
-                  </p>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${
-                      onboardingPacket.status === "complete"
-                        ? "bg-green-50 text-green-900 ring-green-100"
-                        : onboardingPacket.status === "pending"
-                          ? "bg-amber-50 text-amber-900 ring-amber-100"
-                          : "bg-rose-50 text-rose-900 ring-rose-100"
-                    }`}
-                  >
-                    {onboardingPacket.label}
-                  </span>
-                </div>
-
-                <h2 className="mt-1 text-2xl font-black text-green-950">
-                  Referral & Commission Setup
-                </h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Ambassadors are generally referral-based and commission-based.
-                  Hourly opportunities are rare and must be separately approved
-                  by SitGuru in writing.
-                </p>
-                <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
-                  {onboardingPacket.helper}
-                </p>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Pill>Referral-first</Pill>
-                  <Pill>Commission-based</Pill>
-                  <Pill>Hourly by exception only</Pill>
-                </div>
-
-                <Link
-                  href={onboardingPacket.href}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-                >
-                  {onboardingPacket.status === "complete"
-                    ? "Review Onboarding"
-                    : onboardingPacket.status === "pending"
-                      ? "View Submitted Packet"
-                      : "Complete Onboarding"}
-                  <ArrowRight size={17} />
-                </Link>
-              </div>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<ClipboardCheck size={22} />}
-              title="Ambassador Setup Steps"
-              detail="Keep setup short: confirm expectations, referral rules, payout terms, and then start sharing SitGuru."
-            />
-            <div className="mt-4 grid gap-2">
-              <ReminderItem>Complete your Ambassador profile and referral code setup.</ReminderItem>
-              <ReminderItem>Confirm referral and commission expectations.</ReminderItem>
-              <ReminderItem>Connect Stripe payouts if eligible for rewards.</ReminderItem>
-            </div>
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-2">
-          <ReferralLinkCard
-            icon={<PawPrint size={22} />}
-            title="Pet Parent Referral Link"
-            detail="Share this with Pet Parents who may need trusted pet care."
-            url={petParentUrl}
-          />
-          <ReferralLinkCard
-            icon={<Users size={22} />}
-            title="Guru Referral Link"
-            detail="Share this with people who may want to apply as a Guru."
-            url={guruUrl}
-          />
-        </section>
+        <AmbassadorProgressPanel
+          onboardingPacket={onboardingPacket}
+          trainingStatus={asString(ambassadorRecord.training_status) || "Not Started"}
+          referralCode={referralCode}
+          stats={stats}
+        />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <StatCard
@@ -636,83 +543,140 @@ export default async function AmbassadorDashboardPage() {
             icon={<ClipboardCheck size={20} />}
             label="Bookings"
             value={String(stats.completedBookings)}
-            detail="Completed referral bookings"
+            detail="Completed referrals"
           />
           <StatCard
             icon={<DollarSign size={20} />}
             label="Pending"
             value={money(stats.pendingRewards)}
-            detail="Not approved yet"
+            detail="Awaiting approval"
           />
           <StatCard
             icon={<BadgeCheck size={20} />}
             label="Approved"
             value={money(stats.approvedRewards)}
-            detail="Approved unpaid rewards"
+            detail="Approved unpaid"
           />
           <StatCard
             icon={<DollarSign size={20} />}
             label="Paid"
             value={money(stats.paidRewards)}
-            detail="Rewards already paid"
+            detail="Already paid"
           />
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
           <DashboardCard>
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-                <GraduationCap size={22} />
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+                  <KeyRound size={22} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                    Ambassador Code
+                  </p>
+                  <h2 className="mt-1 break-all text-4xl font-black text-green-950">
+                    {referralCode}
+                  </h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Use this code with every Pet Parent, future Guru, partner,
+                    or local referral conversation so activity can be tracked.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  Training Status
-                </p>
-                <h2 className="mt-1 text-2xl font-black text-green-950">
-                  {asString(ambassadorRecord.training_status) || "Not Started"}
-                </h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Complete the SitGuru Student Ambassador training videos before
-                  moving into full active status.
-                </p>
+            </div>
 
-                <Link
-                  href="/ambassador/training"
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-                >
-                  View Training
-                  <ArrowRight size={17} />
-                </Link>
+            <div className="mt-5 grid gap-4 lg:grid-cols-2">
+              <ReferralLinkCard
+                icon={<PawPrint size={22} />}
+                title="Pet Parent Referral Link"
+                detail="Share this with Pet Parents who may need trusted pet care."
+                url={petParentUrl}
+              />
+              <ReferralLinkCard
+                icon={<Users size={22} />}
+                title="Guru Referral Link"
+                detail="Share this with people who may want to apply as a Guru."
+                url={guruUrl}
+              />
+            </div>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<Sparkles size={22} />}
+              title="Today’s Focus"
+              detail="Simple next actions to keep the Ambassador workflow moving."
+            />
+
+            <div className="mt-4 grid gap-3">
+              <Link
+                href={onboardingPacket.href}
+                className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                  onboardingPacket.status === "complete"
+                    ? "bg-green-50 text-green-900 ring-1 ring-green-100"
+                    : onboardingPacket.status === "pending"
+                      ? "bg-amber-50 text-amber-900 ring-1 ring-amber-100"
+                      : "bg-rose-50 text-rose-900 ring-1 ring-rose-100"
+                }`}
+              >
+                {onboardingPacket.label}: {onboardingPacket.helper}
+              </Link>
+
+              <ReminderItem>Share your Pet Parent link with one local pet family.</ReminderItem>
+              <ReminderItem>Share your Guru link with one potential sitter, walker, or pet professional.</ReminderItem>
+              <ReminderItem>Message SitGuru if a referral is missing from tracking.</ReminderItem>
+            </div>
+          </DashboardCard>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-3">
+          <DashboardCard>
+            <SectionHeader
+              icon={<BadgeCheck size={22} />}
+              title="Referral Health"
+              detail="Quick view of how your code is performing."
+            />
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
+                {stats.petParentSignups + stats.guruSignups} total referred signups
+              </div>
+              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
+                {stats.completedBookings} completed referral bookings
               </div>
             </div>
           </DashboardCard>
 
           <DashboardCard>
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-                <MessageCircle size={22} />
+            <SectionHeader
+              icon={<DollarSign size={22} />}
+              title="Reward Summary"
+              detail="Referral rewards are reviewed and approved by SitGuru."
+            />
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
+                Pending: {money(stats.pendingRewards)}
               </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  SitGuru Messenger
-                </p>
-                <h2 className="mt-1 text-2xl font-black text-green-950">
-                  Need help?
-                </h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Message SitGuru about onboarding, your referral code, signup
-                  credit, Guru referrals, Pet Parent referrals, or payout
-                  questions.
-                </p>
+              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
+                Approved: {money(stats.approvedRewards)}
+              </div>
+              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
+                Paid: {money(stats.paidRewards)}
+              </div>
+            </div>
+          </DashboardCard>
 
-                <Link
-                  href={`/ambassador/messages?ref=${encodeURIComponent(referralCode)}`}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-                >
-                  Message SitGuru
-                  <ArrowRight size={17} />
-                </Link>
-              </div>
+          <DashboardCard>
+            <SectionHeader
+              icon={<ShieldCheck size={22} />}
+              title="Program Rules"
+              detail="Referral-first. Commission-based. Hourly only by exception."
+            />
+            <div className="mt-4 grid gap-3">
+              <ReminderItem>Do not promise guaranteed bookings or earnings.</ReminderItem>
+              <ReminderItem>Use approved SitGuru messaging when sharing.</ReminderItem>
+              <ReminderItem>Hourly work must be separately approved in writing.</ReminderItem>
             </div>
           </DashboardCard>
         </section>
@@ -720,32 +684,153 @@ export default async function AmbassadorDashboardPage() {
         <section className="grid gap-4 lg:grid-cols-2">
           <DashboardCard>
             <SectionHeader
-              icon={<QrCode size={22} />}
-              title="QR Codes"
-              detail="QR code downloads can be added here for flyers, cards, and social posts."
+              icon={<GraduationCap size={22} />}
+              title="Training"
+              detail="Complete Ambassador training before moving into full active status."
             />
-            <div className="mt-4 rounded-2xl border border-dashed border-green-200 bg-green-50/60 p-5 text-sm font-bold leading-6 text-green-900">
-              QR code tools are coming next. For now, share your referral links
-              directly by text, email, social media, or word of mouth.
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/ambassador/training"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+              >
+                View Training
+                <ArrowRight size={17} />
+              </Link>
+              <span className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-900">
+                {asString(ambassadorRecord.training_status) || "Not Started"}
+              </span>
             </div>
           </DashboardCard>
 
           <DashboardCard>
             <SectionHeader
-              icon={<BookOpenCheck size={22} />}
-              title="Quick Reminders"
-              detail="Keep outreach simple, professional, and accurate."
+              icon={<MessageCircle size={22} />}
+              title="Support"
+              detail="Need help with referrals, payout questions, or missing activity?"
             />
-            <div className="mt-4 grid gap-3">
-              <ReminderItem>Do not promise guaranteed bookings or earnings.</ReminderItem>
-              <ReminderItem>Use your referral code with every signup conversation.</ReminderItem>
-              <ReminderItem>Refer both Pet Parents and future Gurus.</ReminderItem>
-              <ReminderItem>Contact SitGuru if a signup is missing from tracking.</ReminderItem>
-            </div>
+            <Link
+              href={`/ambassador/messages?ref=${encodeURIComponent(referralCode)}`}
+              className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+            >
+              Message SitGuru
+              <ArrowRight size={17} />
+            </Link>
           </DashboardCard>
         </section>
       </div>
     </main>
+  );
+}
+
+
+function AmbassadorProgressPanel({
+  onboardingPacket,
+  trainingStatus,
+  referralCode,
+  stats,
+}: {
+  onboardingPacket: AmbassadorOnboardingPacketDisplay;
+  trainingStatus: string;
+  referralCode: string;
+  stats: ReferralStats;
+}) {
+  const normalizedTraining = trainingStatus.trim().toLowerCase();
+  const hasReferralActivity =
+    stats.petParentSignups + stats.guruSignups + stats.completedBookings > 0;
+
+  const steps = [
+    {
+      label: "Referral Code",
+      value: referralCode ? "Ready" : "Needed",
+      complete: Boolean(referralCode),
+      helper: "Share this with every referral.",
+    },
+    {
+      label: "Onboarding",
+      value: onboardingPacket.label,
+      complete: onboardingPacket.status === "complete",
+      pending: onboardingPacket.status === "pending",
+      helper: onboardingPacket.status === "complete" ? "Reviewed by SitGuru." : onboardingPacket.helper,
+    },
+    {
+      label: "Training",
+      value: trainingStatus,
+      complete:
+        normalizedTraining.includes("complete") ||
+        normalizedTraining.includes("approved") ||
+        normalizedTraining.includes("done"),
+      helper: "Complete training before full active status.",
+    },
+    {
+      label: "Referral Activity",
+      value: hasReferralActivity ? "Started" : "No activity yet",
+      complete: hasReferralActivity,
+      helper: "Activity appears after tracked signups or bookings.",
+    },
+  ];
+
+  const completeCount = steps.filter((step) => step.complete).length;
+
+  return (
+    <section className="rounded-[28px] border border-green-100 bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+            Where You Are
+          </p>
+          <h2 className="mt-1 text-2xl font-black tracking-tight text-green-950">
+            Ambassador Progress
+          </h2>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+            Quick status view so Ambassadors know what is done, what is pending,
+            and what to do next.
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-green-50 px-4 py-3 text-center ring-1 ring-green-100">
+          <p className="text-2xl font-black text-green-950">
+            {completeCount}/{steps.length}
+          </p>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
+            areas ready
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {steps.map((step) => (
+          <div
+            key={step.label}
+            className={`rounded-2xl border p-4 ${
+              step.complete
+                ? "border-green-200 bg-green-50"
+                : step.pending
+                  ? "border-amber-200 bg-amber-50"
+                  : "border-slate-200 bg-slate-50"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                {step.label}
+              </p>
+              <span
+                className={`h-3 w-3 rounded-full ${
+                  step.complete
+                    ? "bg-green-600"
+                    : step.pending
+                      ? "bg-amber-500"
+                      : "bg-slate-300"
+                }`}
+              />
+            </div>
+            <p className="mt-2 text-lg font-black text-slate-950">{step.value}</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
+              {step.helper}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
