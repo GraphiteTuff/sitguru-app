@@ -699,14 +699,14 @@ function HeroSignupCard({
       </h2>
 
       <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-        Use one SitGuru account for Pet Parent, Guru, and Ambassador tools.
+        Use one SitGuru account for all your dashboards.
       </p>
 
       <div className="mt-5 grid gap-3">
         <Link
           href={phoneLoginHref}
           onClick={() => onTrack("Continue with phone", phoneLoginHref)}
-          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200"
         >
           <span aria-hidden="true">☎</span>
           Continue with phone
@@ -715,7 +715,7 @@ function HeroSignupCard({
         <button
           type="button"
           onClick={onGoogleSignup}
-          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
           <GoogleIcon />
           Continue with Google
@@ -724,7 +724,7 @@ function HeroSignupCard({
         <Link
           href={emailLoginHref}
           onClick={() => onTrack("Use email instead", emailLoginHref)}
-          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
           <span aria-hidden="true">✉</span>
           Use email instead
@@ -767,7 +767,7 @@ function HeroSignupCard({
       </div>
 
       <p className="mt-4 text-center text-[11px] font-semibold leading-4 text-slate-500">
-        New here? Your account can be created after phone or Google verification.
+        New here? We’ll create your account after verification.
       </p>
     </aside>
   );
