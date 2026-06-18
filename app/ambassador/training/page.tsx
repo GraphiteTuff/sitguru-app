@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import {
   ArrowLeft,
   ArrowRight,
+  Award,
   BadgeCheck,
   BookOpenCheck,
   CheckCircle2,
@@ -24,6 +25,11 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+
+const AMBASSADOR_TRAINING_PAGE_HREF = "/ambassador/dashboard/training";
+const AMBASSADOR_DASHBOARD_HREF = "/ambassador/dashboard";
+const AMBASSADOR_TRAINING_STEP_LIMIT = 4;
+const AMBASSADOR_BADGE_TITLE = "SitGuru Ambassador Badge";
 
 type AnyRow = Record<string, unknown>;
 
@@ -175,6 +181,26 @@ function getTrainingPercent(steps: StepWithProgress[]) {
   return Math.round((completed / requiredSteps.length) * 100);
 }
 
+function getPublishedAmbassadorTrainingSteps(steps: TrainingStep[]) {
+  return [...steps]
+    .filter((step) => step.is_active !== false)
+    .sort((a, b) => {
+      const stepA = asNumber(a.step_number);
+      const stepB = asNumber(b.step_number);
+
+      if (stepA !== stepB) return stepA - stepB;
+
+      return asString(a.title).localeCompare(asString(b.title));
+    })
+    .slice(0, AMBASSADOR_TRAINING_STEP_LIMIT);
+}
+
+function getBadgeStatusText(trainingComplete: boolean) {
+  return trainingComplete
+    ? "Badge earned — Ambassador training is complete."
+    : "Badge unlocks when all required Ambassador training steps are complete.";
+}
+
 function getTrainingAssetUrl(step: TrainingStep) {
   const externalUrl = asString(step.external_url);
   const videoUrl = asString(step.video_url);
@@ -251,7 +277,7 @@ async function startTrainingStepAction(formData: FormData) {
   const stepId = asString(formData.get("step_id"));
 
   if (!stepId) {
-    redirect("/ambassador/training");
+    redirect(AMBASSADOR_TRAINING_PAGE_HREF);
   }
 
   const now = new Date().toISOString();
@@ -275,8 +301,8 @@ async function startTrainingStepAction(formData: FormData) {
     console.warn("Unable to start Ambassador training step:", error);
   }
 
-  revalidatePath("/ambassador/training");
-  redirect("/ambassador/training");
+  revalidatePath(AMBASSADOR_TRAINING_PAGE_HREF);
+  redirect(AMBASSADOR_TRAINING_PAGE_HREF);
 }
 
 async function completeTrainingStepAction(formData: FormData) {
@@ -288,7 +314,7 @@ async function completeTrainingStepAction(formData: FormData) {
   const acknowledgment = asString(formData.get("acknowledgment"));
 
   if (!stepId) {
-    redirect("/ambassador/training");
+    redirect(AMBASSADOR_TRAINING_PAGE_HREF);
   }
 
   const { data: step, error: stepError } = await supabaseAdmin
@@ -299,7 +325,7 @@ async function completeTrainingStepAction(formData: FormData) {
 
   if (stepError || !step) {
     console.warn("Unable to load Ambassador training step:", stepError);
-    redirect("/ambassador/training?error=missing_step");
+    redirect(`${AMBASSADOR_TRAINING_PAGE_HREF}?error=missing_step`);
   }
 
   const trainingStep = step as TrainingStep;
@@ -307,11 +333,11 @@ async function completeTrainingStepAction(formData: FormData) {
   const requiresAcknowledgment = trainingStep.requires_acknowledgment !== false;
 
   if (requiresAcknowledgment && acknowledgment !== "yes") {
-    redirect("/ambassador/training?error=acknowledgment_required");
+    redirect(`${AMBASSADOR_TRAINING_PAGE_HREF}?error=acknowledgment_required`);
   }
 
   if (requiresSignature && !signatureName) {
-    redirect("/ambassador/training?error=signature_required");
+    redirect(`${AMBASSADOR_TRAINING_PAGE_HREF}?error=signature_required`);
   }
 
   const now = new Date().toISOString();
@@ -340,17 +366,17 @@ async function completeTrainingStepAction(formData: FormData) {
 
   if (error) {
     console.warn("Unable to complete Ambassador training step:", error);
-    redirect("/ambassador/training?error=save_failed");
+    redirect(`${AMBASSADOR_TRAINING_PAGE_HREF}?error=save_failed`);
   }
 
-  await refreshAmbassadorTrainingSummary(ambassador.id);
+  await refreshAmbassadorTrainingSummary(ambassador);
 
-  revalidatePath("/ambassador/training");
+  revalidatePath(AMBASSADOR_TRAINING_PAGE_HREF);
   revalidatePath("/ambassador/dashboard");
-  redirect("/ambassador/training?success=completed");
+  redirect(`${AMBASSADOR_TRAINING_PAGE_HREF}?success=completed`);
 }
 
-async function refreshAmbassadorTrainingSummary(ambassadorId: string) {
+async function refreshAmbassadorTrainingSummary(ambassador: AmbassadorRecord) {
   const [{ data: steps }, { data: progressRows }] = await Promise.all([
     supabaseAdmin
       .from("ambassador_training_steps")
@@ -360,10 +386,10 @@ async function refreshAmbassadorTrainingSummary(ambassadorId: string) {
     supabaseAdmin
       .from("ambassador_training_progress")
       .select("*")
-      .eq("ambassador_id", ambassadorId),
+      .eq("ambassador_id", ambassador.id),
   ]);
 
-  const trainingSteps = ((steps || []) as TrainingStep[]).filter(
+  const trainingSteps = getPublishedAmbassadorTrainingSteps((steps || []) as TrainingStep[]).filter(
     (step) => step.is_required !== false,
   );
   const progress = (progressRows || []) as TrainingProgress[];
@@ -392,9 +418,12 @@ async function refreshAmbassadorTrainingSummary(ambassadorId: string) {
       training_status: trainingComplete ? "Completed" : "In Progress",
       training_completed_at: trainingComplete ? now : null,
       certification_signed_at: trainingComplete ? now : null,
+      certification_name: trainingComplete
+        ? asString(ambassador.full_name) || asString(ambassador.email) || "SitGuru Ambassador"
+        : null,
       updated_at: now,
     })
-    .eq("id", ambassadorId);
+    .eq("id", ambassador.id);
 }
 
 function getPageMessage(searchParams: Record<string, string | string[] | undefined>) {
@@ -457,7 +486,7 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
       .eq("ambassador_id", ambassador.id),
   ]);
 
-  const trainingSteps = (stepsResult || []) as TrainingStep[];
+  const trainingSteps = getPublishedAmbassadorTrainingSteps((stepsResult || []) as TrainingStep[]);
   const progressRows = (progressResult || []) as TrainingProgress[];
 
   const progressMap = new Map(
@@ -474,6 +503,8 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
   );
   const completedRequiredCount = requiredSteps.filter(isStepComplete).length;
   const trainingPercent = getTrainingPercent(stepsWithProgress);
+  const trainingComplete =
+    requiredSteps.length > 0 && completedRequiredCount >= requiredSteps.length;
   const nextStep =
     stepsWithProgress.find((step) => !isStepComplete(step)) ||
     stepsWithProgress[stepsWithProgress.length - 1] ||
@@ -491,7 +522,7 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
 
               <div className="min-w-0">
                 <Link
-                  href="/ambassador/dashboard"
+                  href={AMBASSADOR_DASHBOARD_HREF}
                   className="mb-3 inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-3 py-2 text-xs font-black text-green-900 transition hover:bg-green-100"
                 >
                   <ArrowLeft size={15} />
@@ -541,6 +572,48 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
             {pageMessage.text}
           </section>
         ) : null}
+
+        <section
+          className={`rounded-[28px] border p-5 shadow-sm sm:rounded-[32px] sm:p-6 ${
+            trainingComplete
+              ? "border-green-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_70%)]"
+              : "border-[#dfe9e2] bg-white"
+          }`}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4">
+              <div
+                className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl ${
+                  trainingComplete
+                    ? "bg-green-800 text-white shadow-lg shadow-emerald-900/20"
+                    : "bg-green-50 text-green-800"
+                }`}
+              >
+                {trainingComplete ? <Award size={25} /> : <BadgeCheck size={25} />}
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-700 sm:text-xs">
+                  Ambassador Badge
+                </p>
+                <h2 className="mt-1 text-2xl font-black tracking-tight text-green-950 sm:text-3xl">
+                  {trainingComplete ? AMBASSADOR_BADGE_TITLE : "Complete training to unlock your badge"}
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                  {getBadgeStatusText(trainingComplete)} Your dashboard badge points back to this training page so Ambassadors always know where to finish or review their requirements.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href={AMBASSADOR_TRAINING_PAGE_HREF}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50 sm:w-auto"
+            >
+              View Training Page
+              <ArrowRight size={17} />
+            </Link>
+          </div>
+        </section>
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
           <DashboardCard>
@@ -595,7 +668,7 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
               </a>
             ) : (
               <Link
-                href="/ambassador/dashboard"
+                href={AMBASSADOR_DASHBOARD_HREF}
                 className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
               >
                 Return to Dashboard
@@ -619,7 +692,7 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
               <SectionHeader
                 icon={<BookOpenCheck size={22} />}
                 title="No training steps loaded yet"
-                detail="SitGuru has not published Ambassador training steps yet. Please check back soon or contact your onboarding contact."
+                detail="SitGuru has not published the Ambassador training steps yet. Please check back soon or message SitGuru for help."
               />
             </DashboardCard>
           )}

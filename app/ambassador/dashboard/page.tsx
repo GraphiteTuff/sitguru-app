@@ -794,7 +794,7 @@ export default async function AmbassadorDashboardPage() {
             />
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/ambassador/training"
+                href="/ambassador/dashboard/training"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
               >
                 View Training
