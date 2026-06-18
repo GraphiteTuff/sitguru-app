@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Eye,
@@ -13,7 +13,7 @@ import {
   Sparkles,
   UsersRound,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { login } from "@/app/auth/actions";
 import PhoneCodeLogin from "@/components/auth/PhoneCodeLogin";
@@ -33,7 +33,9 @@ function decodeMessage(value: string | null) {
 }
 
 function getRequestedAudience(value?: string | null): LoginAudience {
-  const normalized = String(value || "").trim().toLowerCase();
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
 
   if (
     normalized === "guru" ||
@@ -65,7 +67,9 @@ function getRequestedAudience(value?: string | null): LoginAudience {
 }
 
 function getRequestedMode(value?: string | null): LoginMethod {
-  const normalized = String(value || "").trim().toLowerCase();
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
 
   if (
     normalized === "email" ||
@@ -104,17 +108,7 @@ function getSafeNextPath(nextValue: string | null, audience: LoginAudience) {
   }
 }
 
-function getAudienceLabel(audience: LoginAudience) {
-  if (audience === "guru") return "Guru";
-  if (audience === "ambassador") return "Ambassador";
-  if (audience === "pet_parent") return "Pet Parent";
-  return "SitGuru One";
-}
-
-function getPhoneAccessLabel(audience: LoginAudience) {
-  if (audience === "guru") return "Guru account";
-  if (audience === "ambassador") return "Ambassador account";
-  if (audience === "pet_parent") return "Pet Parent account";
+function getPhoneAccessLabel() {
   return "Existing SitGuru account";
 }
 
@@ -126,6 +120,7 @@ function getEmailTurnstileAction(audience: LoginAudience) {
 }
 
 function LoginPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const requestedAudience = useMemo(
@@ -151,8 +146,7 @@ function LoginPageContent() {
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
   const errorMessage = decodeMessage(searchParams.get("error"));
-  const audienceLabel = getAudienceLabel(requestedAudience);
-  const phoneAccessLabel = getPhoneAccessLabel(requestedAudience);
+  const phoneAccessLabel = getPhoneAccessLabel();
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -167,10 +161,29 @@ function LoginPageContent() {
     setTurnstileToken("");
   }, []);
 
+  const buildModeHref = useCallback(
+    (method: LoginMethod) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("mode", method);
+      params.delete("error");
+
+      const queryString = params.toString();
+      return queryString ? `/login?${queryString}` : "/login";
+    },
+    [searchParams],
+  );
+
+  useEffect(() => {
+    setLoginMethod(requestedMode);
+    setTurnstileToken("");
+    setTurnstileResetKey((value) => value + 1);
+  }, [requestedMode]);
+
   function switchLoginMethod(method: LoginMethod) {
     setLoginMethod(method);
     setTurnstileToken("");
     setTurnstileResetKey((value) => value + 1);
+    router.replace(buildModeHref(method), { scroll: false });
   }
 
   return (
@@ -231,7 +244,7 @@ function LoginPageContent() {
           <div className="text-center sm:text-left">
             <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-xs font-black text-emerald-800">
               <UsersRound className="h-4 w-4" />
-              {audienceLabel} Access
+              SitGuru One Access
             </div>
 
             <h2 className="mt-4 text-4xl font-black leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-5xl">
@@ -239,7 +252,8 @@ function LoginPageContent() {
             </h2>
 
             <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 sm:text-base">
-              Use one SitGuru account for Pet Parent, Guru, and Ambassador dashboards.
+              Use one SitGuru account for Pet Parent, Guru, and Ambassador
+              dashboards.
             </p>
           </div>
 
@@ -317,6 +331,7 @@ function LoginPageContent() {
           ) : (
             <form action={login} className="mt-5 space-y-4">
               <input type="hidden" name="next" value={nextPath} />
+              <input type="hidden" name="mode" value="email" />
               <input
                 type="hidden"
                 name="turnstileToken"
@@ -371,7 +386,9 @@ function LoginPageContent() {
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
                     className="ml-3 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-emerald-700 transition hover:bg-emerald-50 hover:text-green-900"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                   >
                     {showPassword ? (
                       <EyeOff className="h-5 w-5" />
