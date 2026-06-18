@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -6,7 +7,7 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  CircleAlert,
+  ChevronDown,
   ClipboardCheck,
   FileCheck2,
   FileText,
@@ -31,6 +32,8 @@ const SITE_FONT_STYLE = {
 const AGREEMENT_VERSION = "sitguru-guru-onboarding-packet-v1-2026";
 const DOCUMENT_BUCKET = "guru-onboarding-documents";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+
+type SearchParams = Record<string, string | string[] | undefined>;
 
 type GuruOnboardingPacketRow = {
   id: string;
@@ -75,14 +78,22 @@ type GuruOnboardingDocumentRow = {
   updated_at: string | null;
 };
 
-type SearchParams = Record<string, string | string[] | undefined>;
-
 function asString(value: FormDataEntryValue | string | null | undefined) {
   return typeof value === "string" ? value.trim() : "";
 }
 
 function checkboxValue(formData: FormData, key: string) {
   return formData.get(key) === "on";
+}
+
+function getFirstSearchParam(
+  searchParams: SearchParams | undefined,
+  key: string,
+) {
+  const value = searchParams?.[key];
+
+  if (Array.isArray(value)) return value[0] || "";
+  return value || "";
 }
 
 function prettyStatus(status: string | null | undefined) {
@@ -120,21 +131,41 @@ function statusStyles(status: string | null | undefined) {
     case "rejected":
       return "border-rose-200 bg-rose-50 text-rose-900";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-800";
+      return "border-slate-200 bg-slate-50 text-slate-900";
   }
 }
 
-function getFirstSearchParam(
-  searchParams: SearchParams | undefined,
-  key: string,
-) {
-  const value = searchParams?.[key];
+function isPacketSubmitted(packet: GuruOnboardingPacketRow | null) {
+  const status = String(packet?.status || "")
+    .trim()
+    .toLowerCase();
 
-  if (Array.isArray(value)) {
-    return value[0] || "";
+  return Boolean(
+    packet?.submitted_at ||
+      ["submitted", "pending_review", "in_review", "approved", "complete", "completed"].includes(status),
+  );
+}
+
+function getPacketStatusLabel(packet: GuruOnboardingPacketRow | null) {
+  if (!packet) return "Not Started";
+
+  const status = String(packet.status || "")
+    .trim()
+    .toLowerCase();
+
+  if (["approved", "complete", "completed"].includes(status)) {
+    return "Complete";
   }
 
-  return value || "";
+  if (["submitted", "pending_review", "in_review"].includes(status)) {
+    return "Submitted";
+  }
+
+  if (["needs_fix", "needs_action"].includes(status)) {
+    return "Needs Fix";
+  }
+
+  return prettyStatus(packet.status);
 }
 
 async function uploadGuruDocument({
@@ -150,9 +181,7 @@ async function uploadGuruDocument({
   file: File | null;
   documentType: string;
 }) {
-  if (!file || file.size <= 0) {
-    return;
-  }
+  if (!file || file.size <= 0) return;
 
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new Error(
@@ -222,12 +251,7 @@ async function submitGuruOnboardingPacket(formData: FormData) {
     formData,
     "provider_acknowledged",
   );
-  const taxAcknowledged = checkboxValue(formData, "tax_acknowledged");
   const safetyAcknowledged = checkboxValue(formData, "safety_acknowledged");
-  const careStandardsAcknowledged = checkboxValue(
-    formData,
-    "care_standards_acknowledged",
-  );
   const communicationAcknowledged = checkboxValue(
     formData,
     "communication_acknowledged",
@@ -240,9 +264,7 @@ async function submitGuruOnboardingPacket(formData: FormData) {
 
   const allRequiredAcknowledged =
     providerAcknowledged &&
-    taxAcknowledged &&
     safetyAcknowledged &&
-    careStandardsAcknowledged &&
     communicationAcknowledged &&
     paymentAcknowledged &&
     finalCertificationAcknowledged;
@@ -265,9 +287,9 @@ async function submitGuruOnboardingPacket(formData: FormData) {
     signature_name: legalName,
     agreement_version: AGREEMENT_VERSION,
     provider_acknowledged: providerAcknowledged,
-    tax_acknowledged: taxAcknowledged,
+    tax_acknowledged: paymentAcknowledged,
     safety_acknowledged: safetyAcknowledged,
-    care_standards_acknowledged: careStandardsAcknowledged,
+    care_standards_acknowledged: safetyAcknowledged,
     communication_acknowledged: communicationAcknowledged,
     payment_acknowledged: paymentAcknowledged,
     final_certification_acknowledged: finalCertificationAcknowledged,
@@ -314,7 +336,6 @@ async function submitGuruOnboardingPacket(formData: FormData) {
 
   const governmentIdFile = formData.get("government_id") as File | null;
   const certificationFile = formData.get("certification_document") as File | null;
-  const experienceFile = formData.get("experience_document") as File | null;
 
   await uploadGuruDocument({
     supabase,
@@ -332,144 +353,56 @@ async function submitGuruOnboardingPacket(formData: FormData) {
     documentType: "certification_or_insurance",
   });
 
-  await uploadGuruDocument({
-    supabase,
-    userId: user.id,
-    packetId,
-    file: experienceFile,
-    documentType: "experience_or_resume",
-  });
-
   revalidatePath("/guru/dashboard");
   revalidatePath("/guru/dashboard/onboarding-packet");
 
   redirect("/guru/dashboard/onboarding-packet?submitted=success");
 }
 
-function RequirementCard({
-  icon,
+function StatusPill({ packet }: { packet: GuruOnboardingPacketRow | null }) {
+  const label = getPacketStatusLabel(packet);
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ${statusStyles(
+        packet?.status,
+      )}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function StepCard({
+  number,
   title,
   body,
+  icon,
 }: {
-  icon: React.ReactNode;
+  number: number;
   title: string;
   body: string;
+  icon: ReactNode;
 }) {
   return (
-    <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-5 shadow-sm">
-      <div className="flex gap-4">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-          {icon}
+    <div className="rounded-[1.35rem] border border-emerald-100 bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-black !text-white">
+          {number}
         </span>
-
-        <div>
-          <p className="text-lg font-black !text-slate-950">{title}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-emerald-700">{icon}</span>
+            <p className="text-base font-black leading-6 !text-slate-950">
+              {title}
+            </p>
+          </div>
           <p className="mt-1 text-sm font-bold leading-6 !text-slate-700">
             {body}
           </p>
         </div>
       </div>
     </div>
-  );
-}
-
-function ExistingDocumentList({
-  documents,
-}: {
-  documents: GuruOnboardingDocumentRow[];
-}) {
-  if (!documents.length) {
-    return (
-      <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-white p-5">
-        <p className="text-sm font-bold leading-6 !text-slate-600">
-          No documents uploaded yet. If SitGuru asked you to upload documents,
-          use the upload fields below before submitting.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-3">
-      {documents.map((document) => (
-        <div
-          key={document.id}
-          className="rounded-[1.25rem] border border-emerald-100 bg-white p-4"
-        >
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-sm font-black !text-slate-950">
-                {document.file_name || "Uploaded document"}
-              </p>
-              <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] !text-slate-500">
-                {prettyStatus(document.document_type)} • Submitted{" "}
-                {formatDate(document.submitted_at)}
-              </p>
-            </div>
-
-            <span
-              className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-black ring-1 ${statusStyles(
-                document.status,
-              )}`}
-            >
-              {prettyStatus(document.status)}
-            </span>
-          </div>
-
-          {document.admin_notes ? (
-            <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-bold leading-5 !text-amber-900">
-              {document.admin_notes}
-            </p>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function UploadField({
-  name,
-  title,
-  description,
-  requiredLabel,
-}: {
-  name: string;
-  title: string;
-  description: string;
-  requiredLabel: string;
-}) {
-  return (
-    <label className="block rounded-[1.25rem] border border-slate-200 bg-white p-5">
-      <div className="flex items-start gap-4">
-        <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-          <UploadCloud className="h-5 w-5" />
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-base font-black !text-slate-950">{title}</p>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] !text-slate-600">
-              {requiredLabel}
-            </span>
-          </div>
-
-          <p className="mt-1 text-sm font-bold leading-6 !text-slate-600">
-            {description}
-          </p>
-
-          <input
-            name={name}
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.webp"
-            className="mt-4 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold !text-slate-700 file:mr-4 file:rounded-full file:border-0 file:bg-emerald-600 file:px-4 file:py-2 file:text-sm file:font-black file:text-white hover:file:bg-emerald-700"
-          />
-
-          <p className="mt-2 text-xs font-bold leading-5 !text-slate-500">
-            Accepted file types: PDF, JPG, PNG, WEBP. Max size: 8 MB.
-          </p>
-        </div>
-      </div>
-    </label>
   );
 }
 
@@ -485,23 +418,95 @@ function AcknowledgmentCheckbox({
   defaultChecked: boolean;
 }) {
   return (
-    <label className="block rounded-[1.25rem] border border-emerald-100 bg-white p-5 shadow-sm">
-      <div className="flex gap-4">
+    <label className="block rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+      <div className="flex gap-3">
         <input
           type="checkbox"
           name={name}
           defaultChecked={defaultChecked}
           className="mt-1 h-5 w-5 shrink-0 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
         />
-
         <div>
-          <p className="text-base font-black !text-slate-950">{title}</p>
-          <p className="mt-1 text-sm font-bold leading-6 !text-slate-600">
+          <p className="text-sm font-black leading-5 !text-slate-950">
+            {title}
+          </p>
+          <p className="mt-1 text-xs font-bold leading-5 !text-slate-600">
             {body}
           </p>
         </div>
       </div>
     </label>
+  );
+}
+
+function UploadField({
+  name,
+  title,
+  description,
+}: {
+  name: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <label className="block rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex items-start gap-3">
+        <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+          <UploadCloud className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black !text-slate-950">{title}</p>
+          <p className="mt-1 text-xs font-bold leading-5 !text-slate-600">
+            {description}
+          </p>
+          <input
+            name={name}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            className="mt-3 block w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold !text-slate-950 file:mr-3 file:rounded-full file:border-0 file:bg-emerald-600 file:px-4 file:py-2 file:text-sm file:font-black file:!text-white hover:file:bg-emerald-700"
+          />
+        </div>
+      </div>
+    </label>
+  );
+}
+
+function ExistingDocumentList({
+  documents,
+}: {
+  documents: GuruOnboardingDocumentRow[];
+}) {
+  if (!documents.length) {
+    return (
+      <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-bold leading-6 !text-slate-600">
+        No documents uploaded yet. Upload only if SitGuru requested a document.
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {documents.map((document) => (
+        <div
+          key={document.id}
+          className="rounded-2xl border border-emerald-100 bg-white p-4"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black !text-slate-950">
+                {document.file_name || "Uploaded document"}
+              </p>
+              <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] !text-slate-500">
+                {prettyStatus(document.document_type)} • {formatDate(document.submitted_at)}
+              </p>
+            </div>
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-800">
+              {prettyStatus(document.status)}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -543,398 +548,361 @@ export default async function GuruOnboardingPacketPage({
 
   const documents = (documentsData || []) as GuruOnboardingDocumentRow[];
   const hasPacketTable = !packetError;
-  const packetStatus = packet?.status || "not_started";
-  const isSubmitted =
-    packetStatus === "submitted" ||
-    packetStatus === "pending_review" ||
-    packetStatus === "approved" ||
-    Boolean(packet?.submitted_at);
+  const alreadySubmitted = isPacketSubmitted(packet);
 
   return (
     <main
-      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-5 py-10 text-slate-900 sm:px-6 lg:px-8"
+      className="guru-onboarding-packet-page min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-5 text-slate-950 sm:px-6 sm:py-8 lg:px-8"
       style={SITE_FONT_STYLE}
     >
-      <section className="mx-auto max-w-6xl overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
-        <div className="bg-[radial-gradient(circle_at_88%_20%,rgba(255,255,255,0.92),transparent_22%),linear-gradient(110deg,#05c997_0%,#80e7d2_48%,#b9e6ff_100%)] p-7 sm:p-9">
-          <p className="text-sm font-black uppercase tracking-[0.3em] !text-[#07132f]">
-            SitGuru Guru Onboarding
-          </p>
+      <style>{`
+        .guru-onboarding-packet-page input,
+        .guru-onboarding-packet-page textarea,
+        .guru-onboarding-packet-page select {
+          color: #0f172a !important;
+        }
+        .guru-onboarding-packet-page input::placeholder,
+        .guru-onboarding-packet-page textarea::placeholder {
+          color: #64748b !important;
+          opacity: 1 !important;
+        }
+        .guru-onboarding-packet-page input[type="file"] {
+          color: #0f172a !important;
+          background: #ffffff !important;
+        }
+        .guru-onboarding-packet-page input[type="file"]::file-selector-button {
+          color: #ffffff !important;
+          background: #059669 !important;
+          border: 0 !important;
+          border-radius: 9999px !important;
+          padding: 0.5rem 1rem !important;
+          font-weight: 900 !important;
+        }
+        .guru-onboarding-packet-page ::selection {
+          background: #bbf7d0 !important;
+          color: #020617 !important;
+        }
+      `}</style>
 
-          <h1 className="mt-4 text-4xl font-black leading-tight tracking-[-0.045em] !text-[#07132f] sm:text-6xl">
-            Complete Your Guru Onboarding Packet
-          </h1>
+      <section className="mx-auto max-w-3xl overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+        <div className="bg-[radial-gradient(circle_at_90%_18%,rgba(255,255,255,0.9),transparent_24%),linear-gradient(110deg,#05c997_0%,#80e7d2_52%,#b9e6ff_100%)] p-5 sm:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.26em] !text-[#07132f]">
+                SitGuru Guru Onboarding
+              </p>
+              <h1 className="mt-3 text-3xl font-black leading-tight tracking-[-0.04em] !text-[#07132f] sm:text-5xl">
+                Step 5: Onboarding Packet
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm font-bold leading-6 !text-slate-800 sm:text-base sm:leading-7">
+                A quick 2–3 minute review. Confirm the essentials, type your
+                legal name, and upload only documents SitGuru requested.
+              </p>
+            </div>
 
-          <p className="mt-4 max-w-4xl text-lg font-bold leading-8 !text-slate-700">
-            Review SitGuru’s Guru expectations, confirm the required
-            acknowledgments, upload any requested documents, and submit your
-            typed signature so Step 5 can be reviewed.
-          </p>
+            <div className="shrink-0">
+              <StatusPill packet={packet} />
+            </div>
+          </div>
         </div>
 
-        <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_340px]">
-          <section className="space-y-6">
-            {submitted === "success" ? (
-              <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-700" />
-                  <div>
-                    <p className="text-base font-black !text-emerald-900">
-                      Onboarding packet submitted
-                    </p>
-                    <p className="mt-1 text-sm font-bold leading-6 !text-emerald-800">
-                      SitGuru received your acknowledgments and signature. We’ll
-                      review your packet and update your onboarding status if
-                      anything else is needed.
-                    </p>
-                  </div>
+        <div className="space-y-4 p-4 sm:p-6">
+          {submitted === "success" ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-700" />
+                <div>
+                  <p className="text-base font-black !text-emerald-900">
+                    Packet submitted
+                  </p>
+                  <p className="mt-1 text-sm font-bold leading-6 !text-emerald-800">
+                    SitGuru received your Step 5 packet. We’ll review it and let
+                    you know if anything else is needed.
+                  </p>
                 </div>
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {errorStatus === "missing" ? (
-              <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 p-5">
-                <div className="flex items-start gap-3">
-                  <CircleAlert className="mt-1 h-5 w-5 shrink-0 text-rose-700" />
-                  <div>
-                    <p className="text-base font-black !text-rose-900">
-                      Missing required acknowledgments
-                    </p>
-                    <p className="mt-1 text-sm font-bold leading-6 !text-rose-800">
-                      Please enter your legal name and check each required
-                      acknowledgment before submitting your packet.
-                    </p>
-                  </div>
+          {errorStatus === "missing" ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-rose-700" />
+                <div>
+                  <p className="text-base font-black !text-rose-900">
+                    One more step needed
+                  </p>
+                  <p className="mt-1 text-sm font-bold leading-6 !text-rose-800">
+                    Please check each required acknowledgment and type your legal
+                    name before submitting.
+                  </p>
                 </div>
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {!hasPacketTable ? (
-              <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-5">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-amber-700" />
-                  <div>
-                    <p className="text-base font-black !text-amber-900">
-                      Onboarding storage needs setup
-                    </p>
-                    <p className="mt-1 text-sm font-bold leading-6 !text-amber-900">
-                      The page is ready, but the Supabase onboarding packet
-                      tables need to be created before submissions can be saved.
-                    </p>
-                  </div>
+          {!hasPacketTable ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-amber-700" />
+                <div>
+                  <p className="text-base font-black !text-amber-900">
+                    Onboarding storage needs setup
+                  </p>
+                  <p className="mt-1 text-sm font-bold leading-6 !text-amber-900">
+                    The page is ready, but the Supabase packet tables need to be
+                    available before submissions can be saved.
+                  </p>
                 </div>
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            <section className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6">
-              <h2 className="text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                What this packet captures
-              </h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StepCard
+              number={1}
+              title="Review"
+              body="Confirm the required Guru expectations."
+              icon={<ClipboardCheck className="h-4 w-4" />}
+            />
+            <StepCard
+              number={2}
+              title="Sign"
+              body="Type your legal name as your signature."
+              icon={<PenLine className="h-4 w-4" />}
+            />
+            <StepCard
+              number={3}
+              title="Submit"
+              body="Upload requested docs and send for review."
+              icon={<FileCheck2 className="h-4 w-4" />}
+            />
+          </div>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <RequirementCard
-                  icon={<UserCircle2 className="h-5 w-5" />}
-                  title="Guru identity and setup"
-                  body="Your typed legal name, signature name, and onboarding packet version are saved with your submission."
-                />
-
-                <RequirementCard
-                  icon={<ClipboardCheck className="h-5 w-5" />}
-                  title="Required acknowledgments"
-                  body="SitGuru documents that you reviewed provider expectations, safety standards, communications, and payout notes."
-                />
-
-                <RequirementCard
-                  icon={<UploadCloud className="h-5 w-5" />}
-                  title="Requested document uploads"
-                  body="If SitGuru requested supporting documents, you can upload them here for private admin review."
-                />
-
-                <RequirementCard
-                  icon={<LockKeyhole className="h-5 w-5" />}
-                  title="Secure recordkeeping"
-                  body="Your submission date, agreement version, and basic security metadata are saved for onboarding review."
-                />
-              </div>
-            </section>
-
-            <form
-              action={submitGuruOnboardingPacket}
-              className="rounded-[1.75rem] border border-emerald-100 bg-emerald-50/50 p-6"
-            >
-              <div>
-                <p className="text-sm font-black uppercase tracking-[0.22em] !text-emerald-700">
-                  Required Review
-                </p>
-
-                <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                  Review and acknowledge
-                </h2>
-
-                <p className="mt-3 max-w-3xl text-sm font-bold leading-6 !text-slate-700">
-                  Check each required item below. This helps SitGuru document
-                  your onboarding packet without making the process confusing.
-                </p>
+          <form action={submitGuruOnboardingPacket} className="space-y-4">
+            <section className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-emerald-700" />
+                <div>
+                  <h2 className="text-2xl font-black tracking-[-0.03em] !text-slate-950">
+                    Required acknowledgments
+                  </h2>
+                  <p className="mt-1 text-sm font-bold leading-6 !text-slate-700">
+                    Check each item below. This keeps Step 5 simple while still
+                    documenting the required clicks.
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-6 grid gap-4">
+              <details className="mt-4 rounded-2xl border border-emerald-100 bg-white p-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black !text-slate-950">
+                  What you are confirming
+                  <ChevronDown className="h-4 w-4 text-emerald-700" />
+                </summary>
+                <div className="mt-3 space-y-2 text-sm font-bold leading-6 !text-slate-700">
+                  <p>• You understand Gurus are independent local providers.</p>
+                  <p>• You agree to safe, respectful, reliable pet care.</p>
+                  <p>• You agree to communicate clearly about bookings.</p>
+                  <p>• You understand Stripe is required for eligible payouts.</p>
+                  <p>• You understand SitGuru may review your packet.</p>
+                </div>
+              </details>
+
+              <div className="mt-4 grid gap-3">
                 <AcknowledgmentCheckbox
                   name="provider_acknowledged"
-                  title="Independent provider acknowledgment"
-                  body="I understand that Gurus provide pet care services as independent local providers through the SitGuru marketplace."
+                  title="Independent provider setup"
+                  body="I understand Gurus provide services as independent local providers through SitGuru."
                   defaultChecked={packet?.provider_acknowledged === true}
                 />
 
                 <AcknowledgmentCheckbox
-                  name="tax_acknowledged"
-                  title="Tax information acknowledgment"
-                  body="I understand that payout, tax, W-9, and related payment information may be completed through Stripe or another secure SitGuru-approved method. I will not email sensitive tax forms directly."
-                  defaultChecked={packet?.tax_acknowledged === true}
-                />
-
-                <AcknowledgmentCheckbox
                   name="safety_acknowledged"
-                  title="Trust and safety acknowledgment"
-                  body="I understand that SitGuru may require trust and safety steps before public visibility, booking approval, or payout readiness."
-                  defaultChecked={packet?.safety_acknowledged === true}
-                />
-
-                <AcknowledgmentCheckbox
-                  name="care_standards_acknowledged"
-                  title="Care standards acknowledgment"
-                  body="I agree to provide thoughtful, reliable, and respectful pet care and to follow the details confirmed with each Pet Parent."
-                  defaultChecked={packet?.care_standards_acknowledged === true}
+                  title="Safety and care standards"
+                  body="I agree to provide thoughtful, reliable pet care and follow confirmed care instructions."
+                  defaultChecked={
+                    packet?.safety_acknowledged === true ||
+                    packet?.care_standards_acknowledged === true
+                  }
                 />
 
                 <AcknowledgmentCheckbox
                   name="communication_acknowledged"
                   title="Communication expectations"
-                  body="I agree to communicate clearly, respond professionally, and keep booking-related updates organized through SitGuru when available."
+                  body="I agree to communicate professionally and keep booking-related updates clear."
                   defaultChecked={packet?.communication_acknowledged === true}
                 />
 
                 <AcknowledgmentCheckbox
                   name="payment_acknowledged"
-                  title="Payment and payout acknowledgment"
-                  body="I understand that Stripe payout setup is required before SitGuru can send eligible booking payouts, commission, or referral earnings."
-                  defaultChecked={packet?.payment_acknowledged === true}
+                  title="Payments, tax, and payouts"
+                  body="I understand Stripe setup is required before eligible booking payouts, commission, or referral earnings can be paid."
+                  defaultChecked={
+                    packet?.payment_acknowledged === true ||
+                    packet?.tax_acknowledged === true
+                  }
                 />
 
                 <AcknowledgmentCheckbox
                   name="final_certification_acknowledged"
                   title="Final certification"
-                  body="I certify that the information I submit is accurate to the best of my knowledge and that I understand SitGuru may review my onboarding packet before approval."
+                  body="I certify this information is accurate and understand SitGuru may review my onboarding packet."
                   defaultChecked={
                     packet?.final_certification_acknowledged === true
                   }
                 />
               </div>
+            </section>
 
-              <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6">
-                <div className="flex items-center gap-3">
-                  <PenLine className="h-5 w-5 text-emerald-700" />
-                  <h3 className="text-2xl font-black !text-[#07132f]">
-                    Typed signature
-                  </h3>
+            <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <UserCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-700" />
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-2xl font-black tracking-[-0.03em] !text-slate-950">
+                    Type your legal name
+                  </h2>
+                  <p className="mt-1 text-sm font-bold leading-6 !text-slate-700">
+                    This acts as your typed signature for the onboarding packet.
+                  </p>
+
+                  <label className="mt-4 block">
+                    <span className="mb-2 block text-sm font-black !text-slate-800">
+                      Legal name
+                    </span>
+                    <input
+                      name="legal_name"
+                      defaultValue={packet?.legal_name || ""}
+                      placeholder="Type your full legal name"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold !text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </label>
+
+                  <p className="mt-2 text-xs font-bold leading-5 !text-slate-500">
+                    Agreement version: {AGREEMENT_VERSION}
+                  </p>
                 </div>
+              </div>
+            </section>
 
-                <p className="mt-2 text-sm font-bold leading-6 !text-slate-600">
-                  Type your legal name below to sign and submit your Guru
-                  onboarding packet.
-                </p>
-
-                <label className="mt-5 block">
-                  <span className="mb-2 block text-sm font-black !text-slate-800">
-                    Legal name
-                  </span>
-                  <input
-                    name="legal_name"
-                    defaultValue={packet?.legal_name || ""}
-                    placeholder="Type your full legal name"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base font-bold !text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </label>
-
-                <p className="mt-3 text-xs font-bold leading-5 !text-slate-500">
-                  Agreement version: {AGREEMENT_VERSION}
-                </p>
+            <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <FileText className="mt-1 h-5 w-5 shrink-0 text-emerald-700" />
+                <div>
+                  <h2 className="text-2xl font-black tracking-[-0.03em] !text-slate-950">
+                    Documents
+                  </h2>
+                  <p className="mt-1 text-sm font-bold leading-6 !text-slate-700">
+                    Keep this simple. Upload documents only if SitGuru asked for
+                    them. Do not upload W-9 forms, full SSNs, or banking details.
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-8 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-emerald-700" />
-                  <h3 className="text-2xl font-black !text-[#07132f]">
-                    Requested documents
-                  </h3>
-                </div>
+              <div className="mt-4">
+                <ExistingDocumentList documents={documents} />
+              </div>
 
-                <p className="mt-2 text-sm font-bold leading-6 !text-slate-600">
-                  Only upload documents SitGuru has requested. Do not upload W-9
-                  forms, full SSNs, banking details, or sensitive tax forms here.
-                </p>
+              <details className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black !text-slate-950">
+                  Upload requested documents
+                  <ChevronDown className="h-4 w-4 text-emerald-700" />
+                </summary>
 
-                <div className="mt-5">
-                  <ExistingDocumentList documents={documents} />
-                </div>
-
-                <div className="mt-5 grid gap-4">
+                <div className="mt-4 grid gap-3">
                   <UploadField
                     name="government_id"
                     title="Government ID or verification document"
-                    description="Upload only if SitGuru asked you to provide identity verification documentation."
-                    requiredLabel="If requested"
+                    description="Upload only if SitGuru requested this for onboarding review."
                   />
 
                   <UploadField
                     name="certification_document"
                     title="Certification, insurance, or pet care document"
-                    description="Upload optional pet care certifications, insurance documents, or related support documents."
-                    requiredLabel="Optional"
-                  />
-
-                  <UploadField
-                    name="experience_document"
-                    title="Pet care resume or experience document"
-                    description="Upload an optional resume or experience summary if it helps SitGuru review your Guru setup."
-                    requiredLabel="Optional"
+                    description="Optional support document if it helps your Guru review."
                   />
                 </div>
-              </div>
+              </details>
+            </section>
 
+            <div className="sticky bottom-3 z-20 rounded-[1.25rem] border border-slate-200 bg-white/95 p-3 shadow-[0_16px_42px_rgba(15,23,42,0.16)] backdrop-blur sm:static sm:shadow-none">
               <button
                 type="submit"
-                className="mt-8 flex min-h-[58px] w-full items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-4 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
+                className="flex min-h-[56px] w-full items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-4 text-base font-black !text-white transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
               >
-                Submit Onboarding Packet
-                <ArrowRight className="ml-2 h-5 w-5" />
+                {alreadySubmitted ? "Update Packet" : "Submit Packet"}
+                <ArrowRight className="ml-2 h-5 w-5 text-white" />
               </button>
-            </form>
-
-            <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-5">
-              <p className="text-sm font-black uppercase tracking-[0.18em] !text-amber-800">
-                Secure document note
-              </p>
-              <p className="mt-2 text-sm font-bold leading-6 !text-amber-900">
-                Please do not email tax forms, SSNs, banking details, or
-                sensitive information directly. Stripe payout setup and tax
-                information should be completed only through SitGuru-approved
-                secure tools.
-              </p>
             </div>
-          </section>
+          </form>
 
-          <aside className="h-fit rounded-[1.75rem] border border-emerald-100 bg-white p-6 shadow-sm lg:sticky lg:top-6">
-            <h2 className="text-2xl font-black !text-[#07132f]">
-              Packet Status
-            </h2>
-
-            <div className={`mt-4 rounded-[1.25rem] border p-5 ${statusStyles(packetStatus)}`}>
-              <p className="text-xs font-black uppercase tracking-[0.18em]">
-                Current Status
-              </p>
-
-              <p className="mt-2 text-2xl font-black">
-                {prettyStatus(packetStatus)}
-              </p>
-
-              <p className="mt-2 text-sm font-bold leading-6">
-                {isSubmitted
-                  ? "Your packet has been submitted. SitGuru will review your onboarding information and update your status if anything else is needed."
-                  : "Complete the acknowledgments, add your typed signature, upload any requested documents, and submit your packet for SitGuru review."}
-              </p>
-            </div>
-
-            <div className="mt-5 grid gap-3">
-              <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2">
-                  <FileCheck2 className="h-4 w-4 text-emerald-700" />
-                  <p className="text-sm font-black !text-slate-950">
-                    Submitted
-                  </p>
-                </div>
-                <p className="mt-1 text-sm font-bold !text-slate-600">
-                  {formatDate(packet?.submitted_at)}
+          <aside className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <LockKeyhole className="mt-1 h-5 w-5 shrink-0 text-emerald-700" />
+              <div>
+                <p className="text-base font-black !text-slate-950">
+                  Packet status
                 </p>
-              </div>
-
-              <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-emerald-700" />
-                  <p className="text-sm font-black !text-slate-950">
-                    Reviewed
-                  </p>
-                </div>
-                <p className="mt-1 text-sm font-bold !text-slate-600">
-                  {formatDate(packet?.reviewed_at)}
-                </p>
-              </div>
-
-              <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2">
-                  <UploadCloud className="h-4 w-4 text-emerald-700" />
-                  <p className="text-sm font-black !text-slate-950">
-                    Uploaded Documents
-                  </p>
-                </div>
-                <p className="mt-1 text-sm font-bold !text-slate-600">
-                  {documents.length.toLocaleString()} saved
+                <p className="mt-1 text-sm font-bold leading-6 !text-slate-700">
+                  Submitted: {formatDate(packet?.submitted_at)} • Reviewed:{" "}
+                  {formatDate(packet?.reviewed_at)} • Documents:{" "}
+                  {documents.length.toLocaleString()}
                 </p>
               </div>
             </div>
 
             {packet?.admin_notes ? (
-              <div className="mt-5 rounded-[1.25rem] border border-amber-200 bg-amber-50 p-5">
-                <p className="text-xs font-black uppercase tracking-[0.18em] !text-amber-700">
-                  SitGuru Note
-                </p>
-                <p className="mt-2 text-sm font-bold leading-6 !text-amber-900">
-                  {packet.admin_notes}
-                </p>
-              </div>
+              <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 !text-amber-900">
+                {packet.admin_notes}
+              </p>
             ) : null}
 
-            {packetUrl ? (
-              <a
-                href={packetUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-5 flex min-h-[54px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-emerald-50 px-6 py-3 text-base font-black !text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-100"
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {packetUrl ? (
+                <a
+                  href={packetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex min-h-[48px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black !text-emerald-800 hover:bg-emerald-100"
+                >
+                  External Packet
+                </a>
+              ) : null}
+
+              <Link
+                href="/guru/dashboard/university"
+                className="flex min-h-[48px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-4 py-3 text-sm font-black !text-emerald-800 hover:bg-emerald-50"
               >
-                Open External Secure Packet →
-              </a>
-            ) : null}
+                <GraduationCap className="mr-2 h-4 w-4" />
+                Academy
+              </Link>
 
-            <Link
-              href="/guru/dashboard/university"
-              className="mt-3 flex min-h-[54px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-6 py-3 text-base font-black !text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50"
-            >
-              <GraduationCap className="mr-2 h-5 w-5" />
-              Continue Guru Academy
-            </Link>
+              <Link
+                href="/guru/dashboard/earnings"
+                className="flex min-h-[48px] items-center justify-center rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm font-black !text-slate-800 hover:bg-slate-50"
+              >
+                <WalletCards className="mr-2 h-4 w-4" />
+                Earnings
+              </Link>
 
-            <Link
-              href="/guru/dashboard/profile"
-              className="mt-3 flex min-h-[54px] items-center justify-center rounded-[1rem] border border-slate-200 bg-white px-6 py-3 text-base font-black !text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50"
-            >
-              <UserCircle2 className="mr-2 h-5 w-5" />
-              Update My Profile
-            </Link>
-
-            <Link
-              href="/guru/dashboard/earnings"
-              className="mt-3 flex min-h-[54px] items-center justify-center rounded-[1rem] border border-slate-200 bg-white px-6 py-3 text-base font-black !text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50"
-            >
-              <WalletCards className="mr-2 h-5 w-5" />
-              View Earnings
-            </Link>
-
-            <Link
-              href="/guru/dashboard"
-              className="mt-3 flex min-h-[54px] items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
-            >
-              Back to Dashboard
-            </Link>
+              <Link
+                href="/guru/dashboard"
+                className="flex min-h-[48px] items-center justify-center rounded-[1rem] bg-[#07132f] px-4 py-3 text-sm font-black !text-white hover:bg-[#0b1436]"
+              >
+                Back to Dashboard
+              </Link>
+            </div>
           </aside>
+
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.18em] !text-amber-800">
+              Security note
+            </p>
+            <p className="mt-2 text-sm font-bold leading-6 !text-amber-900">
+              Do not upload tax forms, full SSNs, banking details, or sensitive
+              payment information here. Stripe and tax setup should only be
+              completed through SitGuru-approved secure tools.
+            </p>
+          </div>
         </div>
       </section>
     </main>
