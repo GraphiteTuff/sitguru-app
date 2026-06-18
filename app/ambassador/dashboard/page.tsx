@@ -563,6 +563,18 @@ export default async function AmbassadorDashboardPage() {
                     <Pill>{asString(ambassadorRecord.referral_status) || "Referral Code Active"}</Pill>
                     <Pill>{onboardingPacket.label}</Pill>
                   </div>
+
+                  <div className="mt-4 rounded-3xl border border-green-200 bg-white/90 p-4 shadow-sm">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-700">
+                      Ambassador Referral Code
+                    </p>
+                    <p className="mt-1 break-all text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
+                      {referralCode}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                      Share this code with every Pet Parent, future Guru, local partner, or social media referral so SitGuru can track activity back to you.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
