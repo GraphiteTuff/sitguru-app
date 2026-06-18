@@ -33,6 +33,13 @@ type AmbassadorRecord = {
   dashboard_enabled?: boolean | null;
   login_enabled?: boolean | null;
   status?: string | null;
+  stripe_account_id?: string | null;
+  stripe_connect_account_id?: string | null;
+  stripe_account_status?: string | null;
+  stripe_onboarding_complete?: boolean | null;
+  stripe_payouts_enabled?: boolean | null;
+  payouts_enabled?: boolean | null;
+  charges_enabled?: boolean | null;
 };
 
 type RewardRow = {
@@ -98,6 +105,46 @@ function money(value: number) {
 
 function roundMoney(value: number) {
   return Number(value.toFixed(2));
+}
+
+function isTruthyValue(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value > 0;
+
+  const normalized = asString(value).toLowerCase();
+
+  return ["true", "yes", "ready", "enabled", "complete", "completed"].includes(
+    normalized,
+  );
+}
+
+function getStripeAccountId(ambassador: AmbassadorRecord) {
+  return (
+    asString(ambassador.stripe_account_id) ||
+    asString(ambassador.stripe_connect_account_id)
+  );
+}
+
+function getStripeStatus(ambassador: AmbassadorRecord) {
+  const accountId = getStripeAccountId(ambassador);
+  const status = asString(ambassador.stripe_account_status);
+  const onboardingComplete = isTruthyValue(
+    ambassador.stripe_onboarding_complete,
+  );
+  const payoutsEnabled =
+    isTruthyValue(ambassador.stripe_payouts_enabled) ||
+    isTruthyValue(ambassador.payouts_enabled);
+  const chargesEnabled = isTruthyValue(ambassador.charges_enabled);
+  const ready = Boolean(accountId) && (payoutsEnabled || onboardingComplete);
+
+  return {
+    accountId,
+    status,
+    onboardingComplete,
+    payoutsEnabled,
+    chargesEnabled,
+    ready,
+  };
 }
 
 function formatDate(value?: string | null) {
@@ -418,6 +465,120 @@ function ProjectionCard({
   );
 }
 
+function StripePayoutCard({ ambassador }: { ambassador: AmbassadorRecord }) {
+  const stripeStatus = getStripeStatus(ambassador);
+
+  const statusLabel = stripeStatus.ready
+    ? "Stripe payouts ready"
+    : stripeStatus.accountId
+      ? "Stripe setup needs review"
+      : "Stripe setup needed";
+
+  const statusClasses = stripeStatus.ready
+    ? "border-emerald-200 bg-emerald-50 !text-emerald-700"
+    : stripeStatus.accountId
+      ? "border-amber-200 bg-amber-50 !text-amber-700"
+      : "border-rose-200 bg-rose-50 !text-rose-700";
+
+  return (
+    <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Wallet className="h-6 w-6 text-emerald-700" />
+          <h2 className="text-2xl font-black !text-slate-950">
+            Stripe Payout Setup
+          </h2>
+        </div>
+        <span
+          className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black ${statusClasses}`}
+        >
+          {statusLabel}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm font-semibold leading-6 !text-slate-700">
+        Ambassadors need a completed Stripe payout setup before approved rewards
+        can be paid. SitGuru reviews rewards first, then payouts can be
+        processed through Stripe.
+      </p>
+
+      <div className="mt-5 grid gap-3">
+        {[
+          [
+            "Connect Stripe",
+            stripeStatus.accountId
+              ? "Stripe account found"
+              : "Create or connect your Stripe payout account",
+            Boolean(stripeStatus.accountId),
+          ],
+          [
+            "Complete onboarding",
+            stripeStatus.onboardingComplete
+              ? "Onboarding appears complete"
+              : "Finish identity, tax, and banking requirements",
+            stripeStatus.onboardingComplete,
+          ],
+          [
+            "Enable payouts",
+            stripeStatus.payoutsEnabled
+              ? "Payouts appear enabled"
+              : "Stripe payouts may still need review or banking setup",
+            stripeStatus.payoutsEnabled,
+          ],
+        ].map(([title, detail, complete]) => (
+          <div
+            key={String(title)}
+            className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100"
+          >
+            {complete ? (
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+            ) : (
+              <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            )}
+            <div>
+              <p className="text-sm font-black !text-slate-950">{title}</p>
+              <p className="mt-1 text-xs font-bold leading-5 !text-slate-600">
+                {detail}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {stripeStatus.accountId ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] !text-slate-500">
+            Stripe Account
+          </p>
+          <p className="mt-1 break-all text-sm font-black !text-slate-900">
+            {stripeStatus.accountId}
+          </p>
+          {stripeStatus.status ? (
+            <p className="mt-1 text-xs font-bold !text-slate-600">
+              Status: {stripeStatus.status}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        <Link
+          href="/ambassador/dashboard/payouts"
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
+        >
+          {stripeStatus.ready ? "Review Stripe Setup" : "Set Up Stripe Payouts"}
+        </Link>
+        <Link
+          href="mailto:support@sitguru.com?subject=Ambassador%20Stripe%20Payout%20Help"
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black !text-emerald-800 transition hover:bg-emerald-50"
+        >
+          Ask SitGuru for Help
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function RewardStatusBadge({ status }: { status: string }) {
   return (
     <span
@@ -711,6 +872,8 @@ export default async function AmbassadorDashboardEarningsPage() {
           </section>
 
           <section className="space-y-6">
+            <StripePayoutCard ambassador={ambassador} />
+
             <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <DollarSign className="h-6 w-6 text-emerald-700" />
