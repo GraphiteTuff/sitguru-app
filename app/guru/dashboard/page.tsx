@@ -165,6 +165,15 @@ type GuruUniversityProgress = {
   academyButtonLabel: string;
 };
 
+type GuruOnboardingPacketDisplay = {
+  label: string;
+  status: "complete" | "pending" | "needs_action";
+  href: string;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  helper: string;
+};
+
 function normalizeRole(value?: string | null) {
   const role = String(value || "")
     .trim()
@@ -806,16 +815,95 @@ function isPayoutConnected(profile: GuruProfile | null) {
   );
 }
 
-function getGuruOnboardingPacketDisplay() {
-  const packetUrl =
-    process.env.NEXT_PUBLIC_GURU_ONBOARDING_PACKET_URL ||
-    "/guru/dashboard/onboarding-packet";
+async function getGuruOnboardingPacketDisplay(
+  userId: string,
+): Promise<GuruOnboardingPacketDisplay> {
+  const href = "/guru/dashboard/onboarding-packet";
 
-  return {
-    label: "Needs Action",
-    status: "needs_action" as const,
-    href: packetUrl,
-  };
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("guru_onboarding_packets")
+      .select("status, submitted_at, reviewed_at, admin_notes")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("Unable to load Guru onboarding packet status:", error);
+
+      return {
+        label: "Needs Action",
+        status: "needs_action",
+        href,
+        submittedAt: null,
+        reviewedAt: null,
+        helper:
+          "Complete your onboarding packet so SitGuru can review your Guru setup.",
+      };
+    }
+
+    const rawStatus = String(data?.status || "")
+      .trim()
+      .toLowerCase();
+
+    if (["approved", "complete", "completed"].includes(rawStatus)) {
+      return {
+        label: "Complete",
+        status: "complete",
+        href,
+        submittedAt: data?.submitted_at || null,
+        reviewedAt: data?.reviewed_at || null,
+        helper:
+          "Your Guru onboarding packet has been reviewed and marked complete.",
+      };
+    }
+
+    if (["submitted", "pending_review", "in_review"].includes(rawStatus)) {
+      return {
+        label: "Submitted",
+        status: "pending",
+        href,
+        submittedAt: data?.submitted_at || null,
+        reviewedAt: data?.reviewed_at || null,
+        helper:
+          "Your packet has been submitted. SitGuru will review it and update your onboarding status.",
+      };
+    }
+
+    if (["needs_fix", "needs_action"].includes(rawStatus)) {
+      return {
+        label: "Needs Fix",
+        status: "needs_action",
+        href,
+        submittedAt: data?.submitted_at || null,
+        reviewedAt: data?.reviewed_at || null,
+        helper:
+          data?.admin_notes ||
+          "SitGuru needs one or more updates before this packet can be completed.",
+      };
+    }
+
+    return {
+      label: "Needs Action",
+      status: "needs_action",
+      href,
+      submittedAt: data?.submitted_at || null,
+      reviewedAt: data?.reviewed_at || null,
+      helper:
+        "Review and submit your Guru onboarding packet so SitGuru can document Step 5.",
+    };
+  } catch (error) {
+    console.warn("Unable to load Guru onboarding packet status:", error);
+
+    return {
+      label: "Needs Action",
+      status: "needs_action",
+      href,
+      submittedAt: null,
+      reviewedAt: null,
+      helper:
+        "Complete your onboarding packet so SitGuru can review your Guru setup.",
+    };
+  }
 }
 
 function isCompletedStep(row: Record<string, unknown>) {
@@ -1271,13 +1359,14 @@ function GuruSetupChecklist({
   profile,
   profileCompletion,
   serviceRatesReady,
+  onboardingPacket,
 }: {
   profile: GuruProfile | null;
   profileCompletion: number;
   serviceRatesReady: boolean;
+  onboardingPacket: GuruOnboardingPacketDisplay;
 }) {
   const background = getBackgroundCheckDisplay(profile);
-  const onboardingPacket = getGuruOnboardingPacketDisplay();
   const payoutConnected = isPayoutConnected(profile);
   const hasProfile = profileCompletion >= 70;
   const hasServiceArea = Boolean(
@@ -1325,7 +1414,7 @@ function GuruSetupChecklist({
     {
       number: 5,
       title: "Complete Guru Onboarding Packet",
-      body: "Review and sign your SitGuru Guru Onboarding Packet so your contractor setup, W-9 acknowledgment, safety policies, and onboarding requirements are documented.",
+      body: onboardingPacket.helper,
       status: onboardingPacket.status,
       statusLabel: onboardingPacket.label,
       href: onboardingPacket.href,
@@ -1651,13 +1740,19 @@ export default async function GuruDashboardPage() {
     redirect("/guru/application");
   }
 
-  const [bookings, conversations, serviceRates, universityProgress] =
-    await Promise.all([
-      getGuruBookings(guruProfile, user.id),
-      getGuruConversations(guruProfile, user.id),
-      getGuruServiceRates(guruProfile),
-      getGuruUniversityProgress(user.id),
-    ]);
+  const [
+    bookings,
+    conversations,
+    serviceRates,
+    universityProgress,
+    onboardingPacket,
+  ] = await Promise.all([
+    getGuruBookings(guruProfile, user.id),
+    getGuruConversations(guruProfile, user.id),
+    getGuruServiceRates(guruProfile),
+    getGuruUniversityProgress(user.id),
+    getGuruOnboardingPacketDisplay(user.id),
+  ]);
 
   const name = getGuruName(guruProfile, user.email);
   const welcomeName = getFirstName(name);
@@ -1815,6 +1910,7 @@ export default async function GuruDashboardPage() {
           profile={guruProfile}
           profileCompletion={profileCompletion}
           serviceRatesReady={hasEnabledPricedServiceRates(serviceRates)}
+          onboardingPacket={onboardingPacket}
         />
 
         <GuruAcademyCard progress={universityProgress} />
