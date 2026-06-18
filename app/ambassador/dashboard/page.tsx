@@ -565,6 +565,67 @@ export default async function AmbassadorDashboardPage() {
           />
         </section>
 
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)]">
+          <DashboardCard>
+            <SectionHeader
+              icon={<DollarSign size={22} />}
+              title="Verified Rewards Structure"
+              detail="Ambassadors should always know how verified rewards may be earned and what SitGuru reviews before approval."
+            />
+
+            <div className="mt-5 grid gap-3">
+              <RewardStructureRow
+                label="Pet Parent first completed booking"
+                value="20% of SitGuru share, max $3"
+                detail="Earned after the referred Pet Parent completes a qualifying booking."
+              />
+              <RewardStructureRow
+                label="Referred Guru approved / bookable"
+                value="$5"
+                detail="Earned when a referred Guru becomes approved and bookable."
+              />
+              <RewardStructureRow
+                label="Referred Guru first completed booking"
+                value="$10"
+                detail="Earned after that referred Guru completes their first qualifying booking."
+              />
+              <RewardStructureRow
+                label="Max per referred Guru"
+                value="$15"
+                detail="Keeps rewards simple, fair, and tied to useful SitGuru activity."
+              />
+              <RewardStructureRow
+                label="Social growth milestones"
+                value="25 = $10 · 50 = $25 · 100 = $50"
+                detail="Based on verified social media-driven signups connected to @SitGuruOfficial and your referral code."
+              />
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-950">
+              Rewards are reviewed by SitGuru. Fake, duplicate, self-created, canceled, refunded, or unverifiable activity does not qualify.
+            </div>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<Users size={22} />}
+              title="SitGuru Pack Leader Program"
+              detail="An invite-only leadership path for trusted Ambassadors who want to help grow SitGuru in their service area."
+            />
+
+            <div className="mt-5 grid gap-3">
+              <ReminderItem>Pack Leaders mentor direct Ambassadors and help grow verified local activity.</ReminderItem>
+              <ReminderItem>One level only: rewards are tied to direct Ambassadors, not a recruiting chain.</ReminderItem>
+              <ReminderItem>Pack Leader rewards are based on verified SitGuru activity and SitGuru share.</ReminderItem>
+              <ReminderItem>Founding Pack Leaders may support a city, school, military community, or service area.</ReminderItem>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-950">
+              Pack Leader participation is reviewed and approved by SitGuru. No earnings are guaranteed.
+            </div>
+          </DashboardCard>
+        </section>
+
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
           <DashboardCard>
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -1074,6 +1135,32 @@ function SupportOption({
       <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
         {detail}
       </p>
+    </div>
+  );
+}
+
+function RewardStructureRow({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-green-100 bg-[#fbfcf9] p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-black text-green-950">{label}</p>
+          <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+            {detail}
+          </p>
+        </div>
+        <span className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-green-800 px-3 py-2 text-sm font-black text-white">
+          {value}
+        </span>
+      </div>
     </div>
   );
 }
