@@ -237,14 +237,14 @@ function getAmbassadorAvatarUrl({
   metadataPictureUrl?: string | null;
 }) {
   return (
-    normalizeAvatarUrl(ambassador.profile_photo_url) ||
-    normalizeAvatarUrl(ambassador.photo_url) ||
-    normalizeAvatarUrl(ambassador.image_url) ||
-    normalizeAvatarUrl(ambassador.avatar_url) ||
     normalizeAvatarUrl(profile?.profile_photo_url) ||
     normalizeAvatarUrl(profile?.photo_url) ||
     normalizeAvatarUrl(profile?.image_url) ||
     normalizeAvatarUrl(profile?.avatar_url) ||
+    normalizeAvatarUrl(ambassador.profile_photo_url) ||
+    normalizeAvatarUrl(ambassador.photo_url) ||
+    normalizeAvatarUrl(ambassador.image_url) ||
+    normalizeAvatarUrl(ambassador.avatar_url) ||
     normalizeAvatarUrl(metadataAvatarUrl) ||
     normalizeAvatarUrl(metadataPictureUrl) ||
     ""
