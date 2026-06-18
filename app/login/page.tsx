@@ -20,7 +20,7 @@ import PhoneCodeLogin from "@/components/auth/PhoneCodeLogin";
 import TurnstileWidget from "@/components/TurnstileWidget";
 
 type LoginMethod = "phone" | "email";
-type LoginAudience = "pet_parent" | "guru" | "ambassador";
+type LoginAudience = "one" | "pet_parent" | "guru" | "ambassador";
 
 function decodeMessage(value: string | null) {
   if (!value) return "";
@@ -52,7 +52,16 @@ function getRequestedAudience(value?: string | null): LoginAudience {
     return "ambassador";
   }
 
-  return "pet_parent";
+  if (
+    normalized === "customer" ||
+    normalized === "pet_parent" ||
+    normalized === "pet-parent" ||
+    normalized === "parent"
+  ) {
+    return "pet_parent";
+  }
+
+  return "one";
 }
 
 function getRequestedMode(value?: string | null): LoginMethod {
@@ -70,9 +79,10 @@ function getRequestedMode(value?: string | null): LoginMethod {
 }
 
 function getDefaultDashboardForAudience(audience: LoginAudience) {
-  if (audience === "guru") return "/guru/dashboard";
-  if (audience === "ambassador") return "/ambassador/dashboard";
-  return "/customer/dashboard";
+  if (audience === "guru") return "/login/route?preferred=guru";
+  if (audience === "ambassador") return "/login/route?preferred=ambassador";
+  if (audience === "pet_parent") return "/login/route?preferred=pet_parent";
+  return "/login/route";
 }
 
 function getSafeNextPath(nextValue: string | null, audience: LoginAudience) {
@@ -97,7 +107,22 @@ function getSafeNextPath(nextValue: string | null, audience: LoginAudience) {
 function getAudienceLabel(audience: LoginAudience) {
   if (audience === "guru") return "Guru";
   if (audience === "ambassador") return "Ambassador";
-  return "Pet Parent";
+  if (audience === "pet_parent") return "Pet Parent";
+  return "SitGuru One";
+}
+
+function getPhoneAccessLabel(audience: LoginAudience) {
+  if (audience === "guru") return "Guru account";
+  if (audience === "ambassador") return "Ambassador account";
+  if (audience === "pet_parent") return "Pet Parent account";
+  return "Existing SitGuru account";
+}
+
+function getEmailTurnstileAction(audience: LoginAudience) {
+  if (audience === "guru") return "guru_email_login";
+  if (audience === "ambassador") return "ambassador_email_login";
+  if (audience === "pet_parent") return "pet_parent_email_login";
+  return "sitguru_one_email_login";
 }
 
 function LoginPageContent() {
@@ -127,6 +152,7 @@ function LoginPageContent() {
 
   const errorMessage = decodeMessage(searchParams.get("error"));
   const audienceLabel = getAudienceLabel(requestedAudience);
+  const phoneAccessLabel = getPhoneAccessLabel(requestedAudience);
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -170,11 +196,11 @@ function LoginPageContent() {
         <section className="hidden rounded-[2rem] border border-emerald-100 bg-white/90 p-7 shadow-[0_20px_55px_rgba(15,23,42,0.07)] lg:block">
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
             <Sparkles className="h-4 w-4" />
-            One SitGuru account
+            SitGuru One Access
           </div>
 
           <h1 className="mt-5 text-4xl font-black leading-[1.03] tracking-[-0.055em] text-slate-950 xl:text-5xl">
-            Fast access for every dashboard.
+            One login for every dashboard.
           </h1>
 
           <p className="mt-4 text-base font-semibold leading-7 text-slate-700">
@@ -205,7 +231,7 @@ function LoginPageContent() {
           <div className="text-center sm:text-left">
             <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-xs font-black text-emerald-800">
               <UsersRound className="h-4 w-4" />
-              {audienceLabel} access
+              {audienceLabel} Access
             </div>
 
             <h2 className="mt-4 text-4xl font-black leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-5xl">
@@ -213,7 +239,7 @@ function LoginPageContent() {
             </h2>
 
             <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 sm:text-base">
-              Use one SitGuru account for all your dashboards.
+              Use one SitGuru account for Pet Parent, Guru, and Ambassador dashboards.
             </p>
           </div>
 
@@ -283,6 +309,7 @@ function LoginPageContent() {
                   description="We’ll text you a secure 6-digit code."
                   submitLabel="Send code"
                   verifyLabel="Verify & continue"
+                  accessLabel={phoneAccessLabel}
                   compact
                 />
               </div>
@@ -356,7 +383,7 @@ function LoginPageContent() {
               </div>
 
               <TurnstileWidget
-                action="pet_parent_email_login"
+                action={getEmailTurnstileAction(requestedAudience)}
                 resetKey={turnstileResetKey}
                 onVerify={handleTurnstileVerify}
                 onExpire={handleTurnstileExpire}

@@ -24,6 +24,7 @@ type PhoneCodeLoginProps = {
   verifyLabel?: string;
   compact?: boolean;
   allowCreateUser?: boolean;
+  accessLabel?: string;
 };
 
 function getSafeRedirectPath(
@@ -179,6 +180,7 @@ export default function PhoneCodeLogin({
   verifyLabel = "Verify & continue",
   compact = false,
   allowCreateUser = false,
+  accessLabel,
 }: PhoneCodeLoginProps) {
   const router = useRouter();
 
@@ -201,7 +203,7 @@ export default function PhoneCodeLogin({
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
-  const roleLabel = getRoleLabel(role);
+  const roleLabel = accessLabel || getRoleLabel(role);
   const requestedProfileRole = getRequestedProfileRole(role);
 
   const handleTurnstileVerify = useCallback((token: string) => {
