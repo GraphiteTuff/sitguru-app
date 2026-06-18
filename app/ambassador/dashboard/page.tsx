@@ -498,7 +498,7 @@ export default async function AmbassadorDashboardPage() {
                 </Link>
 
                 <Link
-                  href={`/ambassador/messages?ref=${encodeURIComponent(referralCode)}`}
+                  href={`/ambassador/dashboard/messages?ref=${encodeURIComponent(referralCode)}`}
                   className="flex min-h-14 items-center justify-between rounded-2xl border border-green-200 bg-white px-5 py-4 text-sm font-black text-green-900 transition hover:bg-green-50"
                 >
                   Message SitGuru
@@ -725,62 +725,72 @@ export default async function AmbassadorDashboardPage() {
           </DashboardCard>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <section>
           <DashboardCard>
-            <SectionHeader
-              icon={<MessageCircle size={22} />}
-              title="Support Request Center"
-              detail="Fast Ambassador support so they stay engaged, stocked, and ready in the field."
-            />
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)] lg:items-start">
+              <div>
+                <SectionHeader
+                  icon={<MessageCircle size={22} />}
+                  title="Support Request Center"
+                  detail="Use one simple request card when you need flyers, QR codes, missing-referral help, talking points, or social media support."
+                />
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <SupportActionCard
-                icon={<FileText size={20} />}
-                title="Request Flyers"
-                detail="Ask SitGuru for updated local flyers or print-ready handouts."
-                href={`/ambassador/messages?topic=flyers&ref=${encodeURIComponent(referralCode)}`}
-              />
-              <SupportActionCard
-                icon={<QrCode size={20} />}
-                title="Request QR Codes"
-                detail="Get fresh QR codes for Pet Parent, Guru, or social media outreach."
-                href={`/ambassador/messages?topic=qr-codes&ref=${encodeURIComponent(referralCode)}`}
-              />
-              <SupportActionCard
-                icon={<MessageCircle size={20} />}
-                title="Referral Missing?"
-                detail="Tell SitGuru if a signup or booking is not showing on your dashboard."
-                href={`/ambassador/messages?topic=missing-referral&ref=${encodeURIComponent(referralCode)}`}
-              />
-              <SupportActionCard
-                icon={<BookOpenCheck size={20} />}
-                title="Need Talking Points?"
-                detail="Ask for help with wording, local outreach, or social media posts."
-                href={`/ambassador/messages?topic=talking-points&ref=${encodeURIComponent(referralCode)}`}
-              />
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<Users size={22} />}
-              title="Grow @SitGuruOfficial"
-              detail="Help turn local pet lovers into followers, Pet Parents, Gurus, and verified signups."
-            />
-            <div className="mt-4 grid gap-3">
-              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950 ring-1 ring-green-100">
-                Ambassador goal: encourage people to follow @SitGuruOfficial and sign up using your referral link or code.
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <SupportOption icon={<FileText size={18} />} title="Flyers" detail="Updated local flyers or print-ready handouts." />
+                  <SupportOption icon={<QrCode size={18} />} title="QR Codes" detail="Fresh QR codes for Pet Parent, Guru, or social outreach." />
+                  <SupportOption icon={<MessageCircle size={18} />} title="Missing Referral" detail="A signup or booking is not showing on your dashboard." />
+                  <SupportOption icon={<BookOpenCheck size={18} />} title="Talking Points" detail="Help with wording, local outreach, or social media posts." />
+                </div>
               </div>
-              <ReminderItem>Ask Pet Parents and future Gurus to follow @SitGuruOfficial.</ReminderItem>
-              <ReminderItem>Use your referral link when sharing SitGuru social posts.</ReminderItem>
-              <ReminderItem>Verified social signups may count toward social growth bonuses after SitGuru review.</ReminderItem>
-              <Link
-                href={`/ambassador/messages?topic=social-media-support&ref=${encodeURIComponent(referralCode)}`}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-              >
-                Request Social Media Help
-                <ArrowRight size={17} />
-              </Link>
+
+              <div className="rounded-[24px] border border-green-100 bg-green-50 p-4 sm:p-5">
+                <div className="mb-4 rounded-2xl bg-white px-4 py-3 text-sm font-black leading-6 text-green-950 ring-1 ring-green-100">
+                  Ambassador goal: encourage people to follow @SitGuruOfficial and sign up using your referral link or code. Verified social signups may count toward social growth bonuses after SitGuru review.
+                </div>
+
+                <form action="/ambassador/dashboard/messages" method="get" className="grid gap-3">
+                  <input type="hidden" name="ref" value={referralCode} />
+
+                  <label className="grid gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.16em] text-green-900">
+                      What do you need?
+                    </span>
+                    <select
+                      name="topic"
+                      defaultValue="flyers"
+                      className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-950 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                    >
+                      <option value="flyers">Request flyers / print-ready handouts</option>
+                      <option value="qr-codes">Request QR codes</option>
+                      <option value="missing-referral">Referral or booking is missing</option>
+                      <option value="talking-points">Need talking points or local outreach wording</option>
+                      <option value="social-media-support">Need help growing @SitGuruOfficial</option>
+                      <option value="event-support">Need event, table, or community outreach support</option>
+                      <option value="other-support">Other Ambassador support request</option>
+                    </select>
+                  </label>
+
+                  <label className="grid gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.16em] text-green-900">
+                      Optional note
+                    </span>
+                    <textarea
+                      name="note"
+                      rows={4}
+                      placeholder="Example: I need a QR code for Pet Parent signups for a local event this weekend."
+                      className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold leading-6 text-green-950 outline-none transition placeholder:text-slate-400 focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                    />
+                  </label>
+
+                  <button
+                    type="submit"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+                  >
+                    Open Support Request
+                    <ArrowRight size={17} />
+                  </button>
+                </form>
+              </div>
             </div>
           </DashboardCard>
         </section>
@@ -813,7 +823,7 @@ export default async function AmbassadorDashboardPage() {
               detail="General support for referrals, rewards, partners, events, or local outreach."
             />
             <Link
-              href={`/ambassador/messages?ref=${encodeURIComponent(referralCode)}`}
+              href={`/ambassador/dashboard/messages?ref=${encodeURIComponent(referralCode)}`}
               className="mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
             >
               Message SitGuru
@@ -1037,36 +1047,25 @@ function SectionHeader({
 }
 
 
-function SupportActionCard({
+function SupportOption({
   icon,
   title,
   detail,
-  href,
 }: {
   icon: ReactNode;
   title: string;
   detail: string;
-  href: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="group flex min-h-[132px] flex-col justify-between rounded-2xl border border-green-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50 hover:shadow-md"
-    >
-      <div>
-        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-100 text-green-900 transition group-hover:bg-white">
-          {icon}
-        </div>
-        <h3 className="text-base font-black text-green-950">{title}</h3>
-        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-          {detail}
-        </p>
+    <div className="rounded-2xl border border-green-100 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-100 text-green-900">
+        {icon}
       </div>
-      <span className="mt-3 inline-flex items-center gap-2 text-sm font-black text-green-800">
-        Request support
-        <ArrowRight size={16} />
-      </span>
-    </Link>
+      <h3 className="text-base font-black text-green-950">{title}</h3>
+      <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+        {detail}
+      </p>
+    </div>
   );
 }
 
