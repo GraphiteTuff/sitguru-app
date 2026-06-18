@@ -421,7 +421,6 @@ const phoneLoginHref = "/login?mode=phone";
 const emailLoginHref = "/login?mode=email";
 const guruSignupHref = "/become-a-guru";
 const bothSignupHref = "/signup?role=both&next=/customer/dashboard";
-const ambassadorLoginHref = "/login?role=ambassador";
 
 function GoogleIcon() {
   return (
@@ -746,7 +745,15 @@ function HeroSignupCard({
         </p>
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <Link
+          href={petParentSignupHref}
+          onClick={() => onTrack("Become a Pet Parent Hero Card", petParentSignupHref)}
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+          Become a Pet Parent
+        </Link>
+
         <Link
           href={guruSignupHref}
           onClick={() => onTrack("Become a Guru Hero Card", guruSignupHref)}
@@ -756,13 +763,13 @@ function HeroSignupCard({
         </Link>
 
         <Link
-          href={ambassadorLoginHref}
+          href="/ambassadors"
           onClick={() =>
-            onTrack("Ambassador Access From Hero Card", ambassadorLoginHref)
+            onTrack("Become an Ambassador Hero Card", "/ambassadors")
           }
-          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-xs font-black text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/60 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
-          Ambassador access
+          Become an Ambassador
         </Link>
       </div>
     </aside>
