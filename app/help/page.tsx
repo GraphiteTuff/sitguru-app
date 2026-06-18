@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  Bell,
   CalendarCheck,
-  CheckCircle2,
   CircleHelp,
   CreditCard,
   GraduationCap,
@@ -16,7 +15,6 @@ import {
   Medal,
   MessageCircle,
   PawPrint,
-  Phone,
   Search,
   ShieldCheck,
   Sparkles,
@@ -42,6 +40,18 @@ type HelpSection = {
   }>;
 };
 
+type PaymentGuide = {
+  title: string;
+  audience: string;
+  description: string;
+  imageSrc: string;
+  imageAlt: string;
+  href: string;
+  cta: string;
+  icon: ReactNode;
+  highlights: string[];
+};
+
 const quickHelpCards: HelpCard[] = [
   {
     title: "Pet Parent Help",
@@ -62,11 +72,20 @@ const quickHelpCards: HelpCard[] = [
     icon: <UsersRound className="h-6 w-6" />,
   },
   {
+    title: "Payments & Payouts",
+    eyebrow: "Stripe setup guides",
+    description:
+      "Use role-specific payment guides for Guru payouts, Ambassador payouts, and Pet Parent service payments.",
+    href: "#payments-payouts",
+    cta: "View Guides",
+    icon: <CreditCard className="h-6 w-6" />,
+  },
+  {
     title: "Bookings",
     eyebrow: "Care requests and details",
     description:
       "Learn how requests, communication, care instructions, service notes, and booking records can help keep everyone organized.",
-    href: "#bookings",
+    href: "#bookings-and-communication",
     cta: "Booking Help",
     icon: <CalendarCheck className="h-6 w-6" />,
   },
@@ -75,7 +94,7 @@ const quickHelpCards: HelpCard[] = [
     eyebrow: "Access your account",
     description:
       "Need help with signup, phone login codes, email access, profile details, or account settings? Start here.",
-    href: "#accounts-login",
+    href: "#accounts-and-login",
     cta: "Account Help",
     icon: <Lock className="h-6 w-6" />,
   },
@@ -96,6 +115,57 @@ const quickHelpCards: HelpCard[] = [
     href: "/contact",
     cta: "Contact SitGuru",
     icon: <MessageCircle className="h-6 w-6" />,
+  },
+];
+
+const paymentGuides: PaymentGuide[] = [
+  {
+    title: "Guru Stripe Setup Guide",
+    audience: "For Gurus",
+    description:
+      "Complete Stripe payout setup so you can receive payouts for bookings, commission, and referral earnings.",
+    imageSrc: "/help/stripe/sitguru-guru-stripe-setup-guide.png",
+    imageAlt: "SitGuru Guru Stripe Setup Guide",
+    href: "#guru-stripe-setup",
+    cta: "Guru Setup Steps",
+    icon: <UsersRound className="h-5 w-5" />,
+    highlights: [
+      "Booking payouts",
+      "Commission earnings",
+      "Referral earnings",
+    ],
+  },
+  {
+    title: "Pet Parent Payment Guide",
+    audience: "For Pet Parents",
+    description:
+      "Learn how Pet Parents can securely request, review, and pay for pet care services through SitGuru.",
+    imageSrc: "/help/stripe/sitguru-pet-parent-payment-guide.png",
+    imageAlt: "SitGuru Pet Parent Payment Guide",
+    href: "#pet-parent-payment-guide",
+    cta: "Payment Steps",
+    icon: <PawPrint className="h-5 w-5" />,
+    highlights: [
+      "Secure checkout",
+      "Booking payments",
+      "Receipts and dashboard",
+    ],
+  },
+  {
+    title: "Ambassador Stripe Setup Guide",
+    audience: "For Ambassadors",
+    description:
+      "Complete Stripe payout setup so you can receive ambassador payouts, commission, and referral earnings.",
+    imageSrc: "/help/stripe/sitguru-ambassador-stripe-setup-guide.png",
+    imageAlt: "SitGuru Ambassador Stripe Setup Guide",
+    href: "#ambassador-stripe-setup",
+    cta: "Ambassador Setup Steps",
+    icon: <HeartHandshake className="h-5 w-5" />,
+    highlights: [
+      "Ambassador payouts",
+      "Referral activity",
+      "Commission earnings",
+    ],
   },
 ];
 
@@ -158,8 +228,7 @@ const helpSections: HelpSection[] = [
   },
   {
     title: "Pet Parents",
-    description:
-      "Help for families looking for trusted local pet care.",
+    description: "Help for families looking for trusted local pet care.",
     icon: <PawPrint className="h-5 w-5" />,
     items: [
       {
@@ -178,6 +247,11 @@ const helpSections: HelpSection[] = [
           "Yes. Clear communication helps everyone. Pet Parents should ask questions early so they feel comfortable with the Pet Guru, the service, timing, care expectations, and any special instructions.",
       },
       {
+        question: "How do Pet Parents pay for services?",
+        answer:
+          "Pet Parents can use SitGuru’s secure checkout to review booking details, add a payment method, confirm billing details, submit payment, and manage bookings, receipts, and messages from their dashboard.",
+      },
+      {
         question: "Why should I keep care details organized through SitGuru?",
         answer:
           "Keeping care details organized through SitGuru helps preserve service notes, pet instructions, message history, booking records, and support context if anyone needs to review what was discussed.",
@@ -191,8 +265,7 @@ const helpSections: HelpSection[] = [
   },
   {
     title: "Gurus",
-    description:
-      "Help for expert pet care providers using SitGuru.",
+    description: "Help for expert pet care providers using SitGuru.",
     icon: <UsersRound className="h-5 w-5" />,
     items: [
       {
@@ -209,6 +282,11 @@ const helpSections: HelpSection[] = [
         question: "Do Pet Gurus choose their own services and availability?",
         answer:
           "Yes. Pet Gurus can choose the services they are interested in offering, the areas they prefer to serve, and the requests that fit their availability as SitGuru grows.",
+      },
+      {
+        question: "How do Gurus set up Stripe payouts?",
+        answer:
+          "Gurus can use the Guru Stripe Setup Guide to select Individual as the business type, enter personal details, add business details, connect a bank account, choose a payout account, review the setup, and return to the Earnings tab to track payout activity.",
       },
       {
         question: "Is SitGuru only for new pet care providers?",
@@ -290,8 +368,7 @@ const helpSections: HelpSection[] = [
   },
   {
     title: "Programs",
-    description:
-      "Help with SitGuru program pathways and applications.",
+    description: "Help with SitGuru program pathways and applications.",
     icon: <GraduationCap className="h-5 w-5" />,
     items: [
       {
@@ -315,6 +392,11 @@ const helpSections: HelpSection[] = [
           "Yes. SitGuru welcomes referrals from workforce partners, schools, colleges, community groups, local organizations, veteran representatives, and trusted pet-care networks. Applicants should apply through SitGuru so their information is routed correctly.",
       },
       {
+        question: "How do Ambassadors set up Stripe payouts?",
+        answer:
+          "Ambassadors can use the Ambassador Stripe Setup Guide to complete Stripe setup, connect a bank account, choose a payout account, and return to the SitGuru dashboard to track referral activity, ambassador earnings, and payout status.",
+      },
+      {
         question: "Does applying to a program guarantee approval?",
         answer:
           "No. Applying to a program does not guarantee acceptance, approval, Guru activation, bookings, rewards, or placement. Applications may be reviewed based on program fit, eligibility, onboarding needs, and trust and safety steps.",
@@ -327,25 +409,40 @@ const helpSections: HelpSection[] = [
     ],
   },
   {
-    title: "Booking Payments",
+    title: "Payments & Payouts",
     description:
-      "General help with payment setup, booking totals, and payout-related questions.",
+      "Help with Stripe setup, secure checkout, booking totals, payout tracking, and payment questions.",
     icon: <CreditCard className="h-5 w-5" />,
     items: [
       {
-        question: "How are payments handled?",
+        question: "Where can I find the SitGuru Stripe setup guides?",
         answer:
-          "SitGuru may use trusted third-party payment providers to support booking payments, provider payouts, refunds, tax forms, and related payment activity. Payment workflows may depend on service type, booking status, and available platform features.",
+          "The Payments & Payouts section includes separate guides for Guru Stripe setup, Ambassador Stripe setup, and Pet Parent payment checkout. Each guide explains the steps for that specific role.",
       },
       {
-        question: "Where can I see pricing?",
+        question: "Why do Gurus need to set up Stripe?",
         answer:
-          "Where available, Pet Guru profiles and booking details may display service pricing or related information. Pet Parents and Pet Gurus should review booking details before confirming care.",
+          "Gurus need Stripe setup to receive payouts for bookings, commission, and referral earnings. The Guru Stripe Setup Guide walks through choosing business type, entering personal details, connecting a bank, choosing a payout account, and returning to the Earnings tab.",
       },
       {
-        question: "Who do I contact for payment questions?",
+        question: "Why do Ambassadors need to set up Stripe?",
         answer:
-          "Use the contact page and choose Support as your topic. Include your name, account email, booking details, and a clear description of the payment question.",
+          "Ambassadors need Stripe setup to receive ambassador payouts, commission, and referral earnings. The Ambassador Stripe Setup Guide explains how to connect a payout account and track referral-related earnings in SitGuru.",
+      },
+      {
+        question: "How do Pet Parents pay for services?",
+        answer:
+          "Pet Parents can use SitGuru’s secure checkout to review booking details, add a payment method, confirm billing information, submit payment, receive confirmation, and manage bookings and receipts from their dashboard.",
+      },
+      {
+        question: "Is payment information secure?",
+        answer:
+          "SitGuru may use trusted third-party payment providers such as Stripe to support secure checkout, payout setup, and payment processing. Users should only enter payment details through the official SitGuru or Stripe checkout flow.",
+      },
+      {
+        question: "Who do I contact for payment or payout help?",
+        answer:
+          "Email support@sitguru.com or use the contact page. Include your name, account email, role, booking details if applicable, and a clear description of the issue.",
       },
     ],
   },
@@ -454,6 +551,64 @@ function HelpCard({ card }: { card: HelpCard }) {
   );
 }
 
+function PaymentGuideCard({ guide }: { guide: PaymentGuide }) {
+  return (
+    <article
+      id={guide.href.replace("#", "")}
+      className="group overflow-hidden rounded-[30px] border border-emerald-100 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
+    >
+      <div className="relative aspect-[724/2172] w-full overflow-hidden bg-emerald-50">
+        <Image
+          src={guide.imageSrc}
+          alt={guide.imageAlt}
+          fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover object-top transition duration-300 group-hover:scale-[1.015]"
+          priority={false}
+        />
+      </div>
+
+      <div className="p-5 sm:p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+            {guide.icon}
+            {guide.audience}
+          </span>
+        </div>
+
+        <h3 className="text-2xl font-black tracking-tight text-slate-950">
+          {guide.title}
+        </h3>
+
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+          {guide.description}
+        </p>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          {guide.highlights.map((highlight) => (
+            <span
+              key={highlight}
+              className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-800"
+            >
+              {highlight}
+            </span>
+          ))}
+        </div>
+
+        <a
+          href={guide.imageSrc}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+        >
+          Open Guide
+          <ArrowRight className="h-4 w-4" />
+        </a>
+      </div>
+    </article>
+  );
+}
+
 function FaqSection({ section }: { section: HelpSection }) {
   const sectionId = section.title
     .toLowerCase()
@@ -540,10 +695,10 @@ export default function HelpPage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-3xl text-base font-semibold leading-8 text-slate-700 sm:text-lg">
-            Get quick answers for Pet Parents, Pet Gurus, bookings, accounts,
-            programs, ambassadors, and trust and safety. SitGuru is built to
-            make local pet care feel easier, more trusted, and more community
-            focused.
+            Get quick answers for Pet Parents, Pet Gurus, bookings, payments,
+            payouts, accounts, programs, ambassadors, and trust and safety.
+            SitGuru is built to make local pet care feel easier, more trusted,
+            and more community focused.
           </p>
 
           <div className="mx-auto mt-8 max-w-3xl rounded-[26px] border border-emerald-100 bg-white p-4 text-left shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
@@ -580,6 +735,9 @@ export default function HelpPage() {
             </span>
             <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
               Pet Guru Help
+            </span>
+            <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
+              Payment Guides
             </span>
             <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
               Ambassador Support
@@ -638,6 +796,61 @@ export default function HelpPage() {
                 </details>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="payments-payouts"
+        className="relative mx-auto max-w-7xl scroll-mt-6 px-4 pb-8 sm:px-6 lg:px-8"
+      >
+        <div className="rounded-[36px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_100%)] p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-6 lg:p-8">
+          <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+            <div>
+              <SectionEyebrow icon={<CreditCard className="h-4 w-4" />}>
+                Payments & Payouts
+              </SectionEyebrow>
+
+              <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                Stripe and payment guides for every SitGuru role.
+              </h2>
+
+              <p className="mt-4 text-base font-semibold leading-7 text-slate-600">
+                Use these role-specific guides to help Gurus set up payouts,
+                Ambassadors set up referral earnings, and Pet Parents pay for
+                services through secure checkout.
+              </p>
+            </div>
+
+            <div className="rounded-[28px] border border-emerald-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-950">
+                    Need help with payment setup?
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Email us anytime at{" "}
+                    <a
+                      href="mailto:support@sitguru.com"
+                      className="font-black text-emerald-700 underline decoration-emerald-200 underline-offset-4"
+                    >
+                      support@sitguru.com
+                    </a>{" "}
+                    and include your role, account email, and a short description
+                    of what you need help with.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-3">
+            {paymentGuides.map((guide) => (
+              <PaymentGuideCard key={guide.title} guide={guide} />
+            ))}
           </div>
         </div>
       </section>
