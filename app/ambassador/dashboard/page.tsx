@@ -498,7 +498,7 @@ export default async function AmbassadorDashboardPage() {
                 </Link>
 
                 <Link
-                  href={`/ambassador/dashboard/messages?ref=${encodeURIComponent(referralCode)}`}
+                  href={`mailto:support@sitguru.com?subject=Ambassador%20Support%20Request&body=Ambassador%20Referral%20Code%3A%20${encodeURIComponent(referralCode)}`}
                   className="flex min-h-14 items-center justify-between rounded-2xl border border-green-200 bg-white px-5 py-4 text-sm font-black text-green-900 transition hover:bg-green-50"
                 >
                   Message SitGuru
@@ -748,15 +748,20 @@ export default async function AmbassadorDashboardPage() {
                   Ambassador goal: encourage people to follow @SitGuruOfficial and sign up using your referral link or code. Verified social signups may count toward social growth bonuses after SitGuru review.
                 </div>
 
-                <form action="/ambassador/dashboard/messages" method="get" className="grid gap-3">
-                  <input type="hidden" name="ref" value={referralCode} />
+                <form
+                  action="mailto:support@sitguru.com"
+                  method="post"
+                  encType="text/plain"
+                  className="grid gap-3"
+                >
+                  <input type="hidden" name="Ambassador referral code" value={referralCode} />
 
                   <label className="grid gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.16em] text-green-900">
                       What do you need?
                     </span>
                     <select
-                      name="topic"
+                      name="Support request type"
                       defaultValue="flyers"
                       className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-950 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
                     >
@@ -775,7 +780,7 @@ export default async function AmbassadorDashboardPage() {
                       Optional note
                     </span>
                     <textarea
-                      name="note"
+                      name="Support details"
                       rows={4}
                       placeholder="Example: I need a QR code for Pet Parent signups for a local event this weekend."
                       className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold leading-6 text-green-950 outline-none transition placeholder:text-slate-400 focus:border-green-400 focus:ring-4 focus:ring-green-100"
@@ -786,9 +791,13 @@ export default async function AmbassadorDashboardPage() {
                     type="submit"
                     className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
                   >
-                    Open Support Request
+                    Email SitGuru Support
                     <ArrowRight size={17} />
                   </button>
+
+                  <p className="text-xs font-bold leading-5 text-green-900/75">
+                    This opens an email to support@sitguru.com with the request type, referral code, and optional note.
+                  </p>
                 </form>
               </div>
             </div>
@@ -823,7 +832,7 @@ export default async function AmbassadorDashboardPage() {
               detail="General support for referrals, rewards, partners, events, or local outreach."
             />
             <Link
-              href={`/ambassador/dashboard/messages?ref=${encodeURIComponent(referralCode)}`}
+              href={`mailto:support@sitguru.com?subject=Ambassador%20Support%20Request&body=Ambassador%20Referral%20Code%3A%20${encodeURIComponent(referralCode)}`}
               className="mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
             >
               Message SitGuru
