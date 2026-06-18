@@ -417,12 +417,11 @@ const popularServices = [
 ];
 
 const petParentSignupHref = "/signup?role=pet_parent&next=/customer/dashboard";
-const petParentPhoneSignupHref =
-  "/signup?role=pet_parent&mode=phone&next=/customer/dashboard";
-const petParentLoginHref = "/login?role=pet_parent&next=/customer/dashboard";
+const phoneLoginHref = "/login?mode=phone";
+const emailLoginHref = "/login?mode=email";
 const guruSignupHref = "/become-a-guru";
 const bothSignupHref = "/signup?role=both&next=/customer/dashboard";
-const ambassadorLoginHref = "/ambassador/login";
+const ambassadorLoginHref = "/login?role=ambassador";
 
 function GoogleIcon() {
   return (
@@ -443,19 +442,6 @@ function GoogleIcon() {
         fill="#EA4335"
         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"
       />
-    </svg>
-  );
-}
-
-function AppleIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5 shrink-0 fill-current"
-    >
-      <path d="M16.37 1.51c0 1.08-.44 2.13-1.16 2.91-.77.84-2.04 1.48-3.09 1.39-.13-1.04.39-2.18 1.1-2.94.78-.85 2.15-1.48 3.15-1.36z" />
-      <path d="M20.62 17.47c-.55 1.27-.82 1.84-1.53 2.96-.99 1.51-2.38 3.39-4.11 3.4-1.54.01-1.94-1-4.02-.99-2.08.01-2.52 1-4.06.99-1.73-.01-3.05-1.71-4.04-3.22-2.76-4.22-3.05-9.18-1.35-11.82 1.2-1.87 3.1-2.97 4.88-2.97 1.81 0 2.95 1 4.45 1 1.45 0 2.34-1 4.44-1 1.59 0 3.27.87 4.47 2.36-3.93 2.16-3.29 7.78.87 9.29z" />
     </svg>
   );
 }
@@ -705,18 +691,27 @@ function HeroSignupCard({
   return (
     <aside className="w-full max-w-[360px] rounded-[28px] border border-slate-200 bg-white/96 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:p-6 xl:max-w-[370px]">
       <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
-        Free account
+        Simple access
       </div>
 
-      <h2 className="mt-3 text-[2.05rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.55rem]">
-        Join SitGuru free
+      <h2 className="mt-3 text-[2.05rem] font-black leading-[0.96] tracking-[-0.05em] text-slate-950 xl:text-[2.45rem]">
+        Log in or join.
       </h2>
+
       <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-        Choose Pet Parent, Future Guru, or both. Sign up once and we will route
-        you to the right next step.
+        Use one SitGuru account for Pet Parent, Guru, and Ambassador tools.
       </p>
 
       <div className="mt-5 grid gap-3">
+        <Link
+          href={phoneLoginHref}
+          onClick={() => onTrack("Continue with phone", phoneLoginHref)}
+          className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+        >
+          <span aria-hidden="true">☎</span>
+          Continue with phone
+        </Link>
+
         <button
           type="button"
           onClick={onGoogleSignup}
@@ -726,102 +721,53 @@ function HeroSignupCard({
           Continue with Google
         </button>
 
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          title="Apple login is coming soon"
-          className="flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-400 shadow-sm"
-        >
-          <AppleIcon />
-          Continue with Apple — Coming Soon
-        </button>
-
         <Link
-          href={petParentPhoneSignupHref}
-          onClick={() => onTrack("Continue with phone", petParentPhoneSignupHref)}
+          href={emailLoginHref}
+          onClick={() => onTrack("Use email instead", emailLoginHref)}
           className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
-          ☎ Continue with phone
+          <span aria-hidden="true">✉</span>
+          Use email instead
         </Link>
       </div>
 
       <div className="my-5 flex items-center gap-4">
         <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-bold text-slate-400">or choose path</span>
+        <span className="text-xs font-bold text-slate-400">one account</span>
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 
-      <div className="grid gap-2">
-        <Link
-          href={petParentSignupHref}
-          onClick={() => onTrack("Pet Parent Signup Hero Card", petParentSignupHref)}
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-        >
-          <span className="block text-sm font-black text-emerald-900">
-            Pet Parent
-          </span>
-          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
-            Sign up free to find trusted local Gurus and book pet care.
-          </span>
-        </Link>
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4">
+        <p className="text-sm font-black text-emerald-950">
+          Multiple roles? No problem.
+        </p>
+        <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+          Access Pet Parent, Guru, and Ambassador dashboards from one account.
+        </p>
+      </div>
 
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <Link
           href={guruSignupHref}
-          onClick={() => onTrack("Future Guru Signup Hero Card", guruSignupHref)}
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+          onClick={() => onTrack("Become a Guru Hero Card", guruSignupHref)}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-xs font-black text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/60 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
-          <span className="block text-sm font-black text-slate-950">
-            Future Guru
-          </span>
-          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
-            Create your free Guru profile and go directly to the 5-step setup.
-          </span>
+          Become a Guru
         </Link>
 
         <Link
-          href={bothSignupHref}
-          onClick={() => onTrack("Both Signup Hero Card", bothSignupHref)}
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+          href={ambassadorLoginHref}
+          onClick={() =>
+            onTrack("Ambassador Access From Hero Card", ambassadorLoginHref)
+          }
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
-          <span className="block text-sm font-black text-slate-950">Both</span>
-          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">
-            Use SitGuru as a Pet Parent and continue into Guru setup.
-          </span>
-        </Link>
-
-        <Link
-          href={petParentSignupHref}
-          onClick={() => onTrack("Start Free Signup Hero Card", petParentSignupHref)}
-          className="mt-2 rounded-xl bg-emerald-700 px-5 py-3 text-center text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200"
-        >
-          Start Free as Pet Parent
+          Ambassador access
         </Link>
       </div>
 
-      <p className="mt-4 text-center text-xs font-semibold text-slate-500">
-        Already have a SitGuru account?{" "}
-        <Link
-          href={petParentLoginHref}
-          onClick={() => onTrack("Login From Hero Card", petParentLoginHref)}
-          className="font-black text-emerald-700 hover:text-emerald-800 hover:underline"
-        >
-          Log in
-        </Link>
-      </p>
-
-      <Link
-        href={ambassadorLoginHref}
-        onClick={() =>
-          onTrack("Ambassador Login From Hero Card", ambassadorLoginHref)
-        }
-        className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-      >
-        Ambassador Login
-      </Link>
-
-      <p className="mt-2 text-center text-[11px] font-semibold leading-4 text-slate-500">
-        For Ambassador Candidates and SitGuru representatives.
+      <p className="mt-4 text-center text-[11px] font-semibold leading-4 text-slate-500">
+        New here? Your account can be created after phone or Google verification.
       </p>
     </aside>
   );
@@ -1427,13 +1373,13 @@ export default function HomePage() {
     }
 
     trackEvent({
-      eventName: "homepage_social_signup_clicked",
+      eventName: "homepage_social_login_clicked",
       eventType: "auth",
       source,
       role: "customer",
       metadata: {
         provider: "google",
-        location: "homepage_launch_signup_card",
+        location: "homepage_login_card",
         selected_next_path: "/customer/dashboard",
         version: "easy_signup_trusted_local_launch",
       },

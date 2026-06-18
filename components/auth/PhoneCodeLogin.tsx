@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 type PhoneLoginRole = "customer" | "guru";
 type ProfileRole = "customer" | "guru" | "both";
@@ -175,9 +176,29 @@ export default function PhoneCodeLogin({
   const [errorMessage, setErrorMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
   const roleLabel = getRoleLabel(role);
   const requestedProfileRole = getRequestedProfileRole(role);
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
+
+  const handleTurnstileExpire = useCallback(() => {
+    setTurnstileToken("");
+    setTurnstileResetKey((value) => value + 1);
+  }, []);
+
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileToken("");
+  }, []);
+
+  function resetTurnstile() {
+    setTurnstileToken("");
+    setTurnstileResetKey((value) => value + 1);
+  }
 
   function handlePhoneChange(value: string) {
     const digitsOnly = getDigitsOnly(value);
@@ -193,10 +214,15 @@ export default function PhoneCodeLogin({
   }
 
   async function sendCodeToPhone(phoneToSend: string) {
+    if (!turnstileToken) {
+      return new Error("Please complete the secure login check first.");
+    }
+
     const { error } = await supabase.auth.signInWithOtp({
       phone: phoneToSend,
       options: {
         shouldCreateUser: true,
+        captchaToken: turnstileToken,
         data: {
           role: requestedProfileRole,
           account_type: requestedProfileRole,
@@ -242,6 +268,7 @@ export default function PhoneCodeLogin({
     setDisplaySentPhone(formatPhoneForDisplay(formattedPhone));
     setCodeSent(true);
     setStatusMessage("SitGuru code sent. Check your text messages.");
+    resetTurnstile();
   }
 
   async function handleSendNewCode() {
@@ -269,6 +296,7 @@ export default function PhoneCodeLogin({
     }
 
     setStatusMessage("New SitGuru code sent. Use the latest text message.");
+    resetTurnstile();
   }
 
   async function syncProfileAfterPhoneLogin(
@@ -470,13 +498,25 @@ export default function PhoneCodeLogin({
             </p>
           </div>
 
+          <TurnstileWidget
+            action={`${role}_phone_code_login`}
+            resetKey={turnstileResetKey}
+            onVerify={handleTurnstileVerify}
+            onExpire={handleTurnstileExpire}
+            onError={handleTurnstileError}
+          />
+
           <button
             type="submit"
-            disabled={isSending}
+            disabled={isSending || !turnstileToken}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-base font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {isSending ? "Sending SitGuru code..." : submitLabel}
+            {isSending
+              ? "Sending SitGuru code..."
+              : turnstileToken
+                ? submitLabel
+                : "Complete secure login check"}
           </button>
         </form>
       ) : (
@@ -513,6 +553,7 @@ export default function PhoneCodeLogin({
                 setCode("");
                 setStatusMessage("");
                 setErrorMessage("");
+                resetTurnstile();
               }}
               className="mt-2 text-sm font-black underline-offset-4 hover:underline"
               style={{
@@ -573,14 +614,26 @@ export default function PhoneCodeLogin({
             {isVerifying ? "Verifying..." : verifyLabel}
           </button>
 
+          <TurnstileWidget
+            action={`${role}_phone_code_resend`}
+            resetKey={turnstileResetKey}
+            onVerify={handleTurnstileVerify}
+            onExpire={handleTurnstileExpire}
+            onError={handleTurnstileError}
+          />
+
           <button
             type="button"
             onClick={handleSendNewCode}
-            disabled={isSending}
+            disabled={isSending || !turnstileToken}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {isSending ? "Sending new code..." : "Send a new SitGuru code"}
+            {isSending
+              ? "Sending new code..."
+              : turnstileToken
+                ? "Send a new SitGuru code"
+                : "Complete secure login check to resend"}
           </button>
         </form>
       )}

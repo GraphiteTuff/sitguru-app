@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabaseServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/server";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 type AppRole = "pet_owner" | "guru" | "admin";
 
@@ -474,12 +475,25 @@ export async function login(formData: FormData) {
     typeof formData.get("password") === "string"
       ? String(formData.get("password"))
       : "";
+  const turnstileToken = cleanFormValue(formData.get("turnstileToken"));
 
   const next = getSafeNextPath(formData.get("next"), "/customer/dashboard");
   const fallbackLoginPage = getLoginPageFromNext(next);
 
   if (!email || !password) {
     redirectWithError(fallbackLoginPage, "Email and password are required");
+  }
+
+  const turnstileResult = await verifyTurnstileToken({
+    token: turnstileToken,
+    expectedAction: "pet_parent_email_login",
+  });
+
+  if (!turnstileResult.success) {
+    redirectWithError(
+      fallbackLoginPage,
+      "Secure login check failed. Please refresh the page and try again."
+    );
   }
 
   const supabase = await createClient();
