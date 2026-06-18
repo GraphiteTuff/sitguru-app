@@ -23,6 +23,7 @@ type PhoneCodeLoginProps = {
   submitLabel?: string;
   verifyLabel?: string;
   compact?: boolean;
+  allowCreateUser?: boolean;
 };
 
 function getSafeRedirectPath(
@@ -134,6 +135,26 @@ function getDefaultPath(role: PhoneLoginRole) {
     : "/customer/dashboard/profile";
 }
 
+
+function getPhoneLoginErrorMessage(errorMessage: string, allowCreateUser: boolean) {
+  const cleanMessage = errorMessage.trim();
+
+  if (!allowCreateUser) {
+    const lowerMessage = cleanMessage.toLowerCase();
+
+    if (
+      lowerMessage.includes("signups not allowed") ||
+      lowerMessage.includes("user not found") ||
+      lowerMessage.includes("invalid login credentials") ||
+      lowerMessage.includes("phone")
+    ) {
+      return "We couldn’t find a SitGuru account with that phone number. Use Become a Pet Parent, Become a Guru, or Become an Ambassador to create one.";
+    }
+  }
+
+  return cleanMessage || "We could not send the SitGuru code. Please try again.";
+}
+
 async function safelyAddUserRole(userId: string, role: PhoneLoginRole) {
   try {
     const { error } = await supabase.from("user_roles").insert({
@@ -157,6 +178,7 @@ export default function PhoneCodeLogin({
   submitLabel = "Text me a SitGuru code",
   verifyLabel = "Verify & continue",
   compact = false,
+  allowCreateUser = false,
 }: PhoneCodeLoginProps) {
   const router = useRouter();
 
@@ -221,14 +243,14 @@ export default function PhoneCodeLogin({
     const { error } = await supabase.auth.signInWithOtp({
       phone: phoneToSend,
       options: {
-        shouldCreateUser: true,
+        shouldCreateUser: allowCreateUser,
         captchaToken: turnstileToken,
         data: {
           role: requestedProfileRole,
           account_type: requestedProfileRole,
           signup_method: "phone",
           signup_role: role,
-          source: "phone_login",
+          source: allowCreateUser ? "phone_signup" : "phone_login",
         },
       },
     });
@@ -258,9 +280,7 @@ export default function PhoneCodeLogin({
     setIsSending(false);
 
     if (error) {
-      setErrorMessage(
-        error.message || "We could not send the SitGuru code. Please try again.",
-      );
+      setErrorMessage(getPhoneLoginErrorMessage(error.message || "", allowCreateUser));
       return;
     }
 
@@ -289,8 +309,10 @@ export default function PhoneCodeLogin({
 
     if (error) {
       setErrorMessage(
-        error.message ||
-          "We could not send a new SitGuru code. Please try again.",
+        getPhoneLoginErrorMessage(
+          error.message || "We could not send a new SitGuru code. Please try again.",
+          allowCreateUser,
+        ),
       );
       return;
     }
@@ -387,7 +409,7 @@ export default function PhoneCodeLogin({
       const userId = data.user?.id;
       const userEmail = data.user?.email || null;
 
-      if (userId) {
+      if (userId && allowCreateUser) {
         await syncProfileAfterPhoneLogin(userId, userEmail);
       }
     } catch (profileError) {
