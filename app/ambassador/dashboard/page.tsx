@@ -839,9 +839,54 @@ export default async function AmbassadorDashboardPage() {
               />
             </div>
 
+            <div className="mt-5 rounded-[24px] border border-green-200 bg-gradient-to-br from-green-50 via-white to-emerald-50 p-4 sm:p-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-700">
+                    Projected earning examples
+                  </p>
+                  <h3 className="mt-1 text-xl font-black text-green-950">
+                    See how verified activity can add up.
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    These examples show possible additional Ambassador rewards
+                    when referrals, signups, social activity, and qualifying
+                    bookings are verified by SitGuru.
+                  </p>
+                </div>
+                <span className="inline-flex shrink-0 rounded-full bg-green-800 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white">
+                  Example only
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <ProjectionExampleCard
+                  title="1 qualifying Guru per day"
+                  value="Up to $15/day"
+                  detail="That can equal up to $105/week, about $450/month, or about $5,475/year if repeated consistently."
+                />
+                <ProjectionExampleCard
+                  title="5 completed Pet Parent bookings per week"
+                  value="Up to $15/week"
+                  detail="At the $3 max per qualifying booking, that can equal about $65/month or about $780/year."
+                />
+                <ProjectionExampleCard
+                  title="100 verified social signups per month"
+                  value="Up to $50/month"
+                  detail="A strong social push tied to @SitGuruOfficial and your referral code can equal about $600/year."
+                />
+                <ProjectionExampleCard
+                  title="Growth stack example"
+                  value="Up to $185/month"
+                  detail="Example: 4 qualified Gurus, 25 qualifying Pet Parent bookings, and 100 verified social signups in a month."
+                />
+              </div>
+            </div>
+
             <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-950">
-              Rewards are reviewed by SitGuru. Fake, duplicate, self-created,
-              canceled, refunded, or unverifiable activity does not qualify.
+              Rewards are reviewed by SitGuru. These are examples, not
+              guaranteed earnings. Fake, duplicate, self-created, canceled,
+              refunded, or unverifiable activity does not qualify.
             </div>
           </DashboardCard>
 
@@ -1656,6 +1701,28 @@ function SupportOption({
       </div>
       <h3 className="text-base font-black text-green-950">{title}</h3>
       <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+        {detail}
+      </p>
+    </div>
+  );
+}
+
+function ProjectionExampleCard({
+  title,
+  value,
+  detail,
+}: {
+  title: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-green-100 bg-white p-4 shadow-sm">
+      <p className="text-sm font-black text-green-950">{title}</p>
+      <p className="mt-2 text-2xl font-black tracking-tight text-green-800">
+        {value}
+      </p>
+      <p className="mt-2 text-xs font-bold leading-5 text-slate-600">
         {detail}
       </p>
     </div>
