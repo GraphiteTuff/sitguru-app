@@ -5,6 +5,7 @@ import {
   ArrowRight,
   CalendarCheck,
   CircleHelp,
+  ClipboardCheck,
   CreditCard,
   GraduationCap,
   Heart,
@@ -52,6 +53,15 @@ type PaymentGuide = {
   highlights: string[];
 };
 
+type OnboardingGuide = {
+  title: string;
+  audience: string;
+  description: string;
+  icon: ReactNode;
+  steps: string[];
+  tips: string[];
+};
+
 const quickHelpCards: HelpCard[] = [
   {
     title: "Pet Parent Help",
@@ -70,6 +80,15 @@ const quickHelpCards: HelpCard[] = [
     href: "/become-a-guru",
     cta: "Become a Guru",
     icon: <UsersRound className="h-6 w-6" />,
+  },
+  {
+    title: "Onboarding Help",
+    eyebrow: "Step-by-step setup",
+    description:
+      "Clear onboarding help for Gurus, Ambassadors, and Pet Parents, including what each step means and what happens after submitting.",
+    href: "#onboarding-help",
+    cta: "View Onboarding",
+    icon: <ClipboardCheck className="h-6 w-6" />,
   },
   {
     title: "Payments & Payouts",
@@ -169,6 +188,68 @@ const paymentGuides: PaymentGuide[] = [
   },
 ];
 
+const onboardingGuides: OnboardingGuide[] = [
+  {
+    title: "Guru Onboarding",
+    audience: "For Gurus",
+    description:
+      "Understand each Guru setup step, what is required, what is optional, and how SitGuru reviews your account before you become fully bookable.",
+    icon: <UsersRound className="h-5 w-5" />,
+    steps: [
+      "Step 1: Complete your profile with name, bio, photo, and experience.",
+      "Step 2: Set your service area so local Pet Parents can find you.",
+      "Step 3: Add services, pricing, and request public visibility.",
+      "Step 4: Complete Trust & Safety Screening when required or view the launch-year waiver.",
+      "Step 5: Submit your Guru Onboarding Packet with acknowledgments and typed signature.",
+      "Step 6: Connect Stripe payouts so SitGuru can pay eligible earnings.",
+    ],
+    tips: [
+      "Submitted means SitGuru received your packet and will review it.",
+      "You can continue to Step 6 while Step 5 is pending review.",
+      "Only upload documents if SitGuru specifically requested them.",
+    ],
+  },
+  {
+    title: "Ambassador Onboarding",
+    audience: "For Ambassadors",
+    description:
+      "Learn how Ambassadors complete setup, understand referrals, and prepare for payout or referral earning activity.",
+    icon: <HeartHandshake className="h-5 w-5" />,
+    steps: [
+      "Complete your Ambassador profile and contact details.",
+      "Review Ambassador expectations and referral guidance.",
+      "Use your referral code or referral link when sharing SitGuru.",
+      "Complete Stripe payout setup if referral or ambassador payouts apply.",
+      "Track referral activity and follow SitGuru updates as the program grows.",
+    ],
+    tips: [
+      "Referral setup helps SitGuru credit the right person or campaign.",
+      "Stripe may be needed before eligible referral payouts can be sent.",
+      "Contact SitGuru if your referral code or dashboard looks incorrect.",
+    ],
+  },
+  {
+    title: "Pet Parent Setup",
+    audience: "For Pet Parents",
+    description:
+      "Get help creating your account, adding pet details, finding a Guru, requesting care, and paying securely through SitGuru.",
+    icon: <PawPrint className="h-5 w-5" />,
+    steps: [
+      "Create your Pet Parent account.",
+      "Add pet details and helpful care instructions.",
+      "Search for a Guru and review their profile, services, and location.",
+      "Request a booking and review the service details.",
+      "Pay securely through SitGuru checkout when prompted.",
+      "Use your dashboard to track bookings, messages, receipts, and updates.",
+    ],
+    tips: [
+      "Clear pet details help Gurus provide better care.",
+      "Keep booking conversations organized through SitGuru when available.",
+      "Contact support if checkout or booking details look incorrect.",
+    ],
+  },
+];
+
 const popularQuestions = [
   {
     question: "What is SitGuru?",
@@ -223,6 +304,44 @@ const helpSections: HelpSection[] = [
         question: "Is SitGuru only for one city or state?",
         answer:
           "No. SitGuru is built to support local pet care connections across states, cities, towns, neighborhoods, communities, and townships as the marketplace grows.",
+      },
+    ],
+  },
+  {
+    title: "Onboarding & Setup",
+    description:
+      "Help understanding SitGuru onboarding steps, submitted statuses, documents, and what happens after setup tasks are completed.",
+    icon: <ClipboardCheck className="h-5 w-5" />,
+    items: [
+      {
+        question: "What does Submitted mean on Guru Step 5?",
+        answer:
+          "Submitted means SitGuru received the Guru Onboarding Packet and it is waiting for admin review. Gurus can continue to Step 6 while SitGuru reviews Step 5.",
+      },
+      {
+        question: "Why is Step 5 amber instead of green?",
+        answer:
+          "Amber means Step 5 was submitted and is pending SitGuru review. Once SitGuru approves the packet, Step 5 turns green and shows Complete.",
+      },
+      {
+        question: "Do Gurus have to upload documents during Step 5?",
+        answer:
+          "Only upload documents if SitGuru specifically requested them. Do not upload W-9 forms, full SSNs, banking details, or sensitive payment information through the onboarding packet page.",
+      },
+      {
+        question: "Can a Guru continue to Step 6 before Step 5 is approved?",
+        answer:
+          "Yes. Gurus can save Step 5 and continue to Step 6 to connect Stripe payouts while SitGuru reviews the submitted onboarding packet.",
+      },
+      {
+        question: "What happens after all Guru onboarding steps are complete?",
+        answer:
+          "SitGuru reviews profile readiness, onboarding packet status, trust and safety status, services, pricing, public visibility, and payout readiness before a Guru becomes fully bookable.",
+      },
+      {
+        question: "Where can users get help during onboarding?",
+        answer:
+          "Users can review the Help Center, open the relevant dashboard section, or contact SitGuru support at support@sitguru.com for onboarding, payment, profile, or booking questions.",
       },
     ],
   },
@@ -551,6 +670,56 @@ function HelpCard({ card }: { card: HelpCard }) {
   );
 }
 
+function OnboardingGuideCard({ guide }: { guide: OnboardingGuide }) {
+  return (
+    <article className="rounded-[30px] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+        {guide.icon}
+      </div>
+
+      <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+        {guide.audience}
+      </p>
+      <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+        {guide.title}
+      </h3>
+      <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+        {guide.description}
+      </p>
+
+      <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+          Setup steps
+        </p>
+        <div className="mt-3 grid gap-2">
+          {guide.steps.map((step, index) => (
+            <div
+              key={step}
+              className="rounded-xl bg-white px-3 py-2 text-sm font-bold leading-5 text-slate-700 ring-1 ring-emerald-100"
+            >
+              <span className="font-black text-emerald-700">
+                {index + 1}.
+              </span>{" "}
+              {step}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {guide.tips.map((tip) => (
+          <span
+            key={tip}
+            className="rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-xs font-black text-emerald-800"
+          >
+            {tip}
+          </span>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function PaymentGuideCard({ guide }: { guide: PaymentGuide }) {
   return (
     <article
@@ -737,6 +906,9 @@ export default function HelpPage() {
               Pet Guru Help
             </span>
             <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
+              Onboarding Help
+            </span>
+            <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
               Payment Guides
             </span>
             <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
@@ -754,6 +926,54 @@ export default function HelpPage() {
           {quickHelpCards.map((card) => (
             <HelpCard key={card.title} card={card} />
           ))}
+        </div>
+      </section>
+
+      <section
+        id="onboarding-help"
+        className="relative mx-auto max-w-7xl scroll-mt-6 px-4 pb-8 sm:px-6 lg:px-8"
+      >
+        <div className="rounded-[36px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_100%)] p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-6 lg:p-8">
+          <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+            <div>
+              <SectionEyebrow icon={<ClipboardCheck className="h-4 w-4" />}>
+                Onboarding Help
+              </SectionEyebrow>
+
+              <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                Simple setup help for every SitGuru role.
+              </h2>
+
+              <p className="mt-4 text-base font-semibold leading-7 text-slate-600">
+                Use these quick onboarding guides to understand what each setup
+                step means, what is optional, and what happens after information
+                is submitted to SitGuru.
+              </p>
+            </div>
+
+            <div className="rounded-[28px] border border-emerald-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                  <LifeBuoy className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-950">
+                    Need onboarding help?
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Email support@sitguru.com and include your role, account
+                    email, and the setup step or dashboard area where you need help.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:grid-cols-3">
+            {onboardingGuides.map((guide) => (
+              <OnboardingGuideCard key={guide.title} guide={guide} />
+            ))}
+          </div>
         </div>
       </section>
 
