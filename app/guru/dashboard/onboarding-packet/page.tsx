@@ -120,18 +120,18 @@ function statusStyles(status: string | null | undefined) {
     case "approved":
     case "complete":
     case "completed":
-      return "border-emerald-200 bg-emerald-50 text-emerald-900";
+      return "border-emerald-200 bg-emerald-50 !text-emerald-950";
     case "submitted":
     case "pending_review":
     case "in_review":
-      return "border-blue-200 bg-blue-50 text-blue-900";
+      return "border-blue-200 bg-blue-50 !text-blue-950";
     case "needs_fix":
     case "needs_action":
-      return "border-amber-200 bg-amber-50 text-amber-900";
+      return "border-amber-200 bg-amber-50 !text-amber-950";
     case "rejected":
-      return "border-rose-200 bg-rose-50 text-rose-900";
+      return "border-rose-200 bg-rose-50 !text-rose-950";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-900";
+      return "border-slate-300 bg-white !text-slate-950 shadow-sm";
   }
 }
 
