@@ -638,26 +638,6 @@ export async function GET(request: Request) {
         ? user.user_metadata.name
         : null;
 
-  await upsertPetParentProfileFromCallback({
-    userId: user.id,
-    userEmail,
-    userName,
-    intent,
-  });
-
-  await upsertPetPerksSignupReferral({
-    requestUrl,
-    userId: user.id,
-    userEmail,
-    userName,
-  });
-
-  const safeNextPath = getSafeNextPath(nextParam, type);
-
-  if (safeNextPath) {
-    return NextResponse.redirect(new URL(safeNextPath, requestUrl.origin));
-  }
-
   const metadataRole =
     typeof user.user_metadata?.role === "string"
       ? user.user_metadata.role
@@ -675,17 +655,61 @@ export async function GET(request: Request) {
     metadataAccountType,
   );
 
+  const databaseRedirect = await getDatabaseRedirectPath(user.id);
+  const isIntentionalSignup = intent !== null;
+  const hasExistingSitGuruAccess = Boolean(metadataRedirect || databaseRedirect);
+
+  if (!isIntentionalSignup && !hasExistingSitGuruAccess) {
+    await supabase.auth.signOut();
+
+    const loginUrl = new URL("/login", requestUrl.origin);
+    loginUrl.searchParams.set(
+      "error",
+      "We couldn’t find an existing SitGuru account for that Google login. Choose Become a Pet Parent, Become a Guru, or Become an Ambassador to create one.",
+    );
+    loginUrl.searchParams.set("mode", "phone");
+
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (isIntentionalSignup) {
+    await upsertPetParentProfileFromCallback({
+      userId: user.id,
+      userEmail,
+      userName,
+      intent,
+    });
+
+    await upsertPetPerksSignupReferral({
+      requestUrl,
+      userId: user.id,
+      userEmail,
+      userName,
+    });
+  }
+
+  const safeNextPath = getSafeNextPath(nextParam, type);
+
+  if (safeNextPath) {
+    return NextResponse.redirect(new URL(safeNextPath, requestUrl.origin));
+  }
+
   if (metadataRedirect) {
     return NextResponse.redirect(new URL(metadataRedirect, requestUrl.origin));
   }
-
-  const databaseRedirect = await getDatabaseRedirectPath(user.id);
 
   if (databaseRedirect) {
     return NextResponse.redirect(new URL(databaseRedirect, requestUrl.origin));
   }
 
+  const signupRedirect = isIntentionalSignup
+    ? getRoleRedirectPath(getProfileRoleFromIntent(intent), null)
+    : null;
+
   return NextResponse.redirect(
-    new URL(fallbackRoutes.customerProfile, requestUrl.origin),
+    new URL(
+      signupRedirect || fallbackRoutes.customerProfile,
+      requestUrl.origin,
+    ),
   );
 }
