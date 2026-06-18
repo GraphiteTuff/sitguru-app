@@ -130,7 +130,7 @@ const guruNavLinks: NavLink[] = [
 const ambassadorNavLinks: NavLink[] = [
   { label: "Dashboard", href: "/ambassador/dashboard" },
   { label: "Referrals", href: "/ambassador/dashboard" },
-  { label: "Messages", href: "/ambassador/messages" },
+  { label: "Support", href: "mailto:support@sitguru.com" },
   { label: "Training", href: "/ambassador/training" },
   { label: "Onboarding", href: "/ambassador/dashboard/onboarding-packet" },
 ];
@@ -348,7 +348,7 @@ function getActiveAliases(href: string) {
   if (href === "/guru/dashboard/earnings") return ["/guru/dashboard/earnings", "/guru/earnings"];
   if (href === "/guru/success-center") return ["/guru/success-center", "/guru/dashboard/resources"];
   if (href === "/ambassador/dashboard") return ["/ambassador/dashboard"];
-  if (href === "/ambassador/messages") return ["/ambassador/messages", "/ambassador/dashboard/messages"];
+  if (href === "mailto:support@sitguru.com") return ["mailto:support@sitguru.com"];
   if (href === "/ambassador/training") return ["/ambassador/training", "/ambassador/dashboard/training"];
   if (href === "/ambassador/dashboard/onboarding-packet") {
     return ["/ambassador/dashboard/onboarding-packet"];
@@ -655,7 +655,7 @@ export default function Header({ user = null }: HeaderProps) {
           { label: "Dashboard", href: "/ambassador/dashboard" },
           { label: "Onboarding", href: "/ambassador/dashboard/onboarding-packet" },
           { label: "Training", href: "/ambassador/training" },
-          { label: "Messages", href: "/ambassador/messages" },
+          { label: "Support", href: "mailto:support@sitguru.com" },
           { label: "Ambassador Program", href: "/ambassadors" },
         ]
       : isAdmin
