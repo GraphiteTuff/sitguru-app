@@ -826,8 +826,9 @@ export default function Header({ user = null }: HeaderProps) {
             </>
           ) : (
             <>
-              <Link href="/guru/login" className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Guru Login</Link>
-              <Link href="/login" className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Pet Parent Login</Link>
+              <Link href="/guru/login" className="rounded-full border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Guru Login</Link>
+              <Link href="/login" className="rounded-full border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Pet Parent Login</Link>
+              <Link href="/ambassador/login" className="rounded-full border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50">Ambassador Login</Link>
               <Link href="/signup" className="rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-white shadow-md transition hover:bg-emerald-700">Sign Up Free</Link>
             </>
           )}
@@ -901,6 +902,7 @@ export default function Header({ user = null }: HeaderProps) {
               <div className="mt-2 grid gap-2">
                 <Link href="/guru/login" onClick={() => setMobileOpen(false)} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800">Guru Login</Link>
                 <Link href="/login" onClick={() => setMobileOpen(false)} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800">Pet Parent Login</Link>
+                <Link href="/ambassador/login" onClick={() => setMobileOpen(false)} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-800">Ambassador Login</Link>
                 <Link href="/signup" onClick={() => setMobileOpen(false)} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-white">Sign Up Free</Link>
               </div>
             )}
