@@ -14,6 +14,7 @@ import {
   LogOut,
   MessageCircle,
   PawPrint,
+  PlayCircle,
   QrCode,
   ShieldCheck,
   Sparkles,
@@ -290,6 +291,35 @@ function normalizeUrl(value: string, fallbackPath: string) {
   return `${siteUrl}${fallbackPath}`;
 }
 
+function getEmbeddableVideoUrl(value?: string | null) {
+  const cleanValue = asString(value);
+
+  if (!cleanValue) return "";
+
+  try {
+    const url = new URL(cleanValue);
+
+    if (url.hostname.includes("youtube.com")) {
+      const videoId = url.searchParams.get("v");
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    }
+
+    if (url.hostname.includes("youtu.be")) {
+      const videoId = url.pathname.replace(/^\/+/, "");
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    }
+
+    if (url.hostname.includes("vimeo.com")) {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      if (videoId) return `https://player.vimeo.com/video/${videoId}`;
+    }
+
+    return cleanValue;
+  } catch {
+    return cleanValue;
+  }
+}
+
 function getReferralUrl({
   storedUrl,
   referralCode,
@@ -509,6 +539,11 @@ export default async function AmbassadorDashboardPage() {
     referralCode,
     type: "guru",
   });
+  const ambassadorPromoVideoUrl = getEmbeddableVideoUrl(
+    process.env.NEXT_PUBLIC_AMBASSADOR_PROMO_VIDEO_URL ||
+      process.env.NEXT_PUBLIC_AMBASSADOR_MOTIVATION_VIDEO_URL ||
+      "",
+  );
   const [stats, onboardingPacket] = await Promise.all([
     getReferralStats(referralCode),
     getAmbassadorOnboardingPacketDisplay(
@@ -953,6 +988,67 @@ export default async function AmbassadorDashboardPage() {
                   </p>
                 </form>
               </div>
+            </div>
+          </DashboardCard>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+          <DashboardCard>
+            <SectionHeader
+              icon={<PawPrint size={22} />}
+              title="PawPerks / PetPerks Talking Points"
+              detail="Use these programs as an easy conversation starter with Pet Parents, local businesses, future Gurus, and community partners."
+            />
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                <p className="text-sm font-black text-green-950">PawPerks for Pet Parents</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Mention PawPerks when talking with Pet Parents who want trusted care, rewards, local pet resources, and reasons to keep using SitGuru.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                <p className="text-sm font-black text-green-950">PetPerks for partners</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Mention PetPerks when talking with groomers, trainers, rescues, vets, apartments, and local pet-friendly businesses.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <ReminderItem>Use PawPerks/PetPerks as a softer way to start the SitGuru conversation.</ReminderItem>
+              <ReminderItem>Tell people to sign up with your Ambassador code so activity can be verified.</ReminderItem>
+              <ReminderItem>Ask SitGuru for updated flyers or QR codes before local outreach.</ReminderItem>
+            </div>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<PlayCircle size={22} />}
+              title="Ambassador Promo Video"
+              detail="A quick motivation video for Ambassadors before outreach, events, or social sharing."
+            />
+
+            {ambassadorPromoVideoUrl ? (
+              <div className="mt-5 overflow-hidden rounded-[24px] border border-green-100 bg-black shadow-sm">
+                <iframe
+                  src={ambassadorPromoVideoUrl}
+                  title="SitGuru Ambassador Promo Video"
+                  className="aspect-video w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+            ) : (
+              <div className="mt-5 rounded-[24px] border border-dashed border-green-200 bg-green-50 p-5 text-sm font-bold leading-6 text-green-950">
+                Add the Ambassador promo or motivation video URL in Vercel as
+                <span className="mx-1 rounded-lg bg-white px-2 py-1 font-black">NEXT_PUBLIC_AMBASSADOR_PROMO_VIDEO_URL</span>
+                and this card will automatically show the video here.
+              </div>
+            )}
+
+            <div className="mt-4 rounded-2xl border border-green-100 bg-white px-4 py-3 text-xs font-bold leading-5 text-slate-600">
+              Keep this near the bottom of the dashboard so the top remains focused on referral code, rewards, support, and daily actions.
             </div>
           </DashboardCard>
         </section>
