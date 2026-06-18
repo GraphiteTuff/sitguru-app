@@ -715,36 +715,97 @@ export default async function AmbassadorDashboardEarningsPage() {
               <div className="flex items-center gap-3">
                 <DollarSign className="h-6 w-6 text-emerald-700" />
                 <h2 className="text-2xl font-black !text-slate-950">
-                  Reward rules
+                  Verified Rewards Structure
                 </h2>
               </div>
+              <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
+                Ambassadors should always know how verified rewards may be
+                earned and what SitGuru reviews before approval.
+              </p>
 
               <div className="mt-5 space-y-4">
                 {[
                   [
                     "Pet Parent first completed booking",
+                    "Earned after the referred Pet Parent completes a qualifying booking.",
                     "20% of SitGuru share, max $3",
                   ],
-                  ["Referred Guru approved / bookable", "$5"],
-                  ["Referred Guru first completed booking", "$10"],
-                  ["Max per referred Guru", "$15"],
+                  [
+                    "Referred Guru approved / bookable",
+                    "Earned when a referred Guru becomes approved and bookable.",
+                    "$5",
+                  ],
+                  [
+                    "Referred Guru first completed booking",
+                    "Earned after that referred Guru completes their first qualifying booking.",
+                    "$10",
+                  ],
+                  [
+                    "Max per referred Guru",
+                    "Keeps rewards simple, fair, and tied to useful SitGuru activity.",
+                    "$15",
+                  ],
                   [
                     "Social growth milestones",
+                    "Based on verified social media-driven signups connected to @SitGuruOfficial and your referral code.",
                     "25 = $10 · 50 = $25 · 100 = $50",
                   ],
-                ].map(([label, value]) => (
+                ].map(([label, detail, value]) => (
                   <div
                     key={label}
-                    className="flex items-center justify-between gap-4 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100"
+                    className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3"
                   >
-                    <p className="text-sm font-black !text-slate-900">
-                      {label}
-                    </p>
-                    <p className="shrink-0 text-sm font-black !text-emerald-700">
-                      {value}
-                    </p>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-black !text-slate-950">
+                          {label}
+                        </p>
+                        <p className="mt-1 text-xs font-bold leading-5 !text-slate-600">
+                          {detail}
+                        </p>
+                      </div>
+                      <p className="shrink-0 rounded-full bg-emerald-800 px-4 py-2 text-sm font-black !text-white">
+                        {value}
+                      </p>
+                    </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+                <p className="text-sm font-black !text-slate-950">
+                  Confirmed Pet Parent examples
+                </p>
+                <p className="mt-2 text-xs font-bold leading-5 !text-slate-600">
+                  These examples use the current Pet Parent reward example: 20%
+                  of SitGuru share, max $3, after a referred Pet Parent
+                  completes a qualifying booking.
+                </p>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                  {[
+                    ["10", "Up to $30"],
+                    ["20", "Up to $60"],
+                    ["30", "Up to $90"],
+                    ["50", "Up to $150"],
+                    ["100", "Up to $300"],
+                  ].map(([count, value]) => (
+                    <div
+                      key={count}
+                      className="rounded-2xl bg-emerald-50 px-3 py-3 text-center ring-1 ring-emerald-100"
+                    >
+                      <p className="text-2xl font-black !text-emerald-950">
+                        {count}
+                      </p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] !text-emerald-700">
+                        Pet Parents
+                      </p>
+                      <p className="mt-2 text-sm font-black !text-emerald-900">
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
