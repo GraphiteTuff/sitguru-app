@@ -320,6 +320,17 @@ function getEmbeddableVideoUrl(value?: string | null) {
   }
 }
 
+function isDirectVideoFile(value: string) {
+  const cleanValue = value.toLowerCase().split("?")[0];
+
+  return (
+    cleanValue.endsWith(".mp4") ||
+    cleanValue.endsWith(".webm") ||
+    cleanValue.endsWith(".mov") ||
+    cleanValue.startsWith("/videos/")
+  );
+}
+
 function getReferralUrl({
   storedUrl,
   referralCode,
@@ -542,7 +553,7 @@ export default async function AmbassadorDashboardPage() {
   const ambassadorPromoVideoUrl = getEmbeddableVideoUrl(
     process.env.NEXT_PUBLIC_AMBASSADOR_PROMO_VIDEO_URL ||
       process.env.NEXT_PUBLIC_AMBASSADOR_MOTIVATION_VIDEO_URL ||
-      "",
+      "/videos/sitguru-ambassador-promo.mp4",
   );
   const [stats, onboardingPacket] = await Promise.all([
     getReferralStats(referralCode),
@@ -1031,18 +1042,30 @@ export default async function AmbassadorDashboardPage() {
 
             {ambassadorPromoVideoUrl ? (
               <div className="mt-5 overflow-hidden rounded-[24px] border border-green-100 bg-black shadow-sm">
-                <iframe
-                  src={ambassadorPromoVideoUrl}
-                  title="SitGuru Ambassador Promo Video"
-                  className="aspect-video w-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
+                {isDirectVideoFile(ambassadorPromoVideoUrl) ? (
+                  <video
+                    controls
+                    preload="metadata"
+                    playsInline
+                    className="aspect-video w-full bg-black"
+                  >
+                    <source src={ambassadorPromoVideoUrl} type="video/mp4" />
+                    Your browser does not support the SitGuru Ambassador promo video.
+                  </video>
+                ) : (
+                  <iframe
+                    src={ambassadorPromoVideoUrl}
+                    title="SitGuru Ambassador Promo Video"
+                    className="aspect-video w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                )}
               </div>
             ) : (
               <div className="mt-5 rounded-[24px] border border-dashed border-green-200 bg-green-50 p-5 text-sm font-bold leading-6 text-green-950">
-                Add the Ambassador promo or motivation video URL in Vercel as
-                <span className="mx-1 rounded-lg bg-white px-2 py-1 font-black">NEXT_PUBLIC_AMBASSADOR_PROMO_VIDEO_URL</span>
+                Add a promo video at
+                <span className="mx-1 rounded-lg bg-white px-2 py-1 font-black">public/videos/sitguru-ambassador-promo.mp4</span>
                 and this card will automatically show the video here.
               </div>
             )}
