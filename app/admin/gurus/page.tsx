@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   Download,
   FileSearch,
+  FileText,
   ShieldCheck,
   Sparkles,
   Star,
@@ -49,6 +50,27 @@ type GuruLeadPipelineData = {
   hiddenReferralCodes: number;
   sourceChart: ChartItem[];
   referralCodeChart: ChartItem[];
+};
+
+type GuruOnboardingPacketAdminRow = {
+  id: string;
+  userId: string;
+  legalName: string;
+  status: string;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  adminNotes: string;
+  documentCount: number;
+  messageHref: string;
+};
+
+type GuruOnboardingPacketAdminData = {
+  total: number;
+  submitted: number;
+  needsFix: number;
+  approved: number;
+  documents: number;
+  latest: GuruOnboardingPacketAdminRow[];
 };
 
 type SearchParams = {
@@ -133,6 +155,7 @@ const adminRoutes = {
   dashboard: "/admin",
   gurus: "/admin/gurus",
   guruLeads: "/admin/gurus/leads",
+  guruOnboardingPackets: "/admin/gurus/onboarding-packets",
   guruExport: "/admin/gurus/export",
   newGuru: "/admin/gurus/new",
   approvals: "/admin/guru-approvals",
@@ -1436,6 +1459,84 @@ async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
 }
 
 
+async function getGuruOnboardingPacketAdminData(): Promise<GuruOnboardingPacketAdminData> {
+  const packets = await safeRows<Record<string, unknown>>(
+    supabaseAdmin
+      .from("guru_onboarding_packets")
+      .select("id,user_id,legal_name,status,submitted_at,reviewed_at,admin_notes")
+      .order("submitted_at", { ascending: false })
+      .limit(50),
+    "guru_onboarding_packets",
+  );
+
+  const packetIds = packets.map((packet) => asTrimmedString(packet.id)).filter(Boolean);
+
+  const documents = packetIds.length
+    ? await safeRows<Record<string, unknown>>(
+        supabaseAdmin
+          .from("guru_onboarding_documents")
+          .select("id,packet_id,user_id,document_type,file_name,status,submitted_at")
+          .in("packet_id", packetIds)
+          .order("submitted_at", { ascending: false }),
+        "guru_onboarding_documents",
+      )
+    : [];
+
+  const documentCountByPacket = new Map<string, number>();
+
+  documents.forEach((document) => {
+    const packetId = asTrimmedString(document.packet_id);
+    if (!packetId) return;
+    documentCountByPacket.set(packetId, (documentCountByPacket.get(packetId) || 0) + 1);
+  });
+
+  const latest = packets.slice(0, 6).map((packet) => {
+    const id = asTrimmedString(packet.id);
+    const userId = asTrimmedString(packet.user_id);
+    const legalName = asTrimmedString(packet.legal_name) || "Guru";
+    const status = asTrimmedString(packet.status) || "submitted";
+
+    const params = new URLSearchParams();
+    params.set("threadType", "direct_guru");
+    params.set("recipientRole", "guru");
+    params.set("source", "guru-onboarding-packet");
+    if (userId) params.set("recipientId", userId);
+    if (legalName) params.set("recipientName", legalName);
+
+    return {
+      id,
+      userId,
+      legalName,
+      status,
+      submittedAt: asTrimmedString(packet.submitted_at) || null,
+      reviewedAt: asTrimmedString(packet.reviewed_at) || null,
+      adminNotes: asTrimmedString(packet.admin_notes),
+      documentCount: documentCountByPacket.get(id) || 0,
+      messageHref: `/admin/messages?${params.toString()}`,
+    };
+  });
+
+  const normalizedStatuses = packets.map((packet) =>
+    asTrimmedString(packet.status).toLowerCase(),
+  );
+
+  return {
+    total: packets.length,
+    submitted: normalizedStatuses.filter((status) =>
+      ["submitted", "pending_review", "in_review"].includes(status),
+    ).length,
+    needsFix: normalizedStatuses.filter((status) =>
+      ["needs_fix", "needs_action"].includes(status),
+    ).length,
+    approved: normalizedStatuses.filter((status) =>
+      ["approved", "complete", "completed"].includes(status),
+    ).length,
+    documents: documents.length,
+    latest,
+  };
+}
+
+
 function getMetadataString(
   source: Record<string, unknown> | null | undefined,
   key: string,
@@ -2380,6 +2481,134 @@ function GuruLeadPipelineCard({
   );
 }
 
+function GuruOnboardingPacketReviewCard({
+  data,
+}: {
+  data: GuruOnboardingPacketAdminData;
+}) {
+  return (
+    <DashboardCard>
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
+            Step 5 Review Queue
+          </p>
+          <h2 className="mt-1 text-xl font-black text-slate-950">
+            Guru Onboarding Packets
+          </h2>
+          <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
+            Review submitted Guru onboarding packets, approve Step 5, request fixes,
+            and confirm any uploaded documents before marking the packet complete.
+          </p>
+        </div>
+
+        <Link
+          href={adminRoutes.guruOnboardingPackets}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-700"
+        >
+          <FileText size={17} />
+          Review Packets
+        </Link>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <MiniMetric
+          icon={<FileText size={18} />}
+          label="Total Packets"
+          value={number(data.total)}
+        />
+        <MiniMetric
+          icon={<ClipboardCheck size={18} />}
+          label="Submitted"
+          value={number(data.submitted)}
+        />
+        <MiniMetric
+          icon={<AlertTriangleIcon />}
+          label="Needs Fix"
+          value={number(data.needsFix)}
+        />
+        <MiniMetric
+          icon={<CheckCircle2 size={18} />}
+          label="Approved"
+          value={number(data.approved)}
+        />
+      </div>
+
+      <div className="mt-5 rounded-[24px] border border-amber-100 bg-amber-50 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-base font-black text-amber-950">
+            Latest submissions
+          </h3>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-amber-800 ring-1 ring-amber-200">
+            {number(data.documents)} documents
+          </span>
+        </div>
+
+        <div className="grid gap-3">
+          {data.latest.length ? (
+            data.latest.map((packet) => (
+              <div
+                key={packet.id}
+                className="rounded-2xl border border-amber-100 bg-white p-4"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-slate-950">
+                      {packet.legalName}
+                    </p>
+                    <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                      {packet.status} • Submitted {formatDateShort(packet.submittedAt)} • {packet.documentCount} document{packet.documentCount === 1 ? "" : "s"}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={adminRoutes.guruOnboardingPackets}
+                      className="rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white transition hover:bg-amber-700"
+                    >
+                      Review
+                    </Link>
+                    <Link
+                      href={packet.messageHref}
+                      className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-black text-amber-800 transition hover:bg-amber-50"
+                    >
+                      Message
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-white bg-white p-4 text-sm font-bold text-slate-500">
+              No Guru onboarding packets have been submitted yet.
+            </div>
+          )}
+        </div>
+      </div>
+    </DashboardCard>
+  );
+}
+
+function AlertTriangleIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[18px] w-[18px]"
+      aria-hidden="true"
+    >
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+
 function WorkflowTile({
   href,
   label,
@@ -2417,9 +2646,10 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
     return null;
   }
 
-  const [guruData, guruLeadPipeline] = await Promise.all([
+  const [guruData, guruLeadPipeline, guruOnboardingPackets] = await Promise.all([
     getGuruManagementData(resolvedSearchParams),
     getGuruLeadPipelineData(),
+    getGuruOnboardingPacketAdminData(),
   ]);
   const activeQueue = getActiveQueue(resolvedSearchParams);
   const activeSetupStep = getActiveSetupStep(resolvedSearchParams);
@@ -2523,7 +2753,12 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
           />
         ) : null}
 
-        {!hasFocusedQueue ? <GuruLeadPipelineCard pipeline={guruLeadPipeline} /> : null}
+        {!hasFocusedQueue ? (
+          <>
+            <GuruLeadPipelineCard pipeline={guruLeadPipeline} />
+            <GuruOnboardingPacketReviewCard data={guruOnboardingPackets} />
+          </>
+        ) : null}
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <StatCard
@@ -2803,6 +3038,13 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
             icon={<ClipboardCheck size={22} />}
             title="Guru Approvals"
             description="Review the full approval workflow for new Guru applicants and profile readiness."
+          />
+
+          <QuickLinkCard
+            href={adminRoutes.guruOnboardingPackets}
+            icon={<FileText size={22} />}
+            title="Onboarding Packets"
+            description="Review Guru Step 5 submissions, approve packets, request fixes, and check document counts."
           />
 
           <QuickLinkCard
