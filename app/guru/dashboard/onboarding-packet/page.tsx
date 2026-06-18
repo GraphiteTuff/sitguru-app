@@ -784,6 +784,27 @@ export default async function GuruOnboardingPacketPage({
               </div>
             </section>
 
+            <div className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-3 sm:p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-black !text-emerald-950">
+                    Ready after signature?
+                  </p>
+                  <p className="mt-1 text-xs font-bold leading-5 !text-emerald-800">
+                    Documents are only needed if SitGuru requested them. You can submit now.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[1rem] bg-[#07132f] px-5 py-3 text-sm font-black !text-white transition hover:-translate-y-0.5 hover:bg-[#0b1436] sm:w-auto"
+                >
+                  {alreadySubmitted ? "Update Packet" : "Submit Packet"}
+                  <ArrowRight className="ml-2 h-4 w-4 text-white" />
+                </button>
+              </div>
+            </div>
+
             <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <FileText className="mt-1 h-5 w-5 shrink-0 text-emerald-700" />
