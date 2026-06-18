@@ -68,11 +68,30 @@ function getRedirectPathFromRoles(roles: string[]): string {
   return "/customer/dashboard";
 }
 
-function getLoginPageFromNext(next: string): string {
-  if (next.startsWith("/guru")) return "/guru/login";
+type LoginMode = "phone" | "email";
+
+function getLoginMode(value: FormDataEntryValue | null): LoginMode {
+  const normalized =
+    typeof value === "string" ? value.trim().toLowerCase() : "";
+
+  if (
+    normalized === "email" ||
+    normalized === "password" ||
+    normalized === "mail"
+  ) {
+    return "email";
+  }
+
+  return "phone";
+}
+
+function getLoginPageFromNext(next: string, mode: LoginMode): string {
   if (next.startsWith("/admin")) return "/admin/login";
-  if (next.startsWith("/customer")) return "/customer/login";
-  return "/customer/login";
+
+  const params = new URLSearchParams();
+  params.set("mode", mode);
+
+  return `/login?${params.toString()}`;
 }
 
 function isSafeInternalPath(path: string): boolean {
@@ -87,7 +106,53 @@ function getSafeNextPath(value: FormDataEntryValue | null, fallback: string) {
 }
 
 function redirectWithError(loginPage: string, message: string): never {
-  redirect(`${loginPage}?error=${encodeURIComponent(message)}`);
+  const separator = loginPage.includes("?") ? "&" : "?";
+  redirect(`${loginPage}${separator}error=${encodeURIComponent(message)}`);
+}
+
+function getEmailTurnstileActionFromNext(next: string) {
+  const normalizedNext = next.toLowerCase();
+
+  if (
+    normalizedNext.includes("preferred=guru") ||
+    normalizedNext.startsWith("/guru")
+  ) {
+    return "guru_email_login";
+  }
+
+  if (
+    normalizedNext.includes("preferred=ambassador") ||
+    normalizedNext.startsWith("/ambassador")
+  ) {
+    return "ambassador_email_login";
+  }
+
+  if (
+    normalizedNext.includes("preferred=pet_parent") ||
+    normalizedNext.includes("preferred=customer") ||
+    normalizedNext.startsWith("/customer")
+  ) {
+    return "pet_parent_email_login";
+  }
+
+  return "sitguru_one_email_login";
+}
+
+function getEmailTurnstileAction(formData: FormData, next: string) {
+  const rawAction = cleanFormValue(formData.get("turnstileAction"));
+
+  const allowedActions = new Set([
+    "sitguru_one_email_login",
+    "pet_parent_email_login",
+    "guru_email_login",
+    "ambassador_email_login",
+  ]);
+
+  if (allowedActions.has(rawAction)) {
+    return rawAction;
+  }
+
+  return getEmailTurnstileActionFromNext(next);
 }
 
 function getSignupErrorPath(accountType: AppRole, message: string): string {
@@ -186,7 +251,7 @@ async function upsertWithColumnFallback({
       if (removedColumns.length > 0) {
         console.warn(
           `${table} upsert succeeded after removing missing optional columns:`,
-          removedColumns
+          removedColumns,
         );
       }
 
@@ -309,7 +374,7 @@ export async function signup(formData: FormData) {
       : "";
 
   const accountType = normalizeAccountType(
-    String(formData.get("accountType") || "pet_owner")
+    String(formData.get("accountType") || "pet_owner"),
   );
 
   const referralCode = cleanFormValue(formData.get("referralCode"));
@@ -386,7 +451,7 @@ export async function signup(formData: FormData) {
   if (profileError) {
     redirectSignupError(
       accountType,
-      "Account created, but profile setup failed. " + profileError.message
+      "Account created, but profile setup failed. " + profileError.message,
     );
   }
 
@@ -395,13 +460,13 @@ export async function signup(formData: FormData) {
       user_id: userId,
       role: accountType,
     },
-    { onConflict: "user_id,role" }
+    { onConflict: "user_id,role" },
   );
 
   if (roleError) {
     redirectSignupError(
       accountType,
-      "Account created, but role setup failed. " + roleError.message
+      "Account created, but role setup failed. " + roleError.message,
     );
   }
 
@@ -446,7 +511,7 @@ export async function signup(formData: FormData) {
     if (guruError) {
       redirectSignupError(
         accountType,
-        "Account created, but Guru profile setup failed. " + guruError.message
+        "Account created, but Guru profile setup failed. " + guruError.message,
       );
     }
   }
@@ -476,9 +541,11 @@ export async function login(formData: FormData) {
       ? String(formData.get("password"))
       : "";
   const turnstileToken = cleanFormValue(formData.get("turnstileToken"));
+  const loginMode = getLoginMode(formData.get("mode"));
 
-  const next = getSafeNextPath(formData.get("next"), "/customer/dashboard");
-  const fallbackLoginPage = getLoginPageFromNext(next);
+  const next = getSafeNextPath(formData.get("next"), "/login/route");
+  const fallbackLoginPage = getLoginPageFromNext(next, loginMode);
+  const expectedTurnstileAction = getEmailTurnstileAction(formData, next);
 
   if (!email || !password) {
     redirectWithError(fallbackLoginPage, "Email and password are required");
@@ -486,13 +553,13 @@ export async function login(formData: FormData) {
 
   const turnstileResult = await verifyTurnstileToken({
     token: turnstileToken,
-    expectedAction: "pet_parent_email_login",
+    expectedAction: expectedTurnstileAction,
   });
 
   if (!turnstileResult.success) {
     redirectWithError(
       fallbackLoginPage,
-      "Secure login check failed. Please refresh the page and try again."
+      "Secure login check failed. Please refresh the page and try again.",
     );
   }
 
@@ -565,5 +632,5 @@ export async function logout() {
   await supabase.auth.signOut();
 
   revalidatePath("/", "layout");
-  redirect("/customer/login");
+  redirect("/login?mode=phone");
 }
