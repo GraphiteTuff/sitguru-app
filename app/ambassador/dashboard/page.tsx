@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   DollarSign,
   GraduationCap,
+  FileText,
   KeyRound,
   LogOut,
   MessageCircle,
@@ -58,6 +59,15 @@ type ReferralStats = {
   paidRewards: number;
 };
 
+type AmbassadorOnboardingPacketDisplay = {
+  label: string;
+  status: "complete" | "pending" | "needs_action";
+  href: string;
+  helper: string;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+};
+
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -78,6 +88,115 @@ function money(value: number) {
     style: "currency",
     currency: "USD",
   }).format(Number.isFinite(value) ? value : 0);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Not saved";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not saved";
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+async function getAmbassadorOnboardingPacketDisplay(
+  ambassadorId: string,
+  userId?: string | null,
+): Promise<AmbassadorOnboardingPacketDisplay> {
+  const href = "/ambassador/dashboard/onboarding-packet";
+
+  try {
+    let query = supabaseAdmin
+      .from("ambassador_onboarding_packets")
+      .select("status, submitted_at, reviewed_at, admin_notes")
+      .eq("ambassador_id", ambassadorId);
+
+    if (!ambassadorId && userId) {
+      query = supabaseAdmin
+        .from("ambassador_onboarding_packets")
+        .select("status, submitted_at, reviewed_at, admin_notes")
+        .eq("user_id", userId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) {
+      console.warn("Unable to load Ambassador onboarding packet status:", error);
+      return {
+        label: "Needs Action",
+        status: "needs_action",
+        href,
+        helper:
+          "Review referral, commission, conduct, and payout expectations before sharing SitGuru as an Ambassador.",
+        submittedAt: null,
+        reviewedAt: null,
+      };
+    }
+
+    const status = asString(data?.status).toLowerCase();
+
+    if (["approved", "complete", "completed"].includes(status)) {
+      return {
+        label: "Complete",
+        status: "complete",
+        href,
+        helper:
+          "Your Ambassador onboarding packet has been reviewed and marked complete.",
+        submittedAt: asString(data?.submitted_at) || null,
+        reviewedAt: asString(data?.reviewed_at) || null,
+      };
+    }
+
+    if (["submitted", "pending_review", "in_review"].includes(status)) {
+      return {
+        label: "Submitted",
+        status: "pending",
+        href,
+        helper:
+          "Your Ambassador onboarding packet is submitted and waiting for SitGuru review.",
+        submittedAt: asString(data?.submitted_at) || null,
+        reviewedAt: asString(data?.reviewed_at) || null,
+      };
+    }
+
+    if (["needs_fix", "needs_action"].includes(status)) {
+      return {
+        label: "Needs Fix",
+        status: "needs_action",
+        href,
+        helper:
+          asString(data?.admin_notes) ||
+          "SitGuru needs one or more updates before Ambassador onboarding can be completed.",
+        submittedAt: asString(data?.submitted_at) || null,
+        reviewedAt: asString(data?.reviewed_at) || null,
+      };
+    }
+
+    return {
+      label: "Needs Action",
+      status: "needs_action",
+      href,
+      helper:
+        "Review referral, commission, conduct, and payout expectations before sharing SitGuru as an Ambassador.",
+      submittedAt: asString(data?.submitted_at) || null,
+      reviewedAt: asString(data?.reviewed_at) || null,
+    };
+  } catch (error) {
+    console.warn("Unable to load Ambassador onboarding packet status:", error);
+    return {
+      label: "Needs Action",
+      status: "needs_action",
+      href,
+      helper:
+        "Review referral, commission, conduct, and payout expectations before sharing SitGuru as an Ambassador.",
+      submittedAt: null,
+      reviewedAt: null,
+    };
+  }
 }
 
 function getFirstName(name: string) {
@@ -321,7 +440,13 @@ export default async function AmbassadorDashboardPage() {
     referralCode,
     type: "guru",
   });
-  const stats = await getReferralStats(referralCode);
+  const [stats, onboardingPacket] = await Promise.all([
+    getReferralStats(referralCode),
+    getAmbassadorOnboardingPacketDisplay(
+      asString(ambassadorRecord.id),
+      ambassadorRecord.user_id || user.id,
+    ),
+  ]);
 
   return (
     <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-6 sm:py-8 lg:px-8">
@@ -404,6 +529,77 @@ export default async function AmbassadorDashboardPage() {
                   access.
                 </p>
               </div>
+            </div>
+          </DashboardCard>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <DashboardCard>
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+                <FileText size={22} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                    Ambassador Onboarding
+                  </p>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${
+                      onboardingPacket.status === "complete"
+                        ? "bg-green-50 text-green-900 ring-green-100"
+                        : onboardingPacket.status === "pending"
+                          ? "bg-amber-50 text-amber-900 ring-amber-100"
+                          : "bg-rose-50 text-rose-900 ring-rose-100"
+                    }`}
+                  >
+                    {onboardingPacket.label}
+                  </span>
+                </div>
+
+                <h2 className="mt-1 text-2xl font-black text-green-950">
+                  Referral & Commission Setup
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Ambassadors are generally referral-based and commission-based.
+                  Hourly opportunities are rare and must be separately approved
+                  by SitGuru in writing.
+                </p>
+                <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                  {onboardingPacket.helper}
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Pill>Referral-first</Pill>
+                  <Pill>Commission-based</Pill>
+                  <Pill>Hourly by exception only</Pill>
+                </div>
+
+                <Link
+                  href={onboardingPacket.href}
+                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+                >
+                  {onboardingPacket.status === "complete"
+                    ? "Review Onboarding"
+                    : onboardingPacket.status === "pending"
+                      ? "View Submitted Packet"
+                      : "Complete Onboarding"}
+                  <ArrowRight size={17} />
+                </Link>
+              </div>
+            </div>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<ClipboardCheck size={22} />}
+              title="Ambassador Setup Steps"
+              detail="Keep setup short: confirm expectations, referral rules, payout terms, and then start sharing SitGuru."
+            />
+            <div className="mt-4 grid gap-2">
+              <ReminderItem>Complete your Ambassador profile and referral code setup.</ReminderItem>
+              <ReminderItem>Confirm referral and commission expectations.</ReminderItem>
+              <ReminderItem>Connect Stripe payouts if eligible for rewards.</ReminderItem>
             </div>
           </DashboardCard>
         </section>

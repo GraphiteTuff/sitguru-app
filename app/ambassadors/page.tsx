@@ -222,7 +222,7 @@ const benefits = [
   "Share SitGuru through friends, family, campus groups, neighborhoods, pet care circles, military networks, and social communities.",
   "Refer future Gurus, Pet Parents, partners, and community supporters.",
   "Build leadership, local visibility, and real-world community engagement around a pet-friendly brand.",
-  "Grow with SitGuru through future campaigns, referrals, recognition, local outreach, and Ambassador opportunities.",
+  "Grow with SitGuru through referrals, commission-based opportunities, recognition, local outreach, and Ambassador opportunities. Hourly opportunities are rare and separately approved by SitGuru in writing.",
 ];
 
 const howItWorks = [
@@ -242,7 +242,7 @@ const howItWorks = [
     step: "03",
     title: "Share SitGuru",
     description:
-      "Ambassadors help promote SitGuru through trusted referrals, social posts, community conversations, QR codes, events, campus sharing, professional circles, and local introductions.",
+      "Ambassadors help promote SitGuru through trusted referrals, social posts, community conversations, QR codes, events, campus sharing, professional circles, and local introductions. The program is generally referral-based and commission-based, with hourly opportunities only by rare SitGuru-approved exception.",
   },
   {
     step: "04",
@@ -265,6 +265,7 @@ const ambassadorActivities = [
   "Create social content",
   "Use QR and referral links",
   "Help grow trusted referrals",
+  "Commission/referral focused",
 ];
 
 
@@ -1133,7 +1134,7 @@ export default function AmbassadorProgramPage() {
               </div>
 
               <h2 className="mt-5 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                Help SitGuru grow through referrals, community trust, and
+                Help SitGuru grow through referrals, commission-based opportunities, community trust, and
                 pet-friendly local energy.
               </h2>
 
