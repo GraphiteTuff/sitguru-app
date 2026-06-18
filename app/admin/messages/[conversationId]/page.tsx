@@ -667,6 +667,62 @@ async function createRecipientNotification(params: {
   }
 }
 
+
+function getFallbackRecipientFromForm(formData: FormData) {
+  const userId = safeString(formData.get("fallbackRecipientUserId"));
+  const role = normalizeRole(safeString(formData.get("fallbackRecipientRole")));
+  const name = safeString(formData.get("fallbackRecipientName"));
+  const email = safeString(formData.get("fallbackRecipientEmail"));
+  const phone = safeString(formData.get("fallbackRecipientPhone"));
+
+  if (!userId && !name && !email && !phone) return null;
+
+  return {
+    userId: userId || null,
+    role: role === "admin" ? "user" : role || "user",
+    name: name || email || "SitGuru Contact",
+    email,
+    phone,
+    isSnapshotOnly: !userId,
+  } satisfies RecipientContact;
+}
+
+function getReplyRecipientFallbackFromMessages(messageRows: MessageRow[]) {
+  const candidates = [...messageRows].reverse().flatMap((message) => [
+    {
+      userId: safeString(message.sender_id),
+      role: normalizeRole(message.sender_role || message.sender_role_snapshot),
+      name: safeString(message.sender_name_snapshot),
+      email: safeString(message.sender_email_snapshot),
+      phone: safeString(message.sender_phone_snapshot),
+    },
+    {
+      userId: safeString(message.recipient_id),
+      role: normalizeRole(message.recipient_role || message.recipient_role_snapshot),
+      name: safeString(message.recipient_name_snapshot),
+      email: safeString(message.recipient_email_snapshot),
+      phone: safeString(message.recipient_phone_snapshot),
+    },
+  ]);
+
+  const match = candidates.find(
+    (candidate) =>
+      candidate.role !== "admin" &&
+      Boolean(candidate.userId || candidate.name || candidate.email || candidate.phone),
+  );
+
+  if (!match) return null;
+
+  return {
+    userId: match.userId || null,
+    role: match.role || "user",
+    name: match.name || match.email || "SitGuru Contact",
+    email: match.email,
+    phone: match.phone,
+    isSnapshotOnly: !match.userId,
+  } satisfies RecipientContact;
+}
+
 async function getConversationRecipient({
   conversationId,
   currentUserId,
@@ -864,10 +920,11 @@ async function sendAdminMessage(conversationId: string, formData: FormData) {
     redirect(`/admin/messages/${conversationId}?error=empty`);
   }
 
-  const recipient = await getConversationRecipient({
-    conversationId,
-    currentUserId: user.id,
-  });
+  const recipient =
+    (await getConversationRecipient({
+      conversationId,
+      currentUserId: user.id,
+    })) || getFallbackRecipientFromForm(formData);
 
   if (!recipient) {
     redirect(`/admin/messages/${conversationId}?error=recipient`);
@@ -1270,6 +1327,7 @@ export default async function AdminMessageThreadPage({
     ...Array.from(snapshotParticipantMap.values()),
   ];
 
+  const replyRecipientFallback = getReplyRecipientFallbackFromMessages(messageRows);
   const unreadCount = messageRows.filter(isUnreadMessage).length;
   const threadType =
     participantCards.some((participant) => participant.role === "ambassador") &&
@@ -1536,6 +1594,31 @@ export default async function AdminMessageThreadPage({
             action={sendAdminMessage.bind(null, conversation.id)}
             className="mt-5 rounded-[26px] border border-green-200 bg-white p-4"
           >
+            <input
+              type="hidden"
+              name="fallbackRecipientUserId"
+              value={replyRecipientFallback?.userId || ""}
+            />
+            <input
+              type="hidden"
+              name="fallbackRecipientRole"
+              value={replyRecipientFallback?.role || ""}
+            />
+            <input
+              type="hidden"
+              name="fallbackRecipientName"
+              value={replyRecipientFallback?.name || ""}
+            />
+            <input
+              type="hidden"
+              name="fallbackRecipientEmail"
+              value={replyRecipientFallback?.email || ""}
+            />
+            <input
+              type="hidden"
+              name="fallbackRecipientPhone"
+              value={replyRecipientFallback?.phone || ""}
+            />
             <div className="grid gap-4">
               <label className="grid gap-2">
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
