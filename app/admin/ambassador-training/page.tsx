@@ -89,6 +89,7 @@ const academyOptions: {
   detail: string;
   audience: string;
   modules: string;
+  expectedMaterials: number;
   certificate: string;
 }[] = [
   {
@@ -100,6 +101,7 @@ const academyOptions: {
       "Watch the intro video, review the Pet Parent guide, and acknowledge completion to earn the badge.",
     audience: "Pet Parents",
     modules: "3 steps",
+    expectedMaterials: 3,
     certificate: "Certified Pet Parent",
   },
   {
@@ -111,6 +113,7 @@ const academyOptions: {
       "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion to earn the badge.",
     audience: "Gurus",
     modules: "3 steps",
+    expectedMaterials: 3,
     certificate: "Certified Guru",
   },
   {
@@ -119,9 +122,10 @@ const academyOptions: {
     shortLabel: "Ambassador",
     emoji: "🌟",
     detail:
-      "Watch the Ambassador intro video, review the Ambassador Guide, and acknowledge completion to earn the badge.",
+      "Watch the Ambassador intro video, review the Ambassador Guide, learn referral links, QR codes, and @SitGuruOfficial outreach, then acknowledge completion to earn the badge.",
     audience: "Ambassadors",
-    modules: "3 steps",
+    modules: "4 steps",
+    expectedMaterials: 4,
     certificate: "Certified Ambassador",
   },
 ];
@@ -233,7 +237,14 @@ function getCoreOrientationStep(steps: TrainingStep[]) {
 function getOrientationMaterialPlan(academyType?: string | null) {
   const academy = getAcademyOption(academyType);
 
-  return [
+  const guideTitle =
+    academy.value === "pet_parent"
+      ? "Review the Pet Parent Guide"
+      : academy.value === "guru"
+        ? "Review the Guru Success Guide"
+        : "Review the Ambassador Guide";
+
+  const plan = [
     {
       label: "Step 1",
       title: "Watch the Intro Video",
@@ -242,22 +253,34 @@ function getOrientationMaterialPlan(academyType?: string | null) {
     },
     {
       label: "Step 2",
-      title:
-        academy.value === "pet_parent"
-          ? "Review the Pet Parent Guide"
-          : academy.value === "guru"
-            ? "Review the Guru Success Guide"
-            : "Review the Ambassador Guide",
+      title: guideTitle,
       detail: "Upload the PowerPoint, PDF, or guide file.",
       type: "PowerPoint / PDF",
     },
-    {
-      label: "Step 3",
-      title: "Acknowledge & Get Certified",
-      detail: `Final acknowledgment and ${academy.certificate} badge issuance.`,
-      type: "Certification",
-    },
   ];
+
+  if (academy.value === "ambassador") {
+    plan.push({
+      label: "Step 3",
+      title: "Referral Links, QR Codes & Social Growth",
+      detail:
+        "Teach Ambassadors how to share referral links, request QR support, and drive verified @SitGuruOfficial signups.",
+      type: "Referral / Social",
+    });
+  }
+
+  plan.push({
+    label: `Step ${academy.value === "ambassador" ? 4 : 3}`,
+    title: "Acknowledge & Get Certified",
+    detail: `Final acknowledgment and ${academy.certificate} badge issuance.`,
+    type: "Certification",
+  });
+
+  return plan;
+}
+
+function getExpectedAcademyMaterialCount(academyType?: string | null) {
+  return getAcademyOption(academyType).expectedMaterials;
 }
 
 function getAcademyFilter(value?: string | string[]) {
@@ -1147,10 +1170,9 @@ export default async function AdminAmbassadorTrainingPage({
 
               <p className="mt-4 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
                 Manage Pet Parent Academy, Guru Academy, and Ambassador Academy
-                from one clean backend. Each academy should have one active
-                orientation record with three user-facing actions: watch the
-                video, review the guide, and acknowledge completion to earn the
-                certification badge.
+                from one clean backend. Pet Parent Academy and Guru Academy use
+                3 clean user-facing actions. Ambassador Academy uses 4 actions:
+                intro, guide, referral/social growth, and certification badge.
               </p>
 
               <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-green-900">
@@ -1235,17 +1257,17 @@ export default async function AdminAmbassadorTrainingPage({
                   />
                   <MiniStat
                     label="Flow"
-                    value="Easy as 1, 2, 3"
+                    value={`Easy as 1-${academy.expectedMaterials}`}
                     detail={
                       academy.legacy
                         ? `${number(academy.legacy)} legacy hidden`
-                        : "clean academy path"
+                        : `${academy.modules} clean path`
                     }
                   />
                   <MiniStat
                     label="Materials"
-                    value={number(academy.materials)}
-                    detail="step resources"
+                    value={`${number(academy.materials)} / ${number(academy.expectedMaterials)}`}
+                    detail="official resources"
                   />
                   <MiniStat
                     label="Credential"
@@ -1320,7 +1342,7 @@ export default async function AdminAmbassadorTrainingPage({
               <SectionHeader
                 icon={<Plus size={22} />}
                 title="Add Orientation Record"
-                detail="Create one active orientation record per academy. Add the three user-facing actions as materials under that one record: video, guide, and certification."
+                detail="Create one active orientation record per academy. Pet Parent and Guru use 3 actions. Ambassador uses 4 actions: video, guide, referral/social growth, and certification."
               />
             </div>
 
@@ -1346,7 +1368,7 @@ export default async function AdminAmbassadorTrainingPage({
                     ? `${selectedAcademy.label} Orientation`
                     : "Academy Orientations"
                 }
-                detail="Keep one active orientation record per academy. Add only the three clean actions inside that record: Step 1 video, Step 2 guide, Step 3 acknowledgment/certification."
+                detail="Keep one active orientation record per academy. Pet Parent and Guru should have 3 materials; Ambassador should have 4 materials, including referral links, QR codes, and @SitGuruOfficial growth."
               />
             </div>
 
@@ -1373,8 +1395,8 @@ export default async function AdminAmbassadorTrainingPage({
                     No orientation record yet
                   </h2>
                   <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-green-900/75">
-                    Add one orientation record, then add the video, guide, and
-                    certification materials inside it.
+                    Add one orientation record, then add the official academy
+                    materials inside it.
                   </p>
                 </div>
               )}
@@ -1388,7 +1410,7 @@ export default async function AdminAmbassadorTrainingPage({
 
                   <p className="mt-2 text-xs font-bold leading-5 text-amber-900/80">
                     These older step records are separated so they do not
-                    confuse the Easy as 1, 2, 3 backend. Deactivate them if they
+                    confuse the clean academy path. Deactivate them if they
                     should not appear to users.
                   </p>
 
@@ -1543,7 +1565,7 @@ function TrainingStepEditor({
             />
             <MiniStat
               label="Materials"
-              value={number(materials.length)}
+              value={`${number(materials.length)} / ${number(getExpectedAcademyMaterialCount(step.academy_type))}`}
               detail={`${number(requiredMaterials.length)} required`}
             />
             <MiniStat
@@ -1610,9 +1632,9 @@ function TrainingStepEditor({
               Training Materials
             </h3>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-              For the simplified flow, keep this clean: Material 1 = video,
-              Material 2 = guide/PDF/PowerPoint, Material 3 = certification
-              acknowledgment.
+              For the simplified flow, keep this clean: Pet Parent and Guru use
+              3 materials. Ambassador uses 4 materials: video, guide,
+              referral/social growth, and certification acknowledgment.
             </p>
           </div>
 
@@ -1644,8 +1666,9 @@ function TrainingStepEditor({
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-green-200 bg-green-50/60 p-4 text-sm font-bold leading-6 text-green-900">
-            No materials have been added yet. Add only the three core items:
-            video, guide, and certification acknowledgment.
+            No materials have been added yet. Add only the official academy
+            materials for this role. Pet Parent and Guru use 3. Ambassador uses
+            4, including referral/social growth.
           </div>
         )}
       </div>
