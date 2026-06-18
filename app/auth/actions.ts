@@ -541,7 +541,10 @@ export async function login(formData: FormData) {
       ? String(formData.get("password"))
       : "";
   const turnstileToken = cleanFormValue(formData.get("turnstileToken"));
-  const loginMode = getLoginMode(formData.get("mode"));
+  // This server action is only used by the email/password login form.
+  // Keep all validation, Turnstile, and password errors on the email tab even
+  // if an older form did not send a hidden mode value.
+  const loginMode: LoginMode = "email";
 
   const next = getSafeNextPath(formData.get("next"), "/login/route");
   const fallbackLoginPage = getLoginPageFromNext(next, loginMode);
