@@ -681,6 +681,110 @@ export default async function AmbassadorDashboardPage() {
           </DashboardCard>
         </section>
 
+        <section className="grid gap-4 lg:grid-cols-3">
+          <DashboardCard>
+            <SectionHeader
+              icon={<Sparkles size={22} />}
+              title="Today"
+              detail="Quick actions an Ambassador can do while walking, talking, or sharing from a phone."
+            />
+            <div className="mt-4 grid gap-3">
+              <ReminderItem>Send your Pet Parent link to 3 local pet families.</ReminderItem>
+              <ReminderItem>Send your Guru link to 1 potential sitter, walker, groomer, trainer, or pet professional.</ReminderItem>
+              <ReminderItem>Invite 5 people to follow @SitGuruOfficial.</ReminderItem>
+              <ReminderItem>Message SitGuru if a referral, flyer, or QR code support item is needed.</ReminderItem>
+            </div>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<ClipboardCheck size={22} />}
+              title="This Week"
+              detail="Weekly goals to keep local growth moving."
+            />
+            <div className="mt-4 grid gap-3">
+              <ReminderItem>Post or share SitGuru in 2 approved local groups or community pages.</ReminderItem>
+              <ReminderItem>Talk to 1 local pet business, rescue, groomer, trainer, or apartment community.</ReminderItem>
+              <ReminderItem>Follow up with every person who asked for the link but has not signed up yet.</ReminderItem>
+              <ReminderItem>Check your dashboard for verified signups, rewards, and next milestone.</ReminderItem>
+            </div>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<BadgeCheck size={22} />}
+              title="This Month"
+              detail="Monthly Ambassador focus for stronger growth and better rewards."
+            />
+            <div className="mt-4 grid gap-3">
+              <ReminderItem>Work toward the next verified social signup milestone.</ReminderItem>
+              <ReminderItem>Identify 3 new potential Gurus in your city or service area.</ReminderItem>
+              <ReminderItem>Ask SitGuru for updated flyers, QR codes, or event support before local outreach.</ReminderItem>
+              <ReminderItem>Review rewards and request help if anything looks missing.</ReminderItem>
+            </div>
+          </DashboardCard>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <DashboardCard>
+            <SectionHeader
+              icon={<MessageCircle size={22} />}
+              title="Support Request Center"
+              detail="Fast Ambassador support so they stay engaged, stocked, and ready in the field."
+            />
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <SupportActionCard
+                icon={<FileText size={20} />}
+                title="Request Flyers"
+                detail="Ask SitGuru for updated local flyers or print-ready handouts."
+                href={`/ambassador/messages?topic=flyers&ref=${encodeURIComponent(referralCode)}`}
+              />
+              <SupportActionCard
+                icon={<QrCode size={20} />}
+                title="Request QR Codes"
+                detail="Get fresh QR codes for Pet Parent, Guru, or social media outreach."
+                href={`/ambassador/messages?topic=qr-codes&ref=${encodeURIComponent(referralCode)}`}
+              />
+              <SupportActionCard
+                icon={<MessageCircle size={20} />}
+                title="Referral Missing?"
+                detail="Tell SitGuru if a signup or booking is not showing on your dashboard."
+                href={`/ambassador/messages?topic=missing-referral&ref=${encodeURIComponent(referralCode)}`}
+              />
+              <SupportActionCard
+                icon={<BookOpenCheck size={20} />}
+                title="Need Talking Points?"
+                detail="Ask for help with wording, local outreach, or social media posts."
+                href={`/ambassador/messages?topic=talking-points&ref=${encodeURIComponent(referralCode)}`}
+              />
+            </div>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<Users size={22} />}
+              title="Grow @SitGuruOfficial"
+              detail="Help turn local pet lovers into followers, Pet Parents, Gurus, and verified signups."
+            />
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950 ring-1 ring-green-100">
+                Ambassador goal: encourage people to follow @SitGuruOfficial and sign up using your referral link or code.
+              </div>
+              <ReminderItem>Ask Pet Parents and future Gurus to follow @SitGuruOfficial.</ReminderItem>
+              <ReminderItem>Use your referral link when sharing SitGuru social posts.</ReminderItem>
+              <ReminderItem>Verified social signups may count toward social growth bonuses after SitGuru review.</ReminderItem>
+              <Link
+                href={`/ambassador/messages?topic=social-media-support&ref=${encodeURIComponent(referralCode)}`}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+              >
+                Request Social Media Help
+                <ArrowRight size={17} />
+              </Link>
+            </div>
+          </DashboardCard>
+        </section>
+
         <section className="grid gap-4 lg:grid-cols-2">
           <DashboardCard>
             <SectionHeader
@@ -691,12 +795,12 @@ export default async function AmbassadorDashboardPage() {
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/ambassador/training"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
               >
                 View Training
                 <ArrowRight size={17} />
               </Link>
-              <span className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-900">
+              <span className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-900">
                 {asString(ambassadorRecord.training_status) || "Not Started"}
               </span>
             </div>
@@ -705,12 +809,12 @@ export default async function AmbassadorDashboardPage() {
           <DashboardCard>
             <SectionHeader
               icon={<MessageCircle size={22} />}
-              title="Support"
-              detail="Need help with referrals, payout questions, or missing activity?"
+              title="Message SitGuru"
+              detail="General support for referrals, rewards, partners, events, or local outreach."
             />
             <Link
               href={`/ambassador/messages?ref=${encodeURIComponent(referralCode)}`}
-              className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+              className="mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
             >
               Message SitGuru
               <ArrowRight size={17} />
@@ -929,6 +1033,40 @@ function SectionHeader({
         </p>
       </div>
     </div>
+  );
+}
+
+
+function SupportActionCard({
+  icon,
+  title,
+  detail,
+  href,
+}: {
+  icon: ReactNode;
+  title: string;
+  detail: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-[132px] flex-col justify-between rounded-2xl border border-green-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50 hover:shadow-md"
+    >
+      <div>
+        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-100 text-green-900 transition group-hover:bg-white">
+          {icon}
+        </div>
+        <h3 className="text-base font-black text-green-950">{title}</h3>
+        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+          {detail}
+        </p>
+      </div>
+      <span className="mt-3 inline-flex items-center gap-2 text-sm font-black text-green-800">
+        Request support
+        <ArrowRight size={16} />
+      </span>
+    </Link>
   );
 }
 
