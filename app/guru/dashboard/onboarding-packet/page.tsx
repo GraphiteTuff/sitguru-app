@@ -247,6 +247,7 @@ async function submitGuruOnboardingPacket(formData: FormData) {
   }
 
   const legalName = asString(formData.get("legal_name"));
+  const nextAction = asString(formData.get("next_action"));
   const providerAcknowledged = checkboxValue(
     formData,
     "provider_acknowledged",
@@ -355,6 +356,10 @@ async function submitGuruOnboardingPacket(formData: FormData) {
 
   revalidatePath("/guru/dashboard");
   revalidatePath("/guru/dashboard/onboarding-packet");
+
+  if (nextAction === "step6") {
+    redirect("/api/stripe/connect/onboard?role=guru");
+  }
 
   redirect("/guru/dashboard/onboarding-packet?submitted=success");
 }
@@ -797,9 +802,11 @@ export default async function GuruOnboardingPacketPage({
 
                 <button
                   type="submit"
+                  name="next_action"
+                  value="step6"
                   className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[1rem] bg-[#07132f] px-5 py-3 text-sm font-black !text-white transition hover:-translate-y-0.5 hover:bg-[#0b1436] sm:w-auto"
                 >
-                  {alreadySubmitted ? "Update Packet" : "Submit Packet"}
+                  {alreadySubmitted ? "Update & Continue to Step 6" : "Save & Continue to Step 6"}
                   <ArrowRight className="ml-2 h-4 w-4 text-white" />
                 </button>
               </div>
@@ -846,12 +853,32 @@ export default async function GuruOnboardingPacketPage({
             </section>
 
             <div className="sticky bottom-3 z-20 rounded-[1.25rem] border border-slate-200 bg-white/95 p-3 shadow-[0_16px_42px_rgba(15,23,42,0.16)] backdrop-blur sm:static sm:shadow-none">
+              <div className="mb-3 rounded-2xl bg-emerald-50 px-4 py-3 text-center ring-1 ring-emerald-100">
+                <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
+                  Next Step
+                </p>
+                <p className="mt-1 text-sm font-bold leading-5 !text-emerald-900">
+                  Save this packet, then continue to Step 6 to connect payouts.
+                </p>
+              </div>
+
               <button
                 type="submit"
+                name="next_action"
+                value="step6"
                 className="flex min-h-[56px] w-full items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-4 text-base font-black !text-white transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
               >
-                {alreadySubmitted ? "Update Packet" : "Submit Packet"}
+                {alreadySubmitted ? "Update & Move to Step 6" : "Save & Move to Step 6"}
                 <ArrowRight className="ml-2 h-5 w-5 text-white" />
+              </button>
+
+              <button
+                type="submit"
+                name="next_action"
+                value="stay"
+                className="mt-2 flex min-h-[48px] w-full items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-6 py-3 text-sm font-black !text-emerald-800 transition hover:bg-emerald-50"
+              >
+                Save Packet Only
               </button>
             </div>
           </form>
