@@ -346,8 +346,8 @@ async function submitAmbassadorOnboardingPacket(formData: FormData) {
   revalidatePath("/ambassador/dashboard");
   revalidatePath("/ambassador/dashboard/onboarding-packet");
 
-  if (nextAction === "payouts") {
-    redirect("/api/stripe/connect/onboard?role=ambassador");
+  if (nextAction === "dashboard") {
+    redirect("/ambassador/dashboard?onboarding=submitted");
   }
 
   redirect("/ambassador/dashboard/onboarding-packet?submitted=success");
@@ -733,16 +733,16 @@ export default async function AmbassadorOnboardingPacketPage({
                     Ready after signature?
                   </p>
                   <p className="mt-1 text-xs font-bold leading-5 !text-emerald-800">
-                    Documents are only needed if SitGuru requested them. You can save and continue.
+                    Documents are only needed if SitGuru requested them. You can save and return to your Ambassador dashboard.
                   </p>
                 </div>
                 <button
                   type="submit"
                   name="next_action"
-                  value="payouts"
+                  value="dashboard"
                   className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[1rem] bg-[#07132f] px-5 py-3 text-sm font-black !text-white transition hover:-translate-y-0.5 hover:bg-[#0b1436] sm:w-auto"
                 >
-                  {alreadySubmitted ? "Update & Continue" : "Save & Continue"}
+                  {alreadySubmitted ? "Update & Return to Dashboard" : "Save & Return to Dashboard"}
                   <ArrowRight className="ml-2 h-4 w-4 text-white" />
                 </button>
               </div>
@@ -791,7 +791,7 @@ export default async function AmbassadorOnboardingPacketPage({
                   Next Step
                 </p>
                 <p className="mt-1 text-sm font-bold leading-5 !text-emerald-900">
-                  Save this packet, then continue payout setup if you are eligible for referral or commission earnings.
+                  Save this packet, then return to your Ambassador dashboard. Payout setup will stay inside the Ambassador workflow.
                 </p>
               </div>
               <button
@@ -800,7 +800,7 @@ export default async function AmbassadorOnboardingPacketPage({
                 value="payouts"
                 className="flex min-h-[56px] w-full items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-4 text-base font-black !text-white transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
               >
-                {alreadySubmitted ? "Update & Continue to Payouts" : "Save & Continue to Payouts"}
+                {alreadySubmitted ? "Update & Return to Ambassador Dashboard" : "Save & Return to Ambassador Dashboard"}
                 <ArrowRight className="ml-2 h-5 w-5 text-white" />
               </button>
               <button
