@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -48,6 +49,17 @@ type AmbassadorRecord = {
   created_at?: string | null;
   updated_at?: string | null;
   last_login_at?: string | null;
+  avatar_url?: string | null;
+  profile_photo_url?: string | null;
+  photo_url?: string | null;
+  image_url?: string | null;
+};
+
+type ProfileRow = {
+  avatar_url?: string | null;
+  profile_photo_url?: string | null;
+  photo_url?: string | null;
+  image_url?: string | null;
 };
 
 type ReferralStats = {
@@ -201,6 +213,42 @@ async function getAmbassadorOnboardingPacketDisplay(
 
 function getFirstName(name: string) {
   return name.split(" ").filter(Boolean)[0] || "Ambassador";
+}
+
+function normalizeAvatarUrl(value?: string | null) {
+  if (!value) return "";
+
+  const cleanValue = value.trim();
+
+  if (!cleanValue) return "";
+
+  return cleanValue;
+}
+
+function getAmbassadorAvatarUrl({
+  ambassador,
+  profile,
+  metadataAvatarUrl,
+  metadataPictureUrl,
+}: {
+  ambassador: AmbassadorRecord;
+  profile: ProfileRow | null;
+  metadataAvatarUrl?: string | null;
+  metadataPictureUrl?: string | null;
+}) {
+  return (
+    normalizeAvatarUrl(ambassador.profile_photo_url) ||
+    normalizeAvatarUrl(ambassador.photo_url) ||
+    normalizeAvatarUrl(ambassador.image_url) ||
+    normalizeAvatarUrl(ambassador.avatar_url) ||
+    normalizeAvatarUrl(profile?.profile_photo_url) ||
+    normalizeAvatarUrl(profile?.photo_url) ||
+    normalizeAvatarUrl(profile?.image_url) ||
+    normalizeAvatarUrl(profile?.avatar_url) ||
+    normalizeAvatarUrl(metadataAvatarUrl) ||
+    normalizeAvatarUrl(metadataPictureUrl) ||
+    ""
+  );
 }
 
 function getInitials(name: string) {
@@ -421,10 +469,31 @@ export default async function AmbassadorDashboardPage() {
     redirect("/ambassador/login?error=restricted");
   }
 
+  const { data: profileData } = await supabaseAdmin
+    .from("profiles")
+    .select("avatar_url,profile_photo_url,photo_url,image_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
   const ambassadorRecord = ambassador as AmbassadorRecord;
+  const profile = (profileData || null) as ProfileRow | null;
   const fullName = asString(ambassadorRecord.full_name) || "SitGuru Ambassador";
   const firstName = getFirstName(fullName);
   const referralCode = asString(ambassadorRecord.referral_code);
+  const metadataAvatarUrl =
+    typeof user.user_metadata?.avatar_url === "string"
+      ? user.user_metadata.avatar_url
+      : null;
+  const metadataPictureUrl =
+    typeof user.user_metadata?.picture === "string"
+      ? user.user_metadata.picture
+      : null;
+  const ambassadorAvatarUrl = getAmbassadorAvatarUrl({
+    ambassador: ambassadorRecord,
+    profile,
+    metadataAvatarUrl,
+    metadataPictureUrl,
+  });
 
   if (!referralCode) {
     redirect("/ambassador/login?error=not_found");
@@ -462,8 +531,19 @@ export default async function AmbassadorDashboardPage() {
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
             <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.16),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-7">
               <div className="flex min-w-0 items-start gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-green-100 text-xl font-black text-green-900 ring-1 ring-green-200 sm:h-20 sm:w-20">
-                  {getInitials(fullName)}
+                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-green-100 text-xl font-black text-green-900 ring-1 ring-green-200 sm:h-20 sm:w-20">
+                  {ambassadorAvatarUrl ? (
+                    <Image
+                      src={ambassadorAvatarUrl}
+                      alt={`${fullName} profile photo`}
+                      fill
+                      sizes="96px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    getInitials(fullName)
+                  )}
                 </div>
 
                 <div className="min-w-0">
