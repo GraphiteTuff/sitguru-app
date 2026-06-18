@@ -1069,10 +1069,6 @@ export default async function AmbassadorDashboardPage() {
                 and this card will automatically show the video here.
               </div>
             )}
-
-            <div className="mt-4 rounded-2xl border border-green-100 bg-white px-4 py-3 text-xs font-bold leading-5 text-slate-600">
-              Keep this near the bottom of the dashboard so the top remains focused on referral code, rewards, support, and daily actions.
-            </div>
           </DashboardCard>
         </section>
 
