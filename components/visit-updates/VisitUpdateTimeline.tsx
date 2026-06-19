@@ -92,14 +92,14 @@ export default function VisitUpdateTimeline({
   const photos = updates.filter((update) => update.photo_url);
 
   return (
-    <section className="space-y-5">
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <section className="space-y-5 !text-slate-950">
+      <div className="overflow-hidden rounded-3xl border border-slate-200 !bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-5 sm:p-6">
-          <p className="text-sm font-semibold text-sky-700">
+          <p className="text-sm font-semibold !text-sky-700">
             SitGuru Visit Card
           </p>
 
-          <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-bold !text-slate-950 sm:text-3xl">
             {completed
               ? "Visit completed"
               : inProgress
@@ -107,36 +107,36 @@ export default function VisitUpdateTimeline({
                 : "Visit updates"}
           </h1>
 
-          <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">
+          <p className="mt-2 max-w-2xl text-sm !text-slate-700 sm:text-base">
             Photos, care notes, potty updates, and visit timing in one simple
             place.
           </p>
         </div>
 
         <div className="grid gap-3 p-5 sm:grid-cols-3 sm:p-6">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="rounded-2xl border border-slate-200 !bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-wide !text-slate-600">
               Started
             </p>
-            <p className="mt-1 font-bold text-slate-950">
+            <p className="mt-1 font-bold !text-slate-950">
               {formatDateTime(session?.started_at ?? null)}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="rounded-2xl border border-slate-200 !bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-wide !text-slate-600">
               Ended
             </p>
-            <p className="mt-1 font-bold text-slate-950">
+            <p className="mt-1 font-bold !text-slate-950">
               {formatDateTime(session?.ended_at ?? null)}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="rounded-2xl border border-slate-200 !bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-wide !text-slate-600">
               Duration
             </p>
-            <p className="mt-1 font-bold text-slate-950">
+            <p className="mt-1 font-bold !text-slate-950">
               {getDuration(
                 session?.started_at ?? null,
                 session?.ended_at ?? null
@@ -146,11 +146,11 @@ export default function VisitUpdateTimeline({
         </div>
 
         {session?.final_note ? (
-          <div className="mx-5 mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:mx-6 sm:mb-6">
-            <p className="text-xs uppercase tracking-wide text-emerald-700">
+          <div className="mx-5 mb-5 rounded-2xl border border-emerald-200 !bg-emerald-50 p-4 sm:mx-6 sm:mb-6">
+            <p className="text-xs uppercase tracking-wide !text-emerald-700">
               Final note
             </p>
-            <p className="mt-1 text-sm leading-6 text-emerald-950">
+            <p className="mt-1 text-sm leading-6 !text-emerald-950">
               {session.final_note}
             </p>
           </div>
@@ -158,8 +158,8 @@ export default function VisitUpdateTimeline({
       </div>
 
       {photos.length > 0 ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-lg font-bold text-slate-950">Visit photos</h2>
+        <div className="rounded-3xl border border-slate-200 !bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-lg font-bold !text-slate-950">Visit photos</h2>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {photos.map((photo) => (
@@ -168,7 +168,7 @@ export default function VisitUpdateTimeline({
                 href={photo.photo_url || "#"}
                 target="_blank"
                 rel="noreferrer"
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
+                className="group overflow-hidden rounded-2xl border border-slate-200 !bg-slate-100"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -182,10 +182,10 @@ export default function VisitUpdateTimeline({
         </div>
       ) : null}
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="rounded-3xl border border-slate-200 !bg-white p-5 shadow-sm sm:p-6">
         <div>
-          <h2 className="text-lg font-bold text-slate-950">Visit timeline</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <h2 className="text-lg font-bold !text-slate-950">Visit timeline</h2>
+          <p className="mt-1 text-sm !text-slate-700">
             {viewer === "guru"
               ? "Your updates appear here after you add them."
               : "Updates from your Guru will appear here."}
@@ -193,12 +193,12 @@ export default function VisitUpdateTimeline({
         </div>
 
         {updates.length === 0 ? (
-          <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-            <p className="text-3xl">🐾</p>
-            <h3 className="mt-2 font-bold text-slate-950">
+          <div className="mt-5 rounded-2xl border border-dashed border-slate-300 !bg-slate-50 p-6 text-center">
+            <p className="text-3xl !text-slate-950">🐾</p>
+            <h3 className="mt-2 font-bold !text-slate-950">
               No visit updates yet
             </h3>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm !text-slate-700">
               Once the visit starts, updates will appear here.
             </p>
           </div>
@@ -207,24 +207,24 @@ export default function VisitUpdateTimeline({
             {updates.map((update) => (
               <div
                 key={update.id}
-                className="flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                className="flex gap-3 rounded-2xl border border-slate-200 !bg-slate-50 p-4"
               >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-xl shadow-sm">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl !bg-white text-xl shadow-sm">
                   {getUpdateIcon(update.update_type)}
                 </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 className="font-bold text-slate-950">
+                    <h3 className="font-bold !text-slate-950">
                       {getUpdateLabel(update.update_type)}
                     </h3>
-                    <p className="text-xs font-semibold text-slate-500">
+                    <p className="text-xs font-semibold !text-slate-600">
                       {formatTime(update.created_at)}
                     </p>
                   </div>
 
                   {update.note ? (
-                    <p className="mt-1 text-sm leading-6 text-slate-700">
+                    <p className="mt-1 text-sm leading-6 !text-slate-700">
                       {update.note}
                     </p>
                   ) : null}
@@ -234,7 +234,7 @@ export default function VisitUpdateTimeline({
                       href={update.photo_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-3 inline-flex text-sm font-bold text-sky-700 hover:text-sky-900"
+                      className="mt-3 inline-flex text-sm font-bold !text-sky-700 hover:!text-sky-900"
                     >
                       View photo
                     </a>
