@@ -133,27 +133,38 @@ function MessageAvatar({
   profile,
   photoUrl,
   fallbackName,
+  isOnline = false,
 }: {
   profile?: Profile | null;
   photoUrl?: string | null;
   fallbackName?: string;
+  isOnline?: boolean;
 }) {
   const label = fallbackName || getName(profile);
-
-  if (photoUrl) {
-    return (
-      <img
-        src={photoUrl}
-        alt={label}
-        className="h-11 w-11 rounded-full border border-slate-200 object-cover shadow-sm"
-      />
-    );
-  }
+  const resolvedPhotoUrl = photoUrl || getProfilePhotoUrl(profile);
 
   return (
-    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-black text-slate-700 shadow-sm">
-      {getInitialsFromLabel(label)}
-    </div>
+    <span className="relative inline-flex h-11 w-11 shrink-0">
+      {resolvedPhotoUrl ? (
+        <img
+          src={resolvedPhotoUrl}
+          alt={label}
+          className="h-11 w-11 rounded-full border border-slate-200 object-cover shadow-sm"
+        />
+      ) : (
+        <span className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-black text-slate-700 shadow-sm">
+          {getInitialsFromLabel(label)}
+        </span>
+      )}
+
+      {isOnline ? (
+        <span
+          aria-label="Online now"
+          title="Online now"
+          className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm"
+        />
+      ) : null}
+    </span>
   );
 }
 
@@ -710,6 +721,7 @@ function GuruDashboardMessagesPageContent() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [inboxFilter, setInboxFilter] = useState<"all" | "petParents" | "admin" | "unread">("all");
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(() => new Set());
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -885,6 +897,55 @@ function GuruDashboardMessagesPageContent() {
   useEffect(() => {
     if (!userId) return;
 
+    const channel = supabase.channel("sitguru-message-presence", {
+      config: {
+        presence: {
+          key: userId,
+        },
+      },
+    });
+
+    const syncOnlineUsers = () => {
+      const presenceState = channel.presenceState() as Record<
+        string,
+        Array<{ user_id?: string }>
+      >;
+
+      const activeIds = new Set<string>();
+
+      Object.entries(presenceState).forEach(([presenceKey, presences]) => {
+        if (presenceKey) activeIds.add(presenceKey);
+
+        presences.forEach((presence) => {
+          if (presence.user_id) activeIds.add(presence.user_id);
+        });
+      });
+
+      setOnlineUserIds(activeIds);
+    };
+
+    channel
+      .on("presence", { event: "sync" }, syncOnlineUsers)
+      .on("presence", { event: "join" }, syncOnlineUsers)
+      .on("presence", { event: "leave" }, syncOnlineUsers)
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({
+            user_id: userId,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      void channel.untrack();
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+
     const channel = supabase
       .channel(`guru-messages-live-${userId}`)
       .on(
@@ -1049,6 +1110,10 @@ function GuruDashboardMessagesPageContent() {
     ? getReadableRole(selectedProfile)
     : "No contact selected";
 
+  const selectedProfileIsOnline = selectedProfile
+    ? onlineUserIds.has(selectedProfile.id)
+    : false;
+
   const recipientOptions = useMemo(() => {
     const options: { id: string; label: string }[] = [];
     let adminAdded = false;
@@ -1171,7 +1236,7 @@ function GuruDashboardMessagesPageContent() {
 
                 <p className="mt-5 max-w-3xl text-base leading-8 !text-slate-800 md:text-xl">
                   View and reply to Pet Parent conversations and SitGuru Admin
-                  support in one place.
+                  support in one place, with live online status when someone is available.
                 </p>
               </div>
 
@@ -1282,18 +1347,12 @@ function GuruDashboardMessagesPageContent() {
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-sm font-black !text-slate-950 ring-1 ring-slate-200">
-                        {getProfilePhotoUrl(profile) ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={getProfilePhotoUrl(profile) || ""}
-                            alt={getName(profile)}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          getInitials(profile)
-                        )}
-                      </div>
+                      <MessageAvatar
+                        profile={profile}
+                        photoUrl={getProfilePhotoUrl(profile)}
+                        fallbackName={getName(profile)}
+                        isOnline={onlineUserIds.has(profile.id)}
+                      />
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
@@ -1305,6 +1364,9 @@ function GuruDashboardMessagesPageContent() {
                               {isBookedCustomer
                                 ? "Pet Parent"
                                 : getReadableRole(profile)}
+                            </p>
+                            <p className="mt-0.5 text-[11px] font-black uppercase tracking-[0.16em] !text-slate-500">
+                              {onlineUserIds.has(profile.id) ? "Online now" : "Offline"}
                             </p>
                           </div>
 
@@ -1350,9 +1412,25 @@ function GuruDashboardMessagesPageContent() {
                       ? getName(selectedProfile)
                       : "Select a message recipient"}
                   </h2>
-                  <p className="mt-1 text-sm font-bold !text-slate-600">
-                    {selectedContactLabel}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-bold !text-slate-600">
+                    <span>{selectedContactLabel}</span>
+                    {selectedProfile ? (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-black ${
+                          selectedProfileIsOnline
+                            ? "bg-emerald-50 !text-emerald-700 ring-1 ring-emerald-100"
+                            : "bg-slate-100 !text-slate-500 ring-1 ring-slate-200"
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            selectedProfileIsOnline ? "bg-emerald-500" : "bg-slate-400"
+                          }`}
+                        />
+                        {selectedProfileIsOnline ? "Online now" : "Offline"}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
@@ -1434,6 +1512,7 @@ function GuruDashboardMessagesPageContent() {
                           profile={selectedProfile}
                           photoUrl={senderPhoto}
                           fallbackName={senderName}
+                          isOnline={selectedProfileIsOnline}
                         />
                       ) : null}
 
@@ -1473,6 +1552,7 @@ function GuruDashboardMessagesPageContent() {
                           profile={currentProfile}
                           photoUrl={senderPhoto}
                           fallbackName={senderName}
+                          isOnline
                         />
                       ) : null}
                     </div>
