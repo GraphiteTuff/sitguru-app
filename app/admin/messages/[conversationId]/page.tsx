@@ -185,6 +185,17 @@ function normalizeRole(role?: string | null) {
   return value;
 }
 
+function getRoleLabel(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "admin") return "Admin";
+  if (normalizedRole === "guru") return "Guru";
+  if (normalizedRole === "customer") return "Pet Parent";
+  if (normalizedRole === "ambassador") return "Ambassador";
+
+  return "SitGuru User";
+}
+
 
 function getDirectMessageTypeForRole(role?: string | null) {
   const normalizedRole = normalizeRole(role);
@@ -1044,33 +1055,43 @@ function Avatar({
   name,
   src,
   role,
+  isActive = false,
 }: {
   name: string;
   src?: string | null;
   role?: string | null;
+  isActive?: boolean;
 }) {
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={name}
-        className="h-11 w-11 rounded-full border border-green-100 object-cover shadow-sm"
-      />
-    );
-  }
-
   const normalizedRole = normalizeRole(role);
 
   return (
-    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-green-100 bg-green-50 text-xs font-black text-green-800 shadow-sm">
-      {normalizedRole === "admin" ? (
-        <ShieldCheck className="h-5 w-5" />
-      ) : normalizedRole === "guru" ? (
-        <UsersRound className="h-5 w-5" />
+    <span className="relative inline-flex h-11 w-11 shrink-0">
+      {src ? (
+        <img
+          src={src}
+          alt={name}
+          className="h-11 w-11 rounded-full border border-green-100 object-cover shadow-sm"
+        />
       ) : (
-        getInitials(name) || <UserRound className="h-5 w-5" />
+        <span className="flex h-11 w-11 items-center justify-center rounded-full border border-green-100 bg-green-50 text-xs font-black text-green-800 shadow-sm">
+          {normalizedRole === "admin" ? (
+            <ShieldCheck className="h-5 w-5" />
+          ) : normalizedRole === "guru" ? (
+            <UsersRound className="h-5 w-5" />
+          ) : (
+            getInitials(name) || <UserRound className="h-5 w-5" />
+          )}
+        </span>
       )}
-    </div>
+
+      {isActive ? (
+        <span
+          aria-label="Active thread"
+          title="Active thread"
+          className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm"
+        />
+      ) : null}
+    </span>
   );
 }
 
@@ -1151,6 +1172,131 @@ function StatCard({
       </div>
       <p className="mt-2 text-2xl font-black text-green-950">{value}</p>
     </div>
+  );
+}
+
+function AdminQuickChatBox({
+  conversation,
+  messageRows,
+  replyRecipientFallback,
+}: {
+  conversation: ConversationRow;
+  messageRows: MessageRow[];
+  replyRecipientFallback: RecipientContact | null;
+}) {
+  const recentMessages = messageRows.slice(-3);
+
+  return (
+    <aside className="fixed bottom-5 right-5 z-40 hidden w-[min(430px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-green-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)] xl:block">
+      <div className="border-b border-green-100 bg-green-50 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar
+              name={replyRecipientFallback?.name || "SitGuru Contact"}
+              src=""
+              role={replyRecipientFallback?.role || "user"}
+              isActive
+            />
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-green-700">
+                Admin Quick Chat
+              </p>
+              <h2 className="truncate text-lg font-black leading-tight text-green-950">
+                {replyRecipientFallback?.name || "SitGuru Contact"}
+              </h2>
+              <p className="truncate text-xs font-bold text-slate-600">
+                {getRoleLabel(replyRecipientFallback?.role)} · Active thread
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/admin/messages"
+            className="rounded-full border border-green-200 bg-white px-3 py-1 text-xs font-black text-green-800 transition hover:bg-green-50"
+          >
+            Inbox
+          </Link>
+        </div>
+      </div>
+
+      <div className="max-h-64 space-y-3 overflow-y-auto bg-white p-4">
+        {recentMessages.length ? (
+          recentMessages.map((message) => {
+            const senderRole = normalizeRole(message.sender_role || message.sender_role_snapshot);
+            const isAdmin = senderRole === "admin";
+
+            return (
+              <div
+                key={`admin-quick-${message.id}`}
+                className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm font-semibold leading-5 shadow-sm ${
+                    isAdmin
+                      ? "rounded-br-md bg-green-800 text-white"
+                      : "rounded-bl-md bg-slate-100 text-slate-800"
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">
+                    {getMessageBody(message) || "Message content unavailable."}
+                  </p>
+                  <p
+                    className={`mt-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                      isAdmin ? "text-green-100" : "text-slate-400"
+                    }`}
+                  >
+                    {isAdmin ? "Admin" : getRoleLabel(senderRole)} · {formatDateTime(message.created_at)}
+                  </p>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="rounded-2xl border border-dashed border-green-200 bg-green-50 p-4 text-center text-sm font-bold text-slate-700">
+            No messages yet. Send the first Admin reply below.
+          </div>
+        )}
+      </div>
+
+      <form
+        action={sendAdminMessage.bind(null, conversation.id)}
+        className="border-t border-green-100 bg-slate-50 p-4"
+      >
+        <input type="hidden" name="fallbackRecipientUserId" value={replyRecipientFallback?.userId || ""} />
+        <input type="hidden" name="fallbackRecipientRole" value={replyRecipientFallback?.role || ""} />
+        <input type="hidden" name="fallbackRecipientName" value={replyRecipientFallback?.name || ""} />
+        <input type="hidden" name="fallbackRecipientEmail" value={replyRecipientFallback?.email || ""} />
+        <input type="hidden" name="fallbackRecipientPhone" value={replyRecipientFallback?.phone || ""} />
+        <input type="hidden" name="topic" value={conversation.topic || "direct_message"} />
+
+        <label className="grid gap-2">
+          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-green-800">
+            Quick Admin Reply
+          </span>
+          <textarea
+            name="message"
+            rows={3}
+            placeholder="Type a quick reply..."
+            className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+          />
+        </label>
+
+        <button
+          type="submit"
+          className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+        >
+          <Send className="h-4 w-4" />
+          Send Quick Reply
+        </button>
+
+        <a
+          href="#admin-reply"
+          className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-green-200 bg-white px-4 py-2 text-xs font-black text-green-800 transition hover:bg-green-50"
+        >
+          Open full reply form
+        </a>
+      </form>
+    </aside>
   );
 }
 
@@ -1367,7 +1513,7 @@ export default async function AdminMessageThreadPage({
                   {conversation.subject || "SitGuru Message Thread"}
                 </h1>
                 <p className="mt-1 text-sm font-black text-slate-600">
-                  Clean SitGuru message history · {threadType} · Last activity{" "}
+                  Quick chat thread · {threadType} · Last activity{" "}
                   {formatDateTime(conversation.last_message_at || conversation.updated_at)}
                 </p>
               </div>
@@ -1379,6 +1525,10 @@ export default async function AdminMessageThreadPage({
               </span>
               <span className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-800 ring-1 ring-blue-100">
                 {conversation.topic || "Other"}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 ring-1 ring-emerald-100">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Quick Chat Ready
               </span>
             </div>
           </div>
@@ -1438,7 +1588,7 @@ export default async function AdminMessageThreadPage({
                     {participant.name}
                   </p>
                   <p className="text-xs font-bold capitalize text-slate-500">
-                    {participant.role}
+                    {getRoleLabel(participant.role)}
                     {participant.isSnapshotOnly ? " · Snapshot Contact" : ""}
                   </p>
                   {participant.email ? (
@@ -1460,7 +1610,7 @@ export default async function AdminMessageThreadPage({
               </h2>
               <p className="mt-1 text-sm font-semibold text-slate-600">
                 Mobile-friendly bubble view with avatars, party labels,
-                timestamps, and preserved message history.
+                timestamps, quick chat access, and preserved message history.
               </p>
             </div>
 
@@ -1549,7 +1699,7 @@ export default async function AdminMessageThreadPage({
                                 : "bg-green-50 text-green-800"
                             }`}
                           >
-                            {senderRole}
+                            {getRoleLabel(senderRole)}
                           </span>
                           <span
                             className={`text-xs font-bold ${
@@ -1580,12 +1730,12 @@ export default async function AdminMessageThreadPage({
           </div>
         </section>
 
-        <section className="rounded-[30px] border border-green-200 bg-green-50 p-5 shadow-sm">
+        <section id="admin-reply" className="rounded-[30px] border border-green-200 bg-green-50 p-5 shadow-sm">
           <h2 className="text-2xl font-black text-green-950">
             Send Admin Message
           </h2>
           <p className="mt-1 text-sm font-semibold text-green-900">
-            Reply as SitGuru Admin. This saves the message, creates an in-app
+            Reply as SitGuru Admin. This saves to the same thread, creates an in-app
             notification, sends an email, and sends a text alert when a phone
             number is available.
           </p>
@@ -1673,9 +1823,16 @@ export default async function AdminMessageThreadPage({
           `profiles`, `gurus`, and `messages`. Admin replies write to
           `messages`, update `conversations`, create `notifications`, and attempt
           personal email/SMS delivery using Resend and Twilio environment
-          variables.
+          variables. The quick chat box uses the same Admin reply action, so it
+          stays connected to all message centers.
         </section>
       </div>
+
+      <AdminQuickChatBox
+        conversation={conversation}
+        messageRows={messageRows}
+        replyRecipientFallback={replyRecipientFallback}
+      />
     </main>
   );
 }
