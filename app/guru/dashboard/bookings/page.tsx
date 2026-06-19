@@ -1158,13 +1158,13 @@ export default async function GuruBookingsPage({
   return (
     <main className="min-h-screen bg-[#f6fffb] px-4 py-6 !text-[#061638] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1700px] space-y-6">
-        <section className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="rounded-[28px] border border-[#dfeee7] bg-white p-6 shadow-[0_12px_32px_rgba(16,24,40,0.06)] xl:p-7 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
+        <section className="space-y-6">
+          <div className="rounded-[28px] border border-[#dfeee7] bg-white p-6 shadow-[0_12px_32px_rgba(16,24,40,0.06)] xl:p-8">
             <p className="text-sm font-black uppercase tracking-[0.24em] !text-emerald-600">
               Guru Workspace
             </p>
 
-            <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight !text-[#061638] sm:text-5xl">
+            <h1 className="mt-4 max-w-5xl text-4xl font-black leading-tight tracking-tight !text-[#061638] sm:text-5xl lg:text-6xl">
               Bookings & PawReports
             </h1>
 
@@ -1308,7 +1308,7 @@ export default async function GuruBookingsPage({
           </div>
         </section>
 
-        <section className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)_300px]">
+        <section className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="self-start rounded-[28px] border border-[#dfeee7] bg-white p-5 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-black tracking-tight !text-[#061638]">
@@ -1491,15 +1491,49 @@ export default async function GuruBookingsPage({
             </div>
 
             {!selectedBooking ? (
-              <div className="mt-5 flex min-h-[440px] items-center justify-center rounded-[24px] border border-dashed border-slate-200 bg-slate-50 text-center">
-                <div className="max-w-md px-6">
-                  <div className="text-2xl font-black !text-[#061638]">
-                    No booking selected
+              <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-6">
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch">
+                  <div className="flex min-h-[300px] items-center justify-center rounded-[22px] bg-white p-6 text-center">
+                    <div className="max-w-xl">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 !text-emerald-700">
+                        <PawPrint className="h-8 w-8" />
+                      </div>
+                      <div className="mt-4 text-3xl font-black !text-[#061638]">
+                        No booking selected
+                      </div>
+                      <p className="mt-3 text-base leading-7 !text-slate-600">
+                        Once Pet Parents book you, select a booking from the left panel
+                        to view details, start a PawReport, add photos, and share care updates.
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-3 text-base leading-7 !text-slate-600">
-                    Once Pet Parents book you, select a booking from the left panel
-                    to view details, start a PawReport, add photos, and share care updates.
-                  </p>
+
+                  <div className="rounded-[22px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
+                      Signature Feature
+                    </p>
+                    <h3 className="mt-2 text-2xl font-black tracking-tight !text-[#061638]">
+                      SitGuru PawReport™
+                    </h3>
+                    <p className="mt-3 text-sm font-semibold leading-6 !text-slate-700">
+                      PawReports help Pet Parents feel connected with photos,
+                      potty updates, food and water confirmations, care notes,
+                      and a final summary.
+                    </p>
+                    <div className="mt-4 grid gap-2 text-sm font-bold !text-slate-700">
+                      <div>✓ Add photos from the visit</div>
+                      <div>✓ Track potty updates</div>
+                      <div>✓ Confirm food and water</div>
+                      <div>✓ Complete a final summary</div>
+                    </div>
+                    <Link
+                      href="/guru-success-center#pawreport"
+                      className="mt-5 inline-flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-sm font-black !text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:!text-emerald-800"
+                    >
+                      <span>Learn About PawReports</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1719,7 +1753,7 @@ export default async function GuruBookingsPage({
             )}
           </section>
 
-          <aside className="self-start space-y-6 xl:col-span-2 2xl:col-span-1">
+          <aside className="grid gap-6 md:grid-cols-2 xl:col-span-2 2xl:grid-cols-4">
             <div className="rounded-[28px] border border-[#dfeee7] bg-white p-5 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
               <div className="flex items-center justify-between">
                 <div className="text-3xl font-black tracking-tight !text-[#061638]">
@@ -1906,7 +1940,7 @@ export default async function GuruBookingsPage({
                   <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
                     Signature Feature
                   </p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight !text-[#061638]">
+                  <h2 className="mt-1 text-xl font-black tracking-tight !text-[#061638] sm:text-2xl">
                     SitGuru PawReport™
                   </h2>
                 </div>
