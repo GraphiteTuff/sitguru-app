@@ -8,11 +8,6 @@ import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
-declare global {
-  interface Window {
-    $crisp?: unknown[][];
-  }
-}
 
 const openSans = Open_Sans({
   subsets: ["latin"],
@@ -101,6 +96,19 @@ type HomepageAssistFormState = {
   phone: string;
   topic: HomepageAssistTopic;
   message: string;
+};
+
+type HomepageMessengerSession = {
+  conversationId: string;
+  token: string;
+};
+
+type HomepageMessengerMessage = {
+  id: string;
+  content: string;
+  senderRole: "admin" | "visitor" | "user";
+  senderName: string;
+  createdAt: string;
 };
 
 const initialHomepageAssistForm: HomepageAssistFormState = {
@@ -719,78 +727,6 @@ function TrustRow() {
   );
 }
 
-function pushCrispCommand(command: unknown[]) {
-  if (typeof window === "undefined") return;
-
-  window.$crisp = window.$crisp || [];
-  window.$crisp.push(command);
-}
-
-function openCrispConversation({
-  fullName,
-  email,
-  phone,
-  topic,
-  message,
-  source,
-}: {
-  fullName: string;
-  email: string;
-  phone: string;
-  topic: HomepageAssistTopic;
-  message: string;
-  source: string;
-}) {
-  if (typeof window === "undefined") return;
-
-  const topicLabel = homepageAssistTopicLabels[topic] || "General";
-  const contactName = fullName.trim();
-  const contactEmail = email.trim();
-  const contactPhone = phone.trim();
-  const visitorMessage = [
-    `Homepage help request: ${topicLabel}`,
-    contactName ? `Name: ${contactName}` : "",
-    contactEmail ? `Email: ${contactEmail}` : "",
-    contactPhone ? `Phone: ${contactPhone}` : "",
-    "",
-    message.trim(),
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  if (contactName) {
-    pushCrispCommand(["set", "user:nickname", [contactName]]);
-  }
-
-  if (contactEmail) {
-    pushCrispCommand(["set", "user:email", [contactEmail]]);
-  }
-
-  if (contactPhone) {
-    pushCrispCommand(["set", "user:phone", [contactPhone]]);
-  }
-
-  pushCrispCommand([
-    "set",
-    "session:data",
-    [
-      [
-        ["source", "homepage-assist-popup"],
-        ["traffic_source", source || "direct"],
-        ["topic", topicLabel],
-        ["page", `${window.location.pathname}${window.location.search}`],
-      ],
-    ],
-  ]);
-
-  pushCrispCommand(["do", "chat:open"]);
-  pushCrispCommand(["do", "message:send", ["text", visitorMessage]]);
-
-  window.setTimeout(() => {
-    pushCrispCommand(["do", "chat:open"]);
-  }, 500);
-}
-
 function HomepageAssistPopup({
   source,
   onTrack,
@@ -803,16 +739,36 @@ function HomepageAssistPopup({
   const [form, setForm] = useState<HomepageAssistFormState>(
     initialHomepageAssistForm,
   );
+  const [session, setSession] = useState<HomepageMessengerSession | null>(null);
+  const [messages, setMessages] = useState<HomepageMessengerMessage[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefreshingMessages, setIsRefreshingMessages] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
 
   useEffect(() => {
+    const savedSession = window.localStorage.getItem(
+      "sitguru-homepage-messenger-session",
+    );
+
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession) as HomepageMessengerSession;
+
+        if (parsed?.conversationId && parsed?.token) {
+          setSession(parsed);
+          setIsOpen(true);
+        }
+      } catch {
+        window.localStorage.removeItem("sitguru-homepage-messenger-session");
+      }
+    }
+
     const dismissed = window.sessionStorage.getItem(
       "sitguru-homepage-assist-dismissed",
     );
 
-    if (dismissed === "true") return;
+    if (dismissed === "true" || savedSession) return;
 
     const timer = window.setTimeout(() => {
       setIsOpen(true);
@@ -820,6 +776,46 @@ function HomepageAssistPopup({
 
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!session?.conversationId || !session.token) return;
+
+    let isMounted = true;
+
+    async function loadMessages() {
+      try {
+        const params = new URLSearchParams({
+          conversationId: session?.conversationId || "",
+          token: session?.token || "",
+        });
+
+        const response = await fetch(`/api/homepage-messenger?${params.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) return;
+
+        const payload = (await response.json().catch(() => null)) as {
+          messages?: HomepageMessengerMessage[];
+        } | null;
+
+        if (!isMounted) return;
+
+        setMessages(payload?.messages || []);
+      } catch (error) {
+        console.warn("Unable to refresh homepage messenger messages:", error);
+      }
+    }
+
+    loadMessages();
+
+    const interval = window.setInterval(loadMessages, 3500);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, [session]);
 
   function updateAssistField<K extends keyof HomepageAssistFormState>(
     key: K,
@@ -839,6 +835,33 @@ function HomepageAssistPopup({
     setIsOpen(false);
   }
 
+  async function refreshMessages() {
+    if (!session?.conversationId || !session.token) return;
+
+    setIsRefreshingMessages(true);
+
+    try {
+      const params = new URLSearchParams({
+        conversationId: session.conversationId,
+        token: session.token,
+      });
+
+      const response = await fetch(`/api/homepage-messenger?${params.toString()}`, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) return;
+
+      const payload = (await response.json().catch(() => null)) as {
+        messages?: HomepageMessengerMessage[];
+      } | null;
+
+      setMessages(payload?.messages || []);
+    } finally {
+      setIsRefreshingMessages(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -854,12 +877,14 @@ function HomepageAssistPopup({
     setFormSuccess("");
 
     try {
-      const response = await fetch("/api/contact", {
+      const response = await fetch("/api/homepage-messenger", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          conversationId: session?.conversationId || "",
+          token: session?.token || "",
           fullName: form.fullName,
           email: form.email,
           phone: form.phone,
@@ -877,13 +902,33 @@ function HomepageAssistPopup({
         }),
       });
 
-      const payload = await response.json().catch(() => null);
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        conversationId?: string;
+        token?: string;
+        messages?: HomepageMessengerMessage[];
+      } | null;
 
       if (!response.ok) {
         throw new Error(
           payload?.error || "Unable to send your message right now.",
         );
       }
+
+      if (payload?.conversationId && payload.token) {
+        const nextSession = {
+          conversationId: payload.conversationId,
+          token: payload.token,
+        };
+
+        setSession(nextSession);
+        window.localStorage.setItem(
+          "sitguru-homepage-messenger-session",
+          JSON.stringify(nextSession),
+        );
+      }
+
+      setMessages(payload?.messages || []);
 
       trackEvent({
         eventName: "homepage_assist_popup_submitted",
@@ -894,23 +939,22 @@ function HomepageAssistPopup({
           topic: form.topic,
           has_email: Boolean(form.email.trim()),
           has_phone: Boolean(form.phone.trim()),
-          version: "homepage_assist_popup_admin_alerts",
+          messenger: "sitguru_homepage_messenger",
+          version: "homepage_assist_popup_sitguru_messenger",
         },
       });
 
-      openCrispConversation({
-        fullName: form.fullName,
-        email: form.email,
-        phone: form.phone,
-        topic: form.topic,
-        message: cleanMessage,
-        source,
-      });
-
       setFormSuccess(
-        "Thanks — SitGuru Admin was notified. Opening live chat now so we can keep the conversation going.",
+        "Thanks — SitGuru Admin was notified. Keep this window open and replies will appear here.",
       );
-      setForm(initialHomepageAssistForm);
+      setForm((previous) => ({
+        ...initialHomepageAssistForm,
+        fullName: previous.fullName,
+        email: previous.email,
+        phone: previous.phone,
+        topic: previous.topic,
+      }));
+      setIsOpen(true);
     } catch (error) {
       setFormError(
         error instanceof Error
@@ -940,7 +984,7 @@ function HomepageAssistPopup({
                   <span aria-hidden="true" className="text-base">
                     🐾
                   </span>
-                  SitGuru Help
+                  SitGuru Messenger
                 </div>
                 <h2 className="mt-1 text-xl font-black leading-tight text-white">
                   Hi, welcome to SitGuru!
@@ -998,6 +1042,34 @@ function HomepageAssistPopup({
                 Ambassador
               </Link>
             </div>
+
+            {messages.length > 0 ? (
+              <div className="mt-4 max-h-56 space-y-2 overflow-y-auto rounded-2xl border border-emerald-100 bg-emerald-50/50 p-3">
+                {messages.map((message) => {
+                  const fromAdmin = message.senderRole === "admin";
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${fromAdmin ? "justify-start" : "justify-end"}`}
+                    >
+                      <div
+                        className={`max-w-[86%] rounded-2xl px-3 py-2 text-xs font-semibold leading-5 shadow-sm ${
+                          fromAdmin
+                            ? "border border-emerald-100 bg-white text-slate-800"
+                            : "bg-emerald-700 text-white"
+                        }`}
+                      >
+                        <p className="mb-1 text-[10px] font-black uppercase tracking-[0.12em] opacity-75">
+                          {fromAdmin ? "SitGuru Admin" : "You"}
+                        </p>
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
 
             <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
               <label className="grid gap-1.5">
@@ -1067,10 +1139,11 @@ function HomepageAssistPopup({
                   <p>{formSuccess}</p>
                   <button
                     type="button"
-                    onClick={() => pushCrispCommand(["do", "chat:open"])}
-                    className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-800"
+                    onClick={refreshMessages}
+                    disabled={isRefreshingMessages}
+                    className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-800 disabled:opacity-60"
                   >
-                    Open live chat
+                    {isRefreshingMessages ? "Refreshing..." : "Refresh replies"}
                   </button>
                 </div>
               ) : null}
@@ -1084,7 +1157,8 @@ function HomepageAssistPopup({
               </button>
 
               <p className="text-[11px] font-semibold leading-4 text-slate-500">
-                SitGuru Admin is notified immediately, and live chat opens after you submit.
+                SitGuru Admin is notified immediately. Replies from Admin will
+                appear in this SitGuru Messenger window.
               </p>
             </form>
           </div>

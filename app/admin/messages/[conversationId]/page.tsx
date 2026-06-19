@@ -182,6 +182,7 @@ function normalizeRole(role?: string | null) {
     return "admin";
   }
   if (value.includes("ambassador")) return "ambassador";
+  if (value.includes("visitor") || value.includes("homepage")) return "visitor";
 
   return value;
 }
@@ -193,6 +194,7 @@ function getRoleLabel(role?: string | null) {
   if (normalizedRole === "guru") return "Guru";
   if (normalizedRole === "customer") return "Pet Parent";
   if (normalizedRole === "ambassador") return "Ambassador";
+  if (normalizedRole === "visitor") return "Website Visitor";
 
   return "SitGuru User";
 }
@@ -205,6 +207,7 @@ function getDirectMessageTypeForRole(role?: string | null) {
   if (normalizedRole === "guru") return "direct_guru";
   if (normalizedRole === "customer") return "direct_customer";
   if (normalizedRole === "admin") return "direct_admin";
+  if (normalizedRole === "visitor") return "homepage_messenger";
 
   return "direct_message";
 }
