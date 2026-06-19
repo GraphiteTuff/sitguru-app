@@ -14,7 +14,6 @@ import {
   Download,
   Handshake,
   Inbox,
-  MailForward,
   MessageCircle,
   MessagesSquare,
   Search,
@@ -2815,7 +2814,7 @@ function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
                 title={canSendThread ? "Email this thread to the contact" : "No contact email available"}
                 className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-45"
               >
-                <MailForward size={14} />
+                <Send size={14} />
                 Send
               </button>
             </form>
