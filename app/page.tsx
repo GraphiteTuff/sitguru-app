@@ -128,6 +128,20 @@ const homepageAssistTopicLabels: Record<HomepageAssistTopic, string> = {
   general: "General",
 };
 
+function getMessengerInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!parts.length) return "V";
+
+  const first = parts[0]?.[0] || "";
+  const second = parts.length > 1 ? parts[1]?.[0] || "" : "";
+
+  return `${first}${second}`.toUpperCase() || "V";
+}
+
 type Guru = {
   [key: string]: unknown;
   id: string | number;
@@ -1098,24 +1112,48 @@ function HomepageAssistPopup({
               <div className="mt-3 max-h-[30svh] space-y-2 overflow-y-auto rounded-2xl border border-emerald-100 bg-emerald-50/50 p-2.5 sm:mt-4 sm:max-h-56 sm:p-3">
                 {messages.map((message) => {
                   const fromAdmin = message.senderRole === "admin";
+                  const visitorName =
+                    message.senderName?.trim() ||
+                    form.fullName.trim() ||
+                    "Website Visitor";
+                  const displayName = fromAdmin
+                    ? message.senderName?.trim() || "SitGuru Admin"
+                    : visitorName;
 
                   return (
                     <div
                       key={message.id}
-                      className={`flex ${fromAdmin ? "justify-start" : "justify-end"}`}
+                      className={`flex items-end gap-2 ${
+                        fromAdmin ? "justify-start" : "justify-end"
+                      }`}
                     >
+                      {fromAdmin ? (
+                        <img
+                          src={defaultGuruAvatarPath}
+                          alt="SitGuru Admin"
+                          className="h-8 w-8 shrink-0 rounded-full border border-emerald-100 bg-white object-cover shadow-sm"
+                          loading="lazy"
+                        />
+                      ) : null}
+
                       <div
-                        className={`max-w-[86%] rounded-2xl px-3 py-2 text-xs font-semibold leading-5 shadow-sm ${
+                        className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs font-semibold leading-5 shadow-sm ${
                           fromAdmin
                             ? "border border-emerald-100 bg-white text-slate-800"
                             : "bg-emerald-700 text-white"
                         }`}
                       >
                         <p className="mb-1 text-[10px] font-black uppercase tracking-[0.12em] opacity-75">
-                          {fromAdmin ? "SitGuru Admin" : "You"}
+                          {displayName}
                         </p>
                         <p className="whitespace-pre-wrap">{message.content}</p>
                       </div>
+
+                      {!fromAdmin ? (
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 text-[11px] font-black text-emerald-800 shadow-sm">
+                          {getMessengerInitials(displayName)}
+                        </span>
+                      ) : null}
                     </div>
                   );
                 })}
