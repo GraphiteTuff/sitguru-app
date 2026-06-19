@@ -599,21 +599,53 @@ export async function POST(request: Request) {
       .eq("visitor_token", token);
   }
 
-  await insertVisitorMessage({
-    conversationId,
-    adminUserId: adminProfile.id,
-    fullName,
-    email,
-    phone,
-    topic,
-    message,
-  });
+  try {
+    await insertVisitorMessage({
+      conversationId,
+      adminUserId: adminProfile.id,
+      fullName,
+      email,
+      phone,
+      topic,
+      message,
+    });
+  } catch (error) {
+    console.error("Homepage messenger visitor message insert failed:", error);
 
-  const [emailSent, smsSent, messages] = await Promise.all([
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to save homepage messenger message.",
+        conversationId,
+        token,
+      },
+      { status: 500 },
+    );
+  }
+
+  const [emailResult, smsResult, messagesResult] = await Promise.allSettled([
     sendAdminEmail({ conversationId, fullName, email, phone, topic, message, source }),
     sendAdminSms({ conversationId, fullName, email, phone, topic, message, source }),
     loadConversationMessages(conversationId),
   ]);
+
+  const emailSent = emailResult.status === "fulfilled" ? emailResult.value : false;
+  const smsSent = smsResult.status === "fulfilled" ? smsResult.value : 0;
+  const messages = messagesResult.status === "fulfilled" ? messagesResult.value : [];
+
+  if (emailResult.status === "rejected") {
+    console.error("Homepage messenger admin email alert failed after save:", emailResult.reason);
+  }
+
+  if (smsResult.status === "rejected") {
+    console.error("Homepage messenger admin SMS alert failed after save:", smsResult.reason);
+  }
+
+  if (messagesResult.status === "rejected") {
+    console.error("Homepage messenger message reload failed after save:", messagesResult.reason);
+  }
 
   return NextResponse.json({
     ok: true,
