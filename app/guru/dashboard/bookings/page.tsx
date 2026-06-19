@@ -1527,7 +1527,7 @@ export default async function GuruBookingsPage({
                       <div>✓ Complete a final summary</div>
                     </div>
                     <Link
-                      href="/guru-success-center#pawreport"
+                      href="/guru/success-center"
                       className="mt-5 inline-flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-sm font-black !text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:!text-emerald-800"
                     >
                       <span>Learn About PawReports</span>
@@ -1960,7 +1960,7 @@ export default async function GuruBookingsPage({
               </div>
 
               <Link
-                href="/guru-success-center#pawreport"
+                href="/guru/success-center"
                 className="mt-5 inline-flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-sm font-black !text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:!text-emerald-800"
               >
                 <span>Learn About PawReports</span>
