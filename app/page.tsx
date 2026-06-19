@@ -779,22 +779,18 @@ function HomepageAssistPopup({
   }
 
   function saveCurrentMessengerSession(nextSession: HomepageMessengerSession) {
-    window.sessionStorage.setItem(
-      messengerSessionStorageKey,
-      JSON.stringify(nextSession),
-    );
+    const serializedSession = JSON.stringify(nextSession);
 
-    // Older versions used localStorage, which can leak an old visitor chat into
-    // a later browser visit on the same phone/computer. Always clear it.
-    window.localStorage.removeItem(messengerSessionStorageKey);
+    // Chat widgets like Tawk.to/Crisp keep the active visitor conversation
+    // available after minimize/reload until the visitor or Admin closes it.
+    window.localStorage.setItem(messengerSessionStorageKey, serializedSession);
+    window.sessionStorage.setItem(messengerSessionStorageKey, serializedSession);
   }
 
   useEffect(() => {
-    // Force old persistent homepage messenger sessions to expire. A homepage
-    // visitor chat should only live for the active browser session/tab.
-    window.localStorage.removeItem(messengerSessionStorageKey);
-
-    const savedSession = window.sessionStorage.getItem(messengerSessionStorageKey);
+    const savedSession =
+      window.localStorage.getItem(messengerSessionStorageKey) ||
+      window.sessionStorage.getItem(messengerSessionStorageKey);
 
     if (savedSession) {
       try {
@@ -890,7 +886,21 @@ function HomepageAssistPopup({
 
       const payload = (await response.json().catch(() => null)) as {
         messages?: HomepageMessengerMessage[];
+        conversationStatus?: string;
       } | null;
+
+      const conversationStatus = String(payload?.conversationStatus || "").toLowerCase();
+
+      if (["closed", "archived", "resolved"].includes(conversationStatus)) {
+        clearStoredMessengerSession();
+        setSession(null);
+        setMessages([]);
+        setHasNewAdminReply(false);
+        latestAdminMessageIdRef.current = "";
+        setFormSuccess("This SitGuru chat has been closed.");
+        setIsOpen(false);
+        return;
+      }
 
       applyMessengerMessages(payload?.messages || [], options);
     } catch (error) {
@@ -950,14 +960,39 @@ function HomepageAssistPopup({
 
   function closePopup() {
     window.sessionStorage.setItem(messengerDismissedStorageKey, "true");
-    clearStoredMessengerSession();
-    setSession(null);
-    setMessages([]);
-    setHasNewAdminReply(false);
-    setFormSuccess("");
-    setFormError("");
-    latestAdminMessageIdRef.current = "";
     setIsOpen(false);
+  }
+
+  async function closeConversation() {
+    const activeSession = session;
+
+    try {
+      if (activeSession?.conversationId && activeSession.token) {
+        await fetch("/api/homepage-messenger", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "close",
+            conversationId: activeSession.conversationId,
+            token: activeSession.token,
+          }),
+        });
+      }
+    } catch (error) {
+      console.warn("Unable to close homepage messenger conversation:", error);
+    } finally {
+      clearStoredMessengerSession();
+      window.sessionStorage.setItem(messengerDismissedStorageKey, "true");
+      setSession(null);
+      setMessages([]);
+      setHasNewAdminReply(false);
+      setFormSuccess("");
+      setFormError("");
+      latestAdminMessageIdRef.current = "";
+      setIsOpen(false);
+    }
   }
 
   async function refreshMessages() {
@@ -1062,7 +1097,7 @@ function HomepageAssistPopup({
       });
 
       setFormSuccess(
-        "Thanks — SitGuru Admin was notified. Keep this window open and replies will appear here.",
+        "Thanks — SitGuru Admin was notified. Replies will stay here until this chat is closed.",
       );
       setForm((previous) => ({
         ...initialHomepageAssistForm,
@@ -1304,9 +1339,22 @@ function HomepageAssistPopup({
                 {isSubmitting ? "Sending..." : "Send to SitGuru Admin"}
               </button>
 
-              <p className="text-[11px] font-semibold leading-4 text-slate-500">
-                SitGuru Admin is notified immediately. Replies appear here in real time while this browser session stays open.
-              </p>
+              <div className="grid gap-2">
+                <p className="text-[11px] font-semibold leading-4 text-slate-500">
+                  SitGuru Admin is notified immediately. This chat stays available
+                  until you close the conversation or SitGuru Admin closes it.
+                </p>
+
+                {session?.conversationId ? (
+                  <button
+                    type="button"
+                    onClick={closeConversation}
+                    className="inline-flex min-h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                  >
+                    Close conversation
+                  </button>
+                ) : null}
+              </div>
             </form>
           </div>
         </section>

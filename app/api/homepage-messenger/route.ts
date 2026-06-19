@@ -18,6 +18,7 @@ type HomepageMessengerPayload = {
   pagePath?: unknown;
   referrer?: unknown;
   trafficSource?: unknown;
+  action?: unknown;
 };
 
 type HomepageMessengerSessionRow = {
@@ -238,6 +239,22 @@ async function getSession(conversationId: string, token: string) {
   }
 
   return session;
+}
+
+async function getConversationStatus(conversationId: string) {
+  if (!conversationId) return "";
+
+  const { data } = await supabaseAdmin
+    .from("conversations")
+    .select("status")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  return asString((data as { status?: string | null } | null)?.status).toLowerCase();
+}
+
+function isClosedConversationStatus(status: string) {
+  return ["closed", "archived", "resolved"].includes(status.toLowerCase());
 }
 
 async function loadConversationMessages(conversationId: string) {
@@ -528,9 +545,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Messenger session not found." }, { status: 404 });
   }
 
-  const messages = await loadConversationMessages(conversationId);
+  const [conversationStatus, messages] = await Promise.all([
+    getConversationStatus(conversationId),
+    loadConversationMessages(conversationId),
+  ]);
 
-  return NextResponse.json({ ok: true, conversationId, token, messages });
+  return NextResponse.json({
+    ok: true,
+    conversationId,
+    token,
+    conversationStatus: conversationStatus || "open",
+    messages,
+  });
 }
 
 export async function POST(request: Request) {
@@ -554,6 +580,10 @@ export async function POST(request: Request) {
   const requestedConversationId = asString(payload.conversationId);
   const requestedToken = asString(payload.token);
 
+  if (!fullName) {
+    return NextResponse.json({ error: "Please include your name so SitGuru Admin knows who we are helping." }, { status: 400 });
+  }
+
   if (!message) {
     return NextResponse.json({ error: "Please type a message so SitGuru can help." }, { status: 400 });
   }
@@ -567,6 +597,16 @@ export async function POST(request: Request) {
   let conversationId = requestedConversationId;
   let token = requestedToken;
   let existingSession = await getSession(conversationId, token);
+
+  if (existingSession) {
+    const conversationStatus = await getConversationStatus(conversationId);
+
+    if (isClosedConversationStatus(conversationStatus)) {
+      existingSession = null;
+      conversationId = "";
+      token = "";
+    }
+  }
 
   if (!existingSession) {
     const createdSession = await createHomepageMessengerSession({
@@ -651,10 +691,67 @@ export async function POST(request: Request) {
     ok: true,
     conversationId,
     token,
+    conversationStatus: "open",
     messages,
     alerts: {
       emailSent,
       smsSent,
     },
+  });
+}
+
+export async function PATCH(request: Request) {
+  let payload: HomepageMessengerPayload;
+
+  try {
+    payload = (await request.json()) as HomepageMessengerPayload;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const action = asString(payload.action).toLowerCase();
+  const conversationId = asString(payload.conversationId);
+  const token = asString(payload.token);
+
+  if (action !== "close") {
+    return NextResponse.json({ error: "Unsupported messenger action." }, { status: 400 });
+  }
+
+  const session = await getSession(conversationId, token);
+
+  if (!session) {
+    return NextResponse.json({ error: "Messenger session not found." }, { status: 404 });
+  }
+
+  const now = new Date().toISOString();
+
+  await supabaseAdmin
+    .from("conversations")
+    .update({
+      status: "closed",
+      topic: "homepage_messenger",
+      last_message_preview: "Homepage visitor closed the chat.",
+      last_message_at: now,
+      updated_at: now,
+    })
+    .eq("id", conversationId);
+
+  await supabaseAdmin
+    .from("homepage_messenger_sessions")
+    .update({
+      updated_at: now,
+      last_seen_at: now,
+    })
+    .eq("conversation_id", conversationId)
+    .eq("visitor_token", token);
+
+  revalidatePath("/admin/messages");
+  revalidatePath(`/admin/messages/${conversationId}`);
+
+  return NextResponse.json({
+    ok: true,
+    conversationId,
+    token,
+    conversationStatus: "closed",
   });
 }
