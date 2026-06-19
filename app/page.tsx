@@ -3,7 +3,7 @@
 import { Open_Sans } from "next/font/google";
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
@@ -741,6 +741,8 @@ function HomepageAssistPopup({
   );
   const [session, setSession] = useState<HomepageMessengerSession | null>(null);
   const [messages, setMessages] = useState<HomepageMessengerMessage[]>([]);
+  const [hasNewAdminReply, setHasNewAdminReply] = useState(false);
+  const latestAdminMessageIdRef = useRef("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRefreshingMessages, setIsRefreshingMessages] = useState(false);
   const [formError, setFormError] = useState("");
@@ -777,51 +779,100 @@ function HomepageAssistPopup({
     return () => window.clearTimeout(timer);
   }, []);
 
+  function applyMessengerMessages(
+    nextMessages: HomepageMessengerMessage[],
+    options: { openOnAdminReply?: boolean } = {},
+  ) {
+    const latestAdminMessage = [...nextMessages]
+      .reverse()
+      .find((message) => message.senderRole === "admin");
+    const latestAdminMessageId = latestAdminMessage?.id || "";
+
+    if (
+      options.openOnAdminReply &&
+      latestAdminMessageId &&
+      latestAdminMessageId !== latestAdminMessageIdRef.current
+    ) {
+      setHasNewAdminReply(true);
+      setIsOpen(true);
+      setFormSuccess("SitGuru Admin replied. You can continue the conversation here.");
+    }
+
+    if (latestAdminMessageId) {
+      latestAdminMessageIdRef.current = latestAdminMessageId;
+    }
+
+    setMessages(nextMessages);
+  }
+
+  async function loadMessengerMessages(options: { openOnAdminReply?: boolean } = {}) {
+    if (!session?.conversationId || !session.token) return;
+
+    try {
+      const params = new URLSearchParams({
+        conversationId: session.conversationId,
+        token: session.token,
+      });
+
+      const response = await fetch(`/api/homepage-messenger?${params.toString()}`, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          window.localStorage.removeItem("sitguru-homepage-messenger-session");
+          setSession(null);
+          setMessages([]);
+          latestAdminMessageIdRef.current = "";
+        }
+
+        return;
+      }
+
+      const payload = (await response.json().catch(() => null)) as {
+        messages?: HomepageMessengerMessage[];
+      } | null;
+
+      applyMessengerMessages(payload?.messages || [], options);
+    } catch (error) {
+      console.warn("Unable to refresh homepage messenger messages:", error);
+    }
+  }
+
   useEffect(() => {
     if (!session?.conversationId || !session.token) return;
 
     let isMounted = true;
 
     async function loadMessages() {
-      try {
-        const params = new URLSearchParams({
-          conversationId: session?.conversationId || "",
-          token: session?.token || "",
-        });
-
-        const response = await fetch(`/api/homepage-messenger?${params.toString()}`, {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            window.localStorage.removeItem("sitguru-homepage-messenger-session");
-            setSession(null);
-            setMessages([]);
-          }
-
-          return;
-        }
-
-        const payload = (await response.json().catch(() => null)) as {
-          messages?: HomepageMessengerMessage[];
-        } | null;
-
-        if (!isMounted) return;
-
-        setMessages(payload?.messages || []);
-      } catch (error) {
-        console.warn("Unable to refresh homepage messenger messages:", error);
-      }
+      if (!isMounted) return;
+      await loadMessengerMessages({ openOnAdminReply: true });
     }
 
     loadMessages();
 
-    const interval = window.setInterval(loadMessages, 3500);
+    const channel = supabase
+      .channel(`sitguru-homepage-messenger-${session.conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${session.conversationId}`,
+        },
+        () => {
+          loadMessages();
+        },
+      )
+      .subscribe();
+
+    const interval = window.setInterval(loadMessages, 10000);
 
     return () => {
       isMounted = false;
       window.clearInterval(interval);
+      supabase.removeChannel(channel);
     };
   }, [session]);
 
@@ -849,22 +900,8 @@ function HomepageAssistPopup({
     setIsRefreshingMessages(true);
 
     try {
-      const params = new URLSearchParams({
-        conversationId: session.conversationId,
-        token: session.token,
-      });
-
-      const response = await fetch(`/api/homepage-messenger?${params.toString()}`, {
-        cache: "no-store",
-      });
-
-      if (!response.ok) return;
-
-      const payload = (await response.json().catch(() => null)) as {
-        messages?: HomepageMessengerMessage[];
-      } | null;
-
-      setMessages(payload?.messages || []);
+      await loadMessengerMessages({ openOnAdminReply: false });
+      setHasNewAdminReply(false);
     } finally {
       setIsRefreshingMessages(false);
     }
@@ -936,7 +973,7 @@ function HomepageAssistPopup({
         );
       }
 
-      setMessages(payload?.messages || []);
+      applyMessengerMessages(payload?.messages || [], { openOnAdminReply: false });
 
       trackEvent({
         eventName: "homepage_assist_popup_submitted",
@@ -982,10 +1019,10 @@ function HomepageAssistPopup({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-[80] w-[min(420px,calc(100vw-2rem))] sm:bottom-5 sm:left-5">
+    <div className="fixed inset-x-3 bottom-3 z-[80] pb-[env(safe-area-inset-bottom)] sm:inset-x-auto sm:bottom-5 sm:left-5 sm:w-[420px] sm:pb-0">
       {isOpen ? (
-        <section className="overflow-hidden rounded-[28px] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.22)]">
-          <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-sky-500 px-4 py-4 text-white">
+        <section className="max-h-[calc(100svh-1rem)] overflow-hidden rounded-[24px] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.22)] sm:rounded-[28px]">
+          <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-sky-500 px-4 py-3 text-white sm:py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-50">
@@ -994,10 +1031,10 @@ function HomepageAssistPopup({
                   </span>
                   SitGuru Messenger
                 </div>
-                <h2 className="mt-1 text-xl font-black leading-tight text-white">
+                <h2 className="mt-1 text-lg font-black leading-tight text-white sm:text-xl">
                   Hi, welcome to SitGuru!
                 </h2>
-                <p className="mt-1 text-sm font-semibold leading-5 text-white/90">
+                <p className="mt-1 text-xs font-semibold leading-5 text-white/90 sm:text-sm">
                   We are here for you. Ask us anything about finding care,
                   becoming a Guru, or joining as an Ambassador.
                 </p>
@@ -1006,7 +1043,7 @@ function HomepageAssistPopup({
               <button
                 type="button"
                 onClick={closePopup}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-lg font-black text-white transition hover:bg-white/25"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-base font-black text-white transition hover:bg-white/25 sm:h-9 sm:w-9 sm:text-lg"
                 aria-label="Close SitGuru help popup"
               >
                 ×
@@ -1014,7 +1051,7 @@ function HomepageAssistPopup({
             </div>
           </div>
 
-          <div className="max-h-[72vh] overflow-y-auto p-4">
+          <div className="max-h-[calc(100svh-11.5rem)] overflow-y-auto p-3 sm:max-h-[72vh] sm:p-4">
             <div className="grid gap-2 sm:grid-cols-3">
               <Link
                 href={petParentSignupHref}
@@ -1024,7 +1061,7 @@ function HomepageAssistPopup({
                     petParentSignupHref,
                   )
                 }
-                className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-center text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
+                className="rounded-2xl border border-emerald-100 bg-emerald-50 px-2 py-2.5 text-center text-[11px] font-black text-emerald-800 transition hover:bg-emerald-100 sm:px-3 sm:py-3 sm:text-xs"
               >
                 Pet Parent
               </Link>
@@ -1033,7 +1070,7 @@ function HomepageAssistPopup({
                 onClick={() =>
                   handleQuickLink("Homepage Assist Guru Signup", guruSignupHref)
                 }
-                className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center text-xs font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50"
+                className="rounded-2xl border border-slate-200 bg-white px-2 py-2.5 text-center text-[11px] font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3 sm:py-3 sm:text-xs"
               >
                 Guru
               </Link>
@@ -1045,14 +1082,14 @@ function HomepageAssistPopup({
                     "/ambassadors",
                   )
                 }
-                className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center text-xs font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50"
+                className="rounded-2xl border border-slate-200 bg-white px-2 py-2.5 text-center text-[11px] font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50 sm:px-3 sm:py-3 sm:text-xs"
               >
                 Ambassador
               </Link>
             </div>
 
             {messages.length > 0 ? (
-              <div className="mt-4 max-h-56 space-y-2 overflow-y-auto rounded-2xl border border-emerald-100 bg-emerald-50/50 p-3">
+              <div className="mt-3 max-h-[30svh] space-y-2 overflow-y-auto rounded-2xl border border-emerald-100 bg-emerald-50/50 p-2.5 sm:mt-4 sm:max-h-56 sm:p-3">
                 {messages.map((message) => {
                   const fromAdmin = message.senderRole === "admin";
 
@@ -1079,7 +1116,13 @@ function HomepageAssistPopup({
               </div>
             ) : null}
 
-            <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
+            {session ? (
+              <div className="mt-3 rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-[11px]">
+                Realtime SitGuru Messenger connected
+              </div>
+            ) : null}
+
+            <form onSubmit={handleSubmit} className="mt-3 grid gap-2.5 sm:mt-4 sm:gap-3">
               <label className="grid gap-1.5">
                 <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
                   Topic
@@ -1092,7 +1135,7 @@ function HomepageAssistPopup({
                       event.target.value as HomepageAssistTopic,
                     )
                   }
-                  className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                  className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
                 >
                   {Object.entries(homepageAssistTopicLabels).map(
                     ([value, label]) => (
@@ -1107,9 +1150,9 @@ function HomepageAssistPopup({
               <textarea
                 value={form.message}
                 onChange={(event) => updateAssistField("message", event.target.value)}
-                rows={3}
+                rows={2}
                 placeholder="How can we help today?"
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:py-3"
               />
 
               <div className="grid gap-2 sm:grid-cols-2">
@@ -1117,14 +1160,14 @@ function HomepageAssistPopup({
                   value={form.fullName}
                   onChange={(event) => updateAssistField("fullName", event.target.value)}
                   placeholder="Name optional"
-                  className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                  className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
                 />
                 <input
                   type="email"
                   value={form.email}
                   onChange={(event) => updateAssistField("email", event.target.value)}
                   placeholder="Email optional"
-                  className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                  className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
                 />
               </div>
 
@@ -1133,7 +1176,7 @@ function HomepageAssistPopup({
                 value={form.phone}
                 onChange={(event) => updateAssistField("phone", event.target.value)}
                 placeholder="Phone optional"
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
               />
 
               {formError ? (
@@ -1159,14 +1202,13 @@ function HomepageAssistPopup({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-11 sm:py-3"
               >
                 {isSubmitting ? "Sending..." : "Send to SitGuru Admin"}
               </button>
 
               <p className="text-[11px] font-semibold leading-4 text-slate-500">
-                SitGuru Admin is notified immediately. Replies from Admin will
-                appear in this SitGuru Messenger window.
+                SitGuru Admin is notified immediately. Replies appear here in real time.
               </p>
             </form>
           </div>
@@ -1174,10 +1216,17 @@ function HomepageAssistPopup({
       ) : (
         <button
           type="button"
-          onClick={() => setIsOpen(true)}
-          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 py-4 text-sm font-black text-white shadow-[0_18px_45px_rgba(15,23,42,0.25)] transition hover:bg-emerald-800 sm:w-auto"
+          onClick={() => {
+            setIsOpen(true);
+            setHasNewAdminReply(false);
+          }}
+          className={`flex min-h-13 w-full items-center justify-center gap-2 rounded-full px-4 py-3.5 text-sm font-black text-white shadow-[0_18px_45px_rgba(15,23,42,0.25)] transition sm:min-h-14 sm:w-auto sm:px-5 sm:py-4 ${
+            hasNewAdminReply
+              ? "bg-amber-500 hover:bg-amber-600"
+              : "bg-emerald-700 hover:bg-emerald-800"
+          }`}
         >
-          🐾 Hi! Need help with SitGuru?
+          {hasNewAdminReply ? "🐾 SitGuru Admin replied" : "🐾 Hi! Need help with SitGuru?"}
         </button>
       )}
     </div>
