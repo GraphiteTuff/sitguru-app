@@ -43,6 +43,7 @@ function normalizeRoleValue(role?: string | null) {
   if (value === "owner" || value === "pet_owner" || value === "pet-owner") {
     return "customer";
   }
+  if (value.includes("ambassador")) return "ambassador";
 
   return value;
 }
@@ -68,6 +69,7 @@ function getDashboardHref(role?: string | null) {
 
   if (normalized === "guru") return "/guru/dashboard";
   if (normalized === "admin") return "/admin";
+  if (normalized === "ambassador") return "/partner/ambassadors/dashboard";
 
   return "/customer/dashboard";
 }
@@ -135,6 +137,56 @@ async function findExistingAdminSupportConversation({
     ((legacyReverseResult.data ?? [])[0] as ConversationRow | undefined) ||
     null
   );
+}
+
+async function findExistingAmbassadorAdminConversation({
+  participantUserId,
+  adminUserId,
+}: {
+  participantUserId: string;
+  adminUserId: string;
+}) {
+  const { data: ambassadorParticipantRows } = await supabaseAdmin
+    .from("conversation_participants")
+    .select("conversation_id")
+    .eq("user_id", participantUserId)
+    .limit(100);
+
+  const possibleConversationIds = Array.from(
+    new Set(
+      ((ambassadorParticipantRows || []) as Array<{ conversation_id?: string | null }>)
+        .map((row) => String(row.conversation_id || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (possibleConversationIds.length === 0) return null;
+
+  const { data: adminParticipantRows } = await supabaseAdmin
+    .from("conversation_participants")
+    .select("conversation_id")
+    .eq("user_id", adminUserId)
+    .in("conversation_id", possibleConversationIds)
+    .limit(100);
+
+  const sharedConversationIds = Array.from(
+    new Set(
+      ((adminParticipantRows || []) as Array<{ conversation_id?: string | null }>)
+        .map((row) => String(row.conversation_id || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (sharedConversationIds.length === 0) return null;
+
+  const { data: conversations } = await supabaseAdmin
+    .from("conversations")
+    .select("*")
+    .in("id", sharedConversationIds)
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  return ((conversations || []) as ConversationRow[])[0] || null;
 }
 
 async function getGuruRecordForConfirmedGuru(
@@ -348,6 +400,7 @@ export default async function AdminMessageEntryPage({
     currentUserRole === "guru" ||
     currentUserRole === "provider" ||
     currentUserRole === "sitter";
+  const isAmbassadorUser = currentUserRole === "ambassador";
 
   const guruRecord = isGuruUser
     ? await getGuruRecordForConfirmedGuru(user.id, user.email)
@@ -357,15 +410,24 @@ export default async function AdminMessageEntryPage({
     String(guruRecord?.user_id || user.id).trim() || user.id;
 
   const participantUserId = isGuruUser ? guruParticipantId : user.id;
-  const participantRole = isGuruUser ? "guru" : "customer";
+  const participantRole = isGuruUser
+    ? "guru"
+    : isAmbassadorUser
+      ? "ambassador"
+      : "customer";
 
   const dashboardHref = getDashboardHref(currentUserRole);
 
-  const existingConversation = await findExistingAdminSupportConversation({
-    participantUserId,
-    adminUserId,
-    isGuruUser,
-  });
+  const existingConversation = isAmbassadorUser
+    ? await findExistingAmbassadorAdminConversation({
+        participantUserId,
+        adminUserId,
+      })
+    : await findExistingAdminSupportConversation({
+        participantUserId,
+        adminUserId,
+        isGuruUser,
+      });
 
   if (existingConversation?.id) {
     /**
@@ -376,7 +438,7 @@ export default async function AdminMessageEntryPage({
      * This keeps Amy Customer ↔ SitGuru Admin clean even if a previous thread
      * was created while Amy had stale Guru data.
      */
-    if (!isGuruUser) {
+    if (!isGuruUser && !isAmbassadorUser) {
       await supabaseAdmin
         .from("conversations")
         .update({
@@ -430,18 +492,25 @@ export default async function AdminMessageEntryPage({
     ? `Admin support thread created for ${petName}.`
     : "Admin support thread created.";
 
-  const insertPayload = {
-    customer_id: isGuruUser ? adminUserId : participantUserId,
-    guru_id: isGuruUser ? participantUserId : adminUserId,
+  const insertPayload: Record<string, unknown> = {
     booking_id: bookingId || null,
     started_by_user_id: user.id,
     subject,
     status: "open",
+    topic: isAmbassadorUser ? "ambassador_support" : "admin_support",
     last_message_at: nowIso,
     last_message_preview: preview,
     created_at: nowIso,
     updated_at: nowIso,
   };
+
+  if (isGuruUser) {
+    insertPayload.customer_id = adminUserId;
+    insertPayload.guru_id = participantUserId;
+  } else if (!isAmbassadorUser) {
+    insertPayload.customer_id = participantUserId;
+    insertPayload.guru_id = adminUserId;
+  }
 
   const { data: insertedConversation, error: insertConversationError } =
     await supabaseAdmin
@@ -456,11 +525,16 @@ export default async function AdminMessageEntryPage({
     const recoveredConversation = isDuplicateDirectThreadError(
       insertConversationError,
     )
-      ? await findExistingAdminSupportConversation({
-          participantUserId,
-          adminUserId,
-          isGuruUser,
-        })
+      ? isAmbassadorUser
+        ? await findExistingAmbassadorAdminConversation({
+            participantUserId,
+            adminUserId,
+          })
+        : await findExistingAdminSupportConversation({
+            participantUserId,
+            adminUserId,
+            isGuruUser,
+          })
       : null;
 
     if (recoveredConversation?.id) {
@@ -482,7 +556,7 @@ export default async function AdminMessageEntryPage({
    * A duplicate direct-thread error means the conversation already exists.
    * Reuse it and normalize it instead of failing the page.
    */
-  if (!isGuruUser) {
+  if (!isGuruUser && !isAmbassadorUser) {
     await supabaseAdmin
       .from("conversations")
       .update({
