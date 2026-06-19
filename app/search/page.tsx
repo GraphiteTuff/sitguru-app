@@ -13,7 +13,6 @@ import {
 import { useSearchParams } from "next/navigation";
 import ProviderMap from "@/components/ProviderMap";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
-import AmbassadorSearchBlock from "@/components/AmbassadorSearchBlock";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
@@ -2086,7 +2085,33 @@ function SearchPageContent() {
         )}
       </section>
 
-      <AmbassadorSearchBlock />
+      <section className="mx-auto max-w-[1500px] px-5 pb-10 sm:px-6 lg:px-8">
+        <Card className="border-emerald-100 bg-gradient-to-r from-white via-emerald-50/60 to-white p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                SitGuru Community
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-slate-950">
+                Want to help SitGuru grow locally?
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                SitGuru Ambassadors help Pet Parents, Gurus, partners, students,
+                and local communities learn how to get started. Ambassador
+                profiles stay on the Ambassador page so search remains focused
+                on finding and booking care.
+              </p>
+            </div>
+
+            <Link
+              href="/ambassadors"
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
+            >
+              Learn About Ambassadors
+            </Link>
+          </div>
+        </Card>
+      </section>
     </main>
   );
 }
