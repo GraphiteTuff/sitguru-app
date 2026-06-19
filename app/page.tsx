@@ -81,6 +81,39 @@ const initialSearchFormState: SearchFormState = {
   zipCode: "",
 };
 
+type HomepageAssistTopic =
+  | "pet-parent"
+  | "guru"
+  | "ambassador"
+  | "partner"
+  | "support"
+  | "general";
+
+type HomepageAssistFormState = {
+  fullName: string;
+  email: string;
+  phone: string;
+  topic: HomepageAssistTopic;
+  message: string;
+};
+
+const initialHomepageAssistForm: HomepageAssistFormState = {
+  fullName: "",
+  email: "",
+  phone: "",
+  topic: "general",
+  message: "",
+};
+
+const homepageAssistTopicLabels: Record<HomepageAssistTopic, string> = {
+  "pet-parent": "Pet Parent",
+  guru: "Guru",
+  ambassador: "Ambassador",
+  partner: "Partner",
+  support: "Support",
+  general: "General",
+};
+
 type Guru = {
   [key: string]: unknown;
   id: string | number;
@@ -676,6 +709,296 @@ function TrustRow() {
           <span>{item}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function HomepageAssistPopup({
+  source,
+  onTrack,
+}: {
+  source: string;
+  onTrack: (label: string, destination: string) => void;
+}) {
+  const [isVisible] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const [form, setForm] = useState<HomepageAssistFormState>(
+    initialHomepageAssistForm,
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
+
+  useEffect(() => {
+    const dismissed = window.sessionStorage.getItem(
+      "sitguru-homepage-assist-dismissed",
+    );
+
+    if (dismissed === "true") return;
+
+    const timer = window.setTimeout(() => {
+      setIsOpen(true);
+    }, 2200);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  function updateAssistField<K extends keyof HomepageAssistFormState>(
+    key: K,
+    value: HomepageAssistFormState[K],
+  ) {
+    setForm((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
+
+    if (formError) setFormError("");
+    if (formSuccess) setFormSuccess("");
+  }
+
+  function closePopup() {
+    window.sessionStorage.setItem("sitguru-homepage-assist-dismissed", "true");
+    setIsOpen(false);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const cleanMessage = form.message.trim();
+
+    if (!cleanMessage) {
+      setFormError("Please type a quick message so SitGuru can help.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError("");
+    setFormSuccess("");
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: form.fullName,
+          email: form.email,
+          phone: form.phone,
+          topic: form.topic,
+          programInterest:
+            form.topic === "ambassador" ? "Ambassador Program" : "",
+          message: cleanMessage,
+          source: "homepage-assist-popup",
+          pagePath:
+            typeof window !== "undefined"
+              ? `${window.location.pathname}${window.location.search}`
+              : "/",
+          referrer: typeof document !== "undefined" ? document.referrer : "",
+          trafficSource: source,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          payload?.error || "Unable to send your message right now.",
+        );
+      }
+
+      trackEvent({
+        eventName: "homepage_assist_popup_submitted",
+        eventType: "lead",
+        source,
+        role: form.topic,
+        metadata: {
+          topic: form.topic,
+          has_email: Boolean(form.email.trim()),
+          has_phone: Boolean(form.phone.trim()),
+          version: "homepage_assist_popup_admin_alerts",
+        },
+      });
+
+      setFormSuccess("Thanks — SitGuru received your message.");
+      setForm(initialHomepageAssistForm);
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Unable to send your message right now.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleQuickLink(label: string, destination: string) {
+    onTrack(label, destination);
+    closePopup();
+  }
+
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed bottom-4 left-4 z-[80] w-[min(420px,calc(100vw-2rem))] sm:bottom-5 sm:left-5">
+      {isOpen ? (
+        <section className="overflow-hidden rounded-[28px] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.22)]">
+          <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-sky-500 px-4 py-4 text-white">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-50">
+                  SitGuru Help
+                </p>
+                <h2 className="mt-1 text-xl font-black leading-tight text-white">
+                  Need assistance?
+                </h2>
+                <p className="mt-1 text-sm font-semibold leading-5 text-white/90">
+                  We can help you find care, become a Guru, or join the
+                  Ambassador program.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closePopup}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-lg font-black text-white transition hover:bg-white/25"
+                aria-label="Close SitGuru help popup"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[72vh] overflow-y-auto p-4">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Link
+                href={petParentSignupHref}
+                onClick={() =>
+                  handleQuickLink(
+                    "Homepage Assist Pet Parent Signup",
+                    petParentSignupHref,
+                  )
+                }
+                className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-center text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
+              >
+                Pet Parent
+              </Link>
+              <Link
+                href={guruSignupHref}
+                onClick={() =>
+                  handleQuickLink("Homepage Assist Guru Signup", guruSignupHref)
+                }
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center text-xs font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50"
+              >
+                Guru
+              </Link>
+              <Link
+                href="/ambassadors"
+                onClick={() =>
+                  handleQuickLink(
+                    "Homepage Assist Ambassador Signup",
+                    "/ambassadors",
+                  )
+                }
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center text-xs font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50"
+              >
+                Ambassador
+              </Link>
+            </div>
+
+            <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
+              <label className="grid gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                  Topic
+                </span>
+                <select
+                  value={form.topic}
+                  onChange={(event) =>
+                    updateAssistField(
+                      "topic",
+                      event.target.value as HomepageAssistTopic,
+                    )
+                  }
+                  className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                >
+                  {Object.entries(homepageAssistTopicLabels).map(
+                    ([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+
+              <textarea
+                value={form.message}
+                onChange={(event) => updateAssistField("message", event.target.value)}
+                rows={3}
+                placeholder="Type your question..."
+                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input
+                  value={form.fullName}
+                  onChange={(event) => updateAssistField("fullName", event.target.value)}
+                  placeholder="Name optional"
+                  className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                />
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => updateAssistField("email", event.target.value)}
+                  placeholder="Email optional"
+                  className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                />
+              </div>
+
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(event) => updateAssistField("phone", event.target.value)}
+                placeholder="Phone optional"
+                className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              />
+
+              {formError ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                  {formError}
+                </div>
+              ) : null}
+
+              {formSuccess ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">
+                  {formSuccess}
+                </div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? "Sending..." : "Send to SitGuru Admin"}
+              </button>
+
+              <p className="text-[11px] font-semibold leading-4 text-slate-500">
+                SitGuru Admin is notified when you submit this message.
+              </p>
+            </form>
+          </div>
+        </section>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 py-4 text-sm font-black text-white shadow-[0_18px_45px_rgba(15,23,42,0.25)] transition hover:bg-emerald-800 sm:w-auto"
+        >
+          💬 Need help with SitGuru?
+        </button>
+      )}
     </div>
   );
 }
@@ -2284,6 +2607,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <HomepageAssistPopup source={source} onTrack={trackHomepageClick} />
     </main>
   );
 }
