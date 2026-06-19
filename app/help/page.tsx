@@ -109,6 +109,15 @@ const quickHelpCards: HelpCard[] = [
     icon: <CalendarCheck className="h-6 w-6" />,
   },
   {
+    title: "SitGuru PawReport™",
+    eyebrow: "Photos, notes & care updates",
+    description:
+      "Learn how PawReports help Pet Parents stay connected and how Gurus share photos, potty updates, food and water confirmations, care notes, and completion summaries.",
+    href: "#pawreport-help",
+    cta: "PawReport Help",
+    icon: <PawPrint className="h-6 w-6" />,
+  },
+  {
     title: "Account & Login",
     eyebrow: "Access your account",
     description:
@@ -454,6 +463,40 @@ const helpSections: HelpSection[] = [
         question: "What if something changes after a booking is requested?",
         answer:
           "Communicate as early as possible. If timing, location, pet needs, or service details change, Pet Parents and Gurus should clarify those details before care happens.",
+      },
+    ],
+  },
+
+  {
+    title: "SitGuru PawReport™",
+    description:
+      "Help for Pet Parents and Gurus using PawReport photos, potty updates, food and water confirmations, care notes, and completion summaries.",
+    icon: <PawPrint className="h-5 w-5" />,
+    items: [
+      {
+        question: "What is a SitGuru PawReport™?",
+        answer:
+          "A SitGuru PawReport™ is the care summary connected to a booking. It can include visit start and completion timing, photos, potty updates, food and water updates, care notes, and a final summary from the Guru.",
+      },
+      {
+        question: "How do Pet Parents use PawReports?",
+        answer:
+          "Pet Parents can open the booking from their dashboard and choose View PawReport. The PawReport helps them see what happened during care, review photos and notes, and keep the visit history organized inside SitGuru.",
+      },
+      {
+        question: "How do Gurus complete a strong PawReport?",
+        answer:
+          "Gurus should open the booking, start the PawReport when care begins, add useful updates during the visit, upload clear photos when appropriate, record potty and food or water updates, write a personal note, and complete the PawReport before leaving or shortly after the service ends.",
+      },
+      {
+        question: "What makes a PawReport feel professional?",
+        answer:
+          "A strong PawReport includes the pet’s name, at least one clear photo when possible, potty or care updates, food and water confirmations when relevant, and a warm final note that tells the Pet Parent how their pet did.",
+      },
+      {
+        question: "Are PawReports only for dog walks?",
+        answer:
+          "No. PawReports are useful for dog walking, drop-in visits, pet sitting, daycare, boarding, and house sitting. The exact updates may vary by service, pet needs, and booking details.",
       },
     ],
   },
@@ -917,6 +960,9 @@ export default function HelpPage() {
             <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
               Trust & Safety
             </span>
+            <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
+              SitGuru PawReport™
+            </span>
           </div>
         </div>
       </section>
@@ -926,6 +972,78 @@ export default function HelpPage() {
           {quickHelpCards.map((card) => (
             <HelpCard key={card.title} card={card} />
           ))}
+        </div>
+      </section>
+
+
+      <section
+        id="pawreport-help"
+        className="relative mx-auto max-w-7xl scroll-mt-6 px-4 pb-8 sm:px-6 lg:px-8"
+      >
+        <div className="overflow-hidden rounded-[36px] border border-emerald-100 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
+          <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr] lg:items-stretch">
+            <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_58%,#eff6ff_100%)] p-6 sm:p-8 lg:p-10">
+              <SectionEyebrow icon={<PawPrint className="h-4 w-4" />}>
+                SitGuru PawReport™
+              </SectionEyebrow>
+
+              <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                Photos, care notes, and visit updates in one warm summary.
+              </h2>
+
+              <p className="mt-4 text-base font-semibold leading-8 text-slate-700">
+                PawReports help Pet Parents feel connected while they are away and help Gurus deliver a more professional, trustworthy experience after every booking.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {[
+                  ["📸", "Photos", "Clear photo updates from the visit."],
+                  ["🐾", "Potty Updates", "Pee and poop updates when relevant."],
+                  ["🥣", "Food & Water", "Feeding and fresh water confirmations."],
+                  ["📝", "Care Notes", "Personal notes about how the pet did."],
+                ].map(([icon, title, body]) => (
+                  <div
+                    key={title}
+                    className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"
+                  >
+                    <div className="text-2xl">{icon}</div>
+                    <h3 className="mt-2 text-base font-black text-slate-950">
+                      {title}
+                    </h3>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                      {body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-6 sm:p-8 lg:p-10">
+              <div className="grid gap-4">
+                <div className="rounded-[28px] border border-emerald-100 bg-emerald-50 p-5">
+                  <h3 className="text-xl font-black text-slate-950">
+                    For Pet Parents
+                  </h3>
+                  <ol className="mt-4 grid gap-3 text-sm font-semibold leading-6 text-slate-700">
+                    <li><span className="font-black text-emerald-700">1.</span> Open your dashboard and choose the booking.</li>
+                    <li><span className="font-black text-emerald-700">2.</span> Select View PawReport when updates are available.</li>
+                    <li><span className="font-black text-emerald-700">3.</span> Review photos, potty updates, food and water notes, visit timing, and the Guru’s final summary.</li>
+                  </ol>
+                </div>
+
+                <div className="rounded-[28px] border border-sky-100 bg-sky-50 p-5">
+                  <h3 className="text-xl font-black text-slate-950">
+                    For Gurus
+                  </h3>
+                  <ol className="mt-4 grid gap-3 text-sm font-semibold leading-6 text-slate-700">
+                    <li><span className="font-black text-sky-700">1.</span> Open the booking and start the PawReport when care begins.</li>
+                    <li><span className="font-black text-sky-700">2.</span> Add meaningful updates during care: photos, potty, food, water, and notes.</li>
+                    <li><span className="font-black text-sky-700">3.</span> Complete the PawReport with a warm final note before leaving or shortly after service ends.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -89,6 +89,19 @@ const fallbackGuruResources: GuruResource[] = [
     featured: true,
     sortOrder: 30,
   },
+
+  {
+    id: "pawreport-mastery",
+    title: "SitGuru PawReport™ Mastery",
+    description:
+      "Learn how to start, update, and complete PawReports that reassure Pet Parents, improve reviews, and create a premium care experience.",
+    category: "PawReport",
+    type: "guide",
+    tags: ["PawReport", "Photos", "Care Notes", "Updates"],
+    keywords: ["pawreport", "paw report", "visit updates", "photos", "potty", "pee", "poop", "food", "water", "care notes", "complete report"],
+    featured: true,
+    sortOrder: 25,
+  },
   {
     id: "communication",
     title: "Communicating with pet parents",
@@ -153,6 +166,7 @@ const quickSearches = [
   "How do I earn more as a Guru?",
   "How can I improve my profile?",
   "What should I do before a visit?",
+  "How do I create a great PawReport?",
   "How do payments work?",
   "How should I message a pet parent?",
   "What should I do in an emergency?",
@@ -208,6 +222,10 @@ function detectIntent(query: string): SearchIntent {
   const value = normalize(query);
 
   if (!value) return "general";
+
+  if (/(pawreport|paw report|visit update|visit updates|photo update|potty update)/.test(value)) {
+    return "care";
+  }
 
   if (/(booking|bookings|client|clients|repeat|request|requests|calendar|availability)/.test(value)) {
     return "bookings";
@@ -539,6 +557,73 @@ export default function GuruSuccessCenterPage() {
               </div>
             </div>
           ) : null}
+        </Card>
+
+
+        <Card className="sgsc-pawreport-card">
+          <div className="sgsc-pawreport-hero">
+            <div>
+              <p className="sgsc-pawreport-kicker">Signature SitGuru Feature</p>
+              <div role="heading" aria-level={2} className="sgsc-pawreport-title">
+                SitGuru PawReport™ Mastery
+              </div>
+              <p className="sgsc-pawreport-copy">
+                PawReports are how Gurus show Pet Parents that care happened, how the pet did,
+                and why booking through SitGuru feels more professional than texting updates manually.
+              </p>
+            </div>
+
+            <div className="sgsc-pawreport-badge">🐾 PawReport Ready</div>
+          </div>
+
+          <div className="sgsc-pawreport-layout">
+            <div className="sgsc-pawreport-panel">
+              <p className="sgsc-muted-label">How Gurus use it</p>
+              <div className="sgsc-pawreport-steps">
+                {[
+                  ["1", "Open the booking", "Use the booking card and choose PawReport."],
+                  ["2", "Start PawReport", "Start it when care begins so the Pet Parent sees the visit is active."],
+                  ["3", "Add care updates", "Use photos, pee, poop, food, water, and care notes during the visit."],
+                  ["4", "Complete PawReport", "End with a warm final note before leaving or shortly after service ends."],
+                ].map(([number, title, copy]) => (
+                  <div key={title} className="sgsc-pawreport-step">
+                    <span>{number}</span>
+                    <div>
+                      <strong>{title}</strong>
+                      <p>{copy}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="sgsc-pawreport-panel sgsc-pawreport-panel-soft">
+              <p className="sgsc-muted-label">Five-star PawReport checklist</p>
+              <div className="sgsc-pawreport-checks">
+                {[
+                  "Use the pet’s name in the note",
+                  "Upload at least one clear photo when appropriate",
+                  "Record potty activity when relevant",
+                  "Confirm food or fresh water when part of the service",
+                  "Write a specific final note instead of only saying everything was good",
+                ].map((item) => (
+                  <div key={item} className="sgsc-pawreport-check">
+                    <span>✓</span>
+                    <p>{item}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="sgsc-pawreport-panel sgsc-pawreport-example">
+              <p className="sgsc-muted-label">Example final note</p>
+              <p>
+                Scout had a great visit today. We completed a short walk, he went pee,
+                drank fresh water, and relaxed near the window afterward. He seemed happy,
+                calm, and comfortable when I left.
+              </p>
+            </div>
+          </div>
         </Card>
 
         <div className="sgsc-grid">
@@ -1277,6 +1362,166 @@ export default function GuruSuccessCenterPage() {
           color: #047857;
         }
 
+
+
+        .sgsc-pawreport-card {
+          overflow: hidden;
+          padding: 0;
+          margin-bottom: 22px;
+          border-color: #bbf7d0;
+        }
+
+        .sgsc-pawreport-hero {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 18px;
+          padding: 28px;
+          background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 54%, #eff6ff 100%);
+          border-bottom: 1px solid #d1fae5;
+        }
+
+        .sgsc-pawreport-kicker {
+          margin: 0;
+          color: #047857;
+          font-size: 12px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+        }
+
+        .sgsc-pawreport-title {
+          margin-top: 8px;
+          color: #0f172a;
+          font-size: clamp(28px, 3.3vw, 42px);
+          line-height: 1.02;
+          font-weight: 800;
+          letter-spacing: -0.045em;
+        }
+
+        .sgsc-pawreport-copy {
+          max-width: 820px;
+          margin: 12px 0 0;
+          color: #475569;
+          font-size: 16px;
+          line-height: 1.65;
+          font-weight: 600;
+        }
+
+        .sgsc-pawreport-badge {
+          flex: 0 0 auto;
+          border: 1px solid #86efac;
+          border-radius: 999px;
+          background: #ffffff;
+          color: #047857;
+          padding: 11px 14px;
+          font-size: 13px;
+          font-weight: 800;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+        }
+
+        .sgsc-pawreport-layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+          gap: 18px;
+          padding: 24px;
+        }
+
+        .sgsc-pawreport-panel {
+          border: 1px solid #e2e8f0;
+          border-radius: 24px;
+          background: #f8fafc;
+          padding: 20px;
+        }
+
+        .sgsc-pawreport-panel-soft {
+          background: #f0fdf4;
+          border-color: #bbf7d0;
+        }
+
+        .sgsc-pawreport-example {
+          grid-column: 1 / -1;
+          background: #ffffff;
+        }
+
+        .sgsc-pawreport-example p:last-child {
+          margin: 10px 0 0;
+          color: #334155;
+          font-size: 15px;
+          line-height: 1.7;
+          font-weight: 650;
+        }
+
+        .sgsc-pawreport-steps,
+        .sgsc-pawreport-checks {
+          display: grid;
+          gap: 12px;
+          margin-top: 14px;
+        }
+
+        .sgsc-pawreport-step {
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+          border-radius: 18px;
+          background: #ffffff;
+          padding: 14px;
+          border: 1px solid #e2e8f0;
+        }
+
+        .sgsc-pawreport-step > span {
+          display: inline-flex;
+          width: 30px;
+          height: 30px;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: #059669;
+          color: #ffffff;
+          font-size: 13px;
+          font-weight: 800;
+          flex: 0 0 auto;
+        }
+
+        .sgsc-pawreport-step strong {
+          display: block;
+          color: #0f172a;
+          font-size: 15px;
+        }
+
+        .sgsc-pawreport-step p,
+        .sgsc-pawreport-check p {
+          margin: 4px 0 0;
+          color: #475569;
+          font-size: 14px;
+          line-height: 1.5;
+          font-weight: 600;
+        }
+
+        .sgsc-pawreport-check {
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          border-radius: 16px;
+          background: #ffffff;
+          padding: 12px;
+          border: 1px solid #d1fae5;
+        }
+
+        .sgsc-pawreport-check span {
+          display: inline-flex;
+          width: 24px;
+          height: 24px;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: #dcfce7;
+          color: #047857;
+          font-size: 13px;
+          font-weight: 900;
+          flex: 0 0 auto;
+        }
+
         @media (max-width: 1024px) {
           .sgsc-grid {
             grid-template-columns: 1fr;
@@ -1322,6 +1567,30 @@ export default function GuruSuccessCenterPage() {
             align-self: stretch;
           }
         }
+
+
+        @media (max-width: 760px) {
+          .sgsc-pawreport-hero {
+            flex-direction: column;
+            padding: 22px;
+          }
+
+          .sgsc-pawreport-badge {
+            width: 100%;
+            justify-content: center;
+            text-align: center;
+          }
+
+          .sgsc-pawreport-layout {
+            grid-template-columns: 1fr;
+            padding: 18px;
+          }
+
+          .sgsc-pawreport-example {
+            grid-column: auto;
+          }
+        }
+
       `}</style>
     </main>
   );
