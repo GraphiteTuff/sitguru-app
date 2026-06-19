@@ -1458,7 +1458,7 @@ function GuruDashboardMessagesPageContent() {
                   </label>
 
                   <Link
-                    href="/messages/admin"
+                    href="/messages/admin?role=guru"
                     className="inline-flex h-12 items-center justify-center rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white transition hover:bg-emerald-700 sm:self-end"
                   >
                     Message Admin HQ
