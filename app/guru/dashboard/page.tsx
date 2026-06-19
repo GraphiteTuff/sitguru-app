@@ -1086,6 +1086,76 @@ async function getGuruUniversityProgress(
   }
 }
 
+
+type GuruPawReportStats = {
+  total: number;
+  active: number;
+  completed: number;
+  notStarted: number;
+  completionRate: number | null;
+};
+
+async function getGuruPawReportStats(bookings: BookingRow[]) {
+  const bookingIds = bookings
+    .map((booking) => String(booking.id ?? "").trim())
+    .filter(Boolean);
+
+  const emptyStats: GuruPawReportStats = {
+    total: 0,
+    active: 0,
+    completed: 0,
+    notStarted: bookingIds.length,
+    completionRate: null,
+  };
+
+  if (!bookingIds.length) return emptyStats;
+
+  const { data, error } = await supabaseAdmin
+    .from("booking_visit_sessions")
+    .select("booking_id,status")
+    .in("booking_id", bookingIds);
+
+  if (error || !data) return emptyStats;
+
+  const sessionRows = data as { booking_id: string | null; status: string | null }[];
+  const statusByBooking = new Map<string, string>();
+
+  sessionRows.forEach((row) => {
+    const bookingId = String(row.booking_id || "").trim();
+    if (bookingId) {
+      statusByBooking.set(bookingId, String(row.status || "not_started").toLowerCase());
+    }
+  });
+
+  const active = Array.from(statusByBooking.values()).filter(
+    (status) => status === "in_progress",
+  ).length;
+  const completed = Array.from(statusByBooking.values()).filter(
+    (status) => status === "completed",
+  ).length;
+  const notStarted = Math.max(0, bookingIds.length - active - completed);
+  const completionRate =
+    bookings.filter((booking) =>
+      ["completed", "complete"].includes(getBookingStatus(booking).toLowerCase()),
+    ).length > 0
+      ? Math.round(
+          (completed /
+            bookings.filter((booking) =>
+              ["completed", "complete"].includes(getBookingStatus(booking).toLowerCase()),
+            ).length) *
+            100,
+        )
+      : null;
+
+  return {
+    total: statusByBooking.size,
+    active,
+    completed,
+    notStarted,
+    completionRate,
+  };
+}
+
 function GuruAvatar({
   name,
   imageUrl,
@@ -1224,6 +1294,72 @@ function StatCard({
         ) : null}
       </div>
     </div>
+  );
+}
+
+
+function DashboardSnapshotCard({
+  eyebrow,
+  title,
+  value,
+  helper,
+  href,
+  actionLabel,
+  icon,
+  tone = "emerald",
+}: {
+  eyebrow: string;
+  title: string;
+  value: string | number;
+  helper: string;
+  href: string;
+  actionLabel: string;
+  icon: string;
+  tone?: "emerald" | "sky" | "amber" | "violet" | "slate";
+}) {
+  const toneClasses = {
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
+    sky: "border-sky-100 bg-sky-50 text-sky-700",
+    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    violet: "border-violet-100 bg-violet-50 text-violet-700",
+    slate: "border-slate-100 bg-slate-50 text-slate-700",
+  }[tone];
+
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-[220px] flex-col justify-between rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_14px_36px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_22px_48px_rgba(15,23,42,0.10)]"
+    >
+      <div>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] !text-slate-500">
+              {eyebrow}
+            </p>
+            <h3 className="mt-2 text-2xl font-black leading-tight !text-[#07132f]">
+              {title}
+            </h3>
+          </div>
+          <div
+            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border text-2xl ${toneClasses}`}
+          >
+            {icon}
+          </div>
+        </div>
+
+        <p className="mt-5 text-5xl font-black tracking-tight !text-[#07132f]">
+          {value}
+        </p>
+        <p className="mt-3 text-sm font-bold leading-6 !text-slate-600">
+          {helper}
+        </p>
+      </div>
+
+      <div className="mt-6 inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black !text-slate-800 transition group-hover:border-emerald-200 group-hover:bg-emerald-50 group-hover:!text-emerald-800">
+        <span>{actionLabel}</span>
+        <span className="transition group-hover:translate-x-1">→</span>
+      </div>
+    </Link>
   );
 }
 
@@ -1703,7 +1839,7 @@ function GuruAcademyCard({ progress }: { progress: GuruUniversityProgress }) {
           <div className="mt-4 grid gap-3">
             {[
               "Complete and polish your Guru profile",
-              "Manage bookings, messages, care details, and reviews",
+              "Manage bookings, messages, care details, PawReports, and reviews",
               "Follow SitGuru trust, safety, and pet care standards",
               "Understand Stripe payouts, earnings, and tax reminders",
               "Use the Guru Success Center to keep growing",
@@ -1754,6 +1890,8 @@ export default async function GuruDashboardPage() {
     getGuruOnboardingPacketDisplay(user.id),
   ]);
 
+  const pawReportStats = await getGuruPawReportStats(bookings);
+
   const name = getGuruName(guruProfile, user.email);
   const welcomeName = getFirstName(name);
   const imageUrl = getGuruImage(guruProfile);
@@ -1797,9 +1935,9 @@ export default async function GuruDashboardPage() {
                 Welcome back, {welcomeName} 👋
               </h1>
               <p className="mt-5 max-w-3xl text-xl font-light leading-9 !text-slate-700">
-                Manage bookings, messages, availability, earnings, academy
-                training, and profile photos — all in one polished Guru
-                workspace.
+                Your one-page SitGuru command center: bookings, PawReports,
+                messages, onboarding, profile health, earnings, and next best
+                actions in one clear snapshot.
               </p>
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -1829,6 +1967,12 @@ export default async function GuruDashboardPage() {
                   className="rounded-[1.2rem] bg-[#07132f] px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
                 >
                   My Bookings
+                </Link>
+                <Link
+                  href="/guru/dashboard/bookings"
+                  className="rounded-[1.2rem] bg-emerald-700 px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(5,150,105,0.18)] transition hover:-translate-y-0.5 hover:bg-emerald-800"
+                >
+                  PawReports
                 </Link>
                 <Link
                   href="/guru/dashboard/messages"
@@ -1906,6 +2050,79 @@ export default async function GuruDashboardPage() {
           </div>
         </section>
 
+        <section className="mt-8 rounded-[2.25rem] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f2fffb_55%,#eef8ff_100%)] p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-800">
+                Guru Snapshot
+              </p>
+              <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] !text-[#07132f] sm:text-4xl">
+                Everything you need to know right now
+              </h2>
+              <p className="mt-2 max-w-3xl text-base font-bold leading-7 !text-slate-700">
+                Quickly see your bookings, PawReports, messages, onboarding, profile readiness, and where to go next.
+              </p>
+            </div>
+            <Link
+              href="/guru/dashboard/bookings"
+              className="inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-[#07132f] px-6 py-3 text-sm font-black !text-white transition hover:bg-[#0b1436]"
+            >
+              Open Bookings Hub
+            </Link>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <DashboardSnapshotCard
+              eyebrow="Care Schedule"
+              title="Upcoming bookings"
+              value={upcomingBookings.length}
+              helper="Next visits and active care requests assigned to your Guru account."
+              href="/guru/dashboard/bookings"
+              actionLabel="View bookings"
+              icon="🗓️"
+              tone="sky"
+            />
+            <DashboardSnapshotCard
+              eyebrow="Signature Feature"
+              title="PawReports delivered"
+              value={pawReportStats.completed}
+              helper={
+                pawReportStats.active > 0
+                  ? `${pawReportStats.active} PawReport currently active. Keep Pet Parents updated in real time.`
+                  : "Complete a PawReport for each finished booking to build trust and repeat bookings."
+              }
+              href="/guru/dashboard/bookings"
+              actionLabel="Manage PawReports"
+              icon="🐾"
+              tone="emerald"
+            />
+            <DashboardSnapshotCard
+              eyebrow="Messages"
+              title="Inbox activity"
+              value={conversations.length}
+              helper="Recent Pet Parent and Admin conversations that may need your attention."
+              href="/guru/dashboard/messages"
+              actionLabel="Open inbox"
+              icon="💬"
+              tone="violet"
+            />
+            <DashboardSnapshotCard
+              eyebrow="Profile Health"
+              title="Public profile"
+              value={`${profileCompletion}%`}
+              helper={
+                bookable
+                  ? "Your profile is bookable. Keep services, photos, and availability current."
+                  : "Finish setup steps so Pet Parents can confidently book you."
+              }
+              href="/guru/dashboard/profile"
+              actionLabel="Review profile"
+              icon="⭐"
+              tone={bookable ? "emerald" : "amber"}
+            />
+          </div>
+        </section>
+
         <GuruSetupChecklist
           profile={guruProfile}
           profileCompletion={profileCompletion}
@@ -1927,8 +2144,59 @@ export default async function GuruDashboardPage() {
             value={completedBookings.length}
             icon="✅"
           />
-          <StatCard label="Unread" value={0} icon="💬" />
+          <StatCard label="PawReports" value={pawReportStats.completed} icon="🐾" />
           <StatCard label="Profile" value={`${profileCompletion}%`} icon="⭐" />
+        </section>
+
+        <section className="mt-8 overflow-hidden rounded-[2.25rem] border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_52%,#edf8ff_100%)] shadow-[0_20px_54px_rgba(15,23,42,0.08)]">
+          <div className="grid gap-6 p-6 lg:grid-cols-[1fr_360px] lg:items-center lg:p-8">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-800">
+                SitGuru PawReport™
+              </p>
+              <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] !text-[#07132f] sm:text-4xl">
+                Turn every booking into a trusted care summary
+              </h2>
+              <p className="mt-3 max-w-3xl text-base font-bold leading-7 !text-slate-700">
+                PawReports help Pet Parents see photos, potty updates, food and water confirmations, care notes, and your final summary.
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {["Photos", "Potty updates", "Food & water", "Final summary"].map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm font-black !text-emerald-900"
+                  >
+                    ✓ {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+              <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
+                PawReport Status
+              </p>
+              <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-2xl bg-emerald-50 p-3">
+                  <p className="text-2xl font-black !text-[#07132f]">{pawReportStats.completed}</p>
+                  <p className="text-xs font-bold !text-slate-600">Complete</p>
+                </div>
+                <div className="rounded-2xl bg-sky-50 p-3">
+                  <p className="text-2xl font-black !text-[#07132f]">{pawReportStats.active}</p>
+                  <p className="text-xs font-bold !text-slate-600">Active</p>
+                </div>
+                <div className="rounded-2xl bg-amber-50 p-3">
+                  <p className="text-2xl font-black !text-[#07132f]">{pawReportStats.notStarted}</p>
+                  <p className="text-xs font-bold !text-slate-600">Ready</p>
+                </div>
+              </div>
+              <Link
+                href="/guru/dashboard/bookings"
+                className="mt-5 flex min-h-[52px] items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black !text-white transition hover:bg-emerald-800"
+              >
+                Open PawReports
+              </Link>
+            </div>
+          </div>
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-2">
