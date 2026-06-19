@@ -1125,120 +1125,81 @@ function HomeVideoSection({
 }
 
 
-function SitGuruVisitUpdatesFeature({
+function SitGuruPawReportSection({
   onTrack,
 }: {
   onTrack: (label: string, destination: string) => void;
 }) {
-  const featureCards = [
-    {
-      icon: "📸",
-      title: "Visit photos",
-      body: "Receive photo updates from your Guru during walks, drop-ins, sitting, boarding, and care visits.",
-    },
-    {
-      icon: "🐾",
-      title: "Potty updates",
-      body: "Pee and poop updates help Pet Parents know how their pet is doing while they are away.",
-    },
-    {
-      icon: "🥣",
-      title: "Food & water notes",
-      body: "Gurus can log food, water, and care activity so important details stay organized.",
-    },
-    {
-      icon: "✅",
-      title: "SitGuru Visit Card",
-      body: "Each completed visit can include timing, care notes, activity updates, photos, and a final summary.",
-    },
-  ];
-
-  const timelineItems = [
-    {
-      icon: "▶️",
-      title: "Visit started",
-      time: "12:02 PM",
-      note: "Your Guru began the visit.",
-      accent: "bg-sky-50 border-sky-100",
-    },
-    {
-      icon: "📸",
-      title: "Photo update",
-      time: "12:08 PM",
-      note: "Scout enjoyed some outdoor time.",
-      accent: "bg-slate-50 border-slate-100",
-    },
-    {
-      icon: "💧",
-      title: "Potty update",
-      time: "12:14 PM",
-      note: "Pee update logged.",
-      accent: "bg-slate-50 border-slate-100",
-    },
-    {
-      icon: "🥣",
-      title: "Water refreshed",
-      time: "12:19 PM",
-      note: "Fresh water provided.",
-      accent: "bg-slate-50 border-slate-100",
-    },
-    {
-      icon: "✅",
-      title: "Visit completed",
-      time: "12:32 PM",
-      note: "Final Visit Card ready.",
-      accent: "bg-emerald-50 border-emerald-100",
-    },
-  ];
-
   return (
-    <section className="bg-gradient-to-br from-sky-50 via-white to-emerald-50 py-7 sm:py-12 lg:py-14">
+    <section className="bg-gradient-to-br from-sky-50 via-white to-emerald-50 py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-[0_22px_60px_rgba(15,23,42,0.09)]">
-          <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr] lg:items-stretch">
-            <div className="p-5 sm:p-8 lg:p-10">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-800">
-                <span aria-hidden="true">🐾</span>
-                SitGuru Visit Updates
+        <div className="overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-[0_20px_55px_rgba(15,23,42,0.08)]">
+          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-center">
+            <div className="p-6 sm:p-8 lg:p-10">
+              <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-800 sm:text-xs">
+                Exclusive SitGuru Feature
               </div>
 
-              <h2 className="mt-4 max-w-2xl text-[2rem] font-black leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-4xl lg:text-5xl">
-                Peace of mind while your pet is being cared for.
+              <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-slate-950 sm:text-4xl lg:text-5xl">
+                Stay connected with every visit.
               </h2>
 
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
-                SitGuru Visit Updates help Pet Parents stay connected during
-                care. Gurus can share start and end timing, photos, potty
-                updates, food and water notes, care details, and a completed
-                SitGuru Visit Card after service.
+              <p className="mt-3 text-lg font-black leading-7 text-emerald-700 sm:text-xl">
+                Every booking includes a SitGuru PawReport™
               </p>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {featureCards.map((feature) => (
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
+                Receive photos, potty updates, food and water confirmations,
+                care notes, visit timing, and a complete summary from your Guru.
+                It gives Pet Parents peace of mind while keeping care organized
+                inside SitGuru.
+              </p>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {[
+                  {
+                    icon: "📸",
+                    title: "Photo Updates",
+                    body: "Receive visit photos directly from your Guru.",
+                  },
+                  {
+                    icon: "🐾",
+                    title: "Potty Updates",
+                    body: "Know when pee and poop updates are logged.",
+                  },
+                  {
+                    icon: "🥣",
+                    title: "Food & Water",
+                    body: "See when meals are served and water is refreshed.",
+                  },
+                  {
+                    icon: "📝",
+                    title: "Care Notes",
+                    body: "Get personalized notes and visit observations.",
+                  },
+                ].map((feature) => (
                   <div
                     key={feature.title}
                     className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm"
                   >
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
-                      {feature.icon}
-                    </div>
-                    <h3 className="mt-3 text-base font-black text-slate-950">
+                    <div className="text-2xl">{feature.icon}</div>
+                    <h3 className="mt-2 font-black text-slate-950">
                       {feature.title}
                     </h3>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                    <p className="mt-1 text-sm font-semibold leading-5 text-slate-600">
                       {feature.body}
                     </p>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Link
                   href="/search"
                   onClick={() =>
-                    onTrack("Find Guru Visit Updates Feature", "/search")
+                    onTrack("Find Guru PawReport Section", "/search")
                   }
-                  className="inline-flex min-h-12 items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+                  className="inline-flex min-h-12 items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
                 >
                   Find a Guru
                 </Link>
@@ -1247,88 +1208,64 @@ function SitGuruVisitUpdatesFeature({
                   href={petParentSignupHref}
                   onClick={() =>
                     onTrack(
-                      "Create Pet Parent Visit Updates Feature",
+                      "Create Pet Parent PawReport Section",
                       petParentSignupHref,
                     )
                   }
-                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
                 >
                   Create Pet Parent Account
                 </Link>
               </div>
             </div>
 
-            <div className="border-t border-emerald-100 bg-gradient-to-br from-slate-50 via-white to-emerald-50 p-5 sm:p-8 lg:border-l lg:border-t-0 lg:p-10">
-              <div className="mx-auto max-w-lg rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.12)]">
-                <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-5 sm:p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
-                        SitGuru Visit Card
-                      </p>
-                      <h3 className="mt-2 text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">
-                        Scout&apos;s Visit
-                      </h3>
-                      <p className="mt-1 text-sm font-semibold text-slate-600">
-                        Real-time care updates from your Guru
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">
-                        Status
-                      </p>
-                      <p className="text-xs font-black text-emerald-950">
-                        Completed
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 border-b border-slate-100 p-5 sm:grid-cols-3">
-                  {[
-                    ["Started", "12:02 PM"],
-                    ["Ended", "12:32 PM"],
-                    ["Duration", "30 min"],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
-                    >
-                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
-                        {label}
-                      </p>
-                      <p className="mt-1 text-sm font-black text-slate-950">
-                        {value}
-                      </p>
-                    </div>
-                  ))}
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50 p-6 sm:p-8 lg:p-10">
+              <div className="mx-auto max-w-md overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_22px_55px_rgba(15,23,42,0.12)]">
+                <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-5">
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-sky-700">
+                    SitGuru PawReport™
+                  </p>
+                  <h3 className="mt-2 text-2xl font-black tracking-[-0.035em] text-slate-950">
+                    Scout&apos;s PawReport
+                  </h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">
+                    Real-time care updates from your Guru
+                  </p>
                 </div>
 
                 <div className="space-y-3 p-5">
-                  {timelineItems.map((item) => (
+                  {[
+                    ["▶️", "PawReport Started", "12:02 PM"],
+                    ["📸", "Photo Added", "Scout enjoyed his walk."],
+                    ["💧", "Potty Update", "Pee completed at 12:17 PM."],
+                    ["🥣", "Water Refreshed", "Fresh water provided."],
+                    ["📝", "Guru Note", "Scout was playful, happy, and relaxed."],
+                  ].map(([icon, title, body]) => (
                     <div
-                      key={`${item.title}-${item.time}`}
-                      className={`flex items-start gap-3 rounded-2xl border p-3 ${item.accent}`}
+                      key={title}
+                      className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-xl shadow-sm">
-                        {item.icon}
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-xl shadow-sm">
+                        {icon}
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="font-black text-slate-950">
-                            {item.title}
-                          </p>
-                          <p className="shrink-0 text-xs font-black text-slate-500">
-                            {item.time}
-                          </p>
-                        </div>
-                        <p className="mt-1 text-sm font-semibold text-slate-600">
-                          {item.note}
+                      <div>
+                        <p className="font-black text-slate-950">{title}</p>
+                        <p className="text-xs font-semibold text-slate-500">
+                          {body}
                         </p>
                       </div>
                     </div>
                   ))}
+
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+                    <p className="text-2xl">✅</p>
+                    <p className="mt-1 font-black text-emerald-950">
+                      PawReport Complete
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-emerald-800">
+                      Summary saved to booking history.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1779,7 +1716,7 @@ export default function HomePage() {
 
       <HomeVideoSection onTrack={trackHomepageClick} />
 
-      <SitGuruVisitUpdatesFeature onTrack={trackHomepageClick} />
+      <SitGuruPawReportSection onTrack={trackHomepageClick} />
 
       <section className="bg-white py-5 sm:py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
