@@ -911,6 +911,12 @@ function HomepageAssistPopup({
     event.preventDefault();
 
     const cleanMessage = form.message.trim();
+    const cleanFullName = form.fullName.trim();
+
+    if (!cleanFullName) {
+      setFormError("Please enter your name so SitGuru Admin knows who we are helping.");
+      return;
+    }
 
     if (!cleanMessage) {
       setFormError("Please type a quick message so SitGuru can help.");
@@ -930,7 +936,7 @@ function HomepageAssistPopup({
         body: JSON.stringify({
           conversationId: session?.conversationId || "",
           token: session?.token || "",
-          fullName: form.fullName,
+          fullName: cleanFullName,
           email: form.email,
           phone: form.phone,
           topic: form.topic,
@@ -1159,7 +1165,8 @@ function HomepageAssistPopup({
                 <input
                   value={form.fullName}
                   onChange={(event) => updateAssistField("fullName", event.target.value)}
-                  placeholder="Name optional"
+                  placeholder="Name required"
+                  required
                   className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
                 />
                 <input
