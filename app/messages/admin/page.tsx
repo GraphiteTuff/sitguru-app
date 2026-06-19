@@ -34,6 +34,20 @@ type GuruRow = {
   email?: string | null;
 };
 
+type MessageRoleContext = "customer" | "guru" | "ambassador" | "admin";
+
+type UserRoleRow = {
+  role?: string | null;
+};
+
+type AmbassadorRow = {
+  id?: string | null;
+  user_id?: string | null;
+  email?: string | null;
+  login_email?: string | null;
+  contact_email?: string | null;
+};
+
 function normalizeRoleValue(role?: string | null) {
   const value = String(role || "").trim().toLowerCase();
 
@@ -69,9 +83,66 @@ function getDashboardHref(role?: string | null) {
 
   if (normalized === "guru") return "/guru/dashboard";
   if (normalized === "admin") return "/admin";
-  if (normalized === "ambassador") return "/partner/ambassadors/dashboard";
+  if (normalized === "ambassador") return "/ambassador/dashboard";
 
   return "/customer/dashboard";
+}
+
+function normalizeMessageRoleContext(value?: string | null): MessageRoleContext | "" {
+  const normalized = normalizeRoleValue(value);
+
+  if (normalized === "customer") return "customer";
+  if (normalized === "guru") return "guru";
+  if (normalized === "ambassador") return "ambassador";
+  if (normalized === "admin") return "admin";
+
+  return "";
+}
+
+function hasRoleValue(values: string[], wantedRole: MessageRoleContext) {
+  if (wantedRole === "customer") {
+    return values.some((value) => {
+      const role = normalizeRoleValue(value);
+      return (
+        role === "customer" ||
+        role === "pet_parent" ||
+        role === "pet-parent" ||
+        role === "pet_owner" ||
+        role === "pet-owner" ||
+        role === "owner" ||
+        role === "both"
+      );
+    });
+  }
+
+  if (wantedRole === "guru") {
+    return values.some((value) => {
+      const role = normalizeRoleValue(value);
+      return (
+        role === "guru" ||
+        role === "provider" ||
+        role === "sitter" ||
+        role === "walker" ||
+        role === "future_guru" ||
+        role === "future-guru" ||
+        role === "both"
+      );
+    });
+  }
+
+  if (wantedRole === "ambassador") {
+    return values.some((value) => normalizeRoleValue(value).includes("ambassador"));
+  }
+
+  if (wantedRole === "admin") {
+    return values.some((value) => normalizeRoleValue(value).includes("admin"));
+  }
+
+  return false;
+}
+
+function buildThreadRedirect(conversationId: string, roleContext: MessageRoleContext) {
+  return `/messages/${conversationId}?role=${encodeURIComponent(roleContext)}`;
 }
 
 
@@ -349,6 +420,9 @@ export default async function AdminMessageEntryPage({
     petName?: string;
     booking_id?: string;
     bookingId?: string;
+    role?: string;
+    as?: string;
+    contextRole?: string;
   }>;
 }) {
   const params = (await searchParams) || {};
@@ -367,18 +441,63 @@ export default async function AdminMessageEntryPage({
     redirect("/customer/login");
   }
 
-  const { data: currentProfileData } = await supabaseAdmin
-    .from("profiles")
-    .select("id, role, account_type, created_at, first_name, full_name, email")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [currentProfileResult, userRolesResult, guruAccessResult, ambassadorAccessResult] =
+    await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("id, role, account_type, created_at, first_name, full_name, email")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
+      supabaseAdmin.from("gurus").select("id,user_id,email").eq("user_id", user.id).limit(1),
+      supabaseAdmin
+        .from("ambassadors")
+        .select("id,user_id,email,login_email,contact_email")
+        .or(
+          `user_id.eq.${user.id},email.eq.${String(user.email || "").toLowerCase()},login_email.eq.${String(
+            user.email || "",
+          ).toLowerCase()},contact_email.eq.${String(user.email || "").toLowerCase()}`,
+        )
+        .limit(1),
+    ]);
 
-  const currentProfile = (currentProfileData ?? null) as ProfileRow | null;
+  const currentProfile = (currentProfileResult.data ?? null) as ProfileRow | null;
+  const userRoleRows = (userRolesResult.data || []) as UserRoleRow[];
+  const roleValues = [
+    currentProfile?.role || "",
+    currentProfile?.account_type || "",
+    ...userRoleRows.map((row) => row.role || ""),
+  ].filter(Boolean);
 
-  const currentUserRole =
-    normalizeRoleValue(currentProfile?.role) ||
-    normalizeRoleValue(currentProfile?.account_type) ||
-    "customer";
+  const requestedRoleContext = normalizeMessageRoleContext(
+    params.role || params.as || params.contextRole,
+  );
+
+  const hasGuruAccess =
+    hasRoleValue(roleValues, "guru") || Boolean((guruAccessResult.data || []).length);
+  const hasAmbassadorAccess =
+    hasRoleValue(roleValues, "ambassador") ||
+    Boolean((ambassadorAccessResult.data || []).length);
+  const hasCustomerAccess =
+    hasRoleValue(roleValues, "customer") ||
+    (!hasGuruAccess && !hasAmbassadorAccess) ||
+    requestedRoleContext === "customer";
+  const hasAdminAccess = hasRoleValue(roleValues, "admin");
+
+  const allowedRoleContexts = new Set<MessageRoleContext>();
+  if (hasCustomerAccess) allowedRoleContexts.add("customer");
+  if (hasGuruAccess) allowedRoleContexts.add("guru");
+  if (hasAmbassadorAccess) allowedRoleContexts.add("ambassador");
+  if (hasAdminAccess) allowedRoleContexts.add("admin");
+
+  const fallbackRoleContext = normalizeMessageRoleContext(
+    currentProfile?.role || currentProfile?.account_type,
+  ) || (hasAmbassadorAccess ? "ambassador" : hasGuruAccess ? "guru" : "customer");
+
+  const currentUserRole: MessageRoleContext =
+    requestedRoleContext && allowedRoleContexts.has(requestedRoleContext)
+      ? requestedRoleContext
+      : fallbackRoleContext;
 
   const participantDisplayName = getDisplayName(currentProfile, user.email);
 
@@ -396,10 +515,7 @@ export default async function AdminMessageEntryPage({
    * The user's current profile role/account_type must explicitly say guru.
    * This prevents customer accounts like Amy Jones from being pulled into Guru flows.
    */
-  const isGuruUser =
-    currentUserRole === "guru" ||
-    currentUserRole === "provider" ||
-    currentUserRole === "sitter";
+  const isGuruUser = currentUserRole === "guru";
   const isAmbassadorUser = currentUserRole === "ambassador";
 
   const guruRecord = isGuruUser
@@ -474,7 +590,7 @@ export default async function AdminMessageEntryPage({
       participantDisplayName,
     });
 
-    redirect(`/messages/${existingConversation.id}`);
+    redirect(buildThreadRedirect(existingConversation.id, participantRole as MessageRoleContext));
   }
 
   const nowIso = new Date().toISOString();
@@ -594,10 +710,10 @@ export default async function AdminMessageEntryPage({
 
   await createNotificationIfPossible({
     userId: participantUserId,
-    title: "Admin support thread started",
+    title: "SitGuru Admin message thread started",
     body: "SitGuru Admin Support is ready to help.",
-    href: `/messages/${conversationToUse.id}`,
+    href: buildThreadRedirect(conversationToUse.id, participantRole as MessageRoleContext),
   });
 
-  redirect(`/messages/${conversationToUse.id}`);
+  redirect(buildThreadRedirect(conversationToUse.id, participantRole as MessageRoleContext));
 }

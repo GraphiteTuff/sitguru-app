@@ -266,6 +266,7 @@ function getDashboardHref(role?: string | null) {
   const normalizedRole = normalizeRole(role);
 
   if (normalizedRole === "guru") return "/guru/dashboard";
+  if (normalizedRole === "ambassador") return "/ambassador/dashboard";
   if (normalizedRole === "admin") return "/admin";
 
   return "/customer/dashboard";
@@ -585,14 +586,24 @@ function isMessageFromCurrentUser({
 
 export default async function MessageConversationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{
     conversationId?: string;
     conversationid?: string;
     id?: string;
   }>;
+  searchParams?: Promise<{
+    role?: string;
+    as?: string;
+    contextRole?: string;
+  }>;
 }) {
   const routeParams = await params;
+  const queryParams = searchParams ? await searchParams : {};
+  const requestedRoleContext = normalizeRole(
+    queryParams.role || queryParams.as || queryParams.contextRole || "",
+  );
   const conversationId =
     routeParams.conversationId || routeParams.conversationid || routeParams.id || "";
 
@@ -724,7 +735,8 @@ export default async function MessageConversationPage({
 
   const currentUserProfile = profileMap.get(user.id) || null;
   const currentUserRole = normalizeRole(
-    participantRoleMap.get(user.id) ||
+    requestedRoleContext ||
+      participantRoleMap.get(user.id) ||
       currentUserProfile?.role ||
       currentUserProfile?.account_type ||
       (user.id === conversation.customer_id
@@ -736,10 +748,12 @@ export default async function MessageConversationPage({
 
   const inboxHref =
     currentUserRole === "guru"
-      ? "/guru/dashboard/messages"
-      : currentUserRole === "admin"
-        ? "/admin/messages"
-        : "/messages";
+      ? "/guru/dashboard/messages?role=guru"
+      : currentUserRole === "ambassador"
+        ? "/ambassador/dashboard/messages?role=ambassador"
+        : currentUserRole === "admin"
+          ? "/admin/messages"
+          : "/customer/dashboard/messages?role=customer";
 
   const otherParticipantId =
     Array.from(allowedUserIds).find((participantId) => participantId !== user.id) ||

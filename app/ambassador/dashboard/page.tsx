@@ -734,7 +734,7 @@ export default async function AmbassadorDashboardPage() {
                 </Link>
 
                 <Link
-                  href="/ambassador/dashboard/messages?support=admin"
+                  href="/ambassador/dashboard/messages?support=admin&role=ambassador"
                   className="flex min-h-14 items-center justify-between rounded-2xl border border-green-200 bg-white px-5 py-4 text-sm font-black text-green-900 transition hover:bg-green-50"
                 >
                   Message Center
@@ -773,14 +773,14 @@ export default async function AmbassadorDashboardPage() {
             />
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Link
-                href="/ambassador/dashboard/messages"
+                href="/ambassador/dashboard/messages?role=ambassador"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
               >
                 Open Message Center
                 <ArrowRight size={17} />
               </Link>
               <Link
-                href="/ambassador/dashboard/messages?support=admin"
+                href="/ambassador/dashboard/messages?support=admin&role=ambassador"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
               >
                 Message SitGuru Admin
@@ -1080,7 +1080,7 @@ export default async function AmbassadorDashboardPage() {
                 professional.
               </ReminderItem>
               <Link
-                href="/ambassador/dashboard/messages?support=admin"
+                href="/ambassador/dashboard/messages?support=admin&role=ambassador"
                 className="flex items-start gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm font-bold leading-6 text-green-950 transition hover:bg-green-100"
               >
                 <MessageCircle size={17} className="mt-1 shrink-0 text-green-800" />
@@ -1168,7 +1168,7 @@ export default async function AmbassadorDashboardPage() {
                 Invite 5 people to follow @SitGuruOfficial.
               </ReminderItem>
               <Link
-                href="/ambassador/dashboard/messages?support=admin"
+                href="/ambassador/dashboard/messages?support=admin&role=ambassador"
                 className="flex items-start gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm font-bold leading-6 text-green-950 transition hover:bg-green-100"
               >
                 <MessageCircle size={17} className="mt-1 shrink-0 text-green-800" />
@@ -1273,7 +1273,7 @@ export default async function AmbassadorDashboardPage() {
                 </div>
 
                 <Link
-                  href="/ambassador/dashboard/messages?support=admin"
+                  href="/ambassador/dashboard/messages?support=admin&role=ambassador"
                   className="mb-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
                 >
                   Open SitGuru Admin Chat
@@ -1469,7 +1469,7 @@ export default async function AmbassadorDashboardPage() {
               detail="Open Ambassador quick chat for referrals, rewards, partners, events, missing tracking, or local outreach support."
             />
             <Link
-              href="/ambassador/dashboard/messages?support=admin"
+              href="/ambassador/dashboard/messages?support=admin&role=ambassador"
               className="mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
             >
               Message SitGuru Admin

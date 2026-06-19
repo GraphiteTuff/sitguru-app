@@ -6,6 +6,8 @@ type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+const ROLE_CONTEXT = "ambassador";
+
 function buildQueryString(params: Record<string, string | string[] | undefined>) {
   const query = new URLSearchParams();
 
@@ -21,6 +23,10 @@ function buildQueryString(params: Record<string, string | string[] | undefined>)
 
     query.set(key, value);
   });
+
+  if (!query.has("role") && !query.has("as") && !query.has("contextRole")) {
+    query.set("role", ROLE_CONTEXT);
+  }
 
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
