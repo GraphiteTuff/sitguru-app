@@ -42,15 +42,15 @@ function formatDateTime(value: string | null): string {
 }
 
 function getUpdateLabel(type: string): string {
-  if (type === "visit_started") return "Visit started";
-  if (type === "visit_ended") return "Visit completed";
+  if (type === "visit_started") return "PawReport started";
+  if (type === "visit_ended") return "PawReport completed";
   if (type === "pee") return "Pee update";
   if (type === "poop") return "Poop update";
   if (type === "water") return "Water refreshed";
   if (type === "food") return "Food update";
   if (type === "photo") return "Photo added";
   if (type === "note") return "Care note";
-  return "Visit update";
+  return "PawReport update";
 }
 
 function getUpdateIcon(type: string): string {
@@ -96,20 +96,20 @@ export default function VisitUpdateTimeline({
       <div className="overflow-hidden rounded-3xl border border-slate-200 !bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-5 sm:p-6">
           <p className="text-sm font-semibold !text-sky-700">
-            SitGuru Visit Card
+            SitGuru PawReport™
           </p>
 
           <h1 className="mt-1 text-2xl font-bold !text-slate-950 sm:text-3xl">
             {completed
-              ? "Visit completed"
+              ? "PawReport completed"
               : inProgress
-                ? "Visit in progress"
-                : "Visit updates"}
+                ? "PawReport in progress"
+                : "PawReport"}
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm !text-slate-700 sm:text-base">
-            Photos, care notes, potty updates, and visit timing in one simple
-            place.
+            Photos, potty updates, food and water updates, care notes, and visit
+            timing in one warm, easy-to-read report.
           </p>
         </div>
 
@@ -125,7 +125,7 @@ export default function VisitUpdateTimeline({
 
           <div className="rounded-2xl border border-slate-200 !bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-wide !text-slate-600">
-              Ended
+              Completed
             </p>
             <p className="mt-1 font-bold !text-slate-950">
               {formatDateTime(session?.ended_at ?? null)}
@@ -148,7 +148,7 @@ export default function VisitUpdateTimeline({
         {session?.final_note ? (
           <div className="mx-5 mb-5 rounded-2xl border border-emerald-200 !bg-emerald-50 p-4 sm:mx-6 sm:mb-6">
             <p className="text-xs uppercase tracking-wide !text-emerald-700">
-              Final note
+              Final care note
             </p>
             <p className="mt-1 text-sm leading-6 !text-emerald-950">
               {session.final_note}
@@ -159,7 +159,9 @@ export default function VisitUpdateTimeline({
 
       {photos.length > 0 ? (
         <div className="rounded-3xl border border-slate-200 !bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-lg font-bold !text-slate-950">Visit photos</h2>
+          <h2 className="text-lg font-bold !text-slate-950">
+            PawReport photos
+          </h2>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {photos.map((photo) => (
@@ -173,7 +175,7 @@ export default function VisitUpdateTimeline({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={photo.photo_url || ""}
-                  alt="Visit update"
+                  alt="PawReport update"
                   className="aspect-square h-full w-full object-cover transition group-hover:scale-105"
                 />
               </a>
@@ -184,10 +186,12 @@ export default function VisitUpdateTimeline({
 
       <div className="rounded-3xl border border-slate-200 !bg-white p-5 shadow-sm sm:p-6">
         <div>
-          <h2 className="text-lg font-bold !text-slate-950">Visit timeline</h2>
+          <h2 className="text-lg font-bold !text-slate-950">
+            PawReport timeline
+          </h2>
           <p className="mt-1 text-sm !text-slate-700">
             {viewer === "guru"
-              ? "Your updates appear here after you add them."
+              ? "Your PawReport updates appear here after you add them."
               : "Updates from your Guru will appear here."}
           </p>
         </div>
@@ -196,10 +200,10 @@ export default function VisitUpdateTimeline({
           <div className="mt-5 rounded-2xl border border-dashed border-slate-300 !bg-slate-50 p-6 text-center">
             <p className="text-3xl !text-slate-950">🐾</p>
             <h3 className="mt-2 font-bold !text-slate-950">
-              No visit updates yet
+              No PawReport updates yet
             </h3>
             <p className="mt-1 text-sm !text-slate-700">
-              Once the visit starts, updates will appear here.
+              Once the PawReport starts, updates will appear here.
             </p>
           </div>
         ) : (
