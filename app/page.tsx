@@ -793,7 +793,15 @@ function HomepageAssistPopup({
           cache: "no-store",
         });
 
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (response.status === 404) {
+            window.localStorage.removeItem("sitguru-homepage-messenger-session");
+            setSession(null);
+            setMessages([]);
+          }
+
+          return;
+        }
 
         const payload = (await response.json().catch(() => null)) as {
           messages?: HomepageMessengerMessage[];

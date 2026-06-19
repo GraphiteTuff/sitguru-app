@@ -219,7 +219,25 @@ async function getSession(conversationId: string, token: string) {
 
   if (error || !data?.id) return null;
 
-  return data as HomepageMessengerSessionRow;
+  const session = data as HomepageMessengerSessionRow;
+
+  const { data: conversation } = await supabaseAdmin
+    .from("conversations")
+    .select("id")
+    .eq("id", session.conversation_id)
+    .maybeSingle();
+
+  if (!conversation?.id) {
+    await supabaseAdmin
+      .from("homepage_messenger_sessions")
+      .delete()
+      .eq("conversation_id", session.conversation_id)
+      .eq("visitor_token", session.visitor_token);
+
+    return null;
+  }
+
+  return session;
 }
 
 async function loadConversationMessages(conversationId: string) {
