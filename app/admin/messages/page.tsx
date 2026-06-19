@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import {
   AlertTriangle,
+  Archive,
   BadgeHelp,
   CalendarCheck,
   CheckCircle2,
@@ -13,12 +14,14 @@ import {
   Download,
   Handshake,
   Inbox,
+  MailForward,
   MessageCircle,
   MessagesSquare,
   Search,
   Send,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
   UserRound,
   UsersRound,
   Wrench,
@@ -210,6 +213,8 @@ type AdminThreadCard = {
   visitorName: string | null;
   visitorAvatar: string;
   visitorRoleLabel: string | null;
+  contactName: string;
+  contactEmail: string;
   unreadCount: number;
   status: string;
   messageCount: number;
@@ -272,6 +277,8 @@ const filterLinks = [
   },
   { key: "unread", label: "Unread", href: "/admin/messages?filter=unread" },
   { key: "read", label: "Read", href: "/admin/messages?filter=read" },
+  { key: "archived", label: "Archived", href: "/admin/messages?filter=archived" },
+  { key: "deleted", label: "Deleted", href: "/admin/messages?filter=deleted" },
   {
     key: "escalations",
     label: "Escalations",
@@ -755,6 +762,8 @@ function getMessageBody(message?: MessageRow | null) {
 }
 
 function isUnreadMessage(message: MessageRow) {
+  if (message.is_deleted) return false;
+
   const status = asString(message.status).toLowerCase();
 
   if (message.is_read === false) return true;
@@ -1650,6 +1659,260 @@ async function safeRows<T>(
   return Array.isArray(result.data) ? (result.data as unknown as T[]) : [];
 }
 
+
+function buildQueueActionRedirect(params: {
+  composeSuccess?: string;
+  composeError?: string;
+  conversationId?: string;
+}) {
+  const query = new URLSearchParams();
+
+  if (params.composeSuccess) query.set("compose_success", params.composeSuccess);
+  if (params.composeError) query.set("compose_error", params.composeError);
+  if (params.conversationId) query.set("conversationId", params.conversationId);
+
+  const queryString = query.toString();
+  return queryString ? `/admin/messages?${queryString}` : "/admin/messages";
+}
+
+async function getAdminActionUser() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    redirect("/admin/login");
+  }
+
+  return user;
+}
+
+async function archiveConversationThread(formData: FormData) {
+  "use server";
+
+  await getAdminActionUser();
+
+  const conversationId = String(formData.get("conversationId") || "").trim();
+
+  if (!conversationId) {
+    redirect(buildQueueActionRedirect({ composeError: "missing_conversation" }));
+  }
+
+  const now = new Date().toISOString();
+
+  await supabaseAdmin
+    .from("conversations")
+    .update({
+      status: "archived",
+      updated_at: now,
+    })
+    .eq("id", conversationId);
+
+  await supabaseAdmin
+    .from("messages")
+    .update({
+      status: "archived",
+    })
+    .eq("conversation_id", conversationId);
+
+  revalidatePath("/admin/messages");
+  revalidatePath(`/admin/messages/${conversationId}`);
+
+  redirect(
+    buildQueueActionRedirect({
+      composeSuccess: "archived",
+      conversationId,
+    }),
+  );
+}
+
+async function deleteConversationThread(formData: FormData) {
+  "use server";
+
+  await getAdminActionUser();
+
+  const conversationId = String(formData.get("conversationId") || "").trim();
+
+  if (!conversationId) {
+    redirect(buildQueueActionRedirect({ composeError: "missing_conversation" }));
+  }
+
+  const now = new Date().toISOString();
+
+  await supabaseAdmin
+    .from("conversations")
+    .update({
+      status: "deleted",
+      updated_at: now,
+    })
+    .eq("id", conversationId);
+
+  await supabaseAdmin
+    .from("messages")
+    .update({
+      is_deleted: true,
+      status: "deleted",
+    })
+    .eq("conversation_id", conversationId);
+
+  revalidatePath("/admin/messages");
+  revalidatePath(`/admin/messages/${conversationId}`);
+
+  redirect(
+    buildQueueActionRedirect({
+      composeSuccess: "deleted",
+      conversationId,
+    }),
+  );
+}
+
+async function buildConversationTranscript(conversationId: string) {
+  const [conversationResult, messagesResult] = await Promise.all([
+    supabaseAdmin
+      .from("conversations")
+      .select("*")
+      .eq("id", conversationId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  const conversation = conversationResult.data as ConversationRow | null;
+  const messages = ((messagesResult.data || []) as MessageRow[]).filter(
+    (message) => !message.is_deleted,
+  );
+
+  const subject = conversation?.subject || "SitGuru Message Thread";
+  const transcriptLines = messages.map((message) => {
+    const sender =
+      asString(message.sender_name_snapshot) ||
+      asString(message.sender_email_snapshot) ||
+      getMessageSenderRole(message) ||
+      "SitGuru User";
+    const createdAt = message.created_at
+      ? new Date(message.created_at).toLocaleString("en-US")
+      : "Unknown time";
+    const body = getMessageBody(message) || "[No message body]";
+
+    return `[${createdAt}] ${sender}:\n${body}`;
+  });
+
+  return {
+    subject,
+    text: transcriptLines.length
+      ? transcriptLines.join("\n\n---\n\n")
+      : "No visible messages were found in this thread.",
+    messageCount: messages.length,
+  };
+}
+
+async function sendConversationThread(formData: FormData) {
+  "use server";
+
+  const user = await getAdminActionUser();
+
+  const conversationId = String(formData.get("conversationId") || "").trim();
+  const recipientEmail = String(formData.get("recipientEmail") || "").trim();
+  const recipientName =
+    String(formData.get("recipientName") || "").trim() || recipientEmail;
+
+  if (!conversationId) {
+    redirect(buildQueueActionRedirect({ composeError: "missing_conversation" }));
+  }
+
+  if (!recipientEmail) {
+    redirect(
+      buildQueueActionRedirect({
+        composeError: "missing_thread_email",
+        conversationId,
+      }),
+    );
+  }
+
+  const apiKey = asString(process.env.RESEND_API_KEY);
+
+  if (!apiKey) {
+    redirect(
+      buildQueueActionRedirect({
+        composeError: "missing_resend_key",
+        conversationId,
+      }),
+    );
+  }
+
+  const transcript = await buildConversationTranscript(conversationId);
+  const resend = new Resend(apiKey);
+  const safeRecipientName = escapeHtml(recipientName || "there");
+  const safeSubject = escapeHtml(transcript.subject);
+  const safeTranscript = escapeHtml(transcript.text).replaceAll("\n", "<br />");
+
+  const result = await resend.emails.send({
+    from: getSupportFromEmail(),
+    to: [recipientEmail],
+    replyTo: getSupportReplyToEmail(),
+    subject: `SitGuru Conversation Thread: ${transcript.subject}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; background: #f6fbf7; padding: 24px;">
+        <div style="max-width: 720px; margin: 0 auto; background: #ffffff; border: 1px solid #dcefe2; border-radius: 18px; overflow: hidden;">
+          <div style="background: #0f5132; color: #ffffff; padding: 24px;">
+            <h1 style="margin: 0; font-size: 24px;">SitGuru Conversation Thread</h1>
+            <p style="margin: 8px 0 0; color: #d9f7e5;">${safeSubject}</p>
+          </div>
+          <div style="padding: 24px; color: #123524;">
+            <p style="font-size: 16px; line-height: 1.6;">Hi ${safeRecipientName},</p>
+            <p style="font-size: 16px; line-height: 1.6;">
+              SitGuru Admin sent you a copy of this conversation thread for your records.
+            </p>
+            <div style="margin-top: 20px; padding: 16px; border: 1px solid #dcefe2; border-radius: 14px; background: #fbfefc; font-size: 14px; line-height: 1.6; color: #1f3b2b;">
+              ${safeTranscript}
+            </div>
+            <p style="margin-top: 20px; font-size: 13px; color: #607568; line-height: 1.6;">
+              Sent by ${escapeHtml(user.email || "SitGuru Admin")} from the SitGuru Admin Message Center.
+            </p>
+          </div>
+        </div>
+      </div>
+    `,
+    text: [
+      `Hi ${recipientName || "there"},`,
+      "",
+      "SitGuru Admin sent you a copy of this conversation thread for your records.",
+      "",
+      `Subject: ${transcript.subject}`,
+      "",
+      transcript.text,
+      "",
+      `Sent by ${user.email || "SitGuru Admin"}.`,
+    ].join("\n"),
+  });
+
+  if (result.error) {
+    console.error("Conversation transcript email failed:", result.error);
+    redirect(
+      buildQueueActionRedirect({
+        composeError: "thread_send_failed",
+        conversationId,
+      }),
+    );
+  }
+
+  revalidatePath("/admin/messages");
+  revalidatePath(`/admin/messages/${conversationId}`);
+
+  redirect(
+    buildQueueActionRedirect({
+      composeSuccess: "thread_sent",
+      conversationId,
+    }),
+  );
+}
+
 async function createInternalThread(formData: FormData) {
   "use server";
 
@@ -1978,17 +2241,38 @@ function AdminComposeNotice({
   composeSuccess?: string;
   conversationId?: string;
 }) {
-  if (composeSuccess === "sent") {
+  if (["sent", "archived", "deleted", "thread_sent"].includes(composeSuccess || "")) {
+    const successMessages: Record<string, { title: string; body: string }> = {
+      sent: {
+        title: "Message sent successfully",
+        body:
+          "The conversation thread was created, the first message was saved, and the recipient was marked with an unread SitGuru message.",
+      },
+      archived: {
+        title: "Thread archived",
+        body: "The conversation was moved out of the active Admin queue.",
+      },
+      deleted: {
+        title: "Thread deleted from queue",
+        body:
+          "The conversation was soft-deleted from the active Admin queue while preserving database history.",
+      },
+      thread_sent: {
+        title: "Thread sent",
+        body: "A copy of the conversation thread was emailed to the selected contact.",
+      },
+    };
+    const success = successMessages[composeSuccess || "sent"] || successMessages.sent;
+
     return (
       <section className="rounded-[26px] border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-3">
             <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-700" />
             <div>
-              <h2 className="text-lg font-black">Message sent successfully</h2>
+              <h2 className="text-lg font-black">{success.title}</h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-emerald-900">
-                The conversation thread was created, the first message was saved,
-                and the recipient was marked with an unread SitGuru message.
+                {success.body}
               </p>
             </div>
           </div>
@@ -2017,6 +2301,14 @@ function AdminComposeNotice({
       "The message thread could not be created. If this was an Admin-to-Guru or Admin-to-Ambassador message, confirm the conversations table allows customer_id and guru_id to be blank when started_by_user_id is present.",
     message_create_failed:
       "The conversation was created, but the first message could not be saved. Please try again or check the messages table requirements.",
+    missing_conversation:
+      "The conversation could not be confirmed. Please refresh and try again.",
+    missing_thread_email:
+      "This thread does not have an email address available for sending. Ask the contact for an email or open the thread first.",
+    missing_resend_key:
+      "Resend is not configured, so SitGuru could not email the thread.",
+    thread_send_failed:
+      "SitGuru could not email the thread. Please check the recipient email and try again.",
   };
 
   return (
@@ -2391,11 +2683,10 @@ function InternalComposer({
 }
 
 function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
+  const canSendThread = Boolean(thread.contactEmail);
+
   return (
-    <Link
-      href={thread.href}
-      className="block rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md"
-    >
+    <article className="block rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -2506,16 +2797,59 @@ function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
         </div>
 
         <div className="flex shrink-0 flex-col gap-2 lg:items-end">
-          <span className="rounded-2xl border border-green-100 bg-[#f7faf4] px-4 py-3 text-sm font-black text-green-900">
+          <Link
+            href={thread.href}
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-green-100 bg-[#f7faf4] px-4 py-3 text-sm font-black text-green-900 transition hover:border-green-200 hover:bg-green-50"
+          >
             Open Chat →
-          </span>
+          </Link>
+
+          <div className="grid w-full gap-2 sm:grid-cols-3 lg:w-[360px]">
+            <form action={sendConversationThread}>
+              <input type="hidden" name="conversationId" value={thread.id} />
+              <input type="hidden" name="recipientEmail" value={thread.contactEmail} />
+              <input type="hidden" name="recipientName" value={thread.contactName} />
+              <button
+                type="submit"
+                disabled={!canSendThread}
+                title={canSendThread ? "Email this thread to the contact" : "No contact email available"}
+                className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <MailForward size={14} />
+                Send
+              </button>
+            </form>
+
+            <form action={archiveConversationThread}>
+              <input type="hidden" name="conversationId" value={thread.id} />
+              <button
+                type="submit"
+                className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-900 transition hover:bg-amber-100"
+              >
+                <Archive size={14} />
+                Archive
+              </button>
+            </form>
+
+            <form action={deleteConversationThread}>
+              <input type="hidden" name="conversationId" value={thread.id} />
+              <button
+                type="submit"
+                className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800 transition hover:bg-rose-100"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            </form>
+          </div>
+
           <span className="text-xs font-bold text-slate-400">
-            {number(thread.messageCount)} messages · Saves to message centers · Last activity{" "}
+            {number(thread.messageCount)} messages · {thread.contactEmail ? `Sendable to ${thread.contactEmail}` : "No email on file"} · Last activity{" "}
             {formatDate(thread.lastActivity)}
           </span>
         </div>
       </div>
-    </Link>
+    </article>
   );
 }
 
@@ -2795,6 +3129,41 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
     const normalizedTopic = topic.toLowerCase();
     const isHomepageThread = isHomepageVisitorThread({ conversation, messages, topic });
     const homepageVisitorName = isHomepageThread ? getHomepageVisitorName(messages) : null;
+    const visitorEmail = isHomepageThread
+      ? asString(
+          [...messages]
+            .reverse()
+            .find((message) => {
+              const senderRole = getMessageSenderRole(message);
+              const search = `${message.message_type || ""} ${message.topic || ""} ${message.sender_role || ""} ${message.sender_role_snapshot || ""}`.toLowerCase();
+
+              return (
+                asString(message.sender_email_snapshot) &&
+                (senderRole === "visitor" ||
+                  senderRole === "user" ||
+                  search.includes("homepage") ||
+                  search.includes("visitor"))
+              );
+            })?.sender_email_snapshot,
+        )
+      : "";
+    const snapshotContactEmail =
+      asString(
+        [...messages]
+          .reverse()
+          .find((message) =>
+            asString(message.sender_email_snapshot) &&
+            getMessageSenderRole(message) !== "admin",
+          )?.sender_email_snapshot,
+      ) ||
+      asString(
+        [...messages]
+          .reverse()
+          .find((message) =>
+            asString(message.recipient_email_snapshot) &&
+            getMessageRecipientRole(message) !== "admin",
+          )?.recipient_email_snapshot,
+      );
     const subject = conversation?.subject || (isHomepageThread ? "Homepage Messenger" : "SitGuru Message Thread");
 
     let type: AdminThreadCard["type"] = "general";
@@ -2832,6 +3201,18 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       conversation?.status ||
       latestMessage?.status ||
       (unreadCount > 0 ? "Unread" : "Open");
+    const contactName =
+      homepageVisitorName ||
+      (customerProfile ? getProfileName(customerProfile) : "") ||
+      (guruProfile ? getProfileName(guruProfile) : "") ||
+      (ambassadorProfile ? getProfileName(ambassadorProfile) : "") ||
+      "SitGuru Contact";
+    const contactEmail =
+      visitorEmail ||
+      asString(customerProfile?.email) ||
+      asString(guruProfile?.email) ||
+      asString(ambassadorProfile?.email) ||
+      snapshotContactEmail;
 
     return {
       id: threadKey,
@@ -2899,6 +3280,8 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       visitorName: homepageVisitorName,
       visitorAvatar: "",
       visitorRoleLabel: isHomepageThread ? "Website Visitor" : null,
+      contactName,
+      contactEmail,
       unreadCount,
       status,
       messageCount: messages.length,
@@ -2908,6 +3291,13 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
 
   const filteredThreads = allThreads
     .filter((thread) => {
+      const normalizedStatus = asString(thread.status).toLowerCase();
+      const isArchived = normalizedStatus === "archived";
+      const isDeleted = normalizedStatus === "deleted";
+
+      if (activeFilter === "archived") return isArchived;
+      if (activeFilter === "deleted") return isDeleted;
+      if (isArchived || isDeleted) return false;
       if (activeFilter === "unread") return thread.unreadCount > 0;
       if (activeFilter === "read") return thread.unreadCount === 0;
       if (activeFilter === "escalations") return isEscalationThread(thread);
