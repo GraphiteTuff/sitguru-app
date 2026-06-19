@@ -508,6 +508,12 @@ function GoogleIcon() {
   );
 }
 
+function shouldAutoOpenHomepageMessenger() {
+  if (typeof window === "undefined") return true;
+
+  return window.matchMedia("(min-width: 640px)").matches;
+}
+
 function detectSourceFromUrl() {
   if (typeof window === "undefined") return "direct";
 
@@ -804,7 +810,10 @@ function HomepageAssistPopup({
             }));
           }
 
-          setIsOpen(true);
+          if (shouldAutoOpenHomepageMessenger()) {
+            setIsOpen(true);
+          }
+
           return;
         }
       } catch {
@@ -815,6 +824,8 @@ function HomepageAssistPopup({
     const dismissed = window.sessionStorage.getItem(messengerDismissedStorageKey);
 
     if (dismissed === "true") return;
+
+    if (!shouldAutoOpenHomepageMessenger()) return;
 
     const timer = window.setTimeout(() => {
       setIsOpen(true);
@@ -838,8 +849,11 @@ function HomepageAssistPopup({
       latestAdminMessageId !== latestAdminMessageIdRef.current
     ) {
       setHasNewAdminReply(true);
-      setIsOpen(true);
-      setFormSuccess("SitGuru Admin replied. You can continue the conversation here.");
+
+      if (shouldAutoOpenHomepageMessenger()) {
+        setIsOpen(true);
+        setFormSuccess("SitGuru Admin replied. You can continue the conversation here.");
+      }
     }
 
     if (latestAdminMessageId) {
@@ -1291,7 +1305,7 @@ function HomepageAssistPopup({
               </button>
 
               <p className="text-[11px] font-semibold leading-4 text-slate-500">
-                SitGuru Admin is notified immediately. Replies appear here in real time.
+                SitGuru Admin is notified immediately. Replies appear here in real time while this browser session stays open.
               </p>
             </form>
           </div>
@@ -1303,7 +1317,7 @@ function HomepageAssistPopup({
             setIsOpen(true);
             setHasNewAdminReply(false);
           }}
-          className={`flex min-h-13 w-full items-center justify-center gap-2 rounded-full px-4 py-3.5 text-sm font-black text-white shadow-[0_18px_45px_rgba(15,23,42,0.25)] transition sm:min-h-14 sm:w-auto sm:px-5 sm:py-4 ${
+          className={`flex min-h-13 w-full items-center justify-center gap-2 rounded-full px-4 py-3.5 text-sm font-black text-white shadow-[0_18px_45px_rgba(15,23,42,0.25)] transition sm:min-h-10 sm:w-auto sm:px-4 sm:py-2.5 sm:text-xs sm:shadow-[0_12px_30px_rgba(15,23,42,0.20)] ${
             hasNewAdminReply
               ? "bg-amber-500 hover:bg-amber-600"
               : "bg-emerald-700 hover:bg-emerald-800"
