@@ -8,6 +8,12 @@ import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
+declare global {
+  interface Window {
+    $crisp?: unknown[][];
+  }
+}
+
 const openSans = Open_Sans({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
@@ -713,6 +719,78 @@ function TrustRow() {
   );
 }
 
+function pushCrispCommand(command: unknown[]) {
+  if (typeof window === "undefined") return;
+
+  window.$crisp = window.$crisp || [];
+  window.$crisp.push(command);
+}
+
+function openCrispConversation({
+  fullName,
+  email,
+  phone,
+  topic,
+  message,
+  source,
+}: {
+  fullName: string;
+  email: string;
+  phone: string;
+  topic: HomepageAssistTopic;
+  message: string;
+  source: string;
+}) {
+  if (typeof window === "undefined") return;
+
+  const topicLabel = homepageAssistTopicLabels[topic] || "General";
+  const contactName = fullName.trim();
+  const contactEmail = email.trim();
+  const contactPhone = phone.trim();
+  const visitorMessage = [
+    `Homepage help request: ${topicLabel}`,
+    contactName ? `Name: ${contactName}` : "",
+    contactEmail ? `Email: ${contactEmail}` : "",
+    contactPhone ? `Phone: ${contactPhone}` : "",
+    "",
+    message.trim(),
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  if (contactName) {
+    pushCrispCommand(["set", "user:nickname", [contactName]]);
+  }
+
+  if (contactEmail) {
+    pushCrispCommand(["set", "user:email", [contactEmail]]);
+  }
+
+  if (contactPhone) {
+    pushCrispCommand(["set", "user:phone", [contactPhone]]);
+  }
+
+  pushCrispCommand([
+    "set",
+    "session:data",
+    [
+      [
+        ["source", "homepage-assist-popup"],
+        ["traffic_source", source || "direct"],
+        ["topic", topicLabel],
+        ["page", `${window.location.pathname}${window.location.search}`],
+      ],
+    ],
+  ]);
+
+  pushCrispCommand(["do", "chat:open"]);
+  pushCrispCommand(["do", "message:send", ["text", visitorMessage]]);
+
+  window.setTimeout(() => {
+    pushCrispCommand(["do", "chat:open"]);
+  }, 500);
+}
+
 function HomepageAssistPopup({
   source,
   onTrack,
@@ -820,7 +898,18 @@ function HomepageAssistPopup({
         },
       });
 
-      setFormSuccess("Thanks — SitGuru received your message.");
+      openCrispConversation({
+        fullName: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        topic: form.topic,
+        message: cleanMessage,
+        source,
+      });
+
+      setFormSuccess(
+        "Thanks — SitGuru Admin was notified. Opening live chat now so we can keep the conversation going.",
+      );
       setForm(initialHomepageAssistForm);
     } catch (error) {
       setFormError(
@@ -847,15 +936,18 @@ function HomepageAssistPopup({
           <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-sky-500 px-4 py-4 text-white">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-50">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-50">
+                  <span aria-hidden="true" className="text-base">
+                    🐾
+                  </span>
                   SitGuru Help
-                </p>
+                </div>
                 <h2 className="mt-1 text-xl font-black leading-tight text-white">
-                  Need assistance?
+                  Hi, welcome to SitGuru!
                 </h2>
                 <p className="mt-1 text-sm font-semibold leading-5 text-white/90">
-                  We can help you find care, become a Guru, or join the
-                  Ambassador program.
+                  We are here for you. Ask us anything about finding care,
+                  becoming a Guru, or joining as an Ambassador.
                 </p>
               </div>
 
@@ -936,7 +1028,7 @@ function HomepageAssistPopup({
                 value={form.message}
                 onChange={(event) => updateAssistField("message", event.target.value)}
                 rows={3}
-                placeholder="Type your question..."
+                placeholder="How can we help today?"
                 className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
               />
 
@@ -972,7 +1064,14 @@ function HomepageAssistPopup({
 
               {formSuccess ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">
-                  {formSuccess}
+                  <p>{formSuccess}</p>
+                  <button
+                    type="button"
+                    onClick={() => pushCrispCommand(["do", "chat:open"])}
+                    className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-800"
+                  >
+                    Open live chat
+                  </button>
                 </div>
               ) : null}
 
@@ -985,7 +1084,7 @@ function HomepageAssistPopup({
               </button>
 
               <p className="text-[11px] font-semibold leading-4 text-slate-500">
-                SitGuru Admin is notified when you submit this message.
+                SitGuru Admin is notified immediately, and live chat opens after you submit.
               </p>
             </form>
           </div>
@@ -996,7 +1095,7 @@ function HomepageAssistPopup({
           onClick={() => setIsOpen(true)}
           className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 py-4 text-sm font-black text-white shadow-[0_18px_45px_rgba(15,23,42,0.25)] transition hover:bg-emerald-800 sm:w-auto"
         >
-          💬 Need help with SitGuru?
+          🐾 Hi! Need help with SitGuru?
         </button>
       )}
     </div>
