@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import Header from "@/components/Header";
 import MessageThreadComposer from "@/components/MessageThreadComposer";
 import MessageAutoRefresh from "@/components/MessageAutoRefresh";
+import MessageRealtimeRefresh from "@/components/MessageRealtimeRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -426,6 +427,8 @@ function SitGuruQuickReplyBox({
   otherName,
   otherRole,
   otherImageUrl,
+  currentUserName,
+  currentUserImageUrl,
   messages,
   inboxHref,
 }: {
@@ -435,6 +438,8 @@ function SitGuruQuickReplyBox({
   otherName: string;
   otherRole: string;
   otherImageUrl?: string | null;
+  currentUserName: string;
+  currentUserImageUrl?: string | null;
   messages: MessageRow[];
   inboxHref: string;
 }) {
@@ -484,8 +489,12 @@ function SitGuruQuickReplyBox({
             return (
               <div
                 key={`quick-${message.id}`}
-                className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}
               >
+                {!mine ? (
+                  <Avatar name={otherName} imageUrl={otherImageUrl} compact />
+                ) : null}
+
                 <div
                   className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm font-semibold leading-5 shadow-sm ${
                     mine
@@ -504,6 +513,14 @@ function SitGuruQuickReplyBox({
                     {mine ? "You" : getReadableRole(otherRole)} · {formatMessageTime(message.created_at)}
                   </p>
                 </div>
+
+                {mine ? (
+                  <Avatar
+                    name={currentUserName}
+                    imageUrl={currentUserImageUrl}
+                    compact
+                  />
+                ) : null}
               </div>
             );
           })
@@ -771,6 +788,7 @@ export default async function MessageConversationPage({
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_30%),linear-gradient(180deg,#ffffff,#f2fbf7_48%,#ffffff)] text-slate-950">
       <Header />
       <MessageAutoRefresh intervalMs={1000} />
+      <MessageRealtimeRefresh conversationId={conversation.id} currentUserId={user.id} />
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.10)]">
@@ -1059,6 +1077,11 @@ export default async function MessageConversationPage({
         otherName={otherName}
         otherRole={otherRole}
         otherImageUrl={otherImageUrl}
+        currentUserName={getDisplayNameForRole(currentUserProfile, currentUserRole)}
+        currentUserImageUrl={getMessageAvatarUrl({
+          senderRole: currentUserRole,
+          profileImageUrl: getProfilePhotoUrl(currentUserProfile),
+        })}
         messages={safeMessages}
         inboxHref={inboxHref}
       />

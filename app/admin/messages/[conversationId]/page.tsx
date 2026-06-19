@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import MessageRealtimeRefresh from "@/components/MessageRealtimeRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -1108,28 +1109,31 @@ function DeliveryBanner({
     const parts = safeString(delivery).split("_");
 
     return (
-      <section className="rounded-[26px] border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 shadow-sm">
-        <div className="flex gap-3">
-          <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-700" />
-          <div>
-            <h2 className="text-lg font-black">Message sent</h2>
-            <p className="mt-1 text-sm font-semibold leading-6">
-              SitGuru saved the message and attempted delivery alerts.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-black text-green-900 ring-1 ring-green-100">
-                <Bell className="h-3.5 w-3.5" />
-                In-app notification {parts.includes("app") ? "sent" : "not sent"}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-black text-green-900 ring-1 ring-green-100">
-                <Mail className="h-3.5 w-3.5" />
-                Email {parts.includes("email") ? "sent" : "not sent"}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-black text-green-900 ring-1 ring-green-100">
-                <Smartphone className="h-3.5 w-3.5" />
-                Text {parts.includes("sms") ? "sent" : "not sent"}
-              </span>
+      <section className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-700" />
+            <div>
+              <h2 className="text-base font-black">Message sent</h2>
+              <p className="text-xs font-semibold text-emerald-900">
+                Saved to the thread and delivery alerts were attempted.
+              </p>
             </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-green-900 ring-1 ring-green-100">
+              <Bell className="h-3 w-3" />
+              In-app {parts.includes("app") ? "sent" : "not sent"}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-green-900 ring-1 ring-green-100">
+              <Mail className="h-3 w-3" />
+              Email {parts.includes("email") ? "sent" : "not sent"}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-green-900 ring-1 ring-green-100">
+              <Smartphone className="h-3 w-3" />
+              Text {parts.includes("sms") ? "sent" : "not sent"}
+            </span>
           </div>
         </div>
       </section>
@@ -1146,12 +1150,13 @@ function DeliveryBanner({
         : "The admin message could not be saved. Please check the messages table and try again.";
 
   return (
-    <section className="rounded-[26px] border border-rose-200 bg-rose-50 p-5 text-rose-950 shadow-sm">
-      <h2 className="text-lg font-black">Message was not sent</h2>
-      <p className="mt-1 text-sm font-semibold leading-6">{message}</p>
+    <section className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-950 shadow-sm">
+      <h2 className="text-base font-black">Message was not sent</h2>
+      <p className="mt-1 text-xs font-semibold leading-5">{message}</p>
     </section>
   );
 }
+
 
 function StatCard({
   label,
@@ -1546,6 +1551,7 @@ export default async function AdminMessageThreadPage({
 
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
+      <MessageRealtimeRefresh conversationId={conversation.id} currentUserId={user.id} />
       <div className="mx-auto max-w-6xl space-y-5">
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
           <Link
