@@ -995,6 +995,30 @@ export default async function GuruBookingsPage({
   const rawBookings = await getGuruBookings(guru.id);
   const petPhotoMap = await getPetPhotoMap(rawBookings);
   const allBookings = applyPetPhotosToBookings(rawBookings, petPhotoMap);
+  const bookingIds = allBookings.map((booking) => String(booking.id)).filter(Boolean);
+
+  const { data: pawReportRows } = bookingIds.length
+    ? await supabaseAdmin
+        .from("booking_visit_sessions")
+        .select("booking_id,status")
+        .in("booking_id", bookingIds)
+    : { data: [] as { booking_id: string; status: string | null }[] };
+
+  const pawReportStatusMap = new Map<string, string>();
+  ((pawReportRows || []) as { booking_id: string; status: string | null }[]).forEach(
+    (row) => {
+      if (row.booking_id) {
+        pawReportStatusMap.set(String(row.booking_id), String(row.status || "not_started"));
+      }
+    }
+  );
+
+  const pawReportsDeliveredCount = Array.from(pawReportStatusMap.values()).filter(
+    (status) => status === "completed"
+  ).length;
+  const pawReportsActiveCount = Array.from(pawReportStatusMap.values()).filter(
+    (status) => status === "in_progress"
+  ).length;
 
   const filteredBookings = allBookings
     .filter((booking) => bookingMatchesFilter(booking, activeFilter))
@@ -1007,6 +1031,21 @@ export default async function GuruBookingsPage({
     null;
 
   const guruName = guru.display_name || guru.full_name || "Your Guru Account";
+  const selectedPawReportStatus = selectedBooking
+    ? pawReportStatusMap.get(String(selectedBooking.id)) || "not_started"
+    : "not_started";
+  const selectedPawReportLabel =
+    selectedPawReportStatus === "completed"
+      ? "PawReport Complete"
+      : selectedPawReportStatus === "in_progress"
+        ? "PawReport Active"
+        : "Ready to Start";
+  const selectedPawReportActionLabel =
+    selectedPawReportStatus === "completed"
+      ? "View PawReport"
+      : selectedPawReportStatus === "in_progress"
+        ? "Continue PawReport"
+        : "Start PawReport";
 
   const upcomingCount = allBookings.filter((booking) => {
     return (
@@ -1024,6 +1063,10 @@ export default async function GuruBookingsPage({
     (booking) =>
       canonicalStatus(booking.booking_status || booking.status) === "Completed"
   ).length;
+
+  const pawReportCompletionRate = completedCount > 0
+    ? Math.round((pawReportsDeliveredCount / completedCount) * 100)
+    : null;
 
   const totalEarnings = allBookings
     .filter(
@@ -1122,13 +1165,35 @@ export default async function GuruBookingsPage({
             </p>
 
             <h1 className="mt-4 text-5xl font-black leading-[0.95] tracking-tight !text-[#061638] sm:text-6xl">
-              Bookings Hub
+              Bookings & PawReports
             </h1>
 
             <p className="mt-4 max-w-sm text-lg leading-8 !text-slate-600">
-              Manage your confirmed, upcoming, and past bookings all in one
-              place.
+              Manage bookings, deliver SitGuru PawReports™, and build trust with
+              Pet Parents after every visit.
             </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-wide !text-emerald-700">
+                  PawReports
+                </p>
+                <p className="mt-1 text-2xl font-black !text-[#061638]">
+                  {pawReportsDeliveredCount}
+                </p>
+                <p className="text-xs font-semibold !text-slate-600">Delivered</p>
+              </div>
+
+              <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-wide !text-sky-700">
+                  Active
+                </p>
+                <p className="mt-1 text-2xl font-black !text-[#061638]">
+                  {pawReportsActiveCount}
+                </p>
+                <p className="text-xs font-semibold !text-slate-600">In progress</p>
+              </div>
+            </div>
 
             <p className="mt-3 text-sm font-semibold !text-slate-600">
               Viewing activity for{" "}
@@ -1137,7 +1202,7 @@ export default async function GuruBookingsPage({
           </div>
 
           <div className="self-start rounded-[28px] border border-[#dfeee7] bg-white p-4 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
               <div className="rounded-3xl border border-[#e7f3ed] bg-[#fbfffd] p-5">
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 !text-emerald-600">
@@ -1151,6 +1216,23 @@ export default async function GuruBookingsPage({
                       {allBookings.length}
                     </div>
                     <div className="text-sm !text-slate-500">All time</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-[#e7f3ed] bg-[#fbfffd] p-5">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 !text-violet-600">
+                    <PawPrint className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold !text-slate-600">
+                      PawReports
+                    </div>
+                    <div className="mt-1 text-4xl font-black !text-[#061638]">
+                      {pawReportsDeliveredCount}
+                    </div>
+                    <div className="text-sm !text-slate-500">Delivered</div>
                   </div>
                 </div>
               </div>
@@ -1392,7 +1474,7 @@ export default async function GuruBookingsPage({
           <section className="self-start rounded-[28px] border border-[#dfeee7] bg-white p-5 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
             <div className="flex items-center justify-between border-b border-slate-100 pb-5">
               <h2 className="text-3xl font-black tracking-tight !text-[#061638]">
-                Selected booking
+                Booking & PawReport
               </h2>
 
               <Link
@@ -1415,8 +1497,8 @@ export default async function GuruBookingsPage({
                     No booking selected
                   </div>
                   <p className="mt-3 text-base leading-7 !text-slate-600">
-                    Once customers book you, select a booking from the left panel
-                    to view the full details.
+                    Once Pet Parents book you, select a booking from the left panel
+                    to view details, start a PawReport, add photos, and share care updates.
                   </p>
                 </div>
               </div>
@@ -1562,6 +1644,37 @@ export default async function GuruBookingsPage({
                   </div>
                 </div>
 
+                <div className="mt-6 rounded-[24px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white !text-emerald-700 shadow-sm">
+                        <PawPrint className="h-7 w-7" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black uppercase tracking-[0.16em] !text-emerald-700">
+                          SitGuru PawReport™
+                        </p>
+                        <h3 className="mt-1 text-2xl font-black tracking-tight !text-[#061638]">
+                          {selectedPawReportLabel}
+                        </h3>
+                        <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 !text-slate-700">
+                          PawReports help Pet Parents feel connected with photos,
+                          potty updates, food and water updates, care notes, and a
+                          final summary after each booking.
+                        </p>
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/guru/dashboard/bookings/${selectedBooking.id}/visit-updates`}
+                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
+                    >
+                      <PawPrint className="h-4 w-4" />
+                      {selectedPawReportActionLabel}
+                    </Link>
+                  </div>
+                </div>
+
                 <OrganizedBookingNotes booking={selectedBooking} />
 
                 <div className="mt-6 flex flex-wrap gap-3">
@@ -1578,7 +1691,7 @@ export default async function GuruBookingsPage({
                     className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black !text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 hover:!text-emerald-800"
                   >
                     <PawPrint className="h-4 w-4" />
-                    PawReport
+                    {selectedPawReportActionLabel}
                   </Link>
 
                   <Link
@@ -1753,6 +1866,25 @@ export default async function GuruBookingsPage({
                   </div>
                 </div>
 
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="text-base font-semibold !text-slate-600">
+                    PawReports Submitted
+                  </div>
+                  <div className="flex items-center gap-2 text-xl font-black !text-[#061638]">
+                    <span>{pawReportsDeliveredCount}</span>
+                    <PawPrint className="h-5 w-5 text-violet-500" />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="text-base font-semibold !text-slate-600">
+                    PawReport Completion
+                  </div>
+                  <div className="text-xl font-black !text-[#061638]">
+                    {pawReportCompletionRate === null ? "—" : `${pawReportCompletionRate}%`}
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between">
                   <div className="text-base font-semibold !text-slate-600">
                     Booking Rating
@@ -1763,6 +1895,43 @@ export default async function GuruBookingsPage({
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-[28px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white !text-emerald-700 shadow-sm">
+                  <PawPrint className="h-7 w-7" />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
+                    Signature Feature
+                  </p>
+                  <h2 className="mt-1 text-3xl font-black tracking-tight !text-[#061638]">
+                    SitGuru PawReport™
+                  </h2>
+                </div>
+              </div>
+
+              <p className="mt-4 text-base font-semibold leading-7 !text-slate-700">
+                Every completed booking should include a PawReport. It helps Pet
+                Parents see the care you provided and helps you earn stronger
+                reviews and repeat bookings.
+              </p>
+
+              <div className="mt-5 grid gap-2 text-sm font-bold !text-slate-700">
+                <div>✓ Photos from the visit</div>
+                <div>✓ Potty updates</div>
+                <div>✓ Food and water confirmations</div>
+                <div>✓ Care notes and final summary</div>
+              </div>
+
+              <Link
+                href="/guru-success-center"
+                className="mt-5 inline-flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-sm font-black !text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:!text-emerald-800"
+              >
+                <span>Learn About PawReports</span>
+                <ChevronRight className="h-4 w-4" />
+              </Link>
             </div>
 
             <div className="rounded-[28px] border border-[#dfeee7] bg-[#f7fffb] p-5 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
