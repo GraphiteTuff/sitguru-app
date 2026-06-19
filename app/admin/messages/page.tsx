@@ -243,7 +243,7 @@ const filterLinks = [
   },
   {
     key: "guru-customer",
-    label: "Guru ↔ Customer",
+    label: "Guru ↔ Pet Parent",
     href: "/admin/messages?filter=guru-customer",
   },
   {
@@ -253,7 +253,7 @@ const filterLinks = [
   },
   {
     key: "customer-admin",
-    label: "Customer ↔ Admin",
+    label: "Pet Parent ↔ Admin",
     href: "/admin/messages?filter=customer-admin",
   },
   {
@@ -302,8 +302,8 @@ const inquiryTypes: Array<{
   },
   {
     key: "customer-support",
-    label: "Customer Support",
-    description: "Pet Parent account, care, and general customer questions",
+    label: "Pet Parent Support",
+    description: "Pet Parent account, care, and general Pet Parent questions",
     href: "/admin/messages?inquiry=customer-support",
   },
   {
@@ -345,8 +345,8 @@ const departmentShortcuts = [
   },
   {
     key: "customer_service",
-    label: "Customer Service",
-    description: "Pet Parents, Gurus, bookings, messages, and support issues.",
+    label: "Pet Parent Support",
+    description: "Pet Parents, Gurus, bookings, messages, and care support issues.",
   },
   {
     key: "trust_safety",
@@ -967,7 +967,7 @@ function isEscalationThread(thread: AdminThreadCard) {
 function getThreadTypeLabel(type: AdminThreadCard["type"]) {
   if (type === "internal") return "Internal HQ";
   if (type === "guru-admin") return "Guru ↔ Admin";
-  if (type === "guru-customer") return "Guru ↔ Customer";
+  if (type === "guru-customer") return "Guru ↔ Pet Parent";
   if (type === "customer-admin") return "Pet Parent ↔ Admin";
   if (type === "ambassador-admin") return "Ambassador ↔ Admin";
   return "General";
@@ -1938,7 +1938,7 @@ function AdminComposeNotice({
               href={`/admin/messages/${conversationId}`}
               className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
             >
-              Open Thread
+              Open Chat
             </Link>
           ) : null}
         </div>
@@ -2371,6 +2371,11 @@ function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
               </span>
             )}
 
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Quick Chat Ready
+            </span>
+
             {isEscalationThread(thread) ? (
               <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-800">
                 Review
@@ -2433,10 +2438,10 @@ function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
 
         <div className="flex shrink-0 flex-col gap-2 lg:items-end">
           <span className="rounded-2xl border border-green-100 bg-[#f7faf4] px-4 py-3 text-sm font-black text-green-900">
-            Open Thread →
+            Open Chat →
           </span>
           <span className="text-xs font-bold text-slate-400">
-            {number(thread.messageCount)} messages · Last activity{" "}
+            {number(thread.messageCount)} messages · Saves to message centers · Last activity{" "}
             {formatDate(thread.lastActivity)}
           </span>
         </div>
@@ -2906,8 +2911,8 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
                   <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
                     Manage Pet Parent, Guru, Ambassador, support, safety,
                     payment, technical, partner, and internal HQ conversations
-                    from one Admin inbox. Message history stays visible even
-                    when a profile is archived, hidden, or no longer available.
+                    from one Admin inbox. Open any thread as a quick chat while
+                    keeping the full message history available.
                   </p>
                 </div>
               </div>
@@ -2982,7 +2987,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
             icon={<MessageCircle size={22} />}
             label="Messages Loaded"
             value={number(safeMessages.length)}
-            detail="Direct from Supabase messages table"
+            detail="Synced from SitGuru message threads"
           />
         </section>
 
@@ -3038,7 +3043,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
                   Thread Types
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Conversation mix by operational relationship.
+                  Conversation mix by contact relationship and support route.
                 </p>
               </div>
 
@@ -3097,7 +3102,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
               </h2>
               <p className="mt-1 text-sm font-semibold text-slate-500">
                 Filter by thread type, unread status, escalation level, inquiry
-                type, or search terms.
+                type, or search terms. Open a thread to continue the same chat.
               </p>
             </div>
 
