@@ -1157,18 +1157,18 @@ export default async function GuruBookingsPage({
 
   return (
     <main className="min-h-screen bg-[#f6fffb] px-4 py-6 !text-[#061638] sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1500px] space-y-6">
-        <section className="grid items-start gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <div className="rounded-[28px] border border-[#dfeee7] bg-white p-8 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
+      <div className="mx-auto max-w-[1700px] space-y-6">
+        <section className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="rounded-[28px] border border-[#dfeee7] bg-white p-6 shadow-[0_12px_32px_rgba(16,24,40,0.06)] xl:p-7 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
             <p className="text-sm font-black uppercase tracking-[0.24em] !text-emerald-600">
               Guru Workspace
             </p>
 
-            <h1 className="mt-4 text-5xl font-black leading-[0.95] tracking-tight !text-[#061638] sm:text-6xl">
+            <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight !text-[#061638] sm:text-5xl">
               Bookings & PawReports
             </h1>
 
-            <p className="mt-4 max-w-sm text-lg leading-8 !text-slate-600">
+            <p className="mt-4 max-w-sm text-base font-semibold leading-7 !text-slate-600">
               Manage bookings, deliver SitGuru PawReports™, and build trust with
               Pet Parents after every visit.
             </p>
@@ -1202,7 +1202,7 @@ export default async function GuruBookingsPage({
           </div>
 
           <div className="self-start rounded-[28px] border border-[#dfeee7] bg-white p-4 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
               <div className="rounded-3xl border border-[#e7f3ed] bg-[#fbfffd] p-5">
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 !text-emerald-600">
@@ -1308,7 +1308,7 @@ export default async function GuruBookingsPage({
           </div>
         </section>
 
-        <section className="grid items-start gap-6 xl:grid-cols-[360px_minmax(0,1fr)_320px]">
+        <section className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)_300px]">
           <aside className="self-start rounded-[28px] border border-[#dfeee7] bg-white p-5 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-black tracking-tight !text-[#061638]">
@@ -1719,7 +1719,7 @@ export default async function GuruBookingsPage({
             )}
           </section>
 
-          <aside className="self-start space-y-6">
+          <aside className="self-start space-y-6 xl:col-span-2 2xl:col-span-1">
             <div className="rounded-[28px] border border-[#dfeee7] bg-white p-5 shadow-[0_12px_32px_rgba(16,24,40,0.06)]">
               <div className="flex items-center justify-between">
                 <div className="text-3xl font-black tracking-tight !text-[#061638]">
@@ -1906,7 +1906,7 @@ export default async function GuruBookingsPage({
                   <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
                     Signature Feature
                   </p>
-                  <h2 className="mt-1 text-3xl font-black tracking-tight !text-[#061638]">
+                  <h2 className="mt-1 text-2xl font-black tracking-tight !text-[#061638]">
                     SitGuru PawReport™
                   </h2>
                 </div>
@@ -1926,7 +1926,7 @@ export default async function GuruBookingsPage({
               </div>
 
               <Link
-                href="/guru-success-center"
+                href="/guru-success-center#pawreport"
                 className="mt-5 inline-flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-sm font-black !text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:!text-emerald-800"
               >
                 <span>Learn About PawReports</span>
