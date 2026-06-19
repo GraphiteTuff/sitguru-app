@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AdminMessageRealtimeNotifier from "@/components/admin/AdminMessageRealtimeNotifier";
 
 export const dynamic = "force-dynamic";
 
@@ -194,7 +195,7 @@ type AdminThreadCard = {
   subject: string;
   preview: string;
   href: string;
-  type: "guru-customer" | "guru-admin" | "customer-admin" | "ambassador-admin" | "internal" | "general";
+  type: "guru-customer" | "guru-admin" | "customer-admin" | "ambassador-admin" | "homepage-visitor" | "internal" | "general";
   inquiryType: InquiryKey;
   inquiryLabel: string;
   lastActivity: string | null;
@@ -206,6 +207,9 @@ type AdminThreadCard = {
   adminAvatar: string;
   ambassadorName: string | null;
   ambassadorAvatar: string;
+  visitorName: string | null;
+  visitorAvatar: string;
+  visitorRoleLabel: string | null;
   unreadCount: number;
   status: string;
   messageCount: number;
@@ -260,6 +264,11 @@ const filterLinks = [
     key: "ambassador-admin",
     label: "Ambassador ↔ Admin",
     href: "/admin/messages?filter=ambassador-admin",
+  },
+  {
+    key: "homepage-visitor",
+    label: "Homepage Visitors",
+    href: "/admin/messages?filter=homepage-visitor",
   },
   { key: "unread", label: "Unread", href: "/admin/messages?filter=unread" },
   { key: "read", label: "Read", href: "/admin/messages?filter=read" },
@@ -464,6 +473,9 @@ function normalizeRole(role?: string | null) {
   if (value === "student_ambassador" || value === "community_ambassador") {
     return "ambassador";
   }
+  if (value.includes("visitor") || value.includes("homepage")) {
+    return "visitor";
+  }
   if (
     value === "admin" ||
     value === "super_admin" ||
@@ -636,6 +648,48 @@ function getSnapshotName({
 
 function getSnapshotAvatar() {
   return "";
+}
+
+function isHomepageVisitorThread(params: {
+  conversation?: ConversationRow | null;
+  messages: MessageRow[];
+  topic: string;
+}) {
+  const search = [
+    params.conversation?.subject,
+    params.conversation?.topic,
+    params.topic,
+    ...params.messages.flatMap((message) => [
+      message.message_type,
+      message.topic,
+      message.sender_role,
+      message.sender_role_snapshot,
+      message.recipient_role,
+      message.recipient_role_snapshot,
+    ]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return search.includes("homepage_messenger") || search.includes("homepage visitor");
+}
+
+function getHomepageVisitorName(messages: MessageRow[]) {
+  const visitorMessage = [...messages]
+    .reverse()
+    .find((message) => {
+      const role = getMessageSenderRole(message);
+      const type = `${message.message_type || ""} ${message.topic || ""}`.toLowerCase();
+
+      return role === "visitor" || type.includes("homepage_messenger");
+    });
+
+  return (
+    asString(visitorMessage?.sender_name_snapshot) ||
+    asString(visitorMessage?.sender_email_snapshot).split("@")[0] ||
+    "Homepage Visitor"
+  );
 }
 
 function getAdminAvatar(profile?: ProfileRow | null) {
@@ -970,6 +1024,7 @@ function getThreadTypeLabel(type: AdminThreadCard["type"]) {
   if (type === "guru-customer") return "Guru ↔ Pet Parent";
   if (type === "customer-admin") return "Pet Parent ↔ Admin";
   if (type === "ambassador-admin") return "Ambassador ↔ Admin";
+  if (type === "homepage-visitor") return "Homepage Visitor";
   return "General";
 }
 
@@ -992,6 +1047,10 @@ function getThreadTypeClasses(type: AdminThreadCard["type"]) {
 
   if (type === "ambassador-admin") {
     return "border-cyan-200 bg-cyan-100 text-cyan-900";
+  }
+
+  if (type === "homepage-visitor") {
+    return "border-emerald-200 bg-emerald-100 text-emerald-900";
   }
 
   return "border-slate-200 bg-slate-100 text-slate-800";
@@ -1026,6 +1085,7 @@ function buildThreadTypeChart(threads: AdminThreadCard[]) {
     "guru-admin",
     "customer-admin",
     "ambassador-admin",
+    "homepage-visitor",
     "general",
   ];
 
@@ -2398,6 +2458,15 @@ function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
           </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
+            {thread.visitorName ? (
+              <ParticipantPill
+                label={thread.visitorRoleLabel || "Website Visitor"}
+                name={thread.visitorName}
+                avatar={thread.visitorAvatar}
+                icon={<UserRound size={16} />}
+              />
+            ) : null}
+
             {thread.customerName ? (
               <ParticipantPill
                 label="Pet Parent"
@@ -2724,11 +2793,15 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
     const topic =
       conversation?.topic || latestMessage?.topic || latestMessage?.message_type || "";
     const normalizedTopic = topic.toLowerCase();
-    const subject = conversation?.subject || "SitGuru Message Thread";
+    const isHomepageThread = isHomepageVisitorThread({ conversation, messages, topic });
+    const homepageVisitorName = isHomepageThread ? getHomepageVisitorName(messages) : null;
+    const subject = conversation?.subject || (isHomepageThread ? "Homepage Messenger" : "SitGuru Message Thread");
 
     let type: AdminThreadCard["type"] = "general";
 
-    if (
+    if (isHomepageThread) {
+      type = "homepage-visitor";
+    } else if (
       normalizedTopic.includes("internal") ||
       subject.toLowerCase().includes("internal message")
     ) {
@@ -2746,7 +2819,14 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
     }
 
     const inquiryType = classifyInquiryType(conversation, latestMessage, preview);
-    const unreadCount = messages.filter(isUnreadMessage).length;
+    const unreadCount = messages.filter((message) => {
+      const senderRole = getMessageSenderRole(message);
+      const senderId = asString(message.sender_id);
+
+      if (senderRole === "admin" || senderId === user.id) return false;
+
+      return isUnreadMessage(message);
+    }).length;
 
     const status =
       conversation?.status ||
@@ -2816,6 +2896,9 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       ambassadorAvatar: ambassadorProfile
         ? getProfileAvatar(ambassadorProfile)
         : getSnapshotAvatar(),
+      visitorName: homepageVisitorName,
+      visitorAvatar: "",
+      visitorRoleLabel: isHomepageThread ? "Website Visitor" : null,
       unreadCount,
       status,
       messageCount: messages.length,
@@ -2829,7 +2912,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       if (activeFilter === "read") return thread.unreadCount === 0;
       if (activeFilter === "escalations") return isEscalationThread(thread);
       if (
-        ["internal", "guru-customer", "guru-admin", "customer-admin", "ambassador-admin", "general"].includes(
+        ["internal", "guru-customer", "guru-admin", "customer-admin", "ambassador-admin", "homepage-visitor", "general"].includes(
           activeFilter,
         )
       ) {
@@ -2852,6 +2935,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
         thread.guruName,
         thread.adminName,
         thread.ambassadorName,
+        thread.visitorName,
         thread.inquiryLabel,
         thread.status,
         thread.topic,
@@ -2879,6 +2963,8 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
   const unreadThreads = allThreads.filter((thread) => thread.unreadCount > 0).length;
   const escalationThreads = allThreads.filter(isEscalationThread).length;
   const internalThreads = allThreads.filter((thread) => thread.type === "internal").length;
+  const homepageVisitorThreads = allThreads.filter((thread) => thread.type === "homepage-visitor").length;
+  const latestLoadedMessageId = safeMessages[0]?.id || "";
   const threadTypeChart = buildThreadTypeChart(allThreads);
   const inquiryChart = buildInquiryChart(allThreads);
   const unreadInquiryChart = buildUnreadInquiryChart(allThreads);
@@ -2946,6 +3032,12 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
           </div>
         </section>
 
+        <AdminMessageRealtimeNotifier
+          currentUserId={user.id}
+          latestMessageId={latestLoadedMessageId}
+          initialUnreadCount={unreadMessages}
+        />
+
         <AdminComposeNotice
           composeError={params.compose_error}
           composeSuccess={params.compose_success}
@@ -2954,7 +3046,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
 
         {composeIntent ? <InternalComposer intent={composeIntent} /> : null}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <StatCard
             icon={<Inbox size={22} />}
             label="Threads"
