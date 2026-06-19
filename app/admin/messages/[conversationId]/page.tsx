@@ -1179,22 +1179,33 @@ function AdminQuickChatBox({
   conversation,
   messageRows,
   replyRecipientFallback,
+  participantCards,
 }: {
   conversation: ConversationRow;
   messageRows: MessageRow[];
   replyRecipientFallback: RecipientContact | null;
+  participantCards: ParticipantCard[];
 }) {
   const recentMessages = messageRows.slice(-3);
+  const contactCard =
+    participantCards.find((participant) => normalizeRole(participant.role) !== "admin") ||
+    participantCards[0] ||
+    null;
+  const contactName =
+    contactCard?.name || replyRecipientFallback?.name || "SitGuru Contact";
+  const contactRole =
+    contactCard?.role || replyRecipientFallback?.role || "user";
+  const contactAvatar = contactCard?.avatar || "";
 
   return (
-    <aside className="fixed bottom-5 right-5 z-40 hidden w-[min(430px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-green-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)] xl:block">
+    <aside className="fixed bottom-4 right-4 z-40 w-[min(430px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-green-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)]">
       <div className="border-b border-green-100 bg-green-50 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar
-              name={replyRecipientFallback?.name || "SitGuru Contact"}
-              src=""
-              role={replyRecipientFallback?.role || "user"}
+              name="SitGuru Admin"
+              src={defaultAdminAvatar}
+              role="admin"
               isActive
             />
             <div className="min-w-0">
@@ -1202,10 +1213,10 @@ function AdminQuickChatBox({
                 Admin Quick Chat
               </p>
               <h2 className="truncate text-lg font-black leading-tight text-green-950">
-                {replyRecipientFallback?.name || "SitGuru Contact"}
+                SitGuru Admin
               </h2>
               <p className="truncate text-xs font-bold text-slate-600">
-                {getRoleLabel(replyRecipientFallback?.role)} · Active thread
+                Admin · Active thread
               </p>
             </div>
           </div>
@@ -1217,6 +1228,23 @@ function AdminQuickChatBox({
             Inbox
           </Link>
         </div>
+
+        <div className="mt-3 flex items-center gap-3 rounded-2xl border border-green-100 bg-white/80 p-3">
+          <Avatar
+            name={contactName}
+            src={contactAvatar}
+            role={contactRole}
+            isActive
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black text-slate-950">
+              {contactName}
+            </p>
+            <p className="truncate text-xs font-bold text-slate-500">
+              {getRoleLabel(contactRole)}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="max-h-64 space-y-3 overflow-y-auto bg-white p-4">
@@ -1224,12 +1252,31 @@ function AdminQuickChatBox({
           recentMessages.map((message) => {
             const senderRole = normalizeRole(message.sender_role || message.sender_role_snapshot);
             const isAdmin = senderRole === "admin";
+            const senderCard = message.sender_id
+              ? participantCards.find((participant) => participant.user_id === message.sender_id)
+              : null;
+            const senderName = isAdmin
+              ? "Admin"
+              : safeString(message.sender_name_snapshot) ||
+                senderCard?.name ||
+                contactName ||
+                getRoleLabel(senderRole);
+            const senderAvatar = isAdmin ? defaultAdminAvatar : senderCard?.avatar || contactAvatar;
 
             return (
               <div
                 key={`admin-quick-${message.id}`}
-                className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}
+                className={`flex items-end gap-2 ${isAdmin ? "justify-end" : "justify-start"}`}
               >
+                {!isAdmin ? (
+                  <Avatar
+                    name={senderName}
+                    src={senderAvatar}
+                    role={senderRole}
+                    isActive
+                  />
+                ) : null}
+
                 <div
                   className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm font-semibold leading-5 shadow-sm ${
                     isAdmin
@@ -1245,9 +1292,18 @@ function AdminQuickChatBox({
                       isAdmin ? "text-green-100" : "text-slate-400"
                     }`}
                   >
-                    {isAdmin ? "Admin" : getRoleLabel(senderRole)} · {formatDateTime(message.created_at)}
+                    {senderName} · {formatDateTime(message.created_at)}
                   </p>
                 </div>
+
+                {isAdmin ? (
+                  <Avatar
+                    name="SitGuru Admin"
+                    src={defaultAdminAvatar}
+                    role="admin"
+                    isActive
+                  />
+                ) : null}
               </div>
             );
           })
@@ -1299,6 +1355,7 @@ function AdminQuickChatBox({
     </aside>
   );
 }
+
 
 export default async function AdminMessageThreadPage({
   params,
@@ -1832,6 +1889,7 @@ export default async function AdminMessageThreadPage({
         conversation={conversation}
         messageRows={messageRows}
         replyRecipientFallback={replyRecipientFallback}
+        participantCards={participantCards}
       />
     </main>
   );

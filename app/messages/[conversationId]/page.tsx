@@ -441,7 +441,7 @@ function SitGuruQuickReplyBox({
   const recentMessages = messages.slice(-3);
 
   return (
-    <aside className="fixed bottom-5 right-5 z-40 hidden w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)] xl:block">
+    <aside className="fixed bottom-4 right-4 z-40 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)]">
       <div className="border-b border-emerald-100 bg-emerald-50/90 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
