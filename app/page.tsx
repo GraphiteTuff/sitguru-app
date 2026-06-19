@@ -1365,13 +1365,18 @@ function HomepageAssistPopup({
             setIsOpen(true);
             setHasNewAdminReply(false);
           }}
-          className={`flex min-h-13 w-full items-center justify-center gap-2 rounded-full px-4 py-3.5 text-sm font-black text-white shadow-[0_18px_45px_rgba(15,23,42,0.25)] transition sm:min-h-10 sm:w-auto sm:px-4 sm:py-2.5 sm:text-xs sm:shadow-[0_12px_30px_rgba(15,23,42,0.20)] ${
+          className={`flex min-h-11 w-auto max-w-[230px] items-center justify-center gap-2 rounded-full px-4 py-2.5 text-xs font-black text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] transition sm:min-h-10 sm:max-w-none sm:px-4 sm:py-2.5 sm:text-xs sm:shadow-[0_12px_30px_rgba(15,23,42,0.20)] ${
             hasNewAdminReply
               ? "bg-amber-500 hover:bg-amber-600"
               : "bg-emerald-700 hover:bg-emerald-800"
           }`}
         >
-          {hasNewAdminReply ? "🐾 SitGuru Admin replied" : "🐾 Hi! Need help with SitGuru?"}
+          <span className="sm:hidden">
+            {hasNewAdminReply ? "🐾 Admin replied" : "🐾 Need help?"}
+          </span>
+          <span className="hidden sm:inline">
+            {hasNewAdminReply ? "🐾 SitGuru Admin replied" : "🐾 Hi! Need help with SitGuru?"}
+          </span>
         </button>
       )}
     </div>
