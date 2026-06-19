@@ -91,7 +91,7 @@ function getReadableRole(role?: string | null) {
 
   if (normalized === "admin") return "Admin";
   if (normalized === "guru") return "Guru";
-  if (normalized === "customer") return "Customer";
+  if (normalized === "customer") return "Pet Parent";
 
   return "User";
 }
@@ -275,7 +275,7 @@ function getConversationLabel(role?: string | null) {
 
   if (normalizedRole === "guru") return "Guru Conversation";
   if (normalizedRole === "admin") return "Admin Support";
-  if (normalizedRole === "customer") return "Customer Conversation";
+  if (normalizedRole === "customer") return "Pet Parent Conversation";
 
   return "Conversation";
 }
@@ -418,6 +418,119 @@ function Avatar({
     </div>
   );
 }
+
+function SitGuruQuickReplyBox({
+  conversationId,
+  currentUserId,
+  currentTopic,
+  otherName,
+  otherRole,
+  otherImageUrl,
+  messages,
+  inboxHref,
+}: {
+  conversationId: string;
+  currentUserId: string;
+  currentTopic: string;
+  otherName: string;
+  otherRole: string;
+  otherImageUrl?: string | null;
+  messages: MessageRow[];
+  inboxHref: string;
+}) {
+  const recentMessages = messages.slice(-3);
+
+  return (
+    <aside className="fixed bottom-5 right-5 z-40 hidden w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)] xl:block">
+      <div className="border-b border-emerald-100 bg-emerald-50/90 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="relative shrink-0">
+              <Avatar name={otherName} imageUrl={otherImageUrl} compact />
+              <span
+                aria-label="Active thread"
+                title="Active thread"
+                className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm"
+              />
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">
+                SitGuru Quick Chat
+              </p>
+              <h2 className="truncate text-lg font-black leading-tight text-slate-950">
+                {otherName}
+              </h2>
+              <p className="truncate text-xs font-bold text-slate-600">
+                {getReadableRole(otherRole)} · Active thread
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href={inboxHref}
+            className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-700 transition hover:bg-emerald-50"
+          >
+            Inbox
+          </Link>
+        </div>
+      </div>
+
+      <div className="max-h-64 space-y-3 overflow-y-auto bg-white p-4">
+        {recentMessages.length ? (
+          recentMessages.map((message) => {
+            const mine = message.sender_id === currentUserId;
+
+            return (
+              <div
+                key={`quick-${message.id}`}
+                className={`flex ${mine ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[82%] rounded-2xl px-3 py-2 text-sm font-semibold leading-5 shadow-sm ${
+                    mine
+                      ? "rounded-br-md bg-emerald-600 text-white"
+                      : "rounded-bl-md bg-slate-100 text-slate-800"
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">
+                    {getMessageContent(message) || "Message content unavailable."}
+                  </p>
+                  <p
+                    className={`mt-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                      mine ? "text-emerald-100" : "text-slate-400"
+                    }`}
+                  >
+                    {mine ? "You" : getReadableRole(otherRole)} · {formatMessageTime(message.created_at)}
+                  </p>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 p-4 text-center text-sm font-bold text-slate-700">
+            Start the conversation below. Messages save to the full SitGuru message center.
+          </div>
+        )}
+      </div>
+
+      <div id="quick-reply" className="border-t border-emerald-100 bg-slate-50 p-4">
+        <MessageThreadComposer
+          conversationId={conversationId}
+          currentUserId={currentUserId}
+          currentTopic={currentTopic}
+        />
+        <Link
+          href={`/messages/${conversationId}#reply`}
+          className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-700 transition hover:bg-emerald-50"
+        >
+          Open full message thread
+        </Link>
+      </div>
+    </aside>
+  );
+}
+
 
 function DetailCard({ label, value }: { label: string; value: string }) {
   return (
@@ -844,7 +957,7 @@ export default async function MessageConversationPage({
                 </div>
               </section>
 
-              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+              <section id="reply" className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
                 <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
                   Reply
                 </p>
@@ -938,6 +1051,17 @@ export default async function MessageConversationPage({
           </div>
         </section>
       </section>
+
+      <SitGuruQuickReplyBox
+        conversationId={conversation.id}
+        currentUserId={user.id}
+        currentTopic={topic}
+        otherName={otherName}
+        otherRole={otherRole}
+        otherImageUrl={otherImageUrl}
+        messages={safeMessages}
+        inboxHref={inboxHref}
+      />
     </main>
   );
 }
