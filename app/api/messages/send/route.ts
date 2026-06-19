@@ -1,77 +1,173 @@
+import { Buffer } from "node:buffer";
 import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
-
-type ProfileLookupRow = {
-  id?: string | null;
-  email?: string | null;
-  full_name?: string | null;
-  first_name?: string | null;
-  last_name?: string | null;
-  role?: string | null;
-  avatar_url?: string | null;
-};
-
-type GuruLookupRow = {
-  id?: string | number | null;
-  user_id?: string | null;
-  display_name?: string | null;
-};
+export const runtime = "nodejs";
 
 type ConversationRow = {
   id: string;
   customer_id?: string | null;
   guru_id?: string | null;
   booking_id?: string | null;
+  started_by_user_id?: string | null;
   subject?: string | null;
   status?: string | null;
+  topic?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  last_message_at?: string | null;
+  last_message_preview?: string | null;
 };
 
 type ConversationParticipantRow = {
   conversation_id: string;
   user_id: string;
   role?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
-type TargetUserResult = {
+type ProfileRow = {
+  id: string;
+  full_name?: string | null;
+  display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
+  mobile_phone?: string | null;
+  cell_phone?: string | null;
+  role?: string | null;
+  user_role?: string | null;
+  account_type?: string | null;
+  type?: string | null;
+};
+
+type GuruRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  display_name?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
+  mobile_phone?: string | null;
+  cell_phone?: string | null;
+};
+
+type UserRoleRow = {
+  role?: string | null;
+};
+
+type RecipientContact = {
   userId: string;
   role: string;
-  profile: ProfileLookupRow;
+  name: string;
+  email: string;
+  phone: string;
+};
+
+type DeliveryResult = {
+  messageSaved: boolean;
+  recipientFound: boolean;
+  notificationCreated: boolean;
+  emailSent: boolean;
+  smsSent: boolean;
+  warnings: string[];
 };
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeRole(value: unknown) {
-  return safeString(value).toLowerCase();
+function normalizeRole(role?: string | null) {
+  const value = safeString(role).toLowerCase();
+
+  if (!value) return "user";
+  if (value === "provider" || value === "sitter") return "guru";
+  if (value === "pet_parent" || value === "pet parent" || value === "pet-parent") {
+    return "customer";
+  }
+  if (value === "owner" || value === "pet_owner" || value === "pet-owner") {
+    return "customer";
+  }
+  if (
+    value === "admin" ||
+    value === "super_admin" ||
+    value === "super-admin" ||
+    value === "site_admin" ||
+    value === "site-admin" ||
+    value.includes("admin") ||
+    value === "founder" ||
+    value === "owner"
+  ) {
+    return "admin";
+  }
+  if (value.includes("ambassador")) return "ambassador";
+
+  return value;
 }
 
-function normalizeSearchValue(value: unknown) {
-  return safeString(value).toLowerCase();
+function isAdminRole(role?: string | null) {
+  return normalizeRole(role) === "admin";
 }
 
-function slugify(value: unknown) {
-  return safeString(value)
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+function getBaseUrl() {
+  const raw =
+    safeString(process.env.NEXT_PUBLIC_APP_URL) ||
+    safeString(process.env.NEXT_PUBLIC_SITE_URL) ||
+    "https://www.sitguru.com";
+
+  return raw.replace(/\/+$/, "");
 }
 
-function buildMessageThreadHref(conversationId: string) {
+function buildThreadHref(conversationId: string) {
   return `/messages/${conversationId}`;
 }
 
-function getDisplayName(profile?: ProfileLookupRow | null) {
-  const fullName = safeString(profile?.full_name);
-  const firstName = safeString(profile?.first_name);
-  const lastName = safeString(profile?.last_name);
-  const combinedName = [firstName, lastName].filter(Boolean).join(" ").trim();
+function buildPublicThreadUrl(conversationId: string) {
+  return `${getBaseUrl()}${buildThreadHref(conversationId)}`;
+}
 
-  return fullName || combinedName || safeString(profile?.email) || "SitGuru User";
+function getSupportFromEmail() {
+  return (
+    safeString(process.env.SITGURU_SUPPORT_FROM) ||
+    safeString(process.env.RESEND_FROM_EMAIL) ||
+    "SitGuru <support@sitguru.com>"
+  );
+}
+
+function getSupportReplyToEmail() {
+  return (
+    safeString(process.env.RESEND_REPLY_TO_EMAIL) ||
+    safeString(process.env.SITGURU_SUPPORT_EMAIL) ||
+    "support@sitguru.com"
+  );
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function normalizeUsPhone(phone: string) {
+  const clean = safeString(phone);
+  if (!clean) return "";
+  if (clean.startsWith("+")) return clean;
+
+  const digits = clean.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+
+  return "";
 }
 
 function getMessageText(body: Record<string, unknown> | null) {
@@ -85,875 +181,657 @@ function getMessageText(body: Record<string, unknown> | null) {
 
 function getMessagePreview(message: string) {
   const cleanMessage = message.replace(/\s+/g, " ").trim();
-
-  if (cleanMessage.length <= 140) {
-    return cleanMessage;
-  }
-
-  return `${cleanMessage.slice(0, 137)}...`;
+  return cleanMessage.length <= 180 ? cleanMessage : `${cleanMessage.slice(0, 177)}...`;
 }
 
-function getSubject(body: Record<string, unknown> | null, targetRole: string) {
-  const subject =
-    safeString(body?.subject) ||
-    safeString(body?.topic) ||
-    safeString(body?.category);
+function getProfileName(profile?: ProfileRow | null) {
+  if (!profile) return "SitGuru User";
 
-  if (subject) {
-    return subject;
-  }
+  const candidate =
+    profile.full_name ||
+    profile.display_name ||
+    (profile.first_name && profile.last_name
+      ? `${profile.first_name} ${profile.last_name}`
+      : null) ||
+    profile.first_name ||
+    profile.last_name ||
+    profile.email?.split("@")[0] ||
+    "SitGuru User";
 
-  return targetRole === "admin" ? "Direct Admin Support" : "Direct conversation";
+  return String(candidate).trim() || "SitGuru User";
 }
 
-async function getProfileById(userId: string): Promise<ProfileLookupRow | null> {
+function getProfilePhone(profile?: ProfileRow | null) {
+  if (!profile) return "";
+
+  return (
+    safeString(profile.phone) ||
+    safeString(profile.phone_number) ||
+    safeString(profile.mobile_phone) ||
+    safeString(profile.cell_phone)
+  );
+}
+
+function getGuruName(guru?: GuruRow | null) {
+  if (!guru) return "";
+
+  return safeString(guru.display_name) || safeString(guru.full_name) || safeString(guru.email).split("@")[0];
+}
+
+function getGuruPhone(guru?: GuruRow | null) {
+  if (!guru) return "";
+
+  return (
+    safeString(guru.phone) ||
+    safeString(guru.phone_number) ||
+    safeString(guru.mobile_phone) ||
+    safeString(guru.cell_phone)
+  );
+}
+
+async function safeRows<T>(
+  query: PromiseLike<{ data: unknown; error: unknown }>,
+  label: string,
+): Promise<T[]> {
+  try {
+    const result = await query;
+
+    if (result.error) {
+      console.warn(`Message send query skipped for ${label}:`, result.error);
+      return [];
+    }
+
+    return Array.isArray(result.data) ? (result.data as T[]) : [];
+  } catch (error) {
+    console.warn(`Message send query failed for ${label}:`, error);
+    return [];
+  }
+}
+
+async function getProfile(userId: string) {
   if (!userId) return null;
 
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, email, full_name, first_name, last_name, role, avatar_url")
+    .select("*")
     .eq("id", userId)
-    .maybeSingle<ProfileLookupRow>();
+    .maybeSingle<ProfileRow>();
 
   if (error) {
-    console.error("Profile lookup by id error:", error.message);
+    console.warn("Message send profile lookup failed:", error.message);
     return null;
   }
 
-  return data ?? null;
+  return data || null;
 }
 
-async function getProfileByEmail(email: string): Promise<ProfileLookupRow | null> {
-  const cleanEmail = safeString(email).toLowerCase();
-
-  if (!cleanEmail) return null;
-
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select("id, email, full_name, first_name, last_name, role, avatar_url")
-    .ilike("email", cleanEmail)
-    .maybeSingle<ProfileLookupRow>();
-
-  if (error) {
-    console.error("Profile lookup by email error:", error.message);
-    return null;
-  }
-
-  return data ?? null;
-}
-
-async function isGuruUser(userId: string) {
-  if (!userId) return false;
+async function getGuru(userId: string) {
+  if (!userId) return null;
 
   const { data, error } = await supabaseAdmin
     .from("gurus")
-    .select("id")
+    .select("*")
     .eq("user_id", userId)
-    .limit(1);
+    .maybeSingle<GuruRow>();
 
   if (error) {
-    console.error("Guru user lookup error:", error.message);
-    return false;
+    console.warn("Message send guru lookup failed:", error.message);
+    return null;
   }
 
-  return (data?.length ?? 0) > 0;
+  return data || null;
 }
 
-async function resolveUserRole(userId: string, roleHint?: string | null) {
-  const hinted = normalizeRole(roleHint);
+async function getUserRoles(userId: string) {
+  return safeRows<UserRoleRow>(
+    supabaseAdmin.from("user_roles").select("role").eq("user_id", userId),
+    "user_roles",
+  );
+}
 
-  if (hinted) {
-    if (hinted === "sitter" || hinted === "provider") return "guru";
-    if (hinted === "pet_parent" || hinted === "pet parent") return "customer";
-    return hinted;
-  }
+async function resolveRole(params: {
+  userId: string;
+  participantRole?: string | null;
+  conversation?: ConversationRow | null;
+}) {
+  const participantRole = normalizeRole(params.participantRole);
+  if (participantRole && participantRole !== "user") return participantRole;
 
-  const profile = await getProfileById(userId);
-  const profileRole = normalizeRole(profile?.role);
+  const profile = await getProfile(params.userId);
+  const profileRole = normalizeRole(
+    profile?.role || profile?.user_role || profile?.account_type || profile?.type,
+  );
 
-  if (profileRole) {
-    if (profileRole === "sitter" || profileRole === "provider") return "guru";
-    if (profileRole === "pet_parent" || profileRole === "pet parent") return "customer";
-    return profileRole;
-  }
+  if (profileRole && profileRole !== "user") return profileRole;
 
-  if (await isGuruUser(userId)) {
-    return "guru";
-  }
+  const roles = await getUserRoles(params.userId);
+  const roleFromRows = roles.map((row) => normalizeRole(row.role)).find((role) => role && role !== "user");
+  if (roleFromRows) return roleFromRows;
+
+  if (params.conversation?.guru_id === params.userId) return "guru";
+  if (params.conversation?.customer_id === params.userId) return "customer";
+  if (params.conversation?.started_by_user_id === params.userId) return "admin";
+
+  const guru = await getGuru(params.userId);
+  if (guru?.user_id) return "guru";
 
   return "customer";
 }
 
-async function findGuruByIdOrUserId(value: string) {
-  if (!value) return null;
-
-  const byId = await supabaseAdmin
-    .from("gurus")
-    .select("id, user_id, display_name")
-    .eq("id", value)
-    .maybeSingle<GuruLookupRow>();
-
-  if (!byId.error && byId.data?.user_id) {
-    return byId.data;
-  }
-
-  const byUserId = await supabaseAdmin
-    .from("gurus")
-    .select("id, user_id, display_name")
-    .eq("user_id", value)
-    .maybeSingle<GuruLookupRow>();
-
-  if (!byUserId.error && byUserId.data?.user_id) {
-    return byUserId.data;
-  }
-
-  return null;
-}
-
-async function findGuruByDisplaySlug(value: string) {
-  const searchValue = safeString(value);
-
-  if (!searchValue) return null;
-
-  const normalizedValue = normalizeSearchValue(searchValue);
-  const slugValue = slugify(searchValue);
-
-  const { data, error } = await supabaseAdmin
-    .from("gurus")
-    .select("id, user_id, display_name")
-    .limit(1000)
-    .returns<GuruLookupRow[]>();
-
-  if (error) {
-    console.error("Guru display lookup error:", error.message);
-    return null;
-  }
-
-  const gurus = data ?? [];
-
-  return (
-    gurus.find((guru) => {
-      const displayName = safeString(guru.display_name);
-
-      return (
-        normalizeSearchValue(displayName) === normalizedValue ||
-        slugify(displayName) === slugValue ||
-        normalizeSearchValue(guru.user_id) === normalizedValue
-      );
-    }) ?? null
-  );
-}
-
-async function findGuruByProfileName(value: string) {
-  const searchValue = safeString(value);
-
-  if (!searchValue) return null;
-
-  const normalizedValue = normalizeSearchValue(searchValue);
-  const slugValue = slugify(searchValue);
-
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select("id, email, full_name, first_name, last_name, role, avatar_url")
-    .limit(1000)
-    .returns<ProfileLookupRow[]>();
-
-  if (error) {
-    console.error("Profile name lookup error:", error.message);
-    return null;
-  }
-
-  const profiles = data ?? [];
-
-  const matchedProfile =
-    profiles.find((profile) => {
-      const fullName = getDisplayName(profile);
-      const email = safeString(profile.email);
-      const emailName = email.split("@")[0] || "";
-
-      return (
-        normalizeSearchValue(profile.id) === normalizedValue ||
-        normalizeSearchValue(fullName) === normalizedValue ||
-        slugify(fullName) === slugValue ||
-        normalizeSearchValue(email) === normalizedValue ||
-        slugify(emailName) === slugValue
-      );
-    }) ?? null;
-
-  if (!matchedProfile?.id) {
-    return null;
-  }
-
-  const guru = await findGuruByIdOrUserId(matchedProfile.id);
-
-  if (!guru?.user_id) {
-    return null;
-  }
-
-  return guru;
-}
-
-async function findGuruBySlugOrId(value: string) {
-  const cleanValue = safeString(value);
-
-  if (!cleanValue) return null;
-
-  const directGuru = await findGuruByIdOrUserId(cleanValue);
-
-  if (directGuru?.user_id) {
-    return directGuru;
-  }
-
-  const byDisplaySlug = await findGuruByDisplaySlug(cleanValue);
-
-  if (byDisplaySlug?.user_id) {
-    return byDisplaySlug;
-  }
-
-  const byProfileName = await findGuruByProfileName(cleanValue);
-
-  if (byProfileName?.user_id) {
-    return byProfileName;
-  }
-
-  return null;
-}
-
-async function findAdminUser(adminUserId?: string) {
-  const explicitAdminId = safeString(adminUserId);
-
-  if (explicitAdminId) {
-    const explicitProfile = await getProfileById(explicitAdminId);
-
-    if (explicitProfile?.id) {
-      return explicitProfile;
-    }
-  }
-
-  const adminEmails = ["jason@sitguru.com", "nette@sitguru.com", "support@sitguru.com"];
-
-  for (const email of adminEmails) {
-    const profile = await getProfileByEmail(email);
-
-    if (profile?.id) {
-      return profile;
-    }
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select("id, email, full_name, first_name, last_name, role, avatar_url")
-    .eq("role", "admin")
-    .limit(1)
-    .maybeSingle<ProfileLookupRow>();
-
-  if (error) {
-    console.error("Admin profile lookup error:", error.message);
-    return null;
-  }
-
-  return data ?? null;
-}
-
-async function getTargetUser(params: {
-  guruSlug: string;
-  guruId: string;
-  targetUserId: string;
-  targetRole: string;
-  adminUserId: string;
-}): Promise<TargetUserResult | null> {
-  const normalizedTargetRole = normalizeRole(params.targetRole);
-  const directTargetUserId = safeString(params.targetUserId);
-
-  const wantsAdmin =
-    normalizedTargetRole === "admin" ||
-    normalizedTargetRole === "support" ||
-    normalizeRole(params.guruSlug) === "admin" ||
-    normalizeRole(params.guruId) === "admin";
-
-  if (wantsAdmin) {
-    const adminProfile = await findAdminUser(params.adminUserId);
-
-    if (!adminProfile?.id) {
-      return null;
-    }
-
-    return {
-      userId: adminProfile.id,
-      role: "admin",
-      profile: adminProfile,
-    };
-  }
-
-  if (directTargetUserId) {
-    const targetProfile = await getProfileById(directTargetUserId);
-
-    if (!targetProfile?.id) {
-      return null;
-    }
-
-    const resolvedRole = await resolveUserRole(
-      directTargetUserId,
-      normalizedTargetRole || targetProfile.role || null
-    );
-
-    return {
-      userId: directTargetUserId,
-      role: resolvedRole,
-      profile: targetProfile,
-    };
-  }
-
-  const guruLookupValue = safeString(params.guruSlug) || safeString(params.guruId);
-
-  if (!guruLookupValue) {
-    return null;
-  }
-
-  const guru = await findGuruBySlugOrId(guruLookupValue);
-
-  if (!guru?.user_id) {
-    return null;
-  }
-
-  const profile = await getProfileById(guru.user_id);
+async function buildContact(userId: string, role: string): Promise<RecipientContact> {
+  const [profile, guru] = await Promise.all([getProfile(userId), getGuru(userId)]);
 
   return {
-    userId: guru.user_id,
-    role: "guru",
-    profile:
-      profile ??
-      ({
-        id: guru.user_id,
-        full_name: safeString(guru.display_name) || null,
-        first_name: null,
-        last_name: null,
-        email: null,
-        role: "guru",
-        avatar_url: null,
-      } satisfies ProfileLookupRow),
+    userId,
+    role,
+    name: role === "guru" ? getGuruName(guru) || getProfileName(profile) : getProfileName(profile),
+    email: safeString(profile?.email) || safeString(guru?.email),
+    phone: getProfilePhone(profile) || getGuruPhone(guru),
   };
-}
-
-async function findExistingConversationByParticipants(
-  userA: string,
-  userB: string,
-  bookingId: string | null
-) {
-  const { data: participantRows, error: participantError } = await supabaseAdmin
-    .from("conversation_participants")
-    .select("conversation_id, user_id, role")
-    .in("user_id", [userA, userB]);
-
-  if (participantError) {
-    console.error("Existing participant conversation lookup error:", participantError.message);
-    return null;
-  }
-
-  const counts = new Map<string, Set<string>>();
-
-  for (const row of (participantRows ?? []) as ConversationParticipantRow[]) {
-    const set = counts.get(row.conversation_id) ?? new Set<string>();
-    set.add(row.user_id);
-    counts.set(row.conversation_id, set);
-  }
-
-  const candidateIds = Array.from(counts.entries())
-    .filter(([, users]) => users.has(userA) && users.has(userB))
-    .map(([conversationId]) => conversationId);
-
-  if (candidateIds.length === 0) {
-    return null;
-  }
-
-  let query = supabaseAdmin
-    .from("conversations")
-    .select("id, customer_id, guru_id, booking_id, subject, status")
-    .in("id", candidateIds)
-    .eq("status", "open")
-    .limit(25);
-
-  if (bookingId) {
-    query = query.eq("booking_id", bookingId);
-  } else {
-    query = query.is("booking_id", null);
-  }
-
-  const { data, error } = await query.returns<ConversationRow[]>();
-
-  if (error) {
-    console.error("Existing conversation detail lookup error:", error.message);
-    return null;
-  }
-
-  return data?.[0] ?? null;
-}
-
-async function getConversationById(conversationId: string) {
-  if (!conversationId) return null;
-
-  const { data, error } = await supabaseAdmin
-    .from("conversations")
-    .select("id, customer_id, guru_id, booking_id, subject, status")
-    .eq("id", conversationId)
-    .maybeSingle<ConversationRow>();
-
-  if (error) {
-    console.error("Conversation lookup by id error:", error.message);
-    return null;
-  }
-
-  return data ?? null;
-}
-
-async function isConversationParticipant(conversationId: string, userId: string) {
-  if (!conversationId || !userId) return false;
-
-  const { data, error } = await supabaseAdmin
-    .from("conversation_participants")
-    .select("conversation_id")
-    .eq("conversation_id", conversationId)
-    .eq("user_id", userId)
-    .limit(1);
-
-  if (error) {
-    console.error("Conversation participant authorization lookup error:", error.message);
-    return false;
-  }
-
-  return (data?.length ?? 0) > 0;
-}
-
-async function createConversation(params: {
-  customerUserId: string;
-  guruUserId: string;
-  startedByUserId: string;
-  bookingId: string | null;
-  subject: string | null;
-}) {
-  const nowIso = new Date().toISOString();
-
-  const { data, error } = await supabaseAdmin
-    .from("conversations")
-    .insert({
-      customer_id: params.customerUserId,
-      guru_id: params.guruUserId,
-      started_by_user_id: params.startedByUserId,
-      booking_id: params.bookingId,
-      subject: params.subject,
-      status: "open",
-      created_at: nowIso,
-      updated_at: nowIso,
-      last_message_at: null,
-      last_message_preview: null,
-    })
-    .select("id, customer_id, guru_id, booking_id, subject, status")
-    .single<ConversationRow>();
-
-  if (error) {
-    throw new Error(error.message || "Unable to create conversation.");
-  }
-
-  return data;
-}
-
-async function ensureParticipants(
-  conversationId: string,
-  participants: Array<{ userId: string; role: string }>
-) {
-  const nowIso = new Date().toISOString();
-
-  const rows = participants.map((participant) => ({
-    conversation_id: conversationId,
-    user_id: participant.userId,
-    role: participant.role,
-    last_read_at: null,
-    is_muted: false,
-    is_archived: false,
-    created_at: nowIso,
-    updated_at: nowIso,
-  }));
-
-  const { error } = await supabaseAdmin.from("conversation_participants").upsert(rows, {
-    onConflict: "conversation_id,user_id",
-    ignoreDuplicates: false,
-  });
-
-  if (error) {
-    throw new Error(error.message || "Unable to create conversation participants.");
-  }
-}
-
-async function getRecipientForExistingConversation(
-  conversation: ConversationRow,
-  currentUserId: string
-) {
-  const { data, error } = await supabaseAdmin
-    .from("conversation_participants")
-    .select("conversation_id, user_id, role")
-    .eq("conversation_id", conversation.id)
-    .neq("user_id", currentUserId)
-    .limit(1)
-    .returns<ConversationParticipantRow[]>();
-
-  if (error) {
-    console.error("Existing conversation recipient lookup error:", error.message);
-    return null;
-  }
-
-  const participant = data?.[0];
-
-  if (participant?.user_id) {
-    const profile = await getProfileById(participant.user_id);
-
-    return {
-      userId: participant.user_id,
-      role: participant.role || (await resolveUserRole(participant.user_id, profile?.role || null)),
-      profile:
-        profile ??
-        ({
-          id: participant.user_id,
-          full_name: null,
-          first_name: null,
-          last_name: null,
-          email: null,
-          role: participant.role || "user",
-          avatar_url: null,
-        } satisfies ProfileLookupRow),
-    } satisfies TargetUserResult;
-  }
-
-  const fallbackUserId =
-    conversation.customer_id === currentUserId
-      ? conversation.guru_id
-      : conversation.guru_id === currentUserId
-        ? conversation.customer_id
-        : null;
-
-  if (!fallbackUserId) {
-    return null;
-  }
-
-  const profile = await getProfileById(fallbackUserId);
-
-  return {
-    userId: fallbackUserId,
-    role: await resolveUserRole(fallbackUserId, profile?.role || null),
-    profile:
-      profile ??
-      ({
-        id: fallbackUserId,
-        full_name: null,
-        first_name: null,
-        last_name: null,
-        email: null,
-        role: "user",
-        avatar_url: null,
-      } satisfies ProfileLookupRow),
-  };
-}
-
-async function insertMessage(params: {
-  conversationId: string;
-  senderUserId: string;
-  recipientUserId: string;
-  senderProfile: ProfileLookupRow | null;
-  recipientProfile: ProfileLookupRow | null;
-  senderRole: string;
-  recipientRole: string;
-  message: string;
-  topic: string;
-}) {
-  const nowIso = new Date().toISOString();
-
-  const { error } = await supabaseAdmin.from("messages").insert({
-    conversation_id: params.conversationId,
-    sender_id: params.senderUserId,
-    recipient_id: params.recipientUserId,
-    content: params.message,
-    body: params.message,
-    message_type: "direct",
-    is_read: false,
-    read_at: null,
-    is_deleted: false,
-    edited_at: null,
-    updated_at: nowIso,
-    created_at: nowIso,
-    topic: params.topic || null,
-    sender_name_snapshot: getDisplayName(params.senderProfile),
-    sender_email_snapshot: safeString(params.senderProfile?.email) || null,
-    sender_phone_snapshot: null,
-    sender_role_snapshot: params.senderRole || null,
-    sender_role: params.senderRole || null,
-    recipient_name_snapshot: getDisplayName(params.recipientProfile),
-    recipient_email_snapshot: safeString(params.recipientProfile?.email) || null,
-    recipient_phone_snapshot: null,
-    recipient_role_snapshot: params.recipientRole || null,
-    recipient_role: params.recipientRole || null,
-    status: "sent",
-  });
-
-  if (error) {
-    console.error("Message insert error:", error.message);
-    throw new Error(`Unable to save message: ${error.message}`);
-  }
-}
-
-async function updateConversationLastMessage(params: {
-  conversationId: string;
-  message: string;
-}) {
-  const nowIso = new Date().toISOString();
-
-  const { error } = await supabaseAdmin
-    .from("conversations")
-    .update({
-      updated_at: nowIso,
-      last_message_at: nowIso,
-      last_message_preview: getMessagePreview(params.message),
-    })
-    .eq("id", params.conversationId);
-
-  if (error) {
-    console.error("Conversation last-message update failed:", error.message);
-  }
 }
 
 async function createNotification(params: {
-  recipientUserId: string;
+  recipient: RecipientContact;
   conversationId: string;
-  senderName: string;
-  senderRole: string;
-  subject: string;
-  message: string;
+  preview: string;
 }) {
-  const labelRole =
-    params.senderRole === "guru"
-      ? "Guru"
-      : params.senderRole === "admin"
-        ? "Admin"
-        : "Pet Parent";
+  try {
+    if (!params.recipient.userId) return false;
 
-  const { error } = await supabaseAdmin.from("notifications").insert({
-    user_id: params.recipientUserId,
-    type: "new_message",
-    title: `New message from ${params.senderName || labelRole}`,
-    body: params.subject
-      ? `${labelRole} sent a message about ${params.subject}: ${getMessagePreview(params.message)}`
-      : `${labelRole} sent a new message: ${getMessagePreview(params.message)}`,
-    link: buildMessageThreadHref(params.conversationId),
-    is_read: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
+    const now = new Date().toISOString();
+    const href = buildThreadHref(params.conversationId);
 
-  if (error) {
-    console.error("Message notification insert error:", error.message);
+    const { error } = await supabaseAdmin.from("notifications").insert({
+      user_id: params.recipient.userId,
+      title: "New SitGuru Message",
+      body: params.preview || "You have a new SitGuru message.",
+      type: "message",
+      href,
+      link: href,
+      is_read: false,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (error) {
+      console.error("Message notification insert failed:", error.message);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Message notification insert error:", error);
+    return false;
   }
 }
 
+async function sendRecipientEmail(params: {
+  recipient: RecipientContact;
+  senderName: string;
+  conversationId: string;
+}) {
+  try {
+    const apiKey = safeString(process.env.RESEND_API_KEY);
+    const toEmail = safeString(params.recipient.email);
+
+    if (!apiKey || !toEmail) return false;
+
+    const resend = new Resend(apiKey);
+    const threadUrl = buildPublicThreadUrl(params.conversationId);
+    const recipientName = escapeHtml(params.recipient.name || "there");
+    const senderName = escapeHtml(params.senderName || "SitGuru");
+
+    const result = await resend.emails.send({
+      from: getSupportFromEmail(),
+      to: [toEmail],
+      replyTo: getSupportReplyToEmail(),
+      subject: "New SitGuru Message",
+      html: `
+        <div style="font-family: Arial, sans-serif; background: #f6fbf7; padding: 24px;">
+          <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #dcefe2; border-radius: 18px; overflow: hidden;">
+            <div style="background: #0f5132; color: #ffffff; padding: 24px;">
+              <h1 style="margin: 0; font-size: 24px;">New SitGuru Message</h1>
+              <p style="margin: 8px 0 0; color: #d9f7e5;">Trusted Pet Care. Simplified.</p>
+            </div>
+            <div style="padding: 24px; color: #123524;">
+              <p style="font-size: 16px; line-height: 1.6;">Hi ${recipientName},</p>
+              <p style="font-size: 16px; line-height: 1.6;">
+                You have a new message from ${senderName} in SitGuru.
+              </p>
+              <p style="margin: 24px 0;">
+                <a href="${threadUrl}" style="display: inline-block; background: #0f8f4f; color: #ffffff; text-decoration: none; padding: 13px 20px; border-radius: 999px; font-weight: 700;">
+                  Open SitGuru Message
+                </a>
+              </p>
+              <p style="font-size: 13px; color: #607568; line-height: 1.6;">
+                Please log in to SitGuru to read and reply to this message.
+              </p>
+            </div>
+          </div>
+        </div>
+      `,
+      text: [
+        `Hi ${params.recipient.name || "there"},`,
+        "",
+        `You have a new message from ${params.senderName || "SitGuru"} in SitGuru.`,
+        "",
+        `Open your message here: ${threadUrl}`,
+        "",
+        "Thank you,",
+        "SitGuru",
+        "Trusted Pet Care. Simplified.",
+      ].join("\n"),
+    });
+
+    if (result.error) {
+      console.error("Message email delivery failed:", result.error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Message email delivery error:", error);
+    return false;
+  }
+}
+
+async function sendRecipientSms(params: {
+  recipient: RecipientContact;
+  senderName: string;
+  conversationId: string;
+}) {
+  try {
+    const accountSid = safeString(process.env.TWILIO_ACCOUNT_SID);
+    const authToken = safeString(process.env.TWILIO_AUTH_TOKEN);
+    const messagingServiceSid = safeString(process.env.TWILIO_MESSAGING_SERVICE_SID);
+    const fromPhone = safeString(process.env.TWILIO_PHONE_NUMBER);
+    const toPhone = normalizeUsPhone(params.recipient.phone);
+
+    if (!accountSid || !authToken || !toPhone || (!messagingServiceSid && !fromPhone)) {
+      return false;
+    }
+
+    const threadUrl = buildPublicThreadUrl(params.conversationId);
+    const body = new URLSearchParams({
+      To: toPhone,
+      Body: `SitGuru: You have a new message from ${params.senderName || "SitGuru"}. Log in to view and reply: ${threadUrl}`,
+    });
+
+    if (messagingServiceSid) {
+      body.set("MessagingServiceSid", messagingServiceSid);
+    } else {
+      body.set("From", fromPhone);
+    }
+
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+      },
+    );
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.error("Message SMS delivery failed:", response.status, text);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Message SMS delivery error:", error);
+    return false;
+  }
+}
+
+async function auditMessageSend(params: {
+  actorId: string;
+  actorEmail: string | null;
+  conversationId: string;
+  recipient: RecipientContact;
+  delivery: DeliveryResult;
+}) {
+  try {
+    await supabaseAdmin.from("admin_audit_logs").insert({
+      actor_id: params.actorId,
+      actor_email: params.actorEmail,
+      action: "message_sent",
+      area: "messages",
+      target_type: "conversation",
+      target_id: params.conversationId,
+      metadata: {
+        recipient_user_id: params.recipient.userId,
+        recipient_role: params.recipient.role,
+        recipient_email_available: Boolean(params.recipient.email),
+        recipient_phone_available: Boolean(params.recipient.phone),
+        notification_created: params.delivery.notificationCreated,
+        email_sent: params.delivery.emailSent,
+        sms_sent: params.delivery.smsSent,
+        warnings: params.delivery.warnings,
+      },
+      created_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.warn("Message audit log skipped:", error);
+  }
+}
+
+function chooseRecipient(params: {
+  currentUserId: string;
+  currentUserRole: string;
+  conversation: ConversationRow;
+  participants: ConversationParticipantRow[];
+}) {
+  const roleByUserId = new Map<string, string>();
+
+  params.participants.forEach((participant) => {
+    const userId = safeString(participant.user_id);
+    if (!userId) return;
+    roleByUserId.set(userId, normalizeRole(participant.role));
+  });
+
+  const candidates = Array.from(
+    new Set(
+      [
+        params.conversation.customer_id || "",
+        params.conversation.guru_id || "",
+        params.conversation.started_by_user_id || "",
+        ...params.participants.map((participant) => participant.user_id || ""),
+      ].filter(Boolean),
+    ),
+  ).filter((userId) => userId !== params.currentUserId);
+
+  if (isAdminRole(params.currentUserRole)) {
+    return (
+      candidates.find((userId) => !isAdminRole(roleByUserId.get(userId))) ||
+      candidates[0] ||
+      ""
+    );
+  }
+
+  return (
+    candidates.find((userId) => isAdminRole(roleByUserId.get(userId))) ||
+    candidates[0] ||
+    ""
+  );
+}
+
 export async function POST(req: NextRequest) {
+  const delivery: DeliveryResult = {
+    messageSaved: false,
+    recipientFound: false,
+    notificationCreated: false,
+    emailSent: false,
+    smsSent: false,
+    warnings: [],
+  };
+
   try {
     const supabase = await createClient();
-
     const {
       data: { user },
-      error: userError,
+      error: authError,
     } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    if (authError || !user) {
+      return NextResponse.json(
+        { ok: false, error: "Please log in to send a message.", delivery },
+        { status: 401 },
+      );
     }
 
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-
-    const message = getMessageText(body);
     const conversationId = safeString(body?.conversationId);
+    const messageText = getMessageText(body);
+    const topic = safeString(body?.topic) || "direct_message";
 
-    const recipientId =
-      safeString(body?.recipientId) ||
-      safeString(body?.targetUserId) ||
-      safeString(body?.recipientUserId) ||
-      safeString(body?.toUserId);
-
-    const guruSlug =
-      safeString(body?.guruSlug) ||
-      safeString(body?.guru) ||
-      safeString(body?.guruSlugOrId);
-
-    const guruId =
-      safeString(body?.guruId) ||
-      safeString(body?.guruUserId) ||
-      safeString(body?.providerId);
-
-    const customerId =
-      safeString(body?.customerId) ||
-      safeString(body?.petParentId) ||
-      safeString(body?.customerUserId);
-
-    const targetRole =
-      safeString(body?.targetRole) ||
-      safeString(body?.recipientRole) ||
-      safeString(body?.toRole);
-
-    const adminUserId = safeString(body?.adminUserId);
-    const adminMode = Boolean(body?.adminMode);
-    const bookingIdRaw = safeString(body?.bookingId);
-
-    if (!message) {
+    if (!conversationId) {
       return NextResponse.json(
-        { error: "Missing required message fields." },
-        { status: 400 }
+        { ok: false, error: "Conversation ID is required.", delivery },
+        { status: 400 },
       );
     }
 
-    const currentProfile = await getProfileById(user.id);
-    const currentUserRole = await resolveUserRole(user.id, currentProfile?.role || null);
-
-    let target: TargetUserResult | null = null;
-    let finalConversationId = conversationId || null;
-    let subject = getSubject(body, targetRole);
-
-    if (finalConversationId) {
-      const conversation = await getConversationById(finalConversationId);
-
-      if (!conversation?.id) {
-        return NextResponse.json(
-          { error: "Conversation not found." },
-          { status: 404 }
-        );
-      }
-
-      const canAccessConversation = await isConversationParticipant(
-        finalConversationId,
-        user.id
-      );
-
-      if (!canAccessConversation) {
-        return NextResponse.json(
-          { error: "You do not have access to this conversation." },
-          { status: 403 }
-        );
-      }
-
-      target = await getRecipientForExistingConversation(conversation, user.id);
-      subject = conversation.subject || subject;
-    } else {
-      target = await getTargetUser({
-        guruSlug,
-        guruId: guruId || customerId,
-        targetUserId: recipientId || customerId,
-        targetRole: adminMode ? "admin" : targetRole,
-        adminUserId,
-      });
-
-      if (!target?.userId) {
-        return NextResponse.json(
-          { error: "Target user not found." },
-          { status: 404 }
-        );
-      }
-
-      if (target.userId === user.id) {
-        return NextResponse.json(
-          { error: "You cannot message yourself." },
-          { status: 400 }
-        );
-      }
-
-      const bookingId = bookingIdRaw || null;
-
-      const existingConversation = await findExistingConversationByParticipants(
-        user.id,
-        target.userId,
-        bookingId
-      );
-
-      finalConversationId = existingConversation?.id ?? null;
-
-      if (!finalConversationId) {
-        const guruUserId =
-          currentUserRole === "guru"
-            ? user.id
-            : target.role === "guru"
-              ? target.userId
-              : user.id;
-
-        const customerUserId = guruUserId === user.id ? target.userId : user.id;
-
-        const createdConversation = await createConversation({
-          customerUserId,
-          guruUserId,
-          startedByUserId: user.id,
-          bookingId,
-          subject,
-        });
-
-        finalConversationId = createdConversation.id;
-      }
-
-      await ensureParticipants(finalConversationId, [
-        { userId: user.id, role: currentUserRole || "customer" },
-        { userId: target.userId, role: target.role || "user" },
-      ]);
-    }
-
-    if (!finalConversationId || !target?.userId) {
+    if (!messageText || messageText.length < 1) {
       return NextResponse.json(
-        { error: "Missing required message fields." },
-        { status: 400 }
+        { ok: false, error: "Please enter a message before sending.", delivery },
+        { status: 400 },
       );
     }
 
-    await insertMessage({
-      conversationId: finalConversationId,
-      senderUserId: user.id,
-      recipientUserId: target.userId,
-      senderProfile: currentProfile,
-      recipientProfile: target.profile,
-      senderRole: currentUserRole || "customer",
-      recipientRole: target.role || "user",
-      message,
-      topic: subject,
+    if (messageText.length > 5000) {
+      return NextResponse.json(
+        { ok: false, error: "Please keep messages under 5,000 characters.", delivery },
+        { status: 400 },
+      );
+    }
+
+    const [{ data: conversation, error: conversationError }, participants] = await Promise.all([
+      supabaseAdmin
+        .from("conversations")
+        .select("*")
+        .eq("id", conversationId)
+        .maybeSingle<ConversationRow>(),
+      safeRows<ConversationParticipantRow>(
+        supabaseAdmin
+          .from("conversation_participants")
+          .select("*")
+          .eq("conversation_id", conversationId),
+        "conversation_participants",
+      ),
+    ]);
+
+    if (conversationError || !conversation) {
+      return NextResponse.json(
+        { ok: false, error: "Message thread was not found.", delivery },
+        { status: 404 },
+      );
+    }
+
+    const participantRole = participants.find((participant) => participant.user_id === user.id)?.role;
+    const currentUserRole = await resolveRole({
+      userId: user.id,
+      participantRole,
+      conversation,
     });
 
-    await updateConversationLastMessage({
-      conversationId: finalConversationId,
-      message,
-    });
-
-    await createNotification({
-      recipientUserId: target.userId,
-      conversationId: finalConversationId,
-      senderName:
-        getDisplayName(currentProfile) ||
-        safeString(user.user_metadata?.full_name) ||
-        safeString(user.email) ||
-        "SitGuru User",
-      senderRole: currentUserRole || "customer",
-      subject,
-      message,
-    });
-
-    return NextResponse.json(
-      {
-        ok: true,
-        conversationId: finalConversationId,
-        redirectTo: buildMessageThreadHref(finalConversationId),
-      },
-      { status: 200 }
+    const allowedUserIds = new Set(
+      [
+        conversation.customer_id || "",
+        conversation.guru_id || "",
+        conversation.started_by_user_id || "",
+        ...participants.map((participant) => participant.user_id || ""),
+      ].filter(Boolean),
     );
+
+    if (!allowedUserIds.has(user.id) && !isAdminRole(currentUserRole)) {
+      return NextResponse.json(
+        { ok: false, error: "You do not have access to this message thread.", delivery },
+        { status: 403 },
+      );
+    }
+
+    const recipientUserId = chooseRecipient({
+      currentUserId: user.id,
+      currentUserRole,
+      conversation,
+      participants,
+    });
+
+    if (!recipientUserId) {
+      return NextResponse.json(
+        { ok: false, error: "SitGuru could not find the other participant for this thread.", delivery },
+        { status: 400 },
+      );
+    }
+
+    const recipientRole = await resolveRole({
+      userId: recipientUserId,
+      participantRole: participants.find((participant) => participant.user_id === recipientUserId)?.role,
+      conversation,
+    });
+    const recipient = await buildContact(recipientUserId, recipientRole);
+    const senderProfile = await getProfile(user.id);
+    const senderGuru = await getGuru(user.id);
+    const senderName =
+      currentUserRole === "guru"
+        ? getGuruName(senderGuru) || getProfileName(senderProfile)
+        : isAdminRole(currentUserRole)
+          ? "SitGuru Admin"
+          : getProfileName(senderProfile);
+    const preview = getMessagePreview(messageText);
+    const now = new Date().toISOString();
+
+    delivery.recipientFound = true;
+
+    const { data: messageRow, error: messageError } = await supabaseAdmin
+      .from("messages")
+      .insert({
+        conversation_id: conversation.id,
+        sender_id: user.id,
+        recipient_id: recipient.userId,
+        sender_role: currentUserRole,
+        recipient_role: recipient.role,
+        sender_name_snapshot: senderName,
+        sender_email_snapshot: safeString(user.email) || safeString(senderProfile?.email) || null,
+        sender_phone_snapshot: null,
+        sender_role_snapshot: currentUserRole,
+        recipient_name_snapshot: recipient.name,
+        recipient_email_snapshot: recipient.email || null,
+        recipient_phone_snapshot: recipient.phone || null,
+        recipient_role_snapshot: recipient.role,
+        content: messageText,
+        body: messageText,
+        topic,
+        message_type: isAdminRole(currentUserRole) ? `direct_${recipient.role}` : `direct_${currentUserRole}`,
+        status: "unread",
+        is_read: false,
+        created_at: now,
+        updated_at: now,
+      })
+      .select("id")
+      .single();
+
+    if (messageError || !messageRow?.id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: messageError?.message || "Unable to save message.",
+          delivery,
+        },
+        { status: 500 },
+      );
+    }
+
+    delivery.messageSaved = true;
+
+    await supabaseAdmin
+      .from("conversations")
+      .update({
+        topic,
+        status: "open",
+        last_message_at: now,
+        last_message_preview: preview,
+        updated_at: now,
+      })
+      .eq("id", conversation.id);
+
+    await supabaseAdmin.from("conversation_participants").upsert(
+      [
+        {
+          conversation_id: conversation.id,
+          user_id: user.id,
+          role: currentUserRole,
+          created_at: now,
+          updated_at: now,
+        },
+        {
+          conversation_id: conversation.id,
+          user_id: recipient.userId,
+          role: recipient.role,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+      {
+        onConflict: "conversation_id,user_id",
+        ignoreDuplicates: false,
+      },
+    );
+
+    delivery.notificationCreated = await createNotification({
+      recipient,
+      conversationId: conversation.id,
+      preview,
+    });
+
+    if (!delivery.notificationCreated) {
+      delivery.warnings.push("In-app notification was not created.");
+    }
+
+    delivery.emailSent = await sendRecipientEmail({
+      recipient,
+      senderName,
+      conversationId: conversation.id,
+    });
+
+    if (!delivery.emailSent) {
+      delivery.warnings.push(
+        recipient.email
+          ? "Email notification was not sent."
+          : "No recipient email was available.",
+      );
+    }
+
+    delivery.smsSent = await sendRecipientSms({
+      recipient,
+      senderName,
+      conversationId: conversation.id,
+    });
+
+    if (!delivery.smsSent) {
+      delivery.warnings.push(
+        recipient.phone
+          ? "SMS notification was not sent."
+          : "No recipient phone number was available.",
+      );
+    }
+
+    await auditMessageSend({
+      actorId: user.id,
+      actorEmail: user.email || safeString(senderProfile?.email) || null,
+      conversationId: conversation.id,
+      recipient,
+      delivery,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      messageId: messageRow.id,
+      conversationId: conversation.id,
+      recipient: {
+        userId: recipient.userId,
+        role: recipient.role,
+        name: recipient.name,
+        emailAvailable: Boolean(recipient.email),
+        phoneAvailable: Boolean(recipient.phone),
+      },
+      delivery,
+    });
   } catch (error) {
-    console.error("Message send route error:", error);
+    console.error("Message send route failed:", error);
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to send message.",
+        ok: false,
+        error: error instanceof Error ? error.message : "Unable to send message.",
+        delivery,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
