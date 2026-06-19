@@ -1574,6 +1574,14 @@ export default async function GuruBookingsPage({
                   </Link>
 
                   <Link
+                    href={`/guru/dashboard/bookings/${selectedBooking.id}/visit-updates`}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-5 py-3 text-sm font-black !text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 hover:!text-sky-800"
+                  >
+                    <PawPrint className="h-4 w-4" />
+                    Visit Updates
+                  </Link>
+
+                  <Link
                     href={buildBookingsHref({
                       booking: selectedBooking.id,
                       filter: activeFilter,
