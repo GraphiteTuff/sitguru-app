@@ -734,10 +734,10 @@ export default async function AmbassadorDashboardPage() {
                 </Link>
 
                 <Link
-                  href={`mailto:support@sitguru.com?subject=Ambassador%20Support%20Request&body=Ambassador%20Referral%20Code%3A%20${encodeURIComponent(referralCode)}`}
+                  href="/ambassador/dashboard/messages?support=admin"
                   className="flex min-h-14 items-center justify-between rounded-2xl border border-green-200 bg-white px-5 py-4 text-sm font-black text-green-900 transition hover:bg-green-50"
                 >
-                  Message SitGuru
+                  Message Center
                   <ArrowRight size={17} />
                 </Link>
 
@@ -763,6 +763,40 @@ export default async function AmbassadorDashboardPage() {
           referralCode={referralCode}
           stats={stats}
         />
+
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.75fr)]">
+          <DashboardCard>
+            <SectionHeader
+              icon={<MessageCircle size={22} />}
+              title="Ambassador Message Center"
+              detail="Use SitGuru messages instead of email when you need Admin help, referral tracking support, payout questions, event support, or quick follow-up."
+            />
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Link
+                href="/ambassador/dashboard/messages"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+              >
+                Open Message Center
+                <ArrowRight size={17} />
+              </Link>
+              <Link
+                href="/ambassador/dashboard/messages?support=admin"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+              >
+                Message SitGuru Admin
+                <ArrowRight size={17} />
+              </Link>
+            </div>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<ShieldCheck size={22} />}
+              title="Connected Support"
+              detail="Messages stay in SitGuru so Admin and Ambassadors can keep referral, reward, and outreach conversations in one place."
+            />
+          </DashboardCard>
+        </section>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <StatCard
@@ -1045,9 +1079,15 @@ export default async function AmbassadorDashboardPage() {
                 Share your Guru link with one potential sitter, walker, or pet
                 professional.
               </ReminderItem>
-              <ReminderItem>
-                Message SitGuru if a referral is missing from tracking.
-              </ReminderItem>
+              <Link
+                href="/ambassador/dashboard/messages?support=admin"
+                className="flex items-start gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm font-bold leading-6 text-green-950 transition hover:bg-green-100"
+              >
+                <MessageCircle size={17} className="mt-1 shrink-0 text-green-800" />
+                <span>
+                  Message SitGuru Admin if a referral is missing from tracking.
+                </span>
+              </Link>
             </div>
           </DashboardCard>
         </section>
@@ -1127,10 +1167,16 @@ export default async function AmbassadorDashboardPage() {
               <ReminderItem>
                 Invite 5 people to follow @SitGuruOfficial.
               </ReminderItem>
-              <ReminderItem>
-                Message SitGuru if a referral, flyer, or QR code support item is
-                needed.
-              </ReminderItem>
+              <Link
+                href="/ambassador/dashboard/messages?support=admin"
+                className="flex items-start gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm font-bold leading-6 text-green-950 transition hover:bg-green-100"
+              >
+                <MessageCircle size={17} className="mt-1 shrink-0 text-green-800" />
+                <span>
+                  Message SitGuru Admin if a referral, flyer, or QR code support
+                  item is needed.
+                </span>
+              </Link>
             </div>
           </DashboardCard>
 
@@ -1226,6 +1272,14 @@ export default async function AmbassadorDashboardPage() {
                   review.
                 </div>
 
+                <Link
+                  href="/ambassador/dashboard/messages?support=admin"
+                  className="mb-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+                >
+                  Open SitGuru Admin Chat
+                  <ArrowRight size={17} />
+                </Link>
+
                 <form
                   action="mailto:support@sitguru.com"
                   method="post"
@@ -1290,8 +1344,8 @@ export default async function AmbassadorDashboardPage() {
                   </button>
 
                   <p className="text-xs font-bold leading-5 text-green-900/75">
-                    This opens an email to support@sitguru.com with the request
-                    type, referral code, and optional note.
+                    Use Admin Chat for the fastest support. The email form remains as
+                    a backup if you need to send a longer offline request.
                   </p>
                 </form>
               </div>
@@ -1411,14 +1465,14 @@ export default async function AmbassadorDashboardPage() {
           <DashboardCard>
             <SectionHeader
               icon={<MessageCircle size={22} />}
-              title="Message SitGuru"
-              detail="General support for referrals, rewards, partners, events, or local outreach."
+              title="Message SitGuru Admin"
+              detail="Open Ambassador quick chat for referrals, rewards, partners, events, missing tracking, or local outreach support."
             />
             <Link
-              href={`mailto:support@sitguru.com?subject=Ambassador%20Support%20Request&body=Ambassador%20Referral%20Code%3A%20${encodeURIComponent(referralCode)}`}
+              href="/ambassador/dashboard/messages?support=admin"
               className="mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
             >
-              Message SitGuru
+              Message SitGuru Admin
               <ArrowRight size={17} />
             </Link>
           </DashboardCard>
