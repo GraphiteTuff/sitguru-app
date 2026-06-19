@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowRight,
   BookOpen,
   CalendarDays,
   ChevronDown,
@@ -696,8 +697,6 @@ export default function Header({ user = null }: HeaderProps) {
     hasAdminAccess,
     guruStatus: activeUser?.guruStatus,
   });
-  const primarySwitchLink = roleSwitchLinks[0] || null;
-
   const navLinks = useMemo(() => {
     if (isAdmin) return adminNavLinks;
     if (isAmbassador) return ambassadorNavLinks;
@@ -741,13 +740,14 @@ export default function Header({ user = null }: HeaderProps) {
     : isAmbassador
       ? [
           { label: "Dashboard", href: "/ambassador/dashboard" },
+          { label: "Referrals", href: "/ambassador/dashboard/referrals" },
+          { label: "Earnings", href: "/ambassador/dashboard/earnings" },
+          { label: "Support", href: "mailto:support@sitguru.com" },
+          { label: "Training", href: "/ambassador/dashboard/training" },
           {
             label: "Onboarding",
             href: "/ambassador/dashboard/onboarding-packet",
           },
-          { label: "Training", href: "/ambassador/training" },
-          { label: "Support", href: "mailto:support@sitguru.com" },
-          { label: "Ambassador Program", href: "/ambassadors" },
         ]
       : isAdmin
         ? [
@@ -881,14 +881,36 @@ export default function Header({ user = null }: HeaderProps) {
             <div className="h-11 w-48 animate-pulse rounded-full bg-slate-100" />
           ) : isLoggedIn ? (
             <>
-              {primarySwitchLink ? (
-                <Link
-                  href={primarySwitchLink.href}
-                  className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100 xl:inline-flex"
-                >
-                  <Repeat2 className="h-4 w-4" />
-                  {primarySwitchLink.label}
-                </Link>
+              {roleSwitchLinks.length ? (
+                <details className="group relative hidden xl:block">
+                  <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100 [&::-webkit-details-marker]:hidden">
+                    <Repeat2 className="h-4 w-4" />
+                    Switch Dashboard
+                    <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+                  </summary>
+
+                  <div className="absolute right-0 top-full z-50 mt-3 w-72 overflow-hidden rounded-3xl border border-slate-200 bg-white p-2 shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
+                    <p className="px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                      Switch Dashboard
+                    </p>
+
+                    <div className="grid gap-1">
+                      {roleSwitchLinks.map((link) => (
+                        <Link
+                          key={`desktop-switch-${link.href}`}
+                          href={link.href}
+                          className="flex items-center justify-between gap-3 rounded-2xl px-3 py-3 text-sm font-black text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-800"
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Repeat2 className="h-4 w-4 text-emerald-700" />
+                            {link.label}
+                          </span>
+                          <ArrowRight className="h-4 w-4 text-slate-400" />
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </details>
               ) : null}
 
               {isGuru ? (
