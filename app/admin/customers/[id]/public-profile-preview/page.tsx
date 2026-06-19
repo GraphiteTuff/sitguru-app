@@ -20,9 +20,80 @@ type PageProps = {
 
 type AnyRow = Record<string, unknown>;
 
+type PetParentRegistrationHealthRow = {
+  profile_id: string;
+  full_name?: string | null;
+  profile_email?: string | null;
+  profile_phone?: string | null;
+  auth_email?: string | null;
+  auth_phone?: string | null;
+  role?: string | null;
+  admin_status?: string | null;
+  admin_notes?: string | null;
+  registration_health_status?: string | null;
+  profile_created_at?: string | null;
+  auth_created_at?: string | null;
+  auth_last_sign_in_at?: string | null;
+};
+
+
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
+
+
+function normalizeRegistrationHealthStatus(value: unknown) {
+  return asString(value).toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function getRegistrationHealthLabel(value: unknown) {
+  const status = normalizeRegistrationHealthStatus(value);
+
+  if (status === "active_pet_parent") return "Active Pet Parent";
+  if (status === "phone_only_incomplete_signup") return "Phone-only Incomplete Signup";
+  if (status === "registered_pet_parent_needs_profile") return "Needs Profile Completion";
+  if (status === "incomplete_signup") return "Incomplete Signup";
+  if (status === "signup_log_without_auth") return "Signup Log / Missing Auth";
+  if (status === "likely_test_or_spam") return "Likely Test / Spam";
+  if (status === "archived") return "Archived";
+
+  return "Not checked";
+}
+
+function getRegistrationHealthDescription(value: unknown) {
+  const status = normalizeRegistrationHealthStatus(value);
+
+  if (status === "active_pet_parent") {
+    return "This profile is safe to preview as a normal Pet Parent public profile.";
+  }
+
+  if (status === "phone_only_incomplete_signup") {
+    return "This is a phone-only signup with no completed Pet Parent profile yet. Keep it out of active/public Pet Parent views.";
+  }
+
+  if (status === "registered_pet_parent_needs_profile") {
+    return "This Pet Parent has started registration but still needs profile completion before the public profile should look complete.";
+  }
+
+  if (status === "incomplete_signup") {
+    return "This Pet Parent signup is incomplete and should not be treated as a finished public profile.";
+  }
+
+  if (status === "signup_log_without_auth") {
+    return "A signup log exists, but no matching Supabase auth user was found.";
+  }
+
+  if (status === "likely_test_or_spam") {
+    return "This record is likely test/spam and should not be surfaced as a normal Pet Parent.";
+  }
+
+  if (status === "archived") {
+    return "This record is archived and should not be treated as an active Pet Parent.";
+  }
+
+  return "No registration health status was found for this record.";
+}
+
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -418,20 +489,64 @@ async function getProfileByLookupKey(lookupKey: string) {
   }
 }
 
+
+async function getRegistrationHealthByLookupKey(
+  lookupKey: string,
+): Promise<PetParentRegistrationHealthRow | null> {
+  try {
+    if (isUuid(lookupKey)) {
+      const { data, error } = await supabaseAdmin
+        .from("admin_pet_parent_registration_health")
+        .select("*")
+        .eq("profile_id", lookupKey)
+        .maybeSingle();
+
+      if (error) return null;
+      return (data ?? null) as PetParentRegistrationHealthRow | null;
+    }
+
+    if (lookupKey.includes("@")) {
+      const cleanEmail = lookupKey.trim().toLowerCase();
+      const { data, error } = await supabaseAdmin
+        .from("admin_pet_parent_registration_health")
+        .select("*")
+        .or(`profile_email.eq.${cleanEmail},auth_email.eq.${cleanEmail}`)
+        .maybeSingle();
+
+      if (error) return null;
+      return (data ?? null) as PetParentRegistrationHealthRow | null;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+
 export default async function AdminCustomerPublicProfilePreviewPage({
   params,
 }: PageProps) {
   const resolvedParams = await params;
   const lookupKey = decodeURIComponent(resolvedParams.id || "").trim();
 
-  const [profile, authUserByLookup] = await Promise.all([
+  const [profile, authUserByLookup, registrationHealthByLookup] = await Promise.all([
     getProfileByLookupKey(lookupKey),
     getAuthUserByLookupKey(lookupKey),
+    getRegistrationHealthByLookupKey(lookupKey),
   ]);
 
   const authUser =
     authUserByLookup ||
     (profile?.id ? await getAuthUserById(String(profile.id)) : null);
+
+  const registrationHealth =
+    registrationHealthByLookup ||
+    (profile?.id ? await getRegistrationHealthByLookupKey(String(profile.id)) : null);
+  const registrationHealthStatus = normalizeRegistrationHealthStatus(
+    registrationHealth?.registration_health_status,
+  );
+  const publicProfileReady = registrationHealthStatus === "active_pet_parent";
 
   const relatedCustomerId = getRelatedRecordId({
     lookupKey,
@@ -462,9 +577,10 @@ export default async function AdminCustomerPublicProfilePreviewPage({
   const memberSince =
     formatMonthYear(profile?.created_at) ||
     formatMonthYear(authUser?.created_at);
-  const publicBio =
-    petParentBio ||
-    `${firstName} is part of the SitGuru pet care community and uses SitGuru to connect with trusted local pet care providers.`;
+  const publicBio = publicProfileReady
+    ? petParentBio ||
+      `${firstName} is part of the SitGuru pet care community and uses SitGuru to connect with trusted local pet care providers.`
+    : "This Pet Parent profile is not public-ready yet. It is visible here only for Super Admin review.";
 
   if (!profile && !authUser) {
     return (
@@ -528,6 +644,20 @@ export default async function AdminCustomerPublicProfilePreviewPage({
           </div>
         </div>
 
+        {!publicProfileReady ? (
+          <div className="rounded-[2rem] border border-orange-200 bg-orange-50 p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">
+              Admin-only public profile safety check
+            </p>
+            <h2 className="mt-1 text-2xl font-black text-orange-950">
+              {getRegistrationHealthLabel(registrationHealthStatus)}
+            </h2>
+            <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-orange-900">
+              {getRegistrationHealthDescription(registrationHealthStatus)}
+            </p>
+          </div>
+        ) : null}
+
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#d8fff2_0%,#bff7ea_48%,#eaf7ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
@@ -557,7 +687,7 @@ export default async function AdminCustomerPublicProfilePreviewPage({
               </p>
 
               <h1 className="mt-4 max-w-4xl text-4xl font-extrabold tracking-[-0.045em] text-slate-950 md:text-6xl">
-                Meet {firstName}
+                {publicProfileReady ? `Meet ${firstName}` : "Profile not public-ready yet"}
               </h1>
 
               {location ? (
@@ -568,8 +698,9 @@ export default async function AdminCustomerPublicProfilePreviewPage({
               ) : null}
 
               <p className="mt-5 max-w-3xl text-base leading-8 text-slate-900/75 md:text-lg">
-                {firstName} is a SitGuru Pet Parent connected to the SitGuru pet
-                care community.
+                {publicProfileReady
+                  ? `${firstName} is a SitGuru Pet Parent connected to the SitGuru pet care community.`
+                  : "This signup should stay in admin review until registration, contact, and profile details are complete."}
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -758,6 +889,10 @@ export default async function AdminCustomerPublicProfilePreviewPage({
               <MiniBox
                 label="Profile Row"
                 value={profile ? "Found" : "Missing"}
+              />
+              <MiniBox
+                label="Registration Health"
+                value={getRegistrationHealthLabel(registrationHealthStatus)}
               />
               <MiniBox
                 label="Auth Created"

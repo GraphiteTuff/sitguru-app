@@ -165,6 +165,23 @@ type CustomerInsight = {
   profileCompletion: number;
 };
 
+
+type PetParentRegistrationHealthRow = {
+  profile_id: string;
+  full_name?: string | null;
+  profile_email?: string | null;
+  profile_phone?: string | null;
+  auth_email?: string | null;
+  auth_phone?: string | null;
+  role?: string | null;
+  admin_status?: string | null;
+  admin_notes?: string | null;
+  registration_health_status?: string | null;
+  profile_created_at?: string | null;
+  auth_created_at?: string | null;
+  auth_last_sign_in_at?: string | null;
+};
+
 type LocationInsight = {
   label: string;
   customers: number;
@@ -1048,6 +1065,75 @@ async function safeAdminQuery(
   }
 }
 
+
+function normalizeRegistrationHealthStatus(value: unknown) {
+  return asString(value).toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function isActivePetParentHealth(row: PetParentRegistrationHealthRow | undefined) {
+  return normalizeRegistrationHealthStatus(row?.registration_health_status) === "active_pet_parent";
+}
+
+function isSeparatedPetParentHealth(row: PetParentRegistrationHealthRow | undefined) {
+  const status = normalizeRegistrationHealthStatus(row?.registration_health_status);
+
+  return Boolean(
+    status &&
+      status !== "active_pet_parent" &&
+      status !== "not_pet_parent",
+  );
+}
+
+function mapRegistrationHealthToSignupQuality(
+  row: PetParentRegistrationHealthRow | undefined,
+): CustomerInsight["signupQuality"] | null {
+  const status = normalizeRegistrationHealthStatus(row?.registration_health_status);
+
+  if (!status) return null;
+  if (status === "active_pet_parent") return "active";
+  if (status === "phone_only_incomplete_signup") return "needs_review";
+  if (status === "registered_pet_parent_needs_profile") return "needs_review";
+  if (status === "incomplete_signup") return "needs_review";
+  if (status === "signup_log_without_auth") return "needs_review";
+  if (status === "likely_test_or_spam") return "likely_test_spam";
+  if (status === "archived") return "likely_test_spam";
+
+  return "needs_review";
+}
+
+function getRegistrationHealthLabel(row: PetParentRegistrationHealthRow | undefined) {
+  const status = normalizeRegistrationHealthStatus(row?.registration_health_status);
+
+  if (status === "active_pet_parent") return "Active Pet Parent";
+  if (status === "phone_only_incomplete_signup") return "Phone-only Signup";
+  if (status === "registered_pet_parent_needs_profile") return "Needs Profile";
+  if (status === "incomplete_signup") return "Incomplete Signup";
+  if (status === "signup_log_without_auth") return "Signup / No Auth";
+  if (status === "likely_test_or_spam") return "Likely Test / Spam";
+  if (status === "archived") return "Archived";
+
+  return "";
+}
+
+function mapRegistrationHealthToAdminStatus(row: PetParentRegistrationHealthRow | undefined) {
+  const status = normalizeRegistrationHealthStatus(row?.registration_health_status);
+
+  if (status === "active_pet_parent") return "active";
+  if (status === "archived") return "archived";
+  if (status === "likely_test_or_spam") return "likely_spam";
+  if (
+    status === "phone_only_incomplete_signup" ||
+    status === "registered_pet_parent_needs_profile" ||
+    status === "incomplete_signup"
+  ) {
+    return "incomplete_signup";
+  }
+  if (status === "signup_log_without_auth") return "needs_review";
+
+  return "";
+}
+
+
 async function getCustomerIntelligenceData() {
   const [
     profilesResult,
@@ -1060,6 +1146,7 @@ async function getCustomerIntelligenceData() {
     referralConversionsResult,
     networkClicksResult,
     partnerCampaignsResult,
+    registrationHealthResult,
   ] = await Promise.all([
     safeAdminQuery(
       supabaseAdmin
@@ -1141,6 +1228,14 @@ async function getCustomerIntelligenceData() {
         .limit(1000),
       "partner_campaigns",
     ),
+    safeAdminQuery(
+      supabaseAdmin
+        .from("admin_pet_parent_registration_health")
+        .select("*")
+        .order("profile_created_at", { ascending: false })
+        .limit(1000),
+      "admin_pet_parent_registration_health",
+    ),
   ]);
 
   const rawProfiles = ((profilesResult.data || []) as ProfileRow[]).filter(Boolean);
@@ -1153,6 +1248,28 @@ async function getCustomerIntelligenceData() {
   const rawReferralConversions = ((referralConversionsResult.data || []) as AnyRow[]).filter(Boolean);
   const rawNetworkClicks = ((networkClicksResult.data || []) as AnyRow[]).filter(Boolean);
   const rawPartnerCampaigns = ((partnerCampaignsResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawRegistrationHealth = (
+    (registrationHealthResult.data || []) as PetParentRegistrationHealthRow[]
+  ).filter(Boolean);
+
+  const registrationHealthByProfileId = new Map(
+    rawRegistrationHealth
+      .map((row) => [String(row.profile_id || ""), row] as const)
+      .filter(([profileId]) => Boolean(profileId)),
+  );
+  const hasRegistrationHealthView = registrationHealthByProfileId.size > 0;
+  const healthExcludedCustomerIds = new Set(
+    rawRegistrationHealth
+      .filter((row) => isSeparatedPetParentHealth(row))
+      .map((row) => row.profile_id)
+      .filter(Boolean),
+  );
+  const healthActiveCustomerIds = new Set(
+    rawRegistrationHealth
+      .filter((row) => isActivePetParentHealth(row))
+      .map((row) => row.profile_id)
+      .filter(Boolean),
+  );
 
   const hiddenCustomerIds = new Set(
     rawProfiles
@@ -1173,15 +1290,21 @@ async function getCustomerIntelligenceData() {
   const excludedCustomerIds = new Set([
     ...Array.from(hiddenCustomerIds),
     ...Array.from(separatedCustomerIds),
+    ...Array.from(healthExcludedCustomerIds),
   ]);
 
-  const profiles = rawProfiles.filter(
-    (profile) =>
+  const profiles = rawProfiles.filter((profile) => {
+    const health = registrationHealthByProfileId.get(profile.id);
+
+    return (
       isCustomerProfile(profile) &&
       !isDemoLikeRow(profile as AnyRow) &&
       !hiddenCustomerIds.has(profile.id) &&
-      !separatedCustomerIds.has(profile.id),
-  );
+      !separatedCustomerIds.has(profile.id) &&
+      !healthExcludedCustomerIds.has(profile.id) &&
+      (!hasRegistrationHealthView || healthActiveCustomerIds.has(profile.id) || isActivePetParentHealth(health))
+    );
+  });
   const bookings = rawBookings.filter(
     (booking) =>
       !isDemoLikeRow(booking as AnyRow) &&
@@ -1234,7 +1357,8 @@ async function getCustomerIntelligenceData() {
     separatedStatusCounts.archived +
     separatedStatusCounts.likelySpam +
     separatedStatusCounts.incompleteSignup +
-    separatedStatusCounts.deleted;
+    separatedStatusCounts.deleted +
+    healthExcludedCustomerIds.size;
 
   const signupRows = [...launchSignups, ...launchWaitlist];
   const clickRows = [...referralClicks, ...networkClicks];
@@ -1247,11 +1371,20 @@ async function getCustomerIntelligenceData() {
     if (!profile.id) continue;
 
     const source = normalizeSource(getSource(profile as AnyRow));
+    const health = registrationHealthByProfileId.get(profile.id);
+    const healthEmail = asString(health?.profile_email) || asString(health?.auth_email);
 
     customerMap.set(profile.id, {
       id: profile.id,
-      name: getSafeCustomerDisplayName(profile as AnyRow, "Customer"),
-      email: profile.email || "",
+      name: getSafeCustomerDisplayName(
+        {
+          ...(profile as AnyRow),
+          full_name: asString(health?.full_name) || profile.full_name,
+          email: healthEmail || profile.email,
+        },
+        "Customer",
+      ),
+      email: healthEmail || profile.email || "",
       avatarUrl: profile.avatar_url || "",
       city: getCity(profile as AnyRow),
       state: getState(profile as AnyRow),
@@ -1271,8 +1404,11 @@ async function getCustomerIntelligenceData() {
       segment: "Lead",
       signupQuality: "incomplete",
       signupQualityLabel: "Registered",
-      adminStatus: getAdminStatus(profile as AnyRow),
-      adminStatusLabel: getAdminStatusLabel(getAdminStatus(profile as AnyRow)),
+      adminStatus:
+        mapRegistrationHealthToAdminStatus(health) || getAdminStatus(profile as AnyRow),
+      adminStatusLabel: getAdminStatusLabel(
+        mapRegistrationHealthToAdminStatus(health) || getAdminStatus(profile as AnyRow),
+      ),
       archivedAt: getArchivedAt(profile as AnyRow),
       profileCompletion: 0,
     });
@@ -1391,13 +1527,22 @@ async function getCustomerIntelligenceData() {
     };
 
     const segment = getCustomerSegment(enriched);
-    const signupQuality = getCustomerSignupQuality({
+    const registrationHealth = registrationHealthByProfileId.get(customer.id);
+    const healthSignupQuality = mapRegistrationHealthToSignupQuality(registrationHealth);
+    const healthLabel = getRegistrationHealthLabel(registrationHealth);
+    const calculatedSignupQuality = getCustomerSignupQuality({
       ...enriched,
       segment,
       signupQuality: "incomplete",
       signupQualityLabel: "Registered",
       profileCompletion: 0,
     });
+    const signupQuality = healthSignupQuality
+      ? {
+          signupQuality: healthSignupQuality,
+          signupQualityLabel: healthLabel || calculatedSignupQuality.signupQualityLabel,
+        }
+      : calculatedSignupQuality;
 
     const profileCompletion = getCustomerProfileCompletion({
       ...enriched,

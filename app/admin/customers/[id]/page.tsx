@@ -42,6 +42,23 @@ type VerificationStatus =
   | "incomplete"
   | "missing";
 
+
+type PetParentRegistrationHealthRow = {
+  profile_id: string;
+  full_name?: string | null;
+  profile_email?: string | null;
+  profile_phone?: string | null;
+  auth_email?: string | null;
+  auth_phone?: string | null;
+  role?: string | null;
+  admin_status?: string | null;
+  admin_notes?: string | null;
+  registration_health_status?: string | null;
+  profile_created_at?: string | null;
+  auth_created_at?: string | null;
+  auth_last_sign_in_at?: string | null;
+};
+
 type AdminStatus =
   | "active"
   | "needs_review"
@@ -661,6 +678,41 @@ async function getProfileByLookupKey(lookupKey: string) {
   }
 }
 
+
+async function getRegistrationHealthByLookupKey(
+  lookupKey: string,
+): Promise<PetParentRegistrationHealthRow | null> {
+  try {
+    if (isUuid(lookupKey)) {
+      const { data, error } = await supabaseAdmin
+        .from("admin_pet_parent_registration_health")
+        .select("*")
+        .eq("profile_id", lookupKey)
+        .maybeSingle();
+
+      if (error) return null;
+      return (data ?? null) as PetParentRegistrationHealthRow | null;
+    }
+
+    if (lookupKey.includes("@")) {
+      const cleanEmail = lookupKey.trim().toLowerCase();
+      const { data, error } = await supabaseAdmin
+        .from("admin_pet_parent_registration_health")
+        .select("*")
+        .or(`profile_email.eq.${cleanEmail},auth_email.eq.${cleanEmail}`)
+        .maybeSingle();
+
+      if (error) return null;
+      return (data ?? null) as PetParentRegistrationHealthRow | null;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+
 function getVerifiedFields(profile: AnyRow | null, authUser: AnyRow | null) {
   const profileEmail = getText(profile, ["email", "customer_email", "pet_parent_email"]);
   const authEmail = getText(authUser, ["email"]);
@@ -830,6 +882,79 @@ function getStatusStyles(status: VerificationStatus) {
     badge: "border-rose-200 bg-white text-rose-800",
   };
 }
+
+
+function normalizeRegistrationHealthStatus(value: unknown) {
+  return asString(value).toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function getRegistrationHealthLabel(value: unknown) {
+  const status = normalizeRegistrationHealthStatus(value);
+
+  if (status === "active_pet_parent") return "Active Pet Parent";
+  if (status === "phone_only_incomplete_signup") return "Phone-only Incomplete Signup";
+  if (status === "registered_pet_parent_needs_profile") return "Needs Profile Completion";
+  if (status === "incomplete_signup") return "Incomplete Signup";
+  if (status === "signup_log_without_auth") return "Signup Log / Missing Auth";
+  if (status === "likely_test_or_spam") return "Likely Test / Spam";
+  if (status === "archived") return "Archived";
+  if (status === "not_pet_parent") return "Not Pet Parent";
+
+  return "Not checked";
+}
+
+function getRegistrationHealthDescription(value: unknown) {
+  const status = normalizeRegistrationHealthStatus(value);
+
+  if (status === "active_pet_parent") {
+    return "This Pet Parent passed the registration health view and may be counted in active Pet Parent stats.";
+  }
+
+  if (status === "phone_only_incomplete_signup") {
+    return "This is a phone-auth signup without email/profile completion. Keep it out of active Pet Parent stats until completed.";
+  }
+
+  if (status === "registered_pet_parent_needs_profile") {
+    return "This signup has an auth/contact record, but still needs profile completion or sign-in activity.";
+  }
+
+  if (status === "incomplete_signup") {
+    return "This person started signup but has not completed enough setup to count as an active Pet Parent.";
+  }
+
+  if (status === "signup_log_without_auth") {
+    return "A Pet Parent signup log exists, but no matching Supabase auth user was found.";
+  }
+
+  if (status === "likely_test_or_spam") {
+    return "This record lacks normal signup trust signals and should stay out of active Pet Parent stats.";
+  }
+
+  if (status === "archived") {
+    return "This record is archived and preserved for audit/history.";
+  }
+
+  return "The registration health view did not return a specific status for this record.";
+}
+
+function mapRegistrationHealthToAdminStatus(value: unknown): AdminStatus | null {
+  const status = normalizeRegistrationHealthStatus(value);
+
+  if (status === "active_pet_parent") return "active";
+  if (status === "archived") return "archived";
+  if (status === "likely_test_or_spam") return "likely_spam";
+  if (
+    status === "phone_only_incomplete_signup" ||
+    status === "registered_pet_parent_needs_profile" ||
+    status === "incomplete_signup"
+  ) {
+    return "incomplete_signup";
+  }
+  if (status === "signup_log_without_auth") return "needs_review";
+
+  return null;
+}
+
 
 function normalizeAdminStatus(value: unknown): AdminStatus {
   const normalized = asString(value).toLowerCase();
@@ -1098,14 +1223,23 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
   const resolvedParams = await params;
   const lookupKey = decodeURIComponent(resolvedParams.id || "").trim();
 
-  const [profile, authUserByLookup] = await Promise.all([
+  const [profile, authUserByLookup, registrationHealthByLookup] = await Promise.all([
     getProfileByLookupKey(lookupKey),
     getAuthUserByLookupKey(lookupKey),
+    getRegistrationHealthByLookupKey(lookupKey),
   ]);
 
   const authUser =
     authUserByLookup ||
     (profile?.id ? await getAuthUserById(String(profile.id)) : null);
+
+  const registrationHealth =
+    registrationHealthByLookup ||
+    (profile?.id ? await getRegistrationHealthByLookupKey(String(profile.id)) : null);
+
+  const registrationHealthStatus = normalizeRegistrationHealthStatus(
+    registrationHealth?.registration_health_status,
+  );
 
   const relatedCustomerId = getRelatedRecordId({
     lookupKey,
@@ -1113,7 +1247,9 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
     authUser,
   });
 
-  const adminStatus = normalizeAdminStatus(profile?.admin_status);
+  const adminStatus =
+    mapRegistrationHealthToAdminStatus(registrationHealth?.registration_health_status) ||
+    normalizeAdminStatus(profile?.admin_status);
   const adminNotes = getText(profile, ["admin_notes"]);
   const archivedAt = getText(profile, ["archived_at"]);
 
@@ -1307,6 +1443,11 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                   <span className={["rounded-full border px-3 py-1 text-xs font-black", statusStyles.badge].join(" ")}>
                     {verification.label}
                   </span>
+                  {registrationHealthStatus ? (
+                    <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-black text-orange-800">
+                      Health: {getRegistrationHealthLabel(registrationHealthStatus)}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -1347,6 +1488,20 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
               However, there is no matching `profiles` row yet. The page is
               showing the Auth name, email, provider, created date, confirmation,
               and sign-in details so Super Admin can still review the signup record.
+            </p>
+          </div>
+        ) : null}
+
+        {registrationHealthStatus && registrationHealthStatus !== "active_pet_parent" ? (
+          <div className="mt-5 rounded-[2rem] border border-orange-200 bg-orange-50 p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">
+              Registration Health View
+            </p>
+            <h2 className="mt-1 text-2xl font-black text-orange-950">
+              {getRegistrationHealthLabel(registrationHealthStatus)}
+            </h2>
+            <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-orange-900">
+              {getRegistrationHealthDescription(registrationHealthStatus)}
             </p>
           </div>
         ) : null}
@@ -1820,6 +1975,10 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
             <ProfileMiniBox label="Lookup Value" value={lookupKey} />
             <ProfileMiniBox label="Resolved ID" value={relatedCustomerId || "—"} />
             <ProfileMiniBox label="Admin status" value={getAdminStatusLabel(adminStatus)} />
+            <ProfileMiniBox
+              label="Registration health"
+              value={getRegistrationHealthLabel(registrationHealthStatus)}
+            />
             <ProfileMiniBox label="Archived at" value={archivedAt ? formatDateTime(archivedAt) : "—"} />
             <ProfileMiniBox label="Profile row found" value={profile ? "Yes" : "No"} />
             <ProfileMiniBox label="Auth user found" value={authUser ? "Yes" : "No"} />
