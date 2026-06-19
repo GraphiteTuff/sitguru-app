@@ -56,7 +56,7 @@ async function getOrCreateSession(
     .maybeSingle();
 
   if (existingError) {
-    console.error("Visit session lookup error:", existingError);
+    console.error("PawReport session lookup error:", existingError);
     return null;
   }
 
@@ -75,7 +75,7 @@ async function getOrCreateSession(
     .single();
 
   if (createError) {
-    console.error("Visit session create error:", createError);
+    console.error("PawReport session create error:", createError);
     return null;
   }
 
@@ -89,7 +89,10 @@ export async function startVisitAction(
   const userId = await getCurrentUserId();
 
   if (!userId) {
-    return { success: false, error: "You must be logged in to start a visit." };
+    return {
+      success: false,
+      error: "You must be logged in to start a PawReport.",
+    };
   }
 
   if (!bookingId) {
@@ -99,7 +102,7 @@ export async function startVisitAction(
   const session = await getOrCreateSession(bookingId, userId);
 
   if (!session?.id) {
-    return { success: false, error: "Could not create visit session." };
+    return { success: false, error: "Could not create PawReport session." };
   }
 
   const now = new Date().toISOString();
@@ -117,15 +120,15 @@ export async function startVisitAction(
     .eq("id", session.id);
 
   if (updateError) {
-    console.error("Start visit error:", updateError);
-    return { success: false, error: "Could not start visit." };
+    console.error("Start PawReport error:", updateError);
+    return { success: false, error: "Could not start PawReport." };
   }
 
   await supabaseAdmin.from("booking_visit_updates").insert({
     session_id: session.id,
     booking_id: bookingId,
     update_type: "visit_started",
-    note: "Visit started.",
+    note: "PawReport started.",
     lat: location?.lat ?? null,
     lng: location?.lng ?? null,
     accuracy: location?.accuracy ?? null,
@@ -146,7 +149,10 @@ export async function endVisitAction(
   const userId = await getCurrentUserId();
 
   if (!userId) {
-    return { success: false, error: "You must be logged in to end a visit." };
+    return {
+      success: false,
+      error: "You must be logged in to complete a PawReport.",
+    };
   }
 
   if (!bookingId) {
@@ -156,7 +162,7 @@ export async function endVisitAction(
   const session = await getOrCreateSession(bookingId, userId);
 
   if (!session?.id) {
-    return { success: false, error: "Could not find visit session." };
+    return { success: false, error: "Could not find PawReport session." };
   }
 
   const now = new Date().toISOString();
@@ -175,15 +181,15 @@ export async function endVisitAction(
     .eq("id", session.id);
 
   if (updateError) {
-    console.error("End visit error:", updateError);
-    return { success: false, error: "Could not end visit." };
+    console.error("Complete PawReport error:", updateError);
+    return { success: false, error: "Could not complete PawReport." };
   }
 
   await supabaseAdmin.from("booking_visit_updates").insert({
     session_id: session.id,
     booking_id: bookingId,
     update_type: "visit_ended",
-    note: finalNote || "Visit completed.",
+    note: finalNote || "PawReport completed.",
     lat: location?.lat ?? null,
     lng: location?.lng ?? null,
     accuracy: location?.accuracy ?? null,
@@ -202,7 +208,10 @@ export async function addVisitUpdateAction(
   const userId = await getCurrentUserId();
 
   if (!userId) {
-    return { success: false, error: "You must be logged in to add an update." };
+    return {
+      success: false,
+      error: "You must be logged in to add a PawReport update.",
+    };
   }
 
   const bookingId = cleanText(formData.get("bookingId"));
@@ -227,13 +236,13 @@ export async function addVisitUpdateAction(
   ];
 
   if (!allowedTypes.includes(updateType)) {
-    return { success: false, error: "Invalid update type." };
+    return { success: false, error: "Invalid PawReport update type." };
   }
 
   const session = await getOrCreateSession(bookingId, userId);
 
   if (!session?.id) {
-    return { success: false, error: "Could not find visit session." };
+    return { success: false, error: "Could not find PawReport session." };
   }
 
   const { error } = await supabaseAdmin.from("booking_visit_updates").insert({
@@ -248,8 +257,8 @@ export async function addVisitUpdateAction(
   });
 
   if (error) {
-    console.error("Add visit update error:", error);
-    return { success: false, error: "Could not add visit update." };
+    console.error("Add PawReport update error:", error);
+    return { success: false, error: "Could not add PawReport update." };
   }
 
   revalidatePath(`/guru/dashboard/bookings/${bookingId}/visit-updates`);

@@ -81,8 +81,8 @@ export default function GuruVisitTracker({
     );
   }, []);
 
-  const visitActive = sessionStatus === "in_progress";
-  const visitCompleted = sessionStatus === "completed";
+  const reportActive = sessionStatus === "in_progress";
+  const reportCompleted = sessionStatus === "completed";
 
   async function handleStartVisit() {
     setMessage("Getting location...");
@@ -93,12 +93,12 @@ export default function GuruVisitTracker({
       const result = await startVisitAction(bookingId, location);
 
       if (!result.success) {
-        setMessage(result.error || "Could not start visit.");
+        setMessage(result.error || "Could not start PawReport.");
         return;
       }
 
       setSessionStatus("in_progress");
-      setMessage("Visit started. Pet Parent can now see updates.");
+      setMessage("PawReport started. Pet Parent can now see updates.");
     });
   }
 
@@ -111,13 +111,13 @@ export default function GuruVisitTracker({
       const result = await endVisitAction(bookingId, finalNote, location);
 
       if (!result.success) {
-        setMessage(result.error || "Could not end visit.");
+        setMessage(result.error || "Could not complete PawReport.");
         return;
       }
 
       setSessionStatus("completed");
       setFinalNote("");
-      setMessage("Visit completed. SitGuru Visit Card is ready.");
+      setMessage("PawReport completed. SitGuru PawReport™ is ready.");
     });
   }
 
@@ -139,17 +139,17 @@ export default function GuruVisitTracker({
       const result = await addVisitUpdateAction(formData);
 
       if (!result.success) {
-        setMessage(result.error || "Could not add update.");
+        setMessage(result.error || "Could not add PawReport update.");
         return;
       }
 
-      setMessage("Update added.");
+      setMessage("PawReport update added.");
     });
   }
 
   async function handleNoteSubmit() {
     if (!note.trim()) {
-      setMessage("Add a note first.");
+      setMessage("Add a PawReport note first.");
       return;
     }
 
@@ -166,19 +166,19 @@ export default function GuruVisitTracker({
     const formData = new FormData();
     formData.append("bookingId", bookingId);
     formData.append("updateType", "photo");
-    formData.append("note", "Photo added.");
+    formData.append("note", "Photo added to PawReport.");
     formData.append("photoUrl", photoUrl.trim());
 
     startTransition(async () => {
       const result = await addVisitUpdateAction(formData);
 
       if (!result.success) {
-        setMessage(result.error || "Could not add photo.");
+        setMessage(result.error || "Could not add PawReport photo.");
         return;
       }
 
       setPhotoUrl("");
-      setMessage("Photo added.");
+      setMessage("Photo added to PawReport.");
     });
   }
 
@@ -208,18 +208,18 @@ export default function GuruVisitTracker({
       const formData = new FormData();
       formData.append("bookingId", bookingId);
       formData.append("updateType", "photo");
-      formData.append("note", "Photo added.");
+      formData.append("note", "Photo added to PawReport.");
       formData.append("photoUrl", data.publicUrl);
 
       startTransition(async () => {
         const result = await addVisitUpdateAction(formData);
 
         if (!result.success) {
-          setMessage(result.error || "Could not save photo update.");
+          setMessage(result.error || "Could not save PawReport photo.");
           return;
         }
 
-        setMessage("Photo uploaded.");
+        setMessage("Photo uploaded to PawReport.");
       });
     } catch (error) {
       setMessage(getFriendlyError(error));
@@ -232,16 +232,16 @@ export default function GuruVisitTracker({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm font-bold !text-sky-700">
-              SitGuru Visit Updates
+              SitGuru PawReport™
             </p>
 
             <h1 className="mt-2 max-w-3xl text-3xl font-black leading-tight !text-slate-950 sm:text-5xl">
-              Keep Pet Parents updated in real time
+              Create a professional PawReport for every visit
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm font-medium !text-slate-700 sm:text-base">
-              Start the visit, add care updates, upload photos, and complete a
-              professional SitGuru Visit Card.
+              Start the PawReport, add care updates, upload photos, and complete
+              a warm, professional summary for the Pet Parent.
             </p>
           </div>
 
@@ -250,11 +250,11 @@ export default function GuruVisitTracker({
               Status
             </p>
             <p className="text-sm font-black !text-slate-950">
-              {visitCompleted
-                ? "Completed"
-                : visitActive
-                  ? "In Progress"
-                  : "Not Started"}
+              {reportCompleted
+                ? "PawReport Complete"
+                : reportActive
+                  ? "PawReport Active"
+                  : "Ready to Start"}
             </p>
           </div>
         </div>
@@ -267,18 +267,18 @@ export default function GuruVisitTracker({
           </div>
         ) : null}
 
-        {!visitActive && !visitCompleted ? (
+        {!reportActive && !reportCompleted ? (
           <button
             type="button"
             onClick={handleStartVisit}
             disabled={isPending}
             className="w-full rounded-2xl bg-slate-950 px-5 py-4 text-base font-bold !text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
           >
-            Start Visit
+            Start PawReport
           </button>
         ) : null}
 
-        {visitActive ? (
+        {reportActive ? (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <button
@@ -332,7 +332,7 @@ export default function GuruVisitTracker({
 
             <div className="rounded-2xl border border-slate-200 !bg-slate-50 p-4">
               <label className="text-sm font-black !text-slate-950">
-                Add a care note
+                Add PawReport Note
               </label>
               <textarea
                 value={note}
@@ -347,13 +347,13 @@ export default function GuruVisitTracker({
                 disabled={isPending}
                 className="mt-3 w-full rounded-2xl bg-sky-600 px-5 py-3 font-bold !text-white transition hover:bg-sky-700 disabled:opacity-60"
               >
-                Add Note
+                Add PawReport Note
               </button>
             </div>
 
             <div className="rounded-2xl border border-slate-200 !bg-slate-50 p-4">
               <label className="text-sm font-black !text-slate-950">
-                Add a photo
+                Add PawReport Photo
               </label>
 
               <input
@@ -392,13 +392,13 @@ export default function GuruVisitTracker({
 
             <div className="rounded-2xl border border-emerald-200 !bg-emerald-50 p-4">
               <label className="text-sm font-black !text-emerald-950">
-                Final visit note
+                Final PawReport Summary
               </label>
               <textarea
                 value={finalNote}
                 onChange={(event) => setFinalNote(event.target.value)}
                 rows={4}
-                placeholder="Example: Visit completed. Bella was happy and relaxed."
+                placeholder="Example: PawReport completed. Bella was happy and relaxed."
                 className="mt-2 w-full rounded-2xl border border-emerald-200 !bg-white p-3 text-sm !text-slate-950 outline-none placeholder:!text-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               />
               <button
@@ -407,20 +407,20 @@ export default function GuruVisitTracker({
                 disabled={isPending}
                 className="mt-3 w-full rounded-2xl bg-emerald-600 px-5 py-4 text-base font-bold !text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
               >
-                End Visit
+                Complete PawReport
               </button>
             </div>
           </>
         ) : null}
 
-        {visitCompleted ? (
+        {reportCompleted ? (
           <div className="rounded-2xl border border-emerald-200 !bg-emerald-50 p-5 text-center">
             <p className="text-3xl">✅</p>
             <h2 className="mt-2 text-xl font-black !text-emerald-950">
-              Visit completed
+              PawReport completed
             </h2>
             <p className="mt-1 text-sm font-medium !text-emerald-800">
-              The SitGuru Visit Card is available for the Pet Parent.
+              The SitGuru PawReport™ is now available for the Pet Parent.
             </p>
           </div>
         ) : null}

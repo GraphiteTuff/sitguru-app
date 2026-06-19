@@ -586,6 +586,14 @@ function BookingRowCard({ booking }: { booking: BookingCard }) {
             View Booking
           </Link>
 
+          <Link
+            href={`${adminRoutes.bookings}/${encodeURIComponent(booking.id)}/visit-updates`}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+          >
+            <PawPrint size={16} />
+            PawReport
+          </Link>
+
           {booking.customerId ? (
             <Link
               href={`${adminRoutes.customers}/${encodeURIComponent(booking.customerId)}`}

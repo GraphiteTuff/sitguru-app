@@ -56,8 +56,13 @@ export default async function GuruVisitUpdatesPage({ params }: PageProps) {
             </p>
 
             <h1 className="text-4xl font-black tracking-tight !text-slate-950 sm:text-5xl">
-              Visit Updates
+              SitGuru PawReport™
             </h1>
+
+            <p className="mt-2 max-w-2xl text-sm font-semibold !text-slate-700 sm:text-base">
+              Start, update, and complete a professional PawReport for this
+              booking.
+            </p>
           </div>
 
           <Link

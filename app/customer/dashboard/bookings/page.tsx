@@ -191,6 +191,10 @@ function getBookingHref(booking: DbRow) {
   return `/customer/dashboard/bookings/${encodeURIComponent(String(booking.id))}`;
 }
 
+function getPawReportHref(booking: DbRow) {
+  return `/customer/dashboard/bookings/${encodeURIComponent(String(booking.id))}/visit-updates`;
+}
+
 function getStatusClasses(status: string | null | undefined) {
   const normalized = (status || "pending").toLowerCase();
 
@@ -551,7 +555,7 @@ function BookingOverviewCard({
             </div>
 
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-              Booked with {guruName}. Open the full Trust & Care overview before making changes or canceling.
+              Booked with {guruName}. View the SitGuru PawReport™ for photos, potty updates, care notes, and visit timing.
             </p>
 
             {!guruAvatar ? (
@@ -573,7 +577,7 @@ function BookingOverviewCard({
             </div>
 
             <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-800">
-              Need to adjust care? Message your Guru or support first so SitGuru can help keep the visit on track.
+              Every booking includes a SitGuru PawReport™ so you can follow photos, potty updates, food and water updates, care notes, and the completed visit summary.
             </div>
           </div>
         </div>
@@ -593,12 +597,36 @@ function BookingOverviewCard({
             </p>
           ) : null}
 
-          <Link
-            href={getBookingHref(booking)}
-            className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
-          >
-            Open Trust & Care Overview
-          </Link>
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-white p-3">
+            <div className="flex items-start gap-2">
+              <PawPrint className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                  SitGuru PawReport™
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                  Photos, potty updates, care notes, and completion details for this booking.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-2">
+            <Link
+              href={getPawReportHref(booking)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+            >
+              <PawPrint className="h-4 w-4" />
+              View PawReport
+            </Link>
+
+            <Link
+              href={getBookingHref(booking)}
+              className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-100"
+            >
+              Open Trust & Care Overview
+            </Link>
+          </div>
         </div>
       </div>
     </article>
@@ -668,13 +696,13 @@ export default async function CustomerBookingsOverviewPage() {
         <div className="mt-5 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
           <div className="bg-gradient-to-r from-[#22c7a8] via-[#78d8d0] to-[#c6ecff] px-6 py-8 sm:px-8 lg:px-10">
             <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-900/70">
-              Trust & care booking overview
+              Trust, care, and PawReport overview
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-              Your SitGuru bookings, organized for peace of mind
+              Your SitGuru bookings and PawReports, organized for peace of mind
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-slate-800/80">
-              Review upcoming care, payment status, support actions, and booking details in one warm customer-friendly place.
+              Review upcoming care, payment status, support actions, booking details, and SitGuru PawReport™ updates in one warm customer-friendly place.
             </p>
           </div>
 
@@ -688,8 +716,8 @@ export default async function CustomerBookingsOverviewPage() {
               <p className="mt-2 text-3xl font-black text-slate-950">{nextBooking ? formatDate(getBookingDate(nextBooking)) : "None"}</p>
             </div>
             <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Support</p>
-              <p className="mt-2 text-3xl font-black text-slate-950">Ready</p>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">PawReports</p>
+              <p className="mt-2 text-3xl font-black text-slate-950">Included</p>
             </div>
           </div>
         </div>
@@ -701,10 +729,10 @@ export default async function CustomerBookingsOverviewPage() {
                 Why you can feel confident
               </p>
               <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                Every booking gets a clear next step
+                Every booking includes a SitGuru PawReport™
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                If a booking needs a change, customers are guided to message the Guru or support before canceling.
+                Pet Parents can view photos, potty updates, food and water confirmations, care notes, and the completed PawReport from each booking.
               </p>
             </div>
             <HeartHandshake className="h-10 w-10 text-emerald-600" />
@@ -716,7 +744,7 @@ export default async function CustomerBookingsOverviewPage() {
             <Sparkles className="mx-auto h-10 w-10 text-emerald-600" />
             <h2 className="mt-4 text-2xl font-black text-slate-950">No bookings yet</h2>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-              Once you book care, this page will become your trust and care booking overview.
+              Once you book care, this page will become your trust, care, and PawReport overview.
             </p>
             <Link
               href="/search"
