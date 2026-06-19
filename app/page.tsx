@@ -101,6 +101,8 @@ type HomepageAssistFormState = {
 type HomepageMessengerSession = {
   conversationId: string;
   token: string;
+  visitorName?: string;
+  startedAt?: number;
 };
 
 type HomepageMessengerMessage = {
@@ -762,10 +764,31 @@ function HomepageAssistPopup({
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
 
-  useEffect(() => {
-    const savedSession = window.localStorage.getItem(
-      "sitguru-homepage-messenger-session",
+  const messengerSessionStorageKey = "sitguru-homepage-messenger-session";
+  const messengerDismissedStorageKey = "sitguru-homepage-assist-dismissed";
+
+  function clearStoredMessengerSession() {
+    window.sessionStorage.removeItem(messengerSessionStorageKey);
+    window.localStorage.removeItem(messengerSessionStorageKey);
+  }
+
+  function saveCurrentMessengerSession(nextSession: HomepageMessengerSession) {
+    window.sessionStorage.setItem(
+      messengerSessionStorageKey,
+      JSON.stringify(nextSession),
     );
+
+    // Older versions used localStorage, which can leak an old visitor chat into
+    // a later browser visit on the same phone/computer. Always clear it.
+    window.localStorage.removeItem(messengerSessionStorageKey);
+  }
+
+  useEffect(() => {
+    // Force old persistent homepage messenger sessions to expire. A homepage
+    // visitor chat should only live for the active browser session/tab.
+    window.localStorage.removeItem(messengerSessionStorageKey);
+
+    const savedSession = window.sessionStorage.getItem(messengerSessionStorageKey);
 
     if (savedSession) {
       try {
@@ -773,18 +796,25 @@ function HomepageAssistPopup({
 
         if (parsed?.conversationId && parsed?.token) {
           setSession(parsed);
+
+          if (parsed.visitorName) {
+            setForm((previous) => ({
+              ...previous,
+              fullName: parsed.visitorName || previous.fullName,
+            }));
+          }
+
           setIsOpen(true);
+          return;
         }
       } catch {
-        window.localStorage.removeItem("sitguru-homepage-messenger-session");
+        clearStoredMessengerSession();
       }
     }
 
-    const dismissed = window.sessionStorage.getItem(
-      "sitguru-homepage-assist-dismissed",
-    );
+    const dismissed = window.sessionStorage.getItem(messengerDismissedStorageKey);
 
-    if (dismissed === "true" || savedSession) return;
+    if (dismissed === "true") return;
 
     const timer = window.setTimeout(() => {
       setIsOpen(true);
@@ -834,9 +864,10 @@ function HomepageAssistPopup({
 
       if (!response.ok) {
         if (response.status === 404) {
-          window.localStorage.removeItem("sitguru-homepage-messenger-session");
+          clearStoredMessengerSession();
           setSession(null);
           setMessages([]);
+          setHasNewAdminReply(false);
           latestAdminMessageIdRef.current = "";
         }
 
@@ -904,7 +935,14 @@ function HomepageAssistPopup({
   }
 
   function closePopup() {
-    window.sessionStorage.setItem("sitguru-homepage-assist-dismissed", "true");
+    window.sessionStorage.setItem(messengerDismissedStorageKey, "true");
+    clearStoredMessengerSession();
+    setSession(null);
+    setMessages([]);
+    setHasNewAdminReply(false);
+    setFormSuccess("");
+    setFormError("");
+    latestAdminMessageIdRef.current = "";
     setIsOpen(false);
   }
 
@@ -981,16 +1019,16 @@ function HomepageAssistPopup({
       }
 
       if (payload?.conversationId && payload.token) {
-        const nextSession = {
+        const nextSession: HomepageMessengerSession = {
           conversationId: payload.conversationId,
           token: payload.token,
+          visitorName: cleanFullName,
+          startedAt: Date.now(),
         };
 
         setSession(nextSession);
-        window.localStorage.setItem(
-          "sitguru-homepage-messenger-session",
-          JSON.stringify(nextSession),
-        );
+        saveCurrentMessengerSession(nextSession);
+        window.sessionStorage.removeItem(messengerDismissedStorageKey);
       }
 
       applyMessengerMessages(payload?.messages || [], { openOnAdminReply: false });
