@@ -2272,7 +2272,7 @@ function GuruAvatar({
         )}
 
         {isAcademyGraduate ? (
-          <div className="absolute -left-3 top-3 z-10">
+          <div className="absolute -left-3 top-3 z-10 hidden sm:block">
             <AcademyGraduateBadge academyType="guru" variant="mini" />
           </div>
         ) : null}
@@ -2310,14 +2310,14 @@ function PublicGuruHeroImage({
 
         {isAcademyGraduate ? (
           <>
-            <div className="absolute left-4 top-4 z-10">
+            <div className="absolute left-4 top-4 z-10 hidden sm:block">
               <AcademyGraduateBadge
                 academyType="guru"
                 variant="photo-overlay"
               />
             </div>
 
-            <div className="absolute bottom-4 left-4 z-10">
+            <div className="absolute bottom-4 left-4 z-10 hidden sm:block">
               <AcademyGraduateBadge academyType="guru" variant="photo-strip" />
             </div>
           </>
@@ -2332,14 +2332,14 @@ function PublicGuruHeroImage({
 
       {isAcademyGraduate ? (
         <>
-          <div className="absolute left-4 top-4 z-10">
+          <div className="absolute left-4 top-4 z-10 hidden sm:block">
             <AcademyGraduateBadge
               academyType="guru"
               variant="photo-overlay"
             />
           </div>
 
-          <div className="absolute bottom-4 left-4 z-10">
+          <div className="absolute bottom-4 left-4 z-10 hidden sm:block">
             <AcademyGraduateBadge academyType="guru" variant="photo-strip" />
           </div>
         </>
@@ -3336,7 +3336,11 @@ async function GuruDashboardView({
                   <span>{guruTier.label}</span>
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2">
-                  <span className="text-lg">🎓</span>
+                  {universityProgress.isComplete ? (
+                    <AcademyGraduateBadge academyType="guru" variant="mini" />
+                  ) : (
+                    <GuruPawCrest className="h-6 w-6" />
+                  )}
                   <span className="text-sm font-black !text-slate-900">
                     {universityProgress.isComplete
                       ? "Guru Academy Graduate"
@@ -3532,8 +3536,8 @@ async function GuruDashboardView({
             </p>
             <h2 className="mt-1 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
               {universityProgress.isComplete
-                ? "Guru Academy Graduate badge issued 🎓"
-                : "Become a Guru Academy Graduate 🎓"}
+                ? "Guru Academy Graduate badge issued"
+                : "Become a Guru Academy Graduate"}
             </h2>
             <p className="mt-2 max-w-4xl text-sm font-bold leading-7 !text-slate-700">
               {universityProgress.isComplete
@@ -3592,7 +3596,7 @@ async function GuruDashboardView({
                       ? 100
                       : universityProgress.progressPercent
                   }
-                  icon="🎓"
+                  icon="🛡️"
                 />
               </div>
             </div>
