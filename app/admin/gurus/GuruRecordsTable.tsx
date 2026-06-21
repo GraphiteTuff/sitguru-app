@@ -117,13 +117,13 @@ function getSafeAdminHref(guru: GuruDisplayRow) {
 }
 
 function getGuruDashboardPreviewHref(guru: GuruDisplayRow) {
-  const fallbackId = String(
-    guru.guruUserId || guru.userId || guru.id || guru.email || "",
-  ).trim();
-
-  if (!fallbackId) return getSafeAdminHref(guru);
-
-  return `/admin/gurus/${encodeURIComponent(fallbackId)}/dashboard-preview`;
+  /*
+   * Guru dashboard-preview route does not exist yet.
+   * Until app/admin/gurus/[id]/dashboard-preview/page.tsx is built,
+   * keep Dashboard View pointed at the existing Guru admin detail page
+   * so the registry never sends Admin to a 404.
+   */
+  return getSafeAdminHref(guru);
 }
 
 function getGuruLocationLabel(guru: GuruDisplayRow) {
@@ -265,13 +265,7 @@ function sortGurusForRegistry(gurus: GuruDisplayRow[]) {
 
 function Avatar({ name, src }: { name: string; src?: string }) {
   if (src) {
-    return (
-      <img
-        alt=""
-        src={src}
-        className="h-full w-full object-cover"
-      />
-    );
+    return <img alt="" src={src} className="h-full w-full object-cover" />;
   }
 
   return <>{getInitials(name) || "G"}</>;
@@ -303,9 +297,9 @@ export default function GuruRecordsTable({
             Click into each Guru view
           </h2>
           <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-            View each Guru through their dashboard preview, public profile, or
-            admin cleanup controls. Dashboard and public profile previews are
-            read-only. Admin cleanup controls are updatable.
+            View each Guru through their dashboard view, public profile, or admin
+            cleanup controls. Public profile previews are customer-facing. Admin
+            cleanup controls are updatable.
           </p>
         </div>
 
