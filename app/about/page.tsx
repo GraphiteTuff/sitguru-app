@@ -442,7 +442,7 @@ export default function AboutPage() {
             <h2>The People Behind SitGuru</h2>
             <p>
               Built by Pet Parents who believe care should feel more human.
-              SitGuru is being built by husband-and-wife founders Jason and
+              SitGuru is locally owned and operated form Quakertown, PA, and is being built by husband-and-wife founders Jason and
               Danette. Their shared vision is to create a more trusted,
               thoughtful, and community-centered experience for pet care — one
               where pets come first, communication matters, and people who truly
