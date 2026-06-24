@@ -457,6 +457,23 @@ function getDateRangeLabel({
   return `${startDate.shortLabel} → ${endDate.shortLabel}`;
 }
 
+function getRangeSelectionHint({
+  mode,
+  startDateId,
+  endDateId,
+}: {
+  mode: CareMode;
+  startDateId: string;
+  endDateId: string;
+}) {
+  if (mode === 'single') return 'Tap one date.';
+
+  if (!startDateId) return 'Tap a start date.';
+  if (!endDateId) return 'Now tap an end date.';
+
+  return 'Range selected. Tap another date to start over.';
+}
+
 function getDatePrice(date: CalendarDate, service: ServiceOption) {
   if (date.status === 'unavailable') return null;
 
@@ -584,6 +601,12 @@ export default function RequestBookingScreen() {
           ? 'day'
           : 'days';
 
+  const rangeSelectionHint = getRangeSelectionHint({
+    mode: selectedService.mode,
+    startDateId,
+    endDateId,
+  });
+
   function goBack() {
     setNotice('');
 
@@ -671,6 +694,16 @@ export default function RequestBookingScreen() {
   function goToNextMonth() {
     setDisplayMonth((currentMonth) => addMonths(currentMonth, 1));
     setEndDateId('');
+  }
+
+  function goToCurrentMonth() {
+    const currentMonth = monthStart(new Date());
+    const todayId = toDateId(getTodayStart());
+
+    setDisplayMonth(currentMonth);
+    setStartDateId(todayId);
+    setEndDateId('');
+    setNotice('');
   }
 
   function togglePawReportItem(item: string) {
@@ -929,7 +962,23 @@ export default function RequestBookingScreen() {
             </View>
           </View>
 
-          {renderPriceCard()}
+          <View style={styles.stickyEstimateCard}>
+            <View>
+              <Text style={styles.stickyEstimateLabel}>Estimate</Text>
+              <Text style={styles.stickyEstimateValue}>
+                {currency(estimate.estimatedSubtotal)}
+              </Text>
+            </View>
+
+            <View style={styles.stickyEstimateCopy}>
+              <Text style={styles.stickyEstimateTitle}>
+                Final after Guru accepts
+              </Text>
+              <Text style={styles.stickyEstimateText}>
+                Prices can change by Guru, service, date, and availability.
+              </Text>
+            </View>
+          </View>
 
           <View style={styles.calendarPanel}>
             <View style={styles.calendarHeader}>
@@ -941,9 +990,7 @@ export default function RequestBookingScreen() {
                   })}
                 </Text>
                 <Text style={styles.calendarHeaderText}>
-                  {selectedService.mode === 'single'
-                    ? 'Tap one available date. Prices show under each day.'
-                    : 'Tap the start date, then tap the end date. Prices show under each day.'}
+                  {rangeSelectionHint} Prices show under each day.
                 </Text>
               </View>
 
@@ -958,11 +1005,41 @@ export default function RequestBookingScreen() {
 
                 <Pressable
                   accessibilityRole="button"
+                  onPress={goToCurrentMonth}
+                  style={styles.todayButton}
+                >
+                  <Text style={styles.todayButtonText}>Today</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
                   onPress={goToNextMonth}
                   style={styles.monthButton}
                 >
                   <Text style={styles.monthButtonText}>›</Text>
                 </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.rangeGuidePanel}>
+              <View style={styles.rangeGuideStep}>
+                <Text style={styles.rangeGuideLabel}>Start</Text>
+                <Text style={styles.rangeGuideValue}>
+                  {getDateById(calendarDates, startDateId)?.shortLabel || 'Choose'}
+                </Text>
+              </View>
+
+              <View style={styles.rangeGuideDivider} />
+
+              <View style={styles.rangeGuideStep}>
+                <Text style={styles.rangeGuideLabel}>
+                  {selectedService.mode === 'single' ? 'Visit' : 'End'}
+                </Text>
+                <Text style={styles.rangeGuideValue}>
+                  {selectedService.mode === 'single'
+                    ? 'Single day'
+                    : getDateById(calendarDates, endDateId)?.shortLabel || 'Choose'}
+                </Text>
               </View>
             </View>
 
@@ -1030,7 +1107,11 @@ export default function RequestBookingScreen() {
                           {unavailable ? 'Busy' : dayPrice ? currency(dayPrice) : '—'}
                         </Text>
 
-                        {today ? (
+                        {isStart && selectedService.mode !== 'single' ? (
+                          <Text style={styles.dateRangeLabelSelected}>Start</Text>
+                        ) : isEnd ? (
+                          <Text style={styles.dateRangeLabelSelected}>End</Text>
+                        ) : today ? (
                           <Text
                             style={[
                               styles.dateTodayLabel,
@@ -1090,6 +1171,8 @@ export default function RequestBookingScreen() {
               })}
             </View>
           </View>
+
+          {renderPriceCard()}
         </View>
       );
     }
@@ -1288,7 +1371,7 @@ export default function RequestBookingScreen() {
               <Text style={styles.heroPhotoIcon}>📅</Text>
               <Text style={styles.heroPhotoTitle}>Booking calendar area</Text>
               <Text style={styles.heroPhotoText}>
-                Sunday-to-Saturday calendar rows help Pet Parents compare dates and prices quickly.
+                Thumb-friendly calendar rows help Pet Parents compare dates and prices quickly.
               </Text>
             </View>
 
@@ -1800,9 +1883,9 @@ const styles = StyleSheet.create({
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
-    height: 48,
+    height: 52,
     justifyContent: 'center',
-    width: 48,
+    width: 52,
   },
   counterButtonText: {
     color: SitGuruColors.primary,
@@ -1898,6 +1981,46 @@ const styles = StyleSheet.create({
   },
   serviceBestForActive: {
     color: '#FFFFFF',
+  },
+  stickyEstimateCard: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 24,
+    borderWidth: 1,
+    elevation: 3,
+    flexDirection: 'row',
+    gap: 14,
+    padding: 14,
+  },
+  stickyEstimateLabel: {
+    color: SitGuruColors.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  stickyEstimateValue: {
+    color: SitGuruColors.text,
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: -0.8,
+    lineHeight: 34,
+  },
+  stickyEstimateCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  stickyEstimateTitle: {
+    color: SitGuruColors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  stickyEstimateText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
   },
   priceCard: {
     backgroundColor: SitGuruColors.surface,
@@ -2025,20 +2148,17 @@ const styles = StyleSheet.create({
   },
   calendarHeader: {
     alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
+    gap: 12,
   },
   calendarHeaderCopy: {
-    flex: 1,
     gap: 3,
   },
   calendarHeaderTitle: {
     color: SitGuruColors.text,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
-    letterSpacing: -0.4,
-    lineHeight: 25,
+    letterSpacing: -0.5,
+    lineHeight: 27,
   },
   calendarHeaderText: {
     color: SitGuruColors.textMuted,
@@ -2047,8 +2167,10 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   monthControls: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
+    width: '100%',
   },
   monthButton: {
     alignItems: 'center',
@@ -2056,15 +2178,63 @@ const styles = StyleSheet.create({
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
-    height: 42,
+    height: 52,
     justifyContent: 'center',
-    width: 42,
+    width: 52,
   },
   monthButtonText: {
     color: SitGuruColors.primary,
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: '900',
-    lineHeight: 30,
+    lineHeight: 34,
+  },
+  todayButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 999,
+    borderWidth: 1,
+    flex: 1,
+    height: 52,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  todayButtonText: {
+    color: SitGuruColors.primary,
+    fontSize: 14,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  rangeGuidePanel: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: 'row',
+    padding: 12,
+  },
+  rangeGuideStep: {
+    flex: 1,
+    gap: 2,
+  },
+  rangeGuideLabel: {
+    color: SitGuruColors.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  rangeGuideValue: {
+    color: SitGuruColors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  rangeGuideDivider: {
+    backgroundColor: SitGuruColors.border,
+    height: 34,
+    marginHorizontal: 10,
+    width: 1,
   },
   calendarLegend: {
     flexDirection: 'row',
@@ -2108,9 +2278,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     flex: 1,
-    minHeight: 84,
-    paddingHorizontal: 4,
-    paddingVertical: 7,
+    minHeight: 92,
+    paddingHorizontal: 3,
+    paddingVertical: 8,
   },
   dateCellOutsideMonth: {
     opacity: 0.42,
@@ -2160,6 +2330,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
   },
+  dateRangeLabelSelected: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '900',
+    marginTop: 2,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
   dateTextSelected: {
     color: '#FFFFFF',
   },
@@ -2184,6 +2362,8 @@ const styles = StyleSheet.create({
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
