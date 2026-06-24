@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import SitGuruActionCard from '@/components/SitGuruActionCard';
 import SitGuruBottomNav from '@/components/SitGuruBottomNav';
@@ -18,7 +19,7 @@ export default function GuruDashboardScreen() {
           icon="service"
           roleLabel="Pet Guru"
           statusText="Guru dashboard"
-          subtitle="Manage your profile, service area, requests, messages, visits, earnings, and payout readiness."
+          subtitle="Manage your profile, service area, requests, messages, visits, pricing, earnings, and payout readiness."
           title="Run your Guru business"
           tone="warning"
         />
@@ -35,7 +36,7 @@ export default function GuruDashboardScreen() {
           <View style={styles.photoFloatingCard}>
             <Text style={styles.photoFloatingTitle}>Profile visibility</Text>
             <Text style={styles.photoFloatingText}>
-              Complete your profile, location, service area, and services to appear in search.
+              Complete your profile, location, service area, services, and pricing to appear in search.
             </Text>
           </View>
         </View>
@@ -56,11 +57,67 @@ export default function GuruDashboardScreen() {
           />
 
           <SitGuruStatCard
-            detail="Profile setup progress"
-            label="Readiness"
-            value="0%"
+            detail="Rates and calendar"
+            label="Pricing"
+            value="Ready"
             wide
           />
+        </View>
+
+        <View style={styles.pricingHeroPanel}>
+          <View style={styles.pricingHeroHeader}>
+            <View>
+              <Text style={styles.pricingEyebrow}>Pricing Calendar</Text>
+              <Text style={styles.pricingTitle}>
+                Control rates, discounts, and availability.
+              </Text>
+            </View>
+
+            <View style={styles.pricingBadge}>
+              <Text style={styles.pricingBadgeText}>New</Text>
+            </View>
+          </View>
+
+          <Text style={styles.pricingText}>
+            Set service rates, additional-pet fees, multi-pet discounts, long-stay
+            savings, custom date pricing, busy days, and booking rules from one
+            mobile-friendly pricing flow.
+          </Text>
+
+          <View style={styles.pricingMiniGrid}>
+            <View style={styles.pricingMiniCard}>
+              <Text style={styles.pricingMiniValue}>$25+</Text>
+              <Text style={styles.pricingMiniLabel}>service rates</Text>
+            </View>
+
+            <View style={styles.pricingMiniCard}>
+              <Text style={styles.pricingMiniValue}>10%</Text>
+              <Text style={styles.pricingMiniLabel}>multi-pet savings</Text>
+            </View>
+
+            <View style={styles.pricingMiniCard}>
+              <Text style={styles.pricingMiniValue}>180</Text>
+              <Text style={styles.pricingMiniLabel}>days ahead</Text>
+            </View>
+          </View>
+
+          <View style={styles.pricingActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/guru-pricing')}
+              style={styles.primaryPricingButton}
+            >
+              <Text style={styles.primaryPricingButtonText}>Open Pricing Calendar</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/request-booking')}
+              style={styles.secondaryPricingButton}
+            >
+              <Text style={styles.secondaryPricingButtonText}>Preview Booking</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.businessPanel}>
@@ -91,17 +148,17 @@ export default function GuruDashboardScreen() {
             />
 
             <SitGuruActionCard
-              ctaLabel="Reply"
-              description="Answer Pet Parent questions and keep care requests moving."
-              icon="message"
-              meta="Messages"
-              title="Reply quickly"
+              ctaLabel="Rates"
+              description="Set service rates, multi-pet savings, long-stay discounts, and calendar pricing."
+              icon="payment"
+              meta="Pricing"
+              title="Pricing calendar"
               tone="dark"
             />
 
             <SitGuruActionCard
               ctaLabel="Review"
-              description="Review pets, dates, routines, notes, and expectations before accepting."
+              description="Review pets, dates, routines, notes, expectations, and estimated pricing before accepting."
               icon="request"
               meta="Requests"
               title="Review requests"
@@ -134,12 +191,12 @@ export default function GuruDashboardScreen() {
 
             <View style={styles.progressRow}>
               <Text style={styles.checkIcon}>•</Text>
-              <Text style={styles.progressText}>Complete Trust & Safety readiness</Text>
+              <Text style={styles.progressText}>Set pricing calendar and discounts</Text>
             </View>
 
             <View style={styles.progressRow}>
               <Text style={styles.checkIcon}>•</Text>
-              <Text style={styles.progressText}>Complete Guru onboarding</Text>
+              <Text style={styles.progressText}>Complete Trust & Safety readiness</Text>
             </View>
 
             <View style={styles.progressRow}>
@@ -151,7 +208,7 @@ export default function GuruDashboardScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Availability and visits</Text>
+            <Text style={styles.sectionTitle}>Availability, pricing, and visits</Text>
             <Text style={styles.sectionMetaLight}>Care</Text>
           </View>
 
@@ -162,6 +219,15 @@ export default function GuruDashboardScreen() {
               icon="availability"
               meta="Schedule"
               title="Availability"
+              tone="warning"
+            />
+
+            <SitGuruActionCard
+              ctaLabel="Rates"
+              description="Adjust service rates, custom dates, busy days, extra pets, and long-stay savings."
+              icon="payment"
+              meta="Pricing"
+              title="Rates"
               tone="warning"
             />
 
@@ -183,7 +249,7 @@ export default function GuruDashboardScreen() {
 
           <View style={styles.cardStack}>
             <SitGuruCard
-              description="Care requests collect dates, pets, routines, service details, and Pet Parent expectations."
+              description="Care requests collect dates, pets, routines, service details, Pet Parent expectations, and estimated pricing."
               icon="request"
               size="compact"
               title="New requests"
@@ -191,7 +257,7 @@ export default function GuruDashboardScreen() {
             />
 
             <SitGuruCard
-              description="Accepted bookings will show visit timing, care notes, messages, and PawReport™ details."
+              description="Accepted bookings will show visit timing, care notes, messages, pricing details, and PawReport™ updates."
               icon="visit"
               size="compact"
               title="Confirmed visits"
@@ -208,8 +274,8 @@ export default function GuruDashboardScreen() {
           <Text style={styles.earningsTitle}>Track completed care and payouts.</Text>
 
           <Text style={styles.earningsText}>
-            Once bookings are completed, this area will show earnings, pending payouts,
-            paid payouts, fees, and booking-by-booking payout details.
+            Once bookings are completed, this area will show earnings, pending
+            payouts, paid payouts, fees, and booking-by-booking payout details.
           </Text>
 
           <View style={styles.earningsGrid}>
@@ -231,7 +297,7 @@ export default function GuruDashboardScreen() {
         </View>
 
         <SitGuruCard
-          description="Pet Parents look for clear profiles, real photos, thoughtful care notes, fast replies, and reliable communication."
+          description="Pet Parents look for clear profiles, real photos, thoughtful care notes, fast replies, fair pricing, and reliable communication."
           icon="trust"
           size="compact"
           title="Trust signals"
@@ -242,7 +308,7 @@ export default function GuruDashboardScreen() {
           items={[
             { icon: 'home', label: 'Home' },
             { icon: 'message', label: 'Messages' },
-            { icon: 'request', label: 'Requests' },
+            { icon: 'payment', label: 'Pricing' },
             { icon: 'payout', label: 'Earnings' },
           ]}
           tone="warning"
@@ -323,6 +389,111 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  pricingHeroPanel: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 30,
+    borderWidth: 1,
+    elevation: 3,
+    gap: 14,
+    padding: 18,
+  },
+  pricingHeroHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  pricingEyebrow: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  pricingTitle: {
+    color: SitGuruColors.text,
+    fontSize: 27,
+    fontWeight: '900',
+    letterSpacing: -0.7,
+    lineHeight: 32,
+    marginTop: 3,
+  },
+  pricingBadge: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  pricingBadgeText: {
+    color: SitGuruColors.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  pricingText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  pricingMiniGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  pricingMiniCard: {
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    flex: 1,
+    gap: 3,
+    padding: 13,
+  },
+  pricingMiniValue: {
+    color: SitGuruColors.text,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  pricingMiniLabel: {
+    color: SitGuruColors.textMuted,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  pricingActions: {
+    gap: 10,
+  },
+  primaryPricingButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.primary,
+    borderRadius: 999,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: 18,
+  },
+  primaryPricingButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  secondaryPricingButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: 18,
+  },
+  secondaryPricingButtonText: {
+    color: SitGuruColors.primary,
+    fontSize: 15,
+    fontWeight: '900',
   },
   businessPanel: {
     backgroundColor: SitGuruColors.primaryDark,

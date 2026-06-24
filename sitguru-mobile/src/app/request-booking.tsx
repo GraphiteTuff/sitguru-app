@@ -13,57 +13,49 @@ import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 
-type RequestStep = 1 | 2 | 3 | 4 | 5 | 6;
+type BookingStep = 1 | 2 | 3 | 4 | 5 | 6;
 type CareMode = 'single' | 'overnight' | 'multi-day';
-type AvailabilityStatus = 'available' | 'limited' | 'unavailable';
-
-type RequestStepConfig = {
-  step: RequestStep;
-  shortTitle: string;
-  title: string;
-  description: string;
-};
+type DateStatus = 'available' | 'limited' | 'busy';
 
 type PetOption = {
   id: string;
   name: string;
   type: 'Dog' | 'Cat' | 'Other';
-  details: string;
   emoji: string;
+  description: string;
 };
 
 type ServiceOption = {
   id: string;
-  label: string;
-  detail: string;
-  duration: string;
+  title: string;
   mode: CareMode;
   baseRate: number;
   additionalPetRate: number;
   rateUnit: string;
-  bestFor: string;
+  description: string;
 };
 
-type CalendarDate = {
+type CalendarDay = {
   id: string;
   date: Date;
   day: string;
-  fullLabel: string;
-  shortLabel: string;
-  status: AvailabilityStatus;
+  status: DateStatus;
   priceAdjustment: number;
-  priceLabel?: string;
+  label?: string;
 };
 
-const weekdayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
-const requestSteps: RequestStepConfig[] = [
+const bookingSteps: {
+  step: BookingStep;
+  shortTitle: string;
+  title: string;
+  description: string;
+}[] = [
   {
     step: 1,
     shortTitle: 'Pet',
-    title: 'Choose a pet',
+    title: 'Choose your pet',
     description:
-      'Select the Pet Passport connected to this request so the Guru can review the right care details.',
+      'Select the Pet Passport for this care request so the Guru can review the right care details.',
   },
   {
     step: 2,
@@ -75,30 +67,30 @@ const requestSteps: RequestStepConfig[] = [
   {
     step: 3,
     shortTitle: 'Calendar',
-    title: 'Choose dates and time',
+    title: 'Choose dates',
     description:
-      'Use the calendar-style picker for single visits, overnight stays, or multi-day care windows.',
+      'Select a date or date range. Estimated prices appear under each available day.',
   },
   {
     step: 4,
     shortTitle: 'Details',
     title: 'Add care details',
     description:
-      'Share routines, access notes, safety details, and PawReport™ preferences so the Guru can prepare.',
+      'Share care notes, access instructions, and PawReport preferences so the Guru can prepare.',
   },
   {
     step: 5,
     shortTitle: 'Review',
-    title: 'Review your request',
+    title: 'Review request',
     description:
-      'Review the Guru, pet, service, schedule, notes, savings, and estimated price before sending.',
+      'Review your pet, service, dates, care notes, savings, and estimated price before sending.',
   },
   {
     step: 6,
     shortTitle: 'Send',
     title: 'Send request',
     description:
-      'Send the request to the Guru for review. Payment should happen later after the Guru accepts.',
+      'Send this request to the Guru. Payment happens later after the Guru accepts.',
   },
 ];
 
@@ -107,119 +99,85 @@ const pets: PetOption[] = [
     id: 'scout',
     name: 'Scout',
     type: 'Dog',
-    details: 'Friendly dog • 30-minute walk',
     emoji: '🐶',
+    description: 'Friendly dog • 30-minute walk',
   },
   {
     id: 'luna',
     name: 'Luna',
     type: 'Cat',
-    details: 'Indoor cat • Feeding and litter notes',
     emoji: '🐱',
+    description: 'Indoor cat • Feeding and litter notes',
   },
   {
     id: 'add-pet',
     name: 'Add another pet',
     type: 'Other',
-    details: 'Create or update a Pet Passport',
-    emoji: '＋',
+    emoji: '+',
+    description: 'Create or update a Pet Passport',
   },
 ];
 
 const services: ServiceOption[] = [
   {
     id: 'dog-walking',
-    label: 'Dog Walking',
-    detail: 'Walks, potty breaks, exercise, and outdoor time.',
-    duration: '30–60 min',
+    title: 'Dog Walking',
     mode: 'single',
     baseRate: 25,
     additionalPetRate: 10,
     rateUnit: 'visit',
-    bestFor: 'Daily walks and quick exercise.',
+    description: 'Walks, potty breaks, exercise, and outdoor time.',
   },
   {
     id: 'drop-in',
-    label: 'Drop-In Visit',
-    detail: 'Food, water, potty break, litter, play, and quick care.',
-    duration: '20–45 min',
+    title: 'Drop-In Visit',
     mode: 'single',
     baseRate: 22,
     additionalPetRate: 8,
     rateUnit: 'visit',
-    bestFor: 'Quick visits, feeding, and check-ins.',
-  },
-  {
-    id: 'pet-sitting',
-    label: 'Pet Sitting',
-    detail: 'In-home care, companionship, routines, and check-ins.',
-    duration: 'Custom',
-    mode: 'multi-day',
-    baseRate: 38,
-    additionalPetRate: 12,
-    rateUnit: 'day',
-    bestFor: 'Recurring care and multi-day home visits.',
+    description: 'Food, water, potty break, litter, play, and quick care.',
   },
   {
     id: 'doggy-day-care',
-    label: 'Doggy Day Care',
-    detail: 'Daytime care with play, supervision, and routine support.',
-    duration: 'Daytime',
+    title: 'Doggy Day Care',
     mode: 'single',
     baseRate: 40,
     additionalPetRate: 15,
     rateUnit: 'day',
-    bestFor: 'Daytime care while Pet Parents are away.',
+    description: 'Daytime care with play, supervision, and routine support.',
   },
   {
     id: 'boarding',
-    label: 'Boarding',
-    detail: 'Overnight care with a Guru when available.',
-    duration: 'Overnight',
+    title: 'Boarding',
     mode: 'overnight',
     baseRate: 58,
     additionalPetRate: 22,
     rateUnit: 'night',
-    bestFor: 'Overnight stays away from home.',
+    description: 'Overnight care with a Guru when available.',
   },
   {
     id: 'house-sitting',
-    label: 'House Sitting',
-    detail: 'Overnight or multi-day care in the Pet Parent’s home.',
-    duration: 'Overnight / Multi-day',
+    title: 'House Sitting',
     mode: 'overnight',
     baseRate: 72,
     additionalPetRate: 20,
     rateUnit: 'night',
-    bestFor: 'Pets who do best staying home.',
+    description: 'Overnight or multi-day care in the Pet Parent home.',
   },
   {
     id: 'multi-day-care',
-    label: 'Multi-Day Care',
-    detail: 'Care across multiple days with a clear date range and notes.',
-    duration: '2+ days',
+    title: 'Multi-Day Care',
     mode: 'multi-day',
     baseRate: 45,
     additionalPetRate: 15,
     rateUnit: 'day',
-    bestFor: 'Vacations, travel, work trips, and extended care.',
+    description: 'Care across multiple days with clear date range and notes.',
   },
 ];
 
-const guruDiscountRules = {
-  multiPetDiscountPercent: 10,
-  longStayMinUnits: 5,
-  longStayDiscountPercent: 8,
-};
+const weekdayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-const singleTimeOptions = [
-  'Morning',
-  'Midday',
-  'Afternoon',
-  'Evening',
-  'Flexible',
-];
-
+const singleTimeOptions = ['Morning', 'Midday', 'Afternoon', 'Evening', 'Flexible'];
 const overnightTimeOptions = [
   'Morning handoff',
   'Afternoon handoff',
@@ -254,7 +212,7 @@ function dateFromId(dateId: string) {
   return new Date(year, month - 1, day);
 }
 
-function getTodayStart() {
+function todayStart() {
   const today = new Date();
   return new Date(today.getFullYear(), today.getMonth(), today.getDate());
 }
@@ -267,148 +225,114 @@ function addMonths(date: Date, months: number) {
   return new Date(date.getFullYear(), date.getMonth() + months, 1);
 }
 
-function getDateLabel(date: Date) {
-  return {
-    day: date.toLocaleDateString('en-US', { day: 'numeric' }),
-    fullLabel: date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric',
-    }),
-    shortLabel: date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    }),
-  };
+function sameMonth(date: Date, month: Date) {
+  return (
+    date.getFullYear() === month.getFullYear() &&
+    date.getMonth() === month.getMonth()
+  );
 }
 
-function getCalendarMeta(date: Date) {
-  const todayStart = getTodayStart();
-  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+function isToday(date: Date) {
+  return toDateId(date) === toDateId(todayStart());
+}
+
+function buildCalendarDay(date: Date): CalendarDay {
   const dayOfWeek = date.getDay();
   const dayOfMonth = date.getDate();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const isHolidayLike =
-    dayOfMonth === 4 || dayOfMonth === 24 || dayOfMonth === 31;
+  const isPeak = dayOfMonth === 4 || dayOfMonth === 24 || dayOfMonth === 31;
 
-  let status: AvailabilityStatus = 'available';
+  let status: DateStatus = 'available';
   let priceAdjustment = 0;
-  let priceLabel = '';
+  let label = '';
 
-  if (dateStart < todayStart) {
+  if (date < todayStart()) {
     return {
-      status: 'unavailable' as AvailabilityStatus,
+      id: toDateId(date),
+      date,
+      day: String(dayOfMonth),
+      status: 'busy',
       priceAdjustment: 0,
-      priceLabel: 'Past',
+      label: 'Past',
     };
   }
 
   if (isWeekend) {
     priceAdjustment += 8;
-    priceLabel = 'Weekend';
+    label = 'Weekend';
   }
 
-  if (isHolidayLike) {
+  if (isPeak) {
     priceAdjustment += 15;
-    priceLabel = 'Peak';
+    label = 'Peak';
   }
 
   if (dayOfWeek === 2 && dayOfMonth % 2 === 0) {
     status = 'limited';
     priceAdjustment += 5;
-    priceLabel = priceLabel || 'Limited';
+    label = label || 'Limited';
   }
 
   if (dayOfWeek === 1 && dayOfMonth % 5 === 0) {
-    status = 'unavailable';
-    priceLabel = 'Busy';
+    status = 'busy';
+    label = 'Busy';
   }
-
-  return {
-    status,
-    priceAdjustment,
-    priceLabel,
-  };
-}
-
-function buildCalendarDate(date: Date): CalendarDate {
-  const labels = getDateLabel(date);
-  const meta = getCalendarMeta(date);
 
   return {
     id: toDateId(date),
     date,
-    day: labels.day,
-    fullLabel: labels.fullLabel,
-    shortLabel: labels.shortLabel,
-    status: meta.status,
-    priceAdjustment: meta.priceAdjustment,
-    priceLabel: meta.priceLabel,
+    day: String(dayOfMonth),
+    status,
+    priceAdjustment,
+    label,
   };
 }
 
 function buildCalendarMonth(displayMonth: Date) {
-  const start = monthStart(displayMonth);
-  const firstDayOffset = start.getDay();
-  const calendarStart = new Date(start);
-  calendarStart.setDate(start.getDate() - firstDayOffset);
+  const firstDay = monthStart(displayMonth);
+  const offset = firstDay.getDay();
+  const calendarStart = new Date(firstDay);
+  calendarStart.setDate(firstDay.getDate() - offset);
 
-  const dates: CalendarDate[] = [];
+  const days: CalendarDay[] = [];
 
   for (let index = 0; index < 42; index += 1) {
     const date = new Date(calendarStart);
     date.setDate(calendarStart.getDate() + index);
-    dates.push(buildCalendarDate(date));
+    days.push(buildCalendarDay(date));
   }
 
-  return dates;
+  return days;
 }
 
-function buildCalendarWeeks(calendarDates: CalendarDate[]) {
-  const weeks: CalendarDate[][] = [];
+function buildCalendarWeeks(days: CalendarDay[]) {
+  const weeks: CalendarDay[][] = [];
 
-  for (let index = 0; index < calendarDates.length; index += 7) {
-    weeks.push(calendarDates.slice(index, index + 7));
+  for (let index = 0; index < days.length; index += 7) {
+    weeks.push(days.slice(index, index + 7));
   }
 
   return weeks;
 }
 
-function isSameMonth(date: Date, displayMonth: Date) {
-  return (
-    date.getMonth() === displayMonth.getMonth() &&
-    date.getFullYear() === displayMonth.getFullYear()
-  );
+function dateLabel(dateId: string) {
+  if (!dateId) return 'Choose date';
+
+  return dateFromId(dateId).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
-function isToday(date: Date) {
-  return toDateId(date) === toDateId(getTodayStart());
-}
+function rangeLabel(startDateId: string, endDateId: string, mode: CareMode) {
+  if (!startDateId) return 'Choose date';
 
-function getDateById(calendarDates: CalendarDate[], dateId: string) {
-  return (
-    calendarDates.find((date) => date.id === dateId) ||
-    (dateId ? buildCalendarDate(dateFromId(dateId)) : undefined)
-  );
-}
+  if (mode === 'single') return dateLabel(startDateId);
 
-function getAllDatesForRange(startDateId: string, endDateId: string) {
-  if (!startDateId) return [];
+  if (!endDateId) return `${dateLabel(startDateId)} • choose end date`;
 
-  const start = dateFromId(startDateId);
-  const end = endDateId ? dateFromId(endDateId) : dateFromId(startDateId);
-  const safeStart = start <= end ? start : end;
-  const safeEnd = start <= end ? end : start;
-
-  const dates: string[] = [];
-  const current = new Date(safeStart);
-
-  while (current <= safeEnd) {
-    dates.push(toDateId(current));
-    current.setDate(current.getDate() + 1);
-  }
-
-  return dates;
+  return `${dateLabel(startDateId)} → ${dateLabel(endDateId)}`;
 }
 
 function isDateInRange(dateId: string, startDateId: string, endDateId: string) {
@@ -421,84 +345,34 @@ function isDateInRange(dateId: string, startDateId: string, endDateId: string) {
   return dateId >= start && dateId <= end;
 }
 
-function getUnitsForService(mode: CareMode, startDateId: string, endDateId: string) {
+function getRangeDateIds(startDateId: string, endDateId: string) {
+  if (!startDateId) return [];
+
+  const start = dateFromId(startDateId);
+  const end = endDateId ? dateFromId(endDateId) : dateFromId(startDateId);
+  const safeStart = start <= end ? start : end;
+  const safeEnd = start <= end ? end : start;
+  const current = new Date(safeStart);
+  const ids: string[] = [];
+
+  while (current <= safeEnd) {
+    ids.push(toDateId(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return ids;
+}
+
+function getUnits(mode: CareMode, startDateId: string, endDateId: string) {
   if (mode === 'single') return 1;
 
-  if (!startDateId || !endDateId || startDateId === endDateId) {
-    return 1;
-  }
+  if (!startDateId || !endDateId || startDateId === endDateId) return 1;
 
-  const startTime = dateFromId(startDateId).getTime();
-  const endTime = dateFromId(endDateId).getTime();
-  const dayDifference = Math.round((endTime - startTime) / (1000 * 60 * 60 * 24));
-  const safeDifference = Math.max(1, Math.abs(dayDifference));
+  const start = dateFromId(startDateId).getTime();
+  const end = dateFromId(endDateId).getTime();
+  const days = Math.max(1, Math.abs(Math.round((end - start) / 86400000)));
 
-  if (mode === 'overnight') return safeDifference;
-
-  return safeDifference + 1;
-}
-
-function getDateRangeLabel({
-  calendarDates,
-  startDateId,
-  endDateId,
-  mode,
-}: {
-  calendarDates: CalendarDate[];
-  startDateId: string;
-  endDateId: string;
-  mode: CareMode;
-}) {
-  const startDate = getDateById(calendarDates, startDateId);
-  const endDate = getDateById(calendarDates, endDateId);
-
-  if (!startDate) return 'Choose date';
-
-  if (mode === 'single') {
-    return startDate.fullLabel;
-  }
-
-  if (!endDateId || !endDate) {
-    return `${startDate.fullLabel} • choose end date`;
-  }
-
-  return `${startDate.shortLabel} → ${endDate.shortLabel}`;
-}
-
-function getRangeSelectionHint({
-  mode,
-  startDateId,
-  endDateId,
-}: {
-  mode: CareMode;
-  startDateId: string;
-  endDateId: string;
-}) {
-  if (mode === 'single') return 'Tap one date.';
-
-  if (!startDateId) return 'Tap a start date.';
-  if (!endDateId) return 'Now tap an end date.';
-
-  return 'Range selected. Tap another date to start over.';
-}
-
-function getDatePrice(date: CalendarDate, service: ServiceOption) {
-  if (date.status === 'unavailable') return null;
-
-  return service.baseRate + date.priceAdjustment;
-}
-
-function getAverageDateAdjustment(dateIds: string[]) {
-  if (!dateIds.length) return 0;
-
-  const calendarDates = dateIds.map((dateId) => buildCalendarDate(dateFromId(dateId)));
-
-  const totalAdjustments = calendarDates.reduce(
-    (sum, date) => sum + (date.status === 'unavailable' ? 0 : date.priceAdjustment),
-    0,
-  );
-
-  return Math.round(totalAdjustments / calendarDates.length);
+  return mode === 'overnight' ? days : days + 1;
 }
 
 function getEstimate({
@@ -516,30 +390,32 @@ function getEstimate({
   applyPawPerks: boolean;
   applyReferralCredit: boolean;
 }) {
-  const units = getUnitsForService(service.mode, startDateId, endDateId);
-  const rangeDateIds =
+  const units = getUnits(service.mode, startDateId, endDateId);
+  const ids =
     service.mode === 'single'
       ? [startDateId]
-      : getAllDatesForRange(startDateId, endDateId || startDateId);
+      : getRangeDateIds(startDateId, endDateId || startDateId);
 
-  const averageAdjustment = getAverageDateAdjustment(rangeDateIds);
+  const averageAdjustment =
+    ids.length > 0
+      ? Math.round(
+          ids.reduce((total, id) => {
+            const day = buildCalendarDay(dateFromId(id));
+            return total + (day.status === 'busy' ? 0 : day.priceAdjustment);
+          }, 0) / ids.length,
+        )
+      : 0;
+
   const adjustedRate = service.baseRate + averageAdjustment;
   const baseTotal = adjustedRate * units;
-  const additionalPetTotal = additionalPets > 0 ? additionalPets * service.additionalPetRate * units : 0;
-  const grossTotal = baseTotal + additionalPetTotal;
-
+  const additionalPetTotal = additionalPets * service.additionalPetRate * units;
   const multiPetSavings =
-    additionalPets > 0
-      ? Math.round(additionalPetTotal * (guruDiscountRules.multiPetDiscountPercent / 100))
-      : 0;
-
+    additionalPets > 0 ? Math.round(additionalPetTotal * 0.1) : 0;
   const longStaySavings =
-    service.mode !== 'single' && units >= guruDiscountRules.longStayMinUnits
-      ? Math.round(baseTotal * (guruDiscountRules.longStayDiscountPercent / 100))
-      : 0;
-
+    service.mode !== 'single' && units >= 5 ? Math.round(baseTotal * 0.08) : 0;
   const pawPerksCredit = applyPawPerks ? 10 : 0;
   const referralCredit = applyReferralCredit ? 5 : 0;
+
   const totalSavings =
     multiPetSavings + longStaySavings + pawPerksCredit + referralCredit;
 
@@ -548,13 +424,12 @@ function getEstimate({
     adjustedRate,
     baseTotal,
     additionalPetTotal,
-    grossTotal,
     multiPetSavings,
     longStaySavings,
     pawPerksCredit,
     referralCredit,
     totalSavings,
-    estimatedSubtotal: Math.max(0, grossTotal - totalSavings),
+    total: Math.max(0, baseTotal + additionalPetTotal - totalSavings),
   };
 }
 
@@ -562,35 +437,25 @@ export default function RequestBookingScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
 
+  const [currentStep, setCurrentStep] = useState<BookingStep>(1);
   const [displayMonth, setDisplayMonth] = useState(monthStart(new Date()));
+  const calendarDays = useMemo(() => buildCalendarMonth(displayMonth), [displayMonth]);
+  const calendarWeeks = useMemo(() => buildCalendarWeeks(calendarDays), [calendarDays]);
 
-  const calendarDates = useMemo(
-    () => buildCalendarMonth(displayMonth),
-    [displayMonth],
-  );
+  const firstAvailable =
+    calendarDays.find((day) => sameMonth(day.date, displayMonth) && day.status !== 'busy') ||
+    calendarDays[0];
 
-  const calendarWeeks = useMemo(
-    () => buildCalendarWeeks(calendarDates),
-    [calendarDates],
-  );
-
-  const firstAvailableDate =
-    calendarDates.find(
-      (date) =>
-        isSameMonth(date.date, displayMonth) && date.status !== 'unavailable',
-    ) || calendarDates[0];
-
-  const [currentStep, setCurrentStep] = useState<RequestStep>(1);
   const [selectedPetId, setSelectedPetId] = useState('scout');
   const [selectedServiceId, setSelectedServiceId] = useState('dog-walking');
-  const [startDateId, setStartDateId] = useState(firstAvailableDate.id);
+  const [startDateId, setStartDateId] = useState(firstAvailable.id);
   const [endDateId, setEndDateId] = useState('');
   const [selectedTime, setSelectedTime] = useState('Midday');
   const [additionalPets, setAdditionalPets] = useState(0);
-  const [careNotes, setCareNotes] = useState('');
-  const [accessNotes, setAccessNotes] = useState('');
   const [applyPawPerks, setApplyPawPerks] = useState(true);
   const [applyReferralCredit, setApplyReferralCredit] = useState(false);
+  const [careNotes, setCareNotes] = useState('');
+  const [accessNotes, setAccessNotes] = useState('');
   const [pawReportItems, setPawReportItems] = useState<string[]>([
     'Photo updates',
     'Care notes',
@@ -600,24 +465,12 @@ export default function RequestBookingScreen() {
   const selectedPet = pets.find((pet) => pet.id === selectedPetId) || pets[0];
   const selectedService =
     services.find((service) => service.id === selectedServiceId) || services[0];
-
   const activeStep =
-    requestSteps.find((step) => step.step === currentStep) || requestSteps[0];
-
+    bookingSteps.find((step) => step.step === currentStep) || bookingSteps[0];
   const progressWidth = `${Math.round(
-    (currentStep / requestSteps.length) * 100,
+    (currentStep / bookingSteps.length) * 100,
   )}%` as `${number}%`;
-
-  const timeOptions =
-    selectedService.mode === 'single' ? singleTimeOptions : overnightTimeOptions;
-
-  const selectedDateRangeLabel = getDateRangeLabel({
-    calendarDates,
-    startDateId,
-    endDateId,
-    mode: selectedService.mode,
-  });
-
+  const selectedRange = rangeLabel(startDateId, endDateId, selectedService.mode);
   const estimate = getEstimate({
     service: selectedService,
     startDateId,
@@ -626,7 +479,6 @@ export default function RequestBookingScreen() {
     applyPawPerks,
     applyReferralCredit,
   });
-
   const unitLabel =
     selectedService.mode === 'single'
       ? selectedService.rateUnit
@@ -637,12 +489,8 @@ export default function RequestBookingScreen() {
         : estimate.units === 1
           ? 'day'
           : 'days';
-
-  const rangeSelectionHint = getRangeSelectionHint({
-    mode: selectedService.mode,
-    startDateId,
-    endDateId,
-  });
+  const timeOptions =
+    selectedService.mode === 'single' ? singleTimeOptions : overnightTimeOptions;
 
   function goBack() {
     setNotice('');
@@ -652,19 +500,19 @@ export default function RequestBookingScreen() {
       return;
     }
 
-    setCurrentStep((currentStep - 1) as RequestStep);
+    setCurrentStep((currentStep - 1) as BookingStep);
   }
 
   function goNext() {
     setNotice('');
 
     if (currentStep < 6) {
-      setCurrentStep((currentStep + 1) as RequestStep);
+      setCurrentStep((currentStep + 1) as BookingStep);
       return;
     }
 
     setNotice(
-      'Care request prepared. Next, this will send to the Guru for review. Payment should happen only after the Guru accepts.',
+      'Request prepared. The Guru reviews availability and final price before payment.',
     );
   }
 
@@ -675,75 +523,48 @@ export default function RequestBookingScreen() {
     }
 
     setSelectedPetId(petId);
-    setNotice('');
   }
 
   function chooseService(service: ServiceOption) {
     setSelectedServiceId(service.id);
-    setNotice('');
+    setEndDateId('');
 
     if (service.mode === 'single') {
-      setEndDateId('');
-      if (!singleTimeOptions.includes(selectedTime)) {
-        setSelectedTime('Midday');
-      }
-      return;
-    }
-
-    if (!overnightTimeOptions.includes(selectedTime)) {
+      setSelectedTime('Midday');
+    } else {
       setSelectedTime('Flexible handoff');
     }
   }
 
-  function chooseDate(date: CalendarDate) {
-    if (date.status === 'unavailable') {
-      setNotice('This day is marked busy by the Guru. Choose another available day.');
+  function chooseDate(day: CalendarDay) {
+    if (day.status === 'busy') {
+      setNotice('This date is unavailable. Please choose another day.');
       return;
     }
 
     setNotice('');
 
     if (selectedService.mode === 'single') {
-      setStartDateId(date.id);
+      setStartDateId(day.id);
       setEndDateId('');
       return;
     }
 
-    if (!startDateId || endDateId || date.id < startDateId) {
-      setStartDateId(date.id);
+    if (!startDateId || endDateId || day.id < startDateId) {
+      setStartDateId(day.id);
       setEndDateId('');
       return;
     }
 
-    if (date.id === startDateId) {
+    if (day.id === startDateId) {
       setEndDateId('');
       return;
     }
 
-    setEndDateId(date.id);
+    setEndDateId(day.id);
   }
 
-  function goToPreviousMonth() {
-    setDisplayMonth((currentMonth) => addMonths(currentMonth, -1));
-    setEndDateId('');
-  }
-
-  function goToNextMonth() {
-    setDisplayMonth((currentMonth) => addMonths(currentMonth, 1));
-    setEndDateId('');
-  }
-
-  function goToCurrentMonth() {
-    const currentMonth = monthStart(new Date());
-    const todayId = toDateId(getTodayStart());
-
-    setDisplayMonth(currentMonth);
-    setStartDateId(todayId);
-    setEndDateId('');
-    setNotice('');
-  }
-
-  function togglePawReportItem(item: string) {
+  function togglePawReport(item: string) {
     if (pawReportItems.includes(item)) {
       setPawReportItems(pawReportItems.filter((currentItem) => currentItem !== item));
       return;
@@ -752,97 +573,62 @@ export default function RequestBookingScreen() {
     setPawReportItems([...pawReportItems, item]);
   }
 
-  function openProfilePreview() {
-    setNotice(
-      'Guru profile preview will open here after Guru profile pages are connected.',
-    );
-  }
-
-  function openMessages() {
-    router.push('/conversation');
-  }
-
-  function renderPriceCard() {
+  function renderEstimateCard() {
     return (
-      <View style={styles.priceCard}>
-        <View style={styles.priceHeader}>
+      <View style={styles.estimateCard}>
+        <View style={styles.estimateHeader}>
           <View>
-            <Text style={styles.priceEyebrow}>Estimated price</Text>
-            <Text style={styles.priceTotal}>{currency(estimate.estimatedSubtotal)}</Text>
+            <Text style={styles.estimateEyebrow}>Estimated total</Text>
+            <Text style={styles.estimateTotal}>{currency(estimate.total)}</Text>
           </View>
-
-          <Text style={styles.priceBadge}>Guru can update</Text>
+          <Text style={styles.estimateBadge}>Final after Guru accepts</Text>
         </View>
 
-        <View style={styles.priceRows}>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{selectedService.label} rate</Text>
-            <Text style={styles.priceValue}>
-              {currency(estimate.adjustedRate)} / {selectedService.rateUnit}
-            </Text>
-          </View>
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Duration</Text>
-            <Text style={styles.priceValue}>
-              {estimate.units} {unitLabel}
-            </Text>
-          </View>
+        <View style={styles.estimateRows}>
+          <PriceRow
+            label={`${selectedService.title} rate`}
+            value={`${currency(estimate.adjustedRate)} / ${selectedService.rateUnit}`}
+          />
+          <PriceRow label="Duration" value={`${estimate.units} ${unitLabel}`} />
 
           {estimate.additionalPetTotal > 0 ? (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Additional pet fee</Text>
-              <Text style={styles.priceValue}>
-                {currency(estimate.additionalPetTotal)}
-              </Text>
-            </View>
+            <PriceRow
+              label="Additional pet fee"
+              value={currency(estimate.additionalPetTotal)}
+            />
           ) : null}
 
           {estimate.multiPetSavings > 0 ? (
-            <View style={styles.savingsRow}>
-              <Text style={styles.savingsLabel}>Multi-pet savings</Text>
-              <Text style={styles.savingsValue}>
-                -{currency(estimate.multiPetSavings)}
-              </Text>
-            </View>
+            <SavingsRow
+              label="Multi-pet savings"
+              value={`-${currency(estimate.multiPetSavings)}`}
+            />
           ) : null}
 
           {estimate.longStaySavings > 0 ? (
-            <View style={styles.savingsRow}>
-              <Text style={styles.savingsLabel}>Long-stay savings</Text>
-              <Text style={styles.savingsValue}>
-                -{currency(estimate.longStaySavings)}
-              </Text>
-            </View>
+            <SavingsRow
+              label="Long-stay savings"
+              value={`-${currency(estimate.longStaySavings)}`}
+            />
           ) : null}
 
           {estimate.pawPerksCredit > 0 ? (
-            <View style={styles.savingsRow}>
-              <Text style={styles.savingsLabel}>PawPerks credit</Text>
-              <Text style={styles.savingsValue}>
-                -{currency(estimate.pawPerksCredit)}
-              </Text>
-            </View>
+            <SavingsRow
+              label="PawPerks credit"
+              value={`-${currency(estimate.pawPerksCredit)}`}
+            />
           ) : null}
 
           {estimate.referralCredit > 0 ? (
-            <View style={styles.savingsRow}>
-              <Text style={styles.savingsLabel}>Referral credit</Text>
-              <Text style={styles.savingsValue}>
-                -{currency(estimate.referralCredit)}
-              </Text>
-            </View>
+            <SavingsRow
+              label="Referral credit"
+              value={`-${currency(estimate.referralCredit)}`}
+            />
           ) : null}
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Payment timing</Text>
-            <Text style={styles.priceValue}>After Guru accepts</Text>
-          </View>
         </View>
 
-        <Text style={styles.priceDisclaimer}>
-          This is an estimate. Gurus can update availability, service rates, date
-          pricing, discounts, and final pricing before accepting.
+        <Text style={styles.estimateNote}>
+          This estimate is not a charge. The Guru confirms availability and final pricing before payment.
         </Text>
       </View>
     );
@@ -852,7 +638,7 @@ export default function RequestBookingScreen() {
     if (currentStep === 1) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.petGrid}>
+          <View style={styles.petList}>
             {pets.map((pet) => {
               const selected = selectedPetId === pet.id;
 
@@ -863,50 +649,21 @@ export default function RequestBookingScreen() {
                   onPress={() => choosePet(pet.id)}
                   style={[styles.petCard, selected && styles.petCardActive]}
                 >
-                  <View
-                    style={[
-                      styles.petAvatar,
-                      selected && styles.petAvatarActive,
-                    ]}
-                  >
+                  <View style={styles.petAvatar}>
                     <Text style={styles.petAvatarText}>{pet.emoji}</Text>
                   </View>
-
-                  <View style={styles.petCardCopy}>
-                    <Text
-                      style={[
-                        styles.petName,
-                        selected && styles.petNameActive,
-                      ]}
-                    >
-                      {pet.name}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.petDetails,
-                        selected && styles.petDetailsActive,
-                      ]}
-                    >
-                      {pet.details}
-                    </Text>
+                  <View style={styles.petCopy}>
+                    <Text style={styles.petName}>{pet.name}</Text>
+                    <Text style={styles.petDescription}>{pet.description}</Text>
                   </View>
-
-                  <Text
-                    style={[
-                      styles.petSelectText,
-                      selected && styles.petSelectTextActive,
-                    ]}
-                  >
-                    {selected ? 'Selected' : 'Choose'}
-                  </Text>
+                  <Text style={styles.petStatus}>{selected ? 'Selected' : 'Choose'}</Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <View style={styles.additionalPetsPanel}>
-            <Text style={styles.choiceSectionTitle}>Additional pets</Text>
-
+          <View style={styles.counterCard}>
+            <Text style={styles.smallSectionTitle}>Additional pets</Text>
             <View style={styles.counterRow}>
               <Pressable
                 accessibilityRole="button"
@@ -915,12 +672,10 @@ export default function RequestBookingScreen() {
               >
                 <Text style={styles.counterButtonText}>-</Text>
               </Pressable>
-
               <View style={styles.counterValue}>
-                <Text style={styles.counterValueText}>{additionalPets}</Text>
-                <Text style={styles.counterValueLabel}>extra pets</Text>
+                <Text style={styles.counterNumber}>{additionalPets}</Text>
+                <Text style={styles.counterLabel}>extra pets</Text>
               </View>
-
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setAdditionalPets(additionalPets + 1)}
@@ -929,55 +684,23 @@ export default function RequestBookingScreen() {
                 <Text style={styles.counterButtonText}>+</Text>
               </Pressable>
             </View>
-
-            <Text style={styles.counterHelper}>
-              Guru multi-pet savings can apply when extra pets are included.
-            </Text>
           </View>
 
-          <View style={styles.discountPanel}>
-            <Text style={styles.choiceSectionTitle}>Pet Parent savings</Text>
-
-            <Pressable
-              accessibilityRole="button"
+          <View style={styles.savingsCard}>
+            <Text style={styles.smallSectionTitle}>Pet Parent savings</Text>
+            <TogglePill
+              active={applyPawPerks}
+              label="Apply PawPerks credit"
               onPress={() => setApplyPawPerks(!applyPawPerks)}
-              style={[
-                styles.discountToggle,
-                applyPawPerks && styles.discountToggleActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.discountToggleText,
-                  applyPawPerks && styles.discountToggleTextActive,
-                ]}
-              >
-                {applyPawPerks ? '✓ ' : ''}
-                Apply PawPerks credit
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
+            />
+            <TogglePill
+              active={applyReferralCredit}
+              label="Apply referral credit"
               onPress={() => setApplyReferralCredit(!applyReferralCredit)}
-              style={[
-                styles.discountToggle,
-                applyReferralCredit && styles.discountToggleActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.discountToggleText,
-                  applyReferralCredit && styles.discountToggleTextActive,
-                ]}
-              >
-                {applyReferralCredit ? '✓ ' : ''}
-                Apply referral credit
-              </Text>
-            </Pressable>
+            />
           </View>
 
-          {renderPriceCard()}
+          {renderEstimateCard()}
         </View>
       );
     }
@@ -985,7 +708,7 @@ export default function RequestBookingScreen() {
     if (currentStep === 2) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.serviceGrid}>
+          <View style={styles.serviceList}>
             {services.map((service) => {
               const selected = selectedServiceId === service.id;
 
@@ -994,44 +717,38 @@ export default function RequestBookingScreen() {
                   key={service.id}
                   accessibilityRole="button"
                   onPress={() => chooseService(service)}
-                  style={[
-                    styles.serviceCard,
-                    selected && styles.serviceCardActive,
-                  ]}
+                  style={[styles.serviceCard, selected && styles.serviceCardActive]}
                 >
-                  <View style={styles.serviceTopRow}>
+                  <View style={styles.serviceHeader}>
                     <Text
                       style={[
                         styles.serviceTitle,
-                        selected && styles.serviceTitleActive,
+                        selected && styles.serviceTextActive,
                       ]}
                     >
-                      {service.label}
+                      {service.title}
                     </Text>
-
                     <Text
                       style={[
-                        styles.serviceDuration,
-                        selected && styles.serviceDurationActive,
+                        styles.serviceRate,
+                        selected && styles.serviceTextActive,
                       ]}
                     >
                       {currency(service.baseRate)} / {service.rateUnit}
                     </Text>
                   </View>
-
                   <Text
                     style={[
-                      styles.serviceDetail,
-                      selected && styles.serviceDetailActive,
+                      styles.serviceDescription,
+                      selected && styles.serviceTextActive,
                     ]}
                   >
-                    {service.detail}
+                    {service.description}
                   </Text>
-
                   <Text
                     style={[
-                      styles.serviceBestFor,
-                      selected && styles.serviceBestForActive,
+                      styles.serviceMeta,
+                      selected && styles.serviceTextActive,
                     ]}
                   >
                     Additional pet: +{currency(service.additionalPetRate)} / {service.rateUnit}
@@ -1040,14 +757,6 @@ export default function RequestBookingScreen() {
               );
             })}
           </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoCardTitle}>Rates can change by day</Text>
-            <Text style={styles.infoCardText}>
-              Gurus can update service rates, weekend pricing, holiday pricing,
-              multi-pet discounts, long-stay savings, and availability by day.
-            </Text>
-          </View>
         </View>
       );
     }
@@ -1055,78 +764,46 @@ export default function RequestBookingScreen() {
     if (currentStep === 3) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.calendarSummaryPanel}>
-            <View>
-              <Text style={styles.calendarEyebrow}>Selected schedule</Text>
-              <Text style={styles.calendarTitle}>{selectedDateRangeLabel}</Text>
-              <Text style={styles.calendarText}>
-                {selectedService.label} • {estimate.units} {unitLabel} • {selectedTime}
-              </Text>
-            </View>
-
-            <View style={styles.calendarBadge}>
-              <Text style={styles.calendarBadgeText}>
-                {selectedService.mode === 'single'
-                  ? 'Single visit'
-                  : selectedService.mode === 'overnight'
-                    ? 'Overnight'
-                    : 'Multi-day'}
-              </Text>
-            </View>
+          <View style={styles.scheduleSummary}>
+            <Text style={styles.scheduleEyebrow}>Selected schedule</Text>
+            <Text style={styles.scheduleTitle}>{selectedRange}</Text>
+            <Text style={styles.scheduleText}>
+              {selectedService.title} • {estimate.units} {unitLabel} • {selectedTime}
+            </Text>
           </View>
 
-          <View style={styles.stickyEstimateCard}>
-            <View>
-              <Text style={styles.stickyEstimateLabel}>Estimate</Text>
-              <Text style={styles.stickyEstimateValue}>
-                {currency(estimate.estimatedSubtotal)}
-              </Text>
-            </View>
+          {renderEstimateCard()}
 
-            <View style={styles.stickyEstimateCopy}>
-              <Text style={styles.stickyEstimateTitle}>
-                Savings included
-              </Text>
-              <Text style={styles.stickyEstimateText}>
-                Multi-pet, long-stay, PawPerks, and referral credits can apply.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.calendarPanel}>
+          <View style={styles.calendarCard}>
             <View style={styles.calendarHeader}>
-              <View style={styles.calendarHeaderCopy}>
-                <Text style={styles.calendarHeaderTitle}>
-                  {displayMonth.toLocaleDateString('en-US', {
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </Text>
-                <Text style={styles.calendarHeaderText}>
-                  {rangeSelectionHint} Prices show under each day.
-                </Text>
-              </View>
-
+              <Text style={styles.calendarTitle}>
+                {displayMonth.toLocaleDateString('en-US', {
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </Text>
               <View style={styles.monthControls}>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={goToPreviousMonth}
+                  onPress={() => setDisplayMonth((month) => addMonths(month, -1))}
                   style={styles.monthButton}
                 >
                   <Text style={styles.monthButtonText}>‹</Text>
                 </Pressable>
-
                 <Pressable
                   accessibilityRole="button"
-                  onPress={goToCurrentMonth}
+                  onPress={() => {
+                    setDisplayMonth(monthStart(new Date()));
+                    setStartDateId(toDateId(todayStart()));
+                    setEndDateId('');
+                  }}
                   style={styles.todayButton}
                 >
                   <Text style={styles.todayButtonText}>Today</Text>
                 </Pressable>
-
                 <Pressable
                   accessibilityRole="button"
-                  onPress={goToNextMonth}
+                  onPress={() => setDisplayMonth((month) => addMonths(month, 1))}
                   style={styles.monthButton}
                 >
                   <Text style={styles.monthButtonText}>›</Text>
@@ -1134,115 +811,84 @@ export default function RequestBookingScreen() {
               </View>
             </View>
 
-            <View style={styles.rangeGuidePanel}>
-              <View style={styles.rangeGuideStep}>
-                <Text style={styles.rangeGuideLabel}>Start</Text>
-                <Text style={styles.rangeGuideValue}>
-                  {getDateById(calendarDates, startDateId)?.shortLabel || 'Choose'}
-                </Text>
-              </View>
+            <Text style={styles.calendarHelp}>
+              {selectedService.mode === 'single'
+                ? 'Tap one date. Prices are estimates.'
+                : endDateId
+                  ? 'Range selected. Tap another date to start over.'
+                  : 'Tap start date, then end date.'}
+            </Text>
 
-              <View style={styles.rangeGuideDivider} />
-
-              <View style={styles.rangeGuideStep}>
-                <Text style={styles.rangeGuideLabel}>
-                  {selectedService.mode === 'single' ? 'Visit' : 'End'}
-                </Text>
-                <Text style={styles.rangeGuideValue}>
-                  {selectedService.mode === 'single'
-                    ? 'Single day'
-                    : getDateById(calendarDates, endDateId)?.shortLabel || 'Choose'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.calendarLegend}>
-              <Text style={styles.legendText}>• Price is estimated</Text>
-              <Text style={styles.legendText}>• Busy days are unavailable</Text>
-              <Text style={styles.legendText}>• Peak rates may apply</Text>
-            </View>
-
-            <View style={styles.weekdayHeader}>
-              {weekdayLabels.map((weekday) => (
-                <Text key={weekday} style={styles.weekdayHeaderText}>
-                  {weekday}
+            <View style={styles.weekdayRow}>
+              {weekdayLabels.map((label) => (
+                <Text key={label} style={styles.weekdayText}>
+                  {label}
                 </Text>
               ))}
             </View>
 
             <View style={styles.calendarWeeks}>
               {calendarWeeks.map((week, weekIndex) => (
-                <View key={`week-${weekIndex}`} style={styles.calendarWeekRow}>
-                  {week.map((date) => {
+                <View key={`week-${weekIndex}`} style={styles.calendarWeek}>
+                  {week.map((day) => {
                     const selected =
                       selectedService.mode === 'single'
-                        ? date.id === startDateId
-                        : isDateInRange(date.id, startDateId, endDateId);
-
-                    const isStart = date.id === startDateId;
-                    const isEnd = date.id === endDateId && Boolean(endDateId);
-                    const inCurrentMonth = isSameMonth(date.date, displayMonth);
-                    const today = isToday(date.date);
-                    const dayPrice = getDatePrice(date, selectedService);
-                    const unavailable = date.status === 'unavailable';
+                        ? day.id === startDateId
+                        : isDateInRange(day.id, startDateId, endDateId);
+                    const isStart = day.id === startDateId;
+                    const isEnd = day.id === endDateId && Boolean(endDateId);
+                    const outsideMonth = !sameMonth(day.date, displayMonth);
+                    const dayPrice =
+                      day.status === 'busy'
+                        ? null
+                        : selectedService.baseRate + day.priceAdjustment;
 
                     return (
                       <Pressable
-                        key={date.id}
+                        key={day.id}
                         accessibilityRole="button"
-                        onPress={() => chooseDate(date)}
+                        onPress={() => chooseDate(day)}
                         style={[
                           styles.dateCell,
-                          !inCurrentMonth && styles.dateCellOutsideMonth,
-                          today && styles.dateCellToday,
-                          selected && styles.dateCellSelected,
-                          (isStart || isEnd) && styles.dateCellEndpoint,
-                          unavailable && styles.dateCellUnavailable,
+                          outsideMonth && styles.dateOutsideMonth,
+                          isToday(day.date) && styles.dateToday,
+                          selected && styles.dateSelected,
+                          (isStart || isEnd) && styles.dateEndpoint,
+                          day.status === 'busy' && styles.dateBusy,
                         ]}
                       >
                         <Text
                           style={[
                             styles.dateDay,
                             selected && styles.dateTextSelected,
-                            unavailable && styles.dateTextUnavailable,
+                            day.status === 'busy' && styles.dateTextMuted,
                           ]}
                         >
-                          {date.day}
+                          {day.day}
                         </Text>
-
                         <Text
                           style={[
                             styles.datePrice,
                             selected && styles.dateTextSelected,
-                            unavailable && styles.dateTextUnavailable,
+                            day.status === 'busy' && styles.dateTextMuted,
                           ]}
                         >
-                          {unavailable ? 'Busy' : dayPrice ? currency(dayPrice) : '—'}
+                          {day.status === 'busy' ? 'Busy' : dayPrice ? currency(dayPrice) : '-'}
                         </Text>
-
-                        {isStart && selectedService.mode !== 'single' ? (
-                          <Text style={styles.dateRangeLabelSelected}>Start</Text>
-                        ) : isEnd ? (
-                          <Text style={styles.dateRangeLabelSelected}>End</Text>
-                        ) : today ? (
-                          <Text
-                            style={[
-                              styles.dateTodayLabel,
-                              selected && styles.dateTextSelected,
-                            ]}
-                          >
-                            Today
-                          </Text>
-                        ) : date.priceLabel && !unavailable ? (
-                          <Text
-                            style={[
-                              styles.dateTag,
-                              selected && styles.dateTextSelected,
-                            ]}
-                          >
-                            {date.priceLabel}
-                          </Text>
-                        ) : null}
+                        <Text
+                          style={[
+                            styles.dateTag,
+                            selected && styles.dateTextSelected,
+                          ]}
+                        >
+                          {isStart && selectedService.mode !== 'single'
+                            ? 'Start'
+                            : isEnd
+                              ? 'End'
+                              : isToday(day.date)
+                                ? 'Today'
+                                : day.label || ''}
+                        </Text>
                       </Pressable>
                     );
                   })}
@@ -1252,40 +898,18 @@ export default function RequestBookingScreen() {
           </View>
 
           <View style={styles.choiceSection}>
-            <Text style={styles.choiceSectionTitle}>Preferred time</Text>
-
+            <Text style={styles.smallSectionTitle}>Preferred time</Text>
             <View style={styles.choiceGrid}>
-              {timeOptions.map((time) => {
-                const selected = selectedTime === time;
-
-                return (
-                  <Pressable
-                    key={time}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setSelectedTime(time);
-                      setNotice('');
-                    }}
-                    style={[
-                      styles.choicePill,
-                      selected && styles.choicePillActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.choicePillText,
-                        selected && styles.choicePillTextActive,
-                      ]}
-                    >
-                      {time}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {timeOptions.map((time) => (
+                <TogglePill
+                  key={time}
+                  active={selectedTime === time}
+                  label={time}
+                  onPress={() => setSelectedTime(time)}
+                />
+              ))}
             </View>
           </View>
-
-          {renderPriceCard()}
         </View>
       );
     }
@@ -1300,7 +924,6 @@ export default function RequestBookingScreen() {
             placeholder="Food, water, potty, leash, medication, anxiety, routine, or special instructions."
             value={careNotes}
           />
-
           <Field
             label="Access notes"
             multiline
@@ -1310,43 +933,17 @@ export default function RequestBookingScreen() {
           />
 
           <View style={styles.choiceSection}>
-            <Text style={styles.choiceSectionTitle}>PawReport™ updates requested</Text>
-
+            <Text style={styles.smallSectionTitle}>PawReport updates requested</Text>
             <View style={styles.choiceGrid}>
-              {pawReportOptions.map((item) => {
-                const selected = pawReportItems.includes(item);
-
-                return (
-                  <Pressable
-                    key={item}
-                    accessibilityRole="button"
-                    onPress={() => togglePawReportItem(item)}
-                    style={[
-                      styles.choicePill,
-                      selected && styles.choicePillActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.choicePillText,
-                        selected && styles.choicePillTextActive,
-                      ]}
-                    >
-                      {selected ? '✓ ' : ''}
-                      {item}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {pawReportOptions.map((item) => (
+                <TogglePill
+                  key={item}
+                  active={pawReportItems.includes(item)}
+                  label={item}
+                  onPress={() => togglePawReport(item)}
+                />
+              ))}
             </View>
-          </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoCardTitle}>Keep details inside SitGuru</Text>
-            <Text style={styles.infoCardText}>
-              Clear notes help the Guru prepare and keep care details connected
-              to the request, messages, and future PawReport™ updates.
-            </Text>
           </View>
         </View>
       );
@@ -1355,18 +952,17 @@ export default function RequestBookingScreen() {
     if (currentStep === 5) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.reviewPanel}>
+          <View style={styles.reviewCard}>
             <Text style={styles.reviewEyebrow}>Review request</Text>
-
             <ReviewRow label="Guru" value="Local Guru" />
             <ReviewRow label="Pet" value={`${selectedPet.name} • ${selectedPet.type}`} />
-            <ReviewRow label="Service" value={selectedService.label} />
-            <ReviewRow label="Schedule" value={selectedDateRangeLabel} />
+            <ReviewRow label="Service" value={selectedService.title} />
+            <ReviewRow label="Schedule" value={selectedRange} />
             <ReviewRow label="Duration" value={`${estimate.units} ${unitLabel}`} />
             <ReviewRow label="Time" value={selectedTime} />
             <ReviewRow
               label="Estimated price"
-              value={`${currency(estimate.estimatedSubtotal)} • final after Guru accepts`}
+              value={`${currency(estimate.total)} • final after Guru accepts`}
             />
             <ReviewRow
               label="Savings"
@@ -1377,34 +973,24 @@ export default function RequestBookingScreen() {
               }
             />
             <ReviewRow
-              label="PawReport™"
+              label="PawReport"
               value={pawReportItems.length ? pawReportItems.join(', ') : 'Can be added later'}
-            />
-            <ReviewRow
-              label="Care notes"
-              value={careNotes.trim() || 'Can be added before sending'}
-            />
-            <ReviewRow
-              label="Access notes"
-              value={accessNotes.trim() || 'Can be added before sending'}
             />
           </View>
 
-          {renderPriceCard()}
+          {renderEstimateCard()}
         </View>
       );
     }
 
     return (
       <View style={styles.stepBody}>
-        <View style={styles.successPanel}>
+        <View style={styles.successCard}>
           <Text style={styles.successIcon}>✓</Text>
-          <Text style={styles.successTitle}>Ready to send to the Guru.</Text>
+          <Text style={styles.successTitle}>Ready to send.</Text>
           <Text style={styles.successText}>
-            Your request includes the pet, service, dates, timing, notes, savings,
-            and estimated price. Payment should happen later after the Guru accepts.
+            This request goes to the Guru for review. Payment happens later after the Guru accepts.
           </Text>
-
           <Pressable
             accessibilityRole="button"
             onPress={goNext}
@@ -1412,14 +998,6 @@ export default function RequestBookingScreen() {
           >
             <Text style={styles.submitButtonText}>Submit Request</Text>
           </Pressable>
-        </View>
-
-        <View style={styles.infoCard}>
-          <Text style={styles.infoCardTitle}>What happens next?</Text>
-          <Text style={styles.infoCardText}>
-            The Guru reviews the request, messages if needed, accepts if available,
-            and then the booking can move into payment and visit preparation.
-          </Text>
         </View>
       </View>
     );
@@ -1430,7 +1008,6 @@ export default function RequestBookingScreen() {
       <View style={styles.page}>
         <View style={styles.topBar}>
           <SitGuruLogo size="small" variant="symbol" />
-
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/find-care')}
@@ -1443,102 +1020,64 @@ export default function RequestBookingScreen() {
         <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
           <View style={styles.heroCopy}>
             <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>Request Booking</Text>
+              <Text style={styles.heroBadgeText}>Pet Parent Booking Request</Text>
             </View>
-
             <Text style={styles.title}>Request care from a Guru.</Text>
-
             <Text style={styles.subtitle}>
-              Choose your pet, service, dates, savings, and notes. Prices are
-              estimated until the Guru accepts.
+              Choose your pet, service, dates, savings, and notes. The Guru reviews before payment.
             </Text>
-
             <View style={styles.heroActions}>
               <Pressable
                 accessibilityRole="button"
-                onPress={openProfilePreview}
+                onPress={() => router.push('/conversation')}
                 style={styles.primaryButton}
               >
-                <Text style={styles.primaryButtonText}>View Guru</Text>
+                <Text style={styles.primaryButtonText}>Message First</Text>
               </Pressable>
-
               <Pressable
                 accessibilityRole="button"
-                onPress={openMessages}
+                onPress={() => router.push('/find-care')}
                 style={styles.secondaryButton}
               >
-                <Text style={styles.secondaryButtonText}>Message First</Text>
+                <Text style={styles.secondaryButtonText}>Back to Search</Text>
               </Pressable>
             </View>
-
             <View style={styles.progressBlock}>
               <View style={styles.progressTopRow}>
-                <Text style={styles.progressLabel}>
-                  Step {currentStep} of {requestSteps.length}
-                </Text>
+                <Text style={styles.progressLabel}>Step {currentStep} of 6</Text>
                 <Text style={styles.progressPercent}>
-                  {Math.round((currentStep / requestSteps.length) * 100)}%
+                  {Math.round((currentStep / bookingSteps.length) * 100)}%
                 </Text>
               </View>
-
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: progressWidth }]} />
               </View>
             </View>
           </View>
 
-          <View style={styles.heroPhotoCard}>
-            <View style={styles.heroPhotoPlaceholder}>
-              <Text style={styles.heroPhotoIcon}>📅</Text>
-              <Text style={styles.heroPhotoTitle}>Booking calendar area</Text>
-              <Text style={styles.heroPhotoText}>
-                Thumb-friendly calendar rows help Pet Parents compare dates,
-                prices, and savings quickly.
-              </Text>
-            </View>
-
-            <View style={styles.heroFloatingCard}>
-              <Text style={styles.heroFloatingTitle}>Price by day</Text>
-              <Text style={styles.heroFloatingText}>
-                Gurus can update rates, discounts, and availability.
-              </Text>
-            </View>
+          <View style={styles.heroVisualCard}>
+            <Text style={styles.heroVisualIcon}>📅</Text>
+            <Text style={styles.heroVisualTitle}>Booking calendar</Text>
+            <Text style={styles.heroVisualText}>
+              Pet Parents see estimated prices. Gurus confirm final availability and pricing.
+            </Text>
           </View>
         </View>
 
-        <View style={styles.stepsRail}>
-          {requestSteps.map((step) => {
-            const active = step.step === currentStep;
+        <View style={styles.stepRail}>
+          {bookingSteps.map((step) => {
+            const active = currentStep === step.step;
             const complete = step.step < currentStep;
 
             return (
               <Pressable
                 key={step.step}
                 accessibilityRole="button"
-                onPress={() => {
-                  setCurrentStep(step.step);
-                  setNotice('');
-                }}
-                style={[
-                  styles.stepPill,
-                  active && styles.stepPillActive,
-                  complete && styles.stepPillComplete,
-                ]}
+                onPress={() => setCurrentStep(step.step)}
+                style={[styles.stepPill, active && styles.stepPillActive]}
               >
-                <Text
-                  style={[
-                    styles.stepPillNumber,
-                    active && styles.stepPillNumberActive,
-                  ]}
-                >
-                  {complete ? '✓' : step.step}
-                </Text>
-                <Text
-                  style={[
-                    styles.stepPillText,
-                    active && styles.stepPillTextActive,
-                  ]}
-                >
+                <Text style={[styles.stepPillText, active && styles.stepPillTextActive]}>
+                  {complete ? '✓ ' : ''}
                   {step.shortTitle}
                 </Text>
               </Pressable>
@@ -1546,27 +1085,22 @@ export default function RequestBookingScreen() {
           })}
         </View>
 
-        <View style={styles.activeStepPanel}>
+        <View style={styles.activePanel}>
           <View style={styles.stepHeader}>
             <View>
               <Text style={styles.stepEyebrow}>Step {activeStep.step}</Text>
               <Text style={styles.stepTitle}>{activeStep.title}</Text>
             </View>
-
-            <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>
-                {currentStep >= 5 ? 'Review' : 'Required'}
-              </Text>
-            </View>
+            <Text style={styles.stepBadge}>
+              {currentStep >= 5 ? 'Review' : 'Required'}
+            </Text>
           </View>
-
           <Text style={styles.stepDescription}>{activeStep.description}</Text>
-
           {renderStepContent()}
         </View>
 
         {notice ? (
-          <View style={styles.noticePanel}>
+          <View style={styles.noticeCard}>
             <Text style={styles.noticeText}>{notice}</Text>
           </View>
         ) : null}
@@ -1578,17 +1112,16 @@ export default function RequestBookingScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={goBack}
-          style={styles.dockSecondaryAction}
+          style={styles.dockSecondaryButton}
         >
           <Text style={styles.dockSecondaryText}>
             {currentStep === 1 ? 'Search' : 'Back'}
           </Text>
         </Pressable>
-
         <Pressable
           accessibilityRole="button"
           onPress={goNext}
-          style={styles.dockPrimaryAction}
+          style={styles.dockPrimaryButton}
         >
           <Text style={styles.dockPrimaryText}>
             {currentStep === 6 ? 'Submit' : 'Continue'}
@@ -1596,6 +1129,29 @@ export default function RequestBookingScreen() {
         </Pressable>
       </View>
     </SitGuruScreen>
+  );
+}
+
+function TogglePill({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.togglePill, active && styles.togglePillActive]}
+    >
+      <Text style={[styles.togglePillText, active && styles.togglePillTextActive]}>
+        {active ? '✓ ' : ''}
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -1609,7 +1165,7 @@ function Field({
 }: {
   label: string;
   placeholder: string;
-  keyboardType?: 'default' | 'email-address' | 'number-pad' | 'phone-pad';
+  keyboardType?: 'default' | 'number-pad' | 'email-address' | 'phone-pad';
   multiline?: boolean;
   value: string;
   onChangeText: (value: string) => void;
@@ -1626,6 +1182,24 @@ function Field({
         style={[styles.input, multiline && styles.multilineInput]}
         value={value}
       />
+    </View>
+  );
+}
+
+function PriceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.priceRow}>
+      <Text style={styles.priceLabel}>{label}</Text>
+      <Text style={styles.priceValue}>{value}</Text>
+    </View>
+  );
+}
+
+function SavingsRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.savingsRow}>
+      <Text style={styles.savingsLabel}>{label}</Text>
+      <Text style={styles.savingsValue}>{value}</Text>
     </View>
   );
 }
@@ -1671,7 +1245,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     elevation: 4,
     gap: 18,
-    overflow: 'hidden',
     padding: 18,
   },
   heroPanelWide: {
@@ -1681,7 +1254,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 16,
     justifyContent: 'center',
-    padding: 4,
   },
   heroBadge: {
     alignSelf: 'flex-start',
@@ -1719,10 +1291,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: SitGuruColors.primary,
     borderRadius: 999,
-    justifyContent: 'center',
     minHeight: 52,
+    justifyContent: 'center',
     paddingHorizontal: 18,
-    paddingVertical: 14,
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -1735,13 +1306,12 @@ const styles = StyleSheet.create({
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
-    justifyContent: 'center',
     minHeight: 52,
+    justifyContent: 'center',
     paddingHorizontal: 18,
-    paddingVertical: 14,
   },
   secondaryButtonText: {
-    color: SitGuruColors.text,
+    color: SitGuruColors.primary,
     fontSize: 15,
     fontWeight: '900',
   },
@@ -1755,13 +1325,13 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     color: SitGuruColors.primary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   progressPercent: {
     color: SitGuruColors.text,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
   },
   progressTrack: {
@@ -1775,92 +1345,51 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: '100%',
   },
-  heroPhotoCard: {
+  heroVisualCard: {
+    alignItems: 'center',
     backgroundColor: SitGuruColors.background,
     borderColor: SitGuruColors.border,
-    borderRadius: 30,
+    borderRadius: 28,
     borderWidth: 1,
-    flex: 1,
-    minHeight: 300,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroPhotoPlaceholder: {
-    alignItems: 'center',
     flex: 1,
     gap: 8,
     justifyContent: 'center',
+    minHeight: 260,
     padding: 22,
   },
-  heroPhotoIcon: {
-    fontSize: 44,
+  heroVisualIcon: {
+    fontSize: 42,
   },
-  heroPhotoTitle: {
+  heroVisualTitle: {
     color: SitGuruColors.text,
     fontSize: 18,
     fontWeight: '900',
     textAlign: 'center',
   },
-  heroPhotoText: {
+  heroVisualText: {
     color: SitGuruColors.textMuted,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
-    maxWidth: 260,
     textAlign: 'center',
   },
-  heroFloatingCard: {
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 22,
-    bottom: 14,
-    gap: 3,
-    left: 14,
-    padding: 14,
-    position: 'absolute',
-    right: 14,
-  },
-  heroFloatingTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  heroFloatingText: {
-    color: '#DCEFE2',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  stepsRail: {
+  stepRail: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
   stepPill: {
-    alignItems: 'center',
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 11,
   },
   stepPillActive: {
     backgroundColor: SitGuruColors.primary,
     borderColor: SitGuruColors.primary,
-  },
-  stepPillComplete: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-  },
-  stepPillNumber: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  stepPillNumberActive: {
-    color: '#FFFFFF',
   },
   stepPillText: {
     color: SitGuruColors.text,
@@ -1870,7 +1399,7 @@ const styles = StyleSheet.create({
   stepPillTextActive: {
     color: '#FFFFFF',
   },
-  activeStepPanel: {
+  activePanel: {
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.primaryLight,
     borderRadius: 30,
@@ -1889,7 +1418,6 @@ const styles = StyleSheet.create({
     color: SitGuruColors.primary,
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   stepTitle: {
@@ -1898,20 +1426,18 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: -0.7,
     lineHeight: 34,
-    marginTop: 2,
   },
   stepBadge: {
     backgroundColor: SitGuruColors.surfaceSoft,
     borderColor: SitGuruColors.primaryLight,
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  stepBadgeText: {
     color: SitGuruColors.primary,
     fontSize: 11,
     fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     textTransform: 'uppercase',
   },
   stepDescription: {
@@ -1923,7 +1449,7 @@ const styles = StyleSheet.create({
   stepBody: {
     gap: 12,
   },
-  petGrid: {
+  petList: {
     gap: 10,
   },
   petCard: {
@@ -1934,6 +1460,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
+    minHeight: 72,
     padding: 14,
   },
   petCardActive: {
@@ -1950,13 +1477,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 54,
   },
-  petAvatarActive: {
-    borderColor: SitGuruColors.primary,
-  },
   petAvatarText: {
-    fontSize: 26,
+    fontSize: 24,
   },
-  petCardCopy: {
+  petCopy: {
     flex: 1,
     gap: 3,
   },
@@ -1965,27 +1489,18 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '900',
   },
-  petNameActive: {
-    color: SitGuruColors.primary,
-  },
-  petDetails: {
+  petDescription: {
     color: SitGuruColors.textMuted,
     fontSize: 13,
     fontWeight: '700',
   },
-  petDetailsActive: {
-    color: SitGuruColors.text,
-  },
-  petSelectText: {
+  petStatus: {
     color: SitGuruColors.primary,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  petSelectTextActive: {
-    color: SitGuruColors.primary,
-  },
-  additionalPetsPanel: {
+  counterCard: {
     backgroundColor: SitGuruColors.background,
     borderColor: SitGuruColors.border,
     borderRadius: 22,
@@ -1993,11 +1508,15 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
   },
+  smallSectionTitle: {
+    color: SitGuruColors.text,
+    fontSize: 17,
+    fontWeight: '900',
+  },
   counterRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
-    justifyContent: 'space-between',
   },
   counterButton: {
     alignItems: 'center',
@@ -2017,27 +1536,19 @@ const styles = StyleSheet.create({
   counterValue: {
     alignItems: 'center',
     flex: 1,
-    gap: 2,
   },
-  counterValueText: {
+  counterNumber: {
     color: SitGuruColors.text,
     fontSize: 26,
     fontWeight: '900',
   },
-  counterValueLabel: {
+  counterLabel: {
     color: SitGuruColors.textMuted,
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  counterHelper: {
-    color: SitGuruColors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  discountPanel: {
+  savingsCard: {
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.primaryLight,
     borderRadius: 22,
@@ -2045,143 +1556,29 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 14,
   },
-  discountToggle: {
+  togglePill: {
     alignItems: 'center',
     backgroundColor: SitGuruColors.background,
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
-    minHeight: 48,
+    minHeight: 46,
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
   },
-  discountToggleActive: {
+  togglePillActive: {
     backgroundColor: SitGuruColors.primary,
     borderColor: SitGuruColors.primary,
   },
-  discountToggleText: {
+  togglePillText: {
     color: SitGuruColors.text,
     fontSize: 13,
     fontWeight: '900',
   },
-  discountToggleTextActive: {
+  togglePillTextActive: {
     color: '#FFFFFF',
   },
-  infoCard: {
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 24,
-    gap: 6,
-    padding: 16,
-  },
-  infoCardTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  infoCardText: {
-    color: '#DCEFE2',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-  },
-  serviceGrid: {
-    gap: 10,
-  },
-  serviceCard: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    gap: 8,
-    padding: 14,
-  },
-  serviceCardActive: {
-    backgroundColor: SitGuruColors.primary,
-    borderColor: SitGuruColors.primary,
-  },
-  serviceTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  serviceTitle: {
-    color: SitGuruColors.text,
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  serviceTitleActive: {
-    color: '#FFFFFF',
-  },
-  serviceDuration: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  serviceDurationActive: {
-    color: '#DCEFE2',
-  },
-  serviceDetail: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-  },
-  serviceDetailActive: {
-    color: '#DCEFE2',
-  },
-  serviceBestFor: {
-    color: SitGuruColors.text,
-    fontSize: 12,
-    fontWeight: '900',
-    lineHeight: 18,
-  },
-  serviceBestForActive: {
-    color: '#FFFFFF',
-  },
-  stickyEstimateCard: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 24,
-    borderWidth: 1,
-    elevation: 3,
-    flexDirection: 'row',
-    gap: 14,
-    padding: 14,
-  },
-  stickyEstimateLabel: {
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-  },
-  stickyEstimateValue: {
-    color: SitGuruColors.text,
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-    lineHeight: 34,
-  },
-  stickyEstimateCopy: {
-    flex: 1,
-    gap: 3,
-  },
-  stickyEstimateTitle: {
-    color: SitGuruColors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  stickyEstimateText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  priceCard: {
+  estimateCard: {
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.primaryLight,
     borderRadius: 24,
@@ -2190,27 +1587,26 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
   },
-  priceHeader: {
+  estimateHeader: {
     alignItems: 'flex-start',
     flexDirection: 'row',
     gap: 12,
     justifyContent: 'space-between',
   },
-  priceEyebrow: {
+  estimateEyebrow: {
     color: SitGuruColors.primary,
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
-  priceTotal: {
+  estimateTotal: {
     color: SitGuruColors.text,
     fontSize: 34,
     fontWeight: '900',
     letterSpacing: -1,
     lineHeight: 39,
   },
-  priceBadge: {
+  estimateBadge: {
     backgroundColor: SitGuruColors.surfaceSoft,
     borderColor: SitGuruColors.primaryLight,
     borderRadius: 999,
@@ -2223,7 +1619,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     textTransform: 'uppercase',
   },
-  priceRows: {
+  estimateRows: {
     gap: 8,
   },
   priceRow: {
@@ -2270,57 +1666,85 @@ const styles = StyleSheet.create({
     color: SitGuruColors.primary,
     fontSize: 13,
     fontWeight: '900',
-    textAlign: 'right',
   },
-  priceDisclaimer: {
+  estimateNote: {
     color: SitGuruColors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 18,
   },
-  calendarSummaryPanel: {
-    alignItems: 'flex-start',
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 24,
+  serviceList: {
+    gap: 10,
+  },
+  serviceCard: {
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 8,
+    minHeight: 88,
+    padding: 14,
+  },
+  serviceCardActive: {
+    backgroundColor: SitGuruColors.primary,
+    borderColor: SitGuruColors.primary,
+  },
+  serviceHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
     gap: 12,
     justifyContent: 'space-between',
+  },
+  serviceTitle: {
+    color: SitGuruColors.text,
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  serviceRate: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  serviceDescription: {
+    color: SitGuruColors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  serviceMeta: {
+    color: SitGuruColors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  serviceTextActive: {
+    color: '#FFFFFF',
+  },
+  scheduleSummary: {
+    backgroundColor: SitGuruColors.primaryDark,
+    borderRadius: 24,
+    gap: 6,
     padding: 16,
   },
-  calendarEyebrow: {
+  scheduleEyebrow: {
     color: '#C9F26D',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
-  calendarTitle: {
+  scheduleTitle: {
     color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '900',
-    letterSpacing: -0.5,
     lineHeight: 27,
-    marginTop: 3,
   },
-  calendarText: {
+  scheduleText: {
     color: '#DCEFE2',
     fontSize: 14,
     fontWeight: '700',
-    lineHeight: 21,
-    marginTop: 4,
   },
-  calendarBadge: {
-    backgroundColor: '#C9F26D',
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-  },
-  calendarBadgeText: {
-    color: SitGuruColors.text,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  calendarPanel: {
+  calendarCard: {
     backgroundColor: SitGuruColors.background,
     borderColor: SitGuruColors.border,
     borderRadius: 24,
@@ -2329,30 +1753,17 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   calendarHeader: {
-    alignItems: 'flex-start',
-    gap: 12,
+    gap: 10,
   },
-  calendarHeaderCopy: {
-    gap: 3,
-  },
-  calendarHeaderTitle: {
+  calendarTitle: {
     color: SitGuruColors.text,
     fontSize: 22,
     fontWeight: '900',
-    letterSpacing: -0.5,
-    lineHeight: 27,
-  },
-  calendarHeaderText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
   },
   monthControls: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
-    width: '100%',
   },
   monthButton: {
     alignItems: 'center',
@@ -2366,9 +1777,8 @@ const styles = StyleSheet.create({
   },
   monthButtonText: {
     color: SitGuruColors.primary,
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '900',
-    lineHeight: 34,
   },
   todayButton: {
     alignItems: 'center',
@@ -2379,7 +1789,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 52,
     justifyContent: 'center',
-    paddingHorizontal: 16,
   },
   todayButtonText: {
     color: SitGuruColors.primary,
@@ -2387,59 +1796,17 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
-  rangeGuidePanel: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    flexDirection: 'row',
-    padding: 12,
-  },
-  rangeGuideStep: {
-    flex: 1,
-    gap: 2,
-  },
-  rangeGuideLabel: {
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  rangeGuideValue: {
-    color: SitGuruColors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  rangeGuideDivider: {
-    backgroundColor: SitGuruColors.border,
-    height: 34,
-    marginHorizontal: 10,
-    width: 1,
-  },
-  calendarLegend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  legendText: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
+  calendarHelp: {
     color: SitGuruColors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    overflow: 'hidden',
-    paddingHorizontal: 9,
-    paddingVertical: 6,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
   },
-  weekdayHeader: {
+  weekdayRow: {
     flexDirection: 'row',
     gap: 6,
   },
-  weekdayHeaderText: {
+  weekdayText: {
     color: SitGuruColors.text,
     flex: 1,
     fontSize: 13,
@@ -2449,7 +1816,7 @@ const styles = StyleSheet.create({
   calendarWeeks: {
     gap: 6,
   },
-  calendarWeekRow: {
+  calendarWeek: {
     flexDirection: 'row',
     gap: 6,
   },
@@ -2464,22 +1831,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
     paddingVertical: 8,
   },
-  dateCellOutsideMonth: {
+  dateOutsideMonth: {
     opacity: 0.42,
   },
-  dateCellToday: {
+  dateToday: {
     borderColor: SitGuruColors.primary,
     borderWidth: 2,
   },
-  dateCellSelected: {
+  dateSelected: {
     backgroundColor: SitGuruColors.surfaceSoft,
     borderColor: SitGuruColors.primaryLight,
   },
-  dateCellEndpoint: {
+  dateEndpoint: {
     backgroundColor: SitGuruColors.primary,
     borderColor: SitGuruColors.primary,
   },
-  dateCellUnavailable: {
+  dateBusy: {
     backgroundColor: '#F4F0EC',
     borderColor: '#E2D7CC',
     opacity: 0.62,
@@ -2488,7 +1855,6 @@ const styles = StyleSheet.create({
     color: SitGuruColors.text,
     fontSize: 20,
     fontWeight: '900',
-    lineHeight: 24,
   },
   datePrice: {
     color: SitGuruColors.primary,
@@ -2504,62 +1870,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
   },
-  dateTodayLabel: {
-    color: SitGuruColors.primary,
-    fontSize: 8,
-    fontWeight: '900',
-    marginTop: 2,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  dateRangeLabelSelected: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: '900',
-    marginTop: 2,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
   dateTextSelected: {
     color: '#FFFFFF',
   },
-  dateTextUnavailable: {
+  dateTextMuted: {
     color: SitGuruColors.textSoft,
   },
   choiceSection: {
     gap: 9,
   },
-  choiceSectionTitle: {
-    color: SitGuruColors.text,
-    fontSize: 17,
-    fontWeight: '900',
-  },
   choiceGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  choicePill: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  choicePillActive: {
-    backgroundColor: SitGuruColors.primary,
-    borderColor: SitGuruColors.primary,
-  },
-  choicePillText: {
-    color: SitGuruColors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  choicePillTextActive: {
-    color: '#FFFFFF',
   },
   fieldWrap: {
     gap: 7,
@@ -2585,7 +1908,7 @@ const styles = StyleSheet.create({
     minHeight: 110,
     textAlignVertical: 'top',
   },
-  reviewPanel: {
+  reviewCard: {
     backgroundColor: SitGuruColors.background,
     borderColor: SitGuruColors.border,
     borderRadius: 24,
@@ -2620,7 +1943,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 20,
   },
-  successPanel: {
+  successCard: {
     alignItems: 'center',
     backgroundColor: SitGuruColors.primaryDark,
     borderRadius: 28,
@@ -2636,9 +1959,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 24,
     fontWeight: '900',
-    letterSpacing: -0.6,
-    lineHeight: 29,
-    textAlign: 'center',
   },
   successText: {
     color: '#DCEFE2',
@@ -2662,7 +1982,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
-  noticePanel: {
+  noticeCard: {
     backgroundColor: SitGuruColors.surfaceSoft,
     borderColor: SitGuruColors.primaryLight,
     borderRadius: 18,
@@ -2695,21 +2015,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
   },
-  dockPrimaryAction: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primary,
-    borderRadius: 999,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 50,
-    paddingHorizontal: 16,
-  },
-  dockPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  dockSecondaryAction: {
+  dockSecondaryButton: {
     alignItems: 'center',
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.border,
@@ -2723,6 +2029,20 @@ const styles = StyleSheet.create({
   dockSecondaryText: {
     color: SitGuruColors.text,
     fontSize: 13,
+    fontWeight: '900',
+  },
+  dockPrimaryButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.primary,
+    borderRadius: 999,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 50,
+    paddingHorizontal: 16,
+  },
+  dockPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '900',
   },
 });

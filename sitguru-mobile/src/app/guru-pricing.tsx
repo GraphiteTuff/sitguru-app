@@ -13,230 +13,167 @@ import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 
-type RequestStep = 1 | 2 | 3 | 4 | 5 | 6;
-type CareMode = 'single' | 'overnight' | 'multi-day';
-type AvailabilityStatus = 'available' | 'limited' | 'unavailable';
+type PricingStep = 1 | 2 | 3 | 4 | 5;
+type ServiceId =
+  | 'dog-walking'
+  | 'drop-in'
+  | 'doggy-day-care'
+  | 'boarding'
+  | 'house-sitting'
+  | 'multi-day-care';
 
-type RequestStepConfig = {
-  step: RequestStep;
-  shortTitle: string;
+type ServiceMode = 'single' | 'overnight' | 'multi-day';
+
+type ServiceConfig = {
+  id: ServiceId;
   title: string;
+  mode: ServiceMode;
+  rateUnit: string;
   description: string;
 };
 
-type PetOption = {
-  id: string;
-  name: string;
-  type: 'Dog' | 'Cat' | 'Other';
-  details: string;
-  emoji: string;
+type ServiceRate = {
+  baseRate: string;
+  additionalPetRate: string;
 };
 
-type ServiceOption = {
-  id: string;
+type DayRule = {
+  adjustment: number;
+  unavailable: boolean;
   label: string;
-  detail: string;
-  duration: string;
-  mode: CareMode;
-  baseRate: number;
-  additionalPetRate: number;
-  rateUnit: string;
-  bestFor: string;
 };
 
-type CalendarDate = {
+type CalendarDay = {
   id: string;
   date: Date;
   day: string;
-  fullLabel: string;
-  shortLabel: string;
-  status: AvailabilityStatus;
-  priceAdjustment: number;
-  priceLabel?: string;
+};
+
+const pricingSteps: {
+  step: PricingStep;
+  shortTitle: string;
+  title: string;
+  description: string;
+}[] = [
+  {
+    step: 1,
+    shortTitle: 'Rates',
+    title: 'Set service rates',
+    description:
+      'Control the base rate and additional-pet rate for each service you offer.',
+  },
+  {
+    step: 2,
+    shortTitle: 'Calendar',
+    title: 'Set calendar pricing',
+    description:
+      'Update special dates, peak days, limited availability, or busy days.',
+  },
+  {
+    step: 3,
+    shortTitle: 'Discounts',
+    title: 'Set discount rules',
+    description:
+      'Create multi-pet savings, long-stay savings, and repeat Pet Parent discounts.',
+  },
+  {
+    step: 4,
+    shortTitle: 'Availability',
+    title: 'Set availability rules',
+    description:
+      'Control same-day requests, weekend requests, holiday requests, and advance booking windows.',
+  },
+  {
+    step: 5,
+    shortTitle: 'Preview',
+    title: 'Preview pricing',
+    description:
+      'Review how your rates and discounts may appear to Pet Parents before a request is sent.',
+  },
+];
+
+const services: ServiceConfig[] = [
+  {
+    id: 'dog-walking',
+    title: 'Dog Walking',
+    mode: 'single',
+    rateUnit: 'visit',
+    description: 'Walks, potty breaks, exercise, and outdoor time.',
+  },
+  {
+    id: 'drop-in',
+    title: 'Drop-In Visit',
+    mode: 'single',
+    rateUnit: 'visit',
+    description: 'Food, water, potty, litter, play, and quick care.',
+  },
+  {
+    id: 'doggy-day-care',
+    title: 'Doggy Day Care',
+    mode: 'single',
+    rateUnit: 'day',
+    description: 'Daytime supervision, play, and care support.',
+  },
+  {
+    id: 'boarding',
+    title: 'Boarding',
+    mode: 'overnight',
+    rateUnit: 'night',
+    description: 'Overnight care with you when available.',
+  },
+  {
+    id: 'house-sitting',
+    title: 'House Sitting',
+    mode: 'overnight',
+    rateUnit: 'night',
+    description: 'Overnight or multi-day care in the Pet Parent home.',
+  },
+  {
+    id: 'multi-day-care',
+    title: 'Multi-Day Care',
+    mode: 'multi-day',
+    rateUnit: 'day',
+    description: 'Care across multiple days with clear date range and notes.',
+  },
+];
+
+const defaultRates: Record<ServiceId, ServiceRate> = {
+  'dog-walking': {
+    baseRate: '25',
+    additionalPetRate: '10',
+  },
+  'drop-in': {
+    baseRate: '22',
+    additionalPetRate: '8',
+  },
+  'doggy-day-care': {
+    baseRate: '40',
+    additionalPetRate: '15',
+  },
+  boarding: {
+    baseRate: '58',
+    additionalPetRate: '22',
+  },
+  'house-sitting': {
+    baseRate: '72',
+    additionalPetRate: '20',
+  },
+  'multi-day-care': {
+    baseRate: '45',
+    additionalPetRate: '15',
+  },
 };
 
 const weekdayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-const requestSteps: RequestStepConfig[] = [
-  {
-    step: 1,
-    shortTitle: 'Pet',
-    title: 'Choose a pet',
-    description:
-      'Select the Pet Passport connected to this request so the Guru can review the right care details.',
-  },
-  {
-    step: 2,
-    shortTitle: 'Service',
-    title: 'Choose care type',
-    description:
-      'Pick the care service you need, including walks, drop-ins, overnight care, boarding, or multi-day care.',
-  },
-  {
-    step: 3,
-    shortTitle: 'Calendar',
-    title: 'Choose dates and time',
-    description:
-      'Use the calendar-style picker for single visits, overnight stays, or multi-day care windows.',
-  },
-  {
-    step: 4,
-    shortTitle: 'Details',
-    title: 'Add care details',
-    description:
-      'Share routines, access notes, safety details, and PawReport™ preferences so the Guru can prepare.',
-  },
-  {
-    step: 5,
-    shortTitle: 'Review',
-    title: 'Review your request',
-    description:
-      'Review the Guru, pet, service, schedule, notes, savings, and estimated price before sending.',
-  },
-  {
-    step: 6,
-    shortTitle: 'Send',
-    title: 'Send request',
-    description:
-      'Send the request to the Guru for review. Payment should happen later after the Guru accepts.',
-  },
-];
-
-const pets: PetOption[] = [
-  {
-    id: 'scout',
-    name: 'Scout',
-    type: 'Dog',
-    details: 'Friendly dog • 30-minute walk',
-    emoji: '🐶',
-  },
-  {
-    id: 'luna',
-    name: 'Luna',
-    type: 'Cat',
-    details: 'Indoor cat • Feeding and litter notes',
-    emoji: '🐱',
-  },
-  {
-    id: 'add-pet',
-    name: 'Add another pet',
-    type: 'Other',
-    details: 'Create or update a Pet Passport',
-    emoji: '＋',
-  },
-];
-
-const services: ServiceOption[] = [
-  {
-    id: 'dog-walking',
-    label: 'Dog Walking',
-    detail: 'Walks, potty breaks, exercise, and outdoor time.',
-    duration: '30–60 min',
-    mode: 'single',
-    baseRate: 25,
-    additionalPetRate: 10,
-    rateUnit: 'visit',
-    bestFor: 'Daily walks and quick exercise.',
-  },
-  {
-    id: 'drop-in',
-    label: 'Drop-In Visit',
-    detail: 'Food, water, potty break, litter, play, and quick care.',
-    duration: '20–45 min',
-    mode: 'single',
-    baseRate: 22,
-    additionalPetRate: 8,
-    rateUnit: 'visit',
-    bestFor: 'Quick visits, feeding, and check-ins.',
-  },
-  {
-    id: 'pet-sitting',
-    label: 'Pet Sitting',
-    detail: 'In-home care, companionship, routines, and check-ins.',
-    duration: 'Custom',
-    mode: 'multi-day',
-    baseRate: 38,
-    additionalPetRate: 12,
-    rateUnit: 'day',
-    bestFor: 'Recurring care and multi-day home visits.',
-  },
-  {
-    id: 'doggy-day-care',
-    label: 'Doggy Day Care',
-    detail: 'Daytime care with play, supervision, and routine support.',
-    duration: 'Daytime',
-    mode: 'single',
-    baseRate: 40,
-    additionalPetRate: 15,
-    rateUnit: 'day',
-    bestFor: 'Daytime care while Pet Parents are away.',
-  },
-  {
-    id: 'boarding',
-    label: 'Boarding',
-    detail: 'Overnight care with a Guru when available.',
-    duration: 'Overnight',
-    mode: 'overnight',
-    baseRate: 58,
-    additionalPetRate: 22,
-    rateUnit: 'night',
-    bestFor: 'Overnight stays away from home.',
-  },
-  {
-    id: 'house-sitting',
-    label: 'House Sitting',
-    detail: 'Overnight or multi-day care in the Pet Parent’s home.',
-    duration: 'Overnight / Multi-day',
-    mode: 'overnight',
-    baseRate: 72,
-    additionalPetRate: 20,
-    rateUnit: 'night',
-    bestFor: 'Pets who do best staying home.',
-  },
-  {
-    id: 'multi-day-care',
-    label: 'Multi-Day Care',
-    detail: 'Care across multiple days with a clear date range and notes.',
-    duration: '2+ days',
-    mode: 'multi-day',
-    baseRate: 45,
-    additionalPetRate: 15,
-    rateUnit: 'day',
-    bestFor: 'Vacations, travel, work trips, and extended care.',
-  },
-];
-
-const guruDiscountRules = {
-  multiPetDiscountPercent: 10,
-  longStayMinUnits: 5,
-  longStayDiscountPercent: 8,
-};
-
-const singleTimeOptions = [
-  'Morning',
-  'Midday',
-  'Afternoon',
-  'Evening',
-  'Flexible',
-];
-
-const overnightTimeOptions = [
-  'Morning handoff',
-  'Afternoon handoff',
-  'Evening handoff',
-  'Flexible handoff',
-];
-
-const pawReportOptions = [
-  'Photo updates',
-  'Potty updates',
-  'Food and water',
-  'Care notes',
-  'Visit timing',
-];
-
 function currency(value: number) {
   return `$${Math.max(0, Math.round(value)).toLocaleString('en-US')}`;
+}
+
+function toNumber(value: string) {
+  const clean = value.replace(/[^\d.]/g, '');
+  const parsed = Number(clean);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function padNumber(value: number) {
@@ -249,16 +186,6 @@ function toDateId(date: Date) {
   )}`;
 }
 
-function dateFromId(dateId: string) {
-  const [year, month, day] = dateId.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function getTodayStart() {
-  const today = new Date();
-  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
-}
-
 function monthStart(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
@@ -267,582 +194,235 @@ function addMonths(date: Date, months: number) {
   return new Date(date.getFullYear(), date.getMonth() + months, 1);
 }
 
-function getDateLabel(date: Date) {
-  return {
-    day: date.toLocaleDateString('en-US', { day: 'numeric' }),
-    fullLabel: date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric',
-    }),
-    shortLabel: date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    }),
-  };
+function sameMonth(date: Date, displayMonth: Date) {
+  return (
+    date.getFullYear() === displayMonth.getFullYear() &&
+    date.getMonth() === displayMonth.getMonth()
+  );
 }
 
-function getCalendarMeta(date: Date) {
-  const todayStart = getTodayStart();
-  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const dayOfWeek = date.getDay();
-  const dayOfMonth = date.getDate();
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const isHolidayLike =
-    dayOfMonth === 4 || dayOfMonth === 24 || dayOfMonth === 31;
-
-  let status: AvailabilityStatus = 'available';
-  let priceAdjustment = 0;
-  let priceLabel = '';
-
-  if (dateStart < todayStart) {
-    return {
-      status: 'unavailable' as AvailabilityStatus,
-      priceAdjustment: 0,
-      priceLabel: 'Past',
-    };
-  }
-
-  if (isWeekend) {
-    priceAdjustment += 8;
-    priceLabel = 'Weekend';
-  }
-
-  if (isHolidayLike) {
-    priceAdjustment += 15;
-    priceLabel = 'Peak';
-  }
-
-  if (dayOfWeek === 2 && dayOfMonth % 2 === 0) {
-    status = 'limited';
-    priceAdjustment += 5;
-    priceLabel = priceLabel || 'Limited';
-  }
-
-  if (dayOfWeek === 1 && dayOfMonth % 5 === 0) {
-    status = 'unavailable';
-    priceLabel = 'Busy';
-  }
-
-  return {
-    status,
-    priceAdjustment,
-    priceLabel,
-  };
+function isToday(date: Date) {
+  return toDateId(date) === toDateId(new Date());
 }
 
-function buildCalendarDate(date: Date): CalendarDate {
-  const labels = getDateLabel(date);
-  const meta = getCalendarMeta(date);
+function isWeekend(date: Date) {
+  return date.getDay() === 0 || date.getDay() === 6;
+}
 
-  return {
-    id: toDateId(date),
-    date,
-    day: labels.day,
-    fullLabel: labels.fullLabel,
-    shortLabel: labels.shortLabel,
-    status: meta.status,
-    priceAdjustment: meta.priceAdjustment,
-    priceLabel: meta.priceLabel,
-  };
+function isPeakDate(date: Date) {
+  const day = date.getDate();
+  return day === 4 || day === 24 || day === 31;
 }
 
 function buildCalendarMonth(displayMonth: Date) {
-  const start = monthStart(displayMonth);
-  const firstDayOffset = start.getDay();
-  const calendarStart = new Date(start);
-  calendarStart.setDate(start.getDate() - firstDayOffset);
+  const firstDay = monthStart(displayMonth);
+  const offset = firstDay.getDay();
+  const calendarStart = new Date(firstDay);
+  calendarStart.setDate(firstDay.getDate() - offset);
 
-  const dates: CalendarDate[] = [];
+  const days: CalendarDay[] = [];
 
   for (let index = 0; index < 42; index += 1) {
     const date = new Date(calendarStart);
     date.setDate(calendarStart.getDate() + index);
-    dates.push(buildCalendarDate(date));
+
+    days.push({
+      id: toDateId(date),
+      date,
+      day: String(date.getDate()),
+    });
   }
 
-  return dates;
+  return days;
 }
 
-function buildCalendarWeeks(calendarDates: CalendarDate[]) {
-  const weeks: CalendarDate[][] = [];
+function buildCalendarWeeks(days: CalendarDay[]) {
+  const weeks: CalendarDay[][] = [];
 
-  for (let index = 0; index < calendarDates.length; index += 7) {
-    weeks.push(calendarDates.slice(index, index + 7));
+  for (let index = 0; index < days.length; index += 7) {
+    weeks.push(days.slice(index, index + 7));
   }
 
   return weeks;
 }
 
-function isSameMonth(date: Date, displayMonth: Date) {
-  return (
-    date.getMonth() === displayMonth.getMonth() &&
-    date.getFullYear() === displayMonth.getFullYear()
-  );
-}
-
-function isToday(date: Date) {
-  return toDateId(date) === toDateId(getTodayStart());
-}
-
-function getDateById(calendarDates: CalendarDate[], dateId: string) {
-  return (
-    calendarDates.find((date) => date.id === dateId) ||
-    (dateId ? buildCalendarDate(dateFromId(dateId)) : undefined)
-  );
-}
-
-function getAllDatesForRange(startDateId: string, endDateId: string) {
-  if (!startDateId) return [];
-
-  const start = dateFromId(startDateId);
-  const end = endDateId ? dateFromId(endDateId) : dateFromId(startDateId);
-  const safeStart = start <= end ? start : end;
-  const safeEnd = start <= end ? end : start;
-
-  const dates: string[] = [];
-  const current = new Date(safeStart);
-
-  while (current <= safeEnd) {
-    dates.push(toDateId(current));
-    current.setDate(current.getDate() + 1);
-  }
-
-  return dates;
-}
-
-function isDateInRange(dateId: string, startDateId: string, endDateId: string) {
-  if (!startDateId) return false;
-  if (!endDateId) return dateId === startDateId;
-
-  const start = startDateId <= endDateId ? startDateId : endDateId;
-  const end = startDateId <= endDateId ? endDateId : startDateId;
-
-  return dateId >= start && dateId <= end;
-}
-
-function getUnitsForService(mode: CareMode, startDateId: string, endDateId: string) {
-  if (mode === 'single') return 1;
-
-  if (!startDateId || !endDateId || startDateId === endDateId) {
-    return 1;
-  }
-
-  const startTime = dateFromId(startDateId).getTime();
-  const endTime = dateFromId(endDateId).getTime();
-  const dayDifference = Math.round((endTime - startTime) / (1000 * 60 * 60 * 24));
-  const safeDifference = Math.max(1, Math.abs(dayDifference));
-
-  if (mode === 'overnight') return safeDifference;
-
-  return safeDifference + 1;
-}
-
-function getDateRangeLabel({
-  calendarDates,
-  startDateId,
-  endDateId,
-  mode,
-}: {
-  calendarDates: CalendarDate[];
-  startDateId: string;
-  endDateId: string;
-  mode: CareMode;
-}) {
-  const startDate = getDateById(calendarDates, startDateId);
-  const endDate = getDateById(calendarDates, endDateId);
-
-  if (!startDate) return 'Choose date';
-
-  if (mode === 'single') {
-    return startDate.fullLabel;
-  }
-
-  if (!endDateId || !endDate) {
-    return `${startDate.fullLabel} • choose end date`;
-  }
-
-  return `${startDate.shortLabel} → ${endDate.shortLabel}`;
-}
-
-function getRangeSelectionHint({
-  mode,
-  startDateId,
-  endDateId,
-}: {
-  mode: CareMode;
-  startDateId: string;
-  endDateId: string;
-}) {
-  if (mode === 'single') return 'Tap one date.';
-
-  if (!startDateId) return 'Tap a start date.';
-  if (!endDateId) return 'Now tap an end date.';
-
-  return 'Range selected. Tap another date to start over.';
-}
-
-function getDatePrice(date: CalendarDate, service: ServiceOption) {
-  if (date.status === 'unavailable') return null;
-
-  return service.baseRate + date.priceAdjustment;
-}
-
-function getAverageDateAdjustment(dateIds: string[]) {
-  if (!dateIds.length) return 0;
-
-  const calendarDates = dateIds.map((dateId) => buildCalendarDate(dateFromId(dateId)));
-
-  const totalAdjustments = calendarDates.reduce(
-    (sum, date) => sum + (date.status === 'unavailable' ? 0 : date.priceAdjustment),
-    0,
-  );
-
-  return Math.round(totalAdjustments / calendarDates.length);
-}
-
-function getEstimate({
-  service,
-  startDateId,
-  endDateId,
-  additionalPets,
-  applyPawPerks,
-  applyReferralCredit,
-}: {
-  service: ServiceOption;
-  startDateId: string;
-  endDateId: string;
-  additionalPets: number;
-  applyPawPerks: boolean;
-  applyReferralCredit: boolean;
-}) {
-  const units = getUnitsForService(service.mode, startDateId, endDateId);
-  const rangeDateIds =
-    service.mode === 'single'
-      ? [startDateId]
-      : getAllDatesForRange(startDateId, endDateId || startDateId);
-
-  const averageAdjustment = getAverageDateAdjustment(rangeDateIds);
-  const adjustedRate = service.baseRate + averageAdjustment;
-  const baseTotal = adjustedRate * units;
-  const additionalPetTotal = additionalPets > 0 ? additionalPets * service.additionalPetRate * units : 0;
-  const grossTotal = baseTotal + additionalPetTotal;
-
-  const multiPetSavings =
-    additionalPets > 0
-      ? Math.round(additionalPetTotal * (guruDiscountRules.multiPetDiscountPercent / 100))
-      : 0;
-
-  const longStaySavings =
-    service.mode !== 'single' && units >= guruDiscountRules.longStayMinUnits
-      ? Math.round(baseTotal * (guruDiscountRules.longStayDiscountPercent / 100))
-      : 0;
-
-  const pawPerksCredit = applyPawPerks ? 10 : 0;
-  const referralCredit = applyReferralCredit ? 5 : 0;
-  const totalSavings =
-    multiPetSavings + longStaySavings + pawPerksCredit + referralCredit;
-
-  return {
-    units,
-    adjustedRate,
-    baseTotal,
-    additionalPetTotal,
-    grossTotal,
-    multiPetSavings,
-    longStaySavings,
-    pawPerksCredit,
-    referralCredit,
-    totalSavings,
-    estimatedSubtotal: Math.max(0, grossTotal - totalSavings),
-  };
-}
-
-export default function RequestBookingScreen() {
+export default function GuruPricingScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
 
+  const [currentStep, setCurrentStep] = useState<PricingStep>(1);
+  const [selectedServiceId, setSelectedServiceId] =
+    useState<ServiceId>('dog-walking');
+  const [serviceRates, setServiceRates] =
+    useState<Record<ServiceId, ServiceRate>>(defaultRates);
   const [displayMonth, setDisplayMonth] = useState(monthStart(new Date()));
+  const [selectedDateId, setSelectedDateId] = useState(toDateId(new Date()));
+  const [dayRules, setDayRules] = useState<Record<string, DayRule>>({});
+  const [weekendAdjustment, setWeekendAdjustment] = useState('8');
+  const [holidayAdjustment, setHolidayAdjustment] = useState('15');
+  const [multiPetDiscountEnabled, setMultiPetDiscountEnabled] = useState(true);
+  const [multiPetDiscountPercent, setMultiPetDiscountPercent] = useState('10');
+  const [longStayDiscountEnabled, setLongStayDiscountEnabled] = useState(true);
+  const [longStayMinUnits, setLongStayMinUnits] = useState('5');
+  const [longStayDiscountPercent, setLongStayDiscountPercent] = useState('8');
+  const [repeatDiscountEnabled, setRepeatDiscountEnabled] = useState(false);
+  const [repeatDiscountPercent, setRepeatDiscountPercent] = useState('5');
+  const [acceptSameDay, setAcceptSameDay] = useState(false);
+  const [acceptWeekends, setAcceptWeekends] = useState(true);
+  const [acceptHolidays, setAcceptHolidays] = useState(true);
+  const [advanceBookingWindow, setAdvanceBookingWindow] = useState('180');
+  const [availabilityNotes, setAvailabilityNotes] = useState('');
 
-  const calendarDates = useMemo(
-    () => buildCalendarMonth(displayMonth),
-    [displayMonth],
-  );
-
-  const calendarWeeks = useMemo(
-    () => buildCalendarWeeks(calendarDates),
-    [calendarDates],
-  );
-
-  const firstAvailableDate =
-    calendarDates.find(
-      (date) =>
-        isSameMonth(date.date, displayMonth) && date.status !== 'unavailable',
-    ) || calendarDates[0];
-
-  const [currentStep, setCurrentStep] = useState<RequestStep>(1);
-  const [selectedPetId, setSelectedPetId] = useState('scout');
-  const [selectedServiceId, setSelectedServiceId] = useState('dog-walking');
-  const [startDateId, setStartDateId] = useState(firstAvailableDate.id);
-  const [endDateId, setEndDateId] = useState('');
-  const [selectedTime, setSelectedTime] = useState('Midday');
-  const [additionalPets, setAdditionalPets] = useState(0);
-  const [careNotes, setCareNotes] = useState('');
-  const [accessNotes, setAccessNotes] = useState('');
-  const [applyPawPerks, setApplyPawPerks] = useState(true);
-  const [applyReferralCredit, setApplyReferralCredit] = useState(false);
-  const [pawReportItems, setPawReportItems] = useState<string[]>([
-    'Photo updates',
-    'Care notes',
-  ]);
-  const [notice, setNotice] = useState('');
-
-  const selectedPet = pets.find((pet) => pet.id === selectedPetId) || pets[0];
   const selectedService =
     services.find((service) => service.id === selectedServiceId) || services[0];
-
+  const selectedRate = serviceRates[selectedServiceId];
   const activeStep =
-    requestSteps.find((step) => step.step === currentStep) || requestSteps[0];
-
+    pricingSteps.find((step) => step.step === currentStep) || pricingSteps[0];
   const progressWidth = `${Math.round(
-    (currentStep / requestSteps.length) * 100,
+    (currentStep / pricingSteps.length) * 100,
   )}%` as `${number}%`;
 
-  const timeOptions =
-    selectedService.mode === 'single' ? singleTimeOptions : overnightTimeOptions;
+  const calendarDays = useMemo(() => buildCalendarMonth(displayMonth), [displayMonth]);
+  const calendarWeeks = useMemo(() => buildCalendarWeeks(calendarDays), [calendarDays]);
+  const selectedDay =
+    calendarDays.find((day) => day.id === selectedDateId) || calendarDays[0];
+  const selectedRule = dayRules[selectedDateId];
 
-  const selectedDateRangeLabel = getDateRangeLabel({
-    calendarDates,
-    startDateId,
-    endDateId,
-    mode: selectedService.mode,
-  });
+  function updateSelectedRate(updates: Partial<ServiceRate>) {
+    setServiceRates((currentRates) => ({
+      ...currentRates,
+      [selectedServiceId]: {
+        ...currentRates[selectedServiceId],
+        ...updates,
+      },
+    }));
+  }
 
-  const estimate = getEstimate({
-    service: selectedService,
-    startDateId,
-    endDateId,
-    additionalPets,
-    applyPawPerks,
-    applyReferralCredit,
-  });
+  function getDateAdjustment(day: CalendarDay) {
+    const rule = dayRules[day.id];
 
-  const unitLabel =
-    selectedService.mode === 'single'
-      ? selectedService.rateUnit
-      : selectedService.mode === 'overnight'
-        ? estimate.units === 1
-          ? 'night'
-          : 'nights'
-        : estimate.units === 1
-          ? 'day'
-          : 'days';
+    if (rule) return rule.unavailable ? 0 : rule.adjustment;
 
-  const rangeSelectionHint = getRangeSelectionHint({
-    mode: selectedService.mode,
-    startDateId,
-    endDateId,
-  });
+    let adjustment = 0;
+
+    if (isWeekend(day.date)) adjustment += toNumber(weekendAdjustment);
+    if (isPeakDate(day.date)) adjustment += toNumber(holidayAdjustment);
+
+    return adjustment;
+  }
+
+  function getDatePrice(day: CalendarDay) {
+    const rule = dayRules[day.id];
+
+    if (rule?.unavailable) return null;
+
+    return toNumber(selectedRate.baseRate) + getDateAdjustment(day);
+  }
+
+  function setSelectedDayRule(rule: DayRule) {
+    setDayRules((currentRules) => ({
+      ...currentRules,
+      [selectedDateId]: rule,
+    }));
+  }
+
+  function clearSelectedDayRule() {
+    setDayRules((currentRules) => {
+      const nextRules = { ...currentRules };
+      delete nextRules[selectedDateId];
+      return nextRules;
+    });
+  }
 
   function goBack() {
-    setNotice('');
-
     if (currentStep === 1) {
-      router.push('/find-care');
+      router.push('/guru-dashboard');
       return;
     }
 
-    setCurrentStep((currentStep - 1) as RequestStep);
+    setCurrentStep((currentStep - 1) as PricingStep);
   }
 
   function goNext() {
-    setNotice('');
-
-    if (currentStep < 6) {
-      setCurrentStep((currentStep + 1) as RequestStep);
+    if (currentStep < 5) {
+      setCurrentStep((currentStep + 1) as PricingStep);
       return;
     }
 
-    setNotice(
-      'Care request prepared. Next, this will send to the Guru for review. Payment should happen only after the Guru accepts.',
-    );
+    router.push('/guru-dashboard');
   }
 
-  function choosePet(petId: string) {
-    if (petId === 'add-pet') {
-      router.push('/pet-parent-setup');
-      return;
-    }
-
-    setSelectedPetId(petId);
-    setNotice('');
-  }
-
-  function chooseService(service: ServiceOption) {
-    setSelectedServiceId(service.id);
-    setNotice('');
-
-    if (service.mode === 'single') {
-      setEndDateId('');
-      if (!singleTimeOptions.includes(selectedTime)) {
-        setSelectedTime('Midday');
-      }
-      return;
-    }
-
-    if (!overnightTimeOptions.includes(selectedTime)) {
-      setSelectedTime('Flexible handoff');
-    }
-  }
-
-  function chooseDate(date: CalendarDate) {
-    if (date.status === 'unavailable') {
-      setNotice('This day is marked busy by the Guru. Choose another available day.');
-      return;
-    }
-
-    setNotice('');
-
-    if (selectedService.mode === 'single') {
-      setStartDateId(date.id);
-      setEndDateId('');
-      return;
-    }
-
-    if (!startDateId || endDateId || date.id < startDateId) {
-      setStartDateId(date.id);
-      setEndDateId('');
-      return;
-    }
-
-    if (date.id === startDateId) {
-      setEndDateId('');
-      return;
-    }
-
-    setEndDateId(date.id);
-  }
-
-  function goToPreviousMonth() {
-    setDisplayMonth((currentMonth) => addMonths(currentMonth, -1));
-    setEndDateId('');
-  }
-
-  function goToNextMonth() {
-    setDisplayMonth((currentMonth) => addMonths(currentMonth, 1));
-    setEndDateId('');
-  }
-
-  function goToCurrentMonth() {
-    const currentMonth = monthStart(new Date());
-    const todayId = toDateId(getTodayStart());
-
-    setDisplayMonth(currentMonth);
-    setStartDateId(todayId);
-    setEndDateId('');
-    setNotice('');
-  }
-
-  function togglePawReportItem(item: string) {
-    if (pawReportItems.includes(item)) {
-      setPawReportItems(pawReportItems.filter((currentItem) => currentItem !== item));
-      return;
-    }
-
-    setPawReportItems([...pawReportItems, item]);
-  }
-
-  function openProfilePreview() {
-    setNotice(
-      'Guru profile preview will open here after Guru profile pages are connected.',
-    );
-  }
-
-  function openMessages() {
-    router.push('/conversation');
-  }
-
-  function renderPriceCard() {
+  function renderServiceSelector() {
     return (
-      <View style={styles.priceCard}>
-        <View style={styles.priceHeader}>
-          <View>
-            <Text style={styles.priceEyebrow}>Estimated price</Text>
-            <Text style={styles.priceTotal}>{currency(estimate.estimatedSubtotal)}</Text>
-          </View>
+      <View style={styles.serviceRail}>
+        {services.map((service) => {
+          const active = selectedServiceId === service.id;
 
-          <Text style={styles.priceBadge}>Guru can update</Text>
+          return (
+            <Pressable
+              key={service.id}
+              accessibilityRole="button"
+              onPress={() => setSelectedServiceId(service.id)}
+              style={[styles.servicePill, active && styles.servicePillActive]}
+            >
+              <Text
+                style={[
+                  styles.servicePillText,
+                  active && styles.servicePillTextActive,
+                ]}
+              >
+                {service.title}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
+
+  function renderPreviewCard() {
+    const sampleUnits = selectedService.mode === 'single' ? 1 : 5;
+    const baseRate = toNumber(selectedRate.baseRate);
+    const additionalPetRate = toNumber(selectedRate.additionalPetRate);
+    const baseTotal = baseRate * sampleUnits;
+    const additionalPetTotal = additionalPetRate * sampleUnits;
+    const multiPetSavings = multiPetDiscountEnabled
+      ? Math.round(additionalPetTotal * (toNumber(multiPetDiscountPercent) / 100))
+      : 0;
+    const longStaySavings =
+      longStayDiscountEnabled && sampleUnits >= toNumber(longStayMinUnits)
+        ? Math.round(baseTotal * (toNumber(longStayDiscountPercent) / 100))
+        : 0;
+    const repeatSavings = repeatDiscountEnabled
+      ? Math.round(baseTotal * (toNumber(repeatDiscountPercent) / 100))
+      : 0;
+    const total = Math.max(
+      0,
+      baseTotal + additionalPetTotal - multiPetSavings - longStaySavings - repeatSavings,
+    );
+
+    return (
+      <View style={styles.previewPanel}>
+        <Text style={styles.previewEyebrow}>Pet Parent estimate preview</Text>
+        <Text style={styles.previewTitle}>{currency(total)}</Text>
+
+        <View style={styles.previewRows}>
+          <PriceRow label={`${selectedService.title} x ${sampleUnits}`} value={currency(baseTotal)} />
+          <PriceRow label="Additional pet estimate" value={currency(additionalPetTotal)} />
+          {multiPetSavings > 0 ? (
+            <SavingsRow label="Multi-pet savings" value={`-${currency(multiPetSavings)}`} />
+          ) : null}
+          {longStaySavings > 0 ? (
+            <SavingsRow label="Long-stay savings" value={`-${currency(longStaySavings)}`} />
+          ) : null}
+          {repeatSavings > 0 ? (
+            <SavingsRow label="Repeat Pet Parent savings" value={`-${currency(repeatSavings)}`} />
+          ) : null}
+          <PriceRow label="Estimated total" value={currency(total)} />
         </View>
 
-        <View style={styles.priceRows}>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{selectedService.label} rate</Text>
-            <Text style={styles.priceValue}>
-              {currency(estimate.adjustedRate)} / {selectedService.rateUnit}
-            </Text>
-          </View>
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Duration</Text>
-            <Text style={styles.priceValue}>
-              {estimate.units} {unitLabel}
-            </Text>
-          </View>
-
-          {estimate.additionalPetTotal > 0 ? (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Additional pet fee</Text>
-              <Text style={styles.priceValue}>
-                {currency(estimate.additionalPetTotal)}
-              </Text>
-            </View>
-          ) : null}
-
-          {estimate.multiPetSavings > 0 ? (
-            <View style={styles.savingsRow}>
-              <Text style={styles.savingsLabel}>Multi-pet savings</Text>
-              <Text style={styles.savingsValue}>
-                -{currency(estimate.multiPetSavings)}
-              </Text>
-            </View>
-          ) : null}
-
-          {estimate.longStaySavings > 0 ? (
-            <View style={styles.savingsRow}>
-              <Text style={styles.savingsLabel}>Long-stay savings</Text>
-              <Text style={styles.savingsValue}>
-                -{currency(estimate.longStaySavings)}
-              </Text>
-            </View>
-          ) : null}
-
-          {estimate.pawPerksCredit > 0 ? (
-            <View style={styles.savingsRow}>
-              <Text style={styles.savingsLabel}>PawPerks credit</Text>
-              <Text style={styles.savingsValue}>
-                -{currency(estimate.pawPerksCredit)}
-              </Text>
-            </View>
-          ) : null}
-
-          {estimate.referralCredit > 0 ? (
-            <View style={styles.savingsRow}>
-              <Text style={styles.savingsLabel}>Referral credit</Text>
-              <Text style={styles.savingsValue}>
-                -{currency(estimate.referralCredit)}
-              </Text>
-            </View>
-          ) : null}
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Payment timing</Text>
-            <Text style={styles.priceValue}>After Guru accepts</Text>
-          </View>
-        </View>
-
-        <Text style={styles.priceDisclaimer}>
-          This is an estimate. Gurus can update availability, service rates, date
-          pricing, discounts, and final pricing before accepting.
+        <Text style={styles.previewNote}>
+          This is a preview only. Pet Parents request care first, then you confirm availability and final pricing.
         </Text>
       </View>
     );
@@ -852,132 +432,34 @@ export default function RequestBookingScreen() {
     if (currentStep === 1) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.petGrid}>
-            {pets.map((pet) => {
-              const selected = selectedPetId === pet.id;
+          {renderServiceSelector()}
 
-              return (
-                <Pressable
-                  key={pet.id}
-                  accessibilityRole="button"
-                  onPress={() => choosePet(pet.id)}
-                  style={[styles.petCard, selected && styles.petCardActive]}
-                >
-                  <View
-                    style={[
-                      styles.petAvatar,
-                      selected && styles.petAvatarActive,
-                    ]}
-                  >
-                    <Text style={styles.petAvatarText}>{pet.emoji}</Text>
-                  </View>
+          <View style={styles.editorPanel}>
+            <Text style={styles.editorEyebrow}>{selectedService.title}</Text>
+            <Text style={styles.editorTitle}>Base rate and additional-pet fee</Text>
+            <Text style={styles.editorText}>{selectedService.description}</Text>
 
-                  <View style={styles.petCardCopy}>
-                    <Text
-                      style={[
-                        styles.petName,
-                        selected && styles.petNameActive,
-                      ]}
-                    >
-                      {pet.name}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.petDetails,
-                        selected && styles.petDetailsActive,
-                      ]}
-                    >
-                      {pet.details}
-                    </Text>
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.petSelectText,
-                      selected && styles.petSelectTextActive,
-                    ]}
-                  >
-                    {selected ? 'Selected' : 'Choose'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.additionalPetsPanel}>
-            <Text style={styles.choiceSectionTitle}>Additional pets</Text>
-
-            <View style={styles.counterRow}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setAdditionalPets(Math.max(0, additionalPets - 1))}
-                style={styles.counterButton}
-              >
-                <Text style={styles.counterButtonText}>-</Text>
-              </Pressable>
-
-              <View style={styles.counterValue}>
-                <Text style={styles.counterValueText}>{additionalPets}</Text>
-                <Text style={styles.counterValueLabel}>extra pets</Text>
-              </View>
-
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setAdditionalPets(additionalPets + 1)}
-                style={styles.counterButton}
-              >
-                <Text style={styles.counterButtonText}>+</Text>
-              </Pressable>
+            <View style={[styles.formGrid, isWide && styles.formGridWide]}>
+              <Field
+                keyboardType="number-pad"
+                label={`Base rate / ${selectedService.rateUnit}`}
+                onChangeText={(value) => updateSelectedRate({ baseRate: value })}
+                placeholder="25"
+                value={selectedRate.baseRate}
+              />
+              <Field
+                keyboardType="number-pad"
+                label={`Additional pet / ${selectedService.rateUnit}`}
+                onChangeText={(value) =>
+                  updateSelectedRate({ additionalPetRate: value })
+                }
+                placeholder="10"
+                value={selectedRate.additionalPetRate}
+              />
             </View>
-
-            <Text style={styles.counterHelper}>
-              Guru multi-pet savings can apply when extra pets are included.
-            </Text>
           </View>
 
-          <View style={styles.discountPanel}>
-            <Text style={styles.choiceSectionTitle}>Pet Parent savings</Text>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setApplyPawPerks(!applyPawPerks)}
-              style={[
-                styles.discountToggle,
-                applyPawPerks && styles.discountToggleActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.discountToggleText,
-                  applyPawPerks && styles.discountToggleTextActive,
-                ]}
-              >
-                {applyPawPerks ? '✓ ' : ''}
-                Apply PawPerks credit
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setApplyReferralCredit(!applyReferralCredit)}
-              style={[
-                styles.discountToggle,
-                applyReferralCredit && styles.discountToggleActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.discountToggleText,
-                  applyReferralCredit && styles.discountToggleTextActive,
-                ]}
-              >
-                {applyReferralCredit ? '✓ ' : ''}
-                Apply referral credit
-              </Text>
-            </Pressable>
-          </View>
-
-          {renderPriceCard()}
+          {renderPreviewCard()}
         </View>
       );
     }
@@ -985,148 +467,28 @@ export default function RequestBookingScreen() {
     if (currentStep === 2) {
       return (
         <View style={styles.stepBody}>
-          <View style={styles.serviceGrid}>
-            {services.map((service) => {
-              const selected = selectedServiceId === service.id;
-
-              return (
-                <Pressable
-                  key={service.id}
-                  accessibilityRole="button"
-                  onPress={() => chooseService(service)}
-                  style={[
-                    styles.serviceCard,
-                    selected && styles.serviceCardActive,
-                  ]}
-                >
-                  <View style={styles.serviceTopRow}>
-                    <Text
-                      style={[
-                        styles.serviceTitle,
-                        selected && styles.serviceTitleActive,
-                      ]}
-                    >
-                      {service.label}
-                    </Text>
-
-                    <Text
-                      style={[
-                        styles.serviceDuration,
-                        selected && styles.serviceDurationActive,
-                      ]}
-                    >
-                      {currency(service.baseRate)} / {service.rateUnit}
-                    </Text>
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.serviceDetail,
-                      selected && styles.serviceDetailActive,
-                    ]}
-                  >
-                    {service.detail}
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.serviceBestFor,
-                      selected && styles.serviceBestForActive,
-                    ]}
-                  >
-                    Additional pet: +{currency(service.additionalPetRate)} / {service.rateUnit}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoCardTitle}>Rates can change by day</Text>
-            <Text style={styles.infoCardText}>
-              Gurus can update service rates, weekend pricing, holiday pricing,
-              multi-pet discounts, long-stay savings, and availability by day.
-            </Text>
-          </View>
-        </View>
-      );
-    }
-
-    if (currentStep === 3) {
-      return (
-        <View style={styles.stepBody}>
-          <View style={styles.calendarSummaryPanel}>
-            <View>
-              <Text style={styles.calendarEyebrow}>Selected schedule</Text>
-              <Text style={styles.calendarTitle}>{selectedDateRangeLabel}</Text>
-              <Text style={styles.calendarText}>
-                {selectedService.label} • {estimate.units} {unitLabel} • {selectedTime}
-              </Text>
-            </View>
-
-            <View style={styles.calendarBadge}>
-              <Text style={styles.calendarBadgeText}>
-                {selectedService.mode === 'single'
-                  ? 'Single visit'
-                  : selectedService.mode === 'overnight'
-                    ? 'Overnight'
-                    : 'Multi-day'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.stickyEstimateCard}>
-            <View>
-              <Text style={styles.stickyEstimateLabel}>Estimate</Text>
-              <Text style={styles.stickyEstimateValue}>
-                {currency(estimate.estimatedSubtotal)}
-              </Text>
-            </View>
-
-            <View style={styles.stickyEstimateCopy}>
-              <Text style={styles.stickyEstimateTitle}>
-                Savings included
-              </Text>
-              <Text style={styles.stickyEstimateText}>
-                Multi-pet, long-stay, PawPerks, and referral credits can apply.
-              </Text>
-            </View>
-          </View>
+          {renderServiceSelector()}
 
           <View style={styles.calendarPanel}>
             <View style={styles.calendarHeader}>
-              <View style={styles.calendarHeaderCopy}>
-                <Text style={styles.calendarHeaderTitle}>
-                  {displayMonth.toLocaleDateString('en-US', {
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </Text>
-                <Text style={styles.calendarHeaderText}>
-                  {rangeSelectionHint} Prices show under each day.
-                </Text>
-              </View>
+              <Text style={styles.calendarTitle}>
+                {displayMonth.toLocaleDateString('en-US', {
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </Text>
 
               <View style={styles.monthControls}>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={goToPreviousMonth}
+                  onPress={() => setDisplayMonth((month) => addMonths(month, -1))}
                   style={styles.monthButton}
                 >
                   <Text style={styles.monthButtonText}>‹</Text>
                 </Pressable>
-
                 <Pressable
                   accessibilityRole="button"
-                  onPress={goToCurrentMonth}
-                  style={styles.todayButton}
-                >
-                  <Text style={styles.todayButtonText}>Today</Text>
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={goToNextMonth}
+                  onPress={() => setDisplayMonth((month) => addMonths(month, 1))}
                   style={styles.monthButton}
                 >
                   <Text style={styles.monthButtonText}>›</Text>
@@ -1134,115 +496,66 @@ export default function RequestBookingScreen() {
               </View>
             </View>
 
-            <View style={styles.rangeGuidePanel}>
-              <View style={styles.rangeGuideStep}>
-                <Text style={styles.rangeGuideLabel}>Start</Text>
-                <Text style={styles.rangeGuideValue}>
-                  {getDateById(calendarDates, startDateId)?.shortLabel || 'Choose'}
-                </Text>
-              </View>
+            <Text style={styles.calendarHelp}>
+              Tap a date to adjust the price or mark the date busy.
+            </Text>
 
-              <View style={styles.rangeGuideDivider} />
-
-              <View style={styles.rangeGuideStep}>
-                <Text style={styles.rangeGuideLabel}>
-                  {selectedService.mode === 'single' ? 'Visit' : 'End'}
-                </Text>
-                <Text style={styles.rangeGuideValue}>
-                  {selectedService.mode === 'single'
-                    ? 'Single day'
-                    : getDateById(calendarDates, endDateId)?.shortLabel || 'Choose'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.calendarLegend}>
-              <Text style={styles.legendText}>• Price is estimated</Text>
-              <Text style={styles.legendText}>• Busy days are unavailable</Text>
-              <Text style={styles.legendText}>• Peak rates may apply</Text>
-            </View>
-
-            <View style={styles.weekdayHeader}>
-              {weekdayLabels.map((weekday) => (
-                <Text key={weekday} style={styles.weekdayHeaderText}>
-                  {weekday}
+            <View style={styles.weekdayRow}>
+              {weekdayLabels.map((label) => (
+                <Text key={label} style={styles.weekdayText}>
+                  {label}
                 </Text>
               ))}
             </View>
 
             <View style={styles.calendarWeeks}>
               {calendarWeeks.map((week, weekIndex) => (
-                <View key={`week-${weekIndex}`} style={styles.calendarWeekRow}>
-                  {week.map((date) => {
-                    const selected =
-                      selectedService.mode === 'single'
-                        ? date.id === startDateId
-                        : isDateInRange(date.id, startDateId, endDateId);
-
-                    const isStart = date.id === startDateId;
-                    const isEnd = date.id === endDateId && Boolean(endDateId);
-                    const inCurrentMonth = isSameMonth(date.date, displayMonth);
-                    const today = isToday(date.date);
-                    const dayPrice = getDatePrice(date, selectedService);
-                    const unavailable = date.status === 'unavailable';
+                <View key={`week-${weekIndex}`} style={styles.calendarWeek}>
+                  {week.map((day) => {
+                    const selected = day.id === selectedDateId;
+                    const outsideMonth = !sameMonth(day.date, displayMonth);
+                    const rule = dayRules[day.id];
+                    const price = getDatePrice(day);
 
                     return (
                       <Pressable
-                        key={date.id}
+                        key={day.id}
                         accessibilityRole="button"
-                        onPress={() => chooseDate(date)}
+                        onPress={() => setSelectedDateId(day.id)}
                         style={[
                           styles.dateCell,
-                          !inCurrentMonth && styles.dateCellOutsideMonth,
-                          today && styles.dateCellToday,
-                          selected && styles.dateCellSelected,
-                          (isStart || isEnd) && styles.dateCellEndpoint,
-                          unavailable && styles.dateCellUnavailable,
+                          outsideMonth && styles.dateOutsideMonth,
+                          isToday(day.date) && styles.dateToday,
+                          selected && styles.dateSelected,
+                          rule?.unavailable && styles.dateBusy,
                         ]}
                       >
                         <Text
                           style={[
                             styles.dateDay,
                             selected && styles.dateTextSelected,
-                            unavailable && styles.dateTextUnavailable,
+                            rule?.unavailable && styles.dateTextMuted,
                           ]}
                         >
-                          {date.day}
+                          {day.day}
                         </Text>
-
                         <Text
                           style={[
                             styles.datePrice,
                             selected && styles.dateTextSelected,
-                            unavailable && styles.dateTextUnavailable,
+                            rule?.unavailable && styles.dateTextMuted,
                           ]}
                         >
-                          {unavailable ? 'Busy' : dayPrice ? currency(dayPrice) : '—'}
+                          {rule?.unavailable ? 'Busy' : price ? currency(price) : '-'}
                         </Text>
-
-                        {isStart && selectedService.mode !== 'single' ? (
-                          <Text style={styles.dateRangeLabelSelected}>Start</Text>
-                        ) : isEnd ? (
-                          <Text style={styles.dateRangeLabelSelected}>End</Text>
-                        ) : today ? (
-                          <Text
-                            style={[
-                              styles.dateTodayLabel,
-                              selected && styles.dateTextSelected,
-                            ]}
-                          >
-                            Today
-                          </Text>
-                        ) : date.priceLabel && !unavailable ? (
-                          <Text
-                            style={[
-                              styles.dateTag,
-                              selected && styles.dateTextSelected,
-                            ]}
-                          >
-                            {date.priceLabel}
-                          </Text>
-                        ) : null}
+                        <Text
+                          style={[
+                            styles.dateTag,
+                            selected && styles.dateTextSelected,
+                          ]}
+                        >
+                          {rule?.label || (isToday(day.date) ? 'Today' : '')}
+                        </Text>
                       </Pressable>
                     );
                   })}
@@ -1251,41 +564,148 @@ export default function RequestBookingScreen() {
             </View>
           </View>
 
-          <View style={styles.choiceSection}>
-            <Text style={styles.choiceSectionTitle}>Preferred time</Text>
-
-            <View style={styles.choiceGrid}>
-              {timeOptions.map((time) => {
-                const selected = selectedTime === time;
-
-                return (
-                  <Pressable
-                    key={time}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setSelectedTime(time);
-                      setNotice('');
-                    }}
-                    style={[
-                      styles.choicePill,
-                      selected && styles.choicePillActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.choicePillText,
-                        selected && styles.choicePillTextActive,
-                      ]}
-                    >
-                      {time}
-                    </Text>
-                  </Pressable>
-                );
+          <View style={styles.dayRulePanel}>
+            <Text style={styles.editorEyebrow}>Selected date</Text>
+            <Text style={styles.editorTitle}>
+              {selectedDay.date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric',
               })}
+            </Text>
+            <Text style={styles.editorText}>
+              Current rule:{' '}
+              {selectedRule
+                ? selectedRule.unavailable
+                  ? 'Busy / unavailable'
+                  : `+${currency(selectedRule.adjustment)} ${selectedRule.label}`
+                : 'Default pricing'}
+            </Text>
+
+            <View style={styles.ruleGrid}>
+              <RuleButton
+                label="+$5"
+                onPress={() =>
+                  setSelectedDayRule({
+                    adjustment: 5,
+                    unavailable: false,
+                    label: 'Custom',
+                  })
+                }
+              />
+              <RuleButton
+                label="+$10"
+                onPress={() =>
+                  setSelectedDayRule({
+                    adjustment: 10,
+                    unavailable: false,
+                    label: 'Custom',
+                  })
+                }
+              />
+              <RuleButton
+                label="Peak +$15"
+                onPress={() =>
+                  setSelectedDayRule({
+                    adjustment: 15,
+                    unavailable: false,
+                    label: 'Peak',
+                  })
+                }
+              />
+              <RuleButton
+                danger
+                label="Busy"
+                onPress={() =>
+                  setSelectedDayRule({
+                    adjustment: 0,
+                    unavailable: true,
+                    label: 'Busy',
+                  })
+                }
+              />
+              <RuleButton label="Clear" onPress={clearSelectedDayRule} />
             </View>
           </View>
 
-          {renderPriceCard()}
+          <View style={[styles.formGrid, isWide && styles.formGridWide]}>
+            <Field
+              keyboardType="number-pad"
+              label="Default weekend add-on"
+              onChangeText={setWeekendAdjustment}
+              placeholder="8"
+              value={weekendAdjustment}
+            />
+            <Field
+              keyboardType="number-pad"
+              label="Default peak / holiday add-on"
+              onChangeText={setHolidayAdjustment}
+              placeholder="15"
+              value={holidayAdjustment}
+            />
+          </View>
+        </View>
+      );
+    }
+
+    if (currentStep === 3) {
+      return (
+        <View style={styles.stepBody}>
+          <ToggleCard
+            active={multiPetDiscountEnabled}
+            description="Give Pet Parents a clearer price when they book care for more than one pet."
+            onPress={() => setMultiPetDiscountEnabled(!multiPetDiscountEnabled)}
+            title="Multi-pet discount"
+          />
+
+          <Field
+            keyboardType="number-pad"
+            label="Multi-pet discount percent"
+            onChangeText={setMultiPetDiscountPercent}
+            placeholder="10"
+            value={multiPetDiscountPercent}
+          />
+
+          <ToggleCard
+            active={longStayDiscountEnabled}
+            description="Offer a discount when overnight or multi-day care reaches your chosen minimum."
+            onPress={() => setLongStayDiscountEnabled(!longStayDiscountEnabled)}
+            title="Long-stay discount"
+          />
+
+          <View style={[styles.formGrid, isWide && styles.formGridWide]}>
+            <Field
+              keyboardType="number-pad"
+              label="Long-stay starts at"
+              onChangeText={setLongStayMinUnits}
+              placeholder="5"
+              value={longStayMinUnits}
+            />
+            <Field
+              keyboardType="number-pad"
+              label="Long-stay discount percent"
+              onChangeText={setLongStayDiscountPercent}
+              placeholder="8"
+              value={longStayDiscountPercent}
+            />
+          </View>
+
+          <ToggleCard
+            active={repeatDiscountEnabled}
+            description="Reward repeat Pet Parents when they book with you again."
+            onPress={() => setRepeatDiscountEnabled(!repeatDiscountEnabled)}
+            title="Repeat Pet Parent discount"
+          />
+
+          <Field
+            keyboardType="number-pad"
+            label="Repeat Pet Parent discount percent"
+            onChangeText={setRepeatDiscountPercent}
+            placeholder="5"
+            value={repeatDiscountPercent}
+          />
+
+          {renderPreviewCard()}
         </View>
       );
     }
@@ -1293,132 +713,80 @@ export default function RequestBookingScreen() {
     if (currentStep === 4) {
       return (
         <View style={styles.stepBody}>
+          <View style={[styles.formGrid, isWide && styles.formGridWide]}>
+            <ToggleCard
+              active={acceptSameDay}
+              description="Allow Pet Parents to request care for today when your calendar allows it."
+              onPress={() => setAcceptSameDay(!acceptSameDay)}
+              title="Accept same-day requests"
+            />
+            <ToggleCard
+              active={acceptWeekends}
+              description="Allow weekend dates to appear available unless marked busy."
+              onPress={() => setAcceptWeekends(!acceptWeekends)}
+              title="Accept weekends"
+            />
+            <ToggleCard
+              active={acceptHolidays}
+              description="Allow peak and holiday dates to appear available with your pricing rules."
+              onPress={() => setAcceptHolidays(!acceptHolidays)}
+              title="Accept holidays"
+            />
+          </View>
+
           <Field
-            label="Care notes"
-            multiline
-            onChangeText={setCareNotes}
-            placeholder="Food, water, potty, leash, medication, anxiety, routine, or special instructions."
-            value={careNotes}
+            keyboardType="number-pad"
+            label="Advance booking window"
+            onChangeText={setAdvanceBookingWindow}
+            placeholder="180"
+            value={advanceBookingWindow}
           />
 
           <Field
-            label="Access notes"
+            label="Availability notes"
             multiline
-            onChangeText={setAccessNotes}
-            placeholder="Parking, gate code, apartment entry, key location, or arrival instructions."
-            value={accessNotes}
+            onChangeText={setAvailabilityNotes}
+            placeholder="Share schedule rules, travel limits, unavailable seasons, or booking preferences."
+            value={availabilityNotes}
           />
-
-          <View style={styles.choiceSection}>
-            <Text style={styles.choiceSectionTitle}>PawReport™ updates requested</Text>
-
-            <View style={styles.choiceGrid}>
-              {pawReportOptions.map((item) => {
-                const selected = pawReportItems.includes(item);
-
-                return (
-                  <Pressable
-                    key={item}
-                    accessibilityRole="button"
-                    onPress={() => togglePawReportItem(item)}
-                    style={[
-                      styles.choicePill,
-                      selected && styles.choicePillActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.choicePillText,
-                        selected && styles.choicePillTextActive,
-                      ]}
-                    >
-                      {selected ? '✓ ' : ''}
-                      {item}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoCardTitle}>Keep details inside SitGuru</Text>
-            <Text style={styles.infoCardText}>
-              Clear notes help the Guru prepare and keep care details connected
-              to the request, messages, and future PawReport™ updates.
-            </Text>
-          </View>
-        </View>
-      );
-    }
-
-    if (currentStep === 5) {
-      return (
-        <View style={styles.stepBody}>
-          <View style={styles.reviewPanel}>
-            <Text style={styles.reviewEyebrow}>Review request</Text>
-
-            <ReviewRow label="Guru" value="Local Guru" />
-            <ReviewRow label="Pet" value={`${selectedPet.name} • ${selectedPet.type}`} />
-            <ReviewRow label="Service" value={selectedService.label} />
-            <ReviewRow label="Schedule" value={selectedDateRangeLabel} />
-            <ReviewRow label="Duration" value={`${estimate.units} ${unitLabel}`} />
-            <ReviewRow label="Time" value={selectedTime} />
-            <ReviewRow
-              label="Estimated price"
-              value={`${currency(estimate.estimatedSubtotal)} • final after Guru accepts`}
-            />
-            <ReviewRow
-              label="Savings"
-              value={
-                estimate.totalSavings > 0
-                  ? `${currency(estimate.totalSavings)} estimated savings`
-                  : 'No savings applied'
-              }
-            />
-            <ReviewRow
-              label="PawReport™"
-              value={pawReportItems.length ? pawReportItems.join(', ') : 'Can be added later'}
-            />
-            <ReviewRow
-              label="Care notes"
-              value={careNotes.trim() || 'Can be added before sending'}
-            />
-            <ReviewRow
-              label="Access notes"
-              value={accessNotes.trim() || 'Can be added before sending'}
-            />
-          </View>
-
-          {renderPriceCard()}
         </View>
       );
     }
 
     return (
       <View style={styles.stepBody}>
-        <View style={styles.successPanel}>
-          <Text style={styles.successIcon}>✓</Text>
-          <Text style={styles.successTitle}>Ready to send to the Guru.</Text>
-          <Text style={styles.successText}>
-            Your request includes the pet, service, dates, timing, notes, savings,
-            and estimated price. Payment should happen later after the Guru accepts.
-          </Text>
+        {renderServiceSelector()}
+        {renderPreviewCard()}
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={goNext}
-            style={styles.submitButton}
-          >
-            <Text style={styles.submitButtonText}>Submit Request</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.infoCard}>
-          <Text style={styles.infoCardTitle}>What happens next?</Text>
-          <Text style={styles.infoCardText}>
-            The Guru reviews the request, messages if needed, accepts if available,
-            and then the booking can move into payment and visit preparation.
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryEyebrow}>Guru pricing summary</Text>
+          <Text style={styles.summaryTitle}>Pricing controls are ready.</Text>
+          <View style={styles.summaryRows}>
+            <PriceRow label="Selected service" value={selectedService.title} />
+            <PriceRow
+              label="Base rate"
+              value={`${currency(toNumber(selectedRate.baseRate))} / ${selectedService.rateUnit}`}
+            />
+            <PriceRow
+              label="Additional pet"
+              value={`${currency(toNumber(selectedRate.additionalPetRate))} / ${selectedService.rateUnit}`}
+            />
+            <PriceRow
+              label="Multi-pet discount"
+              value={multiPetDiscountEnabled ? `${multiPetDiscountPercent}%` : 'Off'}
+            />
+            <PriceRow
+              label="Long-stay discount"
+              value={
+                longStayDiscountEnabled
+                  ? `${longStayDiscountPercent}% after ${longStayMinUnits}`
+                  : 'Off'
+              }
+            />
+            <PriceRow label="Booking window" value={`${advanceBookingWindow} days ahead`} />
+          </View>
+          <Text style={styles.summaryNote}>
+            This is a Guru-only workspace. Pet Parents see clean estimates during booking, while you control rates and availability here.
           </Text>
         </View>
       </View>
@@ -1430,115 +798,60 @@ export default function RequestBookingScreen() {
       <View style={styles.page}>
         <View style={styles.topBar}>
           <SitGuruLogo size="small" variant="symbol" />
-
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/find-care')}
+            onPress={() => router.push('/guru-dashboard')}
             style={styles.topLinkButton}
           >
-            <Text style={styles.topLinkText}>Find Care</Text>
+            <Text style={styles.topLinkText}>Dashboard</Text>
           </Pressable>
         </View>
 
         <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
           <View style={styles.heroCopy}>
             <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>Request Booking</Text>
+              <Text style={styles.heroBadgeText}>Guru Pricing Workspace</Text>
             </View>
-
-            <Text style={styles.title}>Request care from a Guru.</Text>
-
+            <Text style={styles.title}>Control your rates and calendar.</Text>
             <Text style={styles.subtitle}>
-              Choose your pet, service, dates, savings, and notes. Prices are
-              estimated until the Guru accepts.
+              Set service rates, additional pet fees, discounts, date pricing, busy days, and booking rules.
             </Text>
-
-            <View style={styles.heroActions}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={openProfilePreview}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.primaryButtonText}>View Guru</Text>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                onPress={openMessages}
-                style={styles.secondaryButton}
-              >
-                <Text style={styles.secondaryButtonText}>Message First</Text>
-              </Pressable>
-            </View>
-
             <View style={styles.progressBlock}>
               <View style={styles.progressTopRow}>
-                <Text style={styles.progressLabel}>
-                  Step {currentStep} of {requestSteps.length}
-                </Text>
+                <Text style={styles.progressLabel}>Step {currentStep} of 5</Text>
                 <Text style={styles.progressPercent}>
-                  {Math.round((currentStep / requestSteps.length) * 100)}%
+                  {Math.round((currentStep / pricingSteps.length) * 100)}%
                 </Text>
               </View>
-
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: progressWidth }]} />
               </View>
             </View>
           </View>
 
-          <View style={styles.heroPhotoCard}>
-            <View style={styles.heroPhotoPlaceholder}>
-              <Text style={styles.heroPhotoIcon}>📅</Text>
-              <Text style={styles.heroPhotoTitle}>Booking calendar area</Text>
-              <Text style={styles.heroPhotoText}>
-                Thumb-friendly calendar rows help Pet Parents compare dates,
-                prices, and savings quickly.
-              </Text>
-            </View>
-
-            <View style={styles.heroFloatingCard}>
-              <Text style={styles.heroFloatingTitle}>Price by day</Text>
-              <Text style={styles.heroFloatingText}>
-                Gurus can update rates, discounts, and availability.
-              </Text>
-            </View>
+          <View style={styles.heroVisualCard}>
+            <Text style={styles.heroVisualIcon}>💵</Text>
+            <Text style={styles.heroVisualTitle}>Guru-only pricing controls</Text>
+            <Text style={styles.heroVisualText}>
+              This screen controls what Pet Parents may see as estimates before sending a request.
+            </Text>
           </View>
         </View>
 
-        <View style={styles.stepsRail}>
-          {requestSteps.map((step) => {
-            const active = step.step === currentStep;
+        <View style={styles.stepRail}>
+          {pricingSteps.map((step) => {
+            const active = currentStep === step.step;
             const complete = step.step < currentStep;
 
             return (
               <Pressable
                 key={step.step}
                 accessibilityRole="button"
-                onPress={() => {
-                  setCurrentStep(step.step);
-                  setNotice('');
-                }}
-                style={[
-                  styles.stepPill,
-                  active && styles.stepPillActive,
-                  complete && styles.stepPillComplete,
-                ]}
+                onPress={() => setCurrentStep(step.step)}
+                style={[styles.stepPill, active && styles.stepPillActive]}
               >
-                <Text
-                  style={[
-                    styles.stepPillNumber,
-                    active && styles.stepPillNumberActive,
-                  ]}
-                >
-                  {complete ? '✓' : step.step}
-                </Text>
-                <Text
-                  style={[
-                    styles.stepPillText,
-                    active && styles.stepPillTextActive,
-                  ]}
-                >
+                <Text style={[styles.stepPillText, active && styles.stepPillTextActive]}>
+                  {complete ? '✓ ' : ''}
                   {step.shortTitle}
                 </Text>
               </Pressable>
@@ -1546,30 +859,19 @@ export default function RequestBookingScreen() {
           })}
         </View>
 
-        <View style={styles.activeStepPanel}>
+        <View style={styles.activePanel}>
           <View style={styles.stepHeader}>
             <View>
-              <Text style={styles.stepEyebrow}>Step {activeStep.step}</Text>
+              <Text style={styles.stepEyebrow}>Guru pricing step {activeStep.step}</Text>
               <Text style={styles.stepTitle}>{activeStep.title}</Text>
             </View>
-
-            <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>
-                {currentStep >= 5 ? 'Review' : 'Required'}
-              </Text>
-            </View>
+            <Text style={styles.stepBadge}>
+              {currentStep === 5 ? 'Preview' : 'Guru Setup'}
+            </Text>
           </View>
-
           <Text style={styles.stepDescription}>{activeStep.description}</Text>
-
           {renderStepContent()}
         </View>
-
-        {notice ? (
-          <View style={styles.noticePanel}>
-            <Text style={styles.noticeText}>{notice}</Text>
-          </View>
-        ) : null}
 
         <View style={styles.bottomDockSpacer} />
       </View>
@@ -1578,20 +880,19 @@ export default function RequestBookingScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={goBack}
-          style={styles.dockSecondaryAction}
+          style={styles.dockSecondaryButton}
         >
           <Text style={styles.dockSecondaryText}>
-            {currentStep === 1 ? 'Search' : 'Back'}
+            {currentStep === 1 ? 'Dashboard' : 'Previous'}
           </Text>
         </Pressable>
-
         <Pressable
           accessibilityRole="button"
           onPress={goNext}
-          style={styles.dockPrimaryAction}
+          style={styles.dockPrimaryButton}
         >
           <Text style={styles.dockPrimaryText}>
-            {currentStep === 6 ? 'Submit' : 'Continue'}
+            {currentStep === 5 ? 'Done' : 'Continue'}
           </Text>
         </Pressable>
       </View>
@@ -1609,7 +910,7 @@ function Field({
 }: {
   label: string;
   placeholder: string;
-  keyboardType?: 'default' | 'email-address' | 'number-pad' | 'phone-pad';
+  keyboardType?: 'default' | 'number-pad' | 'email-address' | 'phone-pad';
   multiline?: boolean;
   value: string;
   onChangeText: (value: string) => void;
@@ -1630,11 +931,72 @@ function Field({
   );
 }
 
-function ReviewRow({ label, value }: { label: string; value: string }) {
+function RuleButton({
+  label,
+  danger = false,
+  onPress,
+}: {
+  label: string;
+  danger?: boolean;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.reviewRow}>
-      <Text style={styles.reviewLabel}>{label}</Text>
-      <Text style={styles.reviewValue}>{value}</Text>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.ruleButton, danger && styles.ruleButtonDanger]}
+    >
+      <Text style={[styles.ruleButtonText, danger && styles.ruleButtonDangerText]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function ToggleCard({
+  active,
+  title,
+  description,
+  onPress,
+}: {
+  active: boolean;
+  title: string;
+  description: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.toggleCard, active && styles.toggleCardActive]}
+    >
+      <View style={[styles.toggleDot, active && styles.toggleDotActive]}>
+        <Text style={[styles.toggleDotText, active && styles.toggleDotTextActive]}>
+          {active ? '✓' : '•'}
+        </Text>
+      </View>
+      <View style={styles.toggleCopy}>
+        <Text style={styles.toggleTitle}>{title}</Text>
+        <Text style={styles.toggleText}>{description}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function PriceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.priceRow}>
+      <Text style={styles.priceLabel}>{label}</Text>
+      <Text style={styles.priceValue}>{value}</Text>
+    </View>
+  );
+}
+
+function SavingsRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.savingsRow}>
+      <Text style={styles.savingsLabel}>{label}</Text>
+      <Text style={styles.savingsValue}>{value}</Text>
     </View>
   );
 }
@@ -1671,7 +1033,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     elevation: 4,
     gap: 18,
-    overflow: 'hidden',
     padding: 18,
   },
   heroPanelWide: {
@@ -1681,7 +1042,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 16,
     justifyContent: 'center',
-    padding: 4,
   },
   heroBadge: {
     alignSelf: 'flex-start',
@@ -1712,39 +1072,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 25,
   },
-  heroActions: {
-    gap: 10,
-  },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primary,
-    borderRadius: 999,
-    justifyContent: 'center',
-    minHeight: 52,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 52,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  secondaryButtonText: {
-    color: SitGuruColors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
   progressBlock: {
     gap: 8,
   },
@@ -1755,13 +1082,13 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     color: SitGuruColors.primary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   progressPercent: {
     color: SitGuruColors.text,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
   },
   progressTrack: {
@@ -1775,92 +1102,51 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: '100%',
   },
-  heroPhotoCard: {
+  heroVisualCard: {
+    alignItems: 'center',
     backgroundColor: SitGuruColors.background,
     borderColor: SitGuruColors.border,
-    borderRadius: 30,
+    borderRadius: 28,
     borderWidth: 1,
-    flex: 1,
-    minHeight: 300,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroPhotoPlaceholder: {
-    alignItems: 'center',
     flex: 1,
     gap: 8,
     justifyContent: 'center',
+    minHeight: 260,
     padding: 22,
   },
-  heroPhotoIcon: {
-    fontSize: 44,
+  heroVisualIcon: {
+    fontSize: 42,
   },
-  heroPhotoTitle: {
+  heroVisualTitle: {
     color: SitGuruColors.text,
     fontSize: 18,
     fontWeight: '900',
     textAlign: 'center',
   },
-  heroPhotoText: {
+  heroVisualText: {
     color: SitGuruColors.textMuted,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
-    maxWidth: 260,
     textAlign: 'center',
   },
-  heroFloatingCard: {
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 22,
-    bottom: 14,
-    gap: 3,
-    left: 14,
-    padding: 14,
-    position: 'absolute',
-    right: 14,
-  },
-  heroFloatingTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  heroFloatingText: {
-    color: '#DCEFE2',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  stepsRail: {
+  stepRail: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
   stepPill: {
-    alignItems: 'center',
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 11,
   },
   stepPillActive: {
     backgroundColor: SitGuruColors.primary,
     borderColor: SitGuruColors.primary,
-  },
-  stepPillComplete: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-  },
-  stepPillNumber: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  stepPillNumberActive: {
-    color: '#FFFFFF',
   },
   stepPillText: {
     color: SitGuruColors.text,
@@ -1870,7 +1156,7 @@ const styles = StyleSheet.create({
   stepPillTextActive: {
     color: '#FFFFFF',
   },
-  activeStepPanel: {
+  activePanel: {
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.primaryLight,
     borderRadius: 30,
@@ -1889,7 +1175,6 @@ const styles = StyleSheet.create({
     color: SitGuruColors.primary,
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   stepTitle: {
@@ -1898,319 +1183,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: -0.7,
     lineHeight: 34,
-    marginTop: 2,
   },
   stepBadge: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  stepBadgeText: {
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  stepDescription: {
-    color: SitGuruColors.textMuted,
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  stepBody: {
-    gap: 12,
-  },
-  petGrid: {
-    gap: 10,
-  },
-  petCard: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    padding: 14,
-  },
-  petCardActive: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-  },
-  petAvatar: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 54,
-    justifyContent: 'center',
-    width: 54,
-  },
-  petAvatarActive: {
-    borderColor: SitGuruColors.primary,
-  },
-  petAvatarText: {
-    fontSize: 26,
-  },
-  petCardCopy: {
-    flex: 1,
-    gap: 3,
-  },
-  petName: {
-    color: SitGuruColors.text,
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  petNameActive: {
-    color: SitGuruColors.primary,
-  },
-  petDetails: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  petDetailsActive: {
-    color: SitGuruColors.text,
-  },
-  petSelectText: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  petSelectTextActive: {
-    color: SitGuruColors.primary,
-  },
-  additionalPetsPanel: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    gap: 12,
-    padding: 14,
-  },
-  counterRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  counterButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 52,
-    justifyContent: 'center',
-    width: 52,
-  },
-  counterButtonText: {
-    color: SitGuruColors.primary,
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  counterValue: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 2,
-  },
-  counterValueText: {
-    color: SitGuruColors.text,
-    fontSize: 26,
-    fontWeight: '900',
-  },
-  counterValueLabel: {
-    color: SitGuruColors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  counterHelper: {
-    color: SitGuruColors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  discountPanel: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 22,
-    borderWidth: 1,
-    gap: 10,
-    padding: 14,
-  },
-  discountToggle: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    minHeight: 48,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  discountToggleActive: {
-    backgroundColor: SitGuruColors.primary,
-    borderColor: SitGuruColors.primary,
-  },
-  discountToggleText: {
-    color: SitGuruColors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  discountToggleTextActive: {
-    color: '#FFFFFF',
-  },
-  infoCard: {
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 24,
-    gap: 6,
-    padding: 16,
-  },
-  infoCardTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  infoCardText: {
-    color: '#DCEFE2',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-  },
-  serviceGrid: {
-    gap: 10,
-  },
-  serviceCard: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    gap: 8,
-    padding: 14,
-  },
-  serviceCardActive: {
-    backgroundColor: SitGuruColors.primary,
-    borderColor: SitGuruColors.primary,
-  },
-  serviceTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  serviceTitle: {
-    color: SitGuruColors.text,
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  serviceTitleActive: {
-    color: '#FFFFFF',
-  },
-  serviceDuration: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  serviceDurationActive: {
-    color: '#DCEFE2',
-  },
-  serviceDetail: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-  },
-  serviceDetailActive: {
-    color: '#DCEFE2',
-  },
-  serviceBestFor: {
-    color: SitGuruColors.text,
-    fontSize: 12,
-    fontWeight: '900',
-    lineHeight: 18,
-  },
-  serviceBestForActive: {
-    color: '#FFFFFF',
-  },
-  stickyEstimateCard: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 24,
-    borderWidth: 1,
-    elevation: 3,
-    flexDirection: 'row',
-    gap: 14,
-    padding: 14,
-  },
-  stickyEstimateLabel: {
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-  },
-  stickyEstimateValue: {
-    color: SitGuruColors.text,
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-    lineHeight: 34,
-  },
-  stickyEstimateCopy: {
-    flex: 1,
-    gap: 3,
-  },
-  stickyEstimateTitle: {
-    color: SitGuruColors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  stickyEstimateText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  priceCard: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 24,
-    borderWidth: 1,
-    elevation: 2,
-    gap: 12,
-    padding: 16,
-  },
-  priceHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  priceEyebrow: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-  },
-  priceTotal: {
-    color: SitGuruColors.text,
-    fontSize: 34,
-    fontWeight: '900',
-    letterSpacing: -1,
-    lineHeight: 39,
-  },
-  priceBadge: {
     backgroundColor: SitGuruColors.surfaceSoft,
     borderColor: SitGuruColors.primaryLight,
     borderRadius: 999,
@@ -2223,7 +1197,121 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     textTransform: 'uppercase',
   },
-  priceRows: {
+  stepDescription: {
+    color: SitGuruColors.textMuted,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  stepBody: {
+    gap: 12,
+  },
+  serviceRail: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  servicePill: {
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  servicePillActive: {
+    backgroundColor: SitGuruColors.primary,
+    borderColor: SitGuruColors.primary,
+  },
+  servicePillText: {
+    color: SitGuruColors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  servicePillTextActive: {
+    color: '#FFFFFF',
+  },
+  editorPanel: {
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 10,
+    padding: 16,
+  },
+  editorEyebrow: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  editorTitle: {
+    color: SitGuruColors.text,
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    lineHeight: 27,
+  },
+  editorText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+  },
+  formGrid: {
+    gap: 12,
+  },
+  formGridWide: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  fieldWrap: {
+    flex: 1,
+    gap: 7,
+    minWidth: 180,
+  },
+  fieldLabel: {
+    color: SitGuruColors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  input: {
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    color: SitGuruColors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    minHeight: 52,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  multilineInput: {
+    minHeight: 110,
+    textAlignVertical: 'top',
+  },
+  previewPanel: {
+    backgroundColor: SitGuruColors.primaryDark,
+    borderRadius: 28,
+    gap: 12,
+    padding: 18,
+  },
+  previewEyebrow: {
+    color: '#C9F26D',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  previewTitle: {
+    color: '#FFFFFF',
+    fontSize: 30,
+    fontWeight: '900',
+    lineHeight: 35,
+  },
+  previewRows: {
     gap: 8,
   },
   priceRow: {
@@ -2270,55 +1358,12 @@ const styles = StyleSheet.create({
     color: SitGuruColors.primary,
     fontSize: 13,
     fontWeight: '900',
-    textAlign: 'right',
   },
-  priceDisclaimer: {
-    color: SitGuruColors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  calendarSummaryPanel: {
-    alignItems: 'flex-start',
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 24,
-    gap: 12,
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  calendarEyebrow: {
-    color: '#C9F26D',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-  },
-  calendarTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    lineHeight: 27,
-    marginTop: 3,
-  },
-  calendarText: {
+  previewNote: {
     color: '#DCEFE2',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 21,
-    marginTop: 4,
-  },
-  calendarBadge: {
-    backgroundColor: '#C9F26D',
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-  },
-  calendarBadgeText: {
-    color: SitGuruColors.text,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
+    lineHeight: 19,
   },
   calendarPanel: {
     backgroundColor: SitGuruColors.background,
@@ -2329,30 +1374,16 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   calendarHeader: {
-    alignItems: 'flex-start',
-    gap: 12,
+    gap: 10,
   },
-  calendarHeaderCopy: {
-    gap: 3,
-  },
-  calendarHeaderTitle: {
+  calendarTitle: {
     color: SitGuruColors.text,
     fontSize: 22,
     fontWeight: '900',
-    letterSpacing: -0.5,
-    lineHeight: 27,
-  },
-  calendarHeaderText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
   },
   monthControls: {
-    alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
-    width: '100%',
   },
   monthButton: {
     alignItems: 'center',
@@ -2360,86 +1391,26 @@ const styles = StyleSheet.create({
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
+    flex: 1,
     height: 52,
     justifyContent: 'center',
-    width: 52,
   },
   monthButtonText: {
     color: SitGuruColors.primary,
-    fontSize: 30,
-    fontWeight: '900',
-    lineHeight: 34,
-  },
-  todayButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 999,
-    borderWidth: 1,
-    flex: 1,
-    height: 52,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  todayButtonText: {
-    color: SitGuruColors.primary,
-    fontSize: 14,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  rangeGuidePanel: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    flexDirection: 'row',
-    padding: 12,
-  },
-  rangeGuideStep: {
-    flex: 1,
-    gap: 2,
-  },
-  rangeGuideLabel: {
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  rangeGuideValue: {
-    color: SitGuruColors.text,
-    fontSize: 15,
+    fontSize: 28,
     fontWeight: '900',
   },
-  rangeGuideDivider: {
-    backgroundColor: SitGuruColors.border,
-    height: 34,
-    marginHorizontal: 10,
-    width: 1,
-  },
-  calendarLegend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  legendText: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
+  calendarHelp: {
     color: SitGuruColors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    overflow: 'hidden',
-    paddingHorizontal: 9,
-    paddingVertical: 6,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
   },
-  weekdayHeader: {
+  weekdayRow: {
     flexDirection: 'row',
     gap: 6,
   },
-  weekdayHeaderText: {
+  weekdayText: {
     color: SitGuruColors.text,
     flex: 1,
     fontSize: 13,
@@ -2449,7 +1420,7 @@ const styles = StyleSheet.create({
   calendarWeeks: {
     gap: 6,
   },
-  calendarWeekRow: {
+  calendarWeek: {
     flexDirection: 'row',
     gap: 6,
   },
@@ -2464,22 +1435,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
     paddingVertical: 8,
   },
-  dateCellOutsideMonth: {
+  dateOutsideMonth: {
     opacity: 0.42,
   },
-  dateCellToday: {
+  dateToday: {
     borderColor: SitGuruColors.primary,
     borderWidth: 2,
   },
-  dateCellSelected: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-  },
-  dateCellEndpoint: {
+  dateSelected: {
     backgroundColor: SitGuruColors.primary,
     borderColor: SitGuruColors.primary,
   },
-  dateCellUnavailable: {
+  dateBusy: {
     backgroundColor: '#F4F0EC',
     borderColor: '#E2D7CC',
     opacity: 0.62,
@@ -2488,7 +1455,6 @@ const styles = StyleSheet.create({
     color: SitGuruColors.text,
     fontSize: 20,
     fontWeight: '900',
-    lineHeight: 24,
   },
   datePrice: {
     color: SitGuruColors.primary,
@@ -2504,172 +1470,122 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
   },
-  dateTodayLabel: {
-    color: SitGuruColors.primary,
-    fontSize: 8,
-    fontWeight: '900',
-    marginTop: 2,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  dateRangeLabelSelected: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: '900',
-    marginTop: 2,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
   dateTextSelected: {
     color: '#FFFFFF',
   },
-  dateTextUnavailable: {
+  dateTextMuted: {
     color: SitGuruColors.textSoft,
   },
-  choiceSection: {
-    gap: 9,
+  dayRulePanel: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 10,
+    padding: 16,
   },
-  choiceSectionTitle: {
-    color: SitGuruColors.text,
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  choiceGrid: {
+  ruleGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  choicePill: {
+  ruleButton: {
+    alignItems: 'center',
     backgroundColor: SitGuruColors.background,
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
-    minHeight: 44,
+    minHeight: 46,
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
   },
-  choicePillActive: {
+  ruleButtonDanger: {
+    backgroundColor: '#FFF1F0',
+    borderColor: 'rgba(180, 35, 24, 0.18)',
+  },
+  ruleButtonText: {
+    color: SitGuruColors.primary,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  ruleButtonDangerText: {
+    color: SitGuruColors.danger,
+  },
+  toggleCard: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+  },
+  toggleCardActive: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+  },
+  toggleDot: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  toggleDotActive: {
     backgroundColor: SitGuruColors.primary,
     borderColor: SitGuruColors.primary,
   },
-  choicePillText: {
-    color: SitGuruColors.text,
-    fontSize: 13,
+  toggleDotText: {
+    color: SitGuruColors.primary,
+    fontSize: 16,
     fontWeight: '900',
   },
-  choicePillTextActive: {
+  toggleDotTextActive: {
     color: '#FFFFFF',
   },
-  fieldWrap: {
-    gap: 7,
+  toggleCopy: {
+    flex: 1,
+    gap: 4,
   },
-  fieldLabel: {
+  toggleTitle: {
     color: SitGuruColors.text,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '900',
   },
-  input: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    color: SitGuruColors.text,
-    fontSize: 15,
-    fontWeight: '800',
-    minHeight: 52,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  toggleText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
   },
-  multilineInput: {
-    minHeight: 110,
-    textAlignVertical: 'top',
-  },
-  reviewPanel: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
+  summaryCard: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
     borderRadius: 24,
     borderWidth: 1,
-    overflow: 'hidden',
+    gap: 12,
+    padding: 16,
   },
-  reviewEyebrow: {
-    backgroundColor: SitGuruColors.primaryDark,
-    color: '#FFFFFF',
+  summaryEyebrow: {
+    color: SitGuruColors.primary,
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0.7,
-    padding: 14,
     textTransform: 'uppercase',
   },
-  reviewRow: {
-    borderBottomColor: SitGuruColors.border,
-    borderBottomWidth: 1,
-    gap: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  reviewLabel: {
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  reviewValue: {
+  summaryTitle: {
     color: SitGuruColors.text,
-    fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 20,
-  },
-  successPanel: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 28,
-    gap: 9,
-    padding: 18,
-  },
-  successIcon: {
-    color: '#C9F26D',
-    fontSize: 38,
+    fontSize: 22,
     fontWeight: '900',
+    lineHeight: 27,
   },
-  successTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.6,
-    lineHeight: 29,
-    textAlign: 'center',
+  summaryRows: {
+    gap: 8,
   },
-  successText: {
-    color: '#DCEFE2',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-    textAlign: 'center',
-  },
-  submitButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    justifyContent: 'center',
-    marginTop: 4,
-    minHeight: 52,
-    paddingHorizontal: 18,
-    width: '100%',
-  },
-  submitButtonText: {
-    color: SitGuruColors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  noticePanel: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 12,
-  },
-  noticeText: {
+  summaryNote: {
     color: SitGuruColors.textMuted,
     fontSize: 13,
     fontWeight: '700',
@@ -2695,21 +1611,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
   },
-  dockPrimaryAction: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primary,
-    borderRadius: 999,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 50,
-    paddingHorizontal: 16,
-  },
-  dockPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  dockSecondaryAction: {
+  dockSecondaryButton: {
     alignItems: 'center',
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.border,
@@ -2723,6 +1625,20 @@ const styles = StyleSheet.create({
   dockSecondaryText: {
     color: SitGuruColors.text,
     fontSize: 13,
+    fontWeight: '900',
+  },
+  dockPrimaryButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.primary,
+    borderRadius: 999,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 50,
+    paddingHorizontal: 16,
+  },
+  dockPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '900',
   },
 });
