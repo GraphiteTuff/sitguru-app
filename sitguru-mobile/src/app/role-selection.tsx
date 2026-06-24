@@ -13,9 +13,9 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 
 type RoleRoute =
-  | '/pet-parent-dashboard'
-  | '/guru-dashboard'
-  | '/ambassador-dashboard';
+  | '/pet-parent-setup'
+  | '/guru-setup'
+  | '/ambassador-setup';
 
 type RoleOption = {
   id: string;
@@ -35,9 +35,9 @@ const roleOptions: RoleOption[] = [
     eyebrow: 'Find Care',
     title: 'Pet Parent',
     description:
-      'Search trusted local Gurus, organize pet details, message before booking, and request care.',
-    actionLabel: 'Open Pet Parent',
-    route: '/pet-parent-dashboard',
+      'Set up your care profile, add pets, save care location details, and get ready to request trusted local care.',
+    actionLabel: 'Start Pet Parent Setup',
+    route: '/pet-parent-setup',
     icon: 'care',
     tone: 'primary',
     photoLabel: 'Pet Parent + pet photo',
@@ -47,9 +47,9 @@ const roleOptions: RoleOption[] = [
     eyebrow: 'Offer Care',
     title: 'Pet Guru',
     description:
-      'Manage your profile, service area, requests, bookings, visit updates, earnings, and availability.',
-    actionLabel: 'Open Guru',
-    route: '/guru-dashboard',
+      'Build your Guru profile, service area, services, availability, and readiness before appearing in search.',
+    actionLabel: 'Start Guru Setup',
+    route: '/guru-setup',
     icon: 'service',
     tone: 'warning',
     photoLabel: 'Guru care photo',
@@ -59,9 +59,9 @@ const roleOptions: RoleOption[] = [
     eyebrow: 'Grow Community',
     title: 'Ambassador',
     description:
-      'Share SitGuru, track referrals, complete training, view rewards, and support local growth.',
-    actionLabel: 'Open Ambassador',
-    route: '/ambassador-dashboard',
+      'Prepare your referral tools, training path, outreach basics, rewards, and support access.',
+    actionLabel: 'Start Ambassador Setup',
+    route: '/ambassador-setup',
     icon: 'community',
     tone: 'danger',
     photoLabel: 'Community photo',
@@ -70,16 +70,16 @@ const roleOptions: RoleOption[] = [
 
 const quickActions = [
   {
+    label: 'Profiles',
+    description: 'Set up the information each role needs before daily use.',
+  },
+  {
     label: 'Messages',
-    description: 'Start with a conversation before care is booked.',
+    description: 'Start with conversations before care is booked.',
   },
   {
     label: 'Bookings',
     description: 'Keep care requests, notes, and updates organized.',
-  },
-  {
-    label: 'Profiles',
-    description: 'Manage role details from one SitGuru account.',
   },
 ];
 
@@ -108,11 +108,11 @@ export default function RoleSelectionScreen() {
               <Text style={styles.heroBadgeText}>SitGuru One Access</Text>
             </View>
 
-            <Text style={styles.title}>Choose your SitGuru dashboard.</Text>
+            <Text style={styles.title}>Choose your SitGuru setup.</Text>
 
             <Text style={styles.subtitle}>
               One account can support Pet Parent, Pet Guru, and Ambassador
-              access. Choose where you want to go today.
+              access. Choose the role you want to set up first.
             </Text>
 
             <View style={styles.pathPreview}>
@@ -150,7 +150,7 @@ export default function RoleSelectionScreen() {
             <View style={styles.heroFloatingCard}>
               <Text style={styles.heroFloatingTitle}>One login</Text>
               <Text style={styles.heroFloatingText}>
-                Switch between registered roles.
+                Set up and switch between registered roles.
               </Text>
             </View>
           </View>
@@ -158,7 +158,7 @@ export default function RoleSelectionScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionEyebrow}>Your roles</Text>
-          <Text style={styles.sectionTitle}>Pick a dashboard.</Text>
+          <Text style={styles.sectionTitle}>Pick a setup path.</Text>
         </View>
 
         <View style={[styles.roleGrid, isWide && styles.roleGridWide]}>
@@ -198,7 +198,7 @@ export default function RoleSelectionScreen() {
 
         <View style={styles.quickPanel}>
           <Text style={styles.quickEyebrow}>Built for daily use</Text>
-          <Text style={styles.quickTitle}>Keep everything close to your thumb.</Text>
+          <Text style={styles.quickTitle}>Start clean. Use only what you need.</Text>
 
           <View style={styles.quickGrid}>
             {quickActions.map((item) => (
@@ -210,21 +210,40 @@ export default function RoleSelectionScreen() {
           </View>
         </View>
 
+        <View style={styles.openSearchPanel}>
+          <View style={styles.openSearchCopy}>
+            <Text style={styles.openSearchEyebrow}>Not ready to sign up?</Text>
+            <Text style={styles.openSearchTitle}>Browse care first.</Text>
+            <Text style={styles.openSearchText}>
+              You can search local Gurus by service and ZIP code before creating
+              an account.
+            </Text>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/find-care')}
+            style={styles.openSearchButton}
+          >
+            <Text style={styles.openSearchButtonText}>Find Care</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.bottomSpacer} />
       </View>
 
       <View style={styles.bottomDock}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/pet-parent-dashboard')}
+          onPress={() => router.push('/pet-parent-setup')}
           style={styles.dockPrimaryAction}
         >
-          <Text style={styles.dockPrimaryText}>Find Care</Text>
+          <Text style={styles.dockPrimaryText}>Pet Parent</Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/guru-dashboard')}
+          onPress={() => router.push('/guru-setup')}
           style={styles.dockButton}
         >
           <Text style={styles.dockButtonText}>Guru</Text>
@@ -232,7 +251,7 @@ export default function RoleSelectionScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/ambassador-dashboard')}
+          onPress={() => router.push('/ambassador-setup')}
           style={styles.dockButton}
         >
           <Text style={styles.dockButtonText}>Ambassador</Text>
@@ -491,6 +510,7 @@ const styles = StyleSheet.create({
   },
   roleActionText: {
     color: '#FFFFFF',
+    flex: 1,
     fontSize: 14,
     fontWeight: '900',
   },
@@ -541,13 +561,62 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
   },
+  openSearchPanel: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 30,
+    borderWidth: 1,
+    elevation: 3,
+    flexDirection: 'row',
+    gap: 14,
+    justifyContent: 'space-between',
+    padding: 18,
+  },
+  openSearchCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  openSearchEyebrow: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  openSearchTitle: {
+    color: SitGuruColors.text,
+    fontSize: 21,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+    lineHeight: 26,
+  },
+  openSearchText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  openSearchButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.primary,
+    borderRadius: 999,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 18,
+  },
+  openSearchButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+  },
   bottomSpacer: {
     height: 88,
   },
   bottomDock: {
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
     borderColor: SitGuruColors.border,
     borderRadius: 999,
     borderWidth: 1,
