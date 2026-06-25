@@ -131,6 +131,7 @@ const adminRoutes = {
   partners: "/admin/referrals/partners",
   applications: "/admin/referrals/applications",
   payouts: "/admin/referrals/payouts",
+  inventory: "/admin/referrals/inventory",
 };
 
 const programOptions = [
@@ -862,6 +863,14 @@ export default async function AdminReferralCommandCenter({
           </div>
 
           <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto">
+            <Link
+              href={adminRoutes.inventory}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-black text-amber-900 shadow-sm transition hover:bg-amber-100"
+            >
+              <Search size={17} />
+              Read-only Inventory
+            </Link>
+
             <a
               href="#generate-code"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
