@@ -495,8 +495,8 @@ function getGuruLocation(profile: GuruProfile | null) {
 
 function getGuruImage(profile: GuruProfile | null) {
   return (
-    profile?.profile_photo_url ||
     profile?.avatar_url ||
+    profile?.profile_photo_url ||
     profile?.image_url ||
     profile?.photo_url ||
     null

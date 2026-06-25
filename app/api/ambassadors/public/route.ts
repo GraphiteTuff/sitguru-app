@@ -45,12 +45,19 @@ function getFullName(row: Row) {
   );
 }
 
+function getAccountAvatarUrl(row: Row) {
+  return asString(row.account_avatar_url);
+}
+
 function getPhotoUrl(row: Row) {
   return (
+    getAccountAvatarUrl(row) ||
+    asString(row.ambassador_photo_url) ||
+    asString(row.ambassador_photo_path) ||
     asString(row.profile_photo_url) ||
+    asString(row.photo_url) ||
     asString(row.avatar_url) ||
     asString(row.image_url) ||
-    asString(row.photo_url) ||
     ""
   );
 }
@@ -204,9 +211,15 @@ function mergeRows(base: Row, incoming: Row): Row {
     state: getState(base) || getState(incoming),
     service_city: getServiceCity(base) || getServiceCity(incoming),
     service_state: getServiceState(base) || getServiceState(incoming),
-    profile_photo_url: getPhotoUrl(base) || getPhotoUrl(incoming),
-    avatar_url: asString(base.avatar_url) || asString(incoming.avatar_url),
-    image_url: asString(base.image_url) || asString(incoming.image_url),
+    account_avatar_url:
+      getAccountAvatarUrl(incoming) || getAccountAvatarUrl(base),
+    profile_photo_url: getPhotoUrl(incoming) || getPhotoUrl(base),
+    avatar_url: asString(incoming.avatar_url) || asString(base.avatar_url),
+    image_url: asString(incoming.image_url) || asString(base.image_url),
+    ambassador_photo_url:
+      asString(incoming.ambassador_photo_url) || asString(base.ambassador_photo_url),
+    ambassador_photo_path:
+      asString(incoming.ambassador_photo_path) || asString(base.ambassador_photo_path),
     referral_code: getReferralCode(base) || getReferralCode(incoming),
     ambassador_type: getAmbassadorType(base) || getAmbassadorType(incoming),
     bio: getBio(base) || getBio(incoming),
@@ -227,6 +240,8 @@ async function safeRows(tableName: string) {
 
     return ((data || []) as Row[]).map((row) => ({
       ...row,
+      account_avatar_url:
+        tableName === "profiles" ? asString(row.avatar_url) : asString(row.account_avatar_url),
       __source_table: tableName,
     }));
   } catch (error) {
