@@ -351,14 +351,14 @@ export default async function ReferralInventoryPage() {
               <p className="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-200">
                 <ShieldCheck className="h-4 w-4" /> Admin-only read-only cleanup report
               </p>
-              <h1 className="mt-5 text-4xl font-black tracking-tight">Referral inventory report</h1>
+              <h1 className="mt-5 text-4xl font-black tracking-tight">PawPerks referral inventory report</h1>
               <p className="mt-4 text-lg text-slate-200">
-                This is a read-only cleanup report. It does not change referral codes, signup behavior, generation behavior, payouts, or referral program operations. Use it to prepare the future one-code-per-account referral system.
+                This is a read-only PawPerks cleanup report. It does not change referral codes, signup behavior, generation behavior, payouts, or referral program operations. PawPerks is SitGuru’s branded referral/rewards program for Pet Parents, Gurus, Ambassadors, and multi-role accounts; PetPerks appears here only as a legacy/alternate label where existing tables or code already use it. Use this report to prepare SitGuru for the future one-code-per-account PawPerks system.
               </p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/10 p-5 text-sm text-slate-100">
               <p className="font-black uppercase tracking-wide text-emerald-200">Sources read</p>
-              <p className="mt-3">referral_profiles, ambassadors, referral_codes, guru_referral_campaigns, and referral_activity.</p>
+              <p className="mt-3">referral_profiles, ambassadors, referral_codes, guru_referral_campaigns, and referral_activity. Reads are inventory-only; no database rows are inserted, updated, or deleted.</p>
             </div>
           </div>
         </section>
@@ -376,10 +376,26 @@ export default async function ReferralInventoryPage() {
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <StatCard title="Profiles scanned" value={inventory.profiles.length} detail="Rows from referral_profiles." icon={Users} />
-          <StatCard title="Codes found" value={inventory.allCodes.length} detail="Codes across all inventory sources." icon={Link2} />
+          <StatCard title="Codes found" value={inventory.allCodes.length} detail="Existing PawPerks/PetPerks codes across all inventory sources." icon={Link2} />
           <StatCard title="No code" value={inventory.profilesWithNoCode.length} detail="Profiles without a detected code." icon={UserRoundX} />
           <StatCard title="Multiple codes" value={inventory.profilesWithMultipleCodes.length} detail="Profiles with more than one unique code." icon={Copy} />
           <StatCard title="Duplicate codes" value={inventory.duplicateCodes.length} detail="Code strings shared by different owners." icon={AlertTriangle} />
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="flex items-center gap-2 text-2xl font-black"><Users className="h-6 w-6 text-emerald-600" /> All scanned PawPerks profiles and detected codes</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Inventory view of referral_profiles with any matched code from referral_profiles, ambassadors, referral_codes, or guru_referral_campaigns.
+          </p>
+          <InventoryTable rows={inventory.profiles.slice(0, 250)} empty="No referral_profiles rows were available to scan." />
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="flex items-center gap-2 text-2xl font-black"><Link2 className="h-6 w-6 text-blue-600" /> All detected PawPerks/PetPerks code records</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Read-only list of referral code strings found directly in referral_profiles, ambassadors, referral_codes, and guru_referral_campaigns, including available owner and role context.
+          </p>
+          <CodeSourceTable rows={inventory.allCodes.slice(0, 250)} />
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -448,6 +464,29 @@ function InventoryTable({ rows, empty }: { rows: ProfileInventory[]; empty: stri
               <td className="py-3 pr-4"><CodeBadges codes={profile.codes} /></td>
             </tr>
           )) : <tr><td colSpan={4} className="py-6 text-slate-500">{empty}</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
+function CodeSourceTable({ rows }: { rows: CodeSource[] }) {
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="min-w-full text-left text-sm">
+        <thead className="text-xs uppercase text-slate-500"><tr><th className="py-3 pr-4">Code</th><th className="py-3 pr-4">Source</th><th className="py-3 pr-4">Role context</th><th className="py-3 pr-4">Owner</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Created</th></tr></thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.length ? rows.map((code) => (
+            <tr key={`${code.source}:${code.sourceId}:${code.normalizedCode}`} className="align-top">
+              <td className="py-3 pr-4 font-black text-slate-950">{code.code}</td>
+              <td className="py-3 pr-4 text-slate-700">{code.source}</td>
+              <td className="py-3 pr-4 text-slate-700">{code.roleContext || code.ownerType || "Unknown"}</td>
+              <td className="py-3 pr-4 text-slate-700"><p>{code.ownerName || code.ownerId || "Unresolved owner"}</p><p className="text-xs text-slate-500">{code.ownerEmail || code.ownerId || "—"}</p></td>
+              <td className="py-3 pr-4 text-slate-700">{code.status || "—"}</td>
+              <td className="py-3 pr-4 text-slate-500">{code.createdAt || "—"}</td>
+            </tr>
+          )) : <tr><td colSpan={6} className="py-6 text-slate-500">No code records were detected in the scanned source tables.</td></tr>}
         </tbody>
       </table>
     </div>
