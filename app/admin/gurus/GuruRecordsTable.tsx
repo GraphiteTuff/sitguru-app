@@ -10,7 +10,9 @@ import {
   Settings,
   SlidersHorizontal,
   X,
+  AlertTriangle,
 } from "lucide-react";
+import { emailFallback, fallbackInitials } from "@/lib/sitguru/display";
 
 type ApplicationStatus =
   | "new"
@@ -29,6 +31,7 @@ type GuruDisplayRow = {
   guruUserId?: string;
   name: string;
   email: string;
+  phone?: string;
   avatarUrl: string;
   slug: string;
   services: string;
@@ -49,6 +52,8 @@ type GuruDisplayRow = {
   href: string;
   publicHref: string;
   messageHref?: string;
+  inferredFromFallback?: boolean;
+  recordSourceLabel?: string;
   bookingCount?: number;
   totalBookings?: number;
   earnings?: number;
@@ -84,15 +89,6 @@ function asNumber(value: unknown) {
   }
 
   return 0;
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 }
 
 function getSafeAdminHref(guru: GuruDisplayRow) {
@@ -263,12 +259,20 @@ function sortGurusForRegistry(gurus: GuruDisplayRow[]) {
   });
 }
 
-function Avatar({ name, src }: { name: string; src?: string }) {
+function Avatar({
+  name,
+  email,
+  src,
+}: {
+  name: string;
+  email?: string;
+  src?: string;
+}) {
   if (src) {
     return <img alt="" src={src} className="h-full w-full object-cover" />;
   }
 
-  return <>{getInitials(name) || "G"}</>;
+  return <>{fallbackInitials(name, email, "G")}</>;
 }
 
 export default function GuruRecordsTable({
@@ -297,9 +301,9 @@ export default function GuruRecordsTable({
             Click into each Guru view
           </h2>
           <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-            View each Guru through their dashboard view, public profile, or admin
-            cleanup controls. Public profile previews are customer-facing. Admin
-            cleanup controls are updatable.
+            View each Guru through their dashboard view, public profile, or
+            admin cleanup controls. Public profile previews are customer-facing.
+            Admin cleanup controls are updatable.
           </p>
         </div>
 
@@ -421,7 +425,11 @@ export default function GuruRecordsTable({
                   <div className="min-w-0">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-green-800 text-sm font-black text-white">
-                        <Avatar name={guru.name} src={guru.avatarUrl} />
+                        <Avatar
+                          name={guru.name}
+                          email={guru.email}
+                          src={guru.avatarUrl}
+                        />
                       </div>
 
                       <div className="min-w-0">
@@ -429,8 +437,17 @@ export default function GuruRecordsTable({
                           {guru.name}
                         </p>
                         <p className="truncate text-xs font-bold text-slate-500">
-                          {guru.email || "No email on Guru profile yet"}
+                          {emailFallback(
+                            guru.email,
+                            "No email on Guru profile yet",
+                          )}
                         </p>
+                        {guru.inferredFromFallback ? (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-amber-800">
+                            <AlertTriangle size={11} />
+                            {guru.recordSourceLabel || "Fallback record"}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
