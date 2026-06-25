@@ -857,8 +857,8 @@ export default async function AdminReferralCommandCenter({
 
             <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
               Generate, issue, update, archive, and track referral codes across
-              Gurus, Pet Parents, Ambassadors, Partners, PetPerks, campaigns,
-              events, signups, bookings, and payout accountability.
+              Gurus, Pet Parents, Ambassadors, Partners, PetPerks legacy records,
+              campaigns, events, signups, bookings, and payout accountability.
             </p>
           </div>
 
@@ -868,7 +868,7 @@ export default async function AdminReferralCommandCenter({
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-black text-amber-900 shadow-sm transition hover:bg-amber-100"
             >
               <Search size={17} />
-              Read-only Inventory
+              PawPerks Inventory
             </Link>
 
             <a
