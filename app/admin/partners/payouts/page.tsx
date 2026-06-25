@@ -12,6 +12,7 @@ import {
   RefreshCcw,
   ShieldAlert,
   ShieldCheck,
+  UserCheck,
   WalletCards,
   XCircle,
 } from "lucide-react";
@@ -60,6 +61,184 @@ type PartnerPayout = {
   created_at: string;
   updated_at: string;
 };
+
+
+type StripeReadinessRecord = {
+  id: string;
+  role: "Guru" | "Ambassador";
+  name: string;
+  email: string;
+  stripeAccountId: string | null;
+  onboardingComplete: boolean | null;
+  payoutsEnabled: boolean | null;
+  chargesEnabled: boolean | null;
+  disabledReason: string | null;
+  requirementsDue: number;
+  latestPaymentMethod: string | null;
+  payoutCount: number;
+  exceptionCount: number;
+  missingReferenceCount: number;
+  needsAdminReview: boolean;
+  reviewReasons: string[];
+};
+
+type ReadinessCounts = {
+  stripeReady: number;
+  stripeOnboardingStarted: number;
+  stripeRestricted: number;
+  noStripeAccount: number;
+  existingNonStripeMethods: number;
+  missingPayoutReference: number;
+  needsAdminReview: number;
+};
+
+type SourceRow = Record<string, unknown>;
+
+const STRIPE_METHOD_VALUES = new Set(["stripe", "stripe_connect", "connect", "stripe transfer", "stripe_transfer"]);
+
+function asText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function asBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.toLowerCase().trim();
+    if (["true", "yes", "1", "enabled", "complete", "completed"].includes(normalized)) return true;
+    if (["false", "no", "0", "disabled", "incomplete"].includes(normalized)) return false;
+  }
+  if (typeof value === "number") return value === 1;
+  return null;
+}
+
+function getAccountId(row: SourceRow) {
+  return asText(row.stripe_account_id) || asText(row.stripe_connect_account_id);
+}
+
+function getPayoutReference(payout: PartnerPayout) {
+  return (
+    asText(payout.transaction_reference) ||
+    asText(payout.accounting_reference) ||
+    asText(payout.payout_batch_id)
+  );
+}
+
+function isNonStripePaymentMethod(value: string | null | undefined) {
+  if (!value) return false;
+  return !STRIPE_METHOD_VALUES.has(value.toLowerCase().trim());
+}
+
+function buildReadinessRecords(
+  gurus: SourceRow[],
+  ambassadors: SourceRow[],
+  payouts: PartnerPayout[]
+) {
+  const payoutsByAmbassador = new Map<string, PartnerPayout[]>();
+
+  for (const payout of payouts) {
+    if (payout.ambassador_id) {
+      const existing = payoutsByAmbassador.get(payout.ambassador_id) ?? [];
+      existing.push(payout);
+      payoutsByAmbassador.set(payout.ambassador_id, existing);
+    }
+  }
+
+  const buildRecord = (row: SourceRow, role: "Guru" | "Ambassador"): StripeReadinessRecord => {
+    const id = asText(row.id) || `${role.toLowerCase()}-unknown`;
+    const accountId = getAccountId(row);
+    const onboardingComplete =
+      asBoolean(row.stripe_onboarding_complete) ?? asBoolean(row.onboarding_complete);
+    const payoutsEnabled =
+      asBoolean(row.payouts_enabled) ??
+      asBoolean(row.stripe_payouts_enabled) ??
+      asBoolean(row.stripe_payouts_enabled_at);
+    const chargesEnabled =
+      asBoolean(row.charges_enabled) ?? asBoolean(row.stripe_charges_enabled);
+    const disabledReason = asText(row.stripe_disabled_reason);
+    const requirementsDue = Array.isArray(row.stripe_requirements_currently_due)
+      ? row.stripe_requirements_currently_due.length
+      : Number(row.stripe_requirements_currently_due_count || 0);
+    const relatedPayouts = role === "Ambassador" ? payoutsByAmbassador.get(id) ?? [] : [];
+    const latestPaymentMethod = relatedPayouts.find((payout) => payout.payment_method)?.payment_method || null;
+    const exceptionCount = relatedPayouts.filter((payout) =>
+      payout.payment_status === "exception" || payout.payment_status === "failed" || Boolean(payout.exception_reason)
+    ).length;
+    const missingReferenceCount = relatedPayouts.filter((payout) => !getPayoutReference(payout)).length;
+    const reviewReasons = [
+      !accountId ? "No Stripe account" : null,
+      accountId && onboardingComplete !== true ? "Stripe onboarding incomplete" : null,
+      accountId && payoutsEnabled !== true ? "Payouts disabled or unknown" : null,
+      accountId && chargesEnabled !== true ? "Charges disabled or unknown" : null,
+      disabledReason || requirementsDue > 0 ? "Stripe restricted or missing setup" : null,
+      latestPaymentMethod && isNonStripePaymentMethod(latestPaymentMethod) ? `Existing ${latestPaymentMethod} method` : null,
+      exceptionCount > 0 ? "Payout exception" : null,
+      missingReferenceCount > 0 ? "Missing payout reference" : null,
+    ].filter(Boolean) as string[];
+
+    return {
+      id,
+      role,
+      name:
+        asText(row.display_name) ||
+        asText(row.full_name) ||
+        asText(row.name) ||
+        asText(row.business_name) ||
+        "Unnamed recipient",
+      email: asText(row.email) || asText(row.contact_email) || "No email saved",
+      stripeAccountId: accountId,
+      onboardingComplete,
+      payoutsEnabled,
+      chargesEnabled,
+      disabledReason,
+      requirementsDue,
+      latestPaymentMethod,
+      payoutCount: relatedPayouts.length,
+      exceptionCount,
+      missingReferenceCount,
+      needsAdminReview: reviewReasons.length > 0,
+      reviewReasons,
+    };
+  };
+
+  return [
+    ...gurus.map((guru) => buildRecord(guru, "Guru")),
+    ...ambassadors.map((ambassador) => buildRecord(ambassador, "Ambassador")),
+  ].sort((a, b) => Number(b.needsAdminReview) - Number(a.needsAdminReview) || a.name.localeCompare(b.name));
+}
+
+function buildReadinessCounts(records: StripeReadinessRecord[], payouts: PartnerPayout[]): ReadinessCounts {
+  const nonStripeMethods = new Set(
+    payouts.map((payout) => payout.payment_method).filter((method): method is string => isNonStripePaymentMethod(method))
+  );
+
+  return {
+    stripeReady: records.filter(
+      (record) => record.stripeAccountId && record.onboardingComplete === true && record.payoutsEnabled === true && record.chargesEnabled === true && !record.disabledReason && record.requirementsDue === 0
+    ).length,
+    stripeOnboardingStarted: records.filter(
+      (record) => record.stripeAccountId && record.onboardingComplete !== true && !record.disabledReason
+    ).length,
+    stripeRestricted: records.filter(
+      (record) => record.stripeAccountId && (record.payoutsEnabled !== true || record.disabledReason || record.requirementsDue > 0)
+    ).length,
+    noStripeAccount: records.filter((record) => !record.stripeAccountId).length,
+    existingNonStripeMethods: nonStripeMethods.size,
+    missingPayoutReference: payouts.filter((payout) => !getPayoutReference(payout)).length,
+    needsAdminReview: records.filter((record) => record.needsAdminReview).length,
+  };
+}
+
+function readinessBadgeClasses(value: boolean | null) {
+  if (value === true) return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (value === false) return "border-red-200 bg-red-50 text-red-800";
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function readinessLabel(value: boolean | null, trueLabel = "Enabled", falseLabel = "Disabled") {
+  if (value === true) return trueLabel;
+  if (value === false) return falseLabel;
+  return "Unknown";
+}
 
 type PartnerReward = {
   id: string;
@@ -235,7 +414,7 @@ async function updatePayoutStatusAction(formData: FormData) {
 export default async function AdminPartnerPayoutsPage() {
   const supabase = await createClient();
 
-  const [payoutResponse, rewardResponse] = await Promise.all([
+  const [payoutResponse, rewardResponse, guruResponse, ambassadorResponse] = await Promise.all([
     supabase
       .from("partner_payouts")
       .select("*")
@@ -246,13 +425,35 @@ export default async function AdminPartnerPayoutsPage() {
         "id, partner_id, ambassador_id, affiliate_id, campaign_id, reward_amount, currency, status, payout_batch_id, created_at"
       )
       .order("created_at", { ascending: false }),
+    supabase.from("gurus").select("*").order("created_at", { ascending: false }),
+    supabase.from("ambassadors").select("*").order("created_at", { ascending: false }),
   ]);
 
   const payouts = (payoutResponse.data ?? []) as PartnerPayout[];
   const rewards = (rewardResponse.data ?? []) as PartnerReward[];
+  const gurus = (guruResponse.data ?? []) as SourceRow[];
+  const ambassadors = (ambassadorResponse.data ?? []) as SourceRow[];
 
   const payoutError = payoutResponse.error;
   const rewardError = rewardResponse.error;
+  const readinessError = guruResponse.error || ambassadorResponse.error;
+  const readinessRecords = buildReadinessRecords(gurus, ambassadors, payouts);
+  const readinessCounts = buildReadinessCounts(readinessRecords, payouts);
+  const nonStripePaymentMethods = Array.from(
+    new Set(
+      payouts
+        .map((payout) => payout.payment_method)
+        .filter((method): method is string => isNonStripePaymentMethod(method))
+    )
+  ).sort();
+  const payoutReviewRows = payouts.filter(
+    (payout) =>
+      payout.payment_status === "exception" ||
+      payout.payment_status === "failed" ||
+      Boolean(payout.exception_reason) ||
+      !getPayoutReference(payout) ||
+      isNonStripePaymentMethod(payout.payment_method)
+  );
 
   const pendingCount = payouts.filter(
     (payout) => payout.payment_status === "pending"
@@ -428,6 +629,144 @@ export default async function AdminPartnerPayoutsPage() {
             </pre>
           </section>
         ) : null}
+
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
+                <UserCheck className="h-6 w-6" />
+              </div>
+              <p className="mt-5 text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+                Admin-only payout operations
+              </p>
+              <h2 className="mt-2 text-3xl font-black leading-tight text-[#17382B] sm:text-4xl">
+                Payout Method Readiness
+              </h2>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
+                Read-only visibility into Guru and Ambassador Stripe Connect readiness,
+                existing partner payout payment methods, payout exceptions, and rows
+                that may need finance review before any backup payout decision.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-amber-950 lg:max-w-md">
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-amber-800">
+                Admin policy guardrails
+              </p>
+              <ul className="mt-3 space-y-2 text-sm font-bold leading-6">
+                <li>Pet Parent payments must stay inside SitGuru checkout.</li>
+                <li>Backup payout methods are for admin-approved SitGuru-to-Guru/Ambassador payouts only.</li>
+                <li>Do not expose PayPal, Venmo, Cash App, Zelle, or direct payment handles to Pet Parents.</li>
+              </ul>
+            </div>
+          </div>
+
+          {readinessError ? (
+            <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+              <h3 className="text-lg font-black">Readiness data partially unavailable</h3>
+              <p className="mt-2 text-sm font-semibold leading-6">
+                The payouts page loaded, but Guru or Ambassador Stripe readiness rows could not be read.
+              </p>
+              <pre className="mt-4 overflow-auto rounded-2xl bg-white p-4 text-xs font-bold text-amber-900">
+                {readinessError.message}
+              </pre>
+            </div>
+          ) : null}
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["Stripe ready", readinessCounts.stripeReady, "Onboarding, charges, and payouts enabled."],
+              ["Stripe onboarding started", readinessCounts.stripeOnboardingStarted, "Stripe account exists but setup is not complete."],
+              ["Restricted / payouts disabled", readinessCounts.stripeRestricted, "Payouts disabled, setup missing, or restricted."],
+              ["No Stripe account", readinessCounts.noStripeAccount, "No Connect account ID saved."],
+              ["Non-Stripe/manual methods", readinessCounts.existingNonStripeMethods, "Distinct existing partner_payouts.payment_method values."],
+              ["Missing payout reference", readinessCounts.missingPayoutReference, "Rows lacking transaction, accounting, or batch reference."],
+              ["Needs admin review", readinessCounts.needsAdminReview, "Guru/Ambassador records with readiness issues."],
+              ["Payout rows to review", payoutReviewRows.length, "Exception, missing-reference, or non-Stripe method rows."],
+            ].map(([label, value, description]) => (
+              <div key={String(label)} className="rounded-3xl border border-emerald-100 bg-[#FBFCF8] p-5">
+                <p className="text-sm font-black text-emerald-900">{label}</p>
+                <p className="mt-3 text-4xl font-black leading-none text-[#17382B]">{value}</p>
+                <p className="mt-4 text-sm font-semibold leading-6 text-slate-700">{description}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
+            <div className="overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white">
+              <div className="border-b border-emerald-100 bg-[#FBFCF8] p-5">
+                <h3 className="text-xl font-black text-[#17382B]">Guru / Ambassador Stripe readiness</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                  Displays saved Connect IDs and readiness flags only; this does not call Stripe or alter transfers.
+                </p>
+              </div>
+              <div className="max-h-[520px] overflow-auto">
+                <table className="min-w-full divide-y divide-emerald-100 text-left text-sm">
+                  <thead className="bg-white text-xs font-black uppercase tracking-wide text-emerald-700">
+                    <tr>
+                      <th className="px-4 py-3">Recipient</th>
+                      <th className="px-4 py-3">Stripe account</th>
+                      <th className="px-4 py-3">Onboarding</th>
+                      <th className="px-4 py-3">Payouts</th>
+                      <th className="px-4 py-3">Charges</th>
+                      <th className="px-4 py-3">Review</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-emerald-100">
+                    {readinessRecords.slice(0, 75).map((record) => (
+                      <tr key={`${record.role}-${record.id}`} className="align-top">
+                        <td className="px-4 py-4">
+                          <p className="font-black text-[#17382B]">{record.name}</p>
+                          <p className="mt-1 text-xs font-bold text-slate-600">{record.role} · {record.email}</p>
+                        </td>
+                        <td className="px-4 py-4 font-bold text-slate-700">
+                          {record.stripeAccountId || "No Stripe account"}
+                          {record.disabledReason ? <p className="mt-1 text-xs text-red-700">{record.disabledReason}</p> : null}
+                          {record.requirementsDue > 0 ? <p className="mt-1 text-xs text-amber-700">{record.requirementsDue} requirements due</p> : null}
+                        </td>
+                        <td className="px-4 py-4"><span className={`rounded-full border px-3 py-1 text-xs font-black ${readinessBadgeClasses(record.onboardingComplete)}`}>{readinessLabel(record.onboardingComplete, "Complete", "Incomplete")}</span></td>
+                        <td className="px-4 py-4"><span className={`rounded-full border px-3 py-1 text-xs font-black ${readinessBadgeClasses(record.payoutsEnabled)}`}>{readinessLabel(record.payoutsEnabled)}</span></td>
+                        <td className="px-4 py-4"><span className={`rounded-full border px-3 py-1 text-xs font-black ${readinessBadgeClasses(record.chargesEnabled)}`}>{readinessLabel(record.chargesEnabled)}</span></td>
+                        <td className="px-4 py-4 text-xs font-bold text-slate-700">
+                          {record.reviewReasons.length ? record.reviewReasons.join(" · ") : "Stripe ready"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="rounded-[1.5rem] border border-emerald-100 bg-[#FBFCF8] p-5">
+                <h3 className="text-lg font-black text-[#17382B]">Existing payment_method values</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                  {nonStripePaymentMethods.length ? nonStripePaymentMethods.join(", ") : "No non-Stripe/manual values found."}
+                </p>
+              </div>
+
+              <div className="rounded-[1.5rem] border border-amber-100 bg-amber-50 p-5">
+                <h3 className="text-lg font-black text-amber-950">Manual review payout rows</h3>
+                <div className="mt-4 space-y-3">
+                  {payoutReviewRows.slice(0, 8).map((payout) => (
+                    <div key={payout.id} className="rounded-2xl bg-white p-4 text-sm shadow-sm">
+                      <p className="font-black text-[#17382B]">{payout.recipient_name || "Unnamed recipient"}</p>
+                      <p className="mt-1 font-semibold text-slate-700">
+                        {formatMoney(payout.payout_amount, payout.currency || "USD")} · {formatLabel(payout.payment_status)} · {payout.payment_method || "No method"}
+                      </p>
+                      <p className="mt-1 text-xs font-bold text-amber-800">
+                        {payout.exception_reason || (!getPayoutReference(payout) ? "Missing payout reference" : "Review payment method")}
+                      </p>
+                    </div>
+                  ))}
+                  {payoutReviewRows.length === 0 ? (
+                    <p className="text-sm font-semibold leading-6 text-slate-700">No payout exception or missing-reference rows found.</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
           <div className="flex flex-col gap-6">
