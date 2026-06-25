@@ -556,13 +556,13 @@ function getGuruId(guru: GuruRow) {
   );
 }
 
-function getProfileKey(profile: ProfileRow) {
-  return (
-    asTrimmedString(profile.id) ||
-    asTrimmedString(profile.user_id) ||
-    asTrimmedString(profile.profile_id) ||
-    asTrimmedString(profile.email).toLowerCase()
-  );
+function getProfileIdentityKeys(profile: ProfileRow) {
+  return [
+    asTrimmedString(profile.id),
+    asTrimmedString(profile.user_id),
+    asTrimmedString(profile.profile_id),
+    asTrimmedString(profile.email).toLowerCase(),
+  ].filter(Boolean);
 }
 
 function getGuruProfileKey(guru: GuruRow) {
@@ -683,18 +683,22 @@ function getGuruPhone(guru: GuruRow, profile?: ProfileRow) {
 }
 
 function getGuruAvatarUrl(guru: GuruRow, profile?: ProfileRow) {
-  const imageUrl =
+  const profileAvatarUrl = asTrimmedString(profile?.avatar_url);
+  const guruImageUrl =
     asTrimmedString(guru.avatar_url) ||
     asTrimmedString(guru.profile_photo_url) ||
     asTrimmedString(guru.photo_url) ||
     asTrimmedString(guru.image_url) ||
-    asTrimmedString(guru.headshot_url) ||
-    asTrimmedString(profile?.avatar_url) ||
+    asTrimmedString(guru.headshot_url);
+  const profileFallbackImageUrl =
     asTrimmedString(profile?.profile_photo_url) ||
     asTrimmedString(profile?.photo_url) ||
     asTrimmedString(profile?.image_url);
 
-  return avatarImageFallback(imageUrl, "");
+  return avatarImageFallback(
+    profileAvatarUrl || guruImageUrl || profileFallbackImageUrl,
+    "",
+  );
 }
 
 function getGuruSlug(guru: GuruRow, profile?: ProfileRow) {
@@ -1768,11 +1772,9 @@ async function getGuruManagementData(searchParams: SearchParams) {
   const profileMap = new Map<string, ProfileRow>();
 
   for (const profile of profiles) {
-    const key = getProfileKey(profile);
-    const email = asTrimmedString(profile.email).toLowerCase();
-
-    if (key) profileMap.set(key, profile);
-    if (email) profileMap.set(email, profile);
+    for (const key of getProfileIdentityKeys(profile)) {
+      profileMap.set(key, profile);
+    }
   }
 
   const backgroundCheckMap = new Map<string, BackgroundCheckRow>();
