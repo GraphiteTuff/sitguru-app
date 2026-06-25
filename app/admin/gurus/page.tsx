@@ -17,6 +17,16 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruRecordsTable from "./GuruRecordsTable";
+import {
+  CANONICAL_ROLE,
+  PET_PARENT_DISPLAY_LABEL,
+  avatarImageFallback,
+  displayNameFallback,
+  emailFallback,
+  isSitGuruSuperUser,
+  normalizeRoleAlias,
+  phoneFallback,
+} from "@/lib/sitguru/display";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +120,7 @@ type GuruDisplayRow = {
   messageHref: string;
   name: string;
   email: string;
+  phone: string;
   avatarUrl: string;
   slug: string;
   services: string;
@@ -129,6 +140,8 @@ type GuruDisplayRow = {
   joined: string;
   href: string;
   publicHref: string;
+  inferredFromFallback: boolean;
+  recordSourceLabel: string;
 };
 
 type ChartItem = {
@@ -278,7 +291,7 @@ const stuckBeforeStepConfigs: Record<string, SetupStepConfig> = {
     eyebrow: "Guru Missing-Step Queue",
     title: "Missing Step 5: Approved / Bookable",
     description:
-      "Focused Admin queue showing Gurus who are not approved, active, or bookable yet. These Gurus need final Admin review before becoming customer-visible.",
+      "Focused Admin queue showing Gurus who are not approved, active, or bookable yet. These Gurus need final Admin review before becoming Pet Parent-visible.",
   },
 };
 
@@ -299,43 +312,17 @@ function hasAnyNonEmptyValue(...values: unknown[]) {
 }
 
 function normalizeProfileRole(profile: ProfileRow) {
-  const role = asTrimmedString(profile.role).toLowerCase();
+  const canonicalRole = normalizeRoleAlias(asTrimmedString(profile.role));
 
-  if (
-    role === "guru" ||
-    role === "sitter" ||
-    role === "provider" ||
-    role === "walker" ||
-    role === "dog_walker" ||
-    role === "dog walker"
-  ) {
-    return "guru";
+  if (canonicalRole === CANONICAL_ROLE.PET_PARENT) {
+    return PET_PARENT_DISPLAY_LABEL;
   }
 
-  if (
-    role === "ambassador" ||
-    role === "sitguru_rep" ||
-    role === "sitguru rep" ||
-    role === "representative"
-  ) {
-    return "ambassador";
-  }
-
-  if (
-    role === "customer" ||
-    role === "pet_parent" ||
-    role === "pet parent" ||
-    role === "parent" ||
-    role === "client"
-  ) {
-    return "customer";
-  }
-
-  return role;
+  return canonicalRole || asTrimmedString(profile.role).toLowerCase();
 }
 
 function isGuruProfile(profile: ProfileRow) {
-  return normalizeProfileRole(profile) === "guru";
+  return normalizeProfileRole(profile) === CANONICAL_ROLE.GURU;
 }
 
 const nonRealGuruNameMatchers = [
@@ -347,8 +334,6 @@ const nonRealGuruNameMatchers = [
   "darius miller",
   "emma",
   "emma walsh",
-  "jason",
-  "jason bennett",
   "maya",
   "maya reynolds",
   "nina",
@@ -385,7 +370,12 @@ function isNonRealGuruRecord(guru: GuruRow, profile?: ProfileRow) {
       profile?.full_name ||
       profile?.name,
   );
-  const email = normalizeForMatching(getGuruEmail(guru, profile));
+  const displayEmail = getGuruEmail(guru, profile);
+  const email = normalizeForMatching(displayEmail);
+
+  if (isSitGuruSuperUser(displayEmail)) {
+    return true;
+  }
   const slug = normalizeForMatching(guru.slug || profile?.slug);
   const id = normalizeForMatching(guru.id || guru.user_id || guru.profile_id);
   const source = normalizeForMatching(guru.source || profile?.source);
@@ -402,7 +392,9 @@ function isNonRealGuruRecord(guru: GuruRow, profile?: ProfileRow) {
 
   const comparableValues = [name, email, slug, id, source].filter(Boolean);
 
-  if (comparableValues.some((value) => nonRealGuruNameMatchers.includes(value))) {
+  if (
+    comparableValues.some((value) => nonRealGuruNameMatchers.includes(value))
+  ) {
     return true;
   }
 
@@ -659,8 +651,7 @@ function getGuruName(guru: GuruRow, profile?: ProfileRow) {
   const lastName =
     asTrimmedString(guru.last_name) || asTrimmedString(profile?.last_name);
   const combinedName = `${firstName} ${lastName}`.trim();
-
-  return (
+  const preferredName =
     asTrimmedString(guru.display_name) ||
     asTrimmedString(guru.full_name) ||
     asTrimmedString(guru.name) ||
@@ -669,17 +660,30 @@ function getGuruName(guru: GuruRow, profile?: ProfileRow) {
     asTrimmedString(profile?.name) ||
     combinedName ||
     getCleanEmailNameFallback(asTrimmedString(guru.email)) ||
-    getCleanEmailNameFallback(asTrimmedString(profile?.email)) ||
-    "Guru"
-  );
+    getCleanEmailNameFallback(asTrimmedString(profile?.email));
+
+  return displayNameFallback(preferredName, "Guru");
 }
 
 function getGuruEmail(guru: GuruRow, profile?: ProfileRow) {
-  return asTrimmedString(guru.email) || asTrimmedString(profile?.email) || "—";
+  return emailFallback(
+    asTrimmedString(guru.email) || asTrimmedString(profile?.email),
+    "—",
+  );
+}
+
+function getGuruPhone(guru: GuruRow, profile?: ProfileRow) {
+  return phoneFallback(
+    asTrimmedString(guru.phone) ||
+      asTrimmedString(guru.phone_number) ||
+      asTrimmedString(profile?.phone) ||
+      asTrimmedString(profile?.phone_number),
+    "No phone on file",
+  );
 }
 
 function getGuruAvatarUrl(guru: GuruRow, profile?: ProfileRow) {
-  return (
+  const imageUrl =
     asTrimmedString(guru.avatar_url) ||
     asTrimmedString(guru.profile_photo_url) ||
     asTrimmedString(guru.photo_url) ||
@@ -688,9 +692,9 @@ function getGuruAvatarUrl(guru: GuruRow, profile?: ProfileRow) {
     asTrimmedString(profile?.avatar_url) ||
     asTrimmedString(profile?.profile_photo_url) ||
     asTrimmedString(profile?.photo_url) ||
-    asTrimmedString(profile?.image_url) ||
-    ""
-  );
+    asTrimmedString(profile?.image_url);
+
+  return avatarImageFallback(imageUrl, "");
 }
 
 function getGuruSlug(guru: GuruRow, profile?: ProfileRow) {
@@ -924,8 +928,8 @@ function isGuruApprovedThisWeek(guru: GuruRow) {
 function needsProfileUpdate(guru: GuruRow) {
   const hasName = Boolean(
     asTrimmedString(guru.display_name) ||
-      asTrimmedString(guru.full_name) ||
-      asTrimmedString(guru.name),
+    asTrimmedString(guru.full_name) ||
+    asTrimmedString(guru.name),
   );
 
   const hasBio = Boolean(asTrimmedString(guru.bio));
@@ -938,8 +942,8 @@ function needsProfileUpdate(guru: GuruRow) {
       ? true
       : Boolean(
           asTrimmedString(guru.service) ||
-            asTrimmedString(guru.service_name) ||
-            asTrimmedString(guru.specialty),
+          asTrimmedString(guru.service_name) ||
+          asTrimmedString(guru.specialty),
         );
 
   return !hasName || !hasBio || !hasLocation || !hasServices;
@@ -948,10 +952,10 @@ function needsProfileUpdate(guru: GuruRow) {
 function hasGuruProfileStarted(guru: GuruRow, profile?: ProfileRow) {
   return Boolean(
     getGuruId(guru) ||
-      getGuruEmail(guru, profile) !== "—" ||
-      asTrimmedString(guru.created_at) ||
-      asTrimmedString(guru.user_id) ||
-      asTrimmedString(guru.profile_id),
+    getGuruEmail(guru, profile) !== "—" ||
+    asTrimmedString(guru.created_at) ||
+    asTrimmedString(guru.user_id) ||
+    asTrimmedString(guru.profile_id),
   );
 }
 
@@ -963,30 +967,30 @@ function hasGuruServiceData(guru: GuruRow) {
       ? true
       : Boolean(
           asTrimmedString(guru.service) ||
-            asTrimmedString(guru.service_name) ||
-            asTrimmedString(guru.specialty) ||
-            asTrimmedString(guru.title),
+          asTrimmedString(guru.service_name) ||
+          asTrimmedString(guru.specialty) ||
+          asTrimmedString(guru.title),
         );
 
   const hasLocation = Boolean(
     asTrimmedString(guru.city) ||
-      asTrimmedString(guru.state) ||
-      asTrimmedString(guru.service_city) ||
-      asTrimmedString(guru.service_state),
+    asTrimmedString(guru.state) ||
+    asTrimmedString(guru.service_city) ||
+    asTrimmedString(guru.service_state),
   );
 
   const hasRadius = Boolean(
     toNumber(guru.service_radius_miles) ||
-      toNumber(guru.radius_miles) ||
-      toNumber(guru.travel_radius) ||
-      toNumber(guru.max_travel_miles),
+    toNumber(guru.radius_miles) ||
+    toNumber(guru.travel_radius) ||
+    toNumber(guru.max_travel_miles),
   );
 
   const hasRates = Boolean(
     toNumber(guru.hourly_rate) ||
-      toNumber(guru.rate) ||
-      toNumber(guru.price) ||
-      toNumber(guru.base_rate),
+    toNumber(guru.rate) ||
+    toNumber(guru.price) ||
+    toNumber(guru.base_rate),
   );
 
   return hasServices && hasLocation && (hasRadius || hasRates);
@@ -1000,14 +1004,16 @@ function hasGuruProfileReady(guru: GuruRow, profile?: ProfileRow) {
   const hasExperience = getGuruExperience(guru) !== "Not listed";
   const hasPhoto = Boolean(
     asTrimmedString(guru.avatar_url) ||
-      asTrimmedString(guru.profile_photo_url) ||
-      asTrimmedString(guru.photo_url) ||
-      asTrimmedString(guru.image_url) ||
-      asTrimmedString(profile?.avatar_url) ||
-      asTrimmedString(profile?.profile_photo_url),
+    asTrimmedString(guru.profile_photo_url) ||
+    asTrimmedString(guru.photo_url) ||
+    asTrimmedString(guru.image_url) ||
+    asTrimmedString(profile?.avatar_url) ||
+    asTrimmedString(profile?.profile_photo_url),
   );
 
-  return hasName && hasBio && hasExperience && hasPhoto && hasGuruServiceData(guru);
+  return (
+    hasName && hasBio && hasExperience && hasPhoto && hasGuruServiceData(guru)
+  );
 }
 
 function hasGuruCheckrStarted(guru: GuruRow, check?: BackgroundCheckRow) {
@@ -1017,16 +1023,16 @@ function hasGuruCheckrStarted(guru: GuruRow, check?: BackgroundCheckRow) {
 
   return Boolean(
     (status && status !== "not_started") ||
-      asTrimmedString(guru.checkr_package_slug) ||
-      asTrimmedString(check?.package_slug) ||
-      asTrimmedString(guru.checkr_candidate_id) ||
-      asTrimmedString(check?.checkr_candidate_id) ||
-      asTrimmedString(guru.checkr_invitation_id) ||
-      asTrimmedString(check?.checkr_invitation_id) ||
-      asTrimmedString(guru.checkr_report_id) ||
-      asTrimmedString(check?.checkr_report_id) ||
-      asTrimmedString(guru.checkr_invitation_url) ||
-      asTrimmedString(check?.invitation_url),
+    asTrimmedString(guru.checkr_package_slug) ||
+    asTrimmedString(check?.package_slug) ||
+    asTrimmedString(guru.checkr_candidate_id) ||
+    asTrimmedString(check?.checkr_candidate_id) ||
+    asTrimmedString(guru.checkr_invitation_id) ||
+    asTrimmedString(check?.checkr_invitation_id) ||
+    asTrimmedString(guru.checkr_report_id) ||
+    asTrimmedString(check?.checkr_report_id) ||
+    asTrimmedString(guru.checkr_invitation_url) ||
+    asTrimmedString(check?.invitation_url),
   );
 }
 
@@ -1152,7 +1158,9 @@ function getApplicationStatusLabel(status: ApplicationStatus) {
 }
 
 function normalizeQuery(value?: string) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function getActiveQueue(searchParams: SearchParams) {
@@ -1174,9 +1182,7 @@ function getActiveStuckBeforeStep(searchParams: SearchParams) {
 }
 
 function isPendingReviewRow(row: GuruDisplayRow) {
-  return !["bookable", "rejected", "suspended"].includes(
-    row.applicationStatus,
-  );
+  return !["bookable", "rejected", "suspended"].includes(row.applicationStatus);
 }
 
 function isProfileUpdateRow(row: GuruDisplayRow) {
@@ -1274,7 +1280,8 @@ function filterGuruRows(rows: GuruDisplayRow[], searchParams: SearchParams) {
       if (status === "reviewing") return rowStatus === "reviewing";
       if (status === "needs-info") return rowStatus === "needs_info";
       if (status === "pre-approved") return rowStatus === "pre_approved";
-      if (status === "verification") return rowStatus === "verification_pending";
+      if (status === "verification")
+        return rowStatus === "verification_pending";
       if (status === "approved") return rowStatus === "approved";
       if (status === "bookable") return rowStatus === "bookable";
       if (status === "rejected") return rowStatus === "rejected";
@@ -1413,7 +1420,9 @@ async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
   const leads = await safeRows<GuruLeadRow>(
     supabaseAdmin
       .from("guru_leads")
-      .select("id,status,lead_source,referral_code,referred_by_email,created_at")
+      .select(
+        "id,status,lead_source,referral_code,referred_by_email,created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(1000),
     "guru_leads",
@@ -1433,7 +1442,9 @@ async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
 
   const topSource = sourceChart.length > 0 ? sourceChart[0].label : "None yet";
   const topReferralCode =
-    allReferralCodeChart.length > 0 ? allReferralCodeChart[0].label : "None yet";
+    allReferralCodeChart.length > 0
+      ? allReferralCodeChart[0].label
+      : "None yet";
 
   return {
     total: leads.length,
@@ -1452,30 +1463,38 @@ async function getGuruLeadPipelineData(): Promise<GuruLeadPipelineData> {
     topSource,
     topReferralCode,
     totalReferralCodes: allReferralCodeChart.length,
-    hiddenReferralCodes: Math.max(allReferralCodeChart.length - referralCodeChart.length, 0),
+    hiddenReferralCodes: Math.max(
+      allReferralCodeChart.length - referralCodeChart.length,
+      0,
+    ),
     sourceChart,
     referralCodeChart,
   };
 }
 
-
 async function getGuruOnboardingPacketAdminData(): Promise<GuruOnboardingPacketAdminData> {
   const packets = await safeRows<Record<string, unknown>>(
     supabaseAdmin
       .from("guru_onboarding_packets")
-      .select("id,user_id,legal_name,status,submitted_at,reviewed_at,admin_notes")
+      .select(
+        "id,user_id,legal_name,status,submitted_at,reviewed_at,admin_notes",
+      )
       .order("submitted_at", { ascending: false })
       .limit(50),
     "guru_onboarding_packets",
   );
 
-  const packetIds = packets.map((packet) => asTrimmedString(packet.id)).filter(Boolean);
+  const packetIds = packets
+    .map((packet) => asTrimmedString(packet.id))
+    .filter(Boolean);
 
   const documents = packetIds.length
     ? await safeRows<Record<string, unknown>>(
         supabaseAdmin
           .from("guru_onboarding_documents")
-          .select("id,packet_id,user_id,document_type,file_name,status,submitted_at")
+          .select(
+            "id,packet_id,user_id,document_type,file_name,status,submitted_at",
+          )
           .in("packet_id", packetIds)
           .order("submitted_at", { ascending: false }),
         "guru_onboarding_documents",
@@ -1487,7 +1506,10 @@ async function getGuruOnboardingPacketAdminData(): Promise<GuruOnboardingPacketA
   documents.forEach((document) => {
     const packetId = asTrimmedString(document.packet_id);
     if (!packetId) return;
-    documentCountByPacket.set(packetId, (documentCountByPacket.get(packetId) || 0) + 1);
+    documentCountByPacket.set(
+      packetId,
+      (documentCountByPacket.get(packetId) || 0) + 1,
+    );
   });
 
   const latest = packets.slice(0, 6).map((packet) => {
@@ -1536,7 +1558,6 @@ async function getGuruOnboardingPacketAdminData(): Promise<GuruOnboardingPacketA
   };
 }
 
-
 function getMetadataString(
   source: Record<string, unknown> | null | undefined,
   key: string,
@@ -1553,20 +1574,15 @@ function getAuthUserRole(user: AuthUserRow) {
     getMetadataString(user.app_metadata, "user_role") ||
     getMetadataString(user.app_metadata, "account_role");
 
-  return role.toLowerCase();
+  const canonicalRole = normalizeRoleAlias(role);
+
+  return canonicalRole || role.toLowerCase();
 }
 
 function isGuruAuthUser(user: AuthUserRow) {
   const role = getAuthUserRole(user);
 
-  return (
-    role === "guru" ||
-    role === "sitter" ||
-    role === "provider" ||
-    role === "walker" ||
-    role === "dog_walker" ||
-    role === "dog walker"
-  );
+  return role === CANONICAL_ROLE.GURU;
 }
 
 function buildGuruRecordFromAuthUser(user: AuthUserRow): GuruRow {
@@ -1787,7 +1803,9 @@ async function getGuruManagementData(searchParams: SearchParams) {
     }
   }
 
-  for (const authUser of authUsers.filter((authUser) => isGuruAuthUser(authUser))) {
+  for (const authUser of authUsers.filter((authUser) =>
+    isGuruAuthUser(authUser),
+  )) {
     const authGuru = buildGuruRecordFromAuthUser(authUser);
     const profile = profileMap.get(getGuruProfileKey(authGuru));
 
@@ -1825,6 +1843,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
 
     const name = getGuruName(guru, profile);
     const email = getGuruEmail(guru, profile);
+    const phone = getGuruPhone(guru, profile);
     const guruUserId = getGuruUserId(guru, profile);
     const publicIdentifier = getGuruPublicIdentifier({
       guru,
@@ -1851,6 +1870,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       }),
       name,
       email,
+      phone,
       avatarUrl: getGuruAvatarUrl(guru, profile),
       slug,
       services: getGuruServices(guru),
@@ -1870,6 +1890,14 @@ async function getGuruManagementData(searchParams: SearchParams) {
       joined: formatDateShort(asTrimmedString(guru.created_at)),
       href: id ? `/admin/gurus/${encodeURIComponent(id)}` : "/admin/gurus",
       publicHref,
+      inferredFromFallback:
+        guru.source === "profiles" || guru.source === "auth.users",
+      recordSourceLabel:
+        guru.source === "auth.users"
+          ? "Auth fallback"
+          : guru.source === "profiles"
+            ? "Profile fallback"
+            : "Canonical gurus row",
     };
   });
 
@@ -1881,7 +1909,10 @@ async function getGuruManagementData(searchParams: SearchParams) {
   const experienceChart = countByLabel(rows, (row) =>
     getExperienceBucket(row.experience),
   );
-  const serviceChart = countByLabel(rows, (row) => row.services.split(" • ")[0]);
+  const serviceChart = countByLabel(
+    rows,
+    (row) => row.services.split(" • ")[0],
+  );
   const trustChart = buildTrustChartRows(rows);
   const setupChart = countByLabel(rows, (row) => row.setupStepLabel);
 
@@ -1931,13 +1962,16 @@ async function getGuruManagementData(searchParams: SearchParams) {
         .length,
       needsInfo: rows.filter((row) => row.applicationStatus === "needs_info")
         .length,
-      preApproved: rows.filter((row) => row.applicationStatus === "pre_approved")
-        .length,
+      preApproved: rows.filter(
+        (row) => row.applicationStatus === "pre_approved",
+      ).length,
       verification: rows.filter(
         (row) => row.applicationStatus === "verification_pending",
       ).length,
-      approved: rows.filter((row) => row.applicationStatus === "approved").length,
-      bookable: rows.filter((row) => row.applicationStatus === "bookable").length,
+      approved: rows.filter((row) => row.applicationStatus === "approved")
+        .length,
+      bookable: rows.filter((row) => row.applicationStatus === "bookable")
+        .length,
       paused: rows.filter(
         (row) =>
           row.applicationStatus === "suspended" ||
@@ -1955,13 +1989,7 @@ function DashboardCard({ children }: { children: ReactNode }) {
   );
 }
 
-function QueueBanner({
-  queue,
-  shown,
-}: {
-  queue: QueueConfig;
-  shown: number;
-}) {
+function QueueBanner({ queue, shown }: { queue: QueueConfig; shown: number }) {
   return (
     <section className="rounded-[30px] border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -2314,7 +2342,8 @@ function QuickLinkCard({
       </p>
 
       <p className="mt-4 text-sm font-black text-green-800">
-        Open page <span className="transition group-hover:translate-x-1">→</span>
+        Open page{" "}
+        <span className="transition group-hover:translate-x-1">→</span>
       </p>
     </Link>
   );
@@ -2327,11 +2356,31 @@ function GuruLeadPipelineCard({
 }) {
   const statusItems: ChartItem[] = [
     { label: "New", value: pipeline.new, helper: "Fresh leads" },
-    { label: "Contacted", value: pipeline.contacted, helper: "Follow-up started" },
-    { label: "Interested", value: pipeline.interested, helper: "Warm prospects" },
-    { label: "Application Sent", value: pipeline.applicationSent, helper: "Packet sent" },
-    { label: "Applied", value: pipeline.applied, helper: "Application submitted" },
-    { label: "Approved", value: pipeline.approvedGuru, helper: "Converted Gurus" },
+    {
+      label: "Contacted",
+      value: pipeline.contacted,
+      helper: "Follow-up started",
+    },
+    {
+      label: "Interested",
+      value: pipeline.interested,
+      helper: "Warm prospects",
+    },
+    {
+      label: "Application Sent",
+      value: pipeline.applicationSent,
+      helper: "Packet sent",
+    },
+    {
+      label: "Applied",
+      value: pipeline.applied,
+      helper: "Application submitted",
+    },
+    {
+      label: "Approved",
+      value: pipeline.approvedGuru,
+      helper: "Converted Gurus",
+    },
   ].filter((item) => item.value > 0 || item.label === "New");
 
   const topSources = pipeline.sourceChart.slice(0, 3);
@@ -2348,7 +2397,8 @@ function GuruLeadPipelineCard({
             Lead Snapshot
           </h2>
           <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-            Compact view of Guru leads, source performance, and referral activity.
+            Compact view of Guru leads, source performance, and referral
+            activity.
           </p>
         </div>
 
@@ -2484,8 +2534,9 @@ function GuruOnboardingPacketReviewCard({
             Guru Onboarding Packets
           </h2>
           <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-            Review submitted Guru onboarding packets, approve Step 5, request fixes,
-            and confirm any uploaded documents before marking the packet complete.
+            Review submitted Guru onboarding packets, approve Step 5, request
+            fixes, and confirm any uploaded documents before marking the packet
+            complete.
           </p>
         </div>
 
@@ -2544,7 +2595,10 @@ function GuruOnboardingPacketReviewCard({
                       {packet.legalName}
                     </p>
                     <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                      {packet.status} • Submitted {formatDateShort(packet.submittedAt)} • {packet.documentCount} document{packet.documentCount === 1 ? "" : "s"}
+                      {packet.status} • Submitted{" "}
+                      {formatDateShort(packet.submittedAt)} •{" "}
+                      {packet.documentCount} document
+                      {packet.documentCount === 1 ? "" : "s"}
                     </p>
                   </div>
 
@@ -2687,7 +2741,6 @@ function AlertTriangleIcon() {
   );
 }
 
-
 function WorkflowTile({
   href,
   label,
@@ -2725,11 +2778,13 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
     return null;
   }
 
-  const [guruData, guruLeadPipeline, guruOnboardingPackets] = await Promise.all([
-    getGuruManagementData(resolvedSearchParams),
-    getGuruLeadPipelineData(),
-    getGuruOnboardingPacketAdminData(),
-  ]);
+  const [guruData, guruLeadPipeline, guruOnboardingPackets] = await Promise.all(
+    [
+      getGuruManagementData(resolvedSearchParams),
+      getGuruLeadPipelineData(),
+      getGuruOnboardingPacketAdminData(),
+    ],
+  );
   const activeQueue = getActiveQueue(resolvedSearchParams);
   const activeSetupStep = getActiveSetupStep(resolvedSearchParams);
   const activeStuckBeforeStep = getActiveStuckBeforeStep(resolvedSearchParams);
@@ -2743,11 +2798,15 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
         <div className="flex flex-col justify-between gap-4 rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm lg:flex-row lg:items-end">
           <div>
             <Link
-              href={hasFocusedQueue ? adminRoutes.approvals : adminRoutes.dashboard}
+              href={
+                hasFocusedQueue ? adminRoutes.approvals : adminRoutes.dashboard
+              }
               className="mb-4 inline-flex items-center gap-2 text-sm font-black text-green-800 transition hover:text-green-950"
             >
               <ArrowLeft size={17} />
-              {hasFocusedQueue ? "Back to Guru Approvals" : "Back to Admin Dashboard"}
+              {hasFocusedQueue
+                ? "Back to Guru Approvals"
+                : "Back to Admin Dashboard"}
             </Link>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -2900,8 +2959,10 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
           </DashboardCard>
         </section>
         <div className="rounded-[26px] border border-green-100 bg-white p-4 text-sm font-semibold text-slate-500 shadow-sm">
-          <span className="font-black text-green-900">Admin note:</span>{" "}
-          This simplified Guru page keeps the key KPIs, onboarding packet review, and Guru Records table visible without the extra scroll-heavy dashboard sections.
+          <span className="font-black text-green-900">Admin note:</span> This
+          simplified Guru page keeps the key KPIs, onboarding packet review, and
+          Guru Records table visible without the extra scroll-heavy dashboard
+          sections.
         </div>
       </div>
     </main>
