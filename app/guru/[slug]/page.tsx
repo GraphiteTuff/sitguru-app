@@ -955,6 +955,10 @@ function getImageUrlFromRecord(record: Record<string, any> | null) {
   return imageUrl || null;
 }
 
+function getProfilesAvatarUrlFromRecord(record: Record<string, unknown> | null) {
+  return String(record?.avatar_url || "").trim() || null;
+}
+
 function mergeGuruProfilePhoto(
   guruProfile: GuruProfile,
   imageUrl: string | null,
@@ -967,6 +971,21 @@ function mergeGuruProfilePhoto(
     avatar_url: guruProfile.avatar_url || imageUrl,
     image_url: guruProfile.image_url || imageUrl,
     photo_url: guruProfile.photo_url || imageUrl,
+  };
+}
+
+function mergeAccountProfileAvatar(
+  guruProfile: GuruProfile,
+  avatarUrl: string | null,
+): GuruProfile {
+  if (!avatarUrl) return guruProfile;
+
+  return {
+    ...guruProfile,
+    profile_photo_url: avatarUrl,
+    avatar_url: avatarUrl,
+    image_url: avatarUrl,
+    photo_url: avatarUrl,
   };
 }
 
@@ -1151,6 +1170,7 @@ async function findGuruPhotoFromProfiles(guruProfile: GuruProfile) {
         return {
           profile,
           imageUrl,
+          avatarUrl: getProfilesAvatarUrlFromRecord(profile),
         };
       }
     } catch {
@@ -1161,6 +1181,7 @@ async function findGuruPhotoFromProfiles(guruProfile: GuruProfile) {
   return {
     profile: null,
     imageUrl: null,
+    avatarUrl: null,
   };
 }
 
@@ -1170,35 +1191,10 @@ async function hydrateGuruProfilePhotoFields(
 ): Promise<GuruProfile | null> {
   if (!guruProfile) return null;
 
-  const sitGuruPageImage = getGuruImage(guruProfile);
-  if (sitGuruPageImage) {
-    return mergeGuruProfilePhoto(guruProfile, sitGuruPageImage);
-  }
-
-  const sitGuruDuplicateRowImage = await findGuruUploadedPhotoFromSitGuruRows(
-    guruProfile,
-    identifier,
-  );
-
-  if (sitGuruDuplicateRowImage) {
-    return mergeGuruProfilePhoto(guruProfile, sitGuruDuplicateRowImage);
-  }
-
-  const sitGuruMediaImage = await findGuruUploadedPhotoFromMediaTables(
-    guruProfile,
-  );
-
-  if (sitGuruMediaImage) {
-    return mergeGuruProfilePhoto(guruProfile, sitGuruMediaImage);
-  }
-
   const profileFallback = await findGuruPhotoFromProfiles(guruProfile);
-
-  if (profileFallback.profile) {
-    const profile = profileFallback.profile;
-
-    return mergeGuruProfilePhoto(
-      {
+  const profile = profileFallback.profile;
+  const guruProfileWithAccountNames = profile
+    ? {
         ...guruProfile,
         full_name:
           guruProfile.full_name ||
@@ -1220,12 +1216,49 @@ async function hydrateGuruProfilePhotoFields(
           null,
         first_name: guruProfile.first_name || profile.first_name || null,
         last_name: guruProfile.last_name || profile.last_name || null,
-      },
+      }
+    : guruProfile;
+
+  if (profileFallback.avatarUrl) {
+    return mergeAccountProfileAvatar(
+      guruProfileWithAccountNames,
+      profileFallback.avatarUrl,
+    );
+  }
+
+  const sitGuruPageImage = getGuruImage(guruProfileWithAccountNames);
+  if (sitGuruPageImage) {
+    return mergeGuruProfilePhoto(guruProfileWithAccountNames, sitGuruPageImage);
+  }
+
+  const sitGuruDuplicateRowImage = await findGuruUploadedPhotoFromSitGuruRows(
+    guruProfileWithAccountNames,
+    identifier,
+  );
+
+  if (sitGuruDuplicateRowImage) {
+    return mergeGuruProfilePhoto(
+      guruProfileWithAccountNames,
+      sitGuruDuplicateRowImage,
+    );
+  }
+
+  const sitGuruMediaImage = await findGuruUploadedPhotoFromMediaTables(
+    guruProfileWithAccountNames,
+  );
+
+  if (sitGuruMediaImage) {
+    return mergeGuruProfilePhoto(guruProfileWithAccountNames, sitGuruMediaImage);
+  }
+
+  if (profileFallback.imageUrl) {
+    return mergeGuruProfilePhoto(
+      guruProfileWithAccountNames,
       profileFallback.imageUrl,
     );
   }
 
-  return guruProfile;
+  return guruProfileWithAccountNames;
 }
 
 
