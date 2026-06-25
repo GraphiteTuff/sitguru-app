@@ -495,10 +495,10 @@ function getGuruLocation(profile: GuruProfile | null) {
 
 function getGuruImage(profile: GuruProfile | null) {
   return (
-    profile?.avatar_url ||
     profile?.profile_photo_url ||
     profile?.image_url ||
     profile?.photo_url ||
+    profile?.avatar_url ||
     null
   );
 }
@@ -898,11 +898,11 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
       25,
     service_radius: profile.service_radius || profile.service_radius_miles || 25,
     radius_miles: profile.radius_miles || profile.service_radius_miles || 25,
-    image_url: profile.image_url || profile.profile_photo_url || profile.avatar_url || null,
-    avatar_url: profile.avatar_url || profile.profile_photo_url || profile.image_url || null,
-    photo_url: profile.photo_url || profile.profile_photo_url || profile.avatar_url || null,
     profile_photo_url:
-      profile.profile_photo_url || profile.avatar_url || profile.image_url || null,
+      profile.avatar_url || profile.profile_photo_url || profile.image_url || null,
+    image_url: profile.avatar_url || profile.image_url || profile.profile_photo_url || null,
+    photo_url: profile.avatar_url || profile.photo_url || profile.profile_photo_url || null,
+    avatar_url: profile.avatar_url || profile.profile_photo_url || profile.image_url || null,
     rate: profile.rate || null,
     hourly_rate: profile.hourly_rate || null,
     price: profile.price || null,
@@ -1614,11 +1614,11 @@ function buildGuruProfileFromPublicSearchRow(row: Record<string, any>): GuruProf
       25,
     service_radius: row.service_radius || row.service_radius_miles || 25,
     radius_miles: row.radius_miles || row.service_radius_miles || 25,
-    image_url: row.image_url || row.profile_photo_url || row.photo_url || row.avatar_url || null,
-    avatar_url: row.avatar_url || row.profile_photo_url || row.photo_url || row.image_url || null,
-    photo_url: row.photo_url || row.profile_photo_url || row.avatar_url || row.image_url || null,
     profile_photo_url:
-      row.profile_photo_url || row.photo_url || row.avatar_url || row.image_url || null,
+      row.avatar_url || row.profile_photo_url || row.photo_url || row.image_url || null,
+    image_url: row.avatar_url || row.image_url || row.profile_photo_url || row.photo_url || null,
+    photo_url: row.avatar_url || row.photo_url || row.profile_photo_url || row.image_url || null,
+    avatar_url: row.avatar_url || row.profile_photo_url || row.photo_url || row.image_url || null,
     rate: row.rate || null,
     hourly_rate: row.hourly_rate || null,
     price: row.price || null,

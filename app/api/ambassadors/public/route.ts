@@ -50,8 +50,11 @@ function getAccountAvatarUrl(row: Row) {
 }
 
 function getPhotoUrl(row: Row) {
+  const accountAvatarUrl = getAccountAvatarUrl(row);
+
+  if (accountAvatarUrl) return accountAvatarUrl;
+
   return (
-    getAccountAvatarUrl(row) ||
     asString(row.ambassador_photo_url) ||
     asString(row.ambassador_photo_path) ||
     asString(row.profile_photo_url) ||
@@ -214,8 +217,16 @@ function mergeRows(base: Row, incoming: Row): Row {
     account_avatar_url:
       getAccountAvatarUrl(incoming) || getAccountAvatarUrl(base),
     profile_photo_url: getPhotoUrl(incoming) || getPhotoUrl(base),
-    avatar_url: asString(incoming.avatar_url) || asString(base.avatar_url),
-    image_url: asString(incoming.image_url) || asString(base.image_url),
+    avatar_url:
+      getAccountAvatarUrl(incoming) ||
+      asString(incoming.avatar_url) ||
+      getAccountAvatarUrl(base) ||
+      asString(base.avatar_url),
+    image_url:
+      getAccountAvatarUrl(incoming) ||
+      asString(incoming.image_url) ||
+      getAccountAvatarUrl(base) ||
+      asString(base.image_url),
     ambassador_photo_url:
       asString(incoming.ambassador_photo_url) || asString(base.ambassador_photo_url),
     ambassador_photo_path:
