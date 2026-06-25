@@ -129,11 +129,11 @@ export async function POST(req: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       /*
-        Intentionally omit payment_method_types so Stripe Checkout can use
-        SitGuru's Stripe Dashboard payment method settings and show eligible
-        payment methods to Pet Parents. These methods are only for
-        Pet Parent-to-SitGuru checkout; do not add or route any direct
-        Pet Parent-to-Guru payment options here.
+        Pet Parent payments must stay in SitGuru-controlled Stripe Checkout.
+        Intentionally omit payment_method_types so Checkout uses SitGuru's
+        Stripe Dashboard payment method settings and can show eligible
+        Stripe-managed options instead of locking this flow to card-only.
+        Do not add or route any direct Pet Parent-to-Guru payment options here.
       */
       customer_email: user.email ?? undefined,
       line_items: lineItems,
