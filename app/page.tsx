@@ -779,18 +779,23 @@ function HomepageAssistPopup({
   }
 
   function saveCurrentMessengerSession(nextSession: HomepageMessengerSession) {
-    const serializedSession = JSON.stringify(nextSession);
-
-    // Chat widgets like Tawk.to/Crisp keep the active visitor conversation
-    // available after minimize/reload until the visitor or Admin closes it.
-    window.localStorage.setItem(messengerSessionStorageKey, serializedSession);
-    window.sessionStorage.setItem(messengerSessionStorageKey, serializedSession);
+    // Keep visitor chat continuity scoped to this browser tab/session. Avoid
+    // localStorage so a different visitor on the same device never inherits
+    // someone else's previous homepage conversation.
+    window.sessionStorage.setItem(
+      messengerSessionStorageKey,
+      JSON.stringify(nextSession),
+    );
+    window.localStorage.removeItem(messengerSessionStorageKey);
   }
 
   useEffect(() => {
-    const savedSession =
-      window.localStorage.getItem(messengerSessionStorageKey) ||
-      window.sessionStorage.getItem(messengerSessionStorageKey);
+    // Migrate away from older localStorage-backed messenger sessions. The
+    // visitor token still protects the API, but sessionStorage better matches
+    // the expected per-visitor/session chat behavior.
+    window.localStorage.removeItem(messengerSessionStorageKey);
+
+    const savedSession = window.sessionStorage.getItem(messengerSessionStorageKey);
 
     if (savedSession) {
       try {
@@ -1151,9 +1156,10 @@ function HomepageAssistPopup({
                 type="button"
                 onClick={closePopup}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-base font-black text-white transition hover:bg-white/25 sm:h-9 sm:w-9 sm:text-lg"
-                aria-label="Close SitGuru help popup"
+                aria-label="Close SitGuru chat window"
               >
-                ×
+                <span aria-hidden="true">×</span>
+                <span className="sr-only">Close</span>
               </button>
             </div>
           </div>
