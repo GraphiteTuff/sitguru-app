@@ -168,6 +168,102 @@ function formatDateTime(value: string | null) {
   }).format(date);
 }
 
+function isTestStripeReference(value: string | null | undefined) {
+  if (!value) return false;
+
+  const cleanValue = value.toLowerCase();
+
+  return (
+    cleanValue.includes("cs_test") ||
+    cleanValue.includes("pi_test") ||
+    cleanValue.includes("ch_test") ||
+    cleanValue.includes("txn_test") ||
+    cleanValue.includes("tr_test") ||
+    cleanValue.includes("po_test")
+  );
+}
+
+function isTestStripeTransaction(transaction: StripeTransaction) {
+  return (
+    isTestStripeReference(transaction.id) ||
+    isTestStripeReference(transaction.stripeReference) ||
+    isTestStripeReference(transaction.bookingReference)
+  );
+}
+
+function hideLiveTestTransactions(
+  financials: StripeFinancialsResponse,
+): StripeFinancialsResponse {
+  if (!financials.isLive) {
+    return financials;
+  }
+
+  const liveTransactions = financials.transactions.filter(
+    (transaction) => !isTestStripeTransaction(transaction),
+  );
+
+  if (liveTransactions.length === financials.transactions.length) {
+    return financials;
+  }
+
+  const removedTransactions = financials.transactions.filter((transaction) =>
+    isTestStripeTransaction(transaction),
+  );
+
+  const removedPaymentAmount = removedTransactions
+    .filter((transaction) => transaction.type === "payment")
+    .reduce((total, transaction) => total + safeNumber(transaction.amount), 0);
+
+  const removedNetAmount = removedTransactions
+    .filter((transaction) => transaction.type === "payment")
+    .reduce((total, transaction) => total + safeNumber(transaction.net), 0);
+
+  const removedFeeAmount = removedTransactions
+    .filter((transaction) => transaction.type === "payment")
+    .reduce((total, transaction) => total + safeNumber(transaction.fee), 0);
+
+  const removedRefundAmount = removedTransactions
+    .filter((transaction) => transaction.type === "refund")
+    .reduce((total, transaction) => total + safeNumber(transaction.amount), 0);
+
+  const removedDisputeAmount = removedTransactions
+    .filter((transaction) => transaction.type === "dispute")
+    .reduce((total, transaction) => total + safeNumber(transaction.amount), 0);
+
+  return {
+    ...financials,
+    message:
+      financials.message ||
+      "Live Stripe financial data connected. Test-mode Stripe records are hidden from live totals.",
+    summary: {
+      ...financials.summary,
+      grossPayments: Math.max(
+        0,
+        financials.summary.grossPayments - removedPaymentAmount,
+      ),
+      netPayments: Math.max(
+        0,
+        financials.summary.netPayments - removedNetAmount,
+      ),
+      stripeFees: Math.max(0, financials.summary.stripeFees - removedFeeAmount),
+      refunds: Math.max(0, financials.summary.refunds - removedRefundAmount),
+      disputes: Math.max(0, financials.summary.disputes - removedDisputeAmount),
+      availableBalance: Math.max(
+        0,
+        financials.summary.availableBalance - removedNetAmount,
+      ),
+      transactionCount: liveTransactions.length,
+      refundCount: liveTransactions.filter(
+        (transaction) => transaction.type === "refund",
+      ).length,
+      disputeCount: liveTransactions.filter(
+        (transaction) => transaction.type === "dispute",
+      ).length,
+    },
+    transactions: liveTransactions,
+  };
+}
+
 function getRangeDates(range: StripeRange) {
   const now = new Date();
   const start = new Date(now);
@@ -217,7 +313,9 @@ function toneClasses(tone: StripeStatusTone) {
   return tones[tone];
 }
 
-function transactionTone(status: StripeTransaction["status"]): StripeStatusTone {
+function transactionTone(
+  status: StripeTransaction["status"],
+): StripeStatusTone {
   if (status === "paid") return "green";
   if (status === "pending") return "amber";
   if (status === "refunded") return "blue";
@@ -363,8 +461,9 @@ function EmptyState({
 
 export default function AdminStripeFinancialsPage() {
   const [range, setRange] = useState<StripeRange>("month");
-  const [financials, setFinancials] =
-    useState<StripeFinancialsResponse>(fallbackStripeFinancials);
+  const [financials, setFinancials] = useState<StripeFinancialsResponse>(
+    fallbackStripeFinancials,
+  );
   const [loading, setLoading] = useState(true);
   const [loadMessage, setLoadMessage] = useState(
     "Loading Stripe financial activity...",
@@ -372,14 +471,28 @@ export default function AdminStripeFinancialsPage() {
 
   const rangeDates = useMemo(() => getRangeDates(range), [range]);
 
+  const displayedFinancials = useMemo(
+    () => hideLiveTestTransactions(financials),
+    [financials],
+  );
+
+  const hiddenTestTransactionCount =
+    financials.transactions.length - displayedFinancials.transactions.length;
+
   const matchedDepositRate = useMemo(() => {
     const total =
-      financials.summary.matchedDeposits + financials.summary.unmatchedDeposits;
+      displayedFinancials.summary.matchedDeposits +
+      displayedFinancials.summary.unmatchedDeposits;
 
     if (!total) return 0;
 
-    return Math.round((financials.summary.matchedDeposits / total) * 100);
-  }, [financials.summary.matchedDeposits, financials.summary.unmatchedDeposits]);
+    return Math.round(
+      (displayedFinancials.summary.matchedDeposits / total) * 100,
+    );
+  }, [
+    displayedFinancials.summary.matchedDeposits,
+    displayedFinancials.summary.unmatchedDeposits,
+  ]);
 
   async function loadStripeFinancials() {
     setLoading(true);
@@ -464,18 +577,20 @@ export default function AdminStripeFinancialsPage() {
 
                 <span
                   className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] ${
-                    financials.isLive
+                    displayedFinancials.isLive
                       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                       : "border-amber-200 bg-amber-50 text-amber-700"
                   }`}
                 >
-                  {financials.isLive ? "Live Stripe" : "Preview / Offline"}
+                  {displayedFinancials.isLive
+                    ? "Live Stripe"
+                    : "Preview / Offline"}
                 </span>
 
                 <span className="text-sm font-bold text-slate-500">
                   {loading
                     ? "Loading..."
-                    : `Updated ${formatDateTime(financials.generatedAt)}`}
+                    : `Updated ${formatDateTime(displayedFinancials.generatedAt)}`}
                 </span>
               </div>
 
@@ -486,20 +601,22 @@ export default function AdminStripeFinancialsPage() {
               <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
                 Review customer payments, Stripe fees, refunds, disputes,
                 chargebacks, transfers, payout deposits, and Plaid/NFCU bank
-                matching so Stripe activity ties into SitGuru P&amp;L, Cash Flow,
-                General Ledger, Reconciliation, and Banking.
+                matching so Stripe activity ties into SitGuru P&amp;L, Cash
+                Flow, General Ledger, Reconciliation, and Banking.
               </p>
 
               <div
                 className={`mt-4 rounded-[1.25rem] border p-4 ${
-                  financials.isLive
+                  displayedFinancials.isLive
                     ? "border-emerald-100 bg-emerald-50"
                     : "border-amber-100 bg-amber-50"
                 }`}
               >
                 <p
                   className={`text-xs font-black uppercase tracking-[0.18em] ${
-                    financials.isLive ? "text-emerald-700" : "text-amber-700"
+                    displayedFinancials.isLive
+                      ? "text-emerald-700"
+                      : "text-amber-700"
                   }`}
                 >
                   Stripe Data Status
@@ -507,6 +624,13 @@ export default function AdminStripeFinancialsPage() {
                 <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
                   {loadMessage}
                 </p>
+                {hiddenTestTransactionCount > 0 ? (
+                  <p className="mt-2 text-xs font-black uppercase tracking-[0.14em] text-amber-700">
+                    {hiddenTestTransactionCount.toLocaleString()} Stripe test
+                    {hiddenTestTransactionCount === 1 ? " record" : " records"}
+                    hidden from live totals
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -558,49 +682,51 @@ export default function AdminStripeFinancialsPage() {
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
             <SummaryCard
               label="Gross Payments"
-              value={formatCurrency(financials.summary.grossPayments)}
+              value={formatCurrency(displayedFinancials.summary.grossPayments)}
               helper="Customer payments processed through Stripe"
               tone="green"
             />
             <SummaryCard
               label="Net Payments"
-              value={formatCurrency(financials.summary.netPayments)}
+              value={formatCurrency(displayedFinancials.summary.netPayments)}
               helper="Payments after Stripe fees, refunds, and adjustments"
               tone="green"
             />
             <SummaryCard
               label="Stripe Fees"
-              value={formatCurrency(financials.summary.stripeFees)}
+              value={formatCurrency(displayedFinancials.summary.stripeFees)}
               helper="Processing fees feeding P&L and Cash Flow"
               tone="blue"
             />
             <SummaryCard
               label="Refunds"
-              value={formatCurrency(financials.summary.refunds)}
-              helper={`${financials.summary.refundCount.toLocaleString()} refund records`}
+              value={formatCurrency(displayedFinancials.summary.refunds)}
+              helper={`${displayedFinancials.summary.refundCount.toLocaleString()} refund records`}
               tone="amber"
             />
             <SummaryCard
               label="Disputes"
-              value={formatCurrency(financials.summary.disputes)}
-              helper={`${financials.summary.disputeCount.toLocaleString()} dispute records`}
+              value={formatCurrency(displayedFinancials.summary.disputes)}
+              helper={`${displayedFinancials.summary.disputeCount.toLocaleString()} dispute records`}
               tone="red"
             />
             <SummaryCard
               label="Transfers"
-              value={formatCurrency(financials.summary.transfers)}
-              helper={`${financials.summary.payoutCount.toLocaleString()} Stripe payout batches`}
+              value={formatCurrency(displayedFinancials.summary.transfers)}
+              helper={`${displayedFinancials.summary.payoutCount.toLocaleString()} Stripe payout batches`}
               tone="purple"
             />
             <SummaryCard
               label="Available"
-              value={formatCurrency(financials.summary.availableBalance)}
+              value={formatCurrency(
+                displayedFinancials.summary.availableBalance,
+              )}
               helper="Stripe available balance"
               tone="blue"
             />
             <SummaryCard
               label="Pending"
-              value={formatCurrency(financials.summary.pendingBalance)}
+              value={formatCurrency(displayedFinancials.summary.pendingBalance)}
               helper="Stripe pending balance"
               tone="amber"
             />
@@ -619,8 +745,8 @@ export default function AdminStripeFinancialsPage() {
                 </h2>
                 <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
                   Stripe payout transfers should match NFCU/Plaid business bank
-                  deposits. Unmatched deposits should be reviewed before month-end
-                  close, CPA exports, and tax reporting.
+                  deposits. Unmatched deposits should be reviewed before
+                  month-end close, CPA exports, and tax reporting.
                 </p>
               </div>
 
@@ -643,7 +769,7 @@ export default function AdminStripeFinancialsPage() {
                   Matched Deposits
                 </p>
                 <p className="mt-2 text-3xl font-black text-slate-950">
-                  {financials.summary.matchedDeposits.toLocaleString()}
+                  {displayedFinancials.summary.matchedDeposits.toLocaleString()}
                 </p>
                 <p className="mt-1 text-xs font-bold text-slate-600">
                   Stripe payouts matched to banking
@@ -655,7 +781,7 @@ export default function AdminStripeFinancialsPage() {
                   Unmatched Deposits
                 </p>
                 <p className="mt-2 text-3xl font-black text-slate-950">
-                  {financials.summary.unmatchedDeposits.toLocaleString()}
+                  {displayedFinancials.summary.unmatchedDeposits.toLocaleString()}
                 </p>
                 <p className="mt-1 text-xs font-bold text-slate-600">
                   Needs reconciliation review
@@ -667,7 +793,7 @@ export default function AdminStripeFinancialsPage() {
                   Payout Deposits
                 </p>
                 <p className="mt-2 text-3xl font-black text-slate-950">
-                  {formatCurrency(financials.summary.payoutDeposits)}
+                  {formatCurrency(displayedFinancials.summary.payoutDeposits)}
                 </p>
                 <p className="mt-1 text-xs font-bold text-slate-600">
                   Bank deposit total
@@ -679,7 +805,9 @@ export default function AdminStripeFinancialsPage() {
               <div className="h-4 overflow-hidden rounded-full bg-white">
                 <div
                   className="h-full rounded-full bg-emerald-600"
-                  style={{ width: `${Math.max(0, Math.min(100, matchedDepositRate))}%` }}
+                  style={{
+                    width: `${Math.max(0, Math.min(100, matchedDepositRate))}%`,
+                  }}
                 />
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs font-black text-slate-600">
@@ -762,17 +890,18 @@ export default function AdminStripeFinancialsPage() {
                 Payments, Refunds, Fees, Disputes & Transfers
               </h2>
               <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
-                Review Stripe event-level activity and confirm each item is ready
-                for financial statements and bank reconciliation.
+                Review Stripe event-level activity and confirm each item is
+                ready for financial statements and bank reconciliation.
               </p>
             </div>
 
             <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-blue-800">
-              {financials.summary.transactionCount.toLocaleString()} Transactions
+              {displayedFinancials.summary.transactionCount.toLocaleString()}{" "}
+              Transactions
             </span>
           </div>
 
-          {financials.transactions.length > 0 ? (
+          {displayedFinancials.transactions.length > 0 ? (
             <div className="overflow-hidden rounded-[1.5rem] border border-slate-100">
               <div className="overflow-x-auto">
                 <table className="min-w-[1120px] w-full divide-y divide-slate-100 text-left">
@@ -806,7 +935,7 @@ export default function AdminStripeFinancialsPage() {
                   </thead>
 
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {financials.transactions.map((transaction) => (
+                    {displayedFinancials.transactions.map((transaction) => (
                       <tr key={transaction.id}>
                         <td className="px-4 py-4 text-sm font-bold text-slate-600">
                           {formatDateTime(transaction.createdAt)}
@@ -848,7 +977,9 @@ export default function AdminStripeFinancialsPage() {
                         <td className="px-4 py-4">
                           <span
                             className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${toneClasses(
-                              reconciliationTone(transaction.reconciliationStatus),
+                              reconciliationTone(
+                                transaction.reconciliationStatus,
+                              ),
                             )}`}
                           >
                             {transaction.reconciliationStatus.replace("_", " ")}
@@ -884,13 +1015,13 @@ export default function AdminStripeFinancialsPage() {
             </div>
 
             <span className="rounded-full border border-purple-100 bg-purple-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-purple-800">
-              {financials.summary.payoutCount.toLocaleString()} Payouts
+              {displayedFinancials.summary.payoutCount.toLocaleString()} Payouts
             </span>
           </div>
 
-          {financials.payouts.length > 0 ? (
+          {displayedFinancials.payouts.length > 0 ? (
             <div className="grid gap-4 lg:grid-cols-3">
-              {financials.payouts.map((payout) => (
+              {displayedFinancials.payouts.map((payout) => (
                 <div
                   key={payout.id}
                   className="rounded-[1.5rem] border border-slate-100 bg-[#fbfefd] p-5 shadow-sm"
@@ -978,7 +1109,7 @@ export default function AdminStripeFinancialsPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {financials.sourceHealth.map((source) => (
+            {displayedFinancials.sourceHealth.map((source) => (
               <div
                 key={source.id}
                 className={`rounded-[1.25rem] border p-4 ${

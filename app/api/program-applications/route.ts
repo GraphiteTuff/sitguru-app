@@ -50,6 +50,11 @@ type SavedApplication = {
   created_at: string;
 };
 
+type SafeFormData = {
+  get(name: string): FormDataEntryValue | null;
+  getAll(name: string): FormDataEntryValue[];
+};
+
 const MAX_RESUME_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_ADDITIONAL_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_ADDITIONAL_DOCUMENTS = 6;
@@ -654,7 +659,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
+    const formData = (await request.formData()) as unknown as SafeFormData;
 
     const program = normalizeProgram(formData.get("program"));
     const fullName = normalizeString(formData.get("fullName"));

@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
 
+type SafeFormData = {
+  get(name: string): unknown;
+};
+
 function getBaseUrl(request: NextRequest) {
   const forwardedProto = request.headers.get("x-forwarded-proto");
   const forwardedHost = request.headers.get("x-forwarded-host");
@@ -33,12 +37,14 @@ function redirectWithMessage(
 }
 
 export async function POST(request: NextRequest) {
-  const formData = await request.formData();
+  const formData = (await request.formData()) as unknown as SafeFormData;
 
-  const email = String(formData.get("email") || "")
-    .trim()
-    .toLowerCase();
-  const password = String(formData.get("password") || "");
+  const rawEmail = formData.get("email");
+  const rawPassword = formData.get("password");
+
+  const email =
+    typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
+  const password = typeof rawPassword === "string" ? rawPassword : "";
 
   if (!email || !password) {
     return redirectWithMessage(

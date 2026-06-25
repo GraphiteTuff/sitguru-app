@@ -6,6 +6,7 @@ type GuruRecognitionBadgeProps = {
   showStars?: boolean;
   className?: string;
   imageSrc?: string;
+  compactOnMobile?: boolean;
 };
 
 export default function GuruRecognitionBadge({
@@ -16,28 +17,29 @@ export default function GuruRecognitionBadge({
   showStars = false,
   className = "",
   imageSrc = "/images/badges/sitguru-certified-guru-badge.png",
+  compactOnMobile = true,
 }: GuruRecognitionBadgeProps) {
   const sizeClasses = {
     sm: {
       wrapper: "gap-2 rounded-xl px-3 py-2",
-      crest: "h-10 w-10",
-      label: "text-sm",
-      star: "text-xs",
-      sublabel: "text-[10px]",
+      crest: "h-8 w-8 sm:h-10 sm:w-10",
+      label: "text-xs sm:text-sm",
+      star: "text-[10px] sm:text-xs",
+      sublabel: "text-[9px] sm:text-[10px]",
     },
     md: {
-      wrapper: "gap-3 rounded-[1.1rem] px-4 py-3",
-      crest: "h-14 w-14",
-      label: "text-base",
-      star: "text-sm",
-      sublabel: "text-xs",
+      wrapper: "gap-2 rounded-xl px-3 py-2 sm:gap-3 sm:rounded-[1.1rem] sm:px-4 sm:py-3",
+      crest: "h-9 w-9 sm:h-14 sm:w-14",
+      label: "text-xs sm:text-base",
+      star: "text-[10px] sm:text-sm",
+      sublabel: "text-[9px] sm:text-xs",
     },
     lg: {
-      wrapper: "gap-4 rounded-[1.35rem] px-5 py-4",
-      crest: "h-20 w-20",
-      label: "text-xl",
-      star: "text-base",
-      sublabel: "text-sm",
+      wrapper: "gap-2 rounded-xl px-3 py-2 sm:gap-4 sm:rounded-[1.35rem] sm:px-5 sm:py-4",
+      crest: "h-10 w-10 sm:h-20 sm:w-20",
+      label: "text-sm sm:text-xl",
+      star: "text-xs sm:text-base",
+      sublabel: "text-[10px] sm:text-sm",
     },
   };
 
@@ -45,7 +47,7 @@ export default function GuruRecognitionBadge({
 
   return (
     <div
-      className={`inline-flex items-center border border-emerald-200 bg-white/95 shadow-[0_10px_24px_rgba(15,23,42,0.10)] ${selected.wrapper} ${className}`}
+      className={`inline-flex max-w-full items-center border border-emerald-200 bg-white/95 shadow-[0_10px_24px_rgba(15,23,42,0.10)] ${selected.wrapper} ${className}`}
     >
       <div className={`${selected.crest} shrink-0 overflow-hidden rounded-xl bg-white`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -56,20 +58,30 @@ export default function GuruRecognitionBadge({
         />
       </div>
 
-      <div className="flex flex-col items-start text-left">
-        <span className={`${selected.label} font-black !text-slate-900`}>
+      <div className="flex min-w-0 flex-col items-start text-left">
+        <span
+          className={`${selected.label} max-w-[180px] truncate font-black leading-tight !text-slate-900 sm:max-w-none`}
+        >
           {label}
         </span>
 
-        <span
-          className={`${selected.sublabel} mt-0.5 font-bold uppercase tracking-[0.12em] !text-emerald-700`}
-        >
-          {sublabel}
-        </span>
+        {compactOnMobile ? (
+          <span
+            className={`${selected.sublabel} mt-0.5 hidden font-bold uppercase tracking-[0.12em] !text-emerald-700 sm:block`}
+          >
+            {sublabel}
+          </span>
+        ) : (
+          <span
+            className={`${selected.sublabel} mt-0.5 font-bold uppercase tracking-[0.12em] !text-emerald-700`}
+          >
+            {sublabel}
+          </span>
+        )}
 
         {showStars ? (
           <div
-            className="mt-1 flex items-center gap-1"
+            className="mt-1 hidden items-center gap-1 sm:flex"
             aria-label={`${stars} out of 5 recognition stars`}
           >
             {Array.from({ length: 5 }).map((_, index) => (
@@ -91,7 +103,7 @@ export default function GuruRecognitionBadge({
 }
 
 export function GuruCrestIcon({
-  className = "h-10 w-10",
+  className = "h-8 w-8 sm:h-10 sm:w-10",
   imageSrc = "/images/badges/sitguru-certified-guru-badge.png",
 }: {
   className?: string;
