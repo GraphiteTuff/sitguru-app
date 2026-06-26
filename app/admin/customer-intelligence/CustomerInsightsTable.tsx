@@ -24,6 +24,10 @@ type CustomerInsight = {
   state: string;
   country: string;
   zipCode: string;
+  nameSource?: string;
+  emailSource?: string;
+  photoSource?: string;
+  locationSource?: string;
   source: string;
   campaign: string;
   bookingCount: number;
@@ -179,6 +183,20 @@ function getCustomerPublicProfilePreviewHref(customerId: string) {
   return `/admin/customers/${encodeURIComponent(customerId)}/public-profile-preview`;
 }
 
+function getDisplaySourceBadge(source?: string) {
+  if (!source) return null;
+
+  const normalized = source.toLowerCase();
+
+  if (normalized.includes("legacy") || normalized.includes("fallback")) {
+    return "Fallback / legacy";
+  }
+
+  if (normalized.includes("missing")) return "Missing";
+
+  return source;
+}
+
 function Avatar({ name, src }: { name: string; src: string }) {
   return (
     <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-green-800 text-sm font-black text-white">
@@ -287,6 +305,11 @@ function CustomerMobileCard({
               <p className="truncate text-xs font-bold text-slate-500">
                 {customer.email || "No email found"}
               </p>
+              <DisplaySourceLine
+                nameSource={customer.nameSource}
+                emailSource={customer.emailSource}
+                photoSource={customer.photoSource}
+              />
             </div>
 
             <span
@@ -303,7 +326,10 @@ function CustomerMobileCard({
             <MobileMetric label="Spend" value={money(customer.totalSpend)} />
             <MobileMetric label="Bookings" value={number(customer.bookingCount)} />
             <MobileMetric label="Source" value={customer.source || "Direct"} />
-            <MobileMetric label="Location" value={getLocation(customer)} />
+            <MobileMetric
+              label={`Location${customer.locationSource ? ` (${getDisplaySourceBadge(customer.locationSource)})` : ""}`}
+              value={getLocation(customer)}
+            />
             <MobileMetric label="Pets" value={number(customer.petCount)} />
           </div>
 
@@ -313,6 +339,30 @@ function CustomerMobileCard({
         </div>
       </div>
     </div>
+  );
+}
+
+function DisplaySourceLine({
+  nameSource,
+  emailSource,
+  photoSource,
+}: {
+  nameSource?: string;
+  emailSource?: string;
+  photoSource?: string;
+}) {
+  const labels = [
+    nameSource ? `Name: ${getDisplaySourceBadge(nameSource)}` : "",
+    emailSource ? `Email: ${getDisplaySourceBadge(emailSource)}` : "",
+    photoSource ? `Photo: ${getDisplaySourceBadge(photoSource)}` : "",
+  ].filter(Boolean);
+
+  if (!labels.length) return null;
+
+  return (
+    <p className="mt-1 truncate text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">
+      {labels.join(" · ")}
+    </p>
   );
 }
 
@@ -731,6 +781,11 @@ export default function CustomerInsightsTable({
                           <p className="max-w-[210px] truncate text-xs font-bold text-slate-500">
                             {customer.email || "No email found"}
                           </p>
+                          <DisplaySourceLine
+                            nameSource={customer.nameSource}
+                            emailSource={customer.emailSource}
+                            photoSource={customer.photoSource}
+                          />
                         </div>
                       </Link>
                     </td>
@@ -771,6 +826,11 @@ export default function CustomerInsightsTable({
                       {customer.zipCode ? (
                         <span className="block text-xs text-slate-400">
                           ZIP {customer.zipCode}
+                        </span>
+                      ) : null}
+                      {customer.locationSource ? (
+                        <span className="block text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">
+                          {getDisplaySourceBadge(customer.locationSource)}
                         </span>
                       ) : null}
                     </td>

@@ -33,6 +33,16 @@ type PageProps = {
 
 type AnyRow = Record<string, unknown>;
 
+type AdminQueryBuilder = PromiseLike<AdminQueryResult> & {
+  or: (filters: string) => AdminQueryBuilder;
+  order: (column: string, options: { ascending: boolean }) => AdminQueryBuilder;
+};
+
+type AdminQueryResult = {
+  data?: unknown;
+  error?: unknown;
+};
+
 type VerificationStatus =
   | "verified"
   | "active"
@@ -343,10 +353,30 @@ function getDisplayName(row: AnyRow | null | undefined, authUser?: AnyRow | null
 }
 
 function getEmail(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
-  const profileEmail = getText(row, ["email", "customer_email", "pet_parent_email"]);
+  const profileEmail = getText(row, ["email"]);
   const authEmail = getText(authUser, ["email"]);
+  const legacyEmail = getText(row, ["customer_email", "pet_parent_email"]);
 
-  return profileEmail || authEmail || "No email found";
+  return profileEmail || authEmail || legacyEmail || "No email found";
+}
+
+function getEmailSource(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
+  if (getText(row, ["email"])) return "Profile";
+  if (getText(authUser, ["email"])) return "Account";
+  if (getText(row, ["customer_email", "pet_parent_email"])) return "Fallback / legacy";
+
+  return "Missing";
+}
+
+function getAvatarUrl(row: AnyRow | null | undefined) {
+  return getText(row, ["avatar_url"]) || getText(row, ["photo_url", "profile_photo_url", "image_url"]);
+}
+
+function getAvatarSource(row: AnyRow | null | undefined) {
+  if (getText(row, ["avatar_url"])) return "Profile avatar";
+  if (getText(row, ["photo_url", "profile_photo_url", "image_url"])) return "Fallback / legacy photo";
+
+  return "Missing";
 }
 
 function getPhone(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
@@ -357,14 +387,26 @@ function getPhone(row: AnyRow | null | undefined, authUser?: AnyRow | null) {
 }
 
 function getLocation(row: AnyRow | null | undefined) {
-  const city = getText(row, ["city", "customer_city", "location_city"]);
-  const state = getText(row, ["state", "state_code", "customer_state", "location_state"]);
+  const city = getText(row, ["city"]) || getText(row, ["customer_city", "location_city"]);
+  const state = getText(row, ["state", "state_code"]) || getText(row, ["customer_state", "location_state"]);
   const zip = getText(row, ["zip", "zipcode", "zip_code", "postal_code"]);
 
   const cityState = [city, state].filter(Boolean).join(", ");
   const location = [cityState, zip].filter(Boolean).join(" ");
 
   return location || "Unknown";
+}
+
+function getLocationSource(row: AnyRow | null | undefined) {
+  if (getText(row, ["city", "state", "state_code", "zip", "zipcode", "zip_code", "postal_code"])) {
+    return "Profile";
+  }
+
+  if (getText(row, ["customer_city", "location_city", "customer_state", "location_state"])) {
+    return "Fallback / legacy";
+  }
+
+  return "Missing";
 }
 
 function getInitials(name: string) {
@@ -587,11 +629,11 @@ function getSignupRiskAssessment({
 async function safeSelect(
   table: string,
   select: string,
-  filter: (query: any) => any,
+  filter: (query: AdminQueryBuilder) => PromiseLike<AdminQueryResult> | AdminQueryResult,
 ) {
   try {
     const query = supabaseAdmin.from(table).select(select);
-    const result = await filter(query);
+    const result = await filter(query as unknown as AdminQueryBuilder);
 
     if (result.error) {
       return [];
@@ -1281,8 +1323,12 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
 
   const name = getDisplayName(profile, authUser);
   const email = getEmail(profile, authUser);
+  const emailSource = getEmailSource(profile, authUser);
   const phone = getPhone(profile, authUser);
   const location = getLocation(profile);
+  const locationSource = getLocationSource(profile);
+  const avatarUrl = getAvatarUrl(profile);
+  const avatarSource = getAvatarSource(profile);
   const customerDirectMessageHref = buildCustomerDirectMessageHref({
     customerId: relatedCustomerId || (isUuid(lookupKey) ? lookupKey : ""),
     name,
@@ -1309,7 +1355,6 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
   const totalSpend = bookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
   const paidBookings = bookings.filter((booking) => getBookingAmount(booking) > 0).length;
   const averageBookingValue = bookings.length > 0 ? totalSpend / bookings.length : 0;
-  const lastBooking = bookings[0] ?? null;
   const verifiedFields = getVerifiedFields(profile, authUser);
   const verification = getVerificationStatus({
     profile,
@@ -1407,8 +1452,13 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
 
           <div className="mt-5 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-emerald-100 text-xl font-black text-emerald-900">
-                {getInitials(name)}
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-emerald-100 text-xl font-black text-emerald-900">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  getInitials(name)
+                )}
               </div>
 
               <div>
@@ -1758,7 +1808,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                 icon={<Mail className="mt-0.5 h-5 w-5 text-emerald-700" />}
                 label="Email"
                 value={email}
-                detail={verifiedFields.hasConfirmedEmail ? "Email verified" : "Email not verified"}
+                detail={`${emailSource}${verifiedFields.hasConfirmedEmail ? " · Email verified" : " · Email not verified"}`}
               />
 
               <ProfileInfoRow
@@ -1772,6 +1822,14 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
                 icon={<MapPin className="mt-0.5 h-5 w-5 text-emerald-700" />}
                 label="Location"
                 value={location}
+                detail={locationSource}
+              />
+
+              <ProfileInfoRow
+                icon={<UserRound className="mt-0.5 h-5 w-5 text-emerald-700" />}
+                label="Account Photo"
+                value={avatarUrl || "No photo found"}
+                detail={avatarSource}
               />
 
               <div className="grid gap-3 sm:grid-cols-2">
