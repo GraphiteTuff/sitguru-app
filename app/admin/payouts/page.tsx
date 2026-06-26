@@ -22,8 +22,28 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-type PayoutSource = "Guru" | "Partner" | "Platform" | "Adjustment" | "Refund";
-type PayoutStatus = "paid" | "pending" | "review" | "failed" | "scheduled";
+type DbRow = Record<string, unknown> & {
+  guru?: Record<string, unknown>;
+  partner?: Record<string, unknown>;
+};
+
+type PayoutSource =
+  | "Guru"
+  | "Partner"
+  | "Referral"
+  | "Platform"
+  | "Adjustment"
+  | "Refund";
+type PayoutStatus =
+  | "ready"
+  | "paid"
+  | "pending"
+  | "review"
+  | "failed"
+  | "scheduled"
+  | "missing_payout_method"
+  | "stripe_restricted"
+  | "no_stripe_account";
 
 type PayoutRow = {
   id: string;
@@ -39,6 +59,11 @@ type PayoutRow = {
   reference: string;
   batch: string;
   notes: string;
+  recipientHref?: string;
+  relatedHref?: string;
+  stripeHref?: string;
+  sourceTable: string;
+  rawStatus?: string;
 };
 
 type SearchParamsShape = {
@@ -50,99 +75,6 @@ type SearchParamsShape = {
 };
 
 type SearchParamsInput = Promise<SearchParamsShape> | SearchParamsShape;
-
-const demoPayoutRows: PayoutRow[] = [
-  {
-    id: "demo-guru-001",
-    source: "Guru",
-    name: "Avery Johnson",
-    email: "avery.johnson@example.com",
-    city: "Philadelphia",
-    state: "PA",
-    zip: "19103",
-    amount: 428.75,
-    status: "paid",
-    payoutDate: "2026-05-01T10:03:00",
-    reference: "tr_87fa29b1e2f9e",
-    batch: "May 2026 Batch A",
-    notes: "Weekend pet sitting booking",
-  },
-  {
-    id: "demo-guru-002",
-    source: "Guru",
-    name: "Maya Thompson",
-    email: "maya.thompson@example.com",
-    city: "Camden",
-    state: "NJ",
-    zip: "08102",
-    amount: 315.5,
-    status: "pending",
-    payoutDate: "2026-05-03T10:03:00",
-    reference: "tr_9c2c6e9f43c2",
-    batch: "May 2026 Batch A",
-    notes: "Overnight care booking",
-  },
-  {
-    id: "demo-partner-001",
-    source: "Partner",
-    name: "Happy Paws Rescue",
-    email: "payments@happypawsrescue.org",
-    city: "Cherry Hill",
-    state: "NJ",
-    zip: "08002",
-    amount: 225,
-    status: "paid",
-    payoutDate: "2026-04-29T14:15:00",
-    reference: "pc_12ab3c4ef567",
-    batch: "April 2026 Partner Batch",
-    notes: "Referral commission",
-  },
-  {
-    id: "demo-guru-003",
-    source: "Guru",
-    name: "Jordan Lee",
-    email: "jordan.lee@example.com",
-    city: "Wilmington",
-    state: "DE",
-    zip: "19801",
-    amount: 182.25,
-    status: "review",
-    payoutDate: "2026-05-04T10:03:00",
-    reference: "tr_79h1jk2111a2",
-    batch: "May 2026 Batch B",
-    notes: "Manual review required",
-  },
-  {
-    id: "demo-platform-001",
-    source: "Platform",
-    name: "Stripe Platform Transfer",
-    email: "finance@sitguru.com",
-    city: "Remote",
-    state: "US",
-    zip: "00000",
-    amount: 76.85,
-    status: "failed",
-    payoutDate: "2026-05-02T09:59:00",
-    reference: "po_4a31ed_8c1",
-    batch: "May 2026 Platform Batch",
-    notes: "Transfer failed - insufficient balance",
-  },
-  {
-    id: "demo-adjustment-001",
-    source: "Adjustment",
-    name: "Booking Adjustment",
-    email: "accounting@sitguru.com",
-    city: "Philadelphia",
-    state: "PA",
-    zip: "19103",
-    amount: 167.2,
-    status: "scheduled",
-    payoutDate: "2026-05-04T09:00:00",
-    reference: "adj_2026_0504",
-    batch: "May 2026 Adjustments",
-    notes: "Scheduled correction for payout batch",
-  },
-];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -177,6 +109,32 @@ function normalizeStatus(value: unknown): PayoutStatus {
   const status = String(value || "pending").toLowerCase();
 
   if (
+    status.includes("ready") ||
+    status.includes("approved") ||
+    status.includes("qualified")
+  ) {
+    return "ready";
+  }
+
+  if (
+    status.includes("missing") &&
+    (status.includes("payout") || status.includes("method"))
+  ) {
+    return "missing_payout_method";
+  }
+
+  if (status.includes("restricted") || status.includes("disabled")) {
+    return "stripe_restricted";
+  }
+
+  if (
+    status.includes("no_stripe") ||
+    status.includes("stripe account required")
+  ) {
+    return "no_stripe_account";
+  }
+
+  if (
     status.includes("paid") ||
     status.includes("complete") ||
     status.includes("completed") ||
@@ -194,6 +152,8 @@ function normalizeStatus(value: unknown): PayoutStatus {
   ) {
     return "failed";
   }
+
+  if (status.includes("ready")) return "ready";
 
   if (
     status.includes("review") ||
@@ -221,6 +181,8 @@ function normalizeSource(value: unknown): PayoutSource {
     return "Partner";
   }
 
+  if (source.includes("referral") || source.includes("reward"))
+    return "Referral";
   if (source.includes("platform")) return "Platform";
   if (source.includes("adjust")) return "Adjustment";
   if (source.includes("refund")) return "Refund";
@@ -259,7 +221,7 @@ async function safeAdminSelect<T>(table: string, query = "*") {
   }
 }
 
-function rewardAmount(row: any) {
+function rewardAmount(row: DbRow) {
   return normalizeAmount(
     row.normalized_amount ||
       row.reward_amount ||
@@ -270,10 +232,14 @@ function rewardAmount(row: any) {
   );
 }
 
-function rewardStatus(row: any): PayoutStatus {
+function rewardStatus(row: DbRow): PayoutStatus {
   const treatment = String(row.financial_treatment || "").toLowerCase();
   const status = String(
-    row.normalized_status || row.reward_status || row.payout_status || row.status || "",
+    row.normalized_status ||
+      row.reward_status ||
+      row.payout_status ||
+      row.status ||
+      "",
   ).toLowerCase();
 
   if (
@@ -293,6 +259,8 @@ function rewardStatus(row: any): PayoutStatus {
   ) {
     return "scheduled";
   }
+
+  if (status.includes("ready")) return "ready";
 
   if (
     status.includes("review") ||
@@ -314,7 +282,7 @@ function rewardStatus(row: any): PayoutStatus {
   return "pending";
 }
 
-function rewardRecipientName(row: any) {
+function rewardRecipientName(row: DbRow) {
   return (
     row.recipient_name ||
     row.customer_name ||
@@ -331,7 +299,7 @@ function rewardRecipientName(row: any) {
   );
 }
 
-function rewardRecipientEmail(row: any) {
+function rewardRecipientEmail(row: DbRow) {
   return (
     row.recipient_email ||
     row.customer_email ||
@@ -346,8 +314,10 @@ function rewardRecipientEmail(row: any) {
   );
 }
 
-function rewardProgramLabel(row: any) {
-  const category = String(row.financial_category || row.reward_type || row.source || row.type || "")
+function rewardProgramLabel(row: DbRow) {
+  const category = String(
+    row.financial_category || row.reward_type || row.source || row.type || "",
+  )
     .replace(/[-_]+/g, " ")
     .trim();
 
@@ -359,7 +329,7 @@ function rewardProgramLabel(row: any) {
     .join(" ");
 }
 
-function buildReferralRewardPayoutRows(rows: any[]): PayoutRow[] {
+function buildReferralRewardPayoutRows(rows: DbRow[]): PayoutRow[] {
   return rows
     .map((row, index) => {
       const amount = rewardAmount(row);
@@ -367,16 +337,38 @@ function buildReferralRewardPayoutRows(rows: any[]): PayoutRow[] {
       if (amount <= 0) return null;
 
       const programLabel = rewardProgramLabel(row);
-      const treatment = String(row.financial_treatment || "pending_reward_liability");
+      const treatment = String(
+        row.financial_treatment || "pending_reward_liability",
+      );
 
       return {
-        id: String(row.id || row.referral_code_id || row.reward_id || `referral-reward-${index}`),
-        source: "Partner" as PayoutSource,
+        id: String(
+          row.id ||
+            row.referral_code_id ||
+            row.reward_id ||
+            `referral-reward-${index}`,
+        ),
+        source: "Referral" as PayoutSource,
         name: rewardRecipientName(row),
         email: rewardRecipientEmail(row),
-        city: row.city || row.recipient_city || row.customer_city || row.partner_city || "Remote",
-        state: row.state || row.recipient_state || row.customer_state || row.partner_state || "US",
-        zip: row.zip || row.zip_code || row.recipient_zip || row.customer_zip || "",
+        city:
+          row.city ||
+          row.recipient_city ||
+          row.customer_city ||
+          row.partner_city ||
+          "Remote",
+        state:
+          row.state ||
+          row.recipient_state ||
+          row.customer_state ||
+          row.partner_state ||
+          "US",
+        zip:
+          row.zip ||
+          row.zip_code ||
+          row.recipient_zip ||
+          row.customer_zip ||
+          "",
         amount,
         status: rewardStatus(row),
         payoutDate:
@@ -397,13 +389,29 @@ function buildReferralRewardPayoutRows(rows: any[]): PayoutRow[] {
           "Referral reward",
         batch: `${programLabel} / Reward Queue`,
         notes: `Referral reward · ${programLabel} · ${treatment.replaceAll("_", " ")}`,
+        recipientHref: row.ambassador_id
+          ? `/admin/ambassadors/${row.ambassador_id}`
+          : row.partner_id
+            ? `/admin/partners/${row.partner_id}`
+            : undefined,
+        relatedHref: row.referral_id
+          ? `/admin/referrals?referral=${row.referral_id}`
+          : row.referral_code_id
+            ? `/admin/referrals?code=${row.referral_code_id}`
+            : "/admin/referrals",
+        sourceTable: "admin_referral_reward_liability",
+        rawStatus:
+          row.normalized_status ||
+          row.reward_status ||
+          row.payout_status ||
+          row.status ||
+          row.financial_treatment,
       };
     })
     .filter(Boolean) as PayoutRow[];
 }
 
-
-function buildGuruPayoutRows(rows: any[]): PayoutRow[] {
+function buildGuruPayoutRows(rows: DbRow[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `guru-${index}`),
     source: "Guru",
@@ -423,7 +431,11 @@ function buildGuruPayoutRows(rows: any[]): PayoutRow[] {
     ),
     status: normalizeStatus(row.status || row.payout_status),
     payoutDate:
-      row.payout_date || row.scheduled_for || row.created_at || row.updated_at || null,
+      row.payout_date ||
+      row.scheduled_for ||
+      row.created_at ||
+      row.updated_at ||
+      null,
     reference:
       row.transaction_reference ||
       row.stripe_transfer_id ||
@@ -432,10 +444,23 @@ function buildGuruPayoutRows(rows: any[]): PayoutRow[] {
       "No reference",
     batch: row.batch_name || row.batch || row.payout_batch || "Unbatched",
     notes: row.notes || row.memo || "Guru sitting payout",
+    recipientHref: row.guru_id
+      ? `/admin/gurus/${row.guru_id}`
+      : row.user_id
+        ? `/admin/users/${row.user_id}`
+        : undefined,
+    relatedHref: row.booking_id
+      ? `/admin/bookings/${row.booking_id}`
+      : undefined,
+    stripeHref: stripeDashboardHref(
+      row.stripe_transfer_id || row.stripe_payout_id || row.stripe_account_id,
+    ),
+    sourceTable: "guru_payouts",
+    rawStatus: row.status || row.payout_status,
   }));
 }
 
-function buildPartnerPayoutRows(rows: any[]): PayoutRow[] {
+function buildPartnerPayoutRows(rows: DbRow[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `partner-${index}`),
     source: "Partner",
@@ -446,16 +471,27 @@ function buildPartnerPayoutRows(rows: any[]): PayoutRow[] {
       row.partner?.company_name ||
       row.partner?.name ||
       "Partner payout",
-    email: row.email || row.partner_email || row.partner?.email || "No email on file",
+    email:
+      row.email ||
+      row.partner_email ||
+      row.partner?.email ||
+      "No email on file",
     city: row.city || row.partner_city || row.partner?.city || "Unknown",
     state: row.state || row.partner_state || row.partner?.state || "",
     zip: row.zip || row.zip_code || row.partner?.zip || "",
     amount: normalizeAmount(
-      row.amount || row.commission_amount || row.payout_amount || row.total_amount,
+      row.amount ||
+        row.commission_amount ||
+        row.payout_amount ||
+        row.total_amount,
     ),
     status: normalizeStatus(row.status || row.payout_status),
     payoutDate:
-      row.payout_date || row.scheduled_for || row.created_at || row.updated_at || null,
+      row.payout_date ||
+      row.scheduled_for ||
+      row.created_at ||
+      row.updated_at ||
+      null,
     reference:
       row.transaction_reference ||
       row.stripe_transfer_id ||
@@ -464,13 +500,48 @@ function buildPartnerPayoutRows(rows: any[]): PayoutRow[] {
       "No reference",
     batch: row.batch_name || row.batch || row.payout_batch || "Unbatched",
     notes: row.notes || row.memo || "Partner commission payout",
+    recipientHref: row.partner_id
+      ? `/admin/partners/${row.partner_id}`
+      : row.ambassador_id
+        ? `/admin/ambassadors/${row.ambassador_id}`
+        : undefined,
+    relatedHref: row.referral_id
+      ? `/admin/referrals?referral=${row.referral_id}`
+      : undefined,
+    stripeHref: stripeDashboardHref(
+      row.stripe_transfer_id || row.stripe_payout_id || row.stripe_account_id,
+    ),
+    sourceTable: "partner_payouts",
+    rawStatus: row.status || row.payout_status,
   }));
 }
 
-function buildGenericPayoutRows(rows: any[]): PayoutRow[] {
+function stripeDashboardHref(value: unknown) {
+  const id = String(value || "").trim();
+  if (!id) return undefined;
+
+  if (id.startsWith("acct_"))
+    return `https://dashboard.stripe.com/connect/accounts/${id}`;
+  if (id.startsWith("tr_"))
+    return `https://dashboard.stripe.com/transfers/${id}`;
+  if (id.startsWith("po_")) return `https://dashboard.stripe.com/payouts/${id}`;
+  if (id.startsWith("ch_"))
+    return `https://dashboard.stripe.com/payments/${id}`;
+  if (id.startsWith("pi_"))
+    return `https://dashboard.stripe.com/payments/${id}`;
+
+  return undefined;
+}
+
+function buildGenericPayoutRows(
+  rows: DbRow[],
+  sourceTable = "payouts",
+): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `generic-${index}`),
-    source: normalizeSource(row.source || row.type || row.category || "Platform"),
+    source: normalizeSource(
+      row.source || row.type || row.category || "Platform",
+    ),
     name:
       row.recipient_name ||
       row.name ||
@@ -490,7 +561,11 @@ function buildGenericPayoutRows(rows: any[]): PayoutRow[] {
     ),
     status: normalizeStatus(row.status || row.payout_status),
     payoutDate:
-      row.payout_date || row.scheduled_for || row.created_at || row.updated_at || null,
+      row.payout_date ||
+      row.scheduled_for ||
+      row.created_at ||
+      row.updated_at ||
+      null,
     reference:
       row.transaction_reference ||
       row.stripe_transfer_id ||
@@ -499,6 +574,26 @@ function buildGenericPayoutRows(rows: any[]): PayoutRow[] {
       "No reference",
     batch: row.batch_name || row.batch || row.payout_batch || "Unbatched",
     notes: row.notes || row.memo || "Platform payout",
+    recipientHref: row.guru_id
+      ? `/admin/gurus/${row.guru_id}`
+      : row.partner_id
+        ? `/admin/partners/${row.partner_id}`
+        : row.ambassador_id
+          ? `/admin/ambassadors/${row.ambassador_id}`
+          : undefined,
+    relatedHref: row.booking_id
+      ? `/admin/bookings/${row.booking_id}`
+      : row.referral_id
+        ? `/admin/referrals?referral=${row.referral_id}`
+        : undefined,
+    stripeHref: stripeDashboardHref(
+      row.stripe_transfer_id ||
+        row.stripe_payout_id ||
+        row.stripe_account_id ||
+        row.stripe_transaction_id,
+    ),
+    sourceTable,
+    rawStatus: row.status || row.payout_status,
   }));
 }
 
@@ -518,19 +613,26 @@ function dedupeRows(rows: PayoutRow[]) {
 async function getPayoutRows() {
   const supabase = await createClient();
 
-  const guruRows = buildGuruPayoutRows(await safeSelect<any>(supabase, "guru_payouts"));
-  const partnerRows = buildPartnerPayoutRows(
-    await safeSelect<any>(supabase, "partner_payouts"),
+  const guruRows = buildGuruPayoutRows(
+    await safeSelect<DbRow>(supabase, "guru_payouts"),
   );
-  const payoutsRows = buildGenericPayoutRows(await safeSelect<any>(supabase, "payouts"));
+  const partnerRows = buildPartnerPayoutRows(
+    await safeSelect<DbRow>(supabase, "partner_payouts"),
+  );
+  const payoutsRows = buildGenericPayoutRows(
+    await safeSelect<DbRow>(supabase, "payouts"),
+    "payouts",
+  );
   const financialPayoutRows = buildGenericPayoutRows(
-    await safeSelect<any>(supabase, "financial_payouts"),
+    await safeSelect<DbRow>(supabase, "financial_payouts"),
+    "financial_payouts",
   );
   const adminPayoutRows = buildGenericPayoutRows(
-    await safeSelect<any>(supabase, "admin_payouts"),
+    await safeSelect<DbRow>(supabase, "admin_payouts"),
+    "admin_payouts",
   );
   const referralRewardRows = buildReferralRewardPayoutRows(
-    await safeAdminSelect<any>("admin_referral_reward_liability"),
+    await safeAdminSelect<DbRow>("admin_referral_reward_liability"),
   );
 
   const merged = dedupeRows([
@@ -542,11 +644,13 @@ async function getPayoutRows() {
     ...referralRewardRows,
   ]);
 
-  return merged.length ? merged : demoPayoutRows;
+  return merged;
 }
 
 function filterRows(rows: PayoutRow[], params: SearchParamsShape) {
-  const q = String(params?.q || "").toLowerCase().trim();
+  const q = String(params?.q || "")
+    .toLowerCase()
+    .trim();
   const status = String(params?.status || "all").toLowerCase();
   const source = String(params?.source || "all").toLowerCase();
   const batch = String(params?.batch || "all").toLowerCase();
@@ -564,6 +668,8 @@ function filterRows(rows: PayoutRow[], params: SearchParamsShape) {
       row.reference,
       row.batch,
       row.notes,
+      row.sourceTable,
+      row.rawStatus,
     ]
       .join(" ")
       .toLowerCase();
@@ -591,26 +697,45 @@ function uniqueValues(rows: PayoutRow[], key: "batch" | "location") {
 }
 
 function getStatusLabel(status: PayoutStatus) {
+  if (status === "ready") return "Ready";
   if (status === "paid") return "Paid";
   if (status === "pending") return "Pending";
   if (status === "review") return "Needs Review";
   if (status === "failed") return "Failed";
+  if (status === "missing_payout_method") return "Missing Payout Method";
+  if (status === "stripe_restricted") return "Stripe Restricted";
+  if (status === "no_stripe_account") return "No Stripe Account";
   return "Scheduled";
 }
 
 function getStatusBadgeStyles(status: PayoutStatus) {
-  if (status === "paid") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "ready")
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "paid")
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (status === "pending") return "border-blue-200 bg-blue-50 text-blue-800";
   if (status === "review") return "border-amber-200 bg-amber-50 text-amber-800";
   if (status === "failed") return "border-red-200 bg-red-50 text-red-800";
+  if (
+    status === "missing_payout_method" ||
+    status === "stripe_restricted" ||
+    status === "no_stripe_account"
+  )
+    return "border-orange-200 bg-orange-50 text-orange-800";
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
 
 function getSourceBadgeStyles(source: PayoutSource) {
-  if (source === "Guru") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (source === "Partner") return "border-violet-200 bg-violet-50 text-violet-800";
-  if (source === "Platform") return "border-slate-200 bg-slate-100 text-slate-700";
-  if (source === "Adjustment") return "border-indigo-200 bg-indigo-50 text-indigo-800";
+  if (source === "Guru")
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (source === "Partner")
+    return "border-violet-200 bg-violet-50 text-violet-800";
+  if (source === "Referral")
+    return "border-violet-200 bg-violet-50 text-violet-800";
+  if (source === "Platform")
+    return "border-slate-200 bg-slate-100 text-slate-700";
+  if (source === "Adjustment")
+    return "border-indigo-200 bg-indigo-50 text-indigo-800";
   return "border-rose-200 bg-rose-50 text-rose-800";
 }
 
@@ -622,9 +747,14 @@ function getInitials(name: string) {
 function getRecipientTone(source: PayoutSource) {
   if (source === "Guru") return "bg-emerald-50 text-emerald-700";
   if (source === "Partner") return "bg-violet-50 text-violet-700";
+  if (source === "Referral") return "bg-violet-50 text-violet-700";
   if (source === "Platform") return "bg-slate-100 text-slate-700";
   if (source === "Adjustment") return "bg-indigo-50 text-indigo-700";
   return "bg-rose-50 text-rose-700";
+}
+
+function hasRowsText(rows: PayoutRow[], value: string) {
+  return rows.length ? value : "No records yet";
 }
 
 function metricSum(rows: PayoutRow[], status: PayoutStatus) {
@@ -666,7 +796,9 @@ function DashboardCard({
           <p className="mt-2 text-xs font-bold text-[#118a43]">{subtext}</p>
         </div>
 
-        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tone}`}>
+        <div
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tone}`}
+        >
           {icon}
         </div>
       </div>
@@ -735,12 +867,19 @@ function StatusProgress({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-black text-[#111b33]">{label}</p>
-          <p className="text-xs font-semibold text-slate-500">{count} records</p>
+          <p className="text-xs font-semibold text-slate-500">
+            {count} records
+          </p>
         </div>
-        <p className="text-sm font-black text-[#111b33]">{formatCurrency(amount)}</p>
+        <p className="text-sm font-black text-[#111b33]">
+          {formatCurrency(amount)}
+        </p>
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${width}%` }} />
+        <div
+          className={`h-full rounded-full ${colorClass}`}
+          style={{ width: `${width}%` }}
+        />
       </div>
     </div>
   );
@@ -759,26 +898,47 @@ export default async function AdminPayoutLandingPage({
   const locationOptions = uniqueValues(allRows, "location");
 
   const totalScheduled = rows.reduce((sum, row) => sum + row.amount, 0);
+  const totalReady = metricSum(rows, "ready");
+  const totalScheduledOnly = metricSum(rows, "scheduled");
   const totalPaid = metricSum(rows, "paid");
   const totalPending = metricSum(rows, "pending");
   const totalReview = metricSum(rows, "review");
   const totalFailed = metricSum(rows, "failed");
   const averagePayout = rows.length ? totalScheduled / rows.length : 0;
 
-  const visibleRows = rows.slice(0, 6);
+  const visibleRows = [...rows]
+    .sort((a, b) => {
+      const bDate = b.payoutDate ? new Date(b.payoutDate).getTime() : 0;
+      const aDate = a.payoutDate ? new Date(a.payoutDate).getTime() : 0;
+      return bDate - aDate;
+    })
+    .slice(0, 6);
   const reviewCount = countByStatus(rows, "review");
   const failedCount = countByStatus(rows, "failed");
   const pendingCount = countByStatus(rows, "pending");
+  const readyCount = countByStatus(rows, "ready");
   const paidCount = countByStatus(rows, "paid");
+  const scheduledCount = countByStatus(rows, "scheduled");
   const rewardRows = rows.filter((row) =>
-    `${row.notes} ${row.batch} ${row.reference}`.toLowerCase().includes("referral reward"),
+    `${row.notes} ${row.batch} ${row.reference}`
+      .toLowerCase()
+      .includes("referral reward"),
   );
-  const pendingRewardRows = rewardRows.filter((row) =>
-    row.status === "pending" || row.status === "review" || row.status === "scheduled",
+  const pendingRewardRows = rewardRows.filter(
+    (row) =>
+      row.status === "pending" ||
+      row.status === "review" ||
+      row.status === "scheduled",
   );
   const issuedRewardRows = rewardRows.filter((row) => row.status === "paid");
-  const pendingRewardTotal = pendingRewardRows.reduce((sum, row) => sum + row.amount, 0);
-  const issuedRewardTotal = issuedRewardRows.reduce((sum, row) => sum + row.amount, 0);
+  const pendingRewardTotal = pendingRewardRows.reduce(
+    (sum, row) => sum + row.amount,
+    0,
+  );
+  const issuedRewardTotal = issuedRewardRows.reduce(
+    (sum, row) => sum + row.amount,
+    0,
+  );
 
   return (
     <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-10 sm:px-6 xl:px-8 2xl:px-0">
@@ -805,9 +965,10 @@ export default async function AdminPayoutLandingPage({
               </div>
 
               <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-500 sm:text-base">
-                Manage Guru payouts, partner commissions, PawPerks rewards, Guru referral rewards,
-                Ambassador rewards, partner reward liabilities, payout batches, failed transfers,
-                manual reviews, references, and accounting-ready payout activity from one
+                Manage Guru payouts, partner commissions, PawPerks rewards, Guru
+                referral rewards, Ambassador rewards, partner reward
+                liabilities, payout batches, failed transfers, manual reviews,
+                references, and accounting-ready payout activity from one
                 focused SitGuru HQ workspace.
               </p>
             </div>
@@ -815,18 +976,24 @@ export default async function AdminPayoutLandingPage({
 
           <div className="mt-7 grid gap-4 md:grid-cols-3">
             <div className="rounded-[1.25rem] border border-emerald-100 bg-[#f7fbf5] p-4">
-              <p className="text-sm font-semibold text-slate-500">Ready to pay</p>
+              <p className="text-sm font-semibold text-slate-500">
+                Ready to pay
+              </p>
               <p className="mt-2 text-3xl font-black text-[#111b33]">
-                {formatCurrency(totalPending + totalScheduled)}
+                {formatCurrency(totalReady + totalPending + totalScheduledOnly)}
               </p>
               <p className="mt-1 text-xs font-bold text-[#118a43]">
-                Pending + scheduled queue
+                Ready + pending + scheduled queue
               </p>
             </div>
 
             <div className="rounded-[1.25rem] border border-amber-100 bg-amber-50 p-4">
-              <p className="text-sm font-semibold text-amber-800">Manual review</p>
-              <p className="mt-2 text-3xl font-black text-amber-950">{reviewCount}</p>
+              <p className="text-sm font-semibold text-amber-800">
+                Manual review
+              </p>
+              <p className="mt-2 text-3xl font-black text-amber-950">
+                {reviewCount}
+              </p>
               <p className="mt-1 text-xs font-bold text-amber-800">
                 Payouts need attention
               </p>
@@ -834,7 +1001,9 @@ export default async function AdminPayoutLandingPage({
 
             <div className="rounded-[1.25rem] border border-red-100 bg-red-50 p-4">
               <p className="text-sm font-semibold text-red-800">Exceptions</p>
-              <p className="mt-2 text-3xl font-black text-red-950">{failedCount}</p>
+              <p className="mt-2 text-3xl font-black text-red-950">
+                {failedCount}
+              </p>
               <p className="mt-1 text-xs font-bold text-red-800">
                 Failed payout transfers
               </p>
@@ -853,8 +1022,8 @@ export default async function AdminPayoutLandingPage({
                   Payout workflow
                 </h2>
                 <p className="mt-1 text-sm font-medium leading-6 text-slate-500">
-                  This is the payout landing page. Use analytics only when you need
-                  deeper reporting and visual breakdowns.
+                  This is the payout landing page. Use analytics only when you
+                  need deeper reporting and visual breakdowns.
                 </p>
               </div>
             </div>
@@ -884,7 +1053,9 @@ export default async function AdminPayoutLandingPage({
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-base font-black text-[#111b33]">Route focus</p>
+                <p className="text-base font-black text-[#111b33]">
+                  Route focus
+                </p>
                 <p className="mt-1 text-sm font-medium text-slate-500">
                   Main payout buttons should point here:
                 </p>
@@ -900,43 +1071,43 @@ export default async function AdminPayoutLandingPage({
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <DashboardCard
           title="Total Scheduled"
-          value={formatCurrency(totalScheduled)}
-          subtext="↗ 18.6% vs prior period"
+          value={hasRowsText(rows, formatCurrency(totalScheduledOnly))}
+          subtext={`${scheduledCount} scheduled records`}
           icon={<CalendarDays className="h-5 w-5" />}
           tone="bg-emerald-50 text-[#118a43]"
         />
         <DashboardCard
           title="Total Paid"
-          value={formatCurrency(totalPaid)}
-          subtext="↗ 21.3% vs prior period"
+          value={hasRowsText(rows, formatCurrency(totalPaid))}
+          subtext={`${paidCount} paid records`}
           icon={<CheckCircle2 className="h-5 w-5" />}
           tone="bg-emerald-50 text-[#118a43]"
         />
         <DashboardCard
           title="Pending"
-          value={formatCurrency(totalPending)}
-          subtext="↗ 8.4% vs prior period"
+          value={hasRowsText(rows, formatCurrency(totalPending))}
+          subtext={`${pendingCount} pending records`}
           icon={<Clock3 className="h-5 w-5" />}
           tone="bg-blue-50 text-blue-600"
         />
         <DashboardCard
           title="Needs Review"
-          value={formatCurrency(totalReview)}
-          subtext="↗ 12.7% vs prior period"
+          value={hasRowsText(rows, formatCurrency(totalReview))}
+          subtext={`${reviewCount} records need review`}
           icon={<Eye className="h-5 w-5" />}
           tone="bg-amber-50 text-amber-600"
         />
         <DashboardCard
           title="Failed"
-          value={formatCurrency(totalFailed)}
-          subtext="↘ 4.7% vs prior period"
+          value={hasRowsText(rows, formatCurrency(totalFailed))}
+          subtext={`${failedCount} failed records`}
           icon={<AlertTriangle className="h-5 w-5" />}
           tone="bg-red-50 text-red-500"
         />
         <DashboardCard
           title="Avg Payout"
-          value={formatCurrency(averagePayout)}
-          subtext="↗ 14.2% vs prior period"
+          value={hasRowsText(rows, formatCurrency(averagePayout))}
+          subtext={`${rows.length} filtered payout records`}
           icon={<TrendingUp className="h-5 w-5" />}
           tone="bg-emerald-50 text-[#118a43]"
         />
@@ -945,14 +1116,22 @@ export default async function AdminPayoutLandingPage({
       <section className="grid gap-4 md:grid-cols-3">
         <DashboardCard
           title="Referral Reward Queue"
-          value={formatCurrency(pendingRewardTotal)}
+          value={
+            rewardRows.length
+              ? formatCurrency(pendingRewardTotal)
+              : "No records yet"
+          }
           subtext={`${pendingRewardRows.length} pending / review / scheduled rewards`}
           icon={<Sparkles className="h-5 w-5" />}
           tone="bg-violet-50 text-violet-600"
         />
         <DashboardCard
           title="Issued Rewards"
-          value={formatCurrency(issuedRewardTotal)}
+          value={
+            rewardRows.length
+              ? formatCurrency(issuedRewardTotal)
+              : "No records yet"
+          }
           subtext={`${issuedRewardRows.length} paid / credited rewards`}
           icon={<CheckCircle2 className="h-5 w-5" />}
           tone="bg-emerald-50 text-[#118a43]"
@@ -976,9 +1155,10 @@ export default async function AdminPayoutLandingPage({
               PawPerks and program rewards are now in the payout queue.
             </h2>
             <p className="mt-2 max-w-4xl text-sm font-medium leading-6 text-slate-500">
-              This page now reads referral reward liabilities from Supabase and places pending
-              rewards into the payout review workflow while keeping issued rewards visible for
-              accounting and reconciliation review.
+              This page now reads referral reward liabilities from Supabase and
+              places pending rewards into the payout review workflow while
+              keeping issued rewards visible for accounting and reconciliation
+              review.
             </p>
           </div>
 
@@ -1000,7 +1180,9 @@ export default async function AdminPayoutLandingPage({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-black text-[#111b33]">{row.name}</p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">{row.batch}</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    {row.batch}
+                  </p>
                 </div>
                 <span
                   className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${getStatusBadgeStyles(
@@ -1042,7 +1224,8 @@ export default async function AdminPayoutLandingPage({
                     Find payouts fast
                   </h2>
                   <p className="text-sm font-medium text-slate-500">
-                    Filter payout records by status, source, batch, location, or recipient.
+                    Filter payout records by status, source, batch, location, or
+                    recipient.
                   </p>
                 </div>
               </div>
@@ -1084,11 +1267,17 @@ export default async function AdminPayoutLandingPage({
                 className="h-12 w-full rounded-2xl border border-[#e6eee2] bg-white px-4 text-sm font-semibold text-[#111b33] outline-none transition focus:border-[#b9d1b1] focus:ring-4 focus:ring-emerald-50"
               >
                 <option value="all">Status: All</option>
+                <option value="ready">Ready</option>
                 <option value="paid">Paid</option>
                 <option value="pending">Pending</option>
                 <option value="review">Needs Review</option>
                 <option value="failed">Failed</option>
                 <option value="scheduled">Scheduled</option>
+                <option value="missing_payout_method">
+                  Missing Payout Method
+                </option>
+                <option value="stripe_restricted">Stripe Restricted</option>
+                <option value="no_stripe_account">No Stripe Account</option>
               </select>
 
               <select
@@ -1099,6 +1288,7 @@ export default async function AdminPayoutLandingPage({
                 <option value="all">Source: All</option>
                 <option value="guru">Guru</option>
                 <option value="partner">Partner</option>
+                <option value="referral">Referral</option>
                 <option value="platform">Platform</option>
                 <option value="adjustment">Adjustment</option>
                 <option value="refund">Refund</option>
@@ -1140,6 +1330,13 @@ export default async function AdminPayoutLandingPage({
           </p>
 
           <div className="mt-6 space-y-5">
+            <StatusProgress
+              label="Ready"
+              amount={totalReady}
+              count={readyCount}
+              total={totalScheduled}
+              colorClass="bg-emerald-400"
+            />
             <StatusProgress
               label="Paid"
               amount={totalPaid}
@@ -1197,16 +1394,21 @@ export default async function AdminPayoutLandingPage({
             <table className="min-w-[900px] w-full">
               <thead className="bg-[#fbfdfb]">
                 <tr className="border-b border-[#edf2e7] text-left">
-                  {["Recipient", "Source", "Amount", "Status", "Payout Date", "Reference"].map(
-                    (label) => (
-                      <th
-                        key={label}
-                        className="px-5 py-4 text-xs font-black uppercase tracking-[0.02em] text-slate-500"
-                      >
-                        {label}
-                      </th>
-                    ),
-                  )}
+                  {[
+                    "Recipient",
+                    "Source",
+                    "Amount",
+                    "Status",
+                    "Payout Date",
+                    "Reference",
+                  ].map((label) => (
+                    <th
+                      key={label}
+                      className="px-5 py-4 text-xs font-black uppercase tracking-[0.02em] text-slate-500"
+                    >
+                      {label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
 
@@ -1226,8 +1428,21 @@ export default async function AdminPayoutLandingPage({
                           {getInitials(row.name)}
                         </div>
                         <div>
-                          <p className="font-black text-[#111b33]">{row.name}</p>
-                          <p className="text-sm font-medium text-slate-500">{row.email}</p>
+                          {row.recipientHref ? (
+                            <Link
+                              href={row.recipientHref}
+                              className="font-black text-[#111b33] underline decoration-emerald-200 underline-offset-4 transition hover:text-[#118a43]"
+                            >
+                              {row.name}
+                            </Link>
+                          ) : (
+                            <p className="font-black text-[#111b33]">
+                              {row.name}
+                            </p>
+                          )}
+                          <p className="text-sm font-medium text-slate-500">
+                            {row.email}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -1243,7 +1458,9 @@ export default async function AdminPayoutLandingPage({
                     </td>
 
                     <td className="px-5 py-4 align-top">
-                      <p className="font-black text-[#111b33]">{formatCurrency(row.amount)}</p>
+                      <p className="font-black text-[#111b33]">
+                        {formatCurrency(row.amount)}
+                      </p>
                     </td>
 
                     <td className="px-5 py-4 align-top">
@@ -1257,13 +1474,35 @@ export default async function AdminPayoutLandingPage({
                     </td>
 
                     <td className="px-5 py-4 align-top">
-                      <p className="font-black text-[#111b33]">{formatDate(row.payoutDate)}</p>
+                      <p className="font-black text-[#111b33]">
+                        {formatDate(row.payoutDate)}
+                      </p>
                     </td>
 
                     <td className="px-5 py-4 align-top">
                       <p className="font-mono text-sm font-semibold text-slate-500">
                         {row.reference}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {row.relatedHref ? (
+                          <Link
+                            href={row.relatedHref}
+                            className="text-xs font-black text-[#118a43] underline decoration-emerald-200 underline-offset-4"
+                          >
+                            Related record
+                          </Link>
+                        ) : null}
+                        {row.stripeHref ? (
+                          <a
+                            href={row.stripeHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-black text-[#118a43] underline decoration-emerald-200 underline-offset-4"
+                          >
+                            Stripe
+                          </a>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1275,7 +1514,8 @@ export default async function AdminPayoutLandingPage({
                         No payout records found
                       </p>
                       <p className="mt-2 text-sm font-medium text-slate-500">
-                        Adjust your filters or reset to view all payout activity.
+                        Adjust your filters or reset to view all payout
+                        activity.
                       </p>
                     </td>
                   </tr>
@@ -1313,23 +1553,30 @@ export default async function AdminPayoutLandingPage({
 
             <div className="mt-4 space-y-3">
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-sm font-black text-amber-900">Manual review queue</p>
+                <p className="text-sm font-black text-amber-900">
+                  Manual review queue
+                </p>
                 <p className="mt-1 text-xs font-semibold text-amber-800">
                   {reviewCount} payouts need review.
                 </p>
               </div>
 
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                <p className="text-sm font-black text-red-900">Failed transfers</p>
+                <p className="text-sm font-black text-red-900">
+                  Failed transfers
+                </p>
                 <p className="mt-1 text-xs font-semibold text-red-800">
                   {failedCount} payout exceptions found.
                 </p>
               </div>
 
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-sm font-black text-emerald-900">Accounting ready</p>
+                <p className="text-sm font-black text-emerald-900">
+                  Accounting ready
+                </p>
                 <p className="mt-1 text-xs font-semibold text-emerald-800">
-                  References, notes, batches, and payout statuses are grouped for review.
+                  References, notes, batches, and payout statuses are grouped
+                  for review.
                 </p>
               </div>
             </div>
