@@ -145,6 +145,10 @@ type CustomerInsight = {
   state: string;
   country: string;
   zipCode: string;
+  nameSource: string;
+  emailSource: string;
+  photoSource: string;
+  locationSource: string;
   source: string;
   campaign: string;
   bookingCount: number;
@@ -268,20 +272,6 @@ function money(value: number) {
   }).format(value);
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "Not available";
-
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(value));
-  } catch {
-    return "Not available";
-  }
-}
-
 function getText(row: AnyRow, keys: string[], fallback = "") {
   for (const key of keys) {
     const value = asString(row[key]);
@@ -298,25 +288,6 @@ function getAmount(row: AnyRow, keys: string[]) {
   }
 
   return 0;
-}
-
-function getDisplayName(row: AnyRow, fallback = "Customer") {
-  const fullName = getText(row, [
-    "full_name",
-    "display_name",
-    "name",
-    "customer_name",
-    "pet_parent_name",
-    "owner_name",
-  ]);
-
-  if (fullName) return fullName;
-
-  const firstName = getText(row, ["first_name"]);
-  const lastName = getText(row, ["last_name"]);
-  const combinedName = [firstName, lastName].filter(Boolean).join(" ").trim();
-
-  return combinedName || fallback;
 }
 
 function getRawDisplayName(row: AnyRow) {
@@ -418,15 +389,72 @@ function isTrustworthyDisplayName(value: string) {
   return /[a-zA-Z]/.test(trimmed);
 }
 
-function getSafeCustomerDisplayName(row: AnyRow, fallback = "Customer") {
+function getAccountDisplayName(row: AnyRow, fallback = "Customer") {
   const rawName = getRawDisplayName(row);
-  const email = getText(row, ["email", "customer_email", "pet_parent_email"]);
+  const accountEmail = getText(row, ["email", "auth_email", "profile_email"]);
 
   if (rawName && isTrustworthyDisplayName(rawName)) return rawName;
-  if (email && !looksLikeSuspiciousEmail(email)) return email;
-  if (rawName || email) return "Signup Review Needed";
+  if (accountEmail && !looksLikeSuspiciousEmail(accountEmail)) return accountEmail;
+  if (rawName || accountEmail) return "Signup Review Needed";
 
   return fallback;
+}
+
+function getDisplaySourceLabel(value: string, source: "profile" | "account" | "legacy" | "missing") {
+  if (!value) return "Missing";
+  if (source === "profile") return "Profile";
+  if (source === "account") return "Account";
+  if (source === "legacy") return "Fallback / legacy";
+
+  return "Missing";
+}
+
+function getAccountEmail(row: AnyRow) {
+  return getText(row, ["email", "profile_email", "auth_email"]);
+}
+
+function getAccountDisplaySource(row: AnyRow) {
+  const rawName = getRawDisplayName(row);
+
+  if (rawName && isTrustworthyDisplayName(rawName)) {
+    return getText(row, ["full_name", "display_name", "first_name", "last_name"])
+      ? "Profile"
+      : "Fallback / legacy";
+  }
+
+  return getDisplaySourceLabel(getAccountEmail(row), "account");
+}
+
+function getEmailSource(row: AnyRow) {
+  const profileEmail = getText(row, ["email", "profile_email"]);
+  if (profileEmail) return "Profile";
+
+  const authEmail = getText(row, ["auth_email"]);
+  if (authEmail) return "Account";
+
+  const legacyEmail = getText(row, ["customer_email", "pet_parent_email"]);
+  if (legacyEmail) return "Fallback / legacy";
+
+  return "Missing";
+}
+
+function getPhotoSource(row: AnyRow) {
+  if (getText(row, ["avatar_url"])) return "Profile avatar";
+  if (getText(row, ["photo_url", "profile_photo_url", "image_url"])) return "Fallback / legacy photo";
+
+  return "Missing";
+}
+
+function getLocationSource(row: AnyRow) {
+  if (getText(row, ["city", "state", "zip", "zipcode", "zip_code", "postal_code"])) {
+    return "Profile";
+  }
+
+  if (getText(row, ["customer_city", "location_city", "customer_state", "customer_zip", "customer_zip_code"])) {
+    return "Fallback / legacy";
+  }
+
+  return "Missing";
 }
 
 function getCustomerSignupQuality(customer: CustomerInsight) {
@@ -1372,24 +1400,25 @@ async function getCustomerIntelligenceData() {
 
     const source = normalizeSource(getSource(profile as AnyRow));
     const health = registrationHealthByProfileId.get(profile.id);
-    const healthEmail = asString(health?.profile_email) || asString(health?.auth_email);
+    const displayRow = {
+      ...(profile as AnyRow),
+      profile_email: asString(health?.profile_email),
+      auth_email: asString(health?.auth_email),
+    };
 
     customerMap.set(profile.id, {
       id: profile.id,
-      name: getSafeCustomerDisplayName(
-        {
-          ...(profile as AnyRow),
-          full_name: asString(health?.full_name) || profile.full_name,
-          email: healthEmail || profile.email,
-        },
-        "Customer",
-      ),
-      email: healthEmail || profile.email || "",
-      avatarUrl: profile.avatar_url || "",
+      name: getAccountDisplayName(displayRow, "Customer"),
+      email: getAccountEmail(displayRow),
+      avatarUrl: profile.avatar_url || getText(profile as AnyRow, ["photo_url", "profile_photo_url", "image_url"]),
       city: getCity(profile as AnyRow),
       state: getState(profile as AnyRow),
       country: getCountry(profile as AnyRow),
       zipCode: getZipCode(profile as AnyRow),
+      nameSource: getAccountDisplaySource(displayRow),
+      emailSource: getEmailSource(displayRow),
+      photoSource: getPhotoSource(profile as AnyRow),
+      locationSource: getLocationSource(profile as AnyRow),
       source,
       campaign: getCampaign(profile as AnyRow),
       bookingCount: 0,
@@ -1432,13 +1461,17 @@ async function getCustomerIntelligenceData() {
       customerMap.get(fallbackId) ||
       {
         id: fallbackId,
-        name: getSafeCustomerDisplayName(booking as AnyRow, "Customer"),
+        name: getAccountDisplayName(booking as AnyRow, "Customer"),
         email: booking.customer_email || "",
         avatarUrl: "",
         city: "",
         state: "",
         country: "",
         zipCode: "",
+        nameSource: getAccountDisplaySource(booking as AnyRow),
+        emailSource: getEmailSource(booking as AnyRow),
+        photoSource: "Missing",
+        locationSource: getLocationSource(booking as AnyRow),
         source: bookingSource,
         campaign: getCampaign(booking as AnyRow),
         bookingCount: 0,
@@ -1461,10 +1494,19 @@ async function getCustomerIntelligenceData() {
 
     const bookingDate = getBookingDate(booking);
 
-    existing.city = existing.city || getCity(booking as AnyRow);
-    existing.state = existing.state || getState(booking as AnyRow);
+    if (!existing.city && getCity(booking as AnyRow)) {
+      existing.city = getCity(booking as AnyRow);
+      existing.locationSource = "Fallback / legacy";
+    }
+    if (!existing.state && getState(booking as AnyRow)) {
+      existing.state = getState(booking as AnyRow);
+      existing.locationSource = "Fallback / legacy";
+    }
     existing.country = existing.country || getCountry(booking as AnyRow);
-    existing.zipCode = existing.zipCode || getZipCode(booking as AnyRow);
+    if (!existing.zipCode && getZipCode(booking as AnyRow)) {
+      existing.zipCode = getZipCode(booking as AnyRow);
+      existing.locationSource = "Fallback / legacy";
+    }
     existing.source =
       existing.source && existing.source !== "Direct"
         ? existing.source
@@ -2414,16 +2456,21 @@ function DonutChart({
   const activeItems = items.filter((item) => item.value > 0);
   const activeTotal = activeItems.reduce((sum, item) => sum + item.value, 0);
 
-  let currentOffset = 0;
-  const segments = activeItems.map((item, index) => {
-    const percent = activeTotal > 0 ? (item.value / activeTotal) * 100 : 0;
-    const segment = `${chartColors[index % chartColors.length]} ${currentOffset}% ${
-      currentOffset + percent
-    }%`;
+  const segments = activeItems.reduce<{ offset: number; segments: string[] }>(
+    (state, item, index) => {
+      const percent = activeTotal > 0 ? (item.value / activeTotal) * 100 : 0;
+      const nextOffset = state.offset + percent;
 
-    currentOffset += percent;
-    return segment;
-  });
+      return {
+        offset: nextOffset,
+        segments: [
+          ...state.segments,
+          `${chartColors[index % chartColors.length]} ${state.offset}% ${nextOffset}%`,
+        ],
+      };
+    },
+    { offset: 0, segments: [] },
+  ).segments;
 
   const background =
     segments.length > 0
