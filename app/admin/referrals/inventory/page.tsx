@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   AlertTriangle,
+  CheckCircle2,
   ArrowLeft,
   ClipboardCheck,
   Copy,
@@ -8,6 +9,7 @@ import {
   Link2,
   SearchX,
   ShieldCheck,
+  TableProperties,
   UserRoundX,
   Users,
 } from "lucide-react";
@@ -18,6 +20,31 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type Row = Record<string, unknown>;
+
+type JsonRecord = Record<string, unknown>;
+
+type ReferralConflict = {
+  id: string;
+  conflictType: string;
+  normalizedCode: string;
+  ownerName: string;
+  ownerEmail: string;
+  sourceTables: string;
+  recommendedAction: string;
+  resolutionStatus: string;
+  createdAt: string;
+};
+
+type ReferralAuditRow = {
+  id: string;
+  migrationName: string;
+  sourceTable: string;
+  sourceCode: string;
+  action: string;
+  decision: string;
+  reason: string;
+  createdAt: string;
+};
 
 type CodeSource = {
   source: "referral_profiles" | "ambassadors" | "referral_codes" | "guru_referral_campaigns";
@@ -66,6 +93,63 @@ function pick(row: Row, keys: string[]) {
 
 function normalizeCode(value: unknown) {
   return text(value).toUpperCase().replace(/[^A-Z0-9-_]/g, "");
+}
+
+
+function jsonRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function metadataText(metadata: JsonRecord, keys: string[]) {
+  return keys.map((key) => text(metadata[key])).find(Boolean) || "";
+}
+
+function sourceTablesFromMetadata(metadata: JsonRecord, fallback: string) {
+  const sourceRecords = metadata.source_records;
+  if (Array.isArray(sourceRecords)) {
+    const sources = sourceRecords
+      .map((record) => metadataText(jsonRecord(record), ["source", "table", "legacy_source"]))
+      .filter(Boolean);
+    if (sources.length) return Array.from(new Set(sources)).join(", ");
+  }
+
+  return fallback;
+}
+
+function conflictFromRow(row: Row): ReferralConflict {
+  const metadata = jsonRecord(row.metadata);
+  const sourceRecords = Array.isArray(metadata.source_records) ? metadata.source_records.map(jsonRecord) : [];
+  const firstSourceRecord = sourceRecords[0] || {};
+  const normalizedCode = metadataText(metadata, ["code_normalized", "referral_code_normalized", "normalized_code", "referral_code"])
+    || metadataText(firstSourceRecord, ["code", "referral_code", "normalized_code"])
+    || pick(row, ["conflict_key", "conflicting_record_id"]);
+
+  return {
+    id: pick(row, ["id"]),
+    conflictType: pick(row, ["conflict_type"]),
+    normalizedCode,
+    ownerName: metadataText(metadata, ["owner_name", "profile_name", "name", "full_name"]) || metadataText(firstSourceRecord, ["owner_name", "name"]),
+    ownerEmail: metadataText(metadata, ["owner_email", "profile_email", "email"]) || metadataText(firstSourceRecord, ["owner_email", "email"]),
+    sourceTables: sourceTablesFromMetadata(metadata, pick(row, ["conflicting_table"])),
+    recommendedAction: metadataText(metadata, ["recommended_action", "recommendation"]) || "Review this conflict before canonical PawPerks referral code backfill.",
+    resolutionStatus: pick(row, ["resolution_status"]),
+    createdAt: pick(row, ["created_at"]),
+  };
+}
+
+function auditFromRow(row: Row): ReferralAuditRow {
+  const metadata = jsonRecord(row.metadata);
+
+  return {
+    id: pick(row, ["id"]),
+    migrationName: pick(row, ["backfill_name"]),
+    sourceTable: pick(row, ["legacy_source"]),
+    sourceCode: metadataText(metadata, ["referral_code", "referral_code_normalized", "code", "code_normalized"]) || pick(row, ["legacy_record_id"]),
+    action: pick(row, ["action"]),
+    decision: pick(row, ["status"]),
+    reason: pick(row, ["notes"]) || metadataText(metadata, ["reason", "decision_reason", "recommended_action"]),
+    createdAt: pick(row, ["created_at"]),
+  };
 }
 
 function titleize(value: string) {
@@ -255,13 +339,15 @@ function buildActivityIssues(activityRows: Row[], codeMap: Map<string, CodeSourc
 }
 
 async function getInventory() {
-  const [profilesResult, ambassadorsResult, referralCodesResult, guruCampaignsResult, activityResult] =
+  const [profilesResult, ambassadorsResult, referralCodesResult, guruCampaignsResult, activityResult, conflictsResult, auditResult] =
     await Promise.all([
       safeRows("referral_profiles"),
       safeRows("ambassadors"),
       safeRows("referral_codes"),
       safeRows("guru_referral_campaigns"),
       safeRows("referral_activity"),
+      safeRows("pawperks_referral_conflicts"),
+      safeRows("pawperks_referral_backfill_audit"),
     ]);
 
   const profileCodes = profilesResult.rows.map(codeFromProfile).filter(Boolean) as CodeSource[];
@@ -288,9 +374,17 @@ async function getInventory() {
     .sort((a, b) => b.owners - a.owners || a.code.localeCompare(b.code));
   const unresolvedActivity = buildActivityIssues(activityResult.rows, codeMap);
 
-  const warnings = [profilesResult, ambassadorsResult, referralCodesResult, guruCampaignsResult, activityResult]
+  const conflicts = conflictsResult.rows.map(conflictFromRow);
+  const openConflicts = conflicts.filter((conflict) => conflict.resolutionStatus === "open" || conflict.resolutionStatus === "reviewing");
+  const resolvedConflicts = conflicts.filter((conflict) => conflict.resolutionStatus === "resolved" || conflict.resolutionStatus === "ignored");
+  const auditRows = auditResult.rows.map(auditFromRow).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const auditImported = auditRows.filter((row) => row.decision === "imported" || row.action.includes("import")).length;
+  const auditFlagged = auditRows.filter((row) => row.decision === "flagged" || row.action.includes("flag")).length;
+  const auditSkipped = auditRows.filter((row) => row.decision === "skipped" || row.action.includes("skip")).length;
+
+  const warnings = [profilesResult, ambassadorsResult, referralCodesResult, guruCampaignsResult, activityResult, conflictsResult, auditResult]
     .map((result, index) => ({
-      table: ["referral_profiles", "ambassadors", "referral_codes", "guru_referral_campaigns", "referral_activity"][index],
+      table: ["referral_profiles", "ambassadors", "referral_codes", "guru_referral_campaigns", "referral_activity", "pawperks_referral_conflicts", "pawperks_referral_backfill_audit"][index],
       error: result.error,
     }))
     .filter((item) => item.error);
@@ -302,6 +396,17 @@ async function getInventory() {
     profilesWithMultipleCodes,
     duplicateCodes,
     unresolvedActivity,
+    conflicts,
+    openConflicts,
+    resolvedConflicts,
+    canonicalProfilesWithNoCode: conflicts.filter((conflict) => conflict.conflictType === "missing_legacy_referral_code"),
+    canonicalProfilesWithMultipleCodes: conflicts.filter((conflict) => conflict.conflictType === "multiple_legacy_referral_codes"),
+    canonicalDuplicateCodes: conflicts.filter((conflict) => conflict.conflictType === "duplicate_legacy_referral_code"),
+    canonicalUnresolvedActivity: conflicts.filter((conflict) => conflict.conflictType === "unresolved_referral_activity"),
+    auditRows,
+    auditImported,
+    auditFlagged,
+    auditSkipped,
     warnings,
   };
 }
@@ -358,7 +463,7 @@ export default async function ReferralInventoryPage() {
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/10 p-5 text-sm text-slate-100">
               <p className="font-black uppercase tracking-wide text-emerald-200">Sources read</p>
-              <p className="mt-3">referral_profiles, ambassadors, referral_codes, guru_referral_campaigns, and referral_activity. Reads are inventory-only; no database rows are inserted, updated, or deleted.</p>
+              <p className="mt-3">pawperks_referral_conflicts and pawperks_referral_backfill_audit, plus legacy inventory tables for comparison. Reads are inventory-only; no database rows are inserted, updated, or deleted.</p>
             </div>
           </div>
         </section>
@@ -374,12 +479,39 @@ export default async function ReferralInventoryPage() {
           </section>
         ) : null}
 
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard title="Open conflicts" value={inventory.openConflicts.length} detail="Canonical conflict rows with open/reviewing status." icon={AlertTriangle} />
+          <StatCard title="Resolved conflicts" value={inventory.resolvedConflicts.length} detail="Canonical conflict rows marked resolved or ignored." icon={CheckCircle2} />
+          <StatCard title="Profiles with no code" value={inventory.canonicalProfilesWithNoCode.length} detail="missing_legacy_referral_code conflicts." icon={UserRoundX} />
+          <StatCard title="Profiles with multiple codes" value={inventory.canonicalProfilesWithMultipleCodes.length} detail="multiple_legacy_referral_codes conflicts." icon={Copy} />
+          <StatCard title="Duplicate codes across owners" value={inventory.canonicalDuplicateCodes.length} detail="duplicate_legacy_referral_code conflicts." icon={DatabaseZap} />
+          <StatCard title="Unresolved owners/activity" value={inventory.canonicalUnresolvedActivity.length} detail="unresolved_referral_activity conflicts." icon={ClipboardCheck} />
+          <StatCard title="Audit imported/flagged/skipped" value={inventory.auditImported + inventory.auditFlagged + inventory.auditSkipped} detail={`${inventory.auditImported.toLocaleString()} imported · ${inventory.auditFlagged.toLocaleString()} flagged · ${inventory.auditSkipped.toLocaleString()} skipped`} icon={TableProperties} />
+          <StatCard title="Audit rows" value={inventory.auditRows.length} detail="Rows read from pawperks_referral_backfill_audit." icon={ShieldCheck} />
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="flex items-center gap-2 text-2xl font-black"><AlertTriangle className="h-6 w-6 text-amber-600" /> Open canonical PawPerks referral conflicts</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Read-only rows from pawperks_referral_conflicts that need review before canonical code backfill. No approve or resolve actions are available here yet.
+          </p>
+          <ConflictTable rows={inventory.openConflicts.slice(0, 250)} />
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="flex items-center gap-2 text-2xl font-black"><TableProperties className="h-6 w-6 text-purple-600" /> Recent PawPerks referral backfill audit</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Latest read-only audit entries from pawperks_referral_backfill_audit for imported, flagged, skipped, and recorded cleanup decisions.
+          </p>
+          <AuditTable rows={inventory.auditRows.slice(0, 25)} />
+        </section>
+
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <StatCard title="Profiles scanned" value={inventory.profiles.length} detail="Rows from referral_profiles." icon={Users} />
-          <StatCard title="Codes found" value={inventory.allCodes.length} detail="Existing PawPerks/PetPerks codes across all inventory sources." icon={Link2} />
-          <StatCard title="No code" value={inventory.profilesWithNoCode.length} detail="Profiles without a detected code." icon={UserRoundX} />
-          <StatCard title="Multiple codes" value={inventory.profilesWithMultipleCodes.length} detail="Profiles with more than one unique code." icon={Copy} />
-          <StatCard title="Duplicate codes" value={inventory.duplicateCodes.length} detail="Code strings shared by different owners." icon={AlertTriangle} />
+          <StatCard title="Legacy profiles scanned" value={inventory.profiles.length} detail="Rows from referral_profiles." icon={Users} />
+          <StatCard title="Legacy codes found" value={inventory.allCodes.length} detail="Existing PawPerks/PetPerks codes across legacy inventory sources." icon={Link2} />
+          <StatCard title="Legacy no code" value={inventory.profilesWithNoCode.length} detail="Profiles without a detected legacy code." icon={UserRoundX} />
+          <StatCard title="Legacy multiple codes" value={inventory.profilesWithMultipleCodes.length} detail="Profiles with more than one unique legacy code." icon={Copy} />
+          <StatCard title="Legacy duplicate codes" value={inventory.duplicateCodes.length} detail="Legacy code strings shared by different owners." icon={AlertTriangle} />
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -487,6 +619,52 @@ function CodeSourceTable({ rows }: { rows: CodeSource[] }) {
               <td className="py-3 pr-4 text-slate-500">{code.createdAt || "—"}</td>
             </tr>
           )) : <tr><td colSpan={6} className="py-6 text-slate-500">No code records were detected in the scanned source tables.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ConflictTable({ rows }: { rows: ReferralConflict[] }) {
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="min-w-full text-left text-sm">
+        <thead className="text-xs uppercase text-slate-500"><tr><th className="py-3 pr-4">Conflict type</th><th className="py-3 pr-4">Normalized code</th><th className="py-3 pr-4">Owner</th><th className="py-3 pr-4">Source tables</th><th className="py-3 pr-4">Recommended action</th><th className="py-3 pr-4">Resolution</th><th className="py-3 pr-4">Created</th></tr></thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.length ? rows.map((conflict) => (
+            <tr key={conflict.id || `${conflict.conflictType}:${conflict.normalizedCode}:${conflict.createdAt}`} className="align-top">
+              <td className="py-3 pr-4 font-black text-slate-950">{titleize(conflict.conflictType)}</td>
+              <td className="py-3 pr-4 text-slate-700">{conflict.normalizedCode || "—"}</td>
+              <td className="py-3 pr-4 text-slate-700"><p>{conflict.ownerName || "Owner unavailable"}</p><p className="text-xs text-slate-500">{conflict.ownerEmail || "—"}</p></td>
+              <td className="py-3 pr-4 text-slate-700">{conflict.sourceTables || "—"}</td>
+              <td className="max-w-md py-3 pr-4 text-slate-700">{conflict.recommendedAction}</td>
+              <td className="py-3 pr-4 font-bold text-amber-700">{titleize(conflict.resolutionStatus || "open")}</td>
+              <td className="py-3 pr-4 text-slate-500">{conflict.createdAt || "—"}</td>
+            </tr>
+          )) : <tr><td colSpan={7} className="py-6 text-slate-500">No open canonical PawPerks referral conflicts found.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AuditTable({ rows }: { rows: ReferralAuditRow[] }) {
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="min-w-full text-left text-sm">
+        <thead className="text-xs uppercase text-slate-500"><tr><th className="py-3 pr-4">Migration</th><th className="py-3 pr-4">Source table</th><th className="py-3 pr-4">Source code</th><th className="py-3 pr-4">Action</th><th className="py-3 pr-4">Decision</th><th className="py-3 pr-4">Reason</th><th className="py-3 pr-4">Created</th></tr></thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.length ? rows.map((row) => (
+            <tr key={row.id || `${row.migrationName}:${row.sourceTable}:${row.sourceCode}:${row.createdAt}`} className="align-top">
+              <td className="py-3 pr-4 font-black text-slate-950">{row.migrationName || "—"}</td>
+              <td className="py-3 pr-4 text-slate-700">{row.sourceTable || "—"}</td>
+              <td className="py-3 pr-4 text-slate-700">{row.sourceCode || "—"}</td>
+              <td className="py-3 pr-4 text-slate-700">{row.action || "—"}</td>
+              <td className="py-3 pr-4 font-bold text-slate-800">{row.decision || "—"}</td>
+              <td className="max-w-md py-3 pr-4 text-slate-700">{row.reason || "—"}</td>
+              <td className="py-3 pr-4 text-slate-500">{row.createdAt || "—"}</td>
+            </tr>
+          )) : <tr><td colSpan={7} className="py-6 text-slate-500">No PawPerks referral backfill audit rows found.</td></tr>}
         </tbody>
       </table>
     </div>
