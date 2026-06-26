@@ -41,6 +41,11 @@ type PayoutRow = {
   notes: string;
 };
 
+type LoosePayoutRecord = Record<string, unknown> & {
+  guru?: Record<string, unknown>;
+  partner?: Record<string, unknown>;
+};
+
 type SearchParamsShape = {
   q?: string;
   status?: string;
@@ -173,6 +178,24 @@ function normalizeAmount(value: unknown) {
   return Number.isNaN(numberValue) ? 0 : numberValue;
 }
 
+function asString(value: unknown, fallback = "") {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || fallback;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return fallback;
+}
+
+function asOptionalString(value: unknown) {
+  const stringValue = asString(value);
+  return stringValue || null;
+}
+
 function normalizeStatus(value: unknown): PayoutStatus {
   const status = String(value || "pending").toLowerCase();
 
@@ -259,7 +282,7 @@ async function safeAdminSelect<T>(table: string, query = "*") {
   }
 }
 
-function rewardAmount(row: any) {
+function rewardAmount(row: LoosePayoutRecord) {
   return normalizeAmount(
     row.normalized_amount ||
       row.reward_amount ||
@@ -270,7 +293,7 @@ function rewardAmount(row: any) {
   );
 }
 
-function rewardStatus(row: any): PayoutStatus {
+function rewardStatus(row: LoosePayoutRecord): PayoutStatus {
   const treatment = String(row.financial_treatment || "").toLowerCase();
   const status = String(
     row.normalized_status || row.reward_status || row.payout_status || row.status || "",
@@ -314,39 +337,39 @@ function rewardStatus(row: any): PayoutStatus {
   return "pending";
 }
 
-function rewardRecipientName(row: any) {
-  return (
+function rewardRecipientName(row: LoosePayoutRecord) {
+  return asString(
     row.recipient_name ||
-    row.customer_name ||
-    row.pet_parent_name ||
-    row.referrer_name ||
-    row.referred_name ||
-    row.ambassador_name ||
-    row.partner_name ||
-    row.guru_name ||
-    row.full_name ||
-    row.name ||
-    row.financial_category ||
-    "Referral reward recipient"
+      row.customer_name ||
+      row.pet_parent_name ||
+      row.referrer_name ||
+      row.referred_name ||
+      row.ambassador_name ||
+      row.partner_name ||
+      row.guru_name ||
+      row.full_name ||
+      row.name ||
+      row.financial_category,
+    "Referral reward recipient",
   );
 }
 
-function rewardRecipientEmail(row: any) {
-  return (
+function rewardRecipientEmail(row: LoosePayoutRecord) {
+  return asString(
     row.recipient_email ||
-    row.customer_email ||
-    row.pet_parent_email ||
-    row.referrer_email ||
-    row.referred_email ||
-    row.ambassador_email ||
-    row.partner_email ||
-    row.guru_email ||
-    row.email ||
-    "No email on file"
+      row.customer_email ||
+      row.pet_parent_email ||
+      row.referrer_email ||
+      row.referred_email ||
+      row.ambassador_email ||
+      row.partner_email ||
+      row.guru_email ||
+      row.email,
+    "No email on file",
   );
 }
 
-function rewardProgramLabel(row: any) {
+function rewardProgramLabel(row: LoosePayoutRecord) {
   const category = String(row.financial_category || row.reward_type || row.source || row.type || "")
     .replace(/[-_]+/g, " ")
     .trim();
@@ -359,7 +382,7 @@ function rewardProgramLabel(row: any) {
     .join(" ");
 }
 
-function buildReferralRewardPayoutRows(rows: any[]): PayoutRow[] {
+function buildReferralRewardPayoutRows(rows: LoosePayoutRecord[]): PayoutRow[] {
   return rows
     .map((row, index) => {
       const amount = rewardAmount(row);
@@ -367,34 +390,41 @@ function buildReferralRewardPayoutRows(rows: any[]): PayoutRow[] {
       if (amount <= 0) return null;
 
       const programLabel = rewardProgramLabel(row);
-      const treatment = String(row.financial_treatment || "pending_reward_liability");
+      const treatment = asString(row.financial_treatment, "pending_reward_liability");
 
       return {
         id: String(row.id || row.referral_code_id || row.reward_id || `referral-reward-${index}`),
         source: "Partner" as PayoutSource,
         name: rewardRecipientName(row),
         email: rewardRecipientEmail(row),
-        city: row.city || row.recipient_city || row.customer_city || row.partner_city || "Remote",
-        state: row.state || row.recipient_state || row.customer_state || row.partner_state || "US",
-        zip: row.zip || row.zip_code || row.recipient_zip || row.customer_zip || "",
+        city: asString(
+          row.city || row.recipient_city || row.customer_city || row.partner_city,
+          "Remote",
+        ),
+        state: asString(
+          row.state || row.recipient_state || row.customer_state || row.partner_state,
+          "US",
+        ),
+        zip: asString(row.zip || row.zip_code || row.recipient_zip || row.customer_zip),
         amount,
         status: rewardStatus(row),
-        payoutDate:
+        payoutDate: asOptionalString(
           row.paid_at ||
-          row.credited_at ||
-          row.payout_date ||
-          row.scheduled_for ||
-          row.qualified_at ||
-          row.created_at ||
-          row.updated_at ||
-          null,
-        reference:
+            row.credited_at ||
+            row.payout_date ||
+            row.scheduled_for ||
+            row.qualified_at ||
+            row.created_at ||
+            row.updated_at,
+        ),
+        reference: asString(
           row.reference ||
-          row.reward_reference ||
-          row.referral_code ||
-          row.referral_code_id ||
-          row.id ||
+            row.reward_reference ||
+            row.referral_code ||
+            row.referral_code_id ||
+            row.id,
           "Referral reward",
+        ),
         batch: `${programLabel} / Reward Queue`,
         notes: `Referral reward · ${programLabel} · ${treatment.replaceAll("_", " ")}`,
       };
@@ -403,84 +433,91 @@ function buildReferralRewardPayoutRows(rows: any[]): PayoutRow[] {
 }
 
 
-function buildGuruPayoutRows(rows: any[]): PayoutRow[] {
+function buildGuruPayoutRows(rows: LoosePayoutRecord[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `guru-${index}`),
     source: "Guru",
-    name:
+    name: asString(
       row.guru_name ||
-      row.full_name ||
-      row.name ||
-      row.guru?.full_name ||
-      row.guru?.name ||
+        row.full_name ||
+        row.name ||
+        row.guru?.full_name ||
+        row.guru?.name,
       "Guru payout",
-    email: row.email || row.guru_email || row.guru?.email || "No email on file",
-    city: row.city || row.guru_city || row.guru?.city || "Unknown",
-    state: row.state || row.guru_state || row.guru?.state || "",
-    zip: row.zip || row.zip_code || row.guru?.zip || "",
+    ),
+    email: asString(row.email || row.guru_email || row.guru?.email, "No email on file"),
+    city: asString(row.city || row.guru_city || row.guru?.city, "Unknown"),
+    state: asString(row.state || row.guru_state || row.guru?.state),
+    zip: asString(row.zip || row.zip_code || row.guru?.zip),
     amount: normalizeAmount(
       row.amount || row.payout_amount || row.net_amount || row.total_amount,
     ),
     status: normalizeStatus(row.status || row.payout_status),
-    payoutDate:
-      row.payout_date || row.scheduled_for || row.created_at || row.updated_at || null,
-    reference:
+    payoutDate: asOptionalString(
+      row.payout_date || row.scheduled_for || row.created_at || row.updated_at,
+    ),
+    reference: asString(
       row.transaction_reference ||
-      row.stripe_transfer_id ||
-      row.reference ||
-      row.id ||
+        row.stripe_transfer_id ||
+        row.reference ||
+        row.id,
       "No reference",
-    batch: row.batch_name || row.batch || row.payout_batch || "Unbatched",
-    notes: row.notes || row.memo || "Guru sitting payout",
+    ),
+    batch: asString(row.batch_name || row.batch || row.payout_batch, "Unbatched"),
+    notes: asString(row.notes || row.memo, "Guru sitting payout"),
   }));
 }
 
-function buildPartnerPayoutRows(rows: any[]): PayoutRow[] {
+function buildPartnerPayoutRows(rows: LoosePayoutRecord[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `partner-${index}`),
     source: "Partner",
-    name:
+    name: asString(
       row.partner_name ||
-      row.company_name ||
-      row.name ||
-      row.partner?.company_name ||
-      row.partner?.name ||
+        row.company_name ||
+        row.name ||
+        row.partner?.company_name ||
+        row.partner?.name,
       "Partner payout",
-    email: row.email || row.partner_email || row.partner?.email || "No email on file",
-    city: row.city || row.partner_city || row.partner?.city || "Unknown",
-    state: row.state || row.partner_state || row.partner?.state || "",
-    zip: row.zip || row.zip_code || row.partner?.zip || "",
+    ),
+    email: asString(row.email || row.partner_email || row.partner?.email, "No email on file"),
+    city: asString(row.city || row.partner_city || row.partner?.city, "Unknown"),
+    state: asString(row.state || row.partner_state || row.partner?.state),
+    zip: asString(row.zip || row.zip_code || row.partner?.zip),
     amount: normalizeAmount(
       row.amount || row.commission_amount || row.payout_amount || row.total_amount,
     ),
     status: normalizeStatus(row.status || row.payout_status),
-    payoutDate:
-      row.payout_date || row.scheduled_for || row.created_at || row.updated_at || null,
-    reference:
+    payoutDate: asOptionalString(
+      row.payout_date || row.scheduled_for || row.created_at || row.updated_at,
+    ),
+    reference: asString(
       row.transaction_reference ||
-      row.stripe_transfer_id ||
-      row.reference ||
-      row.id ||
+        row.stripe_transfer_id ||
+        row.reference ||
+        row.id,
       "No reference",
-    batch: row.batch_name || row.batch || row.payout_batch || "Unbatched",
-    notes: row.notes || row.memo || "Partner commission payout",
+    ),
+    batch: asString(row.batch_name || row.batch || row.payout_batch, "Unbatched"),
+    notes: asString(row.notes || row.memo, "Partner commission payout"),
   }));
 }
 
-function buildGenericPayoutRows(rows: any[]): PayoutRow[] {
+function buildGenericPayoutRows(rows: LoosePayoutRecord[]): PayoutRow[] {
   return rows.map((row, index) => ({
     id: String(row.id || row.payout_id || `generic-${index}`),
     source: normalizeSource(row.source || row.type || row.category || "Platform"),
-    name:
+    name: asString(
       row.recipient_name ||
-      row.name ||
-      row.account_name ||
-      row.full_name ||
+        row.name ||
+        row.account_name ||
+        row.full_name,
       "Payout record",
-    email: row.email || row.recipient_email || "No email on file",
-    city: row.city || row.location_city || "Remote",
-    state: row.state || row.location_state || "US",
-    zip: row.zip || row.zip_code || "",
+    ),
+    email: asString(row.email || row.recipient_email, "No email on file"),
+    city: asString(row.city || row.location_city, "Remote"),
+    state: asString(row.state || row.location_state, "US"),
+    zip: asString(row.zip || row.zip_code),
     amount: normalizeAmount(
       row.amount ||
         row.payout_amount ||
@@ -489,16 +526,18 @@ function buildGenericPayoutRows(rows: any[]): PayoutRow[] {
         row.net_amount,
     ),
     status: normalizeStatus(row.status || row.payout_status),
-    payoutDate:
-      row.payout_date || row.scheduled_for || row.created_at || row.updated_at || null,
-    reference:
+    payoutDate: asOptionalString(
+      row.payout_date || row.scheduled_for || row.created_at || row.updated_at,
+    ),
+    reference: asString(
       row.transaction_reference ||
-      row.stripe_transfer_id ||
-      row.reference ||
-      row.id ||
+        row.stripe_transfer_id ||
+        row.reference ||
+        row.id,
       "No reference",
-    batch: row.batch_name || row.batch || row.payout_batch || "Unbatched",
-    notes: row.notes || row.memo || "Platform payout",
+    ),
+    batch: asString(row.batch_name || row.batch || row.payout_batch, "Unbatched"),
+    notes: asString(row.notes || row.memo, "Platform payout"),
   }));
 }
 
@@ -518,19 +557,23 @@ function dedupeRows(rows: PayoutRow[]) {
 async function getPayoutRows() {
   const supabase = await createClient();
 
-  const guruRows = buildGuruPayoutRows(await safeSelect<any>(supabase, "guru_payouts"));
-  const partnerRows = buildPartnerPayoutRows(
-    await safeSelect<any>(supabase, "partner_payouts"),
+  const guruRows = buildGuruPayoutRows(
+    await safeSelect<LoosePayoutRecord>(supabase, "guru_payouts"),
   );
-  const payoutsRows = buildGenericPayoutRows(await safeSelect<any>(supabase, "payouts"));
+  const partnerRows = buildPartnerPayoutRows(
+    await safeSelect<LoosePayoutRecord>(supabase, "partner_payouts"),
+  );
+  const payoutsRows = buildGenericPayoutRows(
+    await safeSelect<LoosePayoutRecord>(supabase, "payouts"),
+  );
   const financialPayoutRows = buildGenericPayoutRows(
-    await safeSelect<any>(supabase, "financial_payouts"),
+    await safeSelect<LoosePayoutRecord>(supabase, "financial_payouts"),
   );
   const adminPayoutRows = buildGenericPayoutRows(
-    await safeSelect<any>(supabase, "admin_payouts"),
+    await safeSelect<LoosePayoutRecord>(supabase, "admin_payouts"),
   );
   const referralRewardRows = buildReferralRewardPayoutRows(
-    await safeAdminSelect<any>("admin_referral_reward_liability"),
+    await safeAdminSelect<LoosePayoutRecord>("admin_referral_reward_liability"),
   );
 
   const merged = dedupeRows([
