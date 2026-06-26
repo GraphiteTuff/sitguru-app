@@ -24,6 +24,7 @@ type CustomerInsight = {
   state: string;
   country: string;
   zipCode: string;
+  signupQualityLabel?: string;
   nameSource?: string;
   emailSource?: string;
   photoSource?: string;
@@ -157,13 +158,17 @@ function getLocation(customer: CustomerInsight) {
   return cityStateCountry || customer.zipCode || "Unknown";
 }
 
+function getCustomerStatus(customer: CustomerInsight) {
+  return customer.signupQualityLabel || customer.segment || "Registered";
+}
+
 function segmentClasses(segment: string) {
   const normalized = segment.toLowerCase();
 
-  if (normalized.includes("vip")) return "bg-green-100 text-green-800";
+  if (normalized.includes("vip") || normalized.includes("active")) return "bg-green-100 text-green-800";
   if (normalized.includes("repeat")) return "bg-sky-100 text-sky-800";
   if (normalized.includes("new")) return "bg-amber-100 text-amber-800";
-  if (normalized.includes("incomplete")) return "bg-amber-100 text-amber-800";
+  if (normalized.includes("incomplete") || normalized.includes("missing") || normalized.includes("needs")) return "bg-amber-100 text-amber-800";
   if (normalized.includes("spam") || normalized.includes("test")) {
     return "bg-rose-100 text-rose-800";
   }
@@ -314,10 +319,10 @@ function CustomerMobileCard({
 
             <span
               className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${segmentClasses(
-                customer.segment,
+                getCustomerStatus(customer),
               )}`}
             >
-              {customer.segment}
+              {getCustomerStatus(customer)}
             </span>
           </div>
 
@@ -392,7 +397,7 @@ export default function CustomerInsightsTable({
     () =>
       [
         "All",
-        ...Array.from(new Set(customers.map((customer) => customer.segment))).filter(
+        ...Array.from(new Set(customers.map((customer) => getCustomerStatus(customer)))).filter(
           Boolean,
         ),
       ].sort((a, b) => (a === "All" ? -1 : b === "All" ? 1 : compareText(a, b))),
@@ -425,7 +430,7 @@ export default function CustomerInsightsTable({
       const searchText = [
         customer.name,
         customer.email,
-        customer.segment,
+        getCustomerStatus(customer),
         customer.source,
         customer.campaign,
         location,
@@ -438,7 +443,7 @@ export default function CustomerInsightsTable({
 
       const matchesQuery = !normalizedQuery || searchText.includes(normalizedQuery);
       const matchesSegment =
-        segmentFilter === "All" || customer.segment === segmentFilter;
+        segmentFilter === "All" || getCustomerStatus(customer) === segmentFilter;
       const matchesSource =
         sourceFilter === "All" || (customer.source || "Direct") === sourceFilter;
       const matchesLocation =
@@ -451,7 +456,7 @@ export default function CustomerInsightsTable({
       let result = 0;
 
       if (sortKey === "name") result = compareText(a.name, b.name);
-      if (sortKey === "segment") result = compareText(a.segment, b.segment);
+      if (sortKey === "segment") result = compareText(getCustomerStatus(a), getCustomerStatus(b));
       if (sortKey === "source") result = compareText(a.source, b.source);
       if (sortKey === "location") result = compareText(getLocation(a), getLocation(b));
       if (sortKey === "profileCompletion") {
@@ -793,10 +798,10 @@ export default function CustomerInsightsTable({
                     <td className="px-5 py-4">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${segmentClasses(
-                          customer.segment,
+                          getCustomerStatus(customer),
                         )}`}
                       >
-                        {customer.segment}
+                        {getCustomerStatus(customer)}
                       </span>
                     </td>
 

@@ -53,6 +53,8 @@ type ProfileRow = {
   zipcode?: string | null;
   zip_code?: string | null;
   postal_code?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
   source?: string | null;
   signup_source?: string | null;
   referral_source?: string | null;
@@ -95,6 +97,8 @@ type BookingRow = {
   zipcode?: string | null;
   zip_code?: string | null;
   postal_code?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
   source?: string | null;
   signup_source?: string | null;
   referral_source?: string | null;
@@ -145,6 +149,7 @@ type CustomerInsight = {
   state: string;
   country: string;
   zipCode: string;
+  phone: string;
   nameSource: string;
   emailSource: string;
   photoSource: string;
@@ -572,7 +577,7 @@ function getArchivedAt(row: AnyRow) {
 }
 
 function isSeparatedAdminStatus(status: string) {
-  return ["archived", "likely_spam", "incomplete_signup", "deleted"].includes(
+  return ["archived", "likely_spam", "deleted"].includes(
     normalizeAdminStatus(status),
   );
 }
@@ -1098,18 +1103,10 @@ function normalizeRegistrationHealthStatus(value: unknown) {
   return asString(value).toLowerCase().replace(/[\s-]+/g, "_");
 }
 
-function isActivePetParentHealth(row: PetParentRegistrationHealthRow | undefined) {
-  return normalizeRegistrationHealthStatus(row?.registration_health_status) === "active_pet_parent";
-}
-
-function isSeparatedPetParentHealth(row: PetParentRegistrationHealthRow | undefined) {
+function isCleanupPetParentHealth(row: PetParentRegistrationHealthRow | undefined) {
   const status = normalizeRegistrationHealthStatus(row?.registration_health_status);
 
-  return Boolean(
-    status &&
-      status !== "active_pet_parent" &&
-      status !== "not_pet_parent",
-  );
+  return status === "archived" || status === "likely_test_or_spam";
 }
 
 function mapRegistrationHealthToSignupQuality(
@@ -1133,14 +1130,36 @@ function getRegistrationHealthLabel(row: PetParentRegistrationHealthRow | undefi
   const status = normalizeRegistrationHealthStatus(row?.registration_health_status);
 
   if (status === "active_pet_parent") return "Active Pet Parent";
-  if (status === "phone_only_incomplete_signup") return "Phone-only Signup";
-  if (status === "registered_pet_parent_needs_profile") return "Needs Profile";
+  if (status === "phone_only_incomplete_signup") return "Missing Profile Info";
+  if (status === "registered_pet_parent_needs_profile") return "Needs Profile Info";
   if (status === "incomplete_signup") return "Incomplete Signup";
   if (status === "signup_log_without_auth") return "Signup / No Auth";
   if (status === "likely_test_or_spam") return "Likely Test / Spam";
   if (status === "archived") return "Archived";
 
   return "";
+}
+
+function getReviewSignupQualityLabel(
+  customer: CustomerInsight,
+  healthLabel: string,
+  fallbackLabel: string,
+) {
+  if (customer.signupQuality === "active") return fallbackLabel;
+  if (customer.signupQuality === "likely_test_spam") return fallbackLabel;
+
+  const hasProfileName = hasUsableCustomerName(customer);
+  const hasEmail = Boolean(customer.email);
+  const hasPhone = Boolean(customer.phone);
+  const hasLocation = hasCustomerLocation(customer);
+
+  if (healthLabel === "Needs Profile Info") return "Needs Profile Info";
+  if (healthLabel === "Missing Profile Info") return "Needs Profile Info";
+  if (!hasProfileName || !hasEmail) return "Incomplete Signup";
+  if (!hasLocation) return "Missing Location";
+  if (!hasPhone) return "Missing Phone";
+
+  return fallbackLabel || "Needs Review";
 }
 
 function mapRegistrationHealthToAdminStatus(row: PetParentRegistrationHealthRow | undefined) {
@@ -1285,20 +1304,12 @@ async function getCustomerIntelligenceData() {
       .map((row) => [String(row.profile_id || ""), row] as const)
       .filter(([profileId]) => Boolean(profileId)),
   );
-  const hasRegistrationHealthView = registrationHealthByProfileId.size > 0;
   const healthExcludedCustomerIds = new Set(
     rawRegistrationHealth
-      .filter((row) => isSeparatedPetParentHealth(row))
+      .filter((row) => isCleanupPetParentHealth(row))
       .map((row) => row.profile_id)
       .filter(Boolean),
   );
-  const healthActiveCustomerIds = new Set(
-    rawRegistrationHealth
-      .filter((row) => isActivePetParentHealth(row))
-      .map((row) => row.profile_id)
-      .filter(Boolean),
-  );
-
   const hiddenCustomerIds = new Set(
     rawProfiles
       .filter((profile) => isDemoLikeRow(profile as AnyRow))
@@ -1322,15 +1333,12 @@ async function getCustomerIntelligenceData() {
   ]);
 
   const profiles = rawProfiles.filter((profile) => {
-    const health = registrationHealthByProfileId.get(profile.id);
-
     return (
       isCustomerProfile(profile) &&
       !isDemoLikeRow(profile as AnyRow) &&
       !hiddenCustomerIds.has(profile.id) &&
       !separatedCustomerIds.has(profile.id) &&
-      !healthExcludedCustomerIds.has(profile.id) &&
-      (!hasRegistrationHealthView || healthActiveCustomerIds.has(profile.id) || isActivePetParentHealth(health))
+      !healthExcludedCustomerIds.has(profile.id)
     );
   });
   const bookings = rawBookings.filter(
@@ -1384,7 +1392,6 @@ async function getCustomerIntelligenceData() {
   const separatedAdminRows =
     separatedStatusCounts.archived +
     separatedStatusCounts.likelySpam +
-    separatedStatusCounts.incompleteSignup +
     separatedStatusCounts.deleted +
     healthExcludedCustomerIds.size;
 
@@ -1410,6 +1417,7 @@ async function getCustomerIntelligenceData() {
       id: profile.id,
       name: getAccountDisplayName(displayRow, "Customer"),
       email: getAccountEmail(displayRow),
+      phone: getText(displayRow, ["phone", "phone_number", "profile_phone", "auth_phone"]),
       avatarUrl: profile.avatar_url || getText(profile as AnyRow, ["photo_url", "profile_photo_url", "image_url"]),
       city: getCity(profile as AnyRow),
       state: getState(profile as AnyRow),
@@ -1463,6 +1471,7 @@ async function getCustomerIntelligenceData() {
         id: fallbackId,
         name: getAccountDisplayName(booking as AnyRow, "Customer"),
         email: booking.customer_email || "",
+        phone: "",
         avatarUrl: "",
         city: "",
         state: "",
@@ -1582,7 +1591,7 @@ async function getCustomerIntelligenceData() {
     const signupQuality = healthSignupQuality
       ? {
           signupQuality: healthSignupQuality,
-          signupQualityLabel: healthLabel || calculatedSignupQuality.signupQualityLabel,
+          signupQualityLabel: getReviewSignupQualityLabel(enriched, healthLabel, healthLabel || calculatedSignupQuality.signupQualityLabel),
         }
       : calculatedSignupQuality;
 
@@ -1730,6 +1739,7 @@ async function getCustomerIntelligenceData() {
       topSocialPlatform: socialSourceInsights[0]?.label || "None yet",
       hiddenDemoRows,
       separatedAdminRows,
+      reviewQueueRows: customers.filter((customer) => customer.signupQuality === "needs_review" || customer.signupQuality === "incomplete").length,
       archivedRows: separatedStatusCounts.archived,
       likelySpamRows: separatedStatusCounts.likelySpam,
       incompleteSignupRows: separatedStatusCounts.incompleteSignup,
@@ -2016,9 +2026,9 @@ export default async function AdminCustomerIntelligencePage() {
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             icon={<Users size={22} />}
-            label="Customers"
+            label="Pet Parents"
             value={number(data.metrics.totalCustomers)}
-            detail="Real Pet Parent profiles plus customer IDs found in bookings"
+            detail="Real Pet Parents, including incomplete profiles for admin follow-up"
           />
 
           <StatCard
@@ -2047,8 +2057,8 @@ export default async function AdminCustomerIntelligencePage() {
           <StatCard
             icon={<Search size={22} />}
             label="Rows Excluded"
-            value={number(data.metrics.hiddenDemoRows + data.metrics.separatedAdminRows)}
-            detail={`${number(data.metrics.separatedAdminRows)} archive/spam/incomplete rows removed from active Pet Parent stats`}
+            value={number(data.metrics.hiddenDemoRows)}
+            detail={`${number(data.metrics.separatedAdminRows)} archived/spam/deleted cleanup rows removed; ${number(data.metrics.reviewQueueRows)} incomplete or needs-review Pet Parents remain visible`}
           />
         </section>
 
@@ -2271,7 +2281,7 @@ export default async function AdminCustomerIntelligencePage() {
             href={adminRoutes.customerArchive}
             icon={<Archive size={22} />}
             title="Archive & Spam Manager"
-            description={`Review ${number(data.metrics.archivedRows)} archived, ${number(data.metrics.likelySpamRows)} likely spam, and ${number(data.metrics.incompleteSignupRows)} incomplete signup records outside active Pet Parent stats.`}
+            description={`Review ${number(data.metrics.archivedRows)} archived and ${number(data.metrics.likelySpamRows)} likely spam cleanup records outside active Pet Parent stats. ${number(data.metrics.incompleteSignupRows + data.metrics.needsReviewRows)} incomplete or needs-review Pet Parents remain visible in the registry.`}
           />
 
           <QuickLinkCard
@@ -2340,9 +2350,10 @@ export default async function AdminCustomerIntelligencePage() {
           deleted rows are filtered in-memory before Customer KPIs, social
           attribution, source charts, location charts, and exportable report
           data are calculated from live rows. Records marked archived, likely
-          spam, incomplete signup, or deleted by Admin Cleanup Controls are also
-          excluded from active Pet Parent stats and should be managed from the
-          Archive & Spam Manager.
+          spam, or deleted by Admin Cleanup Controls are excluded from active
+          Pet Parent stats and should be managed from the Archive & Spam
+          Manager. Incomplete and needs-review Pet Parents remain visible as
+          follow-up records in the registry.
         </div>
       </div>
     </main>
