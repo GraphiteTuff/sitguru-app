@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import SitGuruActionCard from '@/components/SitGuruActionCard';
 import SitGuruBottomNav from '@/components/SitGuruBottomNav';
@@ -129,6 +130,53 @@ export default function PetParentDashboardScreen() {
               title="Care handoff checklist"
             />
           </View>
+        </View>
+
+        <View style={styles.livePawReportPanel}>
+          <View style={styles.livePawReportHeader}>
+            <View style={styles.livePawReportIconBadge}>
+              <Text style={styles.livePawReportIcon}>🐾</Text>
+            </View>
+
+            <View style={styles.livePawReportHeaderCopy}>
+              <Text style={styles.livePawReportEyebrow}>Active walk</Text>
+              <Text style={styles.livePawReportTitle}>PawReport Live</Text>
+            </View>
+          </View>
+
+          <Text style={styles.livePawReportText}>
+            Track active walks, visit updates, photos, potty notes, and care progress.
+          </Text>
+
+          <View style={styles.livePawReportStatusCard}>
+            <Text style={styles.livePawReportStatusLabel}>Preview status</Text>
+            <Text style={styles.livePawReportStatusText}>Scout’s walk is in progress</Text>
+          </View>
+
+          <View style={styles.livePawReportStatsGrid}>
+            <View style={styles.livePawReportStatCard}>
+              <Text style={styles.livePawReportStatValue}>18 min</Text>
+              <Text style={styles.livePawReportStatLabel}>Elapsed</Text>
+            </View>
+
+            <View style={styles.livePawReportStatCard}>
+              <Text style={styles.livePawReportStatValue}>0.8 mi</Text>
+              <Text style={styles.livePawReportStatLabel}>Distance</Text>
+            </View>
+
+            <View style={styles.livePawReportStatCard}>
+              <Text style={styles.livePawReportStatValue}>12 min</Text>
+              <Text style={styles.livePawReportStatLabel}>ETA</Text>
+            </View>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/pawreport-live')}
+            style={styles.livePawReportButton}
+          >
+            <Text style={styles.livePawReportButtonText}>View Live PawReport</Text>
+          </Pressable>
         </View>
 
         <View style={styles.section}>
@@ -387,6 +435,115 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 22,
+  },
+  livePawReportPanel: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 30,
+    borderWidth: 1,
+    elevation: 3,
+    gap: 14,
+    padding: 18,
+  },
+  livePawReportHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  livePawReportIconBadge: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  livePawReportIcon: {
+    fontSize: 26,
+  },
+  livePawReportHeaderCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  livePawReportEyebrow: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  livePawReportTitle: {
+    color: SitGuruColors.text,
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: -0.6,
+    lineHeight: 31,
+  },
+  livePawReportText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  livePawReportStatusCard: {
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 4,
+    padding: 14,
+  },
+  livePawReportStatusLabel: {
+    color: SitGuruColors.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  livePawReportStatusText: {
+    color: SitGuruColors.text,
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 23,
+  },
+  livePawReportStatsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  livePawReportStatCard: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 18,
+    borderWidth: 1,
+    flex: 1,
+    gap: 3,
+    padding: 12,
+  },
+  livePawReportStatValue: {
+    color: SitGuruColors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  livePawReportStatLabel: {
+    color: SitGuruColors.textMuted,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  livePawReportButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.primary,
+    borderRadius: 999,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: 18,
+  },
+  livePawReportButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
   },
   progressPanel: {
     backgroundColor: SitGuruColors.surface,

@@ -148,6 +148,40 @@ export default function GuruDashboardScreen() {
           </View>
         </View>
 
+        <View style={styles.liveWalkPanel}>
+          <View style={styles.liveWalkHeader}>
+            <View>
+              <Text style={styles.liveWalkEyebrow}>PawReport controls</Text>
+              <Text style={styles.liveWalkTitle}>Live Walk Controls</Text>
+            </View>
+
+            <Text style={styles.liveWalkBadge}>Ready</Text>
+          </View>
+
+          <Text style={styles.liveWalkText}>
+            Start walks, add updates, send PawReport notes, and complete visits.
+          </Text>
+
+          <View style={styles.liveWalkPreviewCard}>
+            <View style={styles.liveWalkPreviewIcon}>
+              <Text style={styles.liveWalkPreviewIconText}>🐕</Text>
+            </View>
+
+            <View style={styles.liveWalkPreviewCopy}>
+              <Text style={styles.liveWalkBooking}>Scout • Dog Walking • Today</Text>
+              <Text style={styles.liveWalkStatus}>Ready to start</Text>
+            </View>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/guru-live-walk')}
+            style={styles.liveWalkButton}
+          >
+            <Text style={styles.liveWalkButtonText}>Start Live Walk</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.businessPanel}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, styles.darkSectionTitle]}>
@@ -582,6 +616,105 @@ const styles = StyleSheet.create({
   },
   secondaryPricingButtonText: {
     color: SitGuruColors.primary,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  liveWalkPanel: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 30,
+    borderWidth: 1,
+    elevation: 3,
+    gap: 14,
+    padding: 18,
+  },
+  liveWalkHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  liveWalkEyebrow: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  liveWalkTitle: {
+    color: SitGuruColors.text,
+    fontSize: 27,
+    fontWeight: '900',
+    letterSpacing: -0.7,
+    lineHeight: 32,
+    marginTop: 3,
+  },
+  liveWalkBadge: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 999,
+    borderWidth: 1,
+    color: SitGuruColors.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    textTransform: 'uppercase',
+  },
+  liveWalkText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  liveWalkPreviewCard: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+  },
+  liveWalkPreviewIcon: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderRadius: 16,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  liveWalkPreviewIconText: {
+    fontSize: 24,
+  },
+  liveWalkPreviewCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  liveWalkBooking: {
+    color: SitGuruColors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 21,
+  },
+  liveWalkStatus: {
+    color: SitGuruColors.primary,
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  liveWalkButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.primary,
+    borderRadius: 999,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: 18,
+  },
+  liveWalkButtonText: {
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '900',
   },
