@@ -1622,6 +1622,175 @@ async function writeFirstMessageAuditLog(params: {
   }
 }
 
+
+async function getOrCreateAdminUserConversation(params: {
+  adminUserId: string;
+  targetUserId: string;
+  roleContext: string;
+  recipientName?: string;
+  recipientEmail?: string;
+}) {
+  const targetUserId = asString(params.targetUserId);
+  const roleContext = normalizeRole(params.roleContext) || "user";
+
+  if (!targetUserId) {
+    throw new Error("A target user is required to start an admin message thread.");
+  }
+
+  const targetParticipantRows = await safeRows<ConversationParticipantRow>(
+    supabaseAdmin
+      .from("conversation_participants")
+      .select("conversation_id,user_id,role,created_at,updated_at")
+      .eq("user_id", targetUserId),
+    "admin_user_conversation_target_participants",
+  );
+
+  const candidateIds = Array.from(
+    new Set(
+      targetParticipantRows
+        .map((row) => asString(row.conversation_id))
+        .filter(Boolean),
+    ),
+  );
+
+  if (candidateIds.length > 0) {
+    const [candidateConversations, candidateParticipants] = await Promise.all([
+      safeRows<ConversationRow>(
+        supabaseAdmin
+          .from("conversations")
+          .select("id, customer_id, guru_id, booking_id, started_by_user_id, subject, status, topic, created_at, updated_at, last_message_at, last_message_preview")
+          .in("id", candidateIds),
+        "admin_user_conversation_candidates",
+      ),
+      safeRows<ConversationParticipantRow>(
+        supabaseAdmin
+          .from("conversation_participants")
+          .select("conversation_id,user_id,role,created_at,updated_at")
+          .in("conversation_id", candidateIds),
+        "admin_user_conversation_candidate_participants",
+      ),
+    ]);
+
+    const participantsByConversationId = new Map<string, ConversationParticipantRow[]>();
+
+    for (const participant of candidateParticipants) {
+      const conversationId = asString(participant.conversation_id);
+      if (!conversationId) continue;
+
+      const list = participantsByConversationId.get(conversationId) || [];
+      list.push(participant);
+      participantsByConversationId.set(conversationId, list);
+    }
+
+    const existing = candidateConversations
+      .filter((conversation) => !["archived", "deleted", "closed"].includes(asString(conversation.status).toLowerCase()))
+      .filter((conversation) => {
+        const participants = participantsByConversationId.get(conversation.id) || [];
+        const hasTarget = participants.some(
+          (participant) => asString(participant.user_id) === targetUserId,
+        );
+        const hasAdmin =
+          asString(conversation.started_by_user_id) === params.adminUserId ||
+          participants.some((participant) => {
+            const participantRole = normalizeRole(participant.role);
+            return (
+              asString(participant.user_id) === params.adminUserId ||
+              participantRole === "admin" ||
+              participantRole === "owner" ||
+              participantRole === "super_admin"
+            );
+          });
+
+        return hasTarget && hasAdmin;
+      })
+      .sort((a, b) => {
+        const aTime = Date.parse(asString(a.last_message_at) || asString(a.updated_at) || asString(a.created_at));
+        const bTime = Date.parse(asString(b.last_message_at) || asString(b.updated_at) || asString(b.created_at));
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+      })[0];
+
+    if (existing?.id) {
+      const now = new Date().toISOString();
+      await supabaseAdmin.from("conversation_participants").upsert(
+        [
+          {
+            conversation_id: existing.id,
+            user_id: params.adminUserId,
+            role: "admin",
+            created_at: now,
+            updated_at: now,
+          },
+          {
+            conversation_id: existing.id,
+            user_id: targetUserId,
+            role: roleContext,
+            created_at: now,
+            updated_at: now,
+          },
+        ],
+        { onConflict: "conversation_id,user_id", ignoreDuplicates: false },
+      );
+
+      return existing.id;
+    }
+  }
+
+  const recipientLabel =
+    asString(params.recipientName) ||
+    asString(params.recipientEmail) ||
+    roleContext.replaceAll("_", " ") ||
+    "SitGuru User";
+  const topic = roleContext === "guru"
+    ? "Guru Support"
+    : roleContext === "customer"
+      ? "Customer Support"
+      : roleContext === "ambassador"
+        ? "Partner"
+        : "Admin Follow-Up";
+  const now = new Date().toISOString();
+  const conversationPayload: Record<string, unknown> = {
+    subject: `Direct Message: SitGuru Admin ↔ ${recipientLabel}`,
+    status: "open",
+    topic,
+    started_by_user_id: params.adminUserId,
+    created_at: now,
+    updated_at: now,
+  };
+
+  if (roleContext === "guru") conversationPayload.guru_id = targetUserId;
+  if (roleContext === "customer") conversationPayload.customer_id = targetUserId;
+
+  const { data: conversation, error: conversationError } = await supabaseAdmin
+    .from("conversations")
+    .insert(conversationPayload)
+    .select("id")
+    .single();
+
+  if (conversationError || !conversation?.id) {
+    throw new Error(
+      conversationError?.message || "Unable to create an admin message thread.",
+    );
+  }
+
+  const conversationId = String(conversation.id);
+
+  const { error: participantError } = await supabaseAdmin
+    .from("conversation_participants")
+    .upsert(
+      [
+        { conversation_id: conversationId, user_id: params.adminUserId, role: "admin", created_at: now, updated_at: now },
+        { conversation_id: conversationId, user_id: targetUserId, role: roleContext, created_at: now, updated_at: now },
+      ],
+      { onConflict: "conversation_id,user_id", ignoreDuplicates: false },
+    );
+
+  if (participantError) {
+    console.warn("Admin user conversation participant create failed:", participantError.message);
+  }
+
+  return conversationId;
+}
+
 function buildComposeErrorRedirect(reason: string) {
   return `/admin/messages?compose_error=${encodeURIComponent(reason)}`;
 }
@@ -2904,6 +3073,30 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
 
   if (userError || !user) {
     redirect("/admin/login");
+  }
+
+  if (
+    composeIntent?.recipientId &&
+    composeIntent.threadType.startsWith("direct")
+  ) {
+    let conversationId = "";
+
+    try {
+      conversationId = await getOrCreateAdminUserConversation({
+        adminUserId: user.id,
+        targetUserId: composeIntent.recipientId,
+        roleContext:
+          composeIntent.recipientRole ||
+          composeIntent.threadType.replace("direct_", ""),
+        recipientName: composeIntent.recipientName,
+        recipientEmail: composeIntent.recipientEmail,
+      });
+    } catch (error) {
+      console.error("Admin direct message thread resolution failed:", error);
+      redirect(buildComposeErrorRedirect("thread_create_failed"));
+    }
+
+    redirect(`/admin/messages/${encodeURIComponent(conversationId)}`);
   }
 
   const [
