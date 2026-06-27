@@ -180,6 +180,14 @@ export default function GuruDashboardScreen() {
           >
             <Text style={styles.liveWalkButtonText}>Start Live Walk</Text>
           </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/booking-details')}
+            style={styles.liveWalkButton}
+          >
+            <Text style={styles.liveWalkButtonText}>View Booking Details</Text>
+          </Pressable>
         </View>
 
         <View style={styles.businessPanel}>
