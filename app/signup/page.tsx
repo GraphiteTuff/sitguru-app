@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-type AccountIntent = "pet_parent" | "guru" | "both";
+type AccountIntent = "pet_parent" | "guru" | "ambassador" | "both";
 type SignupMode = "email" | "phone";
 
 const accountOptions: {
@@ -43,10 +43,10 @@ const accountOptions: {
     badge: "Earn with care",
   },
   {
-    key: "both",
-    title: "Both",
-    description: "Use SitGuru as a Pet Parent and apply to become a Guru.",
-    badge: "Full access",
+    key: "ambassador",
+    title: "Ambassador",
+    description: "Share SitGuru and grow referrals in your community.",
+    badge: "Promote SitGuru",
   },
 ];
 
@@ -187,6 +187,7 @@ function normalizeAmbassadorReferralCode(value: string) {
 function getDefaultNextPath(intent: AccountIntent) {
   if (intent === "guru") return "/guru/dashboard/profile?step=1";
   if (intent === "both") return "/guru/dashboard/profile?step=1";
+  if (intent === "ambassador") return "/ambassador/dashboard";
 
   return "/customer/dashboard";
 }
@@ -207,15 +208,60 @@ function getRedirectPath(intent: AccountIntent, nextPath: string) {
 function getIntentLabel(intent: AccountIntent) {
   if (intent === "guru") return "Future Guru";
   if (intent === "both") return "Pet Parent + Future Guru";
+  if (intent === "ambassador") return "Ambassador";
   return "Pet Parent";
 }
 
 function getRoleFromIntent(intent: AccountIntent) {
-  return intent === "guru" ? "guru" : "customer";
+  if (intent === "guru") return "guru";
+  if (intent === "ambassador") return "ambassador";
+  if (intent === "both") return "both";
+  return "customer";
 }
 
 function shouldCreateGuruProfile(intent: AccountIntent) {
   return intent === "guru" || intent === "both";
+}
+
+function shouldCreatePetParentProfile(intent: AccountIntent) {
+  return intent === "pet_parent" || intent === "both";
+}
+
+function buildReferralCode(userId: string, fullName: string) {
+  const nameCode = fullName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 10);
+
+  return `${nameCode || "SITGURU"}${userId.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+}
+
+async function ensureUserRole(userId: string, role: string) {
+  await supabase.from("user_roles").upsert(
+    {
+      user_id: userId,
+      role,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,role" },
+  );
+}
+
+async function ensureReferralCode(userId: string, fullName: string, role: string) {
+  const code = buildReferralCode(userId, fullName);
+
+  await supabase.from("pawperks_account_referral_codes").upsert(
+    {
+      account_id: userId,
+      code,
+      program: role === "guru" ? "guru" : role === "ambassador" ? "ambassador" : "pet_parent",
+      status: "active",
+      metadata: { source: "signup", role },
+    },
+    { onConflict: "account_id" },
+  );
+
+  return code;
 }
 
 function buildStarterGuruName(fullName: string, fallback = "New SitGuru") {
@@ -242,6 +288,7 @@ async function ensureStarterGuruProfile({
   email,
   phone,
   zipCode,
+  serviceArea,
   source,
 }: {
   userId: string;
@@ -249,6 +296,7 @@ async function ensureStarterGuruProfile({
   email?: string;
   phone?: string;
   zipCode?: string;
+  serviceArea?: string;
   source: string;
 }) {
   const now = new Date().toISOString();
@@ -266,6 +314,7 @@ async function ensureStarterGuruProfile({
     role: "guru",
     source,
     zip_code: zipCode?.trim() || null,
+    service_area: serviceArea?.trim() || null,
     updated_at: now,
   });
 
@@ -281,6 +330,7 @@ async function ensureStarterGuruProfile({
     full_name: displayName,
     slug,
     zip_code: zipCode?.trim() || null,
+    service_area: serviceArea?.trim() || null,
     is_public: false,
     onboarding_completed: false,
     profile_completed: false,
@@ -301,6 +351,66 @@ async function ensureStarterGuruProfile({
   });
 }
 
+async function ensureStarterAmbassadorProfile({
+  userId,
+  fullName,
+  email,
+  phone,
+  zipCode,
+  serviceArea,
+  source,
+}: {
+  userId: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  zipCode?: string;
+  serviceArea?: string;
+  source: string;
+}) {
+  const now = new Date().toISOString();
+  const displayName = buildStarterGuruName(fullName, "SitGuru Ambassador");
+  const { firstName, lastName } = getNameParts(displayName);
+  const referralCode = await ensureReferralCode(userId, displayName, "ambassador");
+
+  await supabase.from("profiles").upsert({
+    id: userId,
+    full_name: displayName,
+    first_name: firstName || null,
+    last_name: lastName || null,
+    email: email?.trim() || null,
+    phone: phone?.trim() || null,
+    role: "ambassador",
+    source,
+    zip_code: zipCode?.trim() || null,
+    service_area: serviceArea?.trim() || null,
+    referral_code: referralCode,
+    updated_at: now,
+  });
+
+  await supabase.from("ambassadors").upsert(
+    {
+      user_id: userId,
+      full_name: displayName,
+      email: email?.trim() || null,
+      contact_email: email?.trim() || null,
+      phone: phone?.trim() || null,
+      referral_code: referralCode,
+      status: "active",
+      referral_status: "active",
+      onboarding_status: "started",
+      training_status: "not_started",
+      dashboard_enabled: true,
+      login_enabled: true,
+      dashboard_slug: buildStarterGuruSlug(userId, displayName),
+      base_zip_code: zipCode?.trim() || null,
+      service_area: serviceArea?.trim() || null,
+      updated_at: now,
+    },
+    { onConflict: "user_id" },
+  );
+}
+
 function SignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -312,6 +422,7 @@ function SignupPageContent() {
       "";
 
     if (role === "guru" || role === "future_guru") return "guru";
+    if (role === "ambassador" || role === "partner") return "ambassador";
     if (role === "both") return "both";
 
     return "pet_parent";
@@ -349,6 +460,7 @@ function SignupPageContent() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [zipCode, setZipCode] = useState("");
+  const [serviceArea, setServiceArea] = useState("");
   const [password, setPassword] = useState("");
   const [ambassadorReferralCode, setAmbassadorReferralCode] = useState(
     startingAmbassadorReferralCode,
@@ -470,6 +582,7 @@ function SignupPageContent() {
             signup_source: "sitguru_signup_page",
             signup_status: "pending_email_verification",
             zip_code: cleanZipCode,
+            service_area: serviceArea.trim() || cleanZipCode,
             ambassador_referral_code: cleanAmbassadorReferralCode || null,
           },
         },
@@ -480,13 +593,29 @@ function SignupPageContent() {
       const userId = data.user?.id;
 
       if (userId) {
+        await ensureReferralCode(userId, cleanName, getRoleFromIntent(intent));
+        await ensureUserRole(userId, getRoleFromIntent(intent));
+        if (shouldCreatePetParentProfile(intent)) await ensureUserRole(userId, "customer");
+        if (shouldCreateGuruProfile(intent)) await ensureUserRole(userId, "guru");
+        if (intent === "ambassador") await ensureUserRole(userId, "ambassador");
+
         if (shouldCreateGuruProfile(intent)) {
           await ensureStarterGuruProfile({
             userId,
             fullName: cleanName,
             email: cleanEmail,
             zipCode: cleanZipCode,
+            serviceArea: serviceArea.trim() || cleanZipCode,
             source: "sitguru_guru_signup_page",
+          });
+        } else if (intent === "ambassador") {
+          await ensureStarterAmbassadorProfile({
+            userId,
+            fullName: cleanName,
+            email: cleanEmail,
+            zipCode: cleanZipCode,
+            serviceArea: serviceArea.trim() || cleanZipCode,
+            source: "sitguru_ambassador_signup_page",
           });
         } else {
           await supabase.from("profiles").upsert({
@@ -498,6 +627,8 @@ function SignupPageContent() {
             role: getRoleFromIntent(intent),
             source: "sitguru_signup_page",
             zip_code: cleanZipCode,
+            service_area: serviceArea.trim() || cleanZipCode,
+            referral_code: buildReferralCode(userId, cleanName),
             updated_at: new Date().toISOString(),
           });
         }
@@ -564,6 +695,7 @@ function SignupPageContent() {
             signup_source: "sitguru_phone_signup",
             signup_status: "pending_phone_verification",
             zip_code: cleanZipCode,
+            service_area: serviceArea.trim() || cleanZipCode,
             ambassador_referral_code: cleanAmbassadorReferralCode || null,
           },
         },
@@ -948,12 +1080,31 @@ function SignupPageContent() {
                   </div>
 
 
+                  {(intent === "guru" || intent === "ambassador") ? (
+                    <div>
+                      <label
+                        htmlFor="service-area"
+                        className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
+                      >
+                        {intent === "ambassador" ? "Community area" : "Service area"} <span className="text-rose-600">*</span>
+                      </label>
+                      <input
+                        id="service-area"
+                        value={serviceArea}
+                        onChange={(event) => setServiceArea(event.target.value)}
+                        className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        placeholder={intent === "ambassador" ? "Example: Quakertown schools and local events" : "Example: Quakertown, Perkasie, Doylestown"}
+                        required
+                      />
+                    </div>
+                  ) : null}
+
                   <div>
                     <label
                       htmlFor="ambassador-referral-code"
                       className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
                     >
-                      Ambassador referral code
+                                            Ambassador referral code
                     </label>
                     <input
                       id="ambassador-referral-code"

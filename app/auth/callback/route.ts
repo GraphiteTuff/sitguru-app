@@ -20,7 +20,7 @@ type PetPerksSignupSelection =
   | "pet-parent"
   | "pet_parent";
 
-type CallbackIntent = "pet_parent" | "guru" | "both" | "customer" | null;
+type CallbackIntent = "pet_parent" | "guru" | "ambassador" | "both" | "customer" | null;
 
 function getSafeNextPath(nextParam: string | null, type: string | null) {
   if (type === "recovery") {
@@ -101,6 +101,10 @@ function getRoleRedirectPath(role: string | null, accountType?: string | null) {
     return fallbackRoutes.guruProfile;
   }
 
+  if (role?.trim().toLowerCase() === "ambassador" || accountType?.trim().toLowerCase() === "ambassador") {
+    return "/ambassador/dashboard";
+  }
+
   if (isCustomerRole(role) || isCustomerRole(accountType)) {
     return fallbackRoutes.customerProfile;
   }
@@ -131,6 +135,10 @@ function normalizeCallbackIntent(value: string | null): CallbackIntent {
     return "guru";
   }
 
+  if (normalized === "ambassador" || normalized === "partner") {
+    return "ambassador";
+  }
+
   if (
     normalized === "both" ||
     normalized === "pet-parent-and-guru" ||
@@ -151,6 +159,10 @@ function getProfileRoleFromIntent(intent: CallbackIntent) {
 
   if (intent === "both") {
     return "both";
+  }
+
+  if (intent === "ambassador") {
+    return "ambassador";
   }
 
   return "customer";
@@ -177,6 +189,10 @@ function normalizePetPerksSignupSelection(
   value: string | null,
 ): PetPerksSignupSelection {
   const normalized = value?.trim().toLowerCase() || "";
+
+  if (normalized === "ambassador" || normalized === "partner") {
+    return "ambassador";
+  }
 
   if (
     normalized === "both" ||
@@ -351,6 +367,44 @@ async function upsertPetParentProfileFromCallback({
       "Profile upsert during auth callback failed:",
       upsertError.message,
     );
+  }
+
+  const roleValues = intent === "both" ? ["customer", "guru"] : [profileRole || "customer"];
+
+  for (const role of roleValues) {
+    const { error: roleError } = await supabaseAdmin.from("user_roles").upsert(
+      { user_id: userId, role, updated_at: new Date().toISOString() },
+      { onConflict: "user_id,role" },
+    );
+
+    if (roleError) {
+      console.error("User role upsert during auth callback failed:", roleError.message);
+    }
+  }
+
+  if (intent === "ambassador") {
+    const referralCode = `${(preferredName || "SITGURU").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "SITGURU"}${userId.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+    const { error: ambassadorError } = await supabaseAdmin.from("ambassadors").upsert(
+      {
+        user_id: userId,
+        full_name: preferredName || "SitGuru Ambassador",
+        email: userEmail,
+        contact_email: userEmail,
+        referral_code: referralCode,
+        status: "active",
+        referral_status: "active",
+        onboarding_status: "started",
+        training_status: "not_started",
+        dashboard_enabled: true,
+        login_enabled: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+
+    if (ambassadorError) {
+      console.error("Ambassador starter profile upsert during auth callback failed:", ambassadorError.message);
+    }
   }
 }
 

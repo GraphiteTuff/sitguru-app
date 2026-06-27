@@ -1,6 +1,5 @@
 "use client";
 
-import { Open_Sans } from "next/font/google";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -9,11 +8,9 @@ import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
 
-const openSans = Open_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  display: "swap",
-});
+const openSans = {
+  className: "font-sans",
+};
 
 const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
@@ -509,9 +506,9 @@ function GoogleIcon() {
 }
 
 function shouldAutoOpenHomepageMessenger() {
-  if (typeof window === "undefined") return true;
+  if (typeof window === "undefined") return false;
 
-  return window.matchMedia("(min-width: 640px)").matches;
+  return window.matchMedia("(min-width: 768px)").matches;
 }
 
 function detectSourceFromUrl() {
@@ -1131,9 +1128,9 @@ function HomepageAssistPopup({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-x-3 bottom-3 z-[80] pb-[env(safe-area-inset-bottom)] sm:inset-x-auto sm:bottom-5 sm:left-5 sm:w-[420px] sm:pb-0">
+    <div className="fixed bottom-4 right-4 z-[80] w-auto max-w-[calc(100vw-32px)] pb-[env(safe-area-inset-bottom)] sm:bottom-5 sm:left-5 sm:right-auto sm:w-[420px] sm:pb-0">
       {isOpen ? (
-        <section className="max-h-[calc(100svh-1rem)] overflow-hidden rounded-[24px] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.22)] sm:rounded-[28px]">
+        <section className="fixed bottom-3 left-3 right-3 flex max-h-[70dvh] flex-col overflow-hidden rounded-[18px] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.22)] sm:static sm:max-h-[calc(100dvh-2rem)] sm:rounded-[28px]">
           <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-sky-500 px-4 py-3 text-white sm:py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1141,10 +1138,10 @@ function HomepageAssistPopup({
                   <span aria-hidden="true" className="text-base">
                     🐾
                   </span>
-                  SitGuru Messenger
+                  SitGuru Help
                 </div>
                 <h2 className="mt-1 text-lg font-black leading-tight text-white sm:text-xl">
-                  Hi, welcome to SitGuru!
+                  We usually reply soon
                 </h2>
                 <p className="mt-1 text-xs font-semibold leading-5 text-white/90 sm:text-sm">
                   We are here for you. Ask us anything about finding care,
@@ -1164,7 +1161,7 @@ function HomepageAssistPopup({
             </div>
           </div>
 
-          <div className="max-h-[calc(100svh-11.5rem)] overflow-y-auto p-3 sm:max-h-[72vh] sm:p-4">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3 sm:max-h-[72vh] sm:p-4">
             <div className="grid gap-2 sm:grid-cols-3">
               <Link
                 href={petParentSignupHref}
@@ -1255,7 +1252,7 @@ function HomepageAssistPopup({
 
             {session ? (
               <div className="mt-3 rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-[11px]">
-                Realtime SitGuru Messenger connected
+                Realtime SitGuru Help connected
               </div>
             ) : null}
 
@@ -1288,7 +1285,7 @@ function HomepageAssistPopup({
                 value={form.message}
                 onChange={(event) => updateAssistField("message", event.target.value)}
                 rows={2}
-                placeholder="How can we help today?"
+                placeholder="Type your message..."
                 className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:py-3"
               />
 
@@ -1378,10 +1375,10 @@ function HomepageAssistPopup({
           }`}
         >
           <span className="sm:hidden">
-            {hasNewAdminReply ? "🐾 Admin replied" : "🐾 Need help?"}
+            {hasNewAdminReply ? "🐾 Reply" : "🐾 Chat"}
           </span>
           <span className="hidden sm:inline">
-            {hasNewAdminReply ? "🐾 SitGuru Admin replied" : "🐾 Hi! Need help with SitGuru?"}
+            {hasNewAdminReply ? "🐾 SitGuru Admin replied" : "🐾 Need help?"}
           </span>
         </button>
       )}
@@ -2006,6 +2003,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const detectedSource = detectSourceFromUrl();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSource(detectedSource);
 
     trackEvent({
@@ -2111,12 +2109,14 @@ export default function HomePage() {
     const normalizedZip = normalizeZipCode(searchForm.zipCode);
 
     if (!normalizedZip) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setZipLookupStatus("idle");
       setZipLookupMessage("");
       return;
     }
 
     if (normalizedZip.length < 5) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setZipLookupStatus("idle");
       setZipLookupMessage("Enter a 5-digit ZIP code to autofill your area.");
       return;
