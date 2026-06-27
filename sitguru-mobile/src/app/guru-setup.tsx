@@ -38,9 +38,9 @@ const setupSteps: SetupStep[] = [
     shortTitle: 'Service Area',
     title: 'Set Your Service Area',
     description:
-      'Add your city, state, ZIP code, service radius, and service ZIP codes so SitGuru can match you with local Pet Parents.',
+      'Add your service city, state, ZIP code, and service area so SitGuru can match you with local Pet Parents.',
     usedFor:
-      'Find Care search, map visibility, local matching, Guru radius filtering, and care request availability.',
+      'Find Care search, map visibility, local matching, service area filtering, and care request availability.',
   },
   {
     step: 3,
@@ -125,10 +125,11 @@ export default function GuruSetupScreen() {
   const isWide = width >= 760;
 
   const [currentStep, setCurrentStep] = useState<StepNumber>(1);
-  const [city, setCity] = useState('');
-  const [stateValue, setStateValue] = useState('');
-  const [zipCode, setZipCode] = useState('');
-  const [serviceAddress, setServiceAddress] = useState('');
+  const [serviceArea, setServiceArea] = useState('');
+  const [serviceAreaEnabled, setServiceAreaEnabled] = useState(true);
+  const [serviceCity, setServiceCity] = useState('');
+  const [serviceState, setServiceState] = useState('');
+  const [serviceZip, setServiceZip] = useState('');
   const [locationMessage, setLocationMessage] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPetTypes, setSelectedPetTypes] = useState<string[]>([]);
@@ -154,25 +155,25 @@ export default function GuruSetupScreen() {
       return;
     }
 
-    setCity(location.city);
-    setStateValue(location.state);
+    setServiceCity(location.city);
+    setServiceState(location.state);
     setLocationMessage(`ZIP found: ${location.city}, ${location.state}.`);
   }
 
-  function handleServiceAddressChange(value: string) {
-    setServiceAddress(value);
+  function handleServiceAreaChange(value: string) {
+    setServiceArea(value);
 
     const extractedZip = extractZipCode(value);
 
     if (extractedZip) {
-      setZipCode(extractedZip);
+      setServiceZip(extractedZip);
       applyZipLookup(extractedZip);
     }
   }
 
   function handleZipChange(value: string) {
     const cleanZip = value.replace(/\D/g, '').slice(0, 5);
-    setZipCode(cleanZip);
+    setServiceZip(cleanZip);
 
     if (cleanZip.length === 5) {
       applyZipLookup(cleanZip);
@@ -258,21 +259,31 @@ export default function GuruSetupScreen() {
           </View>
 
           <Field
-            label="Service address or starting area"
-            onChangeText={handleServiceAddressChange}
-            placeholder="123 Main Street or Quakertown, PA 18951"
-            value={serviceAddress}
+            label="Service area"
+            onChangeText={handleServiceAreaChange}
+            placeholder="Quakertown, PA 18951 or Upper Bucks"
+            value={serviceArea}
           />
 
           <View style={[styles.formRow, isWide && styles.formRowWide]}>
-            <Field label="City" onChangeText={setCity} placeholder="Quakertown" value={city} />
-            <Field label="State" onChangeText={setStateValue} placeholder="PA" value={stateValue} />
+            <Field
+              label="Service city"
+              onChangeText={setServiceCity}
+              placeholder="Quakertown"
+              value={serviceCity}
+            />
+            <Field
+              label="Service state"
+              onChangeText={setServiceState}
+              placeholder="PA"
+              value={serviceState}
+            />
             <Field
               keyboardType="number-pad"
-              label="ZIP code"
+              label="Service ZIP"
               onChangeText={handleZipChange}
               placeholder="18951"
-              value={zipCode}
+              value={serviceZip}
             />
           </View>
 
@@ -282,10 +293,25 @@ export default function GuruSetupScreen() {
             </View>
           ) : null}
 
-          <View style={[styles.formRow, isWide && styles.formRowWide]}>
-            <Field label="Service radius" placeholder="10 miles" />
-            <Field label="Service ZIP codes" placeholder="18951, 18018, 18101" />
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setServiceAreaEnabled(!serviceAreaEnabled)}
+            style={[
+              styles.serviceAreaToggle,
+              serviceAreaEnabled && styles.serviceAreaToggleActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.serviceAreaToggleText,
+                serviceAreaEnabled && styles.serviceAreaToggleTextActive,
+              ]}
+            >
+              {serviceAreaEnabled
+                ? 'Service area enabled'
+                : 'Service area paused'}
+            </Text>
+          </Pressable>
 
           <Field
             label="Service area notes"
@@ -1081,6 +1107,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
+  },
+  serviceAreaToggle: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 50,
+    paddingHorizontal: 14,
+  },
+  serviceAreaToggleActive: {
+    backgroundColor: SitGuruColors.primary,
+    borderColor: SitGuruColors.primary,
+  },
+  serviceAreaToggleText: {
+    color: SitGuruColors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  serviceAreaToggleTextActive: {
+    color: '#FFFFFF',
   },
   choiceSection: {
     gap: 9,

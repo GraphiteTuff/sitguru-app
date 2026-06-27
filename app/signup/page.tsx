@@ -22,6 +22,7 @@ import {
 import { supabase } from "@/lib/supabase";
 
 type AccountIntent = "pet_parent" | "guru" | "ambassador" | "both";
+type SignupProfileRole = "customer" | "guru" | "ambassador" | "both";
 type SignupMode = "email" | "phone";
 
 const accountOptions: {
@@ -149,7 +150,7 @@ function isValidFullName(value: string) {
 
   return parts.every((part) => {
     const lettersOnly = part.replace(/[^a-zA-Z]/g, "");
-    return lettersOnly.length >= 2 && /^[a-zA-Z][a-zA-Z'’.-]*$/.test(part);
+    return lettersOnly.length >= 2;
   });
 }
 
@@ -158,18 +159,39 @@ function isValidEmailAddress(value: string) {
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return false;
 
-  const domain = cleanEmail.split("@")[1] || "";
-  const blockedDomains = [
-    "10minutemail.com",
-    "guerrillamail.com",
+  const [localPart, domain = ""] = cleanEmail.split("@");
+  const normalizedLocal = localPart.replace(/[^a-z0-9]/g, "");
+  const normalizedDomain = domain.toLowerCase();
+
+  const blockedLocals = new Set([
+    "test",
+    "testing",
+    "tester",
+    "fake",
+    "sample",
+    "demo",
+    "asdf",
+    "qwerty",
+    "user",
+  ]);
+
+  const blockedDomains = new Set([
+    "example.com",
+    "example.org",
+    "example.net",
+    "test.com",
     "mailinator.com",
     "tempmail.com",
-    "tempmail.net",
-    "temp-mail.org",
-    "yopmail.com",
-  ];
+    "temporary-mail.net",
+    "10minutemail.com",
+    "guerrillamail.com",
+  ]);
 
-  return !blockedDomains.includes(domain);
+  if (blockedLocals.has(normalizedLocal)) return false;
+  if (blockedDomains.has(normalizedDomain)) return false;
+  if (/^(.)\1{4,}$/.test(normalizedLocal)) return false;
+
+  return true;
 }
 
 function isValidZipCode(value: string) {
@@ -177,32 +199,13 @@ function isValidZipCode(value: string) {
 }
 
 function normalizeAmbassadorReferralCode(value: string) {
-  return value
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9_-]/g, "")
-    .slice(0, 32);
+  return value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
 }
 
-function getDefaultNextPath(intent: AccountIntent) {
-  if (intent === "guru") return "/guru/dashboard/profile?step=1";
-  if (intent === "both") return "/guru/dashboard/profile?step=1";
+function getRedirectPath(intent: AccountIntent) {
+  if (intent === "guru" || intent === "both") return "/guru/dashboard/profile";
   if (intent === "ambassador") return "/ambassador/dashboard";
-
   return "/customer/dashboard";
-}
-
-function normalizeNextPath(value: string) {
-  const cleanValue = value.trim();
-
-  if (!cleanValue) return "";
-  if (cleanValue.startsWith("/")) return cleanValue;
-
-  return "";
-}
-
-function getRedirectPath(intent: AccountIntent, nextPath: string) {
-  return normalizeNextPath(nextPath) || getDefaultNextPath(intent);
 }
 
 function getIntentLabel(intent: AccountIntent) {
@@ -212,11 +215,20 @@ function getIntentLabel(intent: AccountIntent) {
   return "Pet Parent";
 }
 
-function getRoleFromIntent(intent: AccountIntent) {
+function getProfileRoleFromIntent(intent: AccountIntent): SignupProfileRole {
   if (intent === "guru") return "guru";
   if (intent === "ambassador") return "ambassador";
   if (intent === "both") return "both";
   return "customer";
+}
+
+function getRoleFromIntent(intent: AccountIntent): SignupProfileRole {
+  return getProfileRoleFromIntent(intent);
+}
+
+function getUserRolesFromIntent(intent: AccountIntent) {
+  if (intent === "both") return ["customer", "guru"] as const;
+  return [getProfileRoleFromIntent(intent)] as const;
 }
 
 function shouldCreateGuruProfile(intent: AccountIntent) {
@@ -290,6 +302,7 @@ async function ensureStarterGuruProfile({
   phone,
   zipCode,
   serviceArea,
+  profileRole,
   source,
 }: {
   userId: string;
@@ -298,6 +311,7 @@ async function ensureStarterGuruProfile({
   phone?: string;
   zipCode?: string;
   serviceArea?: string;
+  profileRole: SignupProfileRole;
   source: string;
 }) {
   const now = new Date().toISOString();
@@ -305,25 +319,34 @@ async function ensureStarterGuruProfile({
   const { firstName, lastName } = getNameParts(displayName);
   const slug = buildStarterGuruSlug(userId, displayName);
 
-  await supabase.from("profiles").upsert({
+  const { error: profileError } = await supabase.from("profiles").upsert({
     id: userId,
     full_name: displayName,
     first_name: firstName || null,
     last_name: lastName || null,
     email: email?.trim() || null,
     phone: phone?.trim() || null,
-    role: "guru",
+    role: profileRole,
+    account_type: profileRole,
     source,
     zip_code: zipCode?.trim() || null,
     service_area: serviceArea?.trim() || null,
     updated_at: now,
   });
 
-  const { data: existingGuru } = await supabase
+  if (profileError) {
+    throw new Error(`Profile setup failed: ${profileError.message}`);
+  }
+
+  const { data: existingGuru, error: existingGuruError } = await supabase
     .from("gurus")
     .select("id")
     .eq("user_id", userId)
     .maybeSingle();
+
+  if (existingGuruError) {
+    throw new Error(`Guru profile lookup failed: ${existingGuruError.message}`);
+  }
 
   const starterGuruPayload = {
     user_id: userId,
@@ -333,23 +356,59 @@ async function ensureStarterGuruProfile({
     zip_code: zipCode?.trim() || null,
     service_area: serviceArea?.trim() || null,
     is_public: false,
+    booking_status: "not_listed",
     onboarding_completed: false,
     profile_completed: false,
     updated_at: now,
   };
 
   if (existingGuru?.id) {
-    await supabase
+    const { error: guruUpdateError } = await supabase
       .from("gurus")
       .update(starterGuruPayload)
       .eq("user_id", userId);
+
+    if (guruUpdateError) {
+      throw new Error(`Guru profile update failed: ${guruUpdateError.message}`);
+    }
+
     return;
   }
 
-  await supabase.from("gurus").insert({
+  const { error: guruInsertError } = await supabase.from("gurus").insert({
     ...starterGuruPayload,
     created_at: now,
   });
+
+  if (guruInsertError) {
+    throw new Error(`Guru profile creation failed: ${guruInsertError.message}`);
+  }
+}
+
+async function safelyAddUserRoles(userId: string, intent: AccountIntent) {
+  const roles = getUserRolesFromIntent(intent);
+
+  await Promise.all(
+    roles.map(async (role) => {
+      try {
+        const { error } = await supabase.from("user_roles").upsert(
+          {
+            user_id: userId,
+            role,
+          },
+          {
+            onConflict: "user_id,role",
+          },
+        );
+
+        if (error && error.code !== "23505") {
+          console.warn("Signup user_roles sync skipped:", error.message);
+        }
+      } catch (error) {
+        console.warn("Signup user_roles sync skipped:", error);
+      }
+    }),
+  );
 }
 
 async function ensureStarterAmbassadorProfile({
@@ -429,62 +488,50 @@ function SignupPageContent() {
     return "pet_parent";
   }, [searchParams]);
 
-  const startingMode = useMemo<SignupMode>(() => {
-    const requestedMode = searchParams.get("mode")?.toLowerCase();
-
-    if (
-      requestedMode === "phone" ||
-      requestedMode === "sms" ||
-      requestedMode === "mobile"
-    ) {
-      return "phone";
-    }
-
-    return "email";
-  }, [searchParams]);
-
-  const nextPath = useMemo(() => searchParams.get("next") || "", [searchParams]);
-
-  const startingAmbassadorReferralCode = useMemo(() => {
-    return normalizeAmbassadorReferralCode(
-      searchParams.get("ambassador") ||
-        searchParams.get("ambassador_code") ||
-        searchParams.get("ref") ||
-        searchParams.get("referral") ||
-        "",
-    );
-  }, [searchParams]);
-
-  const [mode, setMode] = useState<SignupMode>(startingMode);
   const [intent, setIntent] = useState<AccountIntent>(startingIntent);
-
+  const [mode, setMode] = useState<SignupMode>("email");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [serviceArea, setServiceArea] = useState("");
-  const [password, setPassword] = useState("");
   const [ambassadorReferralCode, setAmbassadorReferralCode] = useState(
-    startingAmbassadorReferralCode,
+    searchParams.get("ambassador_referral_code") ||
+      searchParams.get("ref") ||
+      searchParams.get("code") ||
+      "",
   );
-  const [showPassword, setShowPassword] = useState(false);
-
-  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
   const [phoneCode, setPhoneCode] = useState("");
-  const [phoneCodeSent, setPhoneCodeSent] = useState(false);
-
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-
+  const [showPassword, setShowPassword] = useState(false);
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [phoneLoading, setPhoneLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const redirectPath = getRedirectPath(intent, nextPath);
+  const redirectPath = getRedirectPath(intent);
+  const intentLabel = getIntentLabel(intent);
+  const needsServiceArea = intent === "guru" || intent === "both" || intent === "ambassador";
 
   function resetAlerts() {
     setError("");
     setMessage("");
+  }
+
+  function handleIntentChange(nextIntent: AccountIntent) {
+    resetAlerts();
+    setIntent(nextIntent);
+    setPhoneCodeSent(false);
+  }
+
+  function handleModeChange(nextMode: SignupMode) {
+    resetAlerts();
+    setMode(nextMode);
+    setPhoneCodeSent(false);
   }
 
   async function handleGoogleSignup() {
@@ -531,6 +578,7 @@ function SignupPageContent() {
       const { cleanName, firstName, lastName } = getNameParts(fullName);
       const cleanEmail = email.trim().toLowerCase();
       const cleanZipCode = zipCode.trim();
+      const profileRole = getProfileRoleFromIntent(intent);
       const cleanAmbassadorReferralCode = normalizeAmbassadorReferralCode(
         ambassadorReferralCode,
       );
@@ -578,7 +626,9 @@ function SignupPageContent() {
             full_name: cleanName,
             first_name: firstName,
             last_name: lastName,
-            role: getRoleFromIntent(intent),
+            role: profileRole,
+            account_type: profileRole,
+            signup_role: profileRole,
             account_intent: intent,
             signup_source: "sitguru_signup_page",
             signup_status: "pending_email_verification",
@@ -607,6 +657,7 @@ function SignupPageContent() {
             email: cleanEmail,
             zipCode: cleanZipCode,
             serviceArea: serviceArea.trim() || cleanZipCode,
+            profileRole,
             source: "sitguru_guru_signup_page",
           });
         } else if (intent === "ambassador") {
@@ -619,20 +670,27 @@ function SignupPageContent() {
             source: "sitguru_ambassador_signup_page",
           });
         } else {
-          await supabase.from("profiles").upsert({
+          const { error: profileError } = await supabase.from("profiles").upsert({
             id: userId,
             full_name: cleanName,
             first_name: firstName || null,
             last_name: lastName || null,
             email: cleanEmail,
-            role: getRoleFromIntent(intent),
+            role: profileRole,
+            account_type: profileRole,
             source: "sitguru_signup_page",
             zip_code: cleanZipCode,
             service_area: serviceArea.trim() || cleanZipCode,
             referral_code: buildReferralCode(userId, cleanName),
             updated_at: new Date().toISOString(),
           });
+
+          if (profileError) {
+            throw new Error(`Profile setup failed: ${profileError.message}`);
+          }
         }
+
+        await safelyAddUserRoles(userId, intent);
       }
 
       setMessage(
@@ -658,6 +716,7 @@ function SignupPageContent() {
       const { cleanName, firstName, lastName } = getNameParts(fullName);
       const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
+      const profileRole = getProfileRoleFromIntent(intent);
       const cleanAmbassadorReferralCode = normalizeAmbassadorReferralCode(
         ambassadorReferralCode,
       );
@@ -691,7 +750,9 @@ function SignupPageContent() {
             full_name: cleanName,
             first_name: firstName,
             last_name: lastName,
-            role: getRoleFromIntent(intent),
+            role: profileRole,
+            account_type: profileRole,
+            signup_role: profileRole,
             account_intent: intent,
             signup_source: "sitguru_phone_signup",
             signup_status: "pending_phone_verification",
@@ -724,6 +785,7 @@ function SignupPageContent() {
       const { cleanName, firstName, lastName } = getNameParts(fullName);
       const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
+      const profileRole = getProfileRoleFromIntent(intent);
       const cleanAmbassadorReferralCode = normalizeAmbassadorReferralCode(
         ambassadorReferralCode,
       );
@@ -765,6 +827,16 @@ function SignupPageContent() {
 
       await supabase.auth.updateUser({
         data: {
+          full_name: cleanName,
+          first_name: firstName,
+          last_name: lastName,
+          role: profileRole,
+          account_type: profileRole,
+          signup_role: profileRole,
+          account_intent: intent,
+          signup_status: "phone_verified",
+          zip_code: cleanZipCode,
+          service_area: serviceArea.trim() || cleanZipCode,
           ambassador_referral_code: cleanAmbassadorReferralCode || null,
         },
       });
@@ -778,21 +850,41 @@ function SignupPageContent() {
             fullName: cleanName,
             phone: normalizedPhone,
             zipCode: cleanZipCode,
+            serviceArea: serviceArea.trim() || cleanZipCode,
+            profileRole,
             source: "sitguru_guru_phone_signup",
           });
+        } else if (intent === "ambassador") {
+          await ensureStarterAmbassadorProfile({
+            userId,
+            fullName: cleanName,
+            phone: normalizedPhone,
+            zipCode: cleanZipCode,
+            serviceArea: serviceArea.trim() || cleanZipCode,
+            source: "sitguru_ambassador_phone_signup",
+          });
         } else {
-          await supabase.from("profiles").upsert({
+          const { error: profileError } = await supabase.from("profiles").upsert({
             id: userId,
             full_name: cleanName,
             first_name: firstName || null,
             last_name: lastName || null,
             phone: normalizedPhone,
-            role: getRoleFromIntent(intent),
+            role: profileRole,
+            account_type: profileRole,
             source: "sitguru_phone_signup",
             zip_code: cleanZipCode,
+            service_area: serviceArea.trim() || cleanZipCode,
+            referral_code: buildReferralCode(userId, cleanName),
             updated_at: new Date().toISOString(),
           });
+
+          if (profileError) {
+            throw new Error(`Profile setup failed: ${profileError.message}`);
+          }
         }
+
+        await safelyAddUserRoles(userId, intent);
       }
 
       router.push(redirectPath);
@@ -800,141 +892,83 @@ function SignupPageContent() {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "That phone code was not accepted. Please try again.",
+          : "We could not verify that code. Please try again.",
       );
     } finally {
       setPhoneLoading(false);
     }
   }
 
+  async function handleAppleSignup() {
+    setAppleLoading(true);
+    setError(
+      "Apple signup is almost ready. Please use email, phone, or Google for now.",
+    );
+    setAppleLoading(false);
+  }
+
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#ecfdf5_100%)] text-slate-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1500px] flex-col px-4 py-5 sm:px-6 lg:px-8">
-        <header className="flex items-center justify-between gap-4">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back home
-          </Link>
+    <main className="min-h-screen bg-[#f7f3ec] text-[#1f1f1f]">
+      <section className="relative overflow-hidden border-b border-[#eadfcd] bg-gradient-to-br from-[#fdf8ef] via-[#f7f3ec] to-[#eaf4ec]">
+        <div className="absolute -left-24 top-8 h-72 w-72 rounded-full bg-[#0f7f60]/10 blur-3xl" />
+        <div className="absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-[#f0b35b]/20 blur-3xl" />
 
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-lg font-black text-slate-950"
-            aria-label="SitGuru homepage"
-          >
-            <img
-              src="/images/sitguru-logo-cropped.png"
-              alt="SitGuru"
-              className="h-10 w-auto"
-              onError={(event) => {
-                event.currentTarget.style.display = "none";
-              }}
-            />
-          </Link>
-        </header>
+        <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8">
+          <div className="mb-8 flex items-center justify-between">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-full border border-[#d8ccb8] bg-white/80 px-4 py-2 text-sm font-semibold text-[#2f2a22] shadow-sm transition hover:border-[#0f7f60]/40 hover:text-[#0f7f60]"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back to SitGuru
+            </Link>
 
-        <section className="grid flex-1 items-center gap-8 py-8 lg:grid-cols-[0.92fr_1.08fr] lg:py-12">
-          <div className="relative overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:p-8 lg:p-10">
-            <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-emerald-100 blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-sky-100 blur-3xl" />
-
-            <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-emerald-800">
-                <Sparkles className="h-4 w-4" />
-                Trusted Pet Care. Simplified.
-              </div>
-
-              <h1 className="mt-6 max-w-2xl text-4xl font-black leading-[0.96] tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
-                Create your free SitGuru account.
-              </h1>
-
-              <p className="mt-5 max-w-2xl text-base font-semibold leading-8 text-slate-700 sm:text-lg">
-                Join as a Pet Parent to find trusted local care, apply as a
-                Future Guru, or choose both if you want full SitGuru access.
-              </p>
-
-              <div className="mt-7 grid gap-3">
-                {[
-                  "Free signup for Pet Parents",
-                  "Mobile-friendly phone, Google, or email signup",
-                  "Trusted local Gurus and safety-first workflows",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4"
-                  >
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
-                    <p className="text-sm font-bold leading-6 text-slate-800">
-                      {item}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-8 rounded-[1.75rem] bg-[linear-gradient(135deg,#064e3b,#059669)] p-5 text-white shadow-2xl shadow-emerald-900/20">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-2xl bg-white/15 p-3">
-                    <ShieldCheck className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-black">
-                      Built for trust from the first click.
-                    </p>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-emerald-50">
-                      SitGuru helps Pet Parents and Gurus connect with clear
-                      profiles, safer booking steps, and support-focused care
-                      workflows.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Link
+              href="/login"
+              className="text-sm font-semibold text-[#0f7f60] transition hover:text-[#0b6049]"
+            >
+              Already have an account?
+            </Link>
           </div>
 
-          <div className="rounded-[2.25rem] border border-slate-200 bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:p-7 lg:p-8">
-            <div className="mx-auto max-w-2xl">
-              <div className="flex items-center gap-3">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                  <PawPrint className="h-7 w-7" />
-                </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-                    Sign Up Free
-                  </p>
-                  <h2 className="text-3xl font-black tracking-tight text-slate-950">
-                    Start in less than a minute.
-                  </h2>
-                </div>
+          <div className="grid flex-1 items-center gap-8 lg:grid-cols-[1fr_0.9fr]">
+            <div className="max-w-2xl">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#0f7f60]/20 bg-white/70 px-4 py-2 text-sm font-semibold text-[#0f7f60] shadow-sm">
+                <Sparkles className="h-4 w-4" />
+                Join the trusted local pet care network
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <h1 className="text-4xl font-black leading-tight tracking-tight text-[#1f1f1f] sm:text-5xl lg:text-6xl">
+                Create your SitGuru account in minutes.
+              </h1>
+
+              <p className="mt-5 max-w-xl text-lg leading-8 text-[#5f5648]">
+                Sign up as a Pet Parent, Future Guru, or Ambassador. You can finish
+                profile details from your dashboard after your account is created.
+              </p>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
                 {accountOptions.map((option) => {
-                  const active = intent === option.key;
+                  const selected = intent === option.key;
 
                   return (
                     <button
                       key={option.key}
                       type="button"
-                      onClick={() => {
-                        setIntent(option.key);
-                        resetAlerts();
-                      }}
-                      className={[
-                        "rounded-3xl border p-4 text-left transition",
-                        active
-                          ? "border-emerald-500 bg-emerald-50 shadow-[0_18px_45px_rgba(16,185,129,0.14)]"
-                          : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50",
-                      ].join(" ")}
+                      onClick={() => handleIntentChange(option.key)}
+                      className={`rounded-3xl border p-4 text-left shadow-sm transition ${
+                        selected
+                          ? "border-[#0f7f60] bg-white shadow-md ring-2 ring-[#0f7f60]/15"
+                          : "border-[#e0d5c2] bg-white/70 hover:border-[#0f7f60]/40"
+                      }`}
                     >
-                      <div className="mb-3 inline-flex rounded-full bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.1em] text-emerald-800 shadow-sm">
+                      <div className="mb-3 inline-flex items-center rounded-full bg-[#0f7f60]/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-[#0f7f60]">
                         {option.badge}
                       </div>
-                      <p className="text-base font-black text-slate-950">
+                      <h2 className="text-lg font-black text-[#221f1a]">
                         {option.title}
-                      </p>
-                      <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
+                      </h2>
+                      <p className="mt-2 text-sm leading-6 text-[#6a6256]">
                         {option.description}
                       </p>
                     </button>
@@ -942,544 +976,411 @@ function SignupPageContent() {
                 })}
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+              <div className="mt-8 grid gap-4 text-sm text-[#5f5648] sm:grid-cols-3">
+                <div className="rounded-2xl border border-[#eadfcd] bg-white/70 p-4">
+                  <CheckCircle2 className="mb-2 h-5 w-5 text-[#0f7f60]" />
+                  Simple signup first
+                </div>
+                <div className="rounded-2xl border border-[#eadfcd] bg-white/70 p-4">
+                  <ShieldCheck className="mb-2 h-5 w-5 text-[#0f7f60]" />
+                  Complete profile later
+                </div>
+                <div className="rounded-2xl border border-[#eadfcd] bg-white/70 p-4">
+                  <PawPrint className="mb-2 h-5 w-5 text-[#0f7f60]" />
+                  Local pet care focus
+                </div>
+              </div>
+            </div>
+
+            <div className="mx-auto w-full max-w-xl rounded-[2rem] border border-[#eadfcd] bg-white p-5 shadow-2xl shadow-[#876b3d]/10 sm:p-7">
+              <div className="mb-6">
+                <p className="text-sm font-black uppercase tracking-[0.22em] text-[#0f7f60]">
+                  {intentLabel} signup
+                </p>
+                <h2 className="mt-2 text-3xl font-black text-[#1f1f1f]">
+                  Start your account
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[#6a6256]">
+                  Create the account now. SitGuru will guide you through any missing
+                  profile details from your dashboard.
+                </p>
+              </div>
+
+              <div className="mb-5 grid grid-cols-2 gap-2 rounded-2xl bg-[#f7f3ec] p-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode("email");
-                    resetAlerts();
-                  }}
-                  className={[
-                    "inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition",
+                  onClick={() => handleModeChange("email")}
+                  className={`rounded-xl px-4 py-3 text-sm font-black transition ${
                     mode === "email"
-                      ? "bg-white text-slate-950 shadow-sm"
-                      : "text-slate-500 hover:bg-white/70",
-                  ].join(" ")}
+                      ? "bg-white text-[#0f7f60] shadow-sm"
+                      : "text-[#6a6256] hover:text-[#0f7f60]"
+                  }`}
                 >
-                  <Mail className="h-4 w-4" />
                   Email
                 </button>
-
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode("phone");
-                    resetAlerts();
-                  }}
-                  className={[
-                    "inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition",
+                  onClick={() => handleModeChange("phone")}
+                  className={`rounded-xl px-4 py-3 text-sm font-black transition ${
                     mode === "phone"
-                      ? "bg-white text-slate-950 shadow-sm"
-                      : "text-slate-500 hover:bg-white/70",
-                  ].join(" ")}
+                      ? "bg-white text-[#0f7f60] shadow-sm"
+                      : "text-[#6a6256] hover:text-[#0f7f60]"
+                  }`}
                 >
-                  <Phone className="h-4 w-4" />
                   Phone
                 </button>
               </div>
 
-              <div className="mt-5 grid gap-3">
-                <button
-                  type="button"
-                  onClick={handleGoogleSignup}
-                  disabled={googleLoading}
-                  className="inline-flex min-h-[52px] w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-base font-black text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {googleLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <GoogleIcon />
-                  )}
-                  Continue with Google
-                </button>
+              {message ? (
+                <div className="mb-4 rounded-2xl border border-[#0f7f60]/20 bg-[#eaf4ec] px-4 py-3 text-sm font-semibold text-[#0f7f60]">
+                  {message}
+                </div>
+              ) : null}
 
-                <button
-                  type="button"
-                  disabled
-                  className="inline-flex min-h-[52px] w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-base font-black text-slate-400"
-                >
-                  <Apple className="h-5 w-5" />
-                  Continue with Apple — Coming Soon
-                </button>
-              </div>
-
-              <div className="my-6 flex items-center gap-4">
-                <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                  or use {mode}
-                </span>
-                <div className="h-px flex-1 bg-slate-200" />
-              </div>
+              {error ? (
+                <div className="mb-4 flex gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              ) : null}
 
               {mode === "email" ? (
                 <form onSubmit={handleEmailSignup} className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="full-name"
-                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                    >
-                      Full name
-                    </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      Full name <span className="text-red-500">*</span>
+                    </span>
                     <div className="relative">
-                      <UserRound className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                      <UserRound className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a7d6b]" />
                       <input
-                        id="full-name"
                         value={fullName}
                         onChange={(event) => setFullName(event.target.value)}
-                        className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-12 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                        placeholder="Your full name"
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-12 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="First and last name"
                         autoComplete="name"
-                        required
                       />
                     </div>
-                  </div>
+                  </label>
 
-                  <div>
-                    <label
-                      htmlFor="email"
-                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                    >
-                      Email
-                    </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      Email <span className="text-red-500">*</span>
+                    </span>
                     <div className="relative">
-                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a7d6b]" />
                       <input
-                        id="email"
-                        type="email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
-                        className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-12 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-12 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
                         placeholder="you@example.com"
                         autoComplete="email"
-                        required
                       />
                     </div>
-                  </div>
+                  </label>
 
-                  <div>
-                    <label
-                      htmlFor="zip-code"
-                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                    >
-                      ZIP code
-                    </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      ZIP code <span className="text-red-500">*</span>
+                    </span>
                     <input
-                      id="zip-code"
                       value={zipCode}
                       onChange={(event) =>
-                        setZipCode(
-                          event.target.value.replace(/\D/g, "").slice(0, 5),
-                        )
+                        setZipCode(event.target.value.replace(/\D/g, "").slice(0, 5))
                       }
-                      inputMode="numeric"
-                      maxLength={5}
-                      className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
                       placeholder="18951"
+                      inputMode="numeric"
                       autoComplete="postal-code"
-                      required
                     />
-                  </div>
+                  </label>
 
-
-                  {(intent === "guru" || intent === "ambassador") ? (
-                    <div>
-                      <label
-                        htmlFor="service-area"
-                        className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                      >
-                        {intent === "ambassador" ? "Community area" : "Service area"} <span className="text-rose-600">*</span>
-                      </label>
+                  {needsServiceArea ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                        Service/community area{" "}
+                        <span className="text-red-500">*</span>
+                      </span>
                       <input
-                        id="service-area"
                         value={serviceArea}
                         onChange={(event) => setServiceArea(event.target.value)}
-                        className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                        placeholder={intent === "ambassador" ? "Example: Quakertown schools and local events" : "Example: Quakertown, Perkasie, Doylestown"}
-                        required
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder={
+                          intent === "ambassador"
+                            ? "Quakertown, Bucks County, or nearby towns"
+                            : "Areas or ZIP codes you serve"
+                        }
                       />
-                    </div>
+                    </label>
                   ) : null}
 
-                  <div>
-                    <label
-                      htmlFor="ambassador-referral-code"
-                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                    >
-                                            Ambassador referral code
+                  {intent === "ambassador" ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                        Ambassador referral code{" "}
+                        <span className="text-[#8a7d6b]">(optional)</span>
+                      </span>
+                      <input
+                        value={ambassadorReferralCode}
+                        onChange={(event) =>
+                          setAmbassadorReferralCode(
+                            normalizeAmbassadorReferralCode(event.target.value),
+                          )
+                        }
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-base uppercase outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="AMBASSADOR-CODE"
+                      />
                     </label>
-                    <input
-                      id="ambassador-referral-code"
-                      value={ambassadorReferralCode}
-                      onChange={(event) =>
-                        setAmbassadorReferralCode(
-                          normalizeAmbassadorReferralCode(event.target.value),
-                        )
-                      }
-                      inputMode="text"
-                      maxLength={32}
-                      className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold uppercase text-slate-950 outline-none transition placeholder:normal-case placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      placeholder="Example: KAMERINCOX"
-                      autoComplete="off"
-                    />
-                    <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-                      Optional — enter this if an Ambassador, Pet Parent, Guru,
-                      or SitGuru referral partner referred you.
-                    </p>
-                  </div>
+                  ) : null}
 
-                  <div>
-                    <label
-                      htmlFor="password"
-                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                    >
-                      Password
-                    </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      Password <span className="text-red-500">*</span>
+                    </span>
                     <div className="relative">
                       <input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
-                        className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 pr-12 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                        placeholder="Create a secure password"
+                        type={showPassword ? "text" : "password"}
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 pr-12 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="At least 6 characters"
                         autoComplete="new-password"
-                        required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword((current) => !current)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-800"
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-[#6a6256] hover:bg-[#f7f3ec]"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
                       >
                         {showPassword ? (
-                          <EyeOff className="h-5 w-5" />
+                          <EyeOff className="h-4 w-4" />
                         ) : (
-                          <Eye className="h-5 w-5" />
+                          <Eye className="h-4 w-4" />
                         )}
                       </button>
                     </div>
-                  </div>
+                  </label>
 
-                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <label className="flex items-start gap-3 rounded-2xl border border-[#eadfcd] bg-[#fdf8ef] p-4 text-sm leading-6 text-[#5f5648]">
                     <input
                       type="checkbox"
                       checked={acceptedTerms}
                       onChange={(event) => setAcceptedTerms(event.target.checked)}
-                      className="mt-1 h-5 w-5 rounded border-slate-300 accent-emerald-600"
+                      className="mt-1 h-4 w-4 rounded border-[#d8ccb8] text-[#0f7f60] focus:ring-[#0f7f60]"
                     />
-                    <span className="text-sm font-semibold leading-6 text-slate-700">
-                      I agree to SitGuru&apos;s Terms, Privacy Policy, and
-                      account communications related to booking, safety, and
-                      support.
+                    <span>
+                      I agree to SitGuru&apos;s terms, privacy policy, and understand
+                      my profile may need additional information before it is complete.
                     </span>
                   </label>
-
-                  {error ? (
-                    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-                      <p className="flex gap-2 text-sm font-bold leading-6 text-rose-800">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                        {error}
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {message ? (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                      <p className="flex gap-2 text-sm font-bold leading-6 text-emerald-800">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                        {message}
-                      </p>
-                    </div>
-                  ) : null}
 
                   <button
                     type="submit"
                     disabled={loading}
-                    className="inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0f7f60] px-5 py-4 text-base font-black text-white shadow-lg shadow-[#0f7f60]/20 transition hover:bg-[#0b6049] disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {loading ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        Creating account...
-                      </>
-                    ) : (
-                      <>
-                        Create {getIntentLabel(intent)} Account
-                        <ArrowRight className="h-5 w-5" />
-                      </>
-                    )}
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+                    Create account
+                    <ArrowRight className="h-5 w-5" />
                   </button>
                 </form>
               ) : (
                 <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="phone-name"
-                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                    >
-                      Full name
-                    </label>
-                    <input
-                      id="phone-name"
-                      value={fullName}
-                      onChange={(event) => setFullName(event.target.value)}
-                      className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      placeholder="Your full name"
-                      autoComplete="name"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="phone"
-                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                    >
-                      Mobile phone
-                    </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      Full name <span className="text-red-500">*</span>
+                    </span>
                     <div className="relative">
-                      <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                      <UserRound className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a7d6b]" />
                       <input
-                        id="phone"
-                        value={phone}
-                        onChange={(event) =>
-                          setPhone(formatPhoneNumber(event.target.value))
-                        }
-                        inputMode="tel"
-                        maxLength={14}
-                        className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-12 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                        placeholder="(555) 123-4567"
-                        autoComplete="tel"
-                        required
+                        value={fullName}
+                        onChange={(event) => setFullName(event.target.value)}
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-12 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="First and last name"
+                        autoComplete="name"
                       />
                     </div>
-                  </div>
+                  </label>
 
-                  <div>
-                    <label
-                      htmlFor="phone-zip"
-                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                    >
-                      ZIP code
-                    </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      Phone <span className="text-red-500">*</span>
+                    </span>
+                    <div className="relative">
+                      <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a7d6b]" />
+                      <input
+                        value={phone}
+                        onChange={(event) => setPhone(formatPhoneNumber(event.target.value))}
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-12 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="(267) 555-1234"
+                        inputMode="tel"
+                        autoComplete="tel"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      ZIP code <span className="text-red-500">*</span>
+                    </span>
                     <input
-                      id="phone-zip"
                       value={zipCode}
                       onChange={(event) =>
-                        setZipCode(
-                          event.target.value.replace(/\D/g, "").slice(0, 5),
-                        )
+                        setZipCode(event.target.value.replace(/\D/g, "").slice(0, 5))
                       }
-                      inputMode="numeric"
-                      maxLength={5}
-                      className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
                       placeholder="18951"
+                      inputMode="numeric"
                       autoComplete="postal-code"
-                      required
                     />
-                  </div>
+                  </label>
 
-
-                  <div>
-                    <label
-                      htmlFor="phone-ambassador-referral-code"
-                      className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                    >
-                      Ambassador referral code
-                    </label>
-                    <input
-                      id="phone-ambassador-referral-code"
-                      value={ambassadorReferralCode}
-                      onChange={(event) =>
-                        setAmbassadorReferralCode(
-                          normalizeAmbassadorReferralCode(event.target.value),
-                        )
-                      }
-                      inputMode="text"
-                      maxLength={32}
-                      className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-bold uppercase text-slate-950 outline-none transition placeholder:normal-case placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                      placeholder="Example: KAMERINCOX"
-                      autoComplete="off"
-                    />
-                    <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-                      Optional — enter this if an Ambassador, Pet Parent, Guru,
-                      or SitGuru referral partner referred you.
-                    </p>
-                  </div>
-
-                  {phoneCodeSent ? (
-                    <div>
-                      <label
-                        htmlFor="phone-code"
-                        className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-700"
-                      >
-                        6-digit code
-                      </label>
+                  {needsServiceArea ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                        Service/community area{" "}
+                        <span className="text-red-500">*</span>
+                      </span>
                       <input
-                        id="phone-code"
-                        value={phoneCode}
-                        onChange={(event) =>
-                          setPhoneCode(
-                            event.target.value.replace(/\D/g, "").slice(0, 6),
-                          )
+                        value={serviceArea}
+                        onChange={(event) => setServiceArea(event.target.value)}
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder={
+                          intent === "ambassador"
+                            ? "Quakertown, Bucks County, or nearby towns"
+                            : "Areas or ZIP codes you serve"
                         }
-                        inputMode="numeric"
-                        maxLength={6}
-                        className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-center text-xl font-black tracking-[0.3em] text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-                        placeholder="000000"
                       />
-                    </div>
+                    </label>
                   ) : null}
 
-                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  {intent === "ambassador" ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                        Ambassador referral code{" "}
+                        <span className="text-[#8a7d6b]">(optional)</span>
+                      </span>
+                      <input
+                        value={ambassadorReferralCode}
+                        onChange={(event) =>
+                          setAmbassadorReferralCode(
+                            normalizeAmbassadorReferralCode(event.target.value),
+                          )
+                        }
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-base uppercase outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="AMBASSADOR-CODE"
+                      />
+                    </label>
+                  ) : null}
+
+                  {phoneCodeSent ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                        6-digit code <span className="text-red-500">*</span>
+                      </span>
+                      <input
+                        value={phoneCode}
+                        onChange={(event) =>
+                          setPhoneCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                        }
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="123456"
+                        inputMode="numeric"
+                      />
+                    </label>
+                  ) : null}
+
+                  <label className="flex items-start gap-3 rounded-2xl border border-[#eadfcd] bg-[#fdf8ef] p-4 text-sm leading-6 text-[#5f5648]">
                     <input
                       type="checkbox"
                       checked={acceptedTerms}
                       onChange={(event) => setAcceptedTerms(event.target.checked)}
-                      className="mt-1 h-5 w-5 rounded border-slate-300 accent-emerald-600"
+                      className="mt-1 h-4 w-4 rounded border-[#d8ccb8] text-[#0f7f60] focus:ring-[#0f7f60]"
                     />
-                    <span className="text-sm font-semibold leading-6 text-slate-700">
-                      I agree to SitGuru&apos;s Terms, Privacy Policy, and
-                      account communications related to booking, safety, and
-                      support.
+                    <span>
+                      I agree to SitGuru&apos;s terms, privacy policy, and understand
+                      my profile may need additional information before it is complete.
                     </span>
                   </label>
-
-                  {error ? (
-                    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-                      <p className="flex gap-2 text-sm font-bold leading-6 text-rose-800">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                        {error}
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {message ? (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                      <p className="flex gap-2 text-sm font-bold leading-6 text-emerald-800">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                        {message}
-                      </p>
-                    </div>
-                  ) : null}
 
                   {!phoneCodeSent ? (
                     <button
                       type="button"
                       onClick={handleSendPhoneCode}
                       disabled={phoneLoading}
-                      className="inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0f7f60] px-5 py-4 text-base font-black text-white shadow-lg shadow-[#0f7f60]/20 transition hover:bg-[#0b6049] disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                      {phoneLoading ? (
-                        <>
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          Sending code...
-                        </>
-                      ) : (
-                        <>
-                          Send Phone Code
-                          <ArrowRight className="h-5 w-5" />
-                        </>
-                      )}
+                      {phoneLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+                      Send phone code
+                      <ArrowRight className="h-5 w-5" />
                     </button>
                   ) : (
-                    <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                      <button
-                        type="button"
-                        onClick={handleVerifyPhoneCode}
-                        disabled={phoneLoading}
-                        className="inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {phoneLoading ? (
-                          <>
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                            Verifying...
-                          </>
-                        ) : (
-                          <>
-                            Verify & Continue
-                            <ArrowRight className="h-5 w-5" />
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleSendPhoneCode}
-                        disabled={phoneLoading}
-                        className="inline-flex min-h-[56px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Resend
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleVerifyPhoneCode}
+                      disabled={phoneLoading}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0f7f60] px-5 py-4 text-base font-black text-white shadow-lg shadow-[#0f7f60]/20 transition hover:bg-[#0b6049] disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {phoneLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+                      Verify and continue
+                      <ArrowRight className="h-5 w-5" />
+                    </button>
                   )}
                 </div>
               )}
 
-              <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-slate-100 pt-5 text-sm font-bold text-slate-600 sm:flex-row">
-                <p>
-                  Already have a SitGuru account?{" "}
-                  <Link
-                    href={`/login?role=${intent}&next=${encodeURIComponent(
-                      redirectPath,
-                    )}`}
-                    className="font-black text-emerald-700 hover:text-emerald-900"
-                  >
-                    Log in
-                  </Link>
-                </p>
-
-                <div className="flex flex-col items-center gap-2 sm:items-end">
-                  <Link
-                    href="/ambassador/login"
-                    className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-5 py-2 text-sm font-black text-emerald-800 transition hover:border-emerald-300 hover:bg-white"
-                  >
-                    Ambassador Login
-                  </Link>
-
-                  <Link
-                    href="/"
-                    className="font-black text-emerald-700 hover:text-emerald-900"
-                  >
-                    Back to SitGuru
-                  </Link>
-                </div>
+              <div className="my-6 flex items-center gap-3 text-xs font-black uppercase tracking-[0.18em] text-[#8a7d6b]">
+                <span className="h-px flex-1 bg-[#eadfcd]" />
+                Or continue with
+                <span className="h-px flex-1 bg-[#eadfcd]" />
               </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={handleGoogleSignup}
+                  disabled={googleLoading}
+                  className="inline-flex items-center justify-center gap-3 rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-sm font-black text-[#2f2a22] transition hover:border-[#0f7f60]/40 hover:text-[#0f7f60] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {googleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
+                  Google
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAppleSignup}
+                  disabled={appleLoading}
+                  className="inline-flex items-center justify-center gap-3 rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-sm font-black text-[#2f2a22] transition hover:border-[#0f7f60]/40 hover:text-[#0f7f60] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {appleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Apple className="h-5 w-5" />}
+                  Apple
+                </button>
+              </div>
+
+              <p className="mt-5 text-center text-xs leading-5 text-[#7b7164]">
+                Phone is required before a profile is marked complete. Profile photo,
+                service area, and ZIP code are verified from your dashboard.
+              </p>
             </div>
           </div>
-        </section>
-
-        <footer className="pb-4 text-center text-xs font-semibold text-slate-500">
-          © 2026 SitGuru. All rights reserved.
-        </footer>
-      </div>
-    </main>
-  );
-}
-
-function SignupPageFallback() {
-  return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#ecfdf5_100%)] px-4 py-10 text-slate-950">
-      <div className="mx-auto max-w-xl rounded-[2rem] border border-slate-200 bg-white p-8 text-center shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-          <PawPrint className="h-7 w-7" />
         </div>
-        <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-950">
-          Loading SitGuru signup...
-        </h1>
-        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-          Getting your signup options ready.
-        </p>
-      </div>
+      </section>
     </main>
   );
 }
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<SignupPageFallback />}>
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#f7f3ec] px-4 py-16 text-[#1f1f1f]">
+          <div className="mx-auto max-w-xl rounded-3xl border border-[#eadfcd] bg-white p-8 text-center shadow-lg">
+            <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-[#0f7f60]" />
+            <p className="text-sm font-semibold text-[#6a6256]">
+              Loading SitGuru signup...
+            </p>
+          </div>
+        </main>
+      }
+    >
       <SignupPageContent />
     </Suspense>
   );

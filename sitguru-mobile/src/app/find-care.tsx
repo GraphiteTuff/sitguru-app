@@ -12,23 +12,18 @@ import {
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
+import {
+  formatGuruLocation,
+  formatGuruRate,
+  getGuruPublicCta,
+  guruDirectory,
+  isGuruPubliclyListed,
+  type GuruRow,
+} from '@/constants/gurus';
 
 type ServiceOption = {
   label: string;
   value: string;
-};
-
-type GuruPreview = {
-  id: string;
-  name: string;
-  role: string;
-  location: string;
-  distance: string;
-  rate: string;
-  rating: string;
-  reviews: string;
-  services: string[];
-  badges: string[];
 };
 
 const services: ServiceOption[] = [
@@ -39,45 +34,6 @@ const services: ServiceOption[] = [
   { label: 'House Sitting', value: 'house_sitting' },
   { label: 'Doggy Day Care', value: 'doggy_day_care' },
   { label: 'Training Support', value: 'training_support' },
-];
-
-const guruPreviews: GuruPreview[] = [
-  {
-    id: 'demo-1',
-    name: 'Local Guru',
-    role: 'Pet Care Guru',
-    location: 'Near your care area',
-    distance: 'Nearby',
-    rate: 'Rate shown on profile',
-    rating: 'New',
-    reviews: 'Profile preview',
-    services: ['Dog Walking', 'Drop-In Visits', 'Pet Sitting'],
-    badges: ['Profile', 'Messages', 'PawReport™'],
-  },
-  {
-    id: 'demo-2',
-    name: 'Trusted Care Provider',
-    role: 'Independent Pet Guru',
-    location: 'Service area match',
-    distance: 'Local',
-    rate: 'Service-based pricing',
-    rating: 'Ready',
-    reviews: 'Care details',
-    services: ['Boarding', 'House Sitting', 'Doggy Day Care'],
-    badges: ['Care Notes', 'Pet Passports', 'Visit Updates'],
-  },
-  {
-    id: 'demo-3',
-    name: 'Neighborhood Guru',
-    role: 'Local Pet Care',
-    location: 'ZIP-based search',
-    distance: 'In area',
-    rate: 'View services',
-    rating: 'Search',
-    reviews: 'Matched by location',
-    services: ['Pet Sitting', 'Training Support', 'Drop-In Visits'],
-    badges: ['Local', 'Trusted', 'Easy Booking'],
-  },
 ];
 
 export default function FindCareScreen() {
@@ -94,6 +50,11 @@ export default function FindCareScreen() {
   const cleanZip = zipCode.replace(/\D/g, '').slice(0, 5);
   const hasValidZip = cleanZip.length === 5;
   const careAreaLabel = hasValidZip ? `ZIP ${cleanZip}` : 'your care area';
+  const publicGurus = guruDirectory.filter(isGuruPubliclyListed);
+  const matchingGurus = publicGurus.filter((guru) =>
+    guru.services.includes(selectedService.label),
+  );
+  const displayedGurus = matchingGurus.length > 0 ? matchingGurus : publicGurus;
 
   function handleZipChange(value: string) {
     const nextZip = value.replace(/\D/g, '').slice(0, 5);
@@ -122,20 +83,24 @@ export default function FindCareScreen() {
     );
   }
 
-  function handleViewProfile(guruName: string) {
-    setNoticeMessage(`${guruName} profile preview selected.`);
+  function handleViewProfile(guru: GuruRow) {
+    setNoticeMessage(`${guru.name} profile preview selected.`);
   }
 
-  function handleMessageGuru(guruName: string) {
+  function handleMessageGuru(guru: GuruRow) {
     setNoticeMessage(
-      `Message selected for ${guruName}. Messaging will open from the Guru profile.`,
+      `Message selected for ${guru.name}. Messaging will open from the Guru profile.`,
     );
   }
 
-  function handleRequestCare(guruName: string) {
-    setNoticeMessage(
-      `Request Care selected for ${guruName}. Care requests will open from the Guru profile.`,
-    );
+  function handlePublicCta(guru: GuruRow) {
+    const cta = getGuruPublicCta(guru);
+
+    if (cta.disabled) {
+      return;
+    }
+
+    router.push('/request-booking');
   }
 
   return (
@@ -307,93 +272,111 @@ export default function FindCareScreen() {
         </View>
 
         <View style={[styles.resultsGrid, isWide && styles.resultsGridWide]}>
-          {guruPreviews.map((guru) => (
-            <View key={guru.id} style={styles.guruCard}>
-              <View style={styles.guruPhotoSlot}>
-                <Text style={styles.guruPhotoIcon}>＋</Text>
-                <Text style={styles.guruPhotoText}>Guru photo</Text>
-              </View>
+          {displayedGurus.map((guru) => {
+            const cta = getGuruPublicCta(guru);
 
-              <View style={styles.guruContent}>
-                <View style={styles.guruTopRow}>
-                  <View style={styles.guruAvatar}>
-                    <Text style={styles.guruAvatarText}>
-                      {guru.name
-                        .split(' ')
-                        .slice(0, 2)
-                        .map((part) => part.charAt(0))
-                        .join('')
-                        .toUpperCase()}
+            return (
+              <View key={guru.id} style={styles.guruCard}>
+                <View style={styles.guruPhotoSlot}>
+                  <Text style={styles.guruPhotoIcon}>＋</Text>
+                  <Text style={styles.guruPhotoText}>Guru photo</Text>
+                </View>
+
+                <View style={styles.guruContent}>
+                  <View style={styles.guruTopRow}>
+                    <View style={styles.guruAvatar}>
+                      <Text style={styles.guruAvatarText}>
+                        {guru.name
+                          .split(' ')
+                          .slice(0, 2)
+                          .map((part) => part.charAt(0))
+                          .join('')
+                          .toUpperCase()}
+                      </Text>
+                    </View>
+
+                    <View style={styles.guruMeta}>
+                      <Text style={styles.guruName}>{guru.name}</Text>
+                      <Text style={styles.guruRole}>{guru.role}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.guruInfoRow}>
+                    <Text style={styles.guruInfoText}>
+                      ⌖ {formatGuruLocation(guru)}
                     </Text>
+                    <Text style={styles.guruInfoText}>• ZIP {guru.service_zip}</Text>
                   </View>
 
-                  <View style={styles.guruMeta}>
-                    <Text style={styles.guruName}>{guru.name}</Text>
-                    <Text style={styles.guruRole}>{guru.role}</Text>
-                  </View>
-                </View>
+                  <View style={styles.guruStatsRow}>
+                    <View style={styles.guruStat}>
+                      <Text style={styles.guruStatValue}>{guru.rating}</Text>
+                      <Text style={styles.guruStatLabel}>Status</Text>
+                    </View>
 
-                <View style={styles.guruInfoRow}>
-                  <Text style={styles.guruInfoText}>⌖ {guru.location}</Text>
-                  <Text style={styles.guruInfoText}>• {guru.distance}</Text>
-                </View>
-
-                <View style={styles.guruStatsRow}>
-                  <View style={styles.guruStat}>
-                    <Text style={styles.guruStatValue}>{guru.rating}</Text>
-                    <Text style={styles.guruStatLabel}>Status</Text>
+                    <View style={styles.guruStat}>
+                      <Text style={styles.guruStatValue}>{formatGuruRate(guru)}</Text>
+                      <Text style={styles.guruStatLabel}>Pricing</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.guruStat}>
-                    <Text style={styles.guruStatValue}>{guru.rate}</Text>
-                    <Text style={styles.guruStatLabel}>Pricing</Text>
+                  <View style={styles.servicesList}>
+                    {guru.services.map((service) => (
+                      <Text key={service} style={styles.guruServicePill}>
+                        {service}
+                      </Text>
+                    ))}
                   </View>
-                </View>
 
-                <View style={styles.servicesList}>
-                  {guru.services.map((service) => (
-                    <Text key={service} style={styles.guruServicePill}>
-                      {service}
-                    </Text>
-                  ))}
-                </View>
+                  <View style={styles.badgeList}>
+                    {guru.badges.map((badge) => (
+                      <Text key={badge} style={styles.guruBadge}>
+                        ✓ {badge}
+                      </Text>
+                    ))}
+                  </View>
 
-                <View style={styles.badgeList}>
-                  {guru.badges.map((badge) => (
-                    <Text key={badge} style={styles.guruBadge}>
-                      ✓ {badge}
-                    </Text>
-                  ))}
-                </View>
+                  <View style={styles.guruActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => handleViewProfile(guru)}
+                      style={styles.viewButton}
+                    >
+                      <Text style={styles.viewButtonText}>View Profile</Text>
+                    </Pressable>
 
-                <View style={styles.guruActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => handleMessageGuru(guru)}
+                      style={styles.messageButton}
+                    >
+                      <Text style={styles.messageButtonText}>Message</Text>
+                    </Pressable>
+                  </View>
+
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => handleViewProfile(guru.name)}
-                    style={styles.viewButton}
+                    accessibilityState={{ disabled: cta.disabled }}
+                    disabled={cta.disabled}
+                    onPress={() => handlePublicCta(guru)}
+                    style={[
+                      styles.bookButton,
+                      cta.disabled && styles.bookButtonDisabled,
+                    ]}
                   >
-                    <Text style={styles.viewButtonText}>View Profile</Text>
-                  </Pressable>
-
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => handleMessageGuru(guru.name)}
-                    style={styles.messageButton}
-                  >
-                    <Text style={styles.messageButtonText}>Message</Text>
+                    <Text
+                      style={[
+                        styles.bookButtonText,
+                        cta.disabled && styles.bookButtonTextDisabled,
+                      ]}
+                    >
+                      {cta.label}
+                    </Text>
                   </Pressable>
                 </View>
-
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => handleRequestCare(guru.name)}
-                  style={styles.bookButton}
-                >
-                  <Text style={styles.bookButtonText}>Request Care</Text>
-                </Pressable>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         <View style={styles.flowPanel}>
@@ -979,10 +962,18 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: 12,
   },
+  bookButtonDisabled: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+    borderWidth: 1,
+  },
   bookButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
+  },
+  bookButtonTextDisabled: {
+    color: SitGuruColors.textMuted,
   },
   flowPanel: {
     backgroundColor: SitGuruColors.primaryDark,

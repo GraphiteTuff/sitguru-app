@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import SitGuruActionCard from '@/components/SitGuruActionCard';
@@ -8,6 +8,8 @@ import SitGuruDashboardHeader from '@/components/SitGuruDashboardHeader';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruStatCard from '@/components/SitGuruStatCard';
 import { SitGuruColors } from '@/constants/colors';
+
+const adminDashboardHref = '/admin-dashboard' as Href;
 
 export default function GuruDashboardScreen() {
   return (
@@ -62,6 +64,32 @@ export default function GuruDashboardScreen() {
             value="Ready"
             wide
           />
+        </View>
+
+        <View style={styles.adminControlPanel}>
+          <View style={styles.adminControlHeader}>
+            <View>
+              <Text style={styles.adminControlEyebrow}>Admin controls</Text>
+              <Text style={styles.adminControlTitle}>
+                Manage Guru booking status.
+              </Text>
+            </View>
+
+            <Text style={styles.adminControlBadge}>booking_status</Text>
+          </View>
+
+          <Text style={styles.adminControlText}>
+            Update each Guru as listed_only, requestable, bookable, or not_listed
+            from the admin dashboard.
+          </Text>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(adminDashboardHref)}
+            style={styles.adminControlButton}
+          >
+            <Text style={styles.adminControlButtonText}>Open Admin Dashboard</Text>
+          </Pressable>
         </View>
 
         <View style={styles.pricingHeroPanel}>
@@ -389,6 +417,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  adminControlPanel: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 30,
+    borderWidth: 1,
+    elevation: 3,
+    gap: 13,
+    padding: 18,
+  },
+  adminControlHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  adminControlEyebrow: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  adminControlTitle: {
+    color: SitGuruColors.text,
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    lineHeight: 29,
+    marginTop: 3,
+  },
+  adminControlBadge: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 999,
+    borderWidth: 1,
+    color: SitGuruColors.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    textTransform: 'uppercase',
+  },
+  adminControlText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21,
+  },
+  adminControlButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.primary,
+    borderRadius: 999,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: 18,
+  },
+  adminControlButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
   },
   pricingHeroPanel: {
     backgroundColor: SitGuruColors.surface,

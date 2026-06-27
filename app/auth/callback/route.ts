@@ -168,6 +168,13 @@ function getProfileRoleFromIntent(intent: CallbackIntent) {
   return "customer";
 }
 
+function getUserRolesFromIntent(intent: CallbackIntent) {
+  if (intent === "both") return ["customer", "guru"] as const;
+  if (intent === "guru") return ["guru"] as const;
+  if (intent === "pet_parent" || intent === "customer") return ["customer"] as const;
+  return [] as const;
+}
+
 function getNameParts(fullName: string | null) {
   const cleanName = fullName?.trim() || "";
   const parts = cleanName.split(/\s+/).filter(Boolean);
@@ -183,6 +190,18 @@ function getNameParts(fullName: string | null) {
     firstName: parts[0] || null,
     lastName: parts.length > 1 ? parts.slice(1).join(" ") : null,
   };
+}
+
+function buildStarterGuruSlug(userId: string, fullName: string | null) {
+  const baseSlug = (fullName || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return baseSlug || `guru-${userId.slice(0, 8)}`;
 }
 
 function normalizePetPerksSignupSelection(
@@ -356,6 +375,7 @@ async function upsertPetParentProfileFromCallback({
           ? existingProfile.last_name
           : null),
       role: profileRole,
+      account_type: profileRole,
     },
     {
       onConflict: "id",
@@ -409,6 +429,117 @@ async function upsertPetParentProfileFromCallback({
     if (ambassadorError) {
       console.error("Ambassador starter profile upsert during auth callback failed:", ambassadorError.message);
     }
+  }
+}
+
+async function syncIntentionalSignupRoleRecords({
+  userId,
+  userEmail,
+  userName,
+  intent,
+}: {
+  userId: string;
+  userEmail: string | null;
+  userName: string | null;
+  intent: CallbackIntent;
+}) {
+  if (!intent) return;
+
+  const supabaseAdmin = createSupabaseAdminClient();
+  const profileRole = getProfileRoleFromIntent(intent);
+  const now = new Date().toISOString();
+
+  const { error: metadataError } = await supabaseAdmin.auth.admin.updateUserById(
+    userId,
+    {
+      user_metadata: {
+        full_name: userName,
+        role: profileRole,
+        account_type: profileRole,
+        signup_role: profileRole,
+        account_intent: intent,
+        signup_source: "sitguru_oauth_callback",
+        signup_status: "oauth_verified",
+      },
+    },
+  );
+
+  if (metadataError) {
+    console.error("Auth metadata role sync failed:", metadataError.message);
+  }
+
+  await Promise.all(
+    getUserRolesFromIntent(intent).map(async (role) => {
+      const { error } = await supabaseAdmin.from("user_roles").upsert(
+        {
+          user_id: userId,
+          role,
+        },
+        {
+          onConflict: "user_id,role",
+        },
+      );
+
+      if (error) {
+        console.error("User role sync during auth callback failed:", error.message);
+      }
+    }),
+  );
+
+  if (intent !== "guru" && intent !== "both") return;
+
+  const displayName = userName?.trim() || userEmail || "New SitGuru";
+  const slug = buildStarterGuruSlug(userId, displayName);
+
+  const { data: existingGuru, error: existingGuruError } = await supabaseAdmin
+    .from("gurus")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingGuruError) {
+    console.error(
+      "Starter Guru lookup during auth callback failed:",
+      existingGuruError.message,
+    );
+    return;
+  }
+
+  const starterGuruPayload = {
+    user_id: userId,
+    display_name: displayName,
+    full_name: displayName,
+    slug,
+    is_public: false,
+    booking_status: "not_listed",
+    onboarding_completed: false,
+    profile_completed: false,
+    updated_at: now,
+  };
+
+  if (existingGuru?.id) {
+    const { error } = await supabaseAdmin
+      .from("gurus")
+      .update(starterGuruPayload)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Starter Guru update during auth callback failed:", error.message);
+    }
+
+    return;
+  }
+
+  const { error: insertError } = await supabaseAdmin.from("gurus").insert({
+    ...starterGuruPayload,
+    created_at: now,
+  });
+
+  if (insertError) {
+    console.error(
+      "Starter Guru creation during auth callback failed:",
+      insertError.message,
+    );
   }
 }
 
@@ -732,6 +863,13 @@ export async function GET(request: Request) {
 
   if (isIntentionalSignup) {
     await upsertPetParentProfileFromCallback({
+      userId: user.id,
+      userEmail,
+      userName,
+      intent,
+    });
+
+    await syncIntentionalSignupRoleRecords({
       userId: user.id,
       userEmail,
       userName,
