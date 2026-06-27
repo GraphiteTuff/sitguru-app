@@ -383,7 +383,11 @@ async function upsertPetParentProfileFromCallback({
   }
 
   if (intent === "ambassador") {
-    const referralCode = `${(preferredName || "SITGURU").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "SITGURU"}${userId.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+    const referralNamePrefix = (preferredName || "SITGURU")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 8) || "SITGURU";
+    const referralCode = `${referralNamePrefix}-${userId.replace(/-/g, "").toUpperCase()}`;
     const { error: ambassadorError } = await supabaseAdmin.from("ambassadors").upsert(
       {
         user_id: userId,

@@ -231,9 +231,10 @@ function buildReferralCode(userId: string, fullName: string) {
   const nameCode = fullName
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 10);
+    .slice(0, 8);
+  const uniqueUserCode = userId.replace(/-/g, "").toUpperCase();
 
-  return `${nameCode || "SITGURU"}${userId.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+  return `${nameCode || "SITGURU"}-${uniqueUserCode}`;
 }
 
 async function ensureUserRole(userId: string, role: string) {

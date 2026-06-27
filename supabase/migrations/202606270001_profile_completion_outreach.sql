@@ -1,5 +1,55 @@
 -- Operational profile completion, outreach, and reminder support for SitGuru.com.
 
+-- Compatibility columns used by signup, completion diagnostics, and admin outreach.
+alter table if exists public.profiles
+  add column if not exists service_area text,
+  add column if not exists local_area text,
+  add column if not exists community_area text,
+  add column if not exists referral_code text,
+  add column if not exists updated_at timestamptz;
+
+alter table if exists public.gurus
+  add column if not exists service_area text,
+  add column if not exists zip_codes_served text,
+  add column if not exists profile_completed boolean,
+  add column if not exists onboarding_completed boolean,
+  add column if not exists updated_at timestamptz;
+
+alter table if exists public.ambassadors
+  add column if not exists user_id uuid,
+  add column if not exists full_name text,
+  add column if not exists email text,
+  add column if not exists contact_email text,
+  add column if not exists phone text,
+  add column if not exists referral_code text,
+  add column if not exists status text,
+  add column if not exists referral_status text,
+  add column if not exists onboarding_status text,
+  add column if not exists training_status text,
+  add column if not exists dashboard_enabled boolean default false,
+  add column if not exists login_enabled boolean default false,
+  add column if not exists dashboard_slug text,
+  add column if not exists base_zip_code text,
+  add column if not exists service_area text,
+  add column if not exists updated_at timestamptz;
+
+create table if not exists public.user_roles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  role text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table if exists public.user_roles
+  add column if not exists updated_at timestamptz;
+
+create unique index if not exists user_roles_user_id_role_key
+  on public.user_roles(user_id, role);
+
+create unique index if not exists ambassadors_user_id_key
+  on public.ambassadors(user_id);
+
 create table if not exists public.communication_logs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid,
