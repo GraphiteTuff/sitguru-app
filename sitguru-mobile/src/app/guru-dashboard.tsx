@@ -140,10 +140,10 @@ export default function GuruDashboardScreen() {
 
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push('/request-booking')}
+              onPress={() => router.push('/guru-pricing')}
               style={styles.secondaryPricingButton}
             >
-              <Text style={styles.secondaryPricingButtonText}>Preview Booking</Text>
+              <Text style={styles.secondaryPricingButtonText}>Review Guru Pricing</Text>
             </Pressable>
           </View>
         </View>

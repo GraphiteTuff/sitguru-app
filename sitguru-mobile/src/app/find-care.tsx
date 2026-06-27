@@ -84,13 +84,13 @@ export default function FindCareScreen() {
   }
 
   function handleViewProfile(guru: GuruRow) {
-    setNoticeMessage(`${guru.name} profile preview selected.`);
+    setNoticeMessage(
+      `${guru.name} profile preview selected. Full Guru profiles will open here when /guru-profile is available.`,
+    );
   }
 
-  function handleMessageGuru(guru: GuruRow) {
-    setNoticeMessage(
-      `Message selected for ${guru.name}. Messaging will open from the Guru profile.`,
-    );
+  function handleMessageGuru(_guru: GuruRow) {
+    router.push('/conversation');
   }
 
   function handlePublicCta(guru: GuruRow) {

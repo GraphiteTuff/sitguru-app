@@ -1022,7 +1022,7 @@ export default function RequestBookingScreen() {
             <View style={styles.heroBadge}>
               <Text style={styles.heroBadgeText}>Pet Parent Booking Request</Text>
             </View>
-            <Text style={styles.title}>Request care from a Guru.</Text>
+            <Text style={styles.title}>Pet Parent Booking Request.</Text>
             <Text style={styles.subtitle}>
               Choose your pet, service, dates, savings, and notes. The Guru reviews before payment.
             </Text>
