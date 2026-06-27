@@ -135,7 +135,7 @@ export default function ConversationScreen() {
 
               <Pressable
                 accessibilityRole="button"
-                onPress={() => showComingSoon('Request Care')}
+                onPress={() => router.push('/request-booking')}
                 style={styles.secondaryButton}
               >
                 <Text style={styles.secondaryButtonText}>Request Care</Text>
@@ -373,7 +373,7 @@ export default function ConversationScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => showComingSoon('Request Care')}
+          onPress={() => router.push('/request-booking')}
           style={styles.dockPrimaryAction}
         >
           <Text style={styles.dockPrimaryText}>Request Care</Text>
