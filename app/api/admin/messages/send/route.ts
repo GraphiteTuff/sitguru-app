@@ -270,6 +270,46 @@ function getPrimaryRecipient({
   };
 }
 
+
+async function writeCommunicationLog(params: {
+  actorId: string;
+  recipientId: string;
+  conversationId: string;
+  recipientRole: string;
+  topic: string;
+  body: string;
+}) {
+  try {
+    const { error } = await supabaseAdmin.from("communication_logs").insert({
+      user_id: params.recipientId,
+      recipient_id: params.recipientId,
+      actor_id: params.actorId,
+      sender_id: params.actorId,
+      conversation_id: params.conversationId,
+      direction: "outbound",
+      channel: "admin_message",
+      type: "admin_message",
+      status: "sent",
+      role_context: params.recipientRole || null,
+      subject: params.topic || "Admin message",
+      message: params.body,
+      body: params.body,
+      metadata: {
+        source: "admin_messages_send_api",
+        conversation_id: params.conversationId,
+        recipient_role: params.recipientRole || null,
+      },
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.warn("Admin communication log insert skipped:", error.message);
+    }
+  } catch (error) {
+    console.warn("Admin communication log insert skipped:", error);
+  }
+}
+
 export async function GET() {
   return NextResponse.json(
     {
@@ -428,6 +468,15 @@ export async function POST(req: NextRequest) {
         conversationUpdateError.message
       );
     }
+
+    await writeCommunicationLog({
+      actorId: senderId,
+      recipientId,
+      conversationId,
+      recipientRole: recipientRole || "customer",
+      topic,
+      body,
+    });
 
     return NextResponse.json(
       {
