@@ -1131,21 +1131,21 @@ function HomepageAssistPopup({
     <div className="fixed bottom-[calc(16px+env(safe-area-inset-bottom))] left-4 right-auto z-[80] w-auto max-w-[calc(100vw-32px)] sm:bottom-5 sm:left-auto sm:right-5 sm:w-[420px]">
       {isOpen ? (
         <section className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-3 right-3 flex max-h-[70dvh] flex-col overflow-hidden rounded-[18px] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.22)] sm:static sm:max-h-[calc(100dvh-2rem)] sm:rounded-[28px]">
-          <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-sky-500 px-4 py-3 text-white sm:py-4">
+          <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-500 px-4 py-[18px] text-white sm:px-5 sm:py-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-50">
-                  <span aria-hidden="true" className="text-base">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-50">
+                  <span aria-hidden="true" className="text-sm">
                     🐾
                   </span>
                   SitGuru Help
                 </div>
-                <h2 className="mt-1 text-lg font-black leading-tight text-white sm:text-xl">
-                  We usually reply soon
+                <h2 className="mt-1.5 text-2xl font-extrabold leading-tight tracking-[-0.02em] text-white sm:text-3xl">
+                  Hi, we’re here to help 🐾
                 </h2>
-                <p className="mt-1 text-xs font-semibold leading-5 text-white/90 sm:text-sm">
-                  We are here for you. Ask us anything about finding care,
-                  becoming a Guru, or joining as an Ambassador.
+                <p className="mt-2 text-sm font-medium leading-5 text-white/90 sm:text-base sm:leading-6">
+                  Have a question about booking care, becoming a Guru, or
+                  referrals? Send us a quick message.
                 </p>
               </div>
 
@@ -1259,7 +1259,7 @@ function HomepageAssistPopup({
             <form onSubmit={handleSubmit} className="mt-3 grid gap-2.5 sm:mt-4 sm:gap-3">
               <label className="grid gap-1.5">
                 <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-                  Topic
+                  What can we help with?
                 </span>
                 <select
                   value={form.topic}
@@ -1285,7 +1285,7 @@ function HomepageAssistPopup({
                 value={form.message}
                 onChange={(event) => updateAssistField("message", event.target.value)}
                 rows={2}
-                placeholder="Type your message..."
+                placeholder="How can we help?"
                 className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:py-3"
               />
 
@@ -1293,7 +1293,7 @@ function HomepageAssistPopup({
                 <input
                   value={form.fullName}
                   onChange={(event) => updateAssistField("fullName", event.target.value)}
-                  placeholder="Name required"
+                  placeholder="Your name"
                   required
                   className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
                 />
@@ -1301,7 +1301,7 @@ function HomepageAssistPopup({
                   type="email"
                   value={form.email}
                   onChange={(event) => updateAssistField("email", event.target.value)}
-                  placeholder="Email optional"
+                  placeholder="Email so we can reply"
                   className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
                 />
               </div>
@@ -1339,13 +1339,13 @@ function HomepageAssistPopup({
                 disabled={isSubmitting}
                 className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-11 sm:py-3"
               >
-                {isSubmitting ? "Sending..." : "Send to SitGuru Admin"}
+                {isSubmitting ? "Sending..." : "Send message"}
               </button>
 
               <div className="grid gap-2">
                 <p className="text-[11px] font-semibold leading-4 text-slate-500">
-                  SitGuru Admin is notified immediately. This chat stays available
-                  until you close the conversation or SitGuru Admin closes it.
+                  We’ll reply as soon as possible. You can close this chat
+                  anytime.
                 </p>
 
                 {session?.conversationId ? (
