@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Open_Sans } from "next/font/google";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -31,11 +30,9 @@ import {
 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
 
-const openSans = Open_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  display: "swap",
-});
+const openSans = {
+  className: "font-sans",
+};
 
 type ProgramKey =
   | "veterans-hire"
