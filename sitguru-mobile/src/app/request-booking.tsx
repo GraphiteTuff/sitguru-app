@@ -989,14 +989,14 @@ export default function RequestBookingScreen() {
           <Text style={styles.successIcon}>✓</Text>
           <Text style={styles.successTitle}>Ready to send.</Text>
           <Text style={styles.successText}>
-            This request goes to the Guru for review. Payment happens later after the Guru accepts.
+            This request goes to the Guru for review. Payment happens later after the Guru accepts. Next step: review the Booking Details hub.
           </Text>
           <Pressable
             accessibilityRole="button"
-            onPress={goNext}
+            onPress={() => router.push('/booking-details')}
             style={styles.submitButton}
           >
-            <Text style={styles.submitButtonText}>Submit Request</Text>
+            <Text style={styles.submitButtonText}>Submit Request • View Booking Details</Text>
           </Pressable>
         </View>
       </View>

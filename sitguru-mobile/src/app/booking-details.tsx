@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import SitGuruBottomNav from '@/components/SitGuruBottomNav';
@@ -70,6 +71,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export default function BookingDetailsScreen() {
+  const [selectedStatus, setSelectedStatus] = useState('Pending Guru Review');
+
   return (
     <SitGuruScreen scroll center={false} maxWidth={760}>
       <View style={styles.page}>
@@ -90,15 +93,17 @@ export default function BookingDetailsScreen() {
 
         <HubCard icon="booking" title="Booking status" meta="Preview">
           <View style={styles.statusWrap}>
-            {statusSteps.map((status, index) => (
-              <View
+            {statusSteps.map((status) => (
+              <Pressable
+                accessibilityRole="button"
                 key={status}
-                style={[styles.statusPill, index === 0 ? styles.statusPillActive : null]}
+                onPress={() => setSelectedStatus(status)}
+                style={[styles.statusPill, selectedStatus === status ? styles.statusPillActive : null]}
               >
-                <Text style={[styles.statusText, index === 0 ? styles.statusTextActive : null]}>
+                <Text style={[styles.statusText, selectedStatus === status ? styles.statusTextActive : null]}>
                   {status}
                 </Text>
-              </View>
+              </Pressable>
             ))}
           </View>
         </HubCard>

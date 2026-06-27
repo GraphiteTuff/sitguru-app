@@ -140,6 +140,22 @@ export default function ConversationScreen() {
               >
                 <Text style={styles.secondaryButtonText}>Request Care</Text>
               </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/pawreport-live')}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>View Live PawReport</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/booking-details')}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>View Booking</Text>
+              </Pressable>
             </View>
           </View>
 

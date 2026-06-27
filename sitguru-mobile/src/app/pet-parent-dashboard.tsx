@@ -177,6 +177,14 @@ export default function PetParentDashboardScreen() {
           >
             <Text style={styles.livePawReportButtonText}>View Live PawReport</Text>
           </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/booking-details')}
+            style={styles.livePawReportButton}
+          >
+            <Text style={styles.livePawReportButtonText}>View Booking Details</Text>
+          </Pressable>
         </View>
 
         <View style={styles.section}>
