@@ -1128,9 +1128,9 @@ function HomepageAssistPopup({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[80] w-auto max-w-[calc(100vw-32px)] pb-[env(safe-area-inset-bottom)] sm:bottom-5 sm:left-5 sm:right-auto sm:w-[420px] sm:pb-0">
+    <div className="fixed bottom-[calc(16px+env(safe-area-inset-bottom))] left-4 right-auto z-[80] w-auto max-w-[calc(100vw-32px)] sm:bottom-5 sm:left-auto sm:right-5 sm:w-[420px]">
       {isOpen ? (
-        <section className="fixed bottom-3 left-3 right-3 flex max-h-[70dvh] flex-col overflow-hidden rounded-[18px] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.22)] sm:static sm:max-h-[calc(100dvh-2rem)] sm:rounded-[28px]">
+        <section className="fixed bottom-[calc(12px+env(safe-area-inset-bottom))] left-3 right-3 flex max-h-[70dvh] flex-col overflow-hidden rounded-[18px] border border-emerald-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.22)] sm:static sm:max-h-[calc(100dvh-2rem)] sm:rounded-[28px]">
           <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-sky-500 px-4 py-3 text-white sm:py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
