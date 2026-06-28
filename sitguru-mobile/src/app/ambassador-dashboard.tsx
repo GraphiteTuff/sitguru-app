@@ -39,6 +39,20 @@ export default function AmbassadorDashboardScreen() {
           <Text style={styles.accountChevron}>›</Text>
         </Pressable>
 
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/support')}
+          style={styles.accountPanel}
+        >
+          <View style={styles.accountIconBadge}>
+            <Text style={styles.accountIcon}>🛟</Text>
+          </View>
+          <View style={styles.accountCopy}>
+            <Text style={styles.accountEyebrow}>Help & Support</Text>
+            <Text style={styles.accountTitle}>Ambassador help for referrals, rewards, training, and support requests</Text>
+          </View>
+          <Text style={styles.accountChevron}>›</Text>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
