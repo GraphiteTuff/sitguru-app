@@ -195,9 +195,11 @@ export default function BookingDetailsScreen() {
 
         <HubCard icon="request" title="Guru actions" meta="Guru view">
           <View style={styles.buttonStack}>
+            <SitGuruButton label="Back to Requests" variant="secondary" onPress={() => router.push('/guru-requests')} />
+            <SitGuruButton label="Message Guru/Pet Parent" onPress={() => router.push('/conversation')} />
+            <SitGuruButton label="Start Live Walk" variant="secondary" onPress={() => router.push('/guru-live-walk')} />
             <SitGuruButton label="Accept Request placeholder" onPress={() => showPlaceholderAlert('Accept Request')} />
             <SitGuruButton label="Decline placeholder" variant="secondary" onPress={() => showPlaceholderAlert('Decline')} />
-            <SitGuruButton label="Start Live Walk" variant="secondary" onPress={() => router.push('/guru-live-walk')} />
           </View>
         </HubCard>
 

@@ -156,6 +156,14 @@ export default function ConversationScreen() {
               >
                 <Text style={styles.secondaryButtonText}>View Booking</Text>
               </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/guru-requests')}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>View Requests</Text>
+              </Pressable>
             </View>
           </View>
 
