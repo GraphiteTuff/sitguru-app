@@ -7,8 +7,13 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 
 type Status = 'Complete UI' | 'Needs wiring' | 'Visual-only' | 'Missing' | 'Needed' | 'Draft' | 'Future' | 'Review' | 'Not wired' | 'Future Supabase' | 'Future Stripe' | 'Future GPS' | 'Future push';
-type Action = { label: string; href?: Href; alert?: string };
-type Feature = { name: string; status: Status; route?: Href };
+type Action = {
+  label: string;
+  href?: Href;
+  placeholder?: string;
+};
+type FeatureChecklistItem = { name: string; status: Status; route?: Href };
+type RoleFlow = { title: string; path: string; status: string; missing: string; actions: Action[] };
 
 const summary = [
   ['UI screens', 'Strong progress'], ['Backend wiring', 'Pending'], ['Payments/Stripe', 'Visual-only'], ['GPS/live tracking', 'Visual-only'],
@@ -19,7 +24,7 @@ const progress = [
   ['Overall readiness', 45], ['Visual UI completion', 80], ['Backend completion', 10], ['Store readiness', 15],
 ] as const;
 
-const features: Feature[] = [
+const features: FeatureChecklistItem[] = [
   { name: 'Home / Welcome', status: 'Complete UI', route: '/' }, { name: 'Find Care', status: 'Complete UI', route: '/find-care' },
   { name: 'Guru Profile', status: 'Complete UI', route: '/guru-profile' }, { name: 'Pet Passports', status: 'Complete UI', route: '/pet-passports' },
   { name: 'Request Booking', status: 'Complete UI', route: '/request-booking' }, { name: 'Booking Details', status: 'Complete UI', route: '/booking-details' },
@@ -31,7 +36,7 @@ const features: Feature[] = [
   { name: 'Admin Operations', status: 'Visual-only', route: '/admin-operations' },
 ];
 
-const roleFlows = [
+const roleFlows: RoleFlow[] = [
   { title: 'Pet Parent flow', path: 'Find Care → Guru Profile → Message → Request Booking → Booking Details → PawReport Live → Reviews', status: 'Visual flow mapped', missing: 'Auth, live availability, booking persistence, payment hold, review storage', actions: [{ label: 'Find Care', href: '/find-care' }, { label: 'Request Booking', href: '/request-booking' }, { label: 'PawReport Live', href: '/pawreport-live' }] },
   { title: 'Guru flow', path: 'Guru Setup → Pricing Calendar → Requests → Booking Details → Live Walk Controls → Earnings/Payouts', status: 'Visual flow mapped', missing: 'Guru onboarding, availability, request matching, GPS, Stripe payouts', actions: [{ label: 'Guru Setup', href: '/guru-setup' }, { label: 'Guru Pricing', href: '/guru-pricing' }, { label: 'Live Walk Controls', href: '/guru-live-walk' }] },
   { title: 'Ambassador flow', path: 'Ambassador Setup → Referrals → Training → Rewards → Notifications', status: 'Preview flow mapped', missing: 'Referral attribution, training records, reward approvals, payout rules', actions: [{ label: 'Ambassador Setup', href: '/ambassador-setup' }, { label: 'Ambassador Dashboard', href: '/ambassador-dashboard' }, { label: 'Notifications', href: '/notifications' }] },
@@ -47,7 +52,7 @@ const quickActions: Action[] = [{ label: 'Admin Operations', href: '/admin-opera
 
 function open(action: Action) {
   if (action.href) router.push(action.href);
-  else Alert.alert('Release readiness preview', action.alert ?? `${action.label} is not available in this visual-only checklist yet.`);
+  else Alert.alert('Release readiness preview', action.placeholder ?? `${action.label} is not available in this visual-only checklist yet.`);
 }
 function Card({ title, eyebrow, children }: { title: string; eyebrow?: string; children: ReactNode }) { return <View style={styles.card}>{eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}<Text style={styles.cardTitle}>{title}</Text>{children}</View>; }
 function Badge({ label }: { label: Status | string }) { return <Text style={[styles.badge, label.includes('Missing') || label.includes('Needed') || label.includes('Not wired') ? styles.badgeWarn : null]}>{label}</Text>; }
@@ -64,7 +69,7 @@ export default function ReleaseReadinessScreen() {
 
         <View style={styles.summaryGrid}>{summary.map(([label, value]) => <View key={label} style={styles.summaryCard}><Text style={styles.summaryLabel}>{label}</Text><Text style={styles.summaryValue}>{value}</Text></View>)}</View>
         <Card title="Completion progress" eyebrow="Placeholder readiness"><View style={styles.progressStack}>{progress.map(([label, value]) => <ProgressRow key={label} label={label} value={value} />)}</View></Card>
-        <Card title="Core feature checklist" eyebrow="Visual route audit">{features.map((feature) => <ChecklistRow key={feature.name} label={feature.name} status={feature.status} action={{ label: feature.route ? 'Open' : 'Review', href: feature.route, alert: feature.name }} />)}</Card>
+        <Card title="Core feature checklist" eyebrow="Visual route audit">{features.map((feature) => <ChecklistRow key={feature.name} label={feature.name} status={feature.status} action={{ label: feature.route ? 'Open' : 'Review', href: feature.route, placeholder: feature.name }} />)}</Card>
         <Card title="Role flow checklist" eyebrow="End-to-end previews">{roleFlows.map((flow) => <View key={flow.title} style={styles.flowCard}><Text style={styles.flowTitle}>{flow.title}</Text><Text style={styles.body}>{flow.path}</Text><Badge label={flow.status} /><Text style={styles.missing}>Missing backend pieces: {flow.missing}</Text><View style={styles.buttonRow}>{flow.actions.map((action) => <Button key={action.label} action={action} />)}</View></View>)}</Card>
         <Card title="Backend and data wiring checklist" eyebrow="Future wiring only">{backend.map((item, index) => <ChecklistRow key={item} label={item} status={index === 16 || index === 17 ? 'Future Stripe' : index === 11 ? 'Future GPS' : index === 15 ? 'Future push' : index < 6 ? 'Future Supabase' : index % 2 ? 'Not wired' : 'Visual-only'} />)}</Card>
         <Card title="Privacy, safety, and permissions checklist">{privacy.map((item, index) => <ChecklistRow key={item} label={item} status={index < 3 ? 'Needed' : index < 8 ? 'Draft' : index < 10 ? 'Review' : 'Future'} />)}</Card>
