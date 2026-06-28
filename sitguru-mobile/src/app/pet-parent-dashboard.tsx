@@ -135,6 +135,7 @@ export default function PetParentDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Browse"
               description="Search local Gurus by service, location, and care fit."
+              href="/find-care"
               icon="search"
               meta="Find"
               title="Browse Gurus"
@@ -144,6 +145,7 @@ export default function PetParentDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Message"
               description="Ask a question before sending a care request."
+              href="/conversation"
               icon="message"
               meta="Chat"
               title="Message first"
@@ -152,6 +154,7 @@ export default function PetParentDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Request"
               description="Send pet details, dates, notes, and expectations in one place."
+              href="/request-booking"
               icon="booking"
               meta="Booking"
               title="Request care"
@@ -161,6 +164,7 @@ export default function PetParentDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Track"
               description="View booking status, visit timing, care notes, and updates."
+              href="/booking-details"
               icon="checklist"
               meta="Updates"
               title="Follow care"
@@ -346,8 +350,8 @@ export default function PetParentDashboardScreen() {
 const styles = StyleSheet.create({
   page: {
     gap: 16,
-    paddingBottom: 4,
-    paddingVertical: 4,
+    paddingBottom: 18,
+    paddingTop: 6,
   },
 
   accountPanel: {
