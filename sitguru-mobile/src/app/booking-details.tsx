@@ -15,6 +15,7 @@ const priceRows = [
   { label: 'Additional pet fee', value: '$0' },
   { label: 'Multi-pet savings', value: '—' },
   { label: 'PawPerks credit', value: '-$5' },
+  { label: 'Payment status', value: 'Payment after Guru accepts' },
 ];
 
 const careNotes = [
@@ -173,7 +174,8 @@ export default function BookingDetailsScreen() {
           {priceRows.map((row) => <InfoRow key={row.label} label={row.label} value={row.value} />)}
           <View style={styles.divider} />
           <InfoRow label="Estimated total" value="$20" />
-          <Text style={styles.smallNote}>Final after Guru accepts. No payment is charged from this preview.</Text>
+          <Text style={styles.smallNote}>Payment after Guru accepts. No payment charged from this preview. Final amount confirmed before payment.</Text>
+          <SitGuruButton label="Payment Status / Payments" variant="secondary" onPress={() => router.push('/payments')} />
         </HubCard>
 
         <HubCard icon="calendar" title="Schedule" meta="Calendar preview">

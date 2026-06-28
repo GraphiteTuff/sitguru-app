@@ -628,7 +628,7 @@ export default function RequestBookingScreen() {
         </View>
 
         <Text style={styles.estimateNote}>
-          This estimate is not a charge. The Guru confirms availability and final pricing before payment.
+          Payment happens after Guru accepts. This estimate is not a charge. The Guru confirms availability and final pricing before payment. Manage payment later from Payments & Payouts.
         </Text>
       </View>
     );
@@ -1055,6 +1055,13 @@ export default function RequestBookingScreen() {
                 style={styles.secondaryButton}
               >
                 <Text style={styles.secondaryButtonText}>Back to Search</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/payments')}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>Payments & Payouts</Text>
               </Pressable>
             </View>
             <View style={styles.progressBlock}>

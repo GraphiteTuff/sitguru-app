@@ -56,6 +56,21 @@ export default function PetParentDashboardScreen() {
 
         <Pressable
           accessibilityRole="button"
+          onPress={() => router.push('/payments')}
+          style={styles.accountPanel}
+        >
+          <View style={styles.accountIconBadge}>
+            <Text style={styles.accountIcon}>💳</Text>
+          </View>
+          <View style={styles.accountCopy}>
+            <Text style={styles.accountEyebrow}>Payments / Credits</Text>
+            <Text style={styles.accountTitle}>Review booking payment status, ways to pay, PawPerks credits, referral credits, and promo codes</Text>
+          </View>
+          <Text style={styles.accountChevron}>›</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push('/notifications')}
           style={styles.notificationsPanel}
         >
