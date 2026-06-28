@@ -118,6 +118,14 @@ export default function ConversationScreen() {
             >
               <Text style={styles.topLinkText}>Inbox</Text>
             </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/account')}
+              style={styles.topLinkButton}
+            >
+              <Text style={styles.topLinkText}>Account</Text>
+            </Pressable>
           </View>
         </View>
 

@@ -93,13 +93,23 @@ export default function RoleSelectionScreen() {
         <View style={styles.topBar}>
           <SitGuruLogo size="small" variant="symbol" />
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/')}
-            style={styles.topLinkButton}
-          >
-            <Text style={styles.topLinkText}>Home</Text>
-          </Pressable>
+          <View style={styles.topBarActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/account')}
+              style={styles.topLinkButton}
+            >
+              <Text style={styles.topLinkText}>Account</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/')}
+              style={styles.topLinkButton}
+            >
+              <Text style={styles.topLinkText}>Home</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
@@ -267,6 +277,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     paddingVertical: 4,
   },
+  topBarActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
