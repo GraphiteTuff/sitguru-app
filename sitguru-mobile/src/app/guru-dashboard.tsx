@@ -51,12 +51,14 @@ export default function GuruDashboardScreen() {
             value="0"
           />
 
-          <SitGuruStatCard
-            detail="Pending care requests"
-            label="Requests"
-            tone="warning"
-            value="0"
-          />
+          <Pressable accessibilityRole="button" onPress={() => router.push('/guru-requests')} style={styles.statLink}>
+            <SitGuruStatCard
+              detail="Pending care requests"
+              label="Requests"
+              tone="warning"
+              value="3"
+            />
+          </Pressable>
 
           <SitGuruStatCard
             detail="Rates and calendar"
@@ -89,6 +91,22 @@ export default function GuruDashboardScreen() {
             style={styles.adminControlButton}
           >
             <Text style={styles.adminControlButtonText}>Open Admin Dashboard</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.requestsHeroPanel}>
+          <View style={styles.pricingHeroHeader}>
+            <View>
+              <Text style={styles.pricingEyebrow}>Care Requests</Text>
+              <Text style={styles.pricingTitle}>Review requests before accepting care.</Text>
+            </View>
+            <View style={styles.pricingBadge}>
+              <Text style={styles.pricingBadgeText}>Inbox</Text>
+            </View>
+          </View>
+          <Text style={styles.pricingText}>Open your Guru request inbox to review pet notes, Pet Parent expectations, estimated pricing, and next steps.</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/guru-requests')} style={styles.primaryPricingButton}>
+            <Text style={styles.primaryPricingButtonText}>Open Care Requests</Text>
           </Pressable>
         </View>
 
@@ -228,6 +246,7 @@ export default function GuruDashboardScreen() {
 
             <SitGuruActionCard
               ctaLabel="Review"
+              onPress={() => router.push('/guru-requests')}
               description="Review pets, dates, routines, notes, expectations, and estimated pricing before accepting."
               icon="request"
               meta="Requests"
@@ -455,6 +474,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 18,
   },
+  statLink: {
+    flexBasis: 0,
+    flexGrow: 1,
+    minWidth: 150,
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -521,6 +545,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '900',
+  },
+  requestsHeroPanel: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 30,
+    borderWidth: 1,
+    elevation: 3,
+    gap: 14,
+    padding: 18,
   },
   pricingHeroPanel: {
     backgroundColor: SitGuruColors.surface,
