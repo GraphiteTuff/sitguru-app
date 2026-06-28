@@ -26,6 +26,23 @@ export default function GuruDashboardScreen() {
           tone="warning"
         />
 
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/notifications')}
+          style={styles.notificationsPanel}
+        >
+          <View style={styles.notificationsIconBadge}>
+            <Text style={styles.notificationsIcon}>🔔</Text>
+          </View>
+          <View style={styles.notificationsCopy}>
+            <Text style={styles.notificationsEyebrow}>Guru alerts</Text>
+            <Text style={styles.notificationsTitle}>New care requests, Pet Parent messages, live walk reminders, and pricing/payout reminders</Text>
+            <Text style={styles.notificationsText}>Open Notifications to prioritize today’s care updates.</Text>
+          </View>
+          <Text style={styles.notificationsChevron}>›</Text>
+        </Pressable>
+
         <View style={styles.photoReadyPanel}>
           <View style={styles.photoSlot}>
             <Text style={styles.photoIcon}>🏡</Text>
@@ -904,4 +921,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
+  notificationsPanel: { alignItems: 'center', backgroundColor: SitGuruColors.surface, borderColor: 'rgba(181, 71, 8, 0.25)', borderRadius: 26, borderWidth: 1, elevation: 3, flexDirection: 'row', gap: 12, padding: 16 },
+  notificationsIconBadge: { alignItems: 'center', backgroundColor: 'rgba(181, 71, 8, 0.10)', borderRadius: 18, height: 52, justifyContent: 'center', width: 52 },
+  notificationsIcon: { fontSize: 24 },
+  notificationsCopy: { flex: 1, gap: 3 },
+  notificationsEyebrow: { color: SitGuruColors.warning, fontSize: 11, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
+  notificationsTitle: { color: SitGuruColors.text, fontSize: 17, fontWeight: '900', lineHeight: 22 },
+  notificationsText: { color: SitGuruColors.textMuted, fontSize: 13, fontWeight: '700', lineHeight: 19 },
+  notificationsChevron: { color: SitGuruColors.warning, fontSize: 30, fontWeight: '900' },
+
 });

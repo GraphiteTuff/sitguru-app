@@ -24,6 +24,23 @@ export default function PetParentDashboardScreen() {
           tone="primary"
         />
 
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/notifications')}
+          style={styles.notificationsPanel}
+        >
+          <View style={styles.notificationsIconBadge}>
+            <Text style={styles.notificationsIcon}>🔔</Text>
+          </View>
+          <View style={styles.notificationsCopy}>
+            <Text style={styles.notificationsEyebrow}>Notifications</Text>
+            <Text style={styles.notificationsTitle}>Booking alerts, messages, and PawReport Live updates</Text>
+            <Text style={styles.notificationsText}>Open your alert center to review care reminders and account notices.</Text>
+          </View>
+          <Text style={styles.notificationsChevron}>›</Text>
+        </Pressable>
+
         <View style={styles.photoReadyPanel}>
           <View style={styles.photoSlot}>
             <Text style={styles.photoIcon}>🐶</Text>
@@ -589,4 +606,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 20,
   },
+  notificationsPanel: { alignItems: 'center', backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primaryLight, borderRadius: 26, borderWidth: 1, elevation: 3, flexDirection: 'row', gap: 12, padding: 16 },
+  notificationsIconBadge: { alignItems: 'center', backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 18, height: 52, justifyContent: 'center', width: 52 },
+  notificationsIcon: { fontSize: 24 },
+  notificationsCopy: { flex: 1, gap: 3 },
+  notificationsEyebrow: { color: SitGuruColors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
+  notificationsTitle: { color: SitGuruColors.text, fontSize: 17, fontWeight: '900', lineHeight: 22 },
+  notificationsText: { color: SitGuruColors.textMuted, fontSize: 13, fontWeight: '700', lineHeight: 19 },
+  notificationsChevron: { color: SitGuruColors.primary, fontSize: 30, fontWeight: '900' },
+
 });
