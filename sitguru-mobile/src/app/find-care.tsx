@@ -83,10 +83,8 @@ export default function FindCareScreen() {
     );
   }
 
-  function handleViewProfile(guru: GuruRow) {
-    setNoticeMessage(
-      `${guru.name} profile preview selected. Full Guru profiles will open here when /guru-profile is available.`,
-    );
+  function handleViewProfile(_guru: GuruRow) {
+    router.push('/guru-profile');
   }
 
   function handleMessageGuru(_guru: GuruRow) {

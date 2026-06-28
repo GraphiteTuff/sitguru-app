@@ -512,7 +512,7 @@ export default function RequestBookingScreen() {
     }
 
     setNotice(
-      'Request prepared. The Guru reviews availability and final price before payment.',
+      'Request prepared. Next step: Booking Details. The Guru reviews availability and final price before payment.',
     );
   }
 
@@ -1029,10 +1029,17 @@ export default function RequestBookingScreen() {
             <View style={styles.heroActions}>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.push('/conversation')}
+                onPress={() => router.push('/guru-profile')}
                 style={styles.primaryButton}
               >
-                <Text style={styles.primaryButtonText}>Message First</Text>
+                <Text style={styles.primaryButtonText}>View Guru</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/conversation')}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>Message First</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
