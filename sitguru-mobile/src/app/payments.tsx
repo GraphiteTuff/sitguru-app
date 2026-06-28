@@ -102,6 +102,11 @@ export default function PaymentsScreen() {
           <Text style={styles.subtitle}>Review booking payment status, ways to pay, Guru payout readiness, rewards, credits, and future Stripe setup.</Text>
         </View>
 
+        <Card title="Release readiness note" eyebrow="Visual-only payments">
+          <Text style={styles.note}>Payments are visual-only until Stripe is wired. No real card, wallet, bank, payment, payout, or Stripe action is connected in this preview.</Text>
+          <Button action={{ label: 'Open Release Readiness', href: '/release-readiness' }} primary />
+        </Card>
+
         <Card title="Payment happens after the Guru accepts" eyebrow="Important payment rule">
           <Text style={styles.body}>This preview does not charge the Pet Parent.</Text>
           <Text style={styles.body}>Payment happens after the Guru accepts.</Text>

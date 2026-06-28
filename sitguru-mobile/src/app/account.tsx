@@ -26,6 +26,7 @@ const quickActions: Action[] = [
   { label: 'Payments & Payouts', href: '/payments' },
   { label: 'Help & Support', href: '/support' },
   { label: 'Admin Operations Preview', href: '/admin-operations' },
+  { label: 'Release Readiness', href: '/release-readiness' },
   { label: 'Guru Pricing', href: '/guru-pricing' },
 ];
 
@@ -166,6 +167,7 @@ export default function AccountScreen() {
           <InfoRow label="App version" value="SitGuru preview 1.0" />
           <InfoRow label="Accessibility" value="Large tap targets and readable labels" />
           <InfoRow label="Saved preferences" value="Visual-only preferences" />
+          <PillButton action={{ label: 'Release Readiness', href: '/release-readiness' }} />
           <PillButton action={{ label: 'Sign Out', note: 'Sign out' }} />
         </SettingsCard>
 

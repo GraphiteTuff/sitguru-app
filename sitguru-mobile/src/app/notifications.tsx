@@ -21,6 +21,17 @@ const filters = ['All', 'Bookings', 'Messages', 'PawReport', 'Payments', 'PawPer
 
 const notifications: NotificationItem[] = [
   {
+    id: 'release-checklist-review',
+    icon: '🚦',
+    category: 'Operations',
+    title: 'Release checklist needs review',
+    message: 'Internal visual checklist tracks launch preparation, blockers, privacy review, payments, live tracking, and store readiness.',
+    time: 'Now',
+    unread: true,
+    actionLabel: 'Open checklist',
+    href: '/release-readiness',
+  },
+  {
     id: 'operations-queue-review',
     icon: '🛠️',
     category: 'Operations',
