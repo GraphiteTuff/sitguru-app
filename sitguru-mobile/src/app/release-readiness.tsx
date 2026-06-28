@@ -410,7 +410,7 @@ const releaseBlockers: SimpleRow[] = [
 ];
 
 const quickActions: Action[] = [
-  { label: 'Backend Readiness', href: appRoute('/backend-readiness') },
+  { label: 'Backend Readiness', href: appRoute('/backend-readiness') }, { label: 'QA Test Center', href: appRoute('/qa-test-center') },
   { label: 'Admin Operations', href: appRoute('/admin-operations') },
   { label: 'Help & Support', href: appRoute('/support') },
   { label: 'Account', href: appRoute('/account') },

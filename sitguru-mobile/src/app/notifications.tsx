@@ -32,6 +32,17 @@ const notifications: NotificationItem[] = [
     href: '/release-readiness',
   },
   {
+    id: 'qa-checklist-review',
+    icon: '✅',
+    category: 'Operations',
+    title: 'QA checklist needs review',
+    message: 'Internal visual QA checklist tracks route coverage, button wiring, mobile layouts, warnings, and open release blockers.',
+    time: 'Now',
+    unread: true,
+    actionLabel: 'Open QA Test Center',
+    href: '/qa-test-center',
+  },
+  {
     id: 'backend-wiring-review',
     icon: '🧩',
     category: 'Operations',

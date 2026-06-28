@@ -28,6 +28,7 @@ const quickActions: Action[] = [
   { label: 'Admin Operations Preview', href: '/admin-operations' },
   { label: 'Release Readiness', href: '/release-readiness' },
   { label: 'Backend Readiness', href: '/backend-readiness' },
+  { label: 'QA Test Center', href: '/qa-test-center' },
   { label: 'Guru Pricing', href: '/guru-pricing' },
 ];
 
@@ -170,6 +171,7 @@ export default function AccountScreen() {
           <InfoRow label="Saved preferences" value="Visual-only preferences" />
           <PillButton action={{ label: 'Release Readiness', href: '/release-readiness' }} />
           <PillButton action={{ label: 'Backend Readiness', href: '/backend-readiness' }} />
+          <PillButton action={{ label: 'QA Test Center', href: '/qa-test-center' }} />
           <PillButton action={{ label: 'Sign Out', note: 'Sign out' }} />
         </SettingsCard>
 
