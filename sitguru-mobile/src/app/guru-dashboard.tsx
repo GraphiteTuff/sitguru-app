@@ -289,6 +289,7 @@ export default function GuruDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Update"
               description="Add your profile photo, display name, bio, services, and trust details."
+              href="/guru-profile"
               icon="profile"
               meta="Profile"
               title="Complete profile"
@@ -307,6 +308,7 @@ export default function GuruDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Rates"
               description="Set service rates, multi-pet savings, long-stay discounts, and calendar pricing."
+              href="/guru-pricing"
               icon="payment"
               meta="Pricing"
               title="Pricing calendar"
@@ -374,6 +376,7 @@ export default function GuruDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Open"
               description="Show when you can take walks, drop-ins, house sitting, boarding, or repeat care."
+              href="/guru-pricing"
               icon="availability"
               meta="Schedule"
               title="Availability"
@@ -383,6 +386,7 @@ export default function GuruDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Rates"
               description="Adjust service rates, custom dates, busy days, extra pets, and long-stay savings."
+              href="/guru-pricing"
               icon="payment"
               meta="Pricing"
               title="Rates"
@@ -392,6 +396,7 @@ export default function GuruDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Prep"
               description="Confirmed visits will show timing, pet notes, routines, and Pet Parent expectations."
+              href="/booking-details"
               icon="visit"
               meta="Visits"
               title="Visit prep"
@@ -486,8 +491,8 @@ export default function GuruDashboardScreen() {
 const styles = StyleSheet.create({
   page: {
     gap: 16,
-    paddingBottom: 4,
-    paddingVertical: 4,
+    paddingBottom: 18,
+    paddingTop: 6,
   },
 
   accountPanel: {

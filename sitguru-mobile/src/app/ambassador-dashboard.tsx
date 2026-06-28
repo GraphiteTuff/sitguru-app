@@ -158,6 +158,7 @@ export default function AmbassadorDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Track"
               description="Keep referral conversations organized by next step and role fit."
+              href="/notifications"
               icon="outreach"
               meta="Outreach"
               title="Track outreach"
@@ -176,6 +177,7 @@ export default function AmbassadorDashboardScreen() {
             <SitGuruActionCard
               ctaLabel="Support"
               description="Ask SitGuru for help with referrals, training, local outreach, or partner ideas."
+              href="/support"
               icon="message"
               meta="Help"
               title="Message support"
@@ -337,8 +339,8 @@ export default function AmbassadorDashboardScreen() {
 const styles = StyleSheet.create({
   page: {
     gap: 16,
-    paddingBottom: 4,
-    paddingVertical: 4,
+    paddingBottom: 18,
+    paddingTop: 6,
   },
 
   accountPanel: {
