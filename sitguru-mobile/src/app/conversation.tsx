@@ -105,6 +105,13 @@ export default function ConversationScreen() {
           <View style={styles.topBarActions}>
             <Pressable
               accessibilityRole="button"
+              onPress={() => router.push('/support')}
+              style={styles.topLinkButton}
+            >
+              <Text style={styles.topLinkText}>Help & Support</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
               onPress={() => router.push('/notifications')}
               style={styles.topLinkButton}
             >
@@ -402,7 +409,7 @@ export default function ConversationScreen() {
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => showComingSoon('Support handoff')}
+            onPress={() => router.push('/support')}
             style={styles.supportButton}
           >
             <Text style={styles.supportButtonText}>Ask Support</Text>

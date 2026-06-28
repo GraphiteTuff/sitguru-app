@@ -41,6 +41,20 @@ export default function GuruDashboardScreen() {
           <Text style={styles.accountChevron}>›</Text>
         </Pressable>
 
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/support')}
+          style={styles.accountPanel}
+        >
+          <View style={styles.accountIconBadge}>
+            <Text style={styles.accountIcon}>🛟</Text>
+          </View>
+          <View style={styles.accountCopy}>
+            <Text style={styles.accountEyebrow}>Help & Support</Text>
+            <Text style={styles.accountTitle}>Guru help for requests, pricing, payouts, live walk controls, and Pet Parent messages</Text>
+          </View>
+          <Text style={styles.accountChevron}>›</Text>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"

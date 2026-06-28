@@ -72,6 +72,7 @@ export default function PawReportLiveScreen() {
 
         <View style={styles.actions}>
           <Button label="Notifications" onPress={() => router.push('/notifications')} />
+          <Button label="Help & Support" onPress={() => router.push('/support')} />
           <Button label="Message Guru" onPress={() => router.push('/conversation')} primary />
           <Button label="View Booking" onPress={() => router.push('/booking-details')} />
           <Button label="Back to Dashboard" onPress={() => router.push('/pet-parent-dashboard')} />

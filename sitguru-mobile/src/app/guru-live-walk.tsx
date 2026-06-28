@@ -44,7 +44,7 @@ export default function GuruLiveWalkScreen() {
     <SitGuruScreen scroll center={false} maxWidth={760}>
       <View style={styles.page}>
         <View style={styles.hero}>
-          <View style={styles.heroActions}><Pressable onPress={() => router.push('/guru-dashboard')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>← Dashboard</Text></Pressable><Pressable onPress={() => router.push('/notifications')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>Notifications</Text></Pressable><Pressable onPress={() => router.push('/guru-requests')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>Back to Requests</Text></Pressable></View>
+          <View style={styles.heroActions}><Pressable onPress={() => router.push('/guru-dashboard')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>← Dashboard</Text></Pressable><Pressable onPress={() => router.push('/notifications')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>Notifications</Text></Pressable><Pressable onPress={() => router.push('/support')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>Help & Support</Text></Pressable><Pressable onPress={() => router.push('/guru-requests')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>Back to Requests</Text></Pressable></View>
           <Text style={styles.eyebrow}>Guru workspace</Text>
           <Text style={styles.title}>Live Walk Controls</Text>
           <Text style={styles.subtitle}>Visual-only PawReport controls for active booked care.</Text>
@@ -67,7 +67,7 @@ export default function GuruLiveWalkScreen() {
         <View style={styles.card}><Text style={styles.sectionTitle}>Care notes preview</Text><Text style={styles.body}>Scout enjoys steady walks, calm greetings, fresh water, and updates through SitGuru.</Text></View>
         <View style={styles.safetyCard}><Text style={styles.sectionTitle}>Safety reminder</Text><Text style={styles.body}>Only track location during active booked care.</Text><Text style={styles.body}>End walk when care is complete.</Text></View>
 
-        <View style={styles.actions}><Button label="Back to Requests" onPress={() => router.push('/guru-requests')} /><Button label="Message Pet Parent" onPress={() => router.push('/conversation')} primary /><Button label="Send Final PawReport" onPress={() => Alert.alert('Final PawReport placeholder', 'This visual-only action is not wired to backend messaging.')} /><Button label="Dashboard" onPress={() => router.push('/guru-dashboard')} /></View>
+        <View style={styles.actions}><Button label="Back to Requests" onPress={() => router.push('/guru-requests')} /><Button label="Message Pet Parent" onPress={() => router.push('/conversation')} primary /><Button label="Send Final PawReport" onPress={() => Alert.alert('Final PawReport placeholder', 'This visual-only action is not wired to backend messaging.')} /><Button label="Help & Support" onPress={() => router.push('/support')} /><Button label="Dashboard" onPress={() => router.push('/guru-dashboard')} /></View>
         <SitGuruBottomNav activeIndex={2} items={[{ icon: 'home', label: 'Home' }, { icon: 'message', label: 'Message' }, { icon: 'visit', label: 'Updates' }, { icon: 'checklist', label: 'End Walk' }]} />
       </View>
     </SitGuruScreen>

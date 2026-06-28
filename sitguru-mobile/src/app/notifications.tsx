@@ -21,6 +21,17 @@ const filters = ['All', 'Bookings', 'Messages', 'PawReport', 'Payments', 'PawPer
 
 const notifications: NotificationItem[] = [
   {
+    id: 'support-update',
+    icon: '🛟',
+    category: 'Support',
+    title: 'Support request update',
+    message: 'SitGuru support has a visual-only update ready for review.',
+    time: 'Now',
+    unread: true,
+    actionLabel: 'Open support',
+    href: '/support',
+  },
+  {
     id: 'review-completed-walk',
     icon: '⭐',
     category: 'Bookings',
@@ -142,6 +153,9 @@ export default function NotificationsScreen() {
             <Text style={styles.backButtonText}>← Back</Text>
           </Pressable>
           <SitGuruLogo size="small" variant="symbol" />
+          <Pressable accessibilityRole="button" onPress={() => router.push('/support')} style={styles.backButton}>
+            <Text style={styles.backButtonText}>Help & Support</Text>
+          </Pressable>
           <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.backButton}>
             <Text style={styles.backButtonText}>Account</Text>
           </Pressable>

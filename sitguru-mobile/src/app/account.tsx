@@ -23,6 +23,7 @@ const quickActions: Action[] = [
   { label: 'Messages', href: '/conversation' },
   { label: 'Notifications', href: '/notifications' },
   { label: 'Booking Details', href: '/booking-details' },
+  { label: 'Help & Support', href: '/support' },
   { label: 'Guru Pricing', href: '/guru-pricing' },
 ];
 
@@ -153,7 +154,7 @@ export default function AccountScreen() {
           <InfoRow label="Contact SitGuru" value="Send a support message" />
           <InfoRow label="Report a safety concern" value="Use urgent safety support placeholder" />
           <View style={styles.buttonGrid}>
-            <PillButton action={{ label: 'Help Center', note: 'Help Center' }} secondary />
+            <PillButton action={{ label: 'Help & Support', href: '/support' }} secondary />
             <PillButton action={{ label: 'Contact SitGuru', href: '/conversation' }} secondary />
             <PillButton action={{ label: 'Report Safety Concern', note: 'Report a safety concern' }} secondary />
           </View>

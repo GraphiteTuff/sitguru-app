@@ -91,6 +91,13 @@ export default function BookingDetailsScreen() {
           >
             <Text style={styles.backButtonText}>Notifications</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/support')}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>Help & Support</Text>
+          </Pressable>
           <Text style={styles.eyebrow}>Central care hub</Text>
           <Text style={styles.title}>Booking Details</Text>
           <Text style={styles.subtitle}>
