@@ -20,6 +20,7 @@ const helpCategories: HelpCategory[] = [
   { emoji: '⭐', title: 'Reviews help', description: 'Review completed care and understand feedback flows.', actionLabel: 'Open Reviews', href: '/reviews' },
   { emoji: '💳', title: 'Payment/Payout Help', description: 'Get visual guidance for payment method, promo code, PawPerks credit, referral credit, refund question, Guru payout setup, and Ambassador rewards.', actionLabel: 'Open Payments & Payouts', href: '/payments' },
   { emoji: '🛠️', title: 'Admin Operations Preview', description: 'Open the visual-only operations hub. This does not grant real admin support permissions.', actionLabel: 'Open Admin Operations Preview', href: '/admin-operations' },
+  { emoji: '🧩', title: 'Backend Readiness', description: 'Review the visual-only production wiring checklist for auth, data, payments, notifications, storage, and admin operations.', actionLabel: 'Open Backend Readiness', href: '/backend-readiness' },
   { emoji: '🚦', title: 'Release Readiness', description: 'Review the internal visual checklist for launch preparation without implying public release is ready.', actionLabel: 'Open Release Readiness', href: '/release-readiness' },
 ];
 
@@ -82,7 +83,7 @@ export default function SupportScreen() {
 
         <View style={styles.safetyCard}><Text style={styles.sectionTitle}>Safety and privacy</Text><Text style={styles.body}>Keep messages, booking details, PawReport updates, and payments inside SitGuru.</Text><Text style={styles.body}>Live tracking only runs during active booked care.</Text><Text style={styles.body}>SitGuru support should only access details needed to help with care and account issues.</Text></View>
 
-        <View style={styles.card}><Text style={styles.sectionTitle}>Contact options</Text><View style={styles.buttonRow}><Button label="Message support" href="/conversation" primary /><Button label="Notifications" href="/notifications" /><Button label="Account settings" href="/account" /><Button label="Admin Operations Preview" href="/admin-operations" /><Button label="Release Readiness" href="/release-readiness" /></View></View>
+        <View style={styles.card}><Text style={styles.sectionTitle}>Contact options</Text><View style={styles.buttonRow}><Button label="Message support" href="/conversation" primary /><Button label="Notifications" href="/notifications" /><Button label="Account settings" href="/account" /><Button label="Admin Operations Preview" href="/admin-operations" /><Button label="Backend Readiness" href="/backend-readiness" /><Button label="Release Readiness" href="/release-readiness" /></View></View>
 
         <View style={styles.bottomDockSpacer} />
       </View>

@@ -32,6 +32,17 @@ const notifications: NotificationItem[] = [
     href: '/release-readiness',
   },
   {
+    id: 'backend-wiring-review',
+    icon: '🧩',
+    category: 'Operations',
+    title: 'Backend wiring checklist needs review',
+    message: 'Internal production wiring plan tracks future auth, roles, profiles, bookings, PawReport Live, payments, notifications, storage, RLS, and admin operations.',
+    time: 'Now',
+    unread: true,
+    actionLabel: 'Open backend plan',
+    href: '/backend-readiness',
+  },
+  {
     id: 'operations-queue-review',
     icon: '🛠️',
     category: 'Operations',
