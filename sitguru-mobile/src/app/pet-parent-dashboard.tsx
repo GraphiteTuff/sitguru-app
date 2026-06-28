@@ -130,6 +130,14 @@ export default function PetParentDashboardScreen() {
               title="Care handoff checklist"
             />
           </View>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/pet-passports')}
+            style={styles.petPassportButton}
+          >
+            <Text style={styles.petPassportButtonText}>Manage Pet Passports</Text>
+          </Pressable>
         </View>
 
         <View style={styles.livePawReportPanel}>
@@ -377,6 +385,8 @@ const styles = StyleSheet.create({
   cardStack: {
     gap: 10,
   },
+  petPassportButton: { alignItems: 'center', backgroundColor: SitGuruColors.primary, borderRadius: 18, minHeight: 54, justifyContent: 'center', marginTop: 10, paddingHorizontal: 16, paddingVertical: 14 },
+  petPassportButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
   emptyPanel: {
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.border,

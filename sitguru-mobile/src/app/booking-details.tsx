@@ -129,6 +129,7 @@ export default function BookingDetailsScreen() {
               <Text style={styles.bodyText}>Care notes preview: friendly, loves brisk walks, prefers a quiet greeting.</Text>
             </View>
           </View>
+          <SitGuruButton label="View Pet Passport" variant="secondary" onPress={() => router.push('/pet-passports')} />
         </HubCard>
 
         <HubCard icon="trust" title="Guru" meta="Care provider">

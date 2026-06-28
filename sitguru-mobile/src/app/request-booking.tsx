@@ -518,7 +518,7 @@ export default function RequestBookingScreen() {
 
   function choosePet(petId: string) {
     if (petId === 'add-pet') {
-      router.push('/pet-parent-setup');
+      router.push('/pet-passports');
       return;
     }
 
@@ -698,6 +698,14 @@ export default function RequestBookingScreen() {
               label="Apply referral credit"
               onPress={() => setApplyReferralCredit(!applyReferralCredit)}
             />
+          </View>
+
+          <View style={styles.savingsCard}>
+            <Text style={styles.smallSectionTitle}>Pet Passport helper</Text>
+            <Text style={styles.helperText}>Need to add a pet or update Scout and Luna before requesting care?</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/pet-passports')} style={styles.helperButton}>
+              <Text style={styles.helperButtonText}>Manage Pet Passports</Text>
+            </Pressable>
           </View>
 
           {renderEstimateCard()}
@@ -2002,6 +2010,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
   },
+  helperText: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  helperButton: { alignItems: 'center', backgroundColor: SitGuruColors.primary, borderRadius: 16, marginTop: 10, minHeight: 48, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 12 },
+  helperButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   bottomDockSpacer: {
     height: 88,
   },
