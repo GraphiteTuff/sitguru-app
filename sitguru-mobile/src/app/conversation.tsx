@@ -127,7 +127,7 @@ export default function ConversationScreen() {
             <View style={styles.heroActions}>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => showComingSoon('Guru profile')}
+                onPress={() => router.push('/guru-profile')}
                 style={styles.primaryButton}
               >
                 <Text style={styles.primaryButtonText}>View Profile</Text>
