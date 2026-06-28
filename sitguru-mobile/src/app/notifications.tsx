@@ -21,6 +21,17 @@ const filters = ['All', 'Bookings', 'Messages', 'PawReport', 'Payments', 'PawPer
 
 const notifications: NotificationItem[] = [
   {
+    id: 'review-completed-walk',
+    icon: '⭐',
+    category: 'Bookings',
+    title: "Review Scout’s completed walk",
+    message: 'Share feedback for Scout’s completed Dog Walking care.',
+    time: 'Today',
+    unread: true,
+    actionLabel: 'Leave review',
+    href: '/reviews',
+  },
+  {
     id: 'booking-review',
     icon: '📋',
     category: 'Booking',
