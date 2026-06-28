@@ -17,9 +17,20 @@ type NotificationItem = {
   href?: Href;
 };
 
-const filters = ['All', 'Bookings', 'Messages', 'PawReport', 'Payments', 'PawPerks', 'Guru', 'Ambassador'];
+const filters = ['All', 'Bookings', 'Messages', 'PawReport', 'Payments', 'PawPerks', 'Guru', 'Ambassador', 'Operations'];
 
 const notifications: NotificationItem[] = [
+  {
+    id: 'operations-queue-review',
+    icon: '🛠️',
+    category: 'Operations',
+    title: 'Operations queue needs review',
+    message: 'Visual-only admin operations preview has booking, payment, support, and safety placeholders ready to review.',
+    time: 'Now',
+    unread: true,
+    actionLabel: 'Open operations',
+    href: '/admin-operations',
+  },
   {
     id: 'payment-status-ready',
     icon: '💳',

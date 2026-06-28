@@ -234,6 +234,7 @@ export default function BookingDetailsScreen() {
         <HubCard icon="lock" title="Support & safety" meta="SitGuru safe care">
           <Text style={styles.bodyText}>Keep care communication, updates, and booking details inside SitGuru.</Text>
           <Text style={styles.bodyText}>Live tracking only runs during active booked care.</Text>
+          <SitGuruButton label="Admin Operations" variant="secondary" onPress={() => router.push('/admin-operations')} />
         </HubCard>
 
         <SitGuruBottomNav

@@ -25,6 +25,7 @@ const quickActions: Action[] = [
   { label: 'Booking Details', href: '/booking-details' },
   { label: 'Payments & Payouts', href: '/payments' },
   { label: 'Help & Support', href: '/support' },
+  { label: 'Admin Operations Preview', href: '/admin-operations' },
   { label: 'Guru Pricing', href: '/guru-pricing' },
 ];
 
