@@ -195,9 +195,12 @@ export default function BookingDetailsScreen() {
           ))}
         </HubCard>
 
-        <HubCard icon="visit" title="PawReport Live" meta="Status: Not started">
-          <Text style={styles.bodyText}>Live updates will appear during active booked care only.</Text>
-          <SitGuruButton label="View PawReport Live" onPress={() => router.push('/pawreport-live')} />
+        <HubCard icon="visit" title="PawReport Live" meta="Status: Completed preview">
+          <Text style={styles.bodyText}>Live updates and completed PawReport summaries stay connected to Booking Details.</Text>
+          <View style={styles.buttonStack}>
+            <SitGuruButton label="View PawReport Live" onPress={() => router.push('/pawreport-live')} />
+            <SitGuruButton label="Reviews & Ratings" variant="secondary" onPress={() => router.push('/reviews')} />
+          </View>
         </HubCard>
 
         <HubCard icon="request" title="Guru actions" meta="Guru view">
@@ -214,6 +217,7 @@ export default function BookingDetailsScreen() {
           <View style={styles.buttonStack}>
             <SitGuruButton label="Message Guru" onPress={() => router.push('/conversation')} />
             <SitGuruButton label="View Live PawReport" variant="secondary" onPress={() => router.push('/pawreport-live')} />
+            <SitGuruButton label="Leave Review" variant="secondary" onPress={() => router.push('/reviews')} />
             <SitGuruButton label="Back to Find Care" variant="ghost" onPress={() => router.push('/find-care')} />
           </View>
         </HubCard>

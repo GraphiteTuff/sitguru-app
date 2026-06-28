@@ -10,7 +10,7 @@ const snapshot = [
   ['Response time', '< 1 hour'],
   ['Completed visits', '48'],
   ['Repeat clients', '12'],
-  ['Rating', 'New preview'],
+  ['Rating', '4.9 preview'],
 ];
 const services = ['Dog Walking', 'Drop-In Visits', 'Boarding', 'House Sitting', 'Doggy Day Care', 'Multi-Day Care'];
 const prices = [
@@ -100,7 +100,8 @@ export default function GuruProfileScreen() {
             </Section>
             <Section eyebrow="Care style" title="What to expect"><Pills items={careStyle} soft /></Section>
             <Section eyebrow="Reviews" title="Reviews placeholder">
-              <Text style={styles.body}>Reviews will appear after completed SitGuru bookings.</Text>
+              <Text style={styles.body}>Reviews build trust after completed SitGuru bookings.</Text>
+              <Action label="View Reviews" route="/reviews" secondary />
               {reviews.map(([name, text]) => <View key={name} style={styles.review}><Text style={styles.reviewName}>{name}</Text><Text style={styles.reviewText}>{text}</Text></View>)}
             </Section>
             <Section eyebrow="Safety" title="Safety/trust notes">{safetyNotes.map((note) => <Text key={note} style={styles.check}>✓ {note}</Text>)}</Section>
@@ -126,7 +127,7 @@ export default function GuruProfileScreen() {
 
 function Section({ children, eyebrow, title }: { children: ReactNode; eyebrow: string; title: string }) { return <View style={styles.section}><Text style={styles.eyebrow}>{eyebrow}</Text><Text style={styles.sectionTitle}>{title}</Text>{children}</View>; }
 function Badge({ label, muted = false }: { label: string; muted?: boolean }) { return <View style={[styles.badge, muted && styles.badgeMuted]}><Text style={styles.badgeText}>{label}</Text></View>; }
-function Action({ label, route, secondary = false }: { label: string; route: '/conversation' | '/request-booking'; secondary?: boolean }) { return <Pressable accessibilityRole="button" onPress={() => router.push(route)} style={[styles.action, secondary && styles.actionSecondary]}><Text style={[styles.actionText, secondary && styles.actionTextSecondary]}>{label}</Text></Pressable>; }
+function Action({ label, route, secondary = false }: { label: string; route: '/conversation' | '/request-booking' | '/reviews'; secondary?: boolean }) { return <Pressable accessibilityRole="button" onPress={() => router.push(route)} style={[styles.action, secondary && styles.actionSecondary]}><Text style={[styles.actionText, secondary && styles.actionTextSecondary]}>{label}</Text></Pressable>; }
 function Dock({ label, route, primary = false }: { label: string; route: '/find-care' | '/conversation' | '/request-booking' | '/booking-details'; primary?: boolean }) { return <Pressable accessibilityRole="button" onPress={() => router.push(route)} style={[styles.dockButton, primary && styles.dockPrimary]}><Text style={[styles.dockText, primary && styles.dockTextPrimary]}>{label}</Text></Pressable>; }
 function MiniCard({ label, value }: { label: string; value: string }) { return <View style={styles.miniCard}><Text style={styles.miniValue}>{value}</Text><Text style={styles.miniLabel}>{label}</Text></View>; }
 function Pills({ items, soft = false }: { items: string[]; soft?: boolean }) { return <View style={styles.pills}>{items.map((item) => <View key={item} style={[styles.pill, soft && styles.softPill]}><Text style={[styles.pillText, soft && styles.softPillText]}>{item}</Text></View>)}</View>; }

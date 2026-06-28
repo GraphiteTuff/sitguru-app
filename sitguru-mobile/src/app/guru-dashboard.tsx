@@ -417,8 +417,15 @@ export default function GuruDashboardScreen() {
           </View>
         </View>
 
+        <Pressable accessibilityRole="button" onPress={() => router.push('/reviews')} style={styles.reviewsPanel}>
+          <Text style={styles.reviewsEyebrow}>Reviews / Trust Signals</Text>
+          <Text style={styles.reviewsTitle}>4.9 rating preview</Text>
+          <Text style={styles.reviewsText}>Completed care feedback and trust-building reviews help Pet Parents book confidently.</Text>
+          <Text style={styles.reviewsButtonText}>Open Reviews & Ratings</Text>
+        </Pressable>
+
         <SitGuruCard
-          description="Pet Parents look for clear profiles, real photos, thoughtful care notes, fast replies, fair pricing, and reliable communication."
+          description="Pet Parents look for clear profiles, real photos, thoughtful care notes, fast replies, fair pricing, reliable communication, and completed care feedback."
           icon="trust"
           size="compact"
           title="Trust signals"
@@ -970,4 +977,9 @@ const styles = StyleSheet.create({
   notificationsText: { color: SitGuruColors.textMuted, fontSize: 13, fontWeight: '700', lineHeight: 19 },
   notificationsChevron: { color: SitGuruColors.warning, fontSize: 30, fontWeight: '900' },
 
+  reviewsPanel: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primaryLight, borderRadius: 28, borderWidth: 1, elevation: 3, gap: 8, padding: 18 },
+  reviewsEyebrow: { color: SitGuruColors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
+  reviewsTitle: { color: SitGuruColors.text, fontSize: 24, fontWeight: '900' },
+  reviewsText: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '700', lineHeight: 21 },
+  reviewsButtonText: { color: SitGuruColors.primary, fontSize: 15, fontWeight: '900', marginTop: 4 },
 });
