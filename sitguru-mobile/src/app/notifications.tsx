@@ -120,6 +120,9 @@ export default function NotificationsScreen() {
             <Text style={styles.backButtonText}>← Back</Text>
           </Pressable>
           <SitGuruLogo size="small" variant="symbol" />
+          <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.backButton}>
+            <Text style={styles.backButtonText}>Account</Text>
+          </Pressable>
         </View>
 
         <View style={styles.heroPanel}>
@@ -199,8 +202,8 @@ export default function NotificationsScreen() {
         {[
           ['Dashboard', '/pet-parent-dashboard'],
           ['Messages', '/conversation'],
-          ['Booking', '/booking-details'],
           ['Live', '/pawreport-live'],
+          ['Account', '/account'],
         ].map(([label, href]) => (
           <Pressable key={label} accessibilityRole="button" onPress={() => router.push(href as Href)} style={styles.dockButton}>
             <Text style={styles.dockButtonText}>{label}</Text>

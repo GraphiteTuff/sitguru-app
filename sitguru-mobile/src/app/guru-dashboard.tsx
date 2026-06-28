@@ -26,6 +26,21 @@ export default function GuruDashboardScreen() {
           tone="warning"
         />
 
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/account')}
+          style={styles.accountPanel}
+        >
+          <View style={styles.accountIconBadge}>
+            <Text style={styles.accountIcon}>⚙️</Text>
+          </View>
+          <View style={styles.accountCopy}>
+            <Text style={styles.accountEyebrow}>Account & Settings</Text>
+            <Text style={styles.accountTitle}>Manage profile, roles, alerts, privacy, and support</Text>
+          </View>
+          <Text style={styles.accountChevron}>›</Text>
+        </Pressable>
+
 
         <Pressable
           accessibilityRole="button"
@@ -430,6 +445,31 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     paddingVertical: 4,
   },
+
+  accountPanel: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 26,
+    borderWidth: 1,
+    elevation: 2,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+  },
+  accountIconBadge: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderRadius: 18,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  accountIcon: { fontSize: 25 },
+  accountCopy: { flex: 1, gap: 3 },
+  accountEyebrow: { color: SitGuruColors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
+  accountTitle: { color: SitGuruColors.text, fontSize: 16, fontWeight: '900', lineHeight: 21 },
+  accountChevron: { color: SitGuruColors.primary, fontSize: 34, fontWeight: '900' },
   photoReadyPanel: {
     backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.primaryLight,
