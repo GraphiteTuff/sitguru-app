@@ -153,6 +153,14 @@ export default function GuruDashboardScreen() {
           >
             <Text style={styles.adminControlButtonText}>Open Admin Dashboard</Text>
           </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/admin-operations')}
+            style={[styles.adminControlButton, styles.adminControlButtonSecondary]}
+          >
+            <Text style={styles.adminControlButtonSecondaryText}>Admin Operations Preview</Text>
+          </Pressable>
         </View>
 
         <View style={styles.requestsHeroPanel}>
@@ -636,6 +644,16 @@ const styles = StyleSheet.create({
   },
   adminControlButtonText: {
     color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  adminControlButtonSecondary: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+    borderWidth: 1,
+  },
+  adminControlButtonSecondaryText: {
+    color: SitGuruColors.primary,
     fontSize: 15,
     fontWeight: '900',
   },
