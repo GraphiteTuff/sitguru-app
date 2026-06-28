@@ -32,6 +32,17 @@ const notifications: NotificationItem[] = [
     href: '/booking-details',
   },
   {
+    id: 'guru-request',
+    icon: '🧘',
+    category: 'Guru',
+    title: 'New Guru care request',
+    message: 'Luna has a new drop-in request ready for Guru review.',
+    time: '12 min ago',
+    unread: true,
+    actionLabel: 'View requests',
+    href: '/guru-requests',
+  },
+  {
     id: 'new-message',
     icon: '💬',
     category: 'Messages',
