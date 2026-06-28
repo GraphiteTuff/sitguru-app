@@ -805,6 +805,13 @@ export default function GuruPricingScreen() {
           >
             <Text style={styles.topLinkText}>Dashboard</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/payments')}
+            style={styles.topLinkButton}
+          >
+            <Text style={styles.topLinkText}>Payout Readiness</Text>
+          </Pressable>
         </View>
 
         <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
@@ -814,7 +821,7 @@ export default function GuruPricingScreen() {
             </View>
             <Text style={styles.title}>Control your rates and calendar.</Text>
             <Text style={styles.subtitle}>
-              Set service rates, additional pet fees, discounts, date pricing, busy days, and booking rules.
+              Set service rates, additional pet fees, discounts, date pricing, busy days, and booking rules. Review payout readiness from Payments & Payouts.
             </Text>
             <View style={styles.progressBlock}>
               <View style={styles.progressTopRow}>

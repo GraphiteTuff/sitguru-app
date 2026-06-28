@@ -18,14 +18,14 @@ const helpCategories: HelpCategory[] = [
   { emoji: '🔐', title: 'Account/security help', description: 'Manage profile, roles, privacy, security, and account preferences.', actionLabel: 'Open Account Settings', href: '/account' },
   { emoji: '🔔', title: 'Notifications help', description: 'Review booking alerts, message reminders, and PawReport updates.', actionLabel: 'Open Notifications', href: '/notifications' },
   { emoji: '⭐', title: 'Reviews help', description: 'Review completed care and understand feedback flows.', actionLabel: 'Open Reviews', href: '/reviews' },
-  { emoji: '🎁', title: 'Payment/PawPerks help', description: 'Get visual guidance for payment timing, credits, and PawPerks rewards.', actionLabel: 'Show Payment Help', alert: 'Payment and PawPerks support is a visual-only placeholder.' },
+  { emoji: '💳', title: 'Payment/Payout Help', description: 'Get visual guidance for payment method, promo code, PawPerks credit, referral credit, refund question, Guru payout setup, and Ambassador rewards.', actionLabel: 'Open Payments & Payouts', href: '/payments' },
 ];
 
-const supportTopics = ['Booking', 'Payment', 'PawReport', 'Safety', 'Account', 'Guru', 'Ambassador', 'Other'];
+const supportTopics = ['Booking', 'Payment method', 'Promo code', 'PawPerks credit', 'Referral credit', 'Refund question', 'Guru payout setup', 'Ambassador rewards', 'PawReport', 'Safety', 'Account', 'Other'];
 
 const faqs = [
   ['How do bookings work?', 'Pet Parents request care, Gurus review details, and Booking Details becomes the care hub once accepted.'],
-  ['When does payment happen?', 'Payment timing is shown as a preview here and should stay inside SitGuru when connected.'],
+  ['When does payment happen?', 'Payment happens after the Guru accepts. This preview does not charge the Pet Parent. Final amount is confirmed before payment.'],
   ['How does PawReport Live work?', 'PawReport Live shows active visit progress and care updates during booked care only.'],
   ['How do Gurus set pricing?', 'Gurus use the Guru Pricing Workspace for rates, discounts, availability, and payout readiness.'],
   ['How do Pet Passports help?', 'Pet Passports keep routines, care notes, comfort details, and safety reminders easy to review.'],

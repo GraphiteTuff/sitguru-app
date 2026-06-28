@@ -56,6 +56,21 @@ export default function AmbassadorDashboardScreen() {
 
         <Pressable
           accessibilityRole="button"
+          onPress={() => router.push('/payments')}
+          style={styles.accountPanel}
+        >
+          <View style={styles.accountIconBadge}>
+            <Text style={styles.accountIcon}>🎁</Text>
+          </View>
+          <View style={styles.accountCopy}>
+            <Text style={styles.accountEyebrow}>Rewards / Payments</Text>
+            <Text style={styles.accountTitle}>Track pending rewards, approved rewards, paid rewards, and referral tracking</Text>
+          </View>
+          <Text style={styles.accountChevron}>›</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push('/notifications')}
           style={styles.notificationsPanel}
         >

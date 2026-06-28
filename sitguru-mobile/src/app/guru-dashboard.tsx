@@ -58,6 +58,21 @@ export default function GuruDashboardScreen() {
 
         <Pressable
           accessibilityRole="button"
+          onPress={() => router.push('/payments')}
+          style={styles.accountPanel}
+        >
+          <View style={styles.accountIconBadge}>
+            <Text style={styles.accountIcon}>💸</Text>
+          </View>
+          <View style={styles.accountCopy}>
+            <Text style={styles.accountEyebrow}>Payout Readiness / Earnings</Text>
+            <Text style={styles.accountTitle}>Stripe Connect placeholder, pending payout, completed bookings, pricing calendar, and tips after completed care</Text>
+          </View>
+          <Text style={styles.accountChevron}>›</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push('/notifications')}
           style={styles.notificationsPanel}
         >

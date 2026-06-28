@@ -23,6 +23,7 @@ const quickActions: Action[] = [
   { label: 'Messages', href: '/conversation' },
   { label: 'Notifications', href: '/notifications' },
   { label: 'Booking Details', href: '/booking-details' },
+  { label: 'Payments & Payouts', href: '/payments' },
   { label: 'Help & Support', href: '/support' },
   { label: 'Guru Pricing', href: '/guru-pricing' },
 ];
@@ -143,9 +144,9 @@ export default function AccountScreen() {
           <InfoRow label="Guru Stripe Connect" value="Payout setup placeholder" />
           <InfoRow label="Ambassador rewards" value="Rewards destination placeholder" />
           <View style={styles.buttonGrid}>
+            <PillButton action={{ label: 'Payments & Payouts', href: '/payments' }} secondary />
             <PillButton action={{ label: 'Guru Pricing', href: '/guru-pricing' }} secondary />
             <PillButton action={{ label: 'Booking Details', href: '/booking-details' }} secondary />
-            <PillButton action={{ label: 'Payment Setup', note: 'Payment setup' }} secondary />
           </View>
         </SettingsCard>
 

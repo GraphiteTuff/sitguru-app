@@ -184,6 +184,14 @@ export default function ConversationScreen() {
 
               <Pressable
                 accessibilityRole="button"
+                onPress={() => router.push('/payments')}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>Payment Status</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
                 onPress={() => router.push('/reviews')}
                 style={styles.secondaryButton}
               >
