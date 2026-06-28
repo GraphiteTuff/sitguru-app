@@ -102,13 +102,23 @@ export default function ConversationScreen() {
         <View style={styles.topBar}>
           <SitGuruLogo size="small" variant="symbol" />
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/messages')}
-            style={styles.topLinkButton}
-          >
-            <Text style={styles.topLinkText}>Inbox</Text>
-          </Pressable>
+          <View style={styles.topBarActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/notifications')}
+              style={styles.topLinkButton}
+            >
+              <Text style={styles.topLinkText}>Notifications</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/messages')}
+              style={styles.topLinkButton}
+            >
+              <Text style={styles.topLinkText}>Inbox</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
@@ -1043,5 +1053,6 @@ const styles = StyleSheet.create({
     color: SitGuruColors.text,
     fontSize: 12,
     fontWeight: '900',
-  },
+  },  topBarActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+
 });

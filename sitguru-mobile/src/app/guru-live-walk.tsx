@@ -44,7 +44,7 @@ export default function GuruLiveWalkScreen() {
     <SitGuruScreen scroll center={false} maxWidth={760}>
       <View style={styles.page}>
         <View style={styles.hero}>
-          <View style={styles.heroActions}><Pressable onPress={() => router.push('/guru-dashboard')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>← Dashboard</Text></Pressable><Pressable onPress={() => router.push('/guru-requests')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>Back to Requests</Text></Pressable></View>
+          <View style={styles.heroActions}><Pressable onPress={() => router.push('/guru-dashboard')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>← Dashboard</Text></Pressable><Pressable onPress={() => router.push('/notifications')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>Notifications</Text></Pressable><Pressable onPress={() => router.push('/guru-requests')} style={styles.backButton} accessibilityRole="button"><Text style={styles.backButtonText}>Back to Requests</Text></Pressable></View>
           <Text style={styles.eyebrow}>Guru workspace</Text>
           <Text style={styles.title}>Live Walk Controls</Text>
           <Text style={styles.subtitle}>Visual-only PawReport controls for active booked care.</Text>

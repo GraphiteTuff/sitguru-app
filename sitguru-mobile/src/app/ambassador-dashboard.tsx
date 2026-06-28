@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import SitGuruActionCard from '@/components/SitGuruActionCard';
 import SitGuruBottomNav from '@/components/SitGuruBottomNav';
@@ -22,6 +23,23 @@ export default function AmbassadorDashboardScreen() {
           title="Grow local SitGuru trust"
           tone="danger"
         />
+
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/notifications')}
+          style={styles.notificationsPanel}
+        >
+          <View style={styles.notificationsIconBadge}>
+            <Text style={styles.notificationsIcon}>🔔</Text>
+          </View>
+          <View style={styles.notificationsCopy}>
+            <Text style={styles.notificationsEyebrow}>Ambassador alerts</Text>
+            <Text style={styles.notificationsTitle}>Referral updates, training reminders, support messages, and reward status</Text>
+            <Text style={styles.notificationsText}>Open Notifications to review community growth updates.</Text>
+          </View>
+          <Text style={styles.notificationsChevron}>›</Text>
+        </Pressable>
 
         <View style={styles.photoReadyPanel}>
           <View style={styles.photoSlot}>
@@ -603,4 +621,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
+  notificationsPanel: { alignItems: 'center', backgroundColor: SitGuruColors.surface, borderColor: 'rgba(180, 35, 24, 0.20)', borderRadius: 26, borderWidth: 1, elevation: 3, flexDirection: 'row', gap: 12, padding: 16 },
+  notificationsIconBadge: { alignItems: 'center', backgroundColor: 'rgba(180, 35, 24, 0.08)', borderRadius: 18, height: 52, justifyContent: 'center', width: 52 },
+  notificationsIcon: { fontSize: 24 },
+  notificationsCopy: { flex: 1, gap: 3 },
+  notificationsEyebrow: { color: SitGuruColors.danger, fontSize: 11, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
+  notificationsTitle: { color: SitGuruColors.text, fontSize: 17, fontWeight: '900', lineHeight: 22 },
+  notificationsText: { color: SitGuruColors.textMuted, fontSize: 13, fontWeight: '700', lineHeight: 19 },
+  notificationsChevron: { color: SitGuruColors.danger, fontSize: 30, fontWeight: '900' },
+
 });
