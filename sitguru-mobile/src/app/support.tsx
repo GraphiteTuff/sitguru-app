@@ -16,6 +16,7 @@ const helpCategories: HelpCategory[] = [
   { emoji: '📥', title: 'Guru request help', description: 'Get oriented around request review, booking acceptance, and care prep.', actionLabel: 'Open Guru Requests', href: '/guru-requests' },
   { emoji: '🎉', title: 'Ambassador/referral help', description: 'Find referral, rewards, training, and ambassador support guidance.', actionLabel: 'Open Ambassador Hub', href: '/ambassador-dashboard' },
   { emoji: '🔐', title: 'Account/security help', description: 'Manage profile, roles, privacy, security, and account preferences.', actionLabel: 'Open Account Settings', href: '/account' },
+  { emoji: '🧭', title: 'Login/account/role access help', description: 'Review the visual-only Auth & Role Session Plan for future login, account recovery, role switching, and session handling.', actionLabel: 'Open Auth & Role Session Plan', href: '/auth-readiness' },
   { emoji: '🔔', title: 'Notifications help', description: 'Review booking alerts, message reminders, and PawReport updates.', actionLabel: 'Open Notifications', href: '/notifications' },
   { emoji: '⭐', title: 'Reviews help', description: 'Review completed care and understand feedback flows.', actionLabel: 'Open Reviews', href: '/reviews' },
   { emoji: '💳', title: 'Payment/Payout Help', description: 'Get visual guidance for payment method, promo code, PawPerks credit, referral credit, refund question, Guru payout setup, and Ambassador rewards.', actionLabel: 'Open Payments & Payouts', href: '/payments' },
@@ -25,13 +26,14 @@ const helpCategories: HelpCategory[] = [
   { emoji: '✅', title: 'QA Test Center', description: 'Open the internal visual-only QA checklist for route, button, mobile layout, and release blocker review.', actionLabel: 'Open QA Test Center', href: '/qa-test-center' },
 ];
 
-const supportTopics = ['Booking', 'Payment method', 'Promo code', 'PawPerks credit', 'Referral credit', 'Refund question', 'Guru payout setup', 'Ambassador rewards', 'PawReport', 'Safety', 'Account', 'Other'];
+const supportTopics = ['Login/account/role access', 'Booking', 'Payment method', 'Promo code', 'PawPerks credit', 'Referral credit', 'Refund question', 'Guru payout setup', 'Ambassador rewards', 'PawReport', 'Safety', 'Account', 'Other'];
 
 const faqs = [
   ['How do bookings work?', 'Pet Parents request care, Gurus review details, and Booking Details becomes the care hub once accepted.'],
   ['When does payment happen?', 'Payment happens after the Guru accepts. This preview does not charge the Pet Parent. Final amount is confirmed before payment.'],
   ['How does PawReport Live work?', 'PawReport Live shows active visit progress and care updates during booked care only.'],
   ['How do Gurus set pricing?', 'Gurus use the Guru Pricing Workspace for rates, discounts, availability, and payout readiness.'],
+  ['How can I review future login or role access help?', 'Use the Auth & Role Session Plan for visual-only account, session, and role switching readiness notes.'],
   ['How do Pet Passports help?', 'Pet Passports keep routines, care notes, comfort details, and safety reminders easy to review.'],
   ['How do referrals and PawPerks work?', 'Ambassador referrals and PawPerks rewards are shown as friendly visual previews in this build.'],
 ];

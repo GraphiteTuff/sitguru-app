@@ -102,6 +102,10 @@ export default function LoginScreen() {
               <Link href="/signup" style={styles.smallLink}>
                 Create account
               </Link>
+
+              <Link href="/auth-readiness" style={styles.smallLink}>
+                Auth readiness preview
+              </Link>
             </View>
           </View>
         </View>

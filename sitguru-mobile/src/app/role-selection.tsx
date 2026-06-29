@@ -104,6 +104,14 @@ export default function RoleSelectionScreen() {
 
             <Pressable
               accessibilityRole="button"
+              onPress={() => router.push('/auth-readiness')}
+              style={styles.topLinkButton}
+            >
+              <Text style={styles.topLinkText}>Auth Plan</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
               onPress={() => router.push('/')}
               style={styles.topLinkButton}
             >
@@ -210,6 +218,8 @@ export default function RoleSelectionScreen() {
           <Text style={styles.quickEyebrow}>Built for daily use</Text>
           <Text style={styles.quickTitle}>Start clean. Use only what you need.</Text>
 
+          <Pressable accessibilityRole="button" onPress={() => router.push('/auth-readiness')} style={styles.authPlanButton}><Text style={styles.authPlanButtonText}>Auth readiness preview →</Text></Pressable>
+
           <View style={styles.quickGrid}>
             {quickActions.map((item) => (
               <View key={item.label} style={styles.quickCard}>
@@ -291,6 +301,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
+  authPlanButton: { alignItems: 'center', backgroundColor: SitGuruColors.primary, borderRadius: 999, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 },
+  authPlanButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   topLinkText: {
     color: SitGuruColors.primary,
     fontSize: 13,
