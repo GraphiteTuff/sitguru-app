@@ -9,7 +9,7 @@ type SitGuruButtonProps = {
   label: string;
   onPress?: () => void;
   size?: 'default' | 'compact';
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
 };
 
 export default function SitGuruButton({
@@ -23,6 +23,7 @@ export default function SitGuruButton({
 }: SitGuruButtonProps) {
   const isPrimary = variant === 'primary';
   const isSecondary = variant === 'secondary';
+  const isDanger = variant === 'danger';
 
   return (
     <Pressable
@@ -36,6 +37,7 @@ export default function SitGuruButton({
         size === 'compact' ? styles.compactButton : styles.defaultButton,
         isPrimary ? styles.primaryButton : null,
         isSecondary ? styles.secondaryButton : null,
+        isDanger ? styles.dangerButton : null,
         variant === 'ghost' ? styles.ghostButton : null,
         disabled ? styles.disabledButton : null,
         pressed && !disabled ? styles.pressedButton : null,
@@ -47,6 +49,7 @@ export default function SitGuruButton({
           size === 'compact' ? styles.compactText : null,
           isPrimary ? styles.primaryText : null,
           isSecondary ? styles.secondaryText : null,
+          isDanger ? styles.dangerText : null,
           variant === 'ghost' ? styles.ghostText : null,
           disabled ? styles.disabledText : null,
         ]}
@@ -72,7 +75,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   compactButton: {
-    minHeight: 42,
+    minHeight: 44,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 12,
@@ -86,6 +89,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: SitGuruColors.primaryLight,
     elevation: 1,
+  },
+  dangerButton: {
+    backgroundColor: '#FFF1F0',
+    borderColor: 'rgba(180, 35, 24, 0.24)',
+    borderWidth: 1,
   },
   ghostButton: {
     backgroundColor: 'transparent',
@@ -116,6 +124,9 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: SitGuruColors.primary,
+  },
+  dangerText: {
+    color: SitGuruColors.danger,
   },
   ghostText: {
     color: SitGuruColors.primary,
