@@ -13,7 +13,7 @@ type RouteGroup = { title: string; routes: string[]; access: string; notes: stri
 type ChecklistItem = { label: string; status: Status };
 
 const route = (href: string) => href as Href;
-const existingRoutes = new Set([
+const existingRoutes = new Set(['/wiring-start-plan', 
   '/', '/account', '/admin-operations', '/ambassador-dashboard', '/ambassador-setup', '/auth-readiness', '/backend-readiness', '/booking-details', '/conversation', '/find-care', '/guru-dashboard', '/guru-live-walk', '/guru-pricing', '/guru-profile', '/guru-requests', '/guru-setup', '/login', '/notifications', '/pawreport-live', '/payments', '/pet-parent-dashboard', '/pet-parent-setup', '/pet-passports', '/qa-test-center', '/release-readiness', '/request-booking', '/reviews', '/role-selection', '/signup', '/support',
 ]);
 
@@ -62,6 +62,7 @@ const redirects: Action[] = [
 const recovery = ['Forgot password future', 'Change email future', 'Change phone future', 'Lost access support future', 'Role correction support', 'Suspended account placeholder', 'Safety/account issue report'];
 const nativeSecurity = ['Biometric login future', 'Device/session management future', 'Push notification permission future', 'Location permission tied to PawReport Live future', 'Camera/photo permission tied to uploads future', 'Secure storage future', 'App lock future', 'Session timeout future'];
 const quickActions: Action[] = [
+  { label: 'Real Wiring Start Plan', href: route('/wiring-start-plan') },
   { label: 'Supabase Schema Readiness', href: route('/schema-readiness') },   { label: 'Login', href: route('/login') }, { label: 'Signup', href: route('/signup') }, { label: 'Role Selection', href: route('/role-selection') }, { label: 'Account', href: route('/account') }, { label: 'Backend Readiness', href: route('/backend-readiness') }, { label: 'Release Readiness', href: route('/release-readiness') }, { label: 'QA Test Center', href: route('/qa-test-center') }, { label: 'Admin Operations', href: route('/admin-operations') }, { label: 'Help & Support', href: route('/support') }, { label: 'Notifications', href: route('/notifications') },
 ];
 

@@ -21,6 +21,17 @@ const filters = ['All', 'Bookings', 'Messages', 'PawReport', 'Payments', 'PawPer
 
 const notifications: NotificationItem[] = [
   {
+    id: 'real-wiring-start-review',
+    icon: '🧭',
+    category: 'Operations',
+    title: 'Real wiring start plan needs review',
+    message: 'Internal implementation roadmap shows the safest order for future auth, roles, profiles, bookings, messages, PawReport Live, payments, notifications, and admin wiring.',
+    time: 'Now',
+    unread: true,
+    actionLabel: 'Open wiring plan',
+    href: '/wiring-start-plan',
+  },
+  {
     id: 'release-checklist-review',
     icon: '🚦',
     category: 'Operations',

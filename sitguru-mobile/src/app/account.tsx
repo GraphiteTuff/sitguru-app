@@ -18,6 +18,7 @@ const roles: Action[] = [
 ];
 
 const quickActions: Action[] = [
+  { label: 'Real Wiring Start Plan', href: '/wiring-start-plan' },
   { label: 'Supabase Schema Readiness', href: '/schema-readiness' },   { label: 'My Pets / Pet Passports', href: '/pet-passports' },
   { label: 'Find Care', href: '/find-care' },
   { label: 'Messages', href: '/conversation' },
@@ -173,6 +174,7 @@ export default function AccountScreen() {
           <InfoRow label="Saved preferences" value="Visual-only preferences" />
           <PillButton action={{ label: 'Release Readiness', href: '/release-readiness' }} />
           <PillButton action={{ label: 'Backend Readiness', href: '/backend-readiness' }} />
+          <PillButton action={{ label: 'Real Wiring Start Plan', href: '/wiring-start-plan' }} />
           <PillButton action={{ label: 'Auth & Role Session Plan', href: '/auth-readiness' }} />
           <PillButton action={{ label: 'QA Test Center', href: '/qa-test-center' }} />
           <PillButton action={{ label: 'Sign Out', note: 'Sign out' }} />

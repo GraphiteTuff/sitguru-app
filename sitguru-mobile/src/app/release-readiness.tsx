@@ -411,6 +411,7 @@ const releaseBlockers: SimpleRow[] = [
 ];
 
 const quickActions: Action[] = [
+  { label: 'Real Wiring Start Plan', href: appRoute('/wiring-start-plan') },
   { label: 'Supabase Schema Readiness', href: appRoute('/schema-readiness') },   { label: 'Auth & Role Session Plan', href: appRoute('/auth-readiness') },
   { label: 'Backend Readiness', href: appRoute('/backend-readiness') }, { label: 'QA Test Center', href: appRoute('/qa-test-center') },
   { label: 'Admin Operations', href: appRoute('/admin-operations') },
