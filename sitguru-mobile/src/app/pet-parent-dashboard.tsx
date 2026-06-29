@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import RoleGate from '@/components/RoleGate';
 import SitGuruActionCard from '@/components/SitGuruActionCard';
 import SitGuruBottomNav from '@/components/SitGuruBottomNav';
 import SitGuruCard from '@/components/SitGuruCard';
@@ -12,7 +13,8 @@ import { SitGuruColors } from '@/constants/colors';
 export default function PetParentDashboardScreen() {
   return (
     <SitGuruScreen scroll center={false} maxWidth={760}>
-      <View style={styles.page}>
+      <RoleGate requiredRole="pet_parent">
+        <View style={styles.page}>
         <SitGuruDashboardHeader
           actionHref="/role-selection"
           actionLabel="Switch"
@@ -342,7 +344,8 @@ export default function PetParentDashboardScreen() {
           ]}
           tone="primary"
         />
-      </View>
+        </View>
+      </RoleGate>
     </SitGuruScreen>
   );
 }
