@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import SitGuruLogo from '@/components/SitGuruLogo';
+import SitGuruProfileAvatar from '@/components/SitGuruProfileAvatar';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,6 +30,8 @@ function InfoRow({ label, value }: { label: string; value: string }) { return <V
 export default function AccountScreen() {
   const { user, session, isAuthenticated, loading, signOut, profile, roles: authRoles, primaryRole, roleOptions, profileLoading, profileError, reloadProfileAndRoles } = useAuth();
   const profileName = profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Not loaded yet';
+  const displayName = profileName === 'Not loaded yet' ? user?.email?.split('@')[0] ?? null : profileName;
+  const location = [profile?.city, profile?.state].filter(Boolean).join(', ');
   const loadedRoles = authRoles.length ? authRoles.map(roleLabel).join(', ') : 'No roles found yet';
   const status = profileError ? 'Warning' : profile ? 'Profile loaded' : 'Needs setup';
   const roleActions: Action[] = roleOptions.length ? roleOptions.map((option) => ({ label: `${option.label} Dashboard`, href: option.dashboardPath })) : fallbackRoleActions;
@@ -48,9 +51,9 @@ export default function AccountScreen() {
         <View style={styles.heroPanel}><Text style={styles.heroEyebrow}>Account hub</Text><Text style={styles.title}>Account & Settings</Text><Text style={styles.subtitle}>Manage your SitGuru profile, roles, alerts, privacy, and support options.</Text></View>
 
         <View style={styles.profileCard}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{isAuthenticated ? (user?.email?.slice(0, 2).toUpperCase() ?? 'SG') : 'SG'}</Text></View>
+          <SitGuruProfileAvatar avatarUrl={profile?.avatar_url} email={user?.email ?? profile?.email} fullName={displayName} role={primaryRole ? roleLabel(primaryRole) : undefined} size={76} />
           <View style={styles.profileCopy}>
-            <Text style={styles.profileName}>{isAuthenticated ? 'Signed in' : 'Not signed in'}</Text>
+            <Text style={styles.profileName}>{isAuthenticated ? displayName ?? 'Signed in' : 'Not signed in'}</Text>
             <Text style={styles.profileText}>{user?.email ?? 'Log in or create an account to connect Supabase Auth.'}</Text>
             <Text style={styles.profileText}>{isAuthenticated ? `User ID: ${user?.id.slice(0, 8)}…` : 'Preview screens remain open for visual testing.'}</Text>
             <View style={styles.progressTrack}><View style={[styles.progressFill, { width: isAuthenticated ? '100%' : '35%' }]} /></View>
@@ -67,6 +70,7 @@ export default function AccountScreen() {
               <InfoRow label="Signed-in email" value={user?.email ?? 'No email on session'} />
               <InfoRow label="User id" value={user?.id ? `${user.id.slice(0, 8)}…` : 'Not available'} />
               <InfoRow label="Profile name" value={profileName} />
+              {location ? <InfoRow label="City / state" value={location} /> : null}
               <InfoRow label="Loaded roles" value={loadedRoles} />
               <InfoRow label="Primary role" value={primaryRole ? roleLabel(primaryRole) : 'None yet'} />
               <InfoRow label="Profile status" value={profileLoading ? 'Loading…' : status} />

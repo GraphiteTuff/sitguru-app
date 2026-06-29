@@ -1,7 +1,7 @@
 import type { Href } from 'expo-router';
 
 export type AppRole = 'pet_parent' | 'guru' | 'ambassador' | 'admin';
-export type ProfileSummary = { id: string; email: string | null; full_name: string | null; first_name: string | null; last_name: string | null; role: string | null; avatar_url: string | null };
+export type ProfileSummary = { id: string; email: string | null; first_name: string | null; last_name: string | null; full_name: string | null; role: string | null; avatar_url: string | null; city?: string | null; state?: string | null };
 export type UserRoleRecord = { id: string | number; user_id: string; role: string | null; created_at: string | null };
 export type RoleOption = { role: AppRole; label: string; description: string; icon: string; dashboardPath: Href };
 
