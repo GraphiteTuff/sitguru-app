@@ -6,11 +6,18 @@ import SitGuruActionCard from '@/components/SitGuruActionCard';
 import SitGuruBottomNav from '@/components/SitGuruBottomNav';
 import SitGuruCard from '@/components/SitGuruCard';
 import SitGuruDashboardHeader from '@/components/SitGuruDashboardHeader';
+import SitGuruProfileAvatar from '@/components/SitGuruProfileAvatar';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruStatCard from '@/components/SitGuruStatCard';
 import { SitGuruColors } from '@/constants/colors';
+import { useAuth } from '@/hooks/useAuth';
+import { roleLabel } from '@/types/auth';
 
 export default function AmbassadorDashboardScreen() {
+  const { isAuthenticated, user, profile, roles } = useAuth();
+  const profileName = profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || user?.email?.split('@')[0] || 'SitGuru member';
+  const loadedRoleText = roles.includes('ambassador') ? 'Ambassador role loaded' : roles.length ? `Loaded roles: ${roles.map(roleLabel).join(', ')}` : 'Role status loading';
+
   return (
     <SitGuruScreen scroll center={false} maxWidth={760}>
       <RoleGate requiredRole="ambassador">
@@ -25,6 +32,21 @@ export default function AmbassadorDashboardScreen() {
           title="Grow local SitGuru trust"
           tone="danger"
         />
+
+        {isAuthenticated ? (
+          <View style={styles.identityPanel}>
+            <SitGuruProfileAvatar avatarUrl={profile?.avatar_url} email={user?.email ?? profile?.email} fullName={profileName} role="Ambassador" size={62} />
+            <View style={styles.identityCopy}>
+              <Text style={styles.identityEyebrow}>Signed-in profile</Text>
+              <Text style={styles.identityName}>{profileName}</Text>
+              <Text style={styles.identityText}>{loadedRoleText}</Text>
+            </View>
+            <View style={styles.identityActions}>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.identityButton}><Text style={styles.identityButtonText}>Account</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/role-selection')} style={[styles.identityButton, styles.identityButtonSecondary]}><Text style={[styles.identityButtonText, styles.identityButtonTextSecondary]}>Roles</Text></Pressable>
+            </View>
+          </View>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"
@@ -695,6 +717,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textTransform: 'uppercase',
   },
+  identityPanel: { alignItems: 'center', backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primaryLight, borderRadius: 26, borderWidth: 1, elevation: 3, flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14 }, identityCopy: { flex: 1, gap: 3, minWidth: 170 }, identityEyebrow: { color: SitGuruColors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' }, identityName: { color: SitGuruColors.text, fontSize: 18, fontWeight: '900' }, identityText: { color: SitGuruColors.textMuted, fontSize: 13, fontWeight: '800', lineHeight: 18 }, identityActions: { flexDirection: 'row', gap: 8 }, identityButton: { alignItems: 'center', backgroundColor: SitGuruColors.primary, borderRadius: 999, justifyContent: 'center', minHeight: 42, paddingHorizontal: 13 }, identityButtonSecondary: { backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.primaryLight, borderWidth: 1 }, identityButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' }, identityButtonTextSecondary: { color: SitGuruColors.primary },
   notificationsPanel: { alignItems: 'center', backgroundColor: SitGuruColors.surface, borderColor: 'rgba(180, 35, 24, 0.20)', borderRadius: 26, borderWidth: 1, elevation: 3, flexDirection: 'row', gap: 12, padding: 16 },
   notificationsIconBadge: { alignItems: 'center', backgroundColor: 'rgba(180, 35, 24, 0.08)', borderRadius: 18, height: 52, justifyContent: 'center', width: 52 },
   notificationsIcon: { fontSize: 24 },
