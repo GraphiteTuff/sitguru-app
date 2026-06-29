@@ -30,6 +30,7 @@ export default function RoleSelectionScreen() {
           <Text style={styles.cardEyebrow}>{isAuthenticated ? 'Signed-in role read' : 'Preview mode'}</Text>
           <Text style={styles.cardTitle}>{isAuthenticated ? `Signed in as ${user?.email ?? 'SitGuru member'}` : 'Not signed in yet'}</Text>
           {isAuthenticated ? <Text style={styles.cardText}>Profile: {profile ? profileName : profileLoading ? 'Loading profile…' : 'Needs setup'}</Text> : <Text style={styles.cardText}>Dashboard preview buttons stay open for visual testing. Log in or create account when ready.</Text>}
+          {isAuthenticated && primaryRole ? <Text style={styles.cardText}>Loaded role: {roleLabel(primaryRole)}</Text> : null}
           {profileError ? <Text style={styles.errorText}>{profileError}</Text> : null}
           {isAuthenticated && !profileLoading && roles.length === 0 ? <View style={styles.setupNotice}><Text style={styles.setupTitle}>No roles found yet</Text><Text style={styles.setupText}>Your account is signed in, but SitGuru has not loaded a Pet Parent, Guru, or Ambassador role yet.</Text></View> : null}
           <View style={styles.buttonRow}>{isAuthenticated ? <SitGuruButton disabled={profileLoading} label={profileLoading ? 'Refreshing roles…' : 'Refresh roles'} onPress={reloadProfileAndRoles} /> : <><SitGuruButton label="Login" onPress={() => router.push('/login')} /><SitGuruButton label="Create account" variant="secondary" onPress={() => router.push('/signup')} /></>}</View>
