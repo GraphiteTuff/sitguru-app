@@ -26,7 +26,7 @@ const careNotes = [
 ];
 
 function showPlaceholderAlert(action: string) {
-  Alert.alert('Visual-only preview', `${action} is a safe placeholder for this screen.`);
+  Alert.alert('Visual-only preview', `${action} is a safe placeholder for this screen. No booking status, payment, message, GPS, or backend data changes.`);
 }
 
 function HubCard({
@@ -205,7 +205,7 @@ export default function BookingDetailsScreen() {
         </HubCard>
 
         <HubCard icon="visit" title="PawReport Live" meta="Status: Completed preview">
-          <Text style={styles.bodyText}>Live updates and completed PawReport summaries stay connected to Booking Details.</Text>
+          <Text style={styles.bodyText}>PawReport Live is a visual-only tracking view here. Live GPS updates and completed PawReport summaries will stay connected to Booking Details once wired.</Text>
           <View style={styles.buttonStack}>
             <SitGuruButton label="View PawReport Live" onPress={() => router.push('/pawreport-live')} />
             <SitGuruButton label="Reviews & Ratings" variant="secondary" onPress={() => router.push('/reviews')} />
@@ -218,7 +218,7 @@ export default function BookingDetailsScreen() {
             <SitGuruButton label="Message Pet Parent" onPress={() => router.push('/conversation')} />
             <SitGuruButton label="Start Live Walk" variant="secondary" onPress={() => router.push('/guru-live-walk')} />
             <SitGuruButton label="Accept Request placeholder" onPress={() => showPlaceholderAlert('Accept Request')} />
-            <SitGuruButton label="Decline placeholder" variant="secondary" onPress={() => showPlaceholderAlert('Decline')} />
+            <SitGuruButton label="Decline placeholder" variant="danger" onPress={() => showPlaceholderAlert('Decline')} />
           </View>
         </HubCard>
 
@@ -233,7 +233,7 @@ export default function BookingDetailsScreen() {
 
         <HubCard icon="lock" title="Support & safety" meta="SitGuru safe care">
           <Text style={styles.bodyText}>Keep care communication, updates, and booking details inside SitGuru.</Text>
-          <Text style={styles.bodyText}>Live tracking only runs during active booked care.</Text>
+          <Text style={styles.bodyText}>Live tracking is visual-only in this preview and should only run during active booked care once GPS is wired.</Text>
           <SitGuruButton label="Admin Operations" variant="secondary" onPress={() => router.push('/admin-operations')} />
         </HubCard>
 
@@ -252,7 +252,7 @@ export default function BookingDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { gap: 16, paddingBottom: 18 },
+  page: { gap: 16, paddingBottom: 32, paddingTop: 4 },
   hero: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 28, borderWidth: 1, gap: 8, padding: 20 },
   backButton: { alignSelf: 'flex-start', backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
   backButtonText: { color: SitGuruColors.primary, fontSize: 13, fontWeight: '900' },

@@ -70,12 +70,14 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingVertical: 16,
+    paddingTop: 20,
+    paddingBottom: 28,
     alignItems: 'center',
   },
   scrollContent: {
     flexGrow: 1,
-    paddingVertical: 16,
+    paddingTop: 20,
+    paddingBottom: 28,
     alignItems: 'center',
   },
   centered: {
