@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import SitGuruLogo from '@/components/SitGuruLogo';
-import SitGuruProfileAvatar from '@/components/SitGuruProfileAvatar';
+import SitGuruRoleIdentityCard from '@/components/SitGuruRoleIdentityCard';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,17 +50,20 @@ export default function AccountScreen() {
         <View style={styles.topBar}><Pressable accessibilityRole="button" onPress={() => router.push('/pet-parent-dashboard')} style={styles.backButton}><Text style={styles.backButtonText}>← Back</Text></Pressable><SitGuruLogo size="small" variant="symbol" /></View>
         <View style={styles.heroPanel}><Text style={styles.heroEyebrow}>Account hub</Text><Text style={styles.title}>Account & Settings</Text><Text style={styles.subtitle}>Manage your SitGuru profile, roles, alerts, privacy, and support options.</Text></View>
 
-        <View style={styles.profileCard}>
-          <SitGuruProfileAvatar avatarUrl={profile?.avatar_url} email={user?.email ?? profile?.email} fullName={displayName} role={primaryRole ? roleLabel(primaryRole) : undefined} size={76} />
-          <View style={styles.profileCopy}>
-            <Text style={styles.profileName}>{isAuthenticated ? displayName ?? 'Signed in' : 'Not signed in'}</Text>
-            <Text style={styles.profileText}>{user?.email ?? 'Log in or create an account to connect Supabase Auth.'}</Text>
-            <Text style={styles.profileText}>{isAuthenticated ? `User ID: ${user?.id.slice(0, 8)}…` : 'Preview screens remain open for visual testing.'}</Text>
-            <View style={styles.progressTrack}><View style={[styles.progressFill, { width: isAuthenticated ? '100%' : '35%' }]} /></View>
-            <Text style={styles.profileMeta}>Session status: {loading ? 'Checking…' : session ? 'Active' : 'No active session'}</Text>
-          </View>
-          {isAuthenticated ? <PillButton action={{ label: loading ? 'Signing Out…' : 'Sign Out' }} onPress={handleSignOut} /> : <View style={styles.authButtonStack}><PillButton action={{ label: 'Log In', href: '/login' }} /><PillButton action={{ label: 'Create Account', href: '/signup' }} secondary /></View>}
-        </View>
+        <SitGuruRoleIdentityCard
+          avatarUrl={profile?.avatar_url}
+          email={user?.email ?? profile?.email}
+          onPrimaryAction={reloadProfileAndRoles}
+          onSecondaryAction={() => router.push('/role-selection')}
+          primaryActionLabel={profileLoading ? 'Refreshing…' : 'Refresh Profile & Roles'}
+          profileName={isAuthenticated ? displayName : 'Guest preview'}
+          roleLabel={primaryRole ? roleLabel(primaryRole) : 'No primary role'}
+          secondaryActionLabel="Role Selection"
+          statusLabel={profileLoading ? 'Loading…' : status}
+          subtitle={isAuthenticated ? `${loadedRoles}${location ? ` • ${location}` : ''}` : 'Log in to load your profile photo, roles, city, and account status.'}
+          title="Premium account identity"
+          tone={primaryRole === 'guru' ? 'guru' : primaryRole === 'ambassador' ? 'ambassador' : primaryRole === 'admin' ? 'admin' : 'petParent'}
+        />
 
 
 

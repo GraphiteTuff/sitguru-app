@@ -1,15 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import SitGuruLogo from '@/components/SitGuruLogo';
+import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { guruDirectory, isGuruPubliclyListed } from '@/constants/gurus';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
-import { getGuruDisplayName, getGuruInitials, getGuruLocationLabel, getGuruPhotoUrl, getGuruRateLabel, getGuruRatingLabel, type PublicGuruProfile } from '@/types/guru';
+import { getGuruDisplayName, getGuruLocationLabel, getGuruPhotoUrl, getGuruRateLabel, getGuruRatingLabel, type PublicGuruProfile } from '@/types/guru';
 
 
 const placeholderGurus: PublicGuruProfile[] = guruDirectory.filter(isGuruPubliclyListed).map((guru) => ({
@@ -67,7 +68,6 @@ export default function GuruProfileScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
   const [gurus, setGurus] = useState<PublicGuruProfile[]>(placeholderGurus);
-  const [hidePhoto, setHidePhoto] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -81,7 +81,6 @@ export default function GuruProfileScreen() {
   const guruName = getGuruDisplayName(selectedGuru);
   const guruLocation = getGuruLocationLabel(selectedGuru);
   const guruPhotoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(selectedGuru));
-  const showPhoto = guruPhotoUrl && !hidePhoto;
 
   return (
     <SitGuruScreen scroll center={false} maxWidth={920}>
@@ -98,14 +97,18 @@ export default function GuruProfileScreen() {
 
         <View style={styles.heroCard}>
           <View style={styles.heroPhoto}>
-            {showPhoto ? <Image accessibilityLabel={`${guruName} profile photo`} onError={() => setHidePhoto(true)} source={{ uri: guruPhotoUrl }} style={styles.heroImage} /> : <>
-              <Text style={styles.heroIcon}>{getGuruInitials(selectedGuru)}</Text>
-              <Text style={styles.heroPhotoTitle}>Guru photo</Text>
-              <Text style={styles.heroPhotoText}>A warm local care photo will appear here.</Text>
-            </>}
+            <SitGuruProfilePhotoFrame
+              fallbackEmoji="🏡"
+              helperLabel="Public Guru profile photo"
+              imageUrl={guruPhotoUrl}
+              name={guruName}
+              roleLabel={selectedGuru.is_verified ? 'Verified Guru' : 'Guru'}
+              shape="portrait"
+              size="hero"
+            />
           </View>
           <View style={[styles.heroContent, isWide && styles.heroContentWide]}>
-            <View style={styles.avatarWrap}><Text style={styles.avatarInitials}>{getGuruInitials(selectedGuru)}</Text></View>
+            <SitGuruProfilePhotoFrame imageUrl={guruPhotoUrl} name={guruName} shape="circle" size="md" />
             <View style={styles.heroCopy}>
               <View style={styles.badgeRow}>
                 <Badge label="Booking Ready" />

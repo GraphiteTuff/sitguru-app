@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Image,
     Pressable,
     StyleSheet,
     Text,
@@ -11,12 +10,13 @@ import {
 } from 'react-native';
 
 import SitGuruLogo from '@/components/SitGuruLogo';
+import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { guruDirectory, isGuruPubliclyListed } from '@/constants/gurus';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
-import { getGuruDisplayName, getGuruInitials, getGuruLocationLabel, getGuruPhotoUrl, getGuruRateLabel, getGuruRatingLabel, type PublicGuruProfile } from '@/types/guru';
+import { getGuruDisplayName, getGuruLocationLabel, getGuruPhotoUrl, getGuruRateLabel, getGuruRatingLabel, type PublicGuruProfile } from '@/types/guru';
 
 type ServiceOption = {
   label: string;
@@ -71,7 +71,6 @@ export default function FindCareScreen() {
   const [dynamicGurus, setDynamicGurus] = useState<PublicGuruProfile[]>([]);
   const [isLoadingGurus, setIsLoadingGurus] = useState(true);
   const [usedGuruFallback, setUsedGuruFallback] = useState(false);
-  const [hiddenPhotoGuruIds, setHiddenPhotoGuruIds] = useState<Record<string, boolean>>({});
 
   const cleanZip = zipCode.replace(/\D/g, '').slice(0, 5);
   const hasValidZip = cleanZip.length === 5;
@@ -312,24 +311,23 @@ export default function FindCareScreen() {
           {displayedGurus.map((guru) => {
             const name = getGuruDisplayName(guru);
             const photoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(guru));
-            const showPhoto = photoUrl && !hiddenPhotoGuruIds[guru.id];
-
             return (
               <View key={guru.id} style={styles.guruCard}>
                 <View style={styles.guruPhotoSlot}>
-                  {showPhoto ? (
-                    <Image accessibilityLabel={`${name} profile photo`} onError={() => setHiddenPhotoGuruIds((current) => ({ ...current, [guru.id]: true }))} source={{ uri: photoUrl }} style={styles.guruPhoto} />
-                  ) : (
-                    <View style={styles.guruPhotoFallback}>
-                      <Text style={styles.guruPhotoInitials}>{getGuruInitials(guru)}</Text>
-                      <Text style={styles.guruPhotoText}>Guru photo</Text>
-                    </View>
-                  )}
+                  <SitGuruProfilePhotoFrame
+                    fallbackEmoji="🏡"
+                    helperLabel={guru.is_verified ? 'Verified local care' : 'Local Guru'}
+                    imageUrl={photoUrl}
+                    name={name}
+                    roleLabel={guru.is_verified ? 'Verified' : undefined}
+                    shape="square"
+                    size="lg"
+                  />
                 </View>
 
                 <View style={styles.guruContent}>
                   <View style={styles.guruTopRow}>
-                    <View style={styles.guruAvatar}><Text style={styles.guruAvatarText}>{getGuruInitials(guru)}</Text></View>
+                    <SitGuruProfilePhotoFrame imageUrl={photoUrl} name={name} shape="circle" size="sm" />
                     <View style={styles.guruMeta}>
                       <View style={styles.nameRow}>
                         <Text style={styles.guruName}>{name}</Text>
