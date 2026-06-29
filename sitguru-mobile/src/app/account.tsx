@@ -6,13 +6,13 @@ import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
-import { roleLabel } from '@/types/auth';
+import { roleLabel, type AppRole } from '@/types/auth';
 
 type Action = { label: string; href?: Href; note?: string };
 type CardProps = { title: string; eyebrow?: string; children: ReactNode };
 
-const roles: Action[] = [
-  { label: 'Pet Parent Dashboard', href: '/pet-parent-dashboard' }, { label: 'Guru Dashboard', href: '/guru-dashboard' }, { label: 'Ambassador Dashboard', href: '/ambassador-dashboard' }, { label: 'Manage Roles', href: '/role-selection' },
+const fallbackRoleActions: Action[] = [
+  { label: 'Pet Parent Dashboard', href: '/pet-parent-dashboard' }, { label: 'Guru Dashboard', href: '/guru-dashboard' }, { label: 'Ambassador Dashboard', href: '/ambassador-dashboard' },
 ];
 const quickActions: Action[] = [
   { label: 'Real Wiring Start Plan', href: '/wiring-start-plan' }, { label: 'Supabase Schema Readiness', href: '/schema-readiness' }, { label: 'My Pets / Pet Passports', href: '/pet-passports' }, { label: 'Find Care', href: '/find-care' }, { label: 'Messages', href: '/conversation' }, { label: 'Notifications', href: '/notifications' }, { label: 'Booking Details', href: '/booking-details' }, { label: 'Payments & Payouts', href: '/payments' }, { label: 'Help & Support', href: '/support' }, { label: 'Admin Operations Preview', href: '/admin-operations' }, { label: 'Release Readiness', href: '/release-readiness' }, { label: 'Backend Readiness', href: '/backend-readiness' }, { label: 'Auth & Role Session Plan', href: '/auth-readiness' }, { label: 'QA Test Center', href: '/qa-test-center' }, { label: 'Guru Pricing', href: '/guru-pricing' },
@@ -26,10 +26,12 @@ function PillButton({ action, secondary = false, onPress }: { action: Action; se
 function InfoRow({ label, value }: { label: string; value: string }) { return <View style={styles.infoRow}><Text style={styles.infoLabel}>{label}</Text><Text style={styles.infoValue}>{value}</Text></View>; }
 
 export default function AccountScreen() {
-  const { user, session, isAuthenticated, loading, signOut, profile, roles: authRoles, primaryRole, profileLoading, profileError, reloadProfileAndRoles } = useAuth();
+  const { user, session, isAuthenticated, loading, signOut, profile, roles: authRoles, primaryRole, roleOptions, profileLoading, profileError, reloadProfileAndRoles } = useAuth();
   const profileName = profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Not loaded yet';
   const loadedRoles = authRoles.length ? authRoles.map(roleLabel).join(', ') : 'No roles found yet';
-  const status = profileError ? 'Error' : profile ? 'Profile loaded' : 'Needs setup';
+  const status = profileError ? 'Warning' : profile ? 'Profile loaded' : 'Needs setup';
+  const roleActions: Action[] = roleOptions.length ? roleOptions.map((option) => ({ label: `${option.label} Dashboard`, href: option.dashboardPath })) : fallbackRoleActions;
+  const rolePills: AppRole[] = authRoles.length ? authRoles : ['pet_parent', 'guru', 'ambassador'];
 
   async function handleSignOut() {
     const result = await signOut();
@@ -80,7 +82,7 @@ export default function AccountScreen() {
             </>
           )}
         </SettingsCard>
-        <SettingsCard title="Switch roles" eyebrow="Your SitGuru access"><View style={styles.roleGrid}>{['Pet Parent', 'Guru', 'Ambassador'].map((role) => <Text key={role} style={styles.rolePill}>{role}</Text>)}</View><View style={styles.buttonGrid}>{roles.map((action) => <PillButton key={action.label} action={action} secondary />)}</View></SettingsCard>
+        <SettingsCard title="Switch roles" eyebrow="Your SitGuru access"><View style={styles.roleGrid}>{rolePills.map((role) => <Text key={role} style={styles.rolePill}>{roleLabel(role)}</Text>)}</View><View style={styles.buttonGrid}>{roleActions.map((action) => <PillButton key={action.label} action={action} secondary />)}<PillButton action={{ label: 'Manage Roles', href: '/role-selection' }} secondary /></View></SettingsCard>
         <SettingsCard title="Quick account actions"><View style={styles.buttonGrid}>{quickActions.map((action) => <PillButton key={action.label} action={action} secondary />)}</View></SettingsCard>
         <SettingsCard title="Notification preferences">{notificationPrefs.map(([label, enabled]) => <Pressable key={label} accessibilityRole="switch" accessibilityState={{ checked: enabled }} onPress={() => showPlaceholder(label)} style={styles.preferenceRow}><Text style={styles.preferenceLabel}>{label}</Text><View style={[styles.toggleTrack, enabled && styles.toggleTrackOn]}><View style={[styles.toggleThumb, enabled && styles.toggleThumbOn]} /></View></Pressable>)}<PillButton action={{ label: 'Open Notifications', href: '/notifications' }} /></SettingsCard>
         <SettingsCard title="Privacy and security"><InfoRow label="Password" value="Update password placeholder" /><InfoRow label="Two-factor authentication" value="Visual-only setup status" /><InfoRow label="Devices & sessions" value="Review signed-in devices placeholder" /><InfoRow label="Data & privacy" value="Download or manage data placeholder" /><Text style={styles.safetyNote}>Keep booking, payments, messages, and PawReport updates inside SitGuru.</Text><PillButton action={{ label: 'Auth & Role Session Plan', href: '/auth-readiness' }} secondary /></SettingsCard>
