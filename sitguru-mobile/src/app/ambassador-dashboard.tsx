@@ -6,7 +6,7 @@ import SitGuruActionCard from '@/components/SitGuruActionCard';
 import SitGuruBottomNav from '@/components/SitGuruBottomNav';
 import SitGuruCard from '@/components/SitGuruCard';
 import SitGuruDashboardHeader from '@/components/SitGuruDashboardHeader';
-import SitGuruProfileAvatar from '@/components/SitGuruProfileAvatar';
+import SitGuruRoleIdentityCard from '@/components/SitGuruRoleIdentityCard';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruStatCard from '@/components/SitGuruStatCard';
 import { SitGuruColors } from '@/constants/colors';
@@ -34,18 +34,20 @@ export default function AmbassadorDashboardScreen() {
         />
 
         {isAuthenticated ? (
-          <View style={styles.identityPanel}>
-            <SitGuruProfileAvatar avatarUrl={profile?.avatar_url} email={user?.email ?? profile?.email} fullName={profileName} role="Ambassador" size={62} />
-            <View style={styles.identityCopy}>
-              <Text style={styles.identityEyebrow}>Signed-in profile</Text>
-              <Text style={styles.identityName}>{profileName}</Text>
-              <Text style={styles.identityText}>{loadedRoleText}</Text>
-            </View>
-            <View style={styles.identityActions}>
-              <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.identityButton}><Text style={styles.identityButtonText}>Account</Text></Pressable>
-              <Pressable accessibilityRole="button" onPress={() => router.push('/role-selection')} style={[styles.identityButton, styles.identityButtonSecondary]}><Text style={[styles.identityButtonText, styles.identityButtonTextSecondary]}>Roles</Text></Pressable>
-            </View>
-          </View>
+          <SitGuruRoleIdentityCard
+            avatarUrl={profile?.avatar_url}
+            email={user?.email ?? profile?.email}
+            onPrimaryAction={() => router.push('/account')}
+            onSecondaryAction={() => router.push('/role-selection')}
+            primaryActionLabel="Account"
+            profileName={profileName}
+            roleLabel="Ambassador"
+            secondaryActionLabel="Role Selection"
+            statusLabel={loadedRoleText}
+            subtitle="Your profile photo, role, and account identity are shown in a premium controlled frame."
+            title="Signed-in Ambassador identity"
+            tone="ambassador"
+          />
         ) : null}
 
         <Pressable

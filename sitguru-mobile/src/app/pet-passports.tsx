@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import SitGuruButton from '@/components/SitGuruButton';
+import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 
@@ -13,6 +14,8 @@ const pets = [
     size: 'Medium',
     age: '5 years old',
     breed: 'German Shorthaired Pointer placeholder',
+    photo_url: null,
+    care_note: 'Energetic, affectionate, and happiest with a predictable walk routine.',
     complete: 100,
   },
   {
@@ -22,6 +25,8 @@ const pets = [
     size: 'Small',
     age: '4 years old',
     breed: 'Indoor cat placeholder',
+    photo_url: null,
+    care_note: 'Prefers quiet greetings, fresh water, and a cozy sunny window.',
     complete: 80,
   },
 ];
@@ -80,7 +85,7 @@ export default function PetPassportsScreen() {
         {pets.map((pet) => (
           <View key={pet.name} style={styles.petCard}>
             <View style={styles.petTopRow}>
-              <View style={styles.petAvatar}><Text style={styles.petAvatarText}>{pet.emoji}</Text></View>
+              <SitGuruProfilePhotoFrame fallbackEmoji={pet.emoji} imageUrl={pet.photo_url} name={pet.name} shape="square" size="md" />
               <View style={styles.petCopy}>
                 <View style={styles.nameRow}>
                   <Text style={styles.petName}>{pet.name}</Text>
@@ -88,6 +93,7 @@ export default function PetPassportsScreen() {
                 </View>
                 <Text style={styles.petMeta}>{pet.breed}</Text>
                 <Text style={styles.petMeta}>{pet.age} • {pet.size}</Text>
+                <Text style={styles.petMeta}>{pet.care_note}</Text>
               </View>
             </View>
             <View style={styles.progressHeader}>
@@ -112,7 +118,7 @@ export default function PetPassportsScreen() {
           <View style={styles.pillRow}>{sizeOptions.map((option) => <Pressable key={option} onPress={() => showPlaceholder(option)} style={styles.pill}><Text style={styles.pillText}>{option}</Text></Pressable>)}</View>
           <TextInput editable={false} placeholder="Breed dropdown placeholder" placeholderTextColor={SitGuruColors.textSoft} style={styles.input} />
           <TextInput editable={false} placeholder="Age" placeholderTextColor={SitGuruColors.textSoft} style={styles.input} />
-          <View style={styles.uploadBox}><Text style={styles.uploadIcon}>＋</Text><Text style={styles.uploadText}>Photo upload placeholder</Text></View>
+          <View style={styles.uploadBox}><SitGuruProfilePhotoFrame fallbackEmoji="🐾" name="New pet" shape="square" size="md" /><Text style={styles.uploadText}>Premium pet photo upload placeholder</Text></View>
           <SitGuruButton label="Save Passport" onPress={() => showPlaceholder('Save Passport')} />
         </View>
 

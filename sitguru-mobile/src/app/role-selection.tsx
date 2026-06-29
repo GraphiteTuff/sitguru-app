@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-na
 
 import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruLogo from '@/components/SitGuruLogo';
-import SitGuruProfileAvatar from '@/components/SitGuruProfileAvatar';
+import SitGuruRoleIdentityCard from '@/components/SitGuruRoleIdentityCard';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,21 +27,22 @@ export default function RoleSelectionScreen() {
           <View style={styles.heroPhoto}><Text style={styles.heroIcon}>🐾</Text><Text style={styles.heroPhotoTitle}>One SitGuru account</Text><Text style={styles.heroPhotoText}>Pet Parent, Guru, and Ambassador paths stay friendly and mobile-ready.</Text></View>
         </View>
 
-        <View style={styles.sessionCard}>
-          <View style={styles.sessionHeader}>
-            <SitGuruProfileAvatar avatarUrl={profile?.avatar_url} email={user?.email ?? profile?.email} fullName={profileName} role={primaryRole ? roleLabel(primaryRole) : undefined} size={68} />
-            <View style={styles.sessionCopy}>
-              <Text style={styles.cardEyebrow}>{isAuthenticated ? 'Signed-in role read' : 'Preview mode'}</Text>
-              <Text style={styles.cardTitle}>{isAuthenticated ? `Signed in as ${user?.email ?? 'SitGuru member'}` : 'Not signed in yet'}</Text>
-              {isAuthenticated ? <Text style={styles.cardText}>Profile name: {profile ? profileName : profileLoading ? 'Loading profile…' : 'Needs setup'}</Text> : <Text style={styles.cardText}>Dashboard preview buttons stay open for visual testing. Log in or create account when ready.</Text>}
-              {isAuthenticated ? <Text style={styles.cardText}>Loaded roles: {roles.length ? roles.map(roleLabel).join(', ') : 'No roles found yet'}</Text> : null}
-              {isAuthenticated && primaryRole ? <Text style={styles.cardText}>Primary role: {roleLabel(primaryRole)}</Text> : null}
-            </View>
-          </View>
-          {profileError ? <Text style={styles.errorText}>{profileError}</Text> : null}
-          {isAuthenticated && !profileLoading && roles.length === 0 ? <View style={styles.setupNotice}><Text style={styles.setupTitle}>No roles found yet</Text><Text style={styles.setupText}>Your account is signed in, but SitGuru has not loaded a Pet Parent, Guru, or Ambassador role yet.</Text></View> : null}
-          <View style={styles.buttonRow}>{isAuthenticated ? <SitGuruButton disabled={profileLoading} label={profileLoading ? 'Refreshing roles…' : 'Refresh roles'} onPress={reloadProfileAndRoles} /> : <><SitGuruButton label="Login" onPress={() => router.push('/login')} /><SitGuruButton label="Create account" variant="secondary" onPress={() => router.push('/signup')} /></>}</View>
-        </View>
+        <SitGuruRoleIdentityCard
+          avatarUrl={profile?.avatar_url}
+          email={user?.email ?? profile?.email}
+          onPrimaryAction={isAuthenticated ? reloadProfileAndRoles : () => router.push('/login')}
+          onSecondaryAction={() => router.push('/find-care')}
+          primaryActionLabel={isAuthenticated ? (profileLoading ? 'Refreshing roles…' : 'Refresh roles') : 'Login'}
+          profileName={profileName}
+          roleLabel={primaryRole ? roleLabel(primaryRole) : isAuthenticated ? 'Roles loading' : 'Preview roles'}
+          secondaryActionLabel="Find Care"
+          statusLabel={isAuthenticated ? (roles.length ? `${roles.length} role${roles.length === 1 ? '' : 's'} loaded` : 'No roles found yet') : 'Signed out'}
+          subtitle={isAuthenticated ? `Loaded roles: ${roles.length ? roles.map(roleLabel).join(', ') : 'none yet'}` : 'Browse public care or preview role paths before signing in.'}
+          title={isAuthenticated ? 'Signed-in role identity' : 'Preview SitGuru roles'}
+          tone={primaryRole === 'guru' ? 'guru' : primaryRole === 'ambassador' ? 'ambassador' : primaryRole === 'admin' ? 'admin' : 'petParent'}
+        />
+        {profileError ? <Text style={styles.errorText}>{profileError}</Text> : null}
+        {isAuthenticated && !profileLoading && roles.length === 0 ? <View style={styles.setupNotice}><Text style={styles.setupTitle}>No roles found yet</Text><Text style={styles.setupText}>Your account is signed in, but SitGuru has not loaded a Pet Parent, Guru, or Ambassador role yet.</Text></View> : null}
 
         {primaryRole && roles.length === 1 ? <Pressable accessibilityRole="button" onPress={() => router.push(roleDashboardPath(primaryRole))} style={styles.primaryContinue}><Text style={styles.primaryContinueText}>Continue to {roleLabel(primaryRole)} Dashboard</Text><Text style={styles.primaryArrow}>→</Text></Pressable> : null}
 
