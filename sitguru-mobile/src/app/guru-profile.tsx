@@ -1,11 +1,37 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import SitGuruLogo from '@/components/SitGuruLogo';
-import SitGuruProfileAvatar from '@/components/SitGuruProfileAvatar';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
+import { guruDirectory, isGuruPubliclyListed } from '@/constants/gurus';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { resolveSupabaseStorageUrl } from '@/lib/storage';
+import { getGuruDisplayName, getGuruInitials, getGuruLocationLabel, getGuruPhotoUrl, getGuruRateLabel, getGuruRatingLabel, type PublicGuruProfile } from '@/types/guru';
+
+
+const placeholderGurus: PublicGuruProfile[] = guruDirectory.filter(isGuruPubliclyListed).map((guru) => ({
+  id: guru.id,
+  display_name: guru.name,
+  bio: `${guru.role} offering ${guru.services.join(', ')} with thoughtful updates and SitGuru trust reminders.`,
+  city: guru.service_city,
+  state: guru.service_state,
+  hourly_rate: guru.rate || null,
+  is_verified: guru.booking_status !== 'listed_only',
+  role: guru.role,
+  source: 'placeholder',
+}));
+
+async function loadPublicGurus() {
+  if (!isSupabaseConfigured) return [] as PublicGuruProfile[];
+  const guruResult = await supabase.from('gurus').select('id, user_id, display_name, bio, city, state, avatar_url, profile_photo_url, hourly_rate, rating_avg, review_count, is_verified').limit(12);
+  if (!guruResult.error && guruResult.data?.length) return guruResult.data as PublicGuruProfile[];
+  const profileResult = await supabase.from('profiles').select('id, full_name, first_name, last_name, bio, city, state, avatar_url, role').in('role', ['guru', 'pet_guru']).limit(12);
+  if (!profileResult.error && profileResult.data?.length) return profileResult.data as PublicGuruProfile[];
+  return [] as PublicGuruProfile[];
+}
 
 const snapshot = [
   ['Response time', '< 1 hour'],
@@ -37,8 +63,25 @@ const reviews = [
 ];
 
 export default function GuruProfileScreen() {
+  const { guruId } = useLocalSearchParams<{ guruId?: string }>();
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
+  const [gurus, setGurus] = useState<PublicGuruProfile[]>(placeholderGurus);
+  const [hidePhoto, setHidePhoto] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    loadPublicGurus().then((rows) => {
+      if (mounted && rows.length) setGurus(rows);
+    }).catch(() => undefined);
+    return () => { mounted = false; };
+  }, []);
+
+  const selectedGuru = gurus.find((guru) => guru.id === guruId) ?? gurus[0] ?? placeholderGurus[0];
+  const guruName = getGuruDisplayName(selectedGuru);
+  const guruLocation = getGuruLocationLabel(selectedGuru);
+  const guruPhotoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(selectedGuru));
+  const showPhoto = guruPhotoUrl && !hidePhoto;
 
   return (
     <SitGuruScreen scroll center={false} maxWidth={920}>
@@ -55,20 +98,22 @@ export default function GuruProfileScreen() {
 
         <View style={styles.heroCard}>
           <View style={styles.heroPhoto}>
-            <Text style={styles.heroIcon}>🌿</Text>
-            <Text style={styles.heroPhotoTitle}>Large hero photo placeholder</Text>
-            <Text style={styles.heroPhotoText}>A warm local care photo will appear here.</Text>
+            {showPhoto ? <Image accessibilityLabel={`${guruName} profile photo`} onError={() => setHidePhoto(true)} source={{ uri: guruPhotoUrl }} style={styles.heroImage} /> : <>
+              <Text style={styles.heroIcon}>{getGuruInitials(selectedGuru)}</Text>
+              <Text style={styles.heroPhotoTitle}>Guru photo</Text>
+              <Text style={styles.heroPhotoText}>A warm local care photo will appear here.</Text>
+            </>}
           </View>
           <View style={[styles.heroContent, isWide && styles.heroContentWide]}>
-            <View style={styles.avatarWrap}><SitGuruProfileAvatar fullName="Local Guru" email="localguru@sitguru.com" role="Certified Guru" size={112} /></View>
+            <View style={styles.avatarWrap}><Text style={styles.avatarInitials}>{getGuruInitials(selectedGuru)}</Text></View>
             <View style={styles.heroCopy}>
               <View style={styles.badgeRow}>
                 <Badge label="Booking Ready" />
-                <Badge label="Certified Guru" muted />
+                {selectedGuru.is_verified ? <Badge label="Verified Guru" muted /> : <Badge label="Guru Preview" muted />}
               </View>
-              <Text style={styles.name}>Local Guru</Text>
-              <Text style={styles.meta}>Quakertown, PA</Text>
-              <Text style={styles.meta}>25-mile service radius</Text>
+              <Text style={styles.name}>{guruName}</Text>
+              <Text style={styles.meta}>{guruLocation}</Text>
+              <Text style={styles.meta}>{getGuruRateLabel(selectedGuru)} • {getGuruRatingLabel(selectedGuru)}</Text>
               <View style={styles.primaryActions}>
                 <Action label="Message Guru" route="/conversation" secondary />
                 <Action label="Request Care" route="/request-booking" />
@@ -97,7 +142,7 @@ export default function GuruProfileScreen() {
 
           <View style={styles.column}>
             <Section eyebrow="Profile" title="About this Guru">
-              <Text style={styles.body}>Friendly placeholder bio for a trusted local Guru who values clear communication, thoughtful care notes, and calm pet routines for nearby families.</Text>
+              <Text style={styles.body}>{selectedGuru.bio || 'Friendly local Guru who values clear communication, thoughtful care notes, and calm pet routines for nearby families.'}</Text>
             </Section>
             <Section eyebrow="Care style" title="What to expect"><Pills items={careStyle} soft /></Section>
             <Section eyebrow="Reviews" title="Reviews placeholder">
@@ -136,6 +181,7 @@ function Row({ label, value }: { label: string; value: string }) { return <View 
 
 const styles = StyleSheet.create({
   page: { gap: 18, paddingBottom: 24 }, topBar: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', gap: 12 }, brandRow: { alignItems: 'center', flexDirection: 'row', gap: 10 }, brandText: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '900' }, backButton: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 }, backButtonText: { color: SitGuruColors.primary, fontSize: 13, fontWeight: '900' },
+  heroImage: { height: '100%', width: '100%' }, avatarInitials: { color: SitGuruColors.primaryDark, fontSize: 34, fontWeight: '900' },
   heroCard: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primaryLight, borderRadius: 32, borderWidth: 1, overflow: 'hidden' }, heroPhoto: { alignItems: 'center', backgroundColor: SitGuruColors.surfaceSoft, minHeight: 220, justifyContent: 'center', padding: 24 }, heroIcon: { fontSize: 46 }, heroPhotoTitle: { color: SitGuruColors.text, fontSize: 20, fontWeight: '900', marginTop: 8 }, heroPhotoText: { color: SitGuruColors.textMuted, fontSize: 14, marginTop: 4, textAlign: 'center' }, heroContent: { gap: 14, padding: 18 }, heroContentWide: { alignItems: 'flex-end', flexDirection: 'row' }, avatarWrap: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 66, borderWidth: 5, borderColor: '#FFFFFF', justifyContent: 'center', marginTop: -70, padding: 4 }, heroCopy: { flex: 1, gap: 8 }, badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, badge: { backgroundColor: SitGuruColors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 }, badgeMuted: { backgroundColor: SitGuruColors.primaryLight }, badgeText: { color: SitGuruColors.surface, fontSize: 12, fontWeight: '900' }, name: { color: SitGuruColors.text, fontSize: 36, fontWeight: '900', letterSpacing: -1 }, meta: { color: SitGuruColors.textMuted, fontSize: 15, fontWeight: '800' }, primaryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 }, action: { alignItems: 'center', backgroundColor: SitGuruColors.primary, borderRadius: 999, flex: 1, minHeight: 50, minWidth: 150, justifyContent: 'center', paddingHorizontal: 16 }, actionSecondary: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primary, borderWidth: 1 }, actionText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' }, actionTextSecondary: { color: SitGuruColors.primary },
   snapshotGrid: { gap: 10 }, fourColumns: { flexDirection: 'row' }, miniCard: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 22, borderWidth: 1, flex: 1, padding: 16 }, miniValue: { color: SitGuruColors.primaryDark, fontSize: 20, fontWeight: '900' }, miniLabel: { color: SitGuruColors.textSoft, fontSize: 12, fontWeight: '900', marginTop: 4 }, contentGrid: { gap: 16 }, contentGridWide: { alignItems: 'flex-start', flexDirection: 'row' }, column: { flex: 1, gap: 16, width: '100%' }, section: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 26, borderWidth: 1, gap: 12, padding: 18 }, eyebrow: { color: SitGuruColors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' }, sectionTitle: { color: SitGuruColors.text, fontSize: 22, fontWeight: '900' }, pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, pill: { backgroundColor: SitGuruColors.primary, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 }, softPill: { backgroundColor: SitGuruColors.surfaceSoft }, pillText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' }, softPillText: { color: SitGuruColors.primaryDark }, priceRow: { alignItems: 'center', borderColor: SitGuruColors.border, borderRadius: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', padding: 12 }, priceLabel: { color: SitGuruColors.text, fontSize: 14, fontWeight: '800' }, priceValue: { color: SitGuruColors.primary, fontSize: 15, fontWeight: '900' }, note: { color: SitGuruColors.textSoft, fontSize: 13, fontWeight: '800' }, calendarRow: { flexDirection: 'row', gap: 8 }, dayCard: { alignItems: 'center', backgroundColor: SitGuruColors.background, borderColor: SitGuruColors.border, borderRadius: 16, borderWidth: 1, flex: 1, padding: 10 }, day: { color: SitGuruColors.textSoft, fontSize: 12, fontWeight: '900' }, status: { color: SitGuruColors.primaryDark, fontSize: 14, fontWeight: '900', marginTop: 5 }, dayTag: { color: SitGuruColors.warning, fontSize: 10, fontWeight: '900', marginTop: 5 }, body: { color: SitGuruColors.textMuted, fontSize: 15, lineHeight: 23 }, review: { backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 18, gap: 5, padding: 13 }, reviewName: { color: SitGuruColors.primaryDark, fontSize: 14, fontWeight: '900' }, reviewText: { color: SitGuruColors.textMuted, fontSize: 13, lineHeight: 19 }, check: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '800', lineHeight: 22 }, bookingCard: { backgroundColor: SitGuruColors.primaryDark, borderRadius: 28, gap: 8, padding: 18 }, bookingTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '900' }, bottomDock: { backgroundColor: SitGuruColors.primaryDark, borderRadius: 28, flexDirection: 'row', gap: 6, padding: 8 }, dockButton: { alignItems: 'center', borderRadius: 18, flex: 1, paddingVertical: 12 }, dockPrimary: { backgroundColor: '#FFFFFF' }, dockText: { color: SitGuruColors.primaryLight, fontSize: 12, fontWeight: '900' }, dockTextPrimary: { color: SitGuruColors.primaryDark },
 });
