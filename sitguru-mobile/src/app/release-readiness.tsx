@@ -398,6 +398,7 @@ const technicalRows: SimpleRow[] = [
 const releaseBlockers: SimpleRow[] = [
   { label: 'Backend not wired', value: 'Blocker', tone: 'blocked' },
   { label: 'Backend readiness plan', value: 'Needs review', tone: 'review' },
+  { label: 'Auth & Role Session Plan', value: 'Needs review', tone: 'review' },
   { label: 'Auth not wired', value: 'Blocker', tone: 'blocked' },
   { label: 'Real payments not wired', value: 'Blocker', tone: 'blocked' },
   { label: 'Real payouts not wired', value: 'Blocker', tone: 'blocked' },
@@ -410,6 +411,7 @@ const releaseBlockers: SimpleRow[] = [
 ];
 
 const quickActions: Action[] = [
+  { label: 'Auth & Role Session Plan', href: appRoute('/auth-readiness') },
   { label: 'Backend Readiness', href: appRoute('/backend-readiness') }, { label: 'QA Test Center', href: appRoute('/qa-test-center') },
   { label: 'Admin Operations', href: appRoute('/admin-operations') },
   { label: 'Help & Support', href: appRoute('/support') },

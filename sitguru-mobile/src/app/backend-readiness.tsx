@@ -13,7 +13,7 @@ type DataRow = { name: string; purpose: string; status: 'Future table' | 'Existi
 type Mapping = { route: string; needs: string };
 
 const route = (href: string) => href as Href;
-const existingRoutes = new Set(['/account', '/release-readiness', '/admin-operations', '/payments', '/booking-details', '/pawreport-live', '/guru-pricing', '/support', '/find-care', '/guru-profile', '/pet-passports', '/conversation', '/request-booking', '/guru-live-walk', '/notifications', '/reviews', '/qa-test-center']);
+const existingRoutes = new Set(['/auth-readiness', '/account', '/release-readiness', '/admin-operations', '/payments', '/booking-details', '/pawreport-live', '/guru-pricing', '/support', '/find-care', '/guru-profile', '/pet-passports', '/conversation', '/request-booking', '/guru-live-walk', '/notifications', '/reviews', '/qa-test-center']);
 
 function showPlaceholder(label: string) {
   Alert.alert('Backend Readiness placeholder', `${label} is a visual-only planning action. No production backend, auth, database, Stripe, GPS, storage, or push logic is wired here.`);
@@ -33,7 +33,7 @@ const summary = [
 ] as const;
 
 const phases: Phase[] = [
-  { title: 'Phase 1: Auth and user roles', status: 'Blocker', tasks: ['Choose sign-in policy', 'Define Pet Parent, Guru, Ambassador, and Admin roles', 'Plan account recovery'], routes: ['/account', '/role-selection'], action: { label: 'Open Account', href: route('/account') } },
+  { title: 'Phase 1: Auth and user roles', status: 'Blocker', tasks: ['Choose sign-in policy', 'Define Pet Parent, Guru, Ambassador, and Admin roles', 'Plan account recovery'], routes: ['/account', '/role-selection', '/auth-readiness'], action: { label: 'Auth & Role Session Plan', href: route('/auth-readiness') } },
   { title: 'Phase 2: Profiles and Pet Passports', status: 'Future wiring', tasks: ['Profile rows', 'Pet Passport ownership', 'Care notes privacy'], routes: ['/account', '/pet-passports'], action: { label: 'Open Pet Passports', href: route('/pet-passports') } },
   { title: 'Phase 3: Search and Guru profiles', status: 'Future wiring', tasks: ['Service areas', 'Guru service catalog', 'Review summaries'], routes: ['/find-care', '/guru-profile'], action: { label: 'Open Find Care', href: route('/find-care') } },
   { title: 'Phase 4: Messaging and conversations', status: 'Future wiring', tasks: ['Conversation records', 'Realtime updates', 'Participant access'], routes: ['/conversation'], action: { label: 'Open Conversation', href: route('/conversation') } },
@@ -64,7 +64,7 @@ const admin = ['Admin role','Operations dashboard data','Active bookings','Live 
 const env = ['SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY only on server, never mobile client','STRIPE_PUBLISHABLE_KEY','Stripe secret keys server-only','Webhook secret server-only','Push notification keys future','Storage bucket names','Production domain','Deep link scheme','EAS build config future','App store metadata future'];
 const blockers = ['Auth not wired','Supabase tables not finalized','RLS not written','Realtime not wired','Stripe not wired','Storage not wired','GPS not wired','Push notifications not wired','Admin permissions not wired','Privacy/legal docs not finalized','QA not complete'];
 const quickActions: Action[] = [
-  { label: 'Release Readiness', href: route('/release-readiness') }, { label: 'Admin Operations', href: route('/admin-operations') }, { label: 'Payments', href: route('/payments') }, { label: 'Booking Details', href: route('/booking-details') }, { label: 'PawReport Live', href: route('/pawreport-live') }, { label: 'Guru Pricing', href: route('/guru-pricing') }, { label: 'Support', href: route('/support') }, { label: 'QA Test Center', href: route('/qa-test-center') }, { label: 'Account', href: route('/account') },
+  { label: 'Auth & Role Session Plan', href: route('/auth-readiness') }, { label: 'Release Readiness', href: route('/release-readiness') }, { label: 'Admin Operations', href: route('/admin-operations') }, { label: 'Payments', href: route('/payments') }, { label: 'Booking Details', href: route('/booking-details') }, { label: 'PawReport Live', href: route('/pawreport-live') }, { label: 'Guru Pricing', href: route('/guru-pricing') }, { label: 'Support', href: route('/support') }, { label: 'QA Test Center', href: route('/qa-test-center') }, { label: 'Account', href: route('/account') },
 ];
 
 export default function BackendReadinessScreen() {

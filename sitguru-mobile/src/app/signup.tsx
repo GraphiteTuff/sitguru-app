@@ -132,6 +132,10 @@ export default function SignupScreen() {
                 Next, choose whether you are here as a Pet Parent, Pet Guru,
                 Ambassador, or more than one.
               </Text>
+
+              <Link href="/auth-readiness" style={styles.authPreviewLink}>
+                Auth readiness preview
+              </Link>
             </View>
           </View>
         </View>
@@ -495,6 +499,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 20,
   },
+  authPreviewLink: { color: SitGuruColors.primary, fontSize: 13, fontWeight: '900', textAlign: 'center' },
   footerText: {
     color: SitGuruColors.textMuted,
     fontSize: 14,

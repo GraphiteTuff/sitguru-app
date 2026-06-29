@@ -54,6 +54,17 @@ const notifications: NotificationItem[] = [
     href: '/backend-readiness',
   },
   {
+    id: 'auth-role-access-review',
+    icon: '🔐',
+    category: 'Operations',
+    title: 'Auth and role access checklist needs review',
+    message: 'Internal visual plan tracks future sign-in, sessions, role access, dashboard redirects, account recovery, and secure routing.',
+    time: 'Now',
+    unread: true,
+    actionLabel: 'Open auth plan',
+    href: '/auth-readiness',
+  },
+  {
     id: 'operations-queue-review',
     icon: '🛠️',
     category: 'Operations',

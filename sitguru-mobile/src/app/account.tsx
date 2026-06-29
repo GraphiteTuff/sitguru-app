@@ -28,6 +28,7 @@ const quickActions: Action[] = [
   { label: 'Admin Operations Preview', href: '/admin-operations' },
   { label: 'Release Readiness', href: '/release-readiness' },
   { label: 'Backend Readiness', href: '/backend-readiness' },
+  { label: 'Auth & Role Session Plan', href: '/auth-readiness' },
   { label: 'QA Test Center', href: '/qa-test-center' },
   { label: 'Guru Pricing', href: '/guru-pricing' },
 ];
@@ -140,6 +141,7 @@ export default function AccountScreen() {
           <InfoRow label="Devices & sessions" value="Review signed-in devices placeholder" />
           <InfoRow label="Data & privacy" value="Download or manage data placeholder" />
           <Text style={styles.safetyNote}>Keep booking, payments, messages, and PawReport updates inside SitGuru.</Text>
+          <PillButton action={{ label: 'Auth & Role Session Plan', href: '/auth-readiness' }} secondary />
           <View style={styles.buttonGrid}>{['Password', 'Two-factor authentication', 'Devices', 'Data & privacy'].map((label) => <PillButton key={label} action={{ label, note: label }} secondary />)}</View>
         </SettingsCard>
 
@@ -171,6 +173,7 @@ export default function AccountScreen() {
           <InfoRow label="Saved preferences" value="Visual-only preferences" />
           <PillButton action={{ label: 'Release Readiness', href: '/release-readiness' }} />
           <PillButton action={{ label: 'Backend Readiness', href: '/backend-readiness' }} />
+          <PillButton action={{ label: 'Auth & Role Session Plan', href: '/auth-readiness' }} />
           <PillButton action={{ label: 'QA Test Center', href: '/qa-test-center' }} />
           <PillButton action={{ label: 'Sign Out', note: 'Sign out' }} />
         </SettingsCard>
