@@ -6,6 +6,7 @@ import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { roleLabel } from '@/types/auth';
 
 type Action = { label: string; href?: Href; note?: string };
 type CardProps = { title: string; eyebrow?: string; children: ReactNode };
@@ -27,9 +28,8 @@ function InfoRow({ label, value }: { label: string; value: string }) { return <V
 export default function AccountScreen() {
   const { user, session, isAuthenticated, loading, signOut, profile, roles: authRoles, primaryRole, profileLoading, profileError, reloadProfileAndRoles } = useAuth();
   const profileName = profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Not loaded yet';
-  const profileLocation = [profile?.city, profile?.state_code ?? profile?.state].filter(Boolean).join(', ') || 'Not provided';
-  const loadedRoles = authRoles.length ? authRoles.map((role) => role.replace('_', ' ')).join(', ') : 'No roles found yet';
-  const status = profileError ? 'Error' : profile ? 'Loaded' : 'Needs setup';
+  const loadedRoles = authRoles.length ? authRoles.map(roleLabel).join(', ') : 'No roles found yet';
+  const status = profileError ? 'Error' : profile ? 'Profile loaded' : 'Needs setup';
 
   async function handleSignOut() {
     const result = await signOut();
@@ -63,9 +63,8 @@ export default function AccountScreen() {
               <InfoRow label="Signed-in email" value={user?.email ?? 'No email on session'} />
               <InfoRow label="User id" value={user?.id ? `${user.id.slice(0, 8)}…` : 'Not available'} />
               <InfoRow label="Profile name" value={profileName} />
-              <InfoRow label="Profile city/state" value={profileLocation} />
               <InfoRow label="Loaded roles" value={loadedRoles} />
-              <InfoRow label="Primary role" value={primaryRole ? primaryRole.replace('_', ' ') : 'None yet'} />
+              <InfoRow label="Primary role" value={primaryRole ? roleLabel(primaryRole) : 'None yet'} />
               <InfoRow label="Profile status" value={profileLoading ? 'Loading…' : status} />
               {profileError ? <Text style={styles.safetyNote}>{profileError}</Text> : null}
               <View style={styles.buttonGrid}>
