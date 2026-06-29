@@ -11,12 +11,11 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruStatCard from '@/components/SitGuruStatCard';
 import { SitGuruColors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
-import { roleLabel } from '@/types/auth';
 
 export default function AmbassadorDashboardScreen() {
   const { isAuthenticated, user, profile, roles } = useAuth();
   const profileName = profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || user?.email?.split('@')[0] || 'SitGuru member';
-  const loadedRoleText = roles.includes('ambassador') ? 'Ambassador role loaded' : roles.length ? `Loaded roles: ${roles.map(roleLabel).join(', ')}` : 'Role status loading';
+  const loadedRoleText = roles.includes('ambassador') ? 'Dashboard access active' : 'Dashboard access ready';
 
   return (
     <SitGuruScreen scroll center={false} maxWidth={760}>
@@ -42,10 +41,10 @@ export default function AmbassadorDashboardScreen() {
             primaryActionLabel="Account"
             profileName={profileName}
             roleLabel="Ambassador"
-            secondaryActionLabel="Role Selection"
+            secondaryActionLabel="Switch role"
             statusLabel={loadedRoleText}
-            subtitle="Your profile photo, role, and account identity are shown in a premium controlled frame."
-            title="Signed-in Ambassador identity"
+            subtitle="Manage today’s SitGuru activity from a profile built for trust."
+            title="Your Ambassador dashboard"
             tone="ambassador"
           />
         ) : null}
