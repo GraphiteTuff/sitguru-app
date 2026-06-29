@@ -411,7 +411,7 @@ const releaseBlockers: SimpleRow[] = [
 ];
 
 const quickActions: Action[] = [
-  { label: 'Auth & Role Session Plan', href: appRoute('/auth-readiness') },
+  { label: 'Supabase Schema Readiness', href: appRoute('/schema-readiness') },   { label: 'Auth & Role Session Plan', href: appRoute('/auth-readiness') },
   { label: 'Backend Readiness', href: appRoute('/backend-readiness') }, { label: 'QA Test Center', href: appRoute('/qa-test-center') },
   { label: 'Admin Operations', href: appRoute('/admin-operations') },
   { label: 'Help & Support', href: appRoute('/support') },

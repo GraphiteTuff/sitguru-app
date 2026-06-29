@@ -54,6 +54,17 @@ const notifications: NotificationItem[] = [
     href: '/backend-readiness',
   },
   {
+    id: 'schema-readiness-review',
+    icon: '🗂️',
+    category: 'Operations',
+    title: 'Schema readiness checklist needs review',
+    message: 'Internal visual plan tracks future Supabase tables, relationships, RLS policy needs, storage buckets, realtime events, migration order, and data cleanup blockers.',
+    time: 'Now',
+    unread: true,
+    actionLabel: 'Open schema plan',
+    href: '/schema-readiness',
+  },
+  {
     id: 'auth-role-access-review',
     icon: '🔐',
     category: 'Operations',
