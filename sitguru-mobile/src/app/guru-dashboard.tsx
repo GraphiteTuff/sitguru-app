@@ -1,6 +1,7 @@
 import { router, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import RoleGate from '@/components/RoleGate';
 import SitGuruActionCard from '@/components/SitGuruActionCard';
 import SitGuruBottomNav from '@/components/SitGuruBottomNav';
 import SitGuruCard from '@/components/SitGuruCard';
@@ -14,7 +15,8 @@ const adminDashboardHref = '/admin-dashboard' as Href;
 export default function GuruDashboardScreen() {
   return (
     <SitGuruScreen scroll center={false} maxWidth={760}>
-      <View style={styles.page}>
+      <RoleGate requiredRole="guru">
+        <View style={styles.page}>
         <SitGuruDashboardHeader
           actionHref="/role-selection"
           actionLabel="Switch"
@@ -483,7 +485,8 @@ export default function GuruDashboardScreen() {
           ]}
           tone="warning"
         />
-      </View>
+        </View>
+      </RoleGate>
     </SitGuruScreen>
   );
 }

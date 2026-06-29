@@ -2,6 +2,7 @@ import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import RoleGate from '@/components/RoleGate';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
@@ -33,7 +34,8 @@ function Bullet({ label, value }: { label: string; value?: string }) { return <V
 export default function AdminOperationsScreen() {
   return (
     <SitGuruScreen scroll center={false} maxWidth={820}>
-      <View style={styles.page}>
+      <RoleGate requiredRole="admin">
+        <View style={styles.page}>
         <View style={styles.topBar}>
           <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.backButton}><Text style={styles.backButtonText}>← Back to Account</Text></Pressable>
           <SitGuruLogo size="small" variant="symbol" />
@@ -66,7 +68,8 @@ export default function AdminOperationsScreen() {
         <Card title="Trust & Safety">{['Safety flags: 0','Live tracking privacy check','Off-platform payment warning','Booking communication policy'].map((label) => <Bullet key={label} label={label} />)}<ActionRow actions={[{ label: 'Help & Support', href: '/support' }, { label: 'Booking Details', href: '/booking-details' }, { label: 'PawReport Live', href: '/pawreport-live' }, { label: 'Open safety review' }, { label: 'Add internal note' }]} /></Card>
         <Card title="App Health Preview">{['App routes: OK','TypeScript: expected pass','Realtime: not wired','Payments: visual-only','GPS: visual-only','Push notifications: visual-only'].map((label) => <Bullet key={label} label={label} />)}<Text style={styles.note}>This is an operations preview. Backend, auth, permissions, realtime, and analytics will be wired later.</Text><ActionRow actions={[{ label: 'Real Wiring Start Plan', href: '/wiring-start-plan' }, { label: 'Supabase Schema Readiness', href: '/schema-readiness' }, { label: 'Auth & Role Session Plan', href: '/auth-readiness' }, { label: 'Backend Readiness', href: '/backend-readiness' }, { label: 'QA Test Center', href: '/qa-test-center' }, { label: 'Release Readiness', href: '/release-readiness' }, { label: 'Notifications', href: '/notifications' }]} /></Card>
         <View style={styles.bottomDockSpacer} />
-      </View>
+        </View>
+      </RoleGate>
       <View style={styles.bottomDock}>{[['Dashboard','/account'],['Bookings','/booking-details'],['Alerts','/notifications'],['Support','/support']].map(([label, href]) => <Pressable key={label} accessibilityRole="button" onPress={() => router.push(href as Href)} style={styles.dockButton}><Text style={styles.dockButtonText}>{label}</Text></Pressable>)}</View>
     </SitGuruScreen>
   );
