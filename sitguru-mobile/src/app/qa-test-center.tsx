@@ -15,7 +15,7 @@ type WireRow = { label: string; destination: string; status: string; tone: Tone;
 
 const href = (path: string) => path as Href;
 
-const existingRoutes = new Set([
+const existingRoutes = new Set(['/wiring-start-plan', 
   '/', '/find-care', '/guru-profile', '/pet-passports', '/request-booking', '/booking-details', '/pawreport-live', '/guru-live-walk', '/conversation', '/notifications', '/account', '/support', '/payments', '/reviews', '/guru-pricing', '/guru-requests', '/admin-operations', '/release-readiness', '/backend-readiness', '/qa-test-center', '/guru-dashboard', '/ambassador-dashboard',
 ]);
 
@@ -75,6 +75,7 @@ const accessibilityChecks = ['Button labels clear','Text contrast review needed'
 const visualWarnings = ['Payments are visual-only','Payouts are visual-only','GPS live tracking is visual-only','Push notifications are visual-only','Image uploads are visual-only','Auth is visual-only','Backend data is visual-only','Admin permissions are visual-only','Reviews are visual-only','Support submissions are visual-only'];
 const releaseBlockers = ['Backend not wired','Auth not wired','RLS/security not wired','Stripe not wired','GPS not wired','Push notifications not wired','Storage upload not wired','App store metadata not ready','Privacy/legal docs not finalized','Device QA not complete'];
 const quickActions: Action[] = [
+  { label: 'Real Wiring Start Plan', href: href('/wiring-start-plan') },
   { label: 'Supabase Schema Readiness', href: href('/schema-readiness') },   { label: 'Auth & Role Session Plan', href: href('/auth-readiness') }, { label: 'Release Readiness', href: href('/release-readiness') }, { label: 'Backend Readiness', href: href('/backend-readiness') }, { label: 'Admin Operations', href: href('/admin-operations') }, { label: 'Account', href: href('/account') }, { label: 'Notifications', href: href('/notifications') }, { label: 'Support', href: href('/support') }, { label: 'Payments', href: href('/payments') }, { label: 'Booking Details', href: href('/booking-details') }, { label: 'Find Care', href: href('/find-care') },
 ];
 
