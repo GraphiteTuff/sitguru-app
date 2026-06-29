@@ -10,7 +10,9 @@ type Props = {
   email?: string | null;
   avatarUrl?: string | null;
   roleLabel?: string | null;
+  roleLabels?: string[];
   statusLabel?: string | null;
+  showEmail?: boolean;
   primaryActionLabel?: string | null;
   onPrimaryAction?: () => void;
   secondaryActionLabel?: string | null;
@@ -20,18 +22,19 @@ type Props = {
 
 const toneEmoji = { petParent: '🐾', guru: '🏡', ambassador: '🌟', admin: '🛡️', neutral: '✨' };
 
-export default function SitGuruRoleIdentityCard({ title, subtitle, profileName, email, avatarUrl, roleLabel, statusLabel, primaryActionLabel, onPrimaryAction, secondaryActionLabel, onSecondaryAction, tone = 'neutral' }: Props) {
+export default function SitGuruRoleIdentityCard({ title, subtitle, profileName, email, avatarUrl, roleLabel, roleLabels, statusLabel, showEmail = false, primaryActionLabel, onPrimaryAction, secondaryActionLabel, onSecondaryAction, tone = 'neutral' }: Props) {
   const name = profileName?.trim() || email?.split('@')[0] || 'SitGuru member';
+  const badges = roleLabels?.length ? roleLabels : roleLabel ? [roleLabel] : [];
   return (
     <View style={[styles.card, tone !== 'neutral' && styles.tintedCard]}>
       <SitGuruProfilePhotoFrame email={email} fallbackEmoji={toneEmoji[tone]} imageUrl={avatarUrl} name={name} roleLabel={roleLabel} shape="squircle" size="lg" />
       <View style={styles.copy}>
         <Text style={styles.eyebrow}>{title}</Text>
         <Text style={styles.name}>{name}</Text>
-        {email ? <Text style={styles.email}>{email}</Text> : null}
+        {showEmail && email ? <Text style={styles.email}>{email}</Text> : null}
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         <View style={styles.badgeRow}>
-          {roleLabel ? <Text style={styles.badge}>{roleLabel}</Text> : null}
+          {badges.map((badge) => <Text key={badge} style={styles.badge}>{badge}</Text>)}
           {statusLabel ? <Text style={[styles.badge, styles.statusBadge]}>{statusLabel}</Text> : null}
         </View>
         <View style={styles.actions}>

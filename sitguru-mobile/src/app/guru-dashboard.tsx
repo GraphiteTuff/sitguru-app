@@ -11,14 +11,13 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruStatCard from '@/components/SitGuruStatCard';
 import { SitGuruColors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
-import { roleLabel } from '@/types/auth';
 
 const adminDashboardHref = '/admin-dashboard' as Href;
 
 export default function GuruDashboardScreen() {
   const { isAuthenticated, user, profile, roles } = useAuth();
   const profileName = profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || user?.email?.split('@')[0] || 'SitGuru member';
-  const loadedRoleText = roles.includes('guru') ? 'Pet Guru role loaded' : roles.length ? `Loaded roles: ${roles.map(roleLabel).join(', ')}` : 'Role status loading';
+  const loadedRoleText = roles.includes('guru') ? 'Dashboard access active' : 'Dashboard access ready';
 
   return (
     <SitGuruScreen scroll center={false} maxWidth={760}>
@@ -40,14 +39,14 @@ export default function GuruDashboardScreen() {
             avatarUrl={profile?.avatar_url}
             email={user?.email ?? profile?.email}
             onPrimaryAction={() => router.push('/account')}
-            onSecondaryAction={() => router.push('/guru-pricing')}
+            onSecondaryAction={() => router.push('/role-selection')}
             primaryActionLabel="Account"
             profileName={profileName}
             roleLabel="Pet Guru"
-            secondaryActionLabel="Guru Pricing"
+            secondaryActionLabel="Switch role"
             statusLabel={loadedRoleText}
-            subtitle="Your profile photo, role, and account identity are shown in a premium controlled frame."
-            title="Signed-in Pet Guru identity"
+            subtitle="Manage today’s SitGuru activity from a profile built for trust."
+            title="Your Guru dashboard"
             tone="guru"
           />
         ) : null}

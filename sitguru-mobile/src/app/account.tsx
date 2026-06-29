@@ -16,7 +16,7 @@ const fallbackRoleActions: Action[] = [
   { label: 'Pet Parent Dashboard', href: '/pet-parent-dashboard' }, { label: 'Guru Dashboard', href: '/guru-dashboard' }, { label: 'Ambassador Dashboard', href: '/ambassador-dashboard' },
 ];
 const quickActions: Action[] = [
-  { label: 'Real Wiring Start Plan', href: '/wiring-start-plan' }, { label: 'Supabase Schema Readiness', href: '/schema-readiness' }, { label: 'My Pets / Pet Passports', href: '/pet-passports' }, { label: 'Find Care', href: '/find-care' }, { label: 'Messages', href: '/conversation' }, { label: 'Notifications', href: '/notifications' }, { label: 'Booking Details', href: '/booking-details' }, { label: 'Payments & Payouts', href: '/payments' }, { label: 'Help & Support', href: '/support' }, { label: 'Release Readiness', href: '/release-readiness' }, { label: 'Backend Readiness', href: '/backend-readiness' }, { label: 'Auth & Role Session Plan', href: '/auth-readiness' }, { label: 'QA Test Center', href: '/qa-test-center' }, { label: 'Guru Pricing', href: '/guru-pricing' },
+  { label: 'My Pets / Pet Passports', href: '/pet-passports' }, { label: 'Find Care', href: '/find-care' }, { label: 'Messages', href: '/conversation' }, { label: 'Notifications', href: '/notifications' }, { label: 'Booking Details', href: '/booking-details' }, { label: 'Payments & Payouts', href: '/payments' }, { label: 'Help & Support', href: '/support' }, { label: 'Guru Pricing', href: '/guru-pricing' },
 ];
 const adminQuickAction: Action = { label: 'Admin Operations', href: '/admin-operations' };
 const notificationPrefs = [['Booking alerts', true], ['Message alerts', true], ['PawReport Live alerts', true], ['Payment/payout alerts', false], ['PawPerks/referral alerts', true]] as const;
@@ -55,49 +55,50 @@ export default function AccountScreen() {
           email={user?.email ?? profile?.email}
           onPrimaryAction={reloadProfileAndRoles}
           onSecondaryAction={() => router.push('/role-selection')}
-          primaryActionLabel={profileLoading ? 'Refreshing…' : 'Refresh Profile & Roles'}
+          primaryActionLabel={profileLoading ? 'Refreshing…' : 'Refresh account data'}
           profileName={isAuthenticated ? displayName : 'Guest preview'}
-          roleLabel={primaryRole ? roleLabel(primaryRole) : 'No primary role'}
-          secondaryActionLabel="Role Selection"
+          roleLabels={rolePills.map(roleLabel)}
+          secondaryActionLabel="Switch dashboard"
+          showEmail
           statusLabel={profileLoading ? 'Loading…' : status}
-          subtitle={isAuthenticated ? `${loadedRoles}${location ? ` • ${location}` : ''}` : 'Log in to load your profile photo, roles, city, and account status.'}
-          title="Premium account identity"
+          subtitle={isAuthenticated ? `${location ? `${location} • ` : ''}Manage the dashboards connected to your SitGuru account.` : 'Log in to load your profile photo, dashboards, city, and account status.'}
+          title="Account profile"
           tone={primaryRole === 'guru' ? 'guru' : primaryRole === 'ambassador' ? 'ambassador' : primaryRole === 'admin' ? 'admin' : 'petParent'}
         />
 
 
 
-        <SettingsCard title="Profile and roles" eyebrow="Real Supabase read">
+        <SettingsCard title="Account profile" eyebrow="Profile details">
           {isAuthenticated ? (
             <>
               <InfoRow label="Signed-in email" value={user?.email ?? 'No email on session'} />
               <InfoRow label="User id" value={user?.id ? `${user.id.slice(0, 8)}…` : 'Not available'} />
               <InfoRow label="Profile name" value={profileName} />
               {location ? <InfoRow label="City / state" value={location} /> : null}
-              <InfoRow label="Loaded roles" value={loadedRoles} />
-              <InfoRow label="Primary role" value={primaryRole ? roleLabel(primaryRole) : 'None yet'} />
+              <InfoRow label="Dashboard access" value={loadedRoles} />
+              <InfoRow label="Default dashboard" value={primaryRole ? roleLabel(primaryRole) : 'None yet'} />
               <InfoRow label="Profile status" value={profileLoading ? 'Loading…' : status} />
               {profileError ? <Text style={styles.safetyNote}>{profileError}</Text> : null}
               <View style={styles.buttonGrid}>
-                <PillButton action={{ label: profileLoading ? 'Refreshing…' : 'Refresh Profile & Roles' }} onPress={reloadProfileAndRoles} />
-                <PillButton action={{ label: 'Role Selection', href: '/role-selection' }} secondary />
+                <PillButton action={{ label: profileLoading ? 'Refreshing…' : 'Refresh account data' }} onPress={reloadProfileAndRoles} />
+                <PillButton action={{ label: 'Switch dashboard', href: '/role-selection' }} secondary />
                 <PillButton action={{ label: loading ? 'Signing Out…' : 'Sign Out' }} onPress={handleSignOut} secondary />
               </View>
             </>
           ) : (
             <>
               <Text style={styles.safetyNote}>Log in or create account to load your SitGuru website profile and roles.</Text>
-              <View style={styles.buttonGrid}><PillButton action={{ label: 'Login', href: '/login' }} /><PillButton action={{ label: 'Signup', href: '/signup' }} secondary /></View>
+              <View style={styles.buttonGrid}><PillButton action={{ label: 'Log in', href: '/login' }} /><PillButton action={{ label: 'Create account', href: '/signup' }} secondary /></View>
             </>
           )}
         </SettingsCard>
-        <SettingsCard title="Switch roles" eyebrow="Your SitGuru access"><View style={styles.roleGrid}>{rolePills.map((role) => <Text key={role} style={styles.rolePill}>{roleLabel(role)}</Text>)}</View><View style={styles.buttonGrid}>{roleActions.map((action) => <PillButton key={action.label} action={action} secondary />)}<PillButton action={{ label: 'Manage Roles', href: '/role-selection' }} secondary /></View></SettingsCard>
+        <SettingsCard title="Dashboard access" eyebrow="Your SitGuru access"><View style={styles.roleGrid}>{rolePills.map((role) => <Text key={role} style={styles.rolePill}>{roleLabel(role)}</Text>)}</View><View style={styles.buttonGrid}>{roleActions.map((action) => <PillButton key={action.label} action={action} secondary />)}<PillButton action={{ label: 'Manage dashboards', href: '/role-selection' }} secondary /></View></SettingsCard>
         <SettingsCard title="Quick account actions"><View style={styles.buttonGrid}>{shownQuickActions.map((action) => <PillButton key={action.label} action={action} secondary />)}</View></SettingsCard>
         <SettingsCard title="Notification preferences">{notificationPrefs.map(([label, enabled]) => <Pressable key={label} accessibilityRole="switch" accessibilityState={{ checked: enabled }} onPress={() => showPlaceholder(label)} style={styles.preferenceRow}><Text style={styles.preferenceLabel}>{label}</Text><View style={[styles.toggleTrack, enabled && styles.toggleTrackOn]}><View style={[styles.toggleThumb, enabled && styles.toggleThumbOn]} /></View></Pressable>)}<PillButton action={{ label: 'Open Notifications', href: '/notifications' }} /></SettingsCard>
-        <SettingsCard title="Privacy and security"><InfoRow label="Password" value="Update password placeholder" /><InfoRow label="Two-factor authentication" value="Visual-only setup status" /><InfoRow label="Devices & sessions" value="Review signed-in devices placeholder" /><InfoRow label="Data & privacy" value="Download or manage data placeholder" /><Text style={styles.safetyNote}>Keep booking, payments, messages, and PawReport updates inside SitGuru.</Text><PillButton action={{ label: 'Auth & Role Session Plan', href: '/auth-readiness' }} secondary /></SettingsCard>
+        <SettingsCard title="Security & session"><InfoRow label="Password" value="Update password placeholder" /><InfoRow label="Two-factor authentication" value="Visual-only setup status" /><InfoRow label="Devices & sessions" value="Review signed-in devices" /><InfoRow label="Data & privacy" value="Download or manage data placeholder" /><Text style={styles.safetyNote}>Keep booking, payments, messages, and PawReport updates inside SitGuru.</Text><PillButton action={{ label: 'Auth & Role Session Plan', href: '/auth-readiness' }} secondary /></SettingsCard>
         <SettingsCard title="Payment and payout readiness"><InfoRow label="Pet Parent payment method" value="Placeholder card readiness" /><InfoRow label="Guru Stripe Connect" value="Payout setup placeholder" /><InfoRow label="Ambassador rewards" value="Rewards destination placeholder" /><View style={styles.buttonGrid}><PillButton action={{ label: 'Payments & Payouts', href: '/payments' }} secondary /><PillButton action={{ label: 'Guru Pricing', href: '/guru-pricing' }} secondary /><PillButton action={{ label: 'Booking Details', href: '/booking-details' }} secondary /></View></SettingsCard>
         <SettingsCard title="Support"><InfoRow label="Help Center" value="Browse common SitGuru questions placeholder" /><InfoRow label="Contact SitGuru" value="Send a support message" /><InfoRow label="Report a safety concern" value="Use urgent safety support placeholder" /><View style={styles.buttonGrid}><PillButton action={{ label: 'Help & Support', href: '/support' }} secondary /><PillButton action={{ label: 'Contact SitGuru', href: '/conversation' }} secondary /><PillButton action={{ label: 'Report Safety Concern', note: 'Report a safety concern' }} secondary /></View></SettingsCard>
-        <SettingsCard title="App settings"><InfoRow label="App version" value="SitGuru preview 1.0" /><InfoRow label="Accessibility" value="Large tap targets and readable labels" /><InfoRow label="Saved preferences" value="Visual-only preferences" /><PillButton action={{ label: 'Release Readiness', href: '/release-readiness' }} /><PillButton action={{ label: 'Backend Readiness', href: '/backend-readiness' }} /><PillButton action={{ label: 'Real Wiring Start Plan', href: '/wiring-start-plan' }} /><PillButton action={{ label: 'QA Test Center', href: '/qa-test-center' }} />{isAuthenticated ? <PillButton action={{ label: 'Sign Out' }} onPress={handleSignOut} /> : null}</SettingsCard>
+        <SettingsCard title="App settings"><InfoRow label="App version" value="SitGuru preview 1.0" /><InfoRow label="Accessibility" value="Large tap targets and readable labels" /><InfoRow label="Saved preferences" value="Notification and dashboard preferences" />{isAuthenticated ? <PillButton action={{ label: 'Sign Out' }} onPress={handleSignOut} /> : null}</SettingsCard>
         <View style={styles.bottomDockSpacer} />
       </View>
       <View style={styles.bottomDock}>{[['Dashboard', '/pet-parent-dashboard'], ['Messages', '/conversation'], ['Alerts', '/notifications'], ['Account', '/account']].map(([label, href]) => <Pressable key={label} accessibilityRole="button" onPress={() => router.push(href as Href)} style={[styles.dockButton, label === 'Account' && styles.dockButtonActive]}><Text style={[styles.dockButtonText, label === 'Account' && styles.dockButtonTextActive]}>{label}</Text></Pressable>)}</View>
