@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+    Image,
     Pressable,
     StyleSheet,
     Text,
@@ -12,19 +13,40 @@ import {
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
-import {
-  formatGuruLocation,
-  formatGuruRate,
-  getGuruPublicCta,
-  guruDirectory,
-  isGuruPubliclyListed,
-  type GuruRow,
-} from '@/constants/gurus';
+import { guruDirectory, isGuruPubliclyListed } from '@/constants/gurus';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { resolveSupabaseStorageUrl } from '@/lib/storage';
+import { getGuruDisplayName, getGuruInitials, getGuruLocationLabel, getGuruPhotoUrl, getGuruRateLabel, getGuruRatingLabel, type PublicGuruProfile } from '@/types/guru';
 
 type ServiceOption = {
   label: string;
   value: string;
 };
+
+
+const placeholderGurus: PublicGuruProfile[] = guruDirectory.filter(isGuruPubliclyListed).map((guru) => ({
+  id: guru.id,
+  display_name: guru.name,
+  bio: `${guru.role} offering ${guru.services.slice(0, 3).join(', ')} with ${guru.badges.join(', ')} support.`,
+  city: guru.service_city,
+  state: guru.service_state,
+  hourly_rate: guru.rate || null,
+  is_verified: guru.booking_status !== 'listed_only',
+  role: guru.role,
+  source: 'placeholder',
+}));
+
+async function loadPublicGurus() {
+  if (!isSupabaseConfigured) return { gurus: [] as PublicGuruProfile[], usedFallback: true };
+
+  const guruResult = await supabase.from('gurus').select('id, user_id, display_name, bio, city, state, avatar_url, profile_photo_url, hourly_rate, rating_avg, review_count, is_verified').limit(12);
+  if (!guruResult.error && guruResult.data?.length) return { gurus: guruResult.data as PublicGuruProfile[], usedFallback: false };
+
+  const profileResult = await supabase.from('profiles').select('id, full_name, first_name, last_name, bio, city, state, avatar_url, role').in('role', ['guru', 'pet_guru']).limit(12);
+  if (!profileResult.error && profileResult.data?.length) return { gurus: profileResult.data as PublicGuruProfile[], usedFallback: false };
+
+  return { gurus: [] as PublicGuruProfile[], usedFallback: true };
+}
 
 const services: ServiceOption[] = [
   { label: 'Dog Walking', value: 'dog_walking' },
@@ -46,15 +68,15 @@ export default function FindCareScreen() {
   );
   const [hasSearched, setHasSearched] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState('');
+  const [dynamicGurus, setDynamicGurus] = useState<PublicGuruProfile[]>([]);
+  const [isLoadingGurus, setIsLoadingGurus] = useState(true);
+  const [usedGuruFallback, setUsedGuruFallback] = useState(false);
+  const [hiddenPhotoGuruIds, setHiddenPhotoGuruIds] = useState<Record<string, boolean>>({});
 
   const cleanZip = zipCode.replace(/\D/g, '').slice(0, 5);
   const hasValidZip = cleanZip.length === 5;
   const careAreaLabel = hasValidZip ? `ZIP ${cleanZip}` : 'your care area';
-  const publicGurus = guruDirectory.filter(isGuruPubliclyListed);
-  const matchingGurus = publicGurus.filter((guru) =>
-    guru.services.includes(selectedService.label),
-  );
-  const displayedGurus = matchingGurus.length > 0 ? matchingGurus : publicGurus;
+  const displayedGurus = dynamicGurus.length > 0 ? dynamicGurus : placeholderGurus;
 
   function handleZipChange(value: string) {
     const nextZip = value.replace(/\D/g, '').slice(0, 5);
@@ -83,21 +105,34 @@ export default function FindCareScreen() {
     );
   }
 
-  function handleViewProfile(_guru: GuruRow) {
-    router.push('/guru-profile');
+  useEffect(() => {
+    let mounted = true;
+    loadPublicGurus()
+      .then(({ gurus, usedFallback }) => {
+        if (!mounted) return;
+        setDynamicGurus(gurus);
+        setUsedGuruFallback(usedFallback || gurus.length === 0);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setDynamicGurus([]);
+        setUsedGuruFallback(true);
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingGurus(false);
+      });
+    return () => { mounted = false; };
+  }, []);
+
+  function handleViewProfile(guru: PublicGuruProfile) {
+    router.push({ pathname: '/guru-profile', params: { guruId: guru.id } });
   }
 
-  function handleMessageGuru(_guru: GuruRow) {
+  function handleMessageGuru(_guru: PublicGuruProfile) {
     router.push('/conversation');
   }
 
-  function handlePublicCta(guru: GuruRow) {
-    const cta = getGuruPublicCta(guru);
-
-    if (cta.disabled) {
-      return;
-    }
-
+  function handlePublicCta(_guru: PublicGuruProfile) {
     router.push('/request-booking');
   }
 
@@ -262,115 +297,62 @@ export default function FindCareScreen() {
             </Text>
 
             <Text style={styles.resultsText}>
-              {hasSearched
-                ? `Showing local Guru previews for ${careAreaLabel}.`
-                : 'Search is open. Enter a ZIP code or choose a service to preview local Guru matches.'}
+              {isLoadingGurus
+                ? 'Loading available Guru profiles and photos...'
+                : usedGuruFallback
+                  ? 'We could not load live Guru search data yet, so these polished preview cards show how local Gurus will appear.'
+                  : hasSearched
+                    ? `Showing live Guru profiles for ${careAreaLabel}.`
+                    : 'Search is open. Enter a ZIP code or choose a service to preview local Guru matches.'}
             </Text>
           </View>
         </View>
 
         <View style={[styles.resultsGrid, isWide && styles.resultsGridWide]}>
           {displayedGurus.map((guru) => {
-            const cta = getGuruPublicCta(guru);
+            const name = getGuruDisplayName(guru);
+            const photoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(guru));
+            const showPhoto = photoUrl && !hiddenPhotoGuruIds[guru.id];
 
             return (
               <View key={guru.id} style={styles.guruCard}>
                 <View style={styles.guruPhotoSlot}>
-                  <Text style={styles.guruPhotoIcon}>＋</Text>
-                  <Text style={styles.guruPhotoText}>Guru photo</Text>
+                  {showPhoto ? (
+                    <Image accessibilityLabel={`${name} profile photo`} onError={() => setHiddenPhotoGuruIds((current) => ({ ...current, [guru.id]: true }))} source={{ uri: photoUrl }} style={styles.guruPhoto} />
+                  ) : (
+                    <View style={styles.guruPhotoFallback}>
+                      <Text style={styles.guruPhotoInitials}>{getGuruInitials(guru)}</Text>
+                      <Text style={styles.guruPhotoText}>Guru photo</Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.guruContent}>
                   <View style={styles.guruTopRow}>
-                    <View style={styles.guruAvatar}>
-                      <Text style={styles.guruAvatarText}>
-                        {guru.name
-                          .split(' ')
-                          .slice(0, 2)
-                          .map((part) => part.charAt(0))
-                          .join('')
-                          .toUpperCase()}
-                      </Text>
-                    </View>
-
+                    <View style={styles.guruAvatar}><Text style={styles.guruAvatarText}>{getGuruInitials(guru)}</Text></View>
                     <View style={styles.guruMeta}>
-                      <Text style={styles.guruName}>{guru.name}</Text>
-                      <Text style={styles.guruRole}>{guru.role}</Text>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.guruName}>{name}</Text>
+                        {guru.is_verified ? <Text style={styles.verifiedBadge}>Verified</Text> : null}
+                      </View>
+                      <Text style={styles.guruRole}>{guru.role || 'Pet Care Guru'}</Text>
                     </View>
                   </View>
 
-                  <View style={styles.guruInfoRow}>
-                    <Text style={styles.guruInfoText}>
-                      ⌖ {formatGuruLocation(guru)}
-                    </Text>
-                    <Text style={styles.guruInfoText}>• ZIP {guru.service_zip}</Text>
-                  </View>
+                  <Text style={styles.guruBio} numberOfLines={3}>{guru.bio || 'Trusted local care with clear updates, thoughtful routines, and SitGuru safety reminders.'}</Text>
+                  <View style={styles.guruInfoRow}><Text style={styles.guruInfoText}>⌖ {getGuruLocationLabel(guru)}</Text></View>
 
                   <View style={styles.guruStatsRow}>
-                    <View style={styles.guruStat}>
-                      <Text style={styles.guruStatValue}>{guru.rating}</Text>
-                      <Text style={styles.guruStatLabel}>Status</Text>
-                    </View>
-
-                    <View style={styles.guruStat}>
-                      <Text style={styles.guruStatValue}>{formatGuruRate(guru)}</Text>
-                      <Text style={styles.guruStatLabel}>Pricing</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.servicesList}>
-                    {guru.services.map((service) => (
-                      <Text key={service} style={styles.guruServicePill}>
-                        {service}
-                      </Text>
-                    ))}
-                  </View>
-
-                  <View style={styles.badgeList}>
-                    {guru.badges.map((badge) => (
-                      <Text key={badge} style={styles.guruBadge}>
-                        ✓ {badge}
-                      </Text>
-                    ))}
+                    <View style={styles.guruStat}><Text style={styles.guruStatValue}>{getGuruRatingLabel(guru)}</Text><Text style={styles.guruStatLabel}>Rating</Text></View>
+                    <View style={styles.guruStat}><Text style={styles.guruStatValue}>{getGuruRateLabel(guru)}</Text><Text style={styles.guruStatLabel}>Rate</Text></View>
                   </View>
 
                   <View style={styles.guruActions}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => handleViewProfile(guru)}
-                      style={styles.viewButton}
-                    >
-                      <Text style={styles.viewButtonText}>View Profile</Text>
-                    </Pressable>
-
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => handleMessageGuru(guru)}
-                      style={styles.messageButton}
-                    >
-                      <Text style={styles.messageButtonText}>Message</Text>
-                    </Pressable>
+                    <Pressable accessibilityRole="button" onPress={() => handleViewProfile(guru)} style={styles.viewButton}><Text style={styles.viewButtonText}>View Profile</Text></Pressable>
+                    <Pressable accessibilityRole="button" onPress={() => handleMessageGuru(guru)} style={styles.messageButton}><Text style={styles.messageButtonText}>Message</Text></Pressable>
                   </View>
 
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: cta.disabled }}
-                    disabled={cta.disabled}
-                    onPress={() => handlePublicCta(guru)}
-                    style={[
-                      styles.bookButton,
-                      cta.disabled && styles.bookButtonDisabled,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.bookButtonText,
-                        cta.disabled && styles.bookButtonTextDisabled,
-                      ]}
-                    >
-                      {cta.label}
-                    </Text>
-                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => handlePublicCta(guru)} style={styles.bookButton}><Text style={styles.bookButtonText}>Request Care</Text></Pressable>
                 </View>
               </View>
             );
@@ -799,6 +781,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 12,
   },
+  guruPhoto: { height: '100%', width: '100%' },
+  guruPhotoFallback: { alignItems: 'center', flex: 1, gap: 7, justifyContent: 'center' },
+  guruPhotoInitials: { color: SitGuruColors.primaryDark, fontSize: 34, fontWeight: '900' },
   guruPhotoSlot: {
     alignItems: 'center',
     backgroundColor: SitGuruColors.background,
@@ -848,6 +833,22 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
+  nameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  verifiedBadge: {
+    backgroundColor: SitGuruColors.primaryLight,
+    borderRadius: 999,
+    color: SitGuruColors.primaryDark,
+    fontSize: 11,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
   guruName: {
     color: SitGuruColors.text,
     fontSize: 18,
@@ -859,6 +860,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  guruBio: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '700', lineHeight: 20 },
   guruInfoRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
