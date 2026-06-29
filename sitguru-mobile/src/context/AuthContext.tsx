@@ -2,7 +2,7 @@ import type { Session, SignUpWithPasswordCredentials, User } from '@supabase/sup
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
-import { normalizeRole, roleDashboardPath, roleDescription, roleIcon, roleLabel, uniqueRoles, type AppRole, type ProfileSummary, type RoleOption } from '@/types/auth';
+import { normalizeRole, roleDashboardPath, roleDescription, roleIcon, roleLabel, uniqueRoles, type AppRole, type ProfileSummary, type RoleOption, type UserRoleRecord } from '@/types/auth';
 
 type SignupMetadata = { first_name?: string; signup_intent?: string };
 type SafeProfileRow = { id: string; email: string | null; first_name: string | null; last_name: string | null; full_name: string | null; role: string | null; avatar_url: string | null };
@@ -24,6 +24,7 @@ const rolesSelect = 'id, user_id, role, created_at';
 
 function friendlyAuthError(message?: string) { if (!message) return 'Something went wrong. Please try again.'; const lower = message.toLowerCase(); if (lower.includes('invalid login')) return 'Email or password does not match our records.'; if (lower.includes('email not confirmed')) return 'Please confirm your email before logging in.'; if (lower.includes('failed to fetch') || lower.includes('network')) return 'Network connection issue. Please try again.'; return message; }
 function friendlyProfileError(message?: string) { if (!message) return 'SitGuru could not load your account profile yet.'; const lower = message.toLowerCase(); if (lower.includes('does not exist') || lower.includes('schema cache')) return 'SitGuru could not find the expected profile or role fields yet.'; if (lower.includes('permission') || lower.includes('policy')) return 'Your account is signed in, but profile access needs setup.'; return friendlyAuthError(message); }
+function friendlyRoleError(message?: string) { if (!message) return 'SitGuru could not load your roles yet. Please refresh in a moment.'; const lower = message.toLowerCase(); if (lower.includes('permission') || lower.includes('policy') || lower.includes('rls')) return 'Your account profile loaded, but SitGuru could not read your roles yet. Please refresh or contact support if this continues.'; if (lower.includes('failed to fetch') || lower.includes('network')) return 'Your profile loaded, but roles could not refresh because of a network issue. Please try again.'; if (lower.includes('does not exist') || lower.includes('schema cache')) return 'Your profile loaded, but SitGuru could not find the role records yet.'; return `Your profile loaded, but roles could not refresh: ${friendlyAuthError(message)}`; }
 function makeRoleOptions(roles: AppRole[]): RoleOption[] { return roles.map((role) => ({ role, label: roleLabel(role), description: roleDescription(role), icon: roleIcon(role), dashboardPath: roleDashboardPath(role) })); }
 function fallbackName(user: User) { const meta = user.user_metadata as Record<string, unknown>; const full = typeof meta.full_name === 'string' ? meta.full_name : undefined; const first = typeof meta.first_name === 'string' ? meta.first_name : undefined; return full?.trim() || first?.trim() || user.email?.split('@')[0] || null; }
 function signupIntentRole(user: User) { return normalizeRole((user.user_metadata as Record<string, unknown>).signup_intent) ?? undefined; }
@@ -63,15 +64,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!nextProfile && !nextError) nextError = 'Profile row was not found for this signed-in SitGuru account.';
 
-    let roleValues: unknown[] = [];
+    let roleRows: UserRoleRecord[] = [];
     try {
       const { data, error } = await supabase.from('user_roles').select(rolesSelect).eq('user_id', user.id).order('created_at', { ascending: true });
-      if (!error && Array.isArray(data)) roleValues = data.map((row) => (row as { role?: unknown }).role);
-    } catch {
-      roleValues = [];
+      if (error) nextError = nextError ?? friendlyRoleError(error.message);
+      else if (Array.isArray(data)) roleRows = data as UserRoleRecord[];
+    } catch (error) {
+      nextError = nextError ?? friendlyRoleError(error instanceof Error ? error.message : undefined);
     }
 
-    const nextRoles = uniqueRoles([...roleValues, nextProfile?.role, signupIntentRole(user)]);
+    const userRoleValues = roleRows.map((row) => normalizeRole(row.role)).filter((role): role is AppRole => Boolean(role));
+    const nextRoles = roleRows.length > 0 ? uniqueRoles(userRoleValues) : uniqueRoles([nextProfile?.role, signupIntentRole(user)]);
     setProfile(nextProfile); setRoles(nextRoles); setProfileError(nextError); setProfileLoading(false);
   }, [clearProfile]);
 
