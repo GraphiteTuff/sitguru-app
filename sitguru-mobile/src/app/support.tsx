@@ -86,7 +86,7 @@ export default function SupportScreen() {
 
         <View style={styles.safetyCard}><Text style={styles.sectionTitle}>Safety and privacy</Text><Text style={styles.body}>Keep messages, booking details, PawReport updates, and payments inside SitGuru.</Text><Text style={styles.body}>Live tracking only runs during active booked care.</Text><Text style={styles.body}>SitGuru support should only access details needed to help with care and account issues.</Text></View>
 
-        <View style={styles.card}><Text style={styles.sectionTitle}>Contact options</Text><View style={styles.buttonRow}><Button label="Message support" href="/conversation" primary /><Button label="Notifications" href="/notifications" /><Button label="Account settings" href="/account" /><Button label="Admin Operations Preview" href="/admin-operations" /><Button label="Backend Readiness" href="/backend-readiness" /><Button label="Release Readiness" href="/release-readiness" /><Button label="QA Test Center" href="/qa-test-center" /></View></View>
+        <View style={styles.card}><Text style={styles.sectionTitle}>Contact options</Text><View style={styles.buttonRow}><Button label="Message support" href="/conversation" primary /><Button label="Notifications" href="/notifications" /><Button label="Account settings" href="/account" /><Button label="Admin Operations Preview" href="/admin-operations" /><Button label="Backend Readiness" href="/backend-readiness" /><Button label="Supabase Schema Readiness" href="/schema-readiness" /><Button label="Release Readiness" href="/release-readiness" /><Button label="QA Test Center" href="/qa-test-center" /></View></View>
 
         <View style={styles.bottomDockSpacer} />
       </View>

@@ -18,7 +18,7 @@ const roles: Action[] = [
 ];
 
 const quickActions: Action[] = [
-  { label: 'My Pets / Pet Passports', href: '/pet-passports' },
+  { label: 'Supabase Schema Readiness', href: '/schema-readiness' },   { label: 'My Pets / Pet Passports', href: '/pet-passports' },
   { label: 'Find Care', href: '/find-care' },
   { label: 'Messages', href: '/conversation' },
   { label: 'Notifications', href: '/notifications' },
