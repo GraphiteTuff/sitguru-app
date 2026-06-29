@@ -11,6 +11,7 @@ import SitGuruIconBadge from '@/components/SitGuruIconBadge';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
+import { useAuth } from '@/hooks/useAuth';
 
 type RoleRoute =
   | '/pet-parent-setup'
@@ -86,6 +87,7 @@ const quickActions = [
 export default function RoleSelectionScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 720;
+  const { isAuthenticated, user } = useAuth();
 
   return (
     <SitGuruScreen scroll center={false} maxWidth={820}>
@@ -172,6 +174,16 @@ export default function RoleSelectionScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        <View style={styles.sessionCard}>
+          <Text style={styles.sessionEyebrow}>Auth session</Text>
+          <Text style={styles.sessionTitle}>
+            {isAuthenticated ? `Signed in as ${user?.email ?? 'SitGuru member'}` : 'Not signed in preview'}
+          </Text>
+          <Text style={styles.sessionText}>
+            Role dashboards remain open for visual testing. User roles will be connected in a later backend update.
+          </Text>
         </View>
 
         <View style={styles.sectionHeader}>
@@ -282,6 +294,32 @@ export default function RoleSelectionScreen() {
 }
 
 const styles = StyleSheet.create({
+  sessionCard: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 6,
+    padding: 16,
+  },
+  sessionEyebrow: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  sessionTitle: {
+    color: SitGuruColors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  sessionText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
   page: {
     gap: 18,
     paddingBottom: 14,
