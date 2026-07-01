@@ -1,5 +1,6 @@
 "use client";
 
+import { validateGuruProfileForBookability } from "@/lib/guruProfileValidation";
 import Link from "next/link";
 import {
   Suspense,
@@ -378,12 +379,7 @@ function isBookableSearchGuru(guru: GuruRow) {
     return false;
   }
 
-  return (
-    guru.is_bookable === true ||
-    applicationStatus === "bookable" ||
-    status === "bookable" ||
-    status === "active"
-  );
+  return validateGuruProfileForBookability({ guru, source: "gurus" }).isPublicVisible;
 }
 
 function normalizeFillInMatchValue(value?: string | null) {

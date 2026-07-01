@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
+import { validateGuruProfileForBookability } from "@/lib/guruProfileValidation";
 
 export const dynamic = "force-dynamic";
 
@@ -536,8 +537,7 @@ function normalizeApplicationStatus(profile: GuruProfile | null) {
 }
 
 function isBookable(profile: GuruProfile | null) {
-  const status = normalizeApplicationStatus(profile).toLowerCase();
-  return Boolean(profile?.is_bookable) || status === "bookable";
+  return validateGuruProfileForBookability({ guru: profile, source: "gurus" }).isBookable;
 }
 
 function calculateProfileCompletion(profile: GuruProfile | null) {

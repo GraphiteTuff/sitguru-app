@@ -13,10 +13,12 @@ import {
   Star,
   UserPlus,
   Users,
+  AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruRecordsTable from "./GuruRecordsTable";
+import { validateGuruProfileForBookability } from "@/lib/guruProfileValidation";
 import {
   CANONICAL_ROLE,
   PET_PARENT_DISPLAY_LABEL,
@@ -133,6 +135,11 @@ type GuruDisplayRow = {
   backgroundStatus: string;
   safetyStatus: string;
   bookable: boolean;
+  isPublicVisible: boolean;
+  adminStatus: string;
+  profileQualityStatus: string;
+  qualityClassification: string;
+  missingRequirements: string[];
   approvedThisWeek: boolean;
   flaggedForReview: boolean;
   setupStep: number;
@@ -1257,6 +1264,14 @@ function filterGuruRows(rows: GuruDisplayRow[], searchParams: SearchParams) {
       }
     }
 
+    if (filter) {
+      if (filter === "needs-setup") return row.qualityClassification === "needs_setup";
+      if (filter === "applications-received") return row.qualityClassification === "application_received";
+      if (filter === "orphaned-fallback") return ["orphaned_profile", "fallback_profile"].includes(row.qualityClassification);
+      if (filter === "cleanup-review") return ["cleanup_review", "duplicate_review"].includes(row.qualityClassification);
+      if (filter === "archived") return row.qualityClassification === "archived";
+    }
+
     if (queue) {
       if (queue === "pending-reviews") {
         return isPendingReviewRow(row);
@@ -1790,30 +1805,17 @@ async function getGuruManagementData(searchParams: SearchParams) {
   const realGuruMap = new Map<string, GuruRow>();
 
   for (const guru of gurus) {
-    const profile = profileMap.get(getGuruProfileKey(guru));
-
-    if (!isNonRealGuruRecord(guru, profile)) {
-      addGuruRecordToMap(realGuruMap, guru);
-    }
+    addGuruRecordToMap(realGuruMap, guru);
   }
 
   for (const profile of profiles.filter((profile) => isGuruProfile(profile))) {
-    const profileGuru = buildGuruRecordFromProfile(profile);
-
-    if (!isNonRealGuruRecord(profileGuru, profile)) {
-      addGuruRecordToMap(realGuruMap, profileGuru);
-    }
+    addGuruRecordToMap(realGuruMap, buildGuruRecordFromProfile(profile));
   }
 
   for (const authUser of authUsers.filter((authUser) =>
     isGuruAuthUser(authUser),
   )) {
-    const authGuru = buildGuruRecordFromAuthUser(authUser);
-    const profile = profileMap.get(getGuruProfileKey(authGuru));
-
-    if (!isNonRealGuruRecord(authGuru, profile)) {
-      addGuruRecordToMap(realGuruMap, authGuru);
-    }
+    addGuruRecordToMap(realGuruMap, buildGuruRecordFromAuthUser(authUser));
   }
 
   const seenGuruObjects = new Set<GuruRow>();
@@ -1822,6 +1824,15 @@ async function getGuruManagementData(searchParams: SearchParams) {
     seenGuruObjects.add(guru);
     return true;
   });
+
+  const duplicateKeys = new Map<string, number>();
+  for (const guru of liveGuruRows) {
+    const profile = profileMap.get(getGuruProfileKey(guru));
+    const duplicateKey = (getGuruEmail(guru, profile) || getGuruName(guru, profile)).toLowerCase();
+    if (duplicateKey && duplicateKey !== "—" && duplicateKey !== "guru") {
+      duplicateKeys.set(duplicateKey, (duplicateKeys.get(duplicateKey) || 0) + 1);
+    }
+  }
 
   const rows: GuruDisplayRow[] = liveGuruRows.map((guru) => {
     const profile = profileMap.get(getGuruProfileKey(guru));
@@ -1858,6 +1869,13 @@ async function getGuruManagementData(searchParams: SearchParams) {
     const publicHref = publicIdentifier
       ? `/guru/${encodeURIComponent(publicIdentifier)}`
       : "/search";
+    const duplicateKey = (email || name).toLowerCase();
+    const quality = validateGuruProfileForBookability({
+      guru,
+      profile,
+      duplicateCandidate: (duplicateKeys.get(duplicateKey) || 0) > 1,
+      source: asTrimmedString(guru.source) || "gurus",
+    });
 
     return {
       id,
@@ -1880,11 +1898,16 @@ async function getGuruManagementData(searchParams: SearchParams) {
       experience: getGuruExperience(guru),
       applicationStatus,
       statusLabel: getApplicationStatusLabel(applicationStatus),
-      profileQuality: getProfileQuality(guru),
+      profileQuality: quality.profileQualityStatus,
       identityStatus,
       backgroundStatus,
       safetyStatus,
-      bookable: isGuruBookable(guru),
+      bookable: quality.isBookable,
+      isPublicVisible: quality.isPublicVisible,
+      adminStatus: quality.adminStatus,
+      profileQualityStatus: quality.profileQualityStatus,
+      qualityClassification: quality.classification,
+      missingRequirements: quality.missingRequirements,
       approvedThisWeek: isGuruApprovedThisWeek(guru),
       flaggedForReview,
       setupStep,
@@ -1972,8 +1995,14 @@ async function getGuruManagementData(searchParams: SearchParams) {
       ).length,
       approved: rows.filter((row) => row.applicationStatus === "approved")
         .length,
-      bookable: rows.filter((row) => row.applicationStatus === "bookable")
-        .length,
+      bookable: rows.filter((row) => row.bookable).length,
+      incomplete: rows.filter((row) => row.qualityClassification === "needs_setup").length,
+      missingEmail: rows.filter((row) => row.missingRequirements.includes("valid email")).length,
+      missingLocation: rows.filter((row) => row.missingRequirements.includes("location or service area")).length,
+      placeholderNames: rows.filter((row) => row.missingRequirements.includes("real display name")).length,
+      orphanedRecords: rows.filter((row) => row.qualityClassification === "orphaned_profile").length,
+      duplicateCandidates: rows.filter((row) => row.qualityClassification === "duplicate_review").length,
+      archivedTestRecords: rows.filter((row) => row.qualityClassification === "archived" || row.missingRequirements.includes("not test account")).length,
       paused: rows.filter(
         (row) =>
           row.applicationStatus === "suspended" ||
@@ -2563,7 +2592,7 @@ function GuruOnboardingPacketReviewCard({
           value={number(data.submitted)}
         />
         <MiniMetric
-          icon={<AlertTriangleIcon />}
+          icon={<AlertTriangle size={18} />}
           label="Needs Fix"
           value={number(data.needsFix)}
         />
@@ -2721,25 +2750,6 @@ function GuruCompactSnapshot({
         </div>
       </DashboardCard>
     </section>
-  );
-}
-
-function AlertTriangleIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-[18px] w-[18px]"
-      aria-hidden="true"
-    >
-      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-      <path d="M12 9v4" />
-      <path d="M12 17h.01" />
-    </svg>
   );
 }
 
@@ -2948,6 +2958,26 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
             detail={`${number(guruData.totals.missingStep5)} missing this step`}
             href="/admin/gurus?setupStep=5"
           />
+        </section>
+
+        <section className="rounded-[30px] border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
+            Dry-run Guru audit
+          </p>
+          <h2 className="mt-1 text-xl font-black text-amber-950">
+            Diagnostic visibility report before changing records
+          </h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MiniMetric icon={<Users size={18} />} label="Total Gurus" value={number(guruData.totals.all)} />
+            <MiniMetric icon={<BadgeCheck size={18} />} label="Active bookable" value={number(guruData.totals.bookable)} />
+            <MiniMetric icon={<FileSearch size={18} />} label="Incomplete" value={number(guruData.totals.incomplete)} />
+            <MiniMetric icon={<FileText size={18} />} label="Missing email" value={number(guruData.totals.missingEmail)} />
+            <MiniMetric icon={<Sparkles size={18} />} label="Missing location" value={number(guruData.totals.missingLocation)} />
+            <MiniMetric icon={<Users size={18} />} label="Placeholder names" value={number(guruData.totals.placeholderNames)} />
+            <MiniMetric icon={<AlertTriangle size={18} />} label="Orphaned records" value={number(guruData.totals.orphanedRecords)} />
+            <MiniMetric icon={<ClipboardCheck size={18} />} label="Duplicate candidates" value={number(guruData.totals.duplicateCandidates)} />
+            <MiniMetric icon={<ShieldCheck size={18} />} label="Archived/test" value={number(guruData.totals.archivedTestRecords)} />
+          </div>
         </section>
 
         {!hasFocusedQueue ? <GuruCompactSnapshot guruData={guruData} /> : null}
