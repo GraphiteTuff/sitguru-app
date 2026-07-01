@@ -44,6 +44,11 @@ type GuruDisplayRow = {
   backgroundStatus: string;
   safetyStatus: string;
   bookable: boolean;
+  isPublicVisible?: boolean;
+  adminStatus?: string;
+  profileQualityStatus?: string;
+  qualityClassification?: string;
+  missingRequirements?: string[];
   approvedThisWeek?: boolean;
   flaggedForReview?: boolean;
   setupStep?: number;
@@ -149,6 +154,9 @@ function getGuruEarnings(guru: GuruDisplayRow) {
 }
 
 function getGuruCompletion(guru: GuruDisplayRow) {
+  const validationCompletion = Number((guru as Record<string, unknown>).completionPercentage ?? (guru as Record<string, unknown>).completion_percentage);
+  if (Number.isFinite(validationCompletion) && validationCompletion >= 0) return Math.round(validationCompletion);
+  if (Array.isArray(guru.missingRequirements)) return Math.max(0, Math.round(((13 - guru.missingRequirements.length) / 13) * 100));
   if (guru.bookable) return 100;
 
   const step = guru.setupStep || 0;
@@ -209,6 +217,7 @@ function getGuruStatusClasses(guru: GuruDisplayRow) {
 
 function getGuruStatusLabel(guru: GuruDisplayRow) {
   if (guru.bookable) return "Bookable Guru";
+  if (guru.qualityClassification) return guru.qualityClassification.replace(/_/g, " ");
 
   return guru.statusLabel || "Application Received";
 }
@@ -232,6 +241,12 @@ function searchMatches(guru: GuruDisplayRow, query: string) {
     guru.safetyStatus,
     guru.bookable ? "bookable active public visible" : "not bookable hidden",
     guru.setupStepLabel || "",
+    guru.qualityClassification || "",
+    guru.adminStatus || "",
+    guru.profileQualityStatus || "",
+    guru.isPublicVisible ? "public visible" : "not public visible",
+    guru.bookable ? "bookable" : "not bookable",
+    ...(guru.missingRequirements || []),
     guru.setupStep ? `step ${guru.setupStep}` : "not started",
   ]
     .join(" ")
@@ -356,9 +371,7 @@ export default function GuruRecordsTable({
               Guru queue
             </p>
             <p className="mt-1 text-xs font-bold text-emerald-900">
-              Showing {number(visibleGurus.length)} of {number(gurus.length)}{" "}
-              real Guru records. Demo, test, fake, bot, and deleted placeholder
-              rows are excluded before this table renders.
+              Showing {number(visibleGurus.length)} of {number(gurus.length)} Guru-source records with dry-run diagnostics. Fallback, incomplete, orphaned, duplicate, and placeholder rows are preserved for review, but validation controls bookability.
             </p>
           </div>
 
@@ -379,7 +392,37 @@ export default function GuruRecordsTable({
               href="/admin/gurus?status=bookable"
               className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
             >
-              Bookable
+              Active Bookable
+            </Link>
+            <Link
+              href="/admin/gurus?filter=needs-setup"
+              className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
+            >
+              Needs Setup
+            </Link>
+            <Link
+              href="/admin/gurus?filter=applications-received"
+              className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
+            >
+              Applications Received
+            </Link>
+            <Link
+              href="/admin/gurus?filter=orphaned-fallback"
+              className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
+            >
+              Orphaned/Fallback
+            </Link>
+            <Link
+              href="/admin/gurus?filter=cleanup-review"
+              className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
+            >
+              Cleanup Review
+            </Link>
+            <Link
+              href="/admin/gurus?filter=archived"
+              className="inline-flex items-center rounded-2xl bg-white px-4 py-2 text-xs font-black text-emerald-900 ring-1 ring-emerald-100 transition hover:bg-emerald-50"
+            >
+              Archived
             </Link>
             <Link
               href="/admin/gurus?filter=profile-updates"
@@ -452,9 +495,10 @@ export default function GuruRecordsTable({
                     </div>
                   </div>
 
-                  <p className="text-sm font-bold text-slate-600">
-                    {getGuruLocationLabel(guru)}
-                  </p>
+                  <div className="text-sm font-bold text-slate-600">
+                    <p>{getGuruLocationLabel(guru)}</p>
+                    <p className="mt-1 text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">Role: Guru • Source: {guru.recordSourceLabel || "Canonical gurus row"}</p>
+                  </div>
 
                   <div>
                     <span
@@ -476,6 +520,14 @@ export default function GuruRecordsTable({
                     >
                       {completion}%
                     </span>
+                    <p className="mt-1 text-[11px] font-bold text-slate-500">
+                      Public: {guru.isPublicVisible ? "Yes" : "No"} • Bookable: {guru.bookable ? "Yes" : "No"}
+                    </p>
+                    {guru.missingRequirements?.length ? (
+                      <p className="mt-1 line-clamp-2 text-[11px] font-semibold text-rose-700">
+                        Missing: {guru.missingRequirements.join(", ")}
+                      </p>
+                    ) : null}
                   </div>
 
                   <p className="text-sm font-black text-slate-950">
@@ -511,8 +563,12 @@ export default function GuruRecordsTable({
                       className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-green-800 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-green-900"
                     >
                       <Settings size={14} />
-                      Admin Cleanup
+                      Controls
                     </Link>
+                    <Link href={`${adminHref}?panel=source-data`} className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50">View source data</Link>
+                    <Link href={`${adminHref}?action=request-completion`} className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 shadow-sm transition hover:bg-amber-100">Request completion</Link>
+                    <Link href={`${adminHref}?action=mark-reviewed`} className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50">Mark reviewed</Link>
+                    <Link href={`${adminHref}?action=archive-restore-test-merge`} className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800 shadow-sm transition hover:bg-rose-100">Archive / Restore / Test / Merge</Link>
                   </div>
                 </div>
               );
