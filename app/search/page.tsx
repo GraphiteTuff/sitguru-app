@@ -78,6 +78,15 @@ type GuruRow = {
   services?: string[] | null;
   distance_miles?: number | null;
   service_radius_display?: number | null;
+  can_show_in_search?: boolean | null;
+  can_view_profile?: boolean | null;
+  can_book?: boolean | null;
+  is_placeholder?: boolean | null;
+  profile_url?: string | null;
+  booking_url?: string | null;
+  map_latitude?: number | string | null;
+  map_longitude?: number | string | null;
+  display_status?: string | null;
 };
 
 type GuruServiceRate = {
@@ -530,6 +539,8 @@ function isPublicSearchGuru(guru: GuruRow) {
 }
 
 function isPlaceholderSearchGuru(guru: GuruRow) {
+  if (guru.is_placeholder === true) return true;
+
   const adminStatus = String(guru.admin_status || "").trim().toLowerCase();
   const publicStatus = String(guru.public_status || "").trim().toLowerCase();
   const qualityStatus = String(guru.profile_quality_status || "")
@@ -565,8 +576,11 @@ function isBookableSearchGuru(guru: GuruRow) {
     .trim()
     .toLowerCase();
 
+  if (guru.can_book === true && !isPlaceholderSearchGuru(guru)) return true;
+
   if (!isPublicSearchGuru(guru)) return false;
   if (isPlaceholderSearchGuru(guru)) return false;
+  if (guru.can_book === false) return false;
   if (hasExplicitFalse(guru.is_bookable)) return false;
   if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
   if (hasExplicitFalse(guru.accepting_bookings)) return false;
@@ -650,6 +664,8 @@ function shouldDisplaySearchGuru(guru: GuruRow) {
 }
 
 function isDisplayOnlySearchGuru(guru: GuruRow) {
+  if (guru.can_book === true && !isPlaceholderSearchGuru(guru)) return false;
+
   return (
     !isBookableSearchGuru(guru) ||
     isPlaceholderSearchGuru(guru) ||
@@ -713,10 +729,18 @@ function getGuruPublicIdentifier(guru: GuruRow) {
 }
 
 function getGuruHref(guru: GuruRow) {
+  const apiProfileUrl = String(guru.profile_url || "").trim();
+
+  if (apiProfileUrl.startsWith("/guru/")) return apiProfileUrl;
+
   return `${PUBLIC_GURU_PROFILE_BASE_PATH}/${getGuruPublicIdentifier(guru)}`;
 }
 
 function getBookGuruHref(guru: GuruRow) {
+  const apiBookingUrl = String(guru.booking_url || "").trim();
+
+  if (apiBookingUrl.startsWith("/book/")) return apiBookingUrl;
+
   return `${BOOK_GURU_BASE_PATH}/${getGuruPublicIdentifier(guru)}`;
 }
 
@@ -819,11 +843,15 @@ function parseCoordinate(value: unknown) {
 }
 
 function getGuruLatitude(guru: GuruRow) {
-  return parseCoordinate(guru.service_latitude ?? guru.latitude ?? guru.lat);
+  return parseCoordinate(
+    guru.map_latitude ?? guru.service_latitude ?? guru.latitude ?? guru.lat,
+  );
 }
 
 function getGuruLongitude(guru: GuruRow) {
-  return parseCoordinate(guru.service_longitude ?? guru.longitude ?? guru.lng);
+  return parseCoordinate(
+    guru.map_longitude ?? guru.service_longitude ?? guru.longitude ?? guru.lng,
+  );
 }
 
 function getGuruRadius(guru: GuruRow) {
@@ -1085,6 +1113,7 @@ function getProviderMapMarkerRows(
         service_radius_miles: getGuruRadius(guru),
         service_radius_display: guru.service_radius_display || getGuruRadius(guru),
         profile_url: getGuruHref(guru),
+        booking_url: getBookGuruHref(guru),
         href: getGuruHref(guru),
         url: getGuruHref(guru),
       };
@@ -1420,6 +1449,24 @@ function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
       primary.accepting_bookings,
       secondary.accepting_bookings,
     ),
+    can_show_in_search: chooseSearchBoolean(
+      primary.can_show_in_search,
+      secondary.can_show_in_search,
+    ),
+    can_view_profile: chooseSearchBoolean(
+      primary.can_view_profile,
+      secondary.can_view_profile,
+    ),
+    can_book: chooseSearchBoolean(primary.can_book, secondary.can_book),
+    is_placeholder: chooseSearchBoolean(
+      primary.is_placeholder,
+      secondary.is_placeholder,
+    ),
+    profile_url: chooseTextValue(primary.profile_url, secondary.profile_url) as string | null,
+    booking_url: chooseTextValue(primary.booking_url, secondary.booking_url) as string | null,
+    map_latitude: chooseNumberValue(primary.map_latitude, secondary.map_latitude) as string | number | null,
+    map_longitude: chooseNumberValue(primary.map_longitude, secondary.map_longitude) as string | number | null,
+    display_status: chooseTextValue(primary.display_status, secondary.display_status) as string | null,
     services: mergeServices(primary.services, secondary.services),
   };
 }
@@ -2385,7 +2432,10 @@ function SearchPageContent() {
                         String(guru.slug || "").toLowerCase() ===
                           selectedGuruSlug.toLowerCase()),
                   );
-                  const bookingDisabled = isDisplayOnlySearchGuru(guru);
+                  const bookingDisabled =
+                    guru.can_book === true && !isPlaceholderSearchGuru(guru)
+                      ? false
+                      : isDisplayOnlySearchGuru(guru);
                   const isAcademyCertified = certifiedGuruUserIds.has(
                     getGuruCertificationUserId(guru),
                   );
@@ -2501,7 +2551,9 @@ function SearchPageContent() {
                               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-bold text-emerald-800">
                                 {guruRateDisplay.primary}
                                 <span className="ml-1 font-semibold text-emerald-700">
-                                  {guruRateDisplay.detail}
+                                  {guruRateDisplay.primary === "Custom quote"
+                                    ? "· Book through SitGuru"
+                                    : guruRateDisplay.detail}
                                 </span>
                               </span>
 
