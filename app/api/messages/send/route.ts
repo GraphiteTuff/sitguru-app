@@ -34,6 +34,7 @@ type ProfileRow = {
   id: string;
   full_name?: string | null;
   display_name?: string | null;
+  name?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
@@ -50,8 +51,12 @@ type ProfileRow = {
 type GuruRow = {
   id?: string | number | null;
   user_id?: string | null;
+  slug?: string | null;
   display_name?: string | null;
   full_name?: string | null;
+  name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   email?: string | null;
   phone?: string | null;
   phone_number?: string | null;
@@ -60,6 +65,7 @@ type GuruRow = {
 };
 
 type UserRoleRow = {
+  user_id?: string | null;
   role?: string | null;
 };
 
@@ -69,6 +75,19 @@ type RecipientContact = {
   name: string;
   email: string;
   phone: string;
+};
+
+type RecipientResolution = {
+  userId: string;
+  roleHint: string;
+  nameHint: string;
+  warnings: string[];
+};
+
+type DirectConversationContext = {
+  conversation: ConversationRow;
+  recipient: RecipientContact;
+  currentUserRole: string;
 };
 
 type DeliveryResult = {
@@ -82,6 +101,10 @@ type DeliveryResult = {
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function safeBoolean(value: unknown) {
+  return value === true || safeString(value).toLowerCase() === "true";
 }
 
 function normalizeRole(role?: string | null) {
@@ -102,8 +125,7 @@ function normalizeRole(role?: string | null) {
     value === "site_admin" ||
     value === "site-admin" ||
     value.includes("admin") ||
-    value === "founder" ||
-    value === "owner"
+    value === "founder"
   ) {
     return "admin";
   }
@@ -114,6 +136,12 @@ function normalizeRole(role?: string | null) {
 
 function isAdminRole(role?: string | null) {
   return normalizeRole(role) === "admin";
+}
+
+function isProbablyUuid(value?: string | null) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    safeString(value),
+  );
 }
 
 function getBaseUrl() {
@@ -190,6 +218,7 @@ function getProfileName(profile?: ProfileRow | null) {
   const candidate =
     profile.full_name ||
     profile.display_name ||
+    profile.name ||
     (profile.first_name && profile.last_name
       ? `${profile.first_name} ${profile.last_name}`
       : null) ||
@@ -215,7 +244,18 @@ function getProfilePhone(profile?: ProfileRow | null) {
 function getGuruName(guru?: GuruRow | null) {
   if (!guru) return "";
 
-  return safeString(guru.display_name) || safeString(guru.full_name) || safeString(guru.email).split("@")[0];
+  const fullNameFromParts = [guru.first_name, guru.last_name]
+    .map((part) => safeString(part))
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    safeString(guru.display_name) ||
+    safeString(guru.full_name) ||
+    safeString(guru.name) ||
+    fullNameFromParts ||
+    safeString(guru.email).split("@")[0]
+  );
 }
 
 function getGuruPhone(guru?: GuruRow | null) {
@@ -227,6 +267,22 @@ function getGuruPhone(guru?: GuruRow | null) {
     safeString(guru.mobile_phone) ||
     safeString(guru.cell_phone)
   );
+}
+
+function titleFromSlug(value: string) {
+  return value
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function normalizeText(value?: string | null) {
+  return safeString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function safeRows<T>(
@@ -265,7 +321,48 @@ async function getProfile(userId: string) {
   return data || null;
 }
 
-async function getGuru(userId: string) {
+async function getProfileByEmail(email: string) {
+  const cleanEmail = safeString(email).toLowerCase();
+  if (!cleanEmail) return null;
+
+  const rows = await safeRows<ProfileRow>(
+    supabaseAdmin.from("profiles").select("*").ilike("email", cleanEmail).limit(1),
+    "profiles by email",
+  );
+
+  return rows[0] || null;
+}
+
+async function getProfilesByName(name: string) {
+  const cleanName = safeString(name);
+  if (!cleanName) return [];
+
+  const [fullNameRows, displayNameRows, nameRows] = await Promise.all([
+    safeRows<ProfileRow>(
+      supabaseAdmin.from("profiles").select("*").ilike("full_name", cleanName).limit(5),
+      "profiles by full_name",
+    ),
+    safeRows<ProfileRow>(
+      supabaseAdmin.from("profiles").select("*").ilike("display_name", cleanName).limit(5),
+      "profiles by display_name",
+    ),
+    safeRows<ProfileRow>(
+      supabaseAdmin.from("profiles").select("*").ilike("name", cleanName).limit(5),
+      "profiles by name",
+    ),
+  ]);
+
+  const seen = new Set<string>();
+
+  return [...fullNameRows, ...displayNameRows, ...nameRows].filter((profile) => {
+    const id = safeString(profile.id);
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+async function getGuruByUserId(userId: string) {
   if (!userId) return null;
 
   const { data, error } = await supabaseAdmin
@@ -284,7 +381,7 @@ async function getGuru(userId: string) {
 
 async function getUserRoles(userId: string) {
   return safeRows<UserRoleRow>(
-    supabaseAdmin.from("user_roles").select("role").eq("user_id", userId),
+    supabaseAdmin.from("user_roles").select("user_id, role").eq("user_id", userId),
     "user_roles",
   );
 }
@@ -293,7 +390,11 @@ async function resolveRole(params: {
   userId: string;
   participantRole?: string | null;
   conversation?: ConversationRow | null;
+  preferredRole?: string | null;
 }) {
+  const preferredRole = normalizeRole(params.preferredRole);
+  if (preferredRole && preferredRole !== "user") return preferredRole;
+
   const participantRole = normalizeRole(params.participantRole);
   if (participantRole && participantRole !== "user") return participantRole;
 
@@ -305,28 +406,280 @@ async function resolveRole(params: {
   if (profileRole && profileRole !== "user") return profileRole;
 
   const roles = await getUserRoles(params.userId);
-  const roleFromRows = roles.map((row) => normalizeRole(row.role)).find((role) => role && role !== "user");
+  const roleFromRows = roles
+    .map((row) => normalizeRole(row.role))
+    .find((role) => role && role !== "user");
   if (roleFromRows) return roleFromRows;
 
   if (params.conversation?.guru_id === params.userId) return "guru";
   if (params.conversation?.customer_id === params.userId) return "customer";
   if (params.conversation?.started_by_user_id === params.userId) return "admin";
 
-  const guru = await getGuru(params.userId);
+  const guru = await getGuruByUserId(params.userId);
   if (guru?.user_id) return "guru";
 
   return "customer";
 }
 
 async function buildContact(userId: string, role: string): Promise<RecipientContact> {
-  const [profile, guru] = await Promise.all([getProfile(userId), getGuru(userId)]);
+  const [profile, guru] = await Promise.all([getProfile(userId), getGuruByUserId(userId)]);
+  const normalizedRole = normalizeRole(role);
 
   return {
     userId,
-    role,
-    name: role === "guru" ? getGuruName(guru) || getProfileName(profile) : getProfileName(profile),
+    role: normalizedRole,
+    name:
+      normalizedRole === "guru"
+        ? getGuruName(guru) || getProfileName(profile)
+        : isAdminRole(normalizedRole)
+          ? "SitGuru Admin"
+          : getProfileName(profile),
     email: safeString(profile?.email) || safeString(guru?.email),
     phone: getProfilePhone(profile) || getGuruPhone(guru),
+  };
+}
+
+async function resolveUserIdFromGuruCandidate(guru: GuruRow | null | undefined) {
+  if (!guru) return "";
+
+  const userId = safeString(guru.user_id);
+  if (userId) return userId;
+
+  const id = safeString(guru.id);
+  if (isProbablyUuid(id)) return id;
+
+  const profile = await getProfileByEmail(safeString(guru.email));
+  if (profile?.id) return profile.id;
+
+  return "";
+}
+
+async function findGuruCandidatesBySlug(slug: string) {
+  const cleanSlug = safeString(slug).toLowerCase();
+  const derivedName = titleFromSlug(cleanSlug);
+  const candidates: GuruRow[] = [];
+
+  if (!cleanSlug) return candidates;
+
+  const candidateSources = await Promise.all([
+    safeRows<GuruRow>(
+      supabaseAdmin.from("public_guru_search_profiles").select("*").eq("slug", cleanSlug).limit(5),
+      "public_guru_search_profiles by slug",
+    ),
+    safeRows<GuruRow>(
+      supabaseAdmin.from("gurus").select("*").eq("slug", cleanSlug).limit(5),
+      "gurus by slug",
+    ),
+    safeRows<GuruRow>(
+      supabaseAdmin.from("public_guru_search_profiles").select("*").ilike("full_name", derivedName).limit(5),
+      "public_guru_search_profiles by full_name",
+    ),
+    safeRows<GuruRow>(
+      supabaseAdmin.from("gurus").select("*").ilike("full_name", derivedName).limit(5),
+      "gurus by full_name",
+    ),
+    safeRows<GuruRow>(
+      supabaseAdmin.from("gurus").select("*").ilike("display_name", derivedName).limit(5),
+      "gurus by display_name",
+    ),
+  ]);
+
+  candidateSources.forEach((rows) => candidates.push(...rows));
+
+  if (!candidates.length && derivedName) {
+    const profiles = await getProfilesByName(derivedName);
+    profiles.forEach((profile) => {
+      candidates.push({
+        id: profile.id,
+        user_id: profile.id,
+        display_name: profile.display_name || profile.full_name || profile.name,
+        full_name: profile.full_name,
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        phone_number: profile.phone_number,
+        mobile_phone: profile.mobile_phone,
+        cell_phone: profile.cell_phone,
+      });
+    });
+  }
+
+  const seen = new Set<string>();
+
+  return candidates.filter((candidate) => {
+    const key =
+      safeString(candidate.user_id) ||
+      safeString(candidate.email).toLowerCase() ||
+      safeString(candidate.id) ||
+      getGuruName(candidate).toLowerCase();
+
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function findGuruCandidatesById(guruId: string) {
+  const cleanGuruId = safeString(guruId);
+  const candidates: GuruRow[] = [];
+
+  if (!cleanGuruId) return candidates;
+
+  const sourceQueries: Promise<GuruRow[]>[] = [
+    safeRows<GuruRow>(
+      supabaseAdmin.from("public_guru_search_profiles").select("*").eq("id", cleanGuruId).limit(5),
+      "public_guru_search_profiles by id",
+    ),
+    safeRows<GuruRow>(
+      supabaseAdmin.from("gurus").select("*").eq("id", cleanGuruId).limit(5),
+      "gurus by id",
+    ),
+    safeRows<GuruRow>(
+      supabaseAdmin.from("public_guru_search_profiles").select("*").eq("user_id", cleanGuruId).limit(5),
+      "public_guru_search_profiles by user_id",
+    ),
+    safeRows<GuruRow>(
+      supabaseAdmin.from("gurus").select("*").eq("user_id", cleanGuruId).limit(5),
+      "gurus by user_id",
+    ),
+  ];
+
+  if (!isProbablyUuid(cleanGuruId)) {
+    sourceQueries.push(findGuruCandidatesBySlug(cleanGuruId));
+  }
+
+  const sourceResults = await Promise.all(sourceQueries);
+  sourceResults.forEach((rows) => candidates.push(...rows));
+
+  const seen = new Set<string>();
+
+  return candidates.filter((candidate) => {
+    const key =
+      safeString(candidate.user_id) ||
+      safeString(candidate.email).toLowerCase() ||
+      safeString(candidate.id) ||
+      getGuruName(candidate).toLowerCase();
+
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function findAdminRecipient(currentUserId: string) {
+  const roleRows = await safeRows<UserRoleRow>(
+    supabaseAdmin.from("user_roles").select("user_id, role").ilike("role", "%admin%"),
+    "admin user_roles",
+  );
+
+  const adminUserIdFromRoles = roleRows
+    .map((row) => safeString(row.user_id))
+    .find((userId) => userId && userId !== currentUserId);
+
+  if (adminUserIdFromRoles) return adminUserIdFromRoles;
+
+  const profileRows = await safeRows<ProfileRow>(
+    supabaseAdmin.from("profiles").select("*").ilike("role", "%admin%").limit(10),
+    "admin profiles by role",
+  );
+
+  return (
+    profileRows
+      .map((profile) => safeString(profile.id))
+      .find((userId) => userId && userId !== currentUserId) || ""
+  );
+}
+
+async function resolveDirectRecipient(params: {
+  body: Record<string, unknown> | null;
+  currentUserId: string;
+  currentUserRole: string;
+}): Promise<RecipientResolution> {
+  const warnings: string[] = [];
+  const recipientId = safeString(params.body?.recipientId);
+  const recipientName = safeString(params.body?.recipientName);
+  const guruId = safeString(params.body?.guruId);
+  const guruSlug = safeString(params.body?.guruSlug) || safeString(params.body?.guru);
+  const customerId = safeString(params.body?.customerId);
+  const adminMode = safeBoolean(params.body?.adminMode);
+
+  if (recipientId) {
+    return {
+      userId: recipientId,
+      roleHint: adminMode ? "admin" : "user",
+      nameHint: recipientName,
+      warnings,
+    };
+  }
+
+  if (guruId || guruSlug) {
+    const candidates = guruId
+      ? await findGuruCandidatesById(guruId)
+      : await findGuruCandidatesBySlug(guruSlug);
+
+    for (const candidate of candidates) {
+      const userId = await resolveUserIdFromGuruCandidate(candidate);
+
+      if (userId) {
+        return {
+          userId,
+          roleHint: "guru",
+          nameHint: recipientName || getGuruName(candidate),
+          warnings,
+        };
+      }
+    }
+
+    warnings.push(
+      `Guru recipient could not be resolved from ${guruId ? `guruId ${guruId}` : `slug ${guruSlug}`}.`,
+    );
+  }
+
+  if (customerId) {
+    return {
+      userId: customerId,
+      roleHint: "customer",
+      nameHint: recipientName,
+      warnings,
+    };
+  }
+
+  if (adminMode) {
+    const adminUserId = await findAdminRecipient(params.currentUserId);
+
+    if (adminUserId) {
+      return {
+        userId: adminUserId,
+        roleHint: "admin",
+        nameHint: "SitGuru Admin",
+        warnings,
+      };
+    }
+
+    warnings.push("No SitGuru Admin recipient could be resolved.");
+  }
+
+  if (recipientName) {
+    const profiles = await getProfilesByName(recipientName);
+    const matchingProfile = profiles.find((profile) => profile.id !== params.currentUserId);
+
+    if (matchingProfile?.id) {
+      return {
+        userId: matchingProfile.id,
+        roleHint: normalizeRole(
+          matchingProfile.role || matchingProfile.user_role || matchingProfile.account_type || matchingProfile.type,
+        ),
+        nameHint: recipientName,
+        warnings,
+      };
+    }
+  }
+
+  return {
+    userId: "",
+    roleHint: "user",
+    nameHint: recipientName,
+    warnings,
   };
 }
 
@@ -494,12 +847,13 @@ async function auditMessageSend(params: {
   conversationId: string;
   recipient: RecipientContact;
   delivery: DeliveryResult;
+  createdNewConversation: boolean;
 }) {
   try {
     await supabaseAdmin.from("admin_audit_logs").insert({
       actor_id: params.actorId,
       actor_email: params.actorEmail,
-      action: "message_sent",
+      action: params.createdNewConversation ? "message_thread_created" : "message_sent",
       area: "messages",
       target_type: "conversation",
       target_id: params.conversationId,
@@ -560,6 +914,232 @@ function chooseRecipient(params: {
   );
 }
 
+async function findExistingDirectConversation(params: {
+  customerId: string;
+  guruId: string;
+  bookingId: string;
+}) {
+  if (!params.customerId && !params.guruId) return null;
+
+  let query = supabaseAdmin
+    .from("conversations")
+    .select("*")
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .limit(1);
+
+  if (params.customerId) {
+    query = query.eq("customer_id", params.customerId);
+  }
+
+  if (params.guruId) {
+    query = query.eq("guru_id", params.guruId);
+  }
+
+  if (params.bookingId) {
+    query = query.eq("booking_id", params.bookingId);
+  } else {
+    query = query.is("booking_id", null);
+  }
+
+  const rows = await safeRows<ConversationRow>(query, "existing direct conversation");
+
+  return rows[0] || null;
+}
+
+async function ensureDirectConversation(params: {
+  body: Record<string, unknown> | null;
+  currentUserId: string;
+  currentUserRole: string;
+  recipient: RecipientContact;
+  topic: string;
+  preview: string;
+}) {
+  const now = new Date().toISOString();
+  const bookingId = safeString(params.body?.bookingId);
+  const subject = safeString(params.body?.subject) || params.topic || "Direct Message";
+  const requestedCustomerId = safeString(params.body?.customerId);
+  const requestedGuruId = safeString(params.body?.guruId);
+  const recipientRole = normalizeRole(params.recipient.role);
+  const currentUserRole = normalizeRole(params.currentUserRole);
+
+  const customerId =
+    requestedCustomerId ||
+    (currentUserRole === "customer" ? params.currentUserId : "") ||
+    (recipientRole === "customer" ? params.recipient.userId : "") ||
+    params.currentUserId;
+
+  const guruId =
+    (recipientRole === "guru" ? params.recipient.userId : "") ||
+    (currentUserRole === "guru" ? params.currentUserId : "") ||
+    (isProbablyUuid(requestedGuruId) ? requestedGuruId : "");
+
+  const existingConversation = await findExistingDirectConversation({
+    customerId,
+    guruId,
+    bookingId,
+  });
+
+  if (existingConversation?.id) {
+    return {
+      conversation: existingConversation,
+      createdNewConversation: false,
+    };
+  }
+
+  const insertPayload = {
+    customer_id: customerId || null,
+    guru_id: guruId || null,
+    booking_id: bookingId || null,
+    started_by_user_id: params.currentUserId,
+    subject,
+    topic: params.topic,
+    status: "open",
+    last_message_at: now,
+    last_message_preview: params.preview,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from("conversations")
+    .insert(insertPayload)
+    .select("*")
+    .single<ConversationRow>();
+
+  if (error || !data?.id) {
+    throw new Error(error?.message || "Unable to create message thread.");
+  }
+
+  return {
+    conversation: data,
+    createdNewConversation: true,
+  };
+}
+
+async function loadExistingConversationContext(params: {
+  conversationId: string;
+  currentUserId: string;
+  body: Record<string, unknown> | null;
+}): Promise<DirectConversationContext> {
+  const [{ data: conversation, error: conversationError }, participants] = await Promise.all([
+    supabaseAdmin
+      .from("conversations")
+      .select("*")
+      .eq("id", params.conversationId)
+      .maybeSingle<ConversationRow>(),
+    safeRows<ConversationParticipantRow>(
+      supabaseAdmin
+        .from("conversation_participants")
+        .select("*")
+        .eq("conversation_id", params.conversationId),
+      "conversation_participants",
+    ),
+  ]);
+
+  if (conversationError || !conversation) {
+    throw new Error("Message thread was not found.");
+  }
+
+  const participantRole = participants.find((participant) => participant.user_id === params.currentUserId)?.role;
+  const currentUserRole = await resolveRole({
+    userId: params.currentUserId,
+    participantRole,
+    conversation,
+  });
+
+  const allowedUserIds = new Set(
+    [
+      conversation.customer_id || "",
+      conversation.guru_id || "",
+      conversation.started_by_user_id || "",
+      ...participants.map((participant) => participant.user_id || ""),
+    ].filter(Boolean),
+  );
+
+  if (!allowedUserIds.has(params.currentUserId) && !isAdminRole(currentUserRole)) {
+    throw new Error("You do not have access to this message thread.");
+  }
+
+  const recipientUserId =
+    chooseRecipient({
+      currentUserId: params.currentUserId,
+      currentUserRole,
+      conversation,
+      participants,
+    }) || safeString(params.body?.recipientId);
+
+  if (!recipientUserId) {
+    throw new Error("SitGuru could not find the other participant for this thread.");
+  }
+
+  const recipientRole = await resolveRole({
+    userId: recipientUserId,
+    participantRole: participants.find((participant) => participant.user_id === recipientUserId)?.role,
+    conversation,
+  });
+
+  const recipient = await buildContact(recipientUserId, recipientRole);
+
+  return {
+    conversation,
+    recipient,
+    currentUserRole,
+  };
+}
+
+async function loadNewConversationContext(params: {
+  body: Record<string, unknown> | null;
+  currentUserId: string;
+  currentUserRole: string;
+  topic: string;
+  preview: string;
+  delivery: DeliveryResult;
+}) {
+  const resolvedRecipient = await resolveDirectRecipient({
+    body: params.body,
+    currentUserId: params.currentUserId,
+    currentUserRole: params.currentUserRole,
+  });
+
+  params.delivery.warnings.push(...resolvedRecipient.warnings);
+
+  if (!resolvedRecipient.userId) {
+    throw new Error(
+      "SitGuru could not find this recipient yet. Please open the Guru profile again or select a recipient from Admin.",
+    );
+  }
+
+  if (resolvedRecipient.userId === params.currentUserId) {
+    throw new Error("You cannot start a message thread with yourself.");
+  }
+
+  const recipientRole = await resolveRole({
+    userId: resolvedRecipient.userId,
+    preferredRole: resolvedRecipient.roleHint,
+  });
+  const recipient = await buildContact(resolvedRecipient.userId, recipientRole);
+
+  if (resolvedRecipient.nameHint && (!recipient.name || recipient.name === "SitGuru User")) {
+    recipient.name = resolvedRecipient.nameHint;
+  }
+
+  const { conversation } = await ensureDirectConversation({
+    body: params.body,
+    currentUserId: params.currentUserId,
+    currentUserRole: params.currentUserRole,
+    recipient,
+    topic: params.topic,
+    preview: params.preview,
+  });
+
+  return {
+    conversation,
+    recipient,
+    currentUserRole: params.currentUserRole,
+  };
+}
+
 export async function POST(req: NextRequest) {
   const delivery: DeliveryResult = {
     messageSaved: false,
@@ -569,6 +1149,8 @@ export async function POST(req: NextRequest) {
     smsSent: false,
     warnings: [],
   };
+
+  let createdNewConversation = false;
 
   try {
     const supabase = await createClient();
@@ -587,14 +1169,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     const conversationId = safeString(body?.conversationId);
     const messageText = getMessageText(body);
-    const topic = safeString(body?.topic) || "direct_message";
-
-    if (!conversationId) {
-      return NextResponse.json(
-        { ok: false, error: "Conversation ID is required.", delivery },
-        { status: 400 },
-      );
-    }
+    const topic = safeString(body?.topic) || safeString(body?.subject) || "direct_message";
 
     if (!messageText || messageText.length < 1) {
       return NextResponse.json(
@@ -610,83 +1185,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [{ data: conversation, error: conversationError }, participants] = await Promise.all([
-      supabaseAdmin
-        .from("conversations")
-        .select("*")
-        .eq("id", conversationId)
-        .maybeSingle<ConversationRow>(),
-      safeRows<ConversationParticipantRow>(
-        supabaseAdmin
-          .from("conversation_participants")
-          .select("*")
-          .eq("conversation_id", conversationId),
-        "conversation_participants",
-      ),
-    ]);
-
-    if (conversationError || !conversation) {
-      return NextResponse.json(
-        { ok: false, error: "Message thread was not found.", delivery },
-        { status: 404 },
-      );
-    }
-
-    const participantRole = participants.find((participant) => participant.user_id === user.id)?.role;
-    const currentUserRole = await resolveRole({
-      userId: user.id,
-      participantRole,
-      conversation,
-    });
-
-    const allowedUserIds = new Set(
-      [
-        conversation.customer_id || "",
-        conversation.guru_id || "",
-        conversation.started_by_user_id || "",
-        ...participants.map((participant) => participant.user_id || ""),
-      ].filter(Boolean),
-    );
-
-    if (!allowedUserIds.has(user.id) && !isAdminRole(currentUserRole)) {
-      return NextResponse.json(
-        { ok: false, error: "You do not have access to this message thread.", delivery },
-        { status: 403 },
-      );
-    }
-
-    const recipientUserId = chooseRecipient({
-      currentUserId: user.id,
-      currentUserRole,
-      conversation,
-      participants,
-    });
-
-    if (!recipientUserId) {
-      return NextResponse.json(
-        { ok: false, error: "SitGuru could not find the other participant for this thread.", delivery },
-        { status: 400 },
-      );
-    }
-
-    const recipientRole = await resolveRole({
-      userId: recipientUserId,
-      participantRole: participants.find((participant) => participant.user_id === recipientUserId)?.role,
-      conversation,
-    });
-    const recipient = await buildContact(recipientUserId, recipientRole);
     const senderProfile = await getProfile(user.id);
-    const senderGuru = await getGuru(user.id);
+    const baseCurrentUserRole = await resolveRole({ userId: user.id });
+    const preview = getMessagePreview(messageText);
+
+    let context: DirectConversationContext;
+
+    if (conversationId) {
+      context = await loadExistingConversationContext({
+        conversationId,
+        currentUserId: user.id,
+        body,
+      });
+    } else {
+      const { conversation, recipient, currentUserRole } = await loadNewConversationContext({
+        body,
+        currentUserId: user.id,
+        currentUserRole: baseCurrentUserRole,
+        topic,
+        preview,
+        delivery,
+      });
+
+      context = { conversation, recipient, currentUserRole };
+      createdNewConversation = true;
+    }
+
+    const { conversation, recipient, currentUserRole } = context;
+
+    delivery.recipientFound = Boolean(recipient.userId);
+
+    const senderGuru = await getGuruByUserId(user.id);
     const senderName =
       currentUserRole === "guru"
         ? getGuruName(senderGuru) || getProfileName(senderProfile)
         : isAdminRole(currentUserRole)
           ? "SitGuru Admin"
           : getProfileName(senderProfile);
-    const preview = getMessagePreview(messageText);
     const now = new Date().toISOString();
-
-    delivery.recipientFound = true;
 
     const { data: messageRow, error: messageError } = await supabaseAdmin
       .from("messages")
@@ -733,6 +1269,7 @@ export async function POST(req: NextRequest) {
       .from("conversations")
       .update({
         topic,
+        subject: safeString(body?.subject) || conversation.subject || topic,
         status: "open",
         last_message_at: now,
         last_message_preview: preview,
@@ -807,12 +1344,14 @@ export async function POST(req: NextRequest) {
       conversationId: conversation.id,
       recipient,
       delivery,
+      createdNewConversation,
     });
 
     return NextResponse.json({
       ok: true,
       messageId: messageRow.id,
       conversationId: conversation.id,
+      createdNewConversation,
       recipient: {
         userId: recipient.userId,
         role: recipient.role,
@@ -825,13 +1364,21 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Message send route failed:", error);
 
+    const message = error instanceof Error ? error.message : "Unable to send message.";
+    const status =
+      message.includes("not found") || message.includes("could not find")
+        ? 404
+        : message.includes("access") || message.includes("cannot")
+          ? 403
+          : 500;
+
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Unable to send message.",
+        error: message,
         delivery,
       },
-      { status: 500 },
+      { status },
     );
   }
 }
