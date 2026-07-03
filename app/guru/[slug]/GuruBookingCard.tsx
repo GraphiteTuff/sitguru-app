@@ -10,6 +10,12 @@ type GuruBookingCardProps = {
   guruName: string;
   hourlyRate?: number | null;
   serviceLabel?: string | null;
+  experienceYears?: number | null;
+  completedBookingsCount?: number | null;
+  responseRatePercent?: number | null;
+  ratingAverage?: number | null;
+  reviewCount?: number | null;
+  rateDisplayLabel?: string | null;
 };
 
 type PetRow = {
@@ -75,12 +81,74 @@ async function fetchCustomerPets(userId: string) {
   return [] as CustomerPet[];
 }
 
-function formatRate(hourlyRate?: number | null) {
-  if (typeof hourlyRate !== "number" || Number.isNaN(hourlyRate)) {
-    return "Ask Guru";
+function formatMoney(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value) || value < 0) {
+    return "";
   }
 
-  return `$${hourlyRate}/hr`;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
+  }).format(value);
+}
+
+function formatRate({
+  hourlyRate,
+  rateDisplayLabel,
+}: {
+  hourlyRate?: number | null;
+  rateDisplayLabel?: string | null;
+}) {
+  const cleanRateDisplayLabel = cleanString(rateDisplayLabel);
+
+  if (cleanRateDisplayLabel) return cleanRateDisplayLabel;
+
+  const formattedRate = formatMoney(hourlyRate);
+
+  if (formattedRate) return `${formattedRate}/hr`;
+
+  return "Custom quote";
+}
+
+function formatExperience(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
+    return "Not listed";
+  }
+
+  return `${value} yr${value === 1 ? "" : "s"}`;
+}
+
+function formatCompletedBookings(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
+    return "0";
+  }
+
+  return String(value);
+}
+
+function formatResponseRate(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value) || value < 0) {
+    return "New";
+  }
+
+  return `${Math.round(Math.min(value, 100))}%`;
+}
+
+function formatRating(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
+    return "5.0";
+  }
+
+  return value.toFixed(1);
+}
+
+function formatReviewCount(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
+    return "0 reviews";
+  }
+
+  return `${value} review${value === 1 ? "" : "s"}`;
 }
 
 function PetAvatar({
@@ -120,12 +188,29 @@ function PetAvatar({
   );
 }
 
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center shadow-sm">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
 export default function GuruBookingCard({
   guruId,
   guruSlug,
   guruName,
   hourlyRate,
   serviceLabel,
+  experienceYears,
+  completedBookingsCount,
+  responseRatePercent,
+  ratingAverage,
+  reviewCount,
+  rateDisplayLabel,
 }: GuruBookingCardProps) {
   const [pets, setPets] = useState<CustomerPet[]>([]);
   const [loadingPets, setLoadingPets] = useState(true);
@@ -212,7 +297,7 @@ export default function GuruBookingCard({
       params.set("petName", resolvedPetName);
       params.set(
         "message",
-        `Hi ${guruName}, I would like to talk about care for ${resolvedPetName}.`
+        `Hi ${guruName}, I would like to talk about care for ${resolvedPetName}.`,
       );
     }
 
@@ -249,6 +334,16 @@ export default function GuruBookingCard({
           </p>
         </div>
 
+        <div className="grid grid-cols-2 gap-3">
+          <MiniStat label="Rating" value={`${formatRating(ratingAverage)} ★`} />
+          <MiniStat label="Reviews" value={formatReviewCount(reviewCount)} />
+          <MiniStat label="Experience" value={formatExperience(experienceYears)} />
+          <MiniStat
+            label="Bookings"
+            value={formatCompletedBookings(completedBookingsCount)}
+          />
+        </div>
+
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -265,17 +360,33 @@ export default function GuruBookingCard({
                 Starting at
               </p>
               <p className="mt-2 text-base font-bold text-slate-900">
-                {formatRate(hourlyRate)}
+                {formatRate({ hourlyRate, rateDisplayLabel })}
               </p>
             </div>
           </div>
         </div>
 
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-          <p className="text-sm font-bold text-slate-900">Best booking flow</p>
+          <p className="text-sm font-bold text-slate-900">
+            Book through SitGuru
+          </p>
           <p className="mt-2 text-sm leading-6 text-slate-700">
-            Choose the pet first, then continue into booking or messaging. That
-            gives your Guru better context from the start.
+            Custom quote or listed price, all booking requests stay inside
+            SitGuru so care details, support, payments, and PawReports stay
+            organized in one place.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
+            Response rate
+          </p>
+          <p className="mt-2 text-base font-black text-slate-950">
+            {formatResponseRate(responseRatePercent)}
+          </p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+            Response rate appears after SitGuru has enough real booking or
+            message response data.
           </p>
         </div>
 
@@ -332,7 +443,8 @@ export default function GuruBookingCard({
                         <p className="mt-1 text-sm text-slate-600">
                           {[pet.breed, pet.age, pet.weight]
                             .filter(Boolean)
-                            .join(" • ") || "Pet profile ready to send with booking"}
+                            .join(" • ") ||
+                            "Pet profile ready to send with booking"}
                         </p>
                       </div>
 
@@ -455,7 +567,10 @@ export default function GuruBookingCard({
           <div className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
             <p>1. Choose the pet that needs care.</p>
             <p>2. Continue to booking or message the Guru first.</p>
-            <p>3. SitGuru carries your pet context forward so communication stays clear.</p>
+            <p>
+              3. SitGuru carries your pet context forward so communication stays
+              clear.
+            </p>
           </div>
         </div>
       </div>
