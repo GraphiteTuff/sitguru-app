@@ -431,7 +431,20 @@ function isValidEmail(value?: string | null) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
-function isBookableSearchGuru(guru: GuruRow) {
+function isSearchSuppressedGuru(guru: GuruRow) {
+  const status = String(guru.status || "").trim().toLowerCase();
+  const applicationStatus = String(guru.application_status || "")
+    .trim()
+    .toLowerCase();
+
+  if (hasExplicitFalse(guru.is_public)) return true;
+  if (hasExplicitFalse(guru.is_public_visible)) return true;
+  if (hasExplicitFalse(guru.is_active)) return true;
+
+  return isNegativeGuruStatus(status) || isNegativeGuruStatus(applicationStatus);
+}
+
+function isPublicSearchGuru(guru: GuruRow) {
   const status = String(guru.status || "").trim().toLowerCase();
   const applicationStatus = String(guru.application_status || "")
     .trim()
@@ -439,32 +452,41 @@ function isBookableSearchGuru(guru: GuruRow) {
   const adminStatus = String(guru.admin_status || "").trim().toLowerCase();
   const publicStatus = String(guru.public_status || "").trim().toLowerCase();
 
-  if (hasExplicitFalse(guru.is_public)) return false;
-  if (hasExplicitFalse(guru.is_public_visible)) return false;
-  if (hasExplicitFalse(guru.is_active)) return false;
-  if (hasExplicitFalse(guru.is_bookable)) return false;
-  if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
-  if (hasExplicitFalse(guru.accepting_bookings)) return false;
-  if (isNegativeGuruStatus(status) || isNegativeGuruStatus(applicationStatus)) {
-    return false;
-  }
+  if (isSearchSuppressedGuru(guru)) return false;
 
-  const hasPublicSignal =
+  return (
     guru.is_public === true ||
     guru.is_public_visible === true ||
     publicStatus === "public" ||
     publicStatus === "visible" ||
-    adminStatus === "approved";
+    adminStatus === "approved" ||
+    applicationStatus === "public" ||
+    applicationStatus === "visible" ||
+    applicationStatus === "bookable" ||
+    status === "public" ||
+    status === "visible" ||
+    status === "bookable"
+  );
+}
 
-  const hasBookableSignal =
+function isBookableSearchGuru(guru: GuruRow) {
+  const status = String(guru.status || "").trim().toLowerCase();
+  const applicationStatus = String(guru.application_status || "")
+    .trim()
+    .toLowerCase();
+
+  if (!isPublicSearchGuru(guru)) return false;
+  if (hasExplicitFalse(guru.is_bookable)) return false;
+  if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
+  if (hasExplicitFalse(guru.accepting_bookings)) return false;
+
+  return (
     guru.is_bookable === true ||
     hasPositiveValue(guru.is_accepting_bookings) ||
     hasPositiveValue(guru.accepting_bookings) ||
     applicationStatus === "bookable" ||
-    status === "bookable" ||
-    status === "active";
-
-  return hasPublicSignal && hasBookableSignal;
+    status === "bookable"
+  );
 }
 
 function normalizeFillInMatchValue(value?: string | null) {
@@ -527,7 +549,7 @@ function isDemoSearchGuru(guru: GuruRow) {
 }
 
 function shouldDisplaySearchGuru(guru: GuruRow) {
-  return isBookableSearchGuru(guru) || isDemoSearchGuru(guru);
+  return isPublicSearchGuru(guru) || isDemoSearchGuru(guru);
 }
 
 function isDisplayOnlySearchGuru(guru: GuruRow) {

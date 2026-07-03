@@ -36,6 +36,7 @@ type GuruRow = {
   is_bookable?: boolean | null;
   is_accepting_bookings?: boolean | null;
   accepting_bookings?: boolean | null;
+  service_area_enabled?: boolean | null;
   service_radius_miles?: number | string | null;
   radius_miles?: number | string | null;
   service_latitude?: number | string | null;
@@ -56,6 +57,31 @@ type GuruRow = {
   photo_url?: string | null;
   avatar_url?: string | null;
   image_url?: string | null;
+};
+
+type PublicSearchOverrideRow = {
+  [key: string]: unknown;
+  target_role?: string | null;
+  email?: string | null;
+  user_id?: string | null;
+  source_id?: string | null;
+  display_name?: string | null;
+  is_public_visible?: boolean | null;
+  is_bookable?: boolean | null;
+  is_active?: boolean | null;
+  is_accepting_bookings?: boolean | null;
+  accepting_bookings?: boolean | null;
+  admin_status?: string | null;
+  public_status?: string | null;
+  status?: string | null;
+  application_status?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  service_zip?: string | null;
+  service_radius_miles?: number | string | null;
+  service_latitude?: number | string | null;
+  service_longitude?: number | string | null;
+  reason?: string | null;
 };
 
 const SEARCH_SOURCE_TABLES = ["public_guru_search_profiles", "gurus"];
@@ -138,38 +164,56 @@ function getGuruState(guru: GuruRow) {
   return cleanString(guru.service_state || guru.state);
 }
 
-function isBookableSearchGuru(guru: GuruRow) {
+function isSearchSuppressedGuru(guru: GuruRow) {
+  const status = normalizeStatus(guru.status);
+  const applicationStatus = normalizeStatus(guru.application_status);
+
+  if (hasExplicitFalse(guru.is_public)) return true;
+  if (hasExplicitFalse(guru.is_public_visible)) return true;
+  if (hasExplicitFalse(guru.is_active)) return true;
+
+  return isNegativeGuruStatus(status) || isNegativeGuruStatus(applicationStatus);
+}
+
+function isPublicSearchGuru(guru: GuruRow) {
   const status = normalizeStatus(guru.status);
   const applicationStatus = normalizeStatus(guru.application_status);
   const adminStatus = normalizeStatus(guru.admin_status);
   const publicStatus = normalizeStatus(guru.public_status);
 
-  if (hasExplicitFalse(guru.is_public)) return false;
-  if (hasExplicitFalse(guru.is_public_visible)) return false;
-  if (hasExplicitFalse(guru.is_active)) return false;
-  if (hasExplicitFalse(guru.is_bookable)) return false;
-  if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
-  if (hasExplicitFalse(guru.accepting_bookings)) return false;
-  if (isNegativeGuruStatus(status) || isNegativeGuruStatus(applicationStatus)) {
-    return false;
-  }
+  if (isSearchSuppressedGuru(guru)) return false;
 
-  const hasPublicSignal =
+  return (
     guru.is_public === true ||
     guru.is_public_visible === true ||
     publicStatus === "public" ||
     publicStatus === "visible" ||
-    adminStatus === "approved";
+    adminStatus === "approved" ||
+    applicationStatus === "public" ||
+    applicationStatus === "visible" ||
+    applicationStatus === "bookable" ||
+    status === "public" ||
+    status === "visible" ||
+    status === "bookable"
+  );
+}
 
-  const hasBookableSignal =
+function isBookableSearchGuru(guru: GuruRow) {
+  const status = normalizeStatus(guru.status);
+  const applicationStatus = normalizeStatus(guru.application_status);
+
+  if (!isPublicSearchGuru(guru)) return false;
+  if (hasExplicitFalse(guru.is_bookable)) return false;
+  if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
+  if (hasExplicitFalse(guru.accepting_bookings)) return false;
+
+  return (
     guru.is_bookable === true ||
     hasPositiveValue(guru.is_accepting_bookings) ||
     hasPositiveValue(guru.accepting_bookings) ||
     applicationStatus === "bookable" ||
-    status === "bookable" ||
-    status === "active";
-
-  return hasPublicSignal && hasBookableSignal;
+    status === "bookable"
+  );
 }
 
 function isDemoSearchGuru(guru: GuruRow) {
@@ -198,7 +242,7 @@ function isDemoSearchGuru(guru: GuruRow) {
 }
 
 function shouldDisplaySearchGuru(guru: GuruRow) {
-  return isBookableSearchGuru(guru) || isDemoSearchGuru(guru);
+  return isPublicSearchGuru(guru) || isDemoSearchGuru(guru);
 }
 
 function getGuruDedupeKey(guru: GuruRow) {
@@ -228,10 +272,164 @@ function readNumber(value: unknown, fallback: number | null = null) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function getOverrideKeysForGuru(guru: GuruRow) {
+  return [
+    normalizeStatus(guru.email) ? `email:${normalizeStatus(guru.email)}` : "",
+    cleanString(guru.user_id) ? `user:${cleanString(guru.user_id)}` : "",
+    cleanString(guru.id) ? `id:${cleanString(guru.id)}` : "",
+  ].filter(Boolean);
+}
+
+function getOverrideKeysForRow(override: PublicSearchOverrideRow) {
+  return [
+    normalizeStatus(override.email)
+      ? `email:${normalizeStatus(override.email)}`
+      : "",
+    cleanString(override.user_id) ? `user:${cleanString(override.user_id)}` : "",
+    cleanString(override.source_id)
+      ? `id:${cleanString(override.source_id)}`
+      : "",
+  ].filter(Boolean);
+}
+
+function buildOverrideMap(overrides: PublicSearchOverrideRow[]) {
+  const overrideMap = new Map<string, PublicSearchOverrideRow>();
+
+  overrides.forEach((override) => {
+    getOverrideKeysForRow(override).forEach((key) => {
+      overrideMap.set(key, override);
+    });
+  });
+
+  return overrideMap;
+}
+
+function findOverrideForGuru(
+  guru: GuruRow,
+  overrideMap: Map<string, PublicSearchOverrideRow>,
+) {
+  for (const key of getOverrideKeysForGuru(guru)) {
+    const override = overrideMap.get(key);
+    if (override) return override;
+  }
+
+  return null;
+}
+
+function chooseOverrideString(
+  overrideValue: unknown,
+  currentValue: unknown,
+  fallbackValue?: string,
+) {
+  const overrideText = cleanString(overrideValue);
+  if (overrideText) return overrideText;
+
+  const currentText = cleanString(currentValue);
+  if (currentText) return currentText;
+
+  return fallbackValue || null;
+}
+
+function applyOverrideToGuru(
+  guru: GuruRow,
+  overrideMap: Map<string, PublicSearchOverrideRow>,
+): GuruRow {
+  const override = findOverrideForGuru(guru, overrideMap);
+
+  if (!override) return guru;
+
+  const publicVisible =
+    typeof override.is_public_visible === "boolean"
+      ? override.is_public_visible
+      : undefined;
+  const bookable =
+    typeof override.is_bookable === "boolean" ? override.is_bookable : undefined;
+  const active =
+    typeof override.is_active === "boolean" ? override.is_active : undefined;
+
+  const acceptingBookings =
+    typeof override.is_accepting_bookings === "boolean"
+      ? override.is_accepting_bookings
+      : typeof override.accepting_bookings === "boolean"
+        ? override.accepting_bookings
+        : bookable;
+
+  return {
+    ...guru,
+    display_name: chooseOverrideString(override.display_name, guru.display_name),
+    full_name: chooseOverrideString(
+      override.display_name,
+      guru.full_name,
+      getGuruName(guru),
+    ),
+    is_public: publicVisible ?? guru.is_public,
+    is_public_visible: publicVisible ?? guru.is_public_visible,
+    is_active: active ?? guru.is_active,
+    is_bookable: bookable ?? guru.is_bookable,
+    is_accepting_bookings: acceptingBookings ?? guru.is_accepting_bookings,
+    accepting_bookings: acceptingBookings ?? guru.accepting_bookings,
+    admin_status: chooseOverrideString(override.admin_status, guru.admin_status),
+    public_status: chooseOverrideString(
+      override.public_status,
+      guru.public_status,
+      publicVisible === true ? "public" : undefined,
+    ),
+    status: chooseOverrideString(
+      override.status,
+      guru.status,
+      bookable === true ? "bookable" : publicVisible === true ? "active" : undefined,
+    ),
+    application_status: chooseOverrideString(
+      override.application_status,
+      guru.application_status,
+      bookable === true ? "bookable" : publicVisible === true ? "public" : undefined,
+    ),
+    service_city: chooseOverrideString(override.service_city, guru.service_city),
+    service_state: chooseOverrideString(override.service_state, guru.service_state),
+    service_zip: chooseOverrideString(override.service_zip, guru.service_zip),
+    service_zip_code: chooseOverrideString(
+      override.service_zip,
+      guru.service_zip_code,
+    ),
+    service_radius_miles:
+      override.service_radius_miles ?? guru.service_radius_miles,
+    radius_miles: override.service_radius_miles ?? guru.radius_miles,
+    service_latitude: override.service_latitude ?? guru.service_latitude,
+    service_longitude: override.service_longitude ?? guru.service_longitude,
+    latitude: override.service_latitude ?? guru.latitude,
+    longitude: override.service_longitude ?? guru.longitude,
+    search_source: "admin_visibility_override",
+  };
+}
+
+async function loadPublicSearchOverrides() {
+  const { data, error } = await supabaseAdmin
+    .from("sitguru_public_search_overrides")
+    .select("*")
+    .eq("target_role", "guru")
+    .limit(500);
+
+  if (error) {
+    if (
+      error.code === "42P01" ||
+      error.message.toLowerCase().includes("does not exist")
+    ) {
+      return new Map<string, PublicSearchOverrideRow>();
+    }
+
+    console.warn("Public Guru search override table could not be read:", error.message);
+    return new Map<string, PublicSearchOverrideRow>();
+  }
+
+  return buildOverrideMap((data || []) as PublicSearchOverrideRow[]);
+}
+
 function normalizeGuruForPublicSearch(guru: GuruRow) {
+  const isDemo = isDemoSearchGuru(guru);
+  const isBookable = isBookableSearchGuru(guru);
   const radius = readNumber(
     guru.service_radius_miles || guru.radius_miles,
-    isDemoSearchGuru(guru) ? 50 : 25,
+    isDemo ? 50 : 25,
   );
 
   return {
@@ -249,25 +447,21 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
     service_state: guru.service_state || guru.state || null,
     service_zip: guru.service_zip || guru.service_zip_code || guru.zip_code || null,
     service_zip_code: guru.service_zip_code || guru.service_zip || guru.zip_code || null,
-    status: isDemoSearchGuru(guru) ? "active" : guru.status || "active",
-    application_status: isDemoSearchGuru(guru)
+    status: isDemo ? "active" : guru.status || (isBookable ? "bookable" : "active"),
+    application_status: isDemo
       ? "preview"
-      : guru.application_status || "bookable",
-    is_public: isDemoSearchGuru(guru) ? true : guru.is_public ?? true,
-    is_public_visible: isDemoSearchGuru(guru)
-      ? true
-      : guru.is_public_visible ?? guru.is_public ?? true,
-    is_active: isDemoSearchGuru(guru) ? true : guru.is_active ?? true,
-    is_bookable: isDemoSearchGuru(guru) ? false : guru.is_bookable ?? true,
-    is_accepting_bookings: isDemoSearchGuru(guru)
-      ? false
-      : guru.is_accepting_bookings ?? guru.accepting_bookings ?? true,
-    accepting_bookings: isDemoSearchGuru(guru)
-      ? false
-      : guru.accepting_bookings ?? guru.is_accepting_bookings ?? true,
+      : guru.application_status || (isBookable ? "bookable" : "public"),
+    admin_status: guru.admin_status || (isDemo ? "demo" : "approved"),
+    public_status: guru.public_status || "public",
+    is_public: true,
+    is_public_visible: true,
+    is_active: isDemo ? true : guru.is_active ?? true,
+    is_bookable: isDemo ? false : isBookable,
+    is_accepting_bookings: isDemo ? false : isBookable,
+    accepting_bookings: isDemo ? false : isBookable,
     service_area_enabled: guru.service_area_enabled ?? true,
-    service_radius_miles: Math.max(Number(radius || 25), isDemoSearchGuru(guru) ? 50 : 1),
-    radius_miles: Math.max(Number(radius || 25), isDemoSearchGuru(guru) ? 50 : 1),
+    service_radius_miles: Math.max(Number(radius || 25), isDemo ? 50 : 1),
+    radius_miles: Math.max(Number(radius || 25), isDemo ? 50 : 1),
     service_latitude: guru.service_latitude || guru.latitude || guru.lat || null,
     service_longitude: guru.service_longitude || guru.longitude || guru.lng || null,
     latitude: guru.latitude || guru.service_latitude || guru.lat || null,
@@ -287,11 +481,14 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
     services: Array.isArray(guru.services) && guru.services.length > 0
       ? guru.services
       : ["Dog Walking", "Pet Sitting", "Drop-In Visits"],
-    search_source: isDemoSearchGuru(guru) ? "demo_search_fallback" : "public_search",
+    search_source: guru.search_source || (isDemo ? "demo_search_fallback" : "public_search"),
   };
 }
 
-async function loadGuruRowsFromTable(tableName: string) {
+async function loadGuruRowsFromTable(
+  tableName: string,
+  overrideMap: Map<string, PublicSearchOverrideRow>,
+) {
   const { data, error } = await supabaseAdmin
     .from(tableName)
     .select("*")
@@ -302,15 +499,18 @@ async function loadGuruRowsFromTable(tableName: string) {
     return [];
   }
 
-  return ((data || []) as GuruRow[]).filter(shouldDisplaySearchGuru);
+  return ((data || []) as GuruRow[])
+    .map((guru) => applyOverrideToGuru(guru, overrideMap))
+    .filter(shouldDisplaySearchGuru);
 }
 
 export async function GET() {
   try {
+    const overrideMap = await loadPublicSearchOverrides();
     let gurus: GuruRow[] = [];
 
     for (const tableName of SEARCH_SOURCE_TABLES) {
-      gurus = await loadGuruRowsFromTable(tableName);
+      gurus = await loadGuruRowsFromTable(tableName, overrideMap);
 
       if (gurus.length > 0) break;
     }
