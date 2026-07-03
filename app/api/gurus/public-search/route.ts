@@ -33,6 +33,7 @@ type GuruRow = {
   admin_status?: string | null;
   public_status?: string | null;
   profile_quality_status?: string | null;
+  booking_status?: string | null;
   source?: string | null;
   profile_source?: string | null;
   search_source?: string | null;
@@ -82,6 +83,7 @@ type PublicSearchOverrideRow = {
   public_status?: string | null;
   status?: string | null;
   application_status?: string | null;
+  booking_status?: string | null;
   service_city?: string | null;
   service_state?: string | null;
   service_zip?: string | null;
@@ -126,6 +128,52 @@ const DEMO_GURU_NAMES = new Set([
   "sofia martinez",
   "suzy q",
 ]);
+
+
+const PLACEHOLDER_EMAIL_DOMAIN = "@placeholder.sitguru.local";
+
+const FALLBACK_LOCATION_COORDINATES: Record<
+  string,
+  { latitude: number; longitude: number }
+> = {
+  "zip:18951": { latitude: 40.4418, longitude: -75.3416 },
+  "city:quakertown:pa": { latitude: 40.4418, longitude: -75.3416 },
+  "zip:19512": { latitude: 40.3337, longitude: -75.6374 },
+  "city:boyertown:pa": { latitude: 40.3337, longitude: -75.6374 },
+  "zip:18944": { latitude: 40.372, longitude: -75.2927 },
+  "city:perkasie:pa": { latitude: 40.372, longitude: -75.2927 },
+  "zip:18901": { latitude: 40.3101, longitude: -75.1299 },
+  "city:doylestown:pa": { latitude: 40.3101, longitude: -75.1299 },
+  "zip:18917": { latitude: 40.3718, longitude: -75.2016 },
+  "city:dublin:pa": { latitude: 40.3718, longitude: -75.2016 },
+  "zip:18960": { latitude: 40.3537, longitude: -75.3049 },
+  "city:sellersville:pa": { latitude: 40.3537, longitude: -75.3049 },
+  "zip:18018": { latitude: 40.6259, longitude: -75.3705 },
+  "zip:18020": { latitude: 40.6595, longitude: -75.3096 },
+  "city:bethlehem:pa": { latitude: 40.6259, longitude: -75.3705 },
+  "zip:18101": { latitude: 40.6023, longitude: -75.4714 },
+  "zip:18102": { latitude: 40.6084, longitude: -75.4812 },
+  "zip:18103": { latitude: 40.5773, longitude: -75.4547 },
+  "zip:18104": { latitude: 40.6115, longitude: -75.5343 },
+  "city:allentown:pa": { latitude: 40.6023, longitude: -75.4714 },
+  "zip:18042": { latitude: 40.6884, longitude: -75.2207 },
+  "city:easton:pa": { latitude: 40.6884, longitude: -75.2207 },
+  "zip:19464": { latitude: 40.2454, longitude: -75.6496 },
+  "city:pottstown:pa": { latitude: 40.2454, longitude: -75.6496 },
+  "zip:19446": { latitude: 40.2415, longitude: -75.2838 },
+  "city:lansdale:pa": { latitude: 40.2415, longitude: -75.2838 },
+  "zip:19401": { latitude: 40.1215, longitude: -75.3399 },
+  "city:norristown:pa": { latitude: 40.1215, longitude: -75.3399 },
+  "zip:19440": { latitude: 40.2798, longitude: -75.2993 },
+  "city:hatfield:pa": { latitude: 40.2798, longitude: -75.2993 },
+  "zip:18964": { latitude: 40.3118, longitude: -75.3252 },
+  "city:souderton:pa": { latitude: 40.3118, longitude: -75.3252 },
+  "zip:18036": { latitude: 40.5115, longitude: -75.3905 },
+  "city:coopersburg:pa": { latitude: 40.5115, longitude: -75.3905 },
+  "zip:18049": { latitude: 40.5395, longitude: -75.4969 },
+  "city:emmaus:pa": { latitude: 40.5395, longitude: -75.4969 },
+  "city:philadelphia:pa": { latitude: 39.9526, longitude: -75.1652 },
+};
 
 function cleanString(value: unknown) {
   return String(value || "").trim();
@@ -261,8 +309,14 @@ function isPublicSearchGuru(guru: GuruRow) {
 function isBookableSearchGuru(guru: GuruRow) {
   const status = normalizeStatus(guru.status);
   const applicationStatus = normalizeStatus(guru.application_status);
+  const bookingStatus = normalizeStatus(guru.booking_status);
+  const adminStatus = normalizeStatus(guru.admin_status);
+  const qualityStatus = normalizeStatus(guru.profile_quality_status);
 
   if (!isPublicSearchGuru(guru)) return false;
+  if (isPlaceholderSearchGuru(guru)) return false;
+  if (bookingStatus === "listed_only" || bookingStatus === "not_listed") return false;
+  if (adminStatus === "placeholder" || qualityStatus === "placeholder") return false;
   if (hasExplicitFalse(guru.is_bookable)) return false;
   if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
   if (hasExplicitFalse(guru.accepting_bookings)) return false;
@@ -271,8 +325,11 @@ function isBookableSearchGuru(guru: GuruRow) {
     guru.is_bookable === true ||
     hasPositiveValue(guru.is_accepting_bookings) ||
     hasPositiveValue(guru.accepting_bookings) ||
+    bookingStatus === "bookable" ||
+    bookingStatus === "requestable" ||
     applicationStatus === "bookable" ||
-    status === "bookable"
+    status === "bookable" ||
+    (adminStatus === "approved" && qualityStatus === "bookable")
   );
 }
 
@@ -298,6 +355,31 @@ function isDemoSearchGuru(guru: GuruRow) {
     source.includes("seed") ||
     source.includes("demo") ||
     source.includes("canonical")
+  );
+}
+
+function isPlaceholderSearchGuru(guru: GuruRow) {
+  const normalizedName = normalizeText(getGuruName(guru));
+  const email = normalizeStatus(guru.email);
+  const adminStatus = normalizeStatus(guru.admin_status);
+  const publicStatus = normalizeStatus(guru.public_status);
+  const qualityStatus = normalizeStatus(guru.profile_quality_status);
+  const bookingStatus = normalizeStatus(guru.booking_status);
+  const source = normalizeStatus(
+    guru.source || guru.profile_source || guru.search_source,
+  );
+
+  return (
+    DEMO_GURU_NAMES.has(normalizedName) ||
+    email.endsWith(PLACEHOLDER_EMAIL_DOMAIN) ||
+    adminStatus === "placeholder" ||
+    publicStatus === "visible_placeholder" ||
+    qualityStatus === "placeholder" ||
+    qualityStatus.includes("demo") ||
+    qualityStatus.includes("seed") ||
+    bookingStatus === "listed_only" ||
+    source.includes("seed") ||
+    source.includes("demo")
   );
 }
 
@@ -670,6 +752,11 @@ function applyOverrideToGuru(
       guru.application_status,
       bookable === true ? "bookable" : publicVisible === true ? "public" : undefined,
     ),
+    booking_status: chooseOverrideString(
+      override.booking_status,
+      guru.booking_status,
+      bookable === true ? "bookable" : undefined,
+    ),
     service_city: chooseOverrideString(override.service_city, guru.service_city),
     service_state: chooseOverrideString(override.service_state, guru.service_state),
     service_zip: chooseOverrideString(override.service_zip, guru.service_zip),
@@ -721,6 +808,7 @@ function overrideToStandaloneGuru(override: PublicSearchOverrideRow): GuruRow {
     status: cleanString(override.status) || (bookable ? "bookable" : "active"),
     application_status:
       cleanString(override.application_status) || (bookable ? "bookable" : "public"),
+    booking_status: cleanString(override.booking_status) || (bookable ? "bookable" : "listed_only"),
     admin_status: cleanString(override.admin_status) || "approved",
     public_status: cleanString(override.public_status) || "public",
     is_public: publicVisible,
@@ -768,18 +856,90 @@ async function loadPublicSearchOverrides() {
   return (data || []) as PublicSearchOverrideRow[];
 }
 
+function getGuruPublicSlug(guru: GuruRow) {
+  return slugify(
+    guru.public_slug ||
+      guru.slug ||
+      guru.display_name ||
+      guru.full_name ||
+      guru.name ||
+      guru.email ||
+      guru.id,
+  );
+}
+
+function getGuruPublicIdentifier(guru: GuruRow) {
+  return encodeURIComponent(getGuruPublicSlug(guru));
+}
+
+function getGuruProfileUrl(guru: GuruRow) {
+  return `/guru/${getGuruPublicIdentifier(guru)}`;
+}
+
+function getGuruBookingUrl(guru: GuruRow, canBook: boolean) {
+  return canBook ? `/book/${getGuruPublicIdentifier(guru)}` : null;
+}
+
+function getFallbackCoordinatesForGuru(guru: GuruRow) {
+  const zip = getGuruZip(guru);
+  if (zip && FALLBACK_LOCATION_COORDINATES[`zip:${zip}`]) {
+    return FALLBACK_LOCATION_COORDINATES[`zip:${zip}`];
+  }
+
+  const city = normalizeText(getGuruCity(guru));
+  const state = normalizeStatus(getGuruState(guru));
+  if (city && state && FALLBACK_LOCATION_COORDINATES[`city:${city}:${state}`]) {
+    return FALLBACK_LOCATION_COORDINATES[`city:${city}:${state}`];
+  }
+
+  return null;
+}
+
+function getGuruCoordinates(guru: GuruRow) {
+  const latitude = Number(guru.service_latitude || guru.latitude || guru.lat);
+  const longitude = Number(guru.service_longitude || guru.longitude || guru.lng);
+
+  if (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180 &&
+    latitude !== 0 &&
+    longitude !== 0
+  ) {
+    return { latitude, longitude };
+  }
+
+  return getFallbackCoordinatesForGuru(guru);
+}
+
+function getDisplayStatus(canBook: boolean, isPlaceholder: boolean) {
+  if (canBook) return "Bookable";
+  if (isPlaceholder) return "Profile Preview";
+  return "Profile Preview";
+}
+
 function normalizeGuruForPublicSearch(guru: GuruRow) {
-  const isDemo = isDemoSearchGuru(guru);
-  const isBookable = isBookableSearchGuru(guru);
+  const isPlaceholder = isPlaceholderSearchGuru(guru) || isDemoSearchGuru(guru);
+  const canBook = isBookableSearchGuru(guru);
   const radius = readNumber(
     guru.service_radius_miles || guru.radius_miles,
-    isDemo ? 50 : 25,
+    isPlaceholder ? 50 : 25,
   );
+  const coordinates = getGuruCoordinates(guru);
+  const publicSlug = getGuruPublicSlug(guru);
+  const profileUrl = getGuruProfileUrl(guru);
+  const bookingUrl = getGuruBookingUrl(guru, canBook);
 
   return {
     id: guru.id,
     user_id: guru.user_id,
-    slug: guru.slug,
+    profile_id: guru.profile_id,
+    guru_id: guru.guru_id,
+    slug: guru.slug || publicSlug,
+    public_slug: guru.public_slug || publicSlug,
     display_name: guru.display_name || guru.full_name || guru.name || "Guru",
     full_name: guru.full_name || guru.display_name || guru.name || "Guru",
     title: guru.title || "Pet Care Guru",
@@ -791,25 +951,41 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
     service_state: guru.service_state || guru.state || null,
     service_zip: guru.service_zip || guru.service_zip_code || guru.zip_code || null,
     service_zip_code: guru.service_zip_code || guru.service_zip || guru.zip_code || null,
-    status: isDemo ? "active" : guru.status || (isBookable ? "bookable" : "active"),
-    application_status: isDemo
+    status: isPlaceholder ? "active" : guru.status || (canBook ? "bookable" : "active"),
+    application_status: isPlaceholder
       ? "preview"
-      : guru.application_status || (isBookable ? "bookable" : "public"),
-    admin_status: guru.admin_status || (isDemo ? "demo" : "approved"),
+      : guru.application_status || (canBook ? "bookable" : "public"),
+    booking_status: isPlaceholder
+      ? "listed_only"
+      : guru.booking_status || (canBook ? "bookable" : "listed_only"),
+    admin_status: guru.admin_status || (isPlaceholder ? "placeholder" : "approved"),
     public_status: guru.public_status || "public",
+    profile_quality_status:
+      guru.profile_quality_status || (isPlaceholder ? "placeholder" : canBook ? "bookable" : "public"),
     is_public: true,
     is_public_visible: true,
-    is_active: isDemo ? true : guru.is_active ?? true,
-    is_bookable: isDemo ? false : isBookable,
-    is_accepting_bookings: isDemo ? false : isBookable,
-    accepting_bookings: isDemo ? false : isBookable,
+    is_active: isPlaceholder ? true : guru.is_active ?? true,
+    is_bookable: canBook,
+    is_accepting_bookings: canBook,
+    accepting_bookings: canBook,
+    can_show_in_search: true,
+    can_view_profile: true,
+    can_book: canBook,
+    is_placeholder: isPlaceholder,
+    profile_url: profileUrl,
+    booking_url: bookingUrl,
+    display_status: getDisplayStatus(canBook, isPlaceholder),
     service_area_enabled: guru.service_area_enabled ?? true,
-    service_radius_miles: Math.max(Number(radius || 25), isDemo ? 50 : 1),
-    radius_miles: Math.max(Number(radius || 25), isDemo ? 50 : 1),
-    service_latitude: guru.service_latitude || guru.latitude || guru.lat || null,
-    service_longitude: guru.service_longitude || guru.longitude || guru.lng || null,
-    latitude: guru.latitude || guru.service_latitude || guru.lat || null,
-    longitude: guru.longitude || guru.service_longitude || guru.lng || null,
+    service_radius_miles: Math.max(Number(radius || 25), isPlaceholder ? 50 : 1),
+    radius_miles: Math.max(Number(radius || 25), isPlaceholder ? 50 : 1),
+    service_latitude: coordinates?.latitude ?? guru.service_latitude ?? guru.latitude ?? guru.lat ?? null,
+    service_longitude: coordinates?.longitude ?? guru.service_longitude ?? guru.longitude ?? guru.lng ?? null,
+    latitude: coordinates?.latitude ?? guru.latitude ?? guru.service_latitude ?? guru.lat ?? null,
+    longitude: coordinates?.longitude ?? guru.longitude ?? guru.service_longitude ?? guru.lng ?? null,
+    lat: coordinates?.latitude ?? guru.lat ?? guru.latitude ?? guru.service_latitude ?? null,
+    lng: coordinates?.longitude ?? guru.lng ?? guru.longitude ?? guru.service_longitude ?? null,
+    map_latitude: coordinates?.latitude ?? null,
+    map_longitude: coordinates?.longitude ?? null,
     hourly_rate: guru.hourly_rate || guru.rate || null,
     rate: guru.rate || guru.hourly_rate || null,
     experience_years: guru.experience_years || null,
@@ -825,7 +1001,7 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
     services: Array.isArray(guru.services) && guru.services.length > 0
       ? guru.services
       : ["Dog Walking", "Pet Sitting", "Drop-In Visits"],
-    search_source: guru.search_source || (isDemo ? "demo_search_fallback" : "public_search"),
+    search_source: guru.search_source || (isPlaceholder ? "placeholder_search" : "public_search"),
   };
 }
 
@@ -904,6 +1080,9 @@ export async function GET(request: NextRequest) {
               debug: {
                 overrides_loaded: overrides.length,
                 standalone_overrides_displayed: standaloneOverrideRows.length,
+                can_book_count: normalizedGurus.filter((guru) => guru.can_book).length,
+                placeholder_count: normalizedGurus.filter((guru) => guru.is_placeholder).length,
+                mapped_count: normalizedGurus.filter((guru) => guru.map_latitude && guru.map_longitude).length,
                 source_results: sourceResults,
               },
             }
