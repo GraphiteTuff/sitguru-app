@@ -29,10 +29,7 @@ import { supabase } from "@/lib/supabase";
 type BookingStep = 1 | 2 | 3;
 
 type ServiceKey =
-  | "drop_in_visit"
-  | "house_sitting"
-  | "doggy_day_care"
-  | "dog_walking";
+  "drop_in_visit" | "house_sitting" | "doggy_day_care" | "dog_walking";
 
 type CalendarStatus = "available" | "blackout" | "pending" | "closed";
 
@@ -111,6 +108,7 @@ type GuruProfileRow = {
   hourly_rate?: number | null;
   rate?: number | null;
   years_experience?: number | null;
+  experience_years?: number | null;
   completed_bookings?: number | null;
   response_rate?: number | null;
 
@@ -136,6 +134,18 @@ type GuruProfileFallbackRow = {
   profile_photo_url?: string | null;
   photo_url?: string | null;
   image_url?: string | null;
+};
+
+type GuruServiceRateRow = {
+  id?: string | null;
+  guru_id?: string | number | null;
+  service_key?: string | null;
+  service_label?: string | null;
+  is_enabled?: boolean | null;
+  rate_amount?: number | string | null;
+  rate_unit?: string | null;
+  duration_minutes?: number | string | null;
+  notes?: string | null;
 };
 
 type ZipLookupResult = {
@@ -235,7 +245,12 @@ const timeWindowOptions = [
   "Specific time needed",
 ];
 
-const visitLengthOptions = ["15 minutes", "30 minutes", "60 minutes", "90 minutes"];
+const visitLengthOptions = [
+  "15 minutes",
+  "30 minutes",
+  "60 minutes",
+  "90 minutes",
+];
 
 const tipOptions: {
   key: TipChoice;
@@ -447,11 +462,22 @@ function toNullableNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
 
   if (typeof value === "string") {
-    const parsed = Number(value);
+    const clean = value.trim();
+    if (!clean) return null;
+
+    const parsed = Number(clean);
     if (Number.isFinite(parsed)) return parsed;
   }
 
   return null;
+}
+
+function getPositiveNumber(value: unknown) {
+  const parsed = toNullableNumber(value);
+
+  if (parsed === null || parsed <= 0) return null;
+
+  return parsed;
 }
 
 function toRadians(value: number) {
@@ -564,6 +590,90 @@ function serviceShortLabelFromKey(key: ServiceKey) {
     serviceOptions.find((option) => option.key === key)?.shortLabel ||
     "General Care"
   );
+}
+
+function getServiceRateLookupKeys(key: ServiceKey) {
+  const aliases: Record<ServiceKey, string[]> = {
+    drop_in_visit: [
+      "drop_in_visit",
+      "drop_in_visits",
+      "drop-in visit",
+      "drop-in visits",
+      "pet_sitting",
+      "pet sitting",
+    ],
+    house_sitting: ["house_sitting", "house sitting"],
+    doggy_day_care: [
+      "doggy_day_care",
+      "doggy day care",
+      "dog day care",
+      "in-home dog day care",
+    ],
+    dog_walking: ["dog_walking", "dog walking"],
+  };
+
+  return aliases[key];
+}
+
+function normalizeServiceRateLookupValue(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function getMatchingGuruServiceRate(
+  selectedService: ServiceKey,
+  serviceRates: GuruServiceRateRow[],
+) {
+  const lookupKeys = getServiceRateLookupKeys(selectedService).map(
+    normalizeServiceRateLookupValue,
+  );
+
+  return (
+    serviceRates.find((rate) => {
+      if (rate.is_enabled === false) return false;
+
+      const key = normalizeServiceRateLookupValue(rate.service_key);
+      const label = normalizeServiceRateLookupValue(rate.service_label);
+
+      return lookupKeys.includes(key) || lookupKeys.includes(label);
+    }) || null
+  );
+}
+
+function getGuruServiceRateAmount(rate: GuruServiceRateRow | null) {
+  if (!rate || rate.is_enabled === false) return null;
+
+  const unit = String(rate.rate_unit || "")
+    .trim()
+    .toLowerCase();
+  if (unit === "custom") return null;
+
+  return getPositiveNumber(rate.rate_amount);
+}
+
+function getRateUnitDisplay(unit?: string | null) {
+  const clean = String(unit || "visit")
+    .trim()
+    .toLowerCase();
+
+  const labels: Record<string, string> = {
+    hour: "hour",
+    visit: "visit",
+    walk: "walk",
+    session: "session",
+    day: "day",
+    night: "night",
+    stay: "stay",
+    pet: "pet",
+    add_on: "add-on",
+    custom: "custom quote",
+  };
+
+  return labels[clean] || clean.replace(/_/g, " ") || "visit";
 }
 
 function getServicePrice(key: ServiceKey, visitLength: string) {
@@ -867,7 +977,15 @@ function mergeGuruProfileWithFallbacks({
     review_count: guruData?.review_count ?? initialReviewCount ?? null,
     hourly_rate: guruData?.hourly_rate ?? initialHourlyRate ?? null,
     years_experience:
-      guruData?.years_experience ?? initialYearsExperience ?? null,
+      guruData?.years_experience ??
+      guruData?.experience_years ??
+      initialYearsExperience ??
+      null,
+    experience_years:
+      guruData?.experience_years ??
+      guruData?.years_experience ??
+      initialYearsExperience ??
+      null,
     completed_bookings:
       guruData?.completed_bookings ?? initialCompletedBookings ?? null,
     response_rate: guruData?.response_rate ?? initialResponseRate ?? null,
@@ -1085,6 +1203,10 @@ export default function BookGuruClient({
     }),
   );
 
+  const [guruServiceRates, setGuruServiceRates] = useState<
+    GuruServiceRateRow[]
+  >([]);
+
   const [weeklyAvailability, setWeeklyAvailability] =
     useState<DayAvailability[]>(defaultAvailability);
   const [blackoutDates, setBlackoutDates] = useState<BlackoutDateRow[]>([]);
@@ -1140,9 +1262,30 @@ export default function BookGuruClient({
     [pets, selectedPetId],
   );
 
+  const selectedGuruServiceRate = useMemo(
+    () => getMatchingGuruServiceRate(selectedService, guruServiceRates),
+    [selectedService, guruServiceRates],
+  );
+
+  const selectedGuruServiceRateAmount = useMemo(
+    () => getGuruServiceRateAmount(selectedGuruServiceRate),
+    [selectedGuruServiceRate],
+  );
+
+  const selectedGuruServiceIsCustomQuote =
+    String(selectedGuruServiceRate?.rate_unit || "")
+      .trim()
+      .toLowerCase() === "custom";
+
+  const selectedGuruServiceRateUnit = getRateUnitDisplay(
+    selectedGuruServiceRate?.rate_unit || "visit",
+  );
+
   const servicePrice = useMemo(
-    () => getServicePrice(selectedService, visitLength),
-    [selectedService, visitLength],
+    () =>
+      selectedGuruServiceRateAmount ??
+      getServicePrice(selectedService, visitLength),
+    [selectedGuruServiceRateAmount, selectedService, visitLength],
   );
 
   const marketplaceFeePercent = useMemo(
@@ -1185,7 +1328,10 @@ export default function BookGuruClient({
       : timeWindow;
 
   const guruDisplayName =
-    guruProfile?.display_name || guruProfile?.full_name || guruName || "SitGuru Guru";
+    guruProfile?.display_name ||
+    guruProfile?.full_name ||
+    guruName ||
+    "SitGuru Guru";
 
   const guruFirstName = firstNameFromDisplayName(guruDisplayName);
   const guruInitials = initialsFromName(guruDisplayName);
@@ -1198,14 +1344,26 @@ export default function BookGuruClient({
     guruProfile?.image_url ||
     "";
 
-  const guruRating = guruProfile?.rating_avg
-    ? guruProfile.rating_avg.toFixed(1)
-    : "4.9";
+  const numericGuruRating =
+    getPositiveNumber(guruProfile?.rating_avg) ??
+    getPositiveNumber(initialGuruRatingAvg) ??
+    5.0;
 
-  const reviewCount = guruProfile?.review_count ?? 128;
+  const guruRating = numericGuruRating.toFixed(1);
+
+  const reviewCount = Math.max(
+    0,
+    Math.round(
+      toNullableNumber(guruProfile?.review_count ?? initialGuruReviewCount) ??
+        0,
+    ),
+  );
 
   const guruRate =
-    guruProfile?.hourly_rate || guruProfile?.rate || servicePrice || 25;
+    selectedGuruServiceRateAmount ??
+    getPositiveNumber(guruProfile?.hourly_rate) ??
+    getPositiveNumber(guruProfile?.rate) ??
+    servicePrice;
 
   const guruLocation = [guruProfile?.city, guruProfile?.state]
     .filter(Boolean)
@@ -1351,9 +1509,35 @@ export default function BookGuruClient({
     return "border-amber-200 bg-amber-50 text-amber-700";
   }, [serviceAreaStatus]);
 
-  const yearsExperience = guruProfile?.years_experience ?? 5;
-  const completedBookings = guruProfile?.completed_bookings ?? 312;
-  const responseRate = guruProfile?.response_rate ?? 98;
+  const yearsExperienceValue =
+    getPositiveNumber(guruProfile?.years_experience) ??
+    getPositiveNumber(guruProfile?.experience_years) ??
+    getPositiveNumber(initialGuruYearsExperience);
+  const yearsExperience =
+    yearsExperienceValue === null
+      ? "Not listed"
+      : String(Math.round(yearsExperienceValue));
+
+  const completedBookings = String(
+    Math.max(
+      0,
+      Math.round(
+        toNullableNumber(
+          guruProfile?.completed_bookings ?? initialGuruCompletedBookings,
+        ) ?? 0,
+      ),
+    ),
+  );
+
+  const responseRateValue = getPositiveNumber(
+    guruProfile?.response_rate ?? initialGuruResponseRate,
+  );
+  const responseRate =
+    responseRateValue === null ? "New" : `${Math.round(responseRateValue)}%`;
+  const responseBadgeText =
+    responseRateValue === null || responseRateValue < 80
+      ? "New Guru"
+      : "Highly Responsive";
 
   const calendarCells = useMemo(
     () =>
@@ -1534,6 +1718,30 @@ export default function BookGuruClient({
         });
 
         setGuruProfile(mergedGuruProfile);
+
+        if (guruData?.id) {
+          const { data: serviceRateData, error: serviceRateError } =
+            await supabase
+              .from("guru_service_rates")
+              .select(
+                "id,guru_id,service_key,service_label,is_enabled,rate_amount,rate_unit,duration_minutes,notes",
+              )
+              .eq("guru_id", String(guruData.id));
+
+          if (serviceRateError) {
+            console.warn(
+              "Could not load Guru service rates for booking page:",
+              serviceRateError.message,
+            );
+            setGuruServiceRates([]);
+          } else {
+            setGuruServiceRates(
+              (serviceRateData || []) as GuruServiceRateRow[],
+            );
+          }
+        } else {
+          setGuruServiceRates([]);
+        }
 
         const guruUserId = guruData?.user_id;
 
@@ -3369,7 +3577,7 @@ export default function BookGuruClient({
 
                   <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
                     <Zap className="h-4 w-4" />
-                    Highly Responsive
+                    {responseBadgeText}
                   </div>
 
                   {guruLocation ? (
@@ -3398,7 +3606,7 @@ export default function BookGuruClient({
                 />
                 <BookingStatCard
                   icon={<Clock3 className="h-5 w-5" />}
-                  value={`${responseRate}%`}
+                  value={responseRate}
                   label="Response Rate"
                 />
               </div>
@@ -3425,12 +3633,23 @@ export default function BookGuruClient({
                     Starting at
                   </p>
                   <p className="text-3xl font-black text-slate-950">
-                    {formatMoneyNoCents(Number(guruRate))}
-                    <span className="text-sm font-bold text-slate-500">
-                      {" "}
-                      / visit
-                    </span>
+                    {selectedGuruServiceIsCustomQuote ? (
+                      "Custom quote"
+                    ) : (
+                      <>
+                        {formatMoneyNoCents(Number(guruRate))}
+                        <span className="text-sm font-bold text-slate-500">
+                          {" "}
+                          / {selectedGuruServiceRateUnit}
+                        </span>
+                      </>
+                    )}
                   </p>
+                  {selectedGuruServiceIsCustomQuote ? (
+                    <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                      Final price confirmed through SitGuru booking.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
@@ -3529,9 +3748,7 @@ export default function BookGuruClient({
                 </p>
 
                 <div className="mt-3 flex justify-between gap-4 text-sm">
-                  <span className="font-semibold text-slate-600">
-                    Guru Tip
-                  </span>
+                  <span className="font-semibold text-slate-600">Guru Tip</span>
                   <span className="font-black text-slate-950">
                     {formatMoney(tipAmount)}
                   </span>
