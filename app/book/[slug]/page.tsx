@@ -21,25 +21,41 @@ type GuruCalendarRow = {
 type GuruRow = {
   id: string;
   user_id?: string | null;
+  profile_id?: string | null;
+  guru_id?: string | null;
   slug?: string | null;
   display_name?: string | null;
   full_name?: string | null;
+  name?: string | null;
   bio?: string | null;
   city?: string | null;
   state?: string | null;
   zip_code?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  service_zip?: string | null;
   profile_photo_url?: string | null;
   photo_url?: string | null;
   avatar_url?: string | null;
   image_url?: string | null;
+  rating?: number | null;
   rating_avg?: number | null;
   review_count?: number | null;
   hourly_rate?: number | null;
   rate?: number | null;
   years_experience?: number | null;
+  experience_years?: number | null;
   completed_bookings?: number | null;
   response_rate?: number | null;
 };
+
+const COMPLETED_BOOKING_STATUSES = [
+  "completed",
+  "complete",
+  "finished",
+  "paid",
+  "confirmed",
+];
 
 function asString(value: unknown) {
   return typeof value === "string" ? value : "";
@@ -50,14 +66,20 @@ function asNullableString(value: unknown) {
 }
 
 function asNullableNumber(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
 }
 
 function normalizeSlug(value: string) {
   return value
     .toLowerCase()
     .trim()
-    .replace(/['’]/g, "")
+    .replace(/[’']/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
@@ -67,11 +89,7 @@ function compactSlug(value: string) {
 }
 
 function titleFromSlug(slug: string) {
-  return slug
-    .trim()
-    .replace(/-/g, " ")
-    .replace(/\s+/g, " ")
-    .toLowerCase();
+  return slug.trim().replace(/-/g, " ").replace(/\s+/g, " ").toLowerCase();
 }
 
 function createNameSlug(value?: string | null) {
@@ -90,22 +108,30 @@ function normalizeGuruRow(row: Record<string, unknown>): GuruRow | null {
   return {
     id,
     user_id: asNullableString(row.user_id),
+    profile_id: asNullableString(row.profile_id),
+    guru_id: asNullableString(row.guru_id),
     slug: asNullableString(row.slug),
     display_name: asNullableString(row.display_name),
     full_name: asNullableString(row.full_name),
+    name: asNullableString(row.name),
     bio: asNullableString(row.bio),
     city: asNullableString(row.city),
     state: asNullableString(row.state),
     zip_code: asNullableString(row.zip_code),
+    service_city: asNullableString(row.service_city),
+    service_state: asNullableString(row.service_state),
+    service_zip: asNullableString(row.service_zip),
     profile_photo_url: asNullableString(row.profile_photo_url),
     photo_url: asNullableString(row.photo_url),
     avatar_url: asNullableString(row.avatar_url),
     image_url: asNullableString(row.image_url),
+    rating: asNullableNumber(row.rating),
     rating_avg: asNullableNumber(row.rating_avg),
     review_count: asNullableNumber(row.review_count),
     hourly_rate: asNullableNumber(row.hourly_rate),
     rate: asNullableNumber(row.rate),
     years_experience: asNullableNumber(row.years_experience),
+    experience_years: asNullableNumber(row.experience_years),
     completed_bookings: asNullableNumber(row.completed_bookings),
     response_rate: asNullableNumber(row.response_rate),
   };
@@ -121,6 +147,20 @@ function getGuruPhotoUrl(guru: GuruRow | null) {
   );
 }
 
+function getGuruName(guru: GuruRow) {
+  return guru.display_name || guru.full_name || guru.name || "SitGuru";
+}
+
+function getGuruLookupIds(guru: GuruRow) {
+  return Array.from(
+    new Set(
+      [guru.id, guru.user_id, guru.profile_id, guru.guru_id]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 function guruMatchesSlug(guru: GuruRow, requestedSlug: string) {
   const requestedSlugNormal = normalizeSlug(requestedSlug);
   const requestedSlugCompact = compactSlug(requestedSlug);
@@ -130,8 +170,10 @@ function guruMatchesSlug(guru: GuruRow, requestedSlug: string) {
     guru.slug,
     guru.display_name,
     guru.full_name,
+    guru.name,
     createNameSlug(guru.display_name),
     createNameSlug(guru.full_name),
+    createNameSlug(guru.name),
   ]
     .map((value) => String(value || "").trim())
     .filter(Boolean);
@@ -251,7 +293,9 @@ async function findGuruBySlugOrName(slug: string) {
 
   return (
     allGurus.find((guru) => guruMatchesSlug(guru, cleanedSlug)) ||
-    allGurus.find((guru) => compactSlug(guru.slug || "") === cleanedSlugCompact) ||
+    allGurus.find(
+      (guru) => compactSlug(guru.slug || "") === cleanedSlugCompact,
+    ) ||
     null
   );
 }
@@ -312,6 +356,52 @@ async function findCalendarSettings(slug: string, fallbackName: string) {
   return (calendarByName.data?.[0] || null) as GuruCalendarRow | null;
 }
 
+async function getActualGuruCompletedBookingCount(guru: GuruRow) {
+  const lookupIds = getGuruLookupIds(guru);
+
+  if (!lookupIds.length) return 0;
+
+  try {
+    const idFilters = lookupIds
+      .flatMap((id) => [
+        `guru_id.eq.${id}`,
+        `guru_user_id.eq.${id}`,
+        `provider_id.eq.${id}`,
+      ])
+      .join(",");
+
+    const statusFilters = COMPLETED_BOOKING_STATUSES.map(
+      (status) => `status.eq.${status}`,
+    ).join(",");
+
+    const { count, error } = await supabaseAdmin
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .or(idFilters)
+      .or(statusFilters);
+
+    if (error) {
+      console.warn("Book Guru actual booking count lookup failed:", {
+        guruId: guru.id,
+        lookupIds,
+        error,
+      });
+
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.warn("Book Guru actual booking count lookup threw:", {
+      guruId: guru.id,
+      lookupIds,
+      error,
+    });
+
+    return 0;
+  }
+}
+
 export default async function BookGuruPage({ params }: PageProps) {
   const { slug } = await params;
 
@@ -325,10 +415,13 @@ export default async function BookGuruPage({ params }: PageProps) {
     notFound();
   }
 
-  const guruName = guruProfile.display_name || guruProfile.full_name || "SitGuru";
+  const guruName = getGuruName(guruProfile);
   const resolvedGuruSlug = guruProfile.slug || normalizeSlug(guruName) || slug;
 
-  const calendarGuru = await findCalendarSettings(resolvedGuruSlug, guruName);
+  const [calendarGuru, actualCompletedBookingCount] = await Promise.all([
+    findCalendarSettings(resolvedGuruSlug, guruName),
+    getActualGuruCompletedBookingCount(guruProfile),
+  ]);
 
   const finalGuruSlug =
     calendarGuru?.guru_slug || guruProfile.slug || resolvedGuruSlug || slug;
@@ -348,14 +441,18 @@ export default async function BookGuruPage({ params }: PageProps) {
       calEventTypeSlug={resolvedCalendarEventTypeSlug}
       initialGuruPhotoUrl={getGuruPhotoUrl(guruProfile)}
       initialGuruBio={guruProfile.bio || ""}
-      initialGuruCity={guruProfile.city || ""}
-      initialGuruState={guruProfile.state || ""}
-      initialGuruRatingAvg={guruProfile.rating_avg ?? null}
-      initialGuruReviewCount={guruProfile.review_count ?? null}
-      initialGuruHourlyRate={guruProfile.hourly_rate ?? guruProfile.rate ?? null}
-      initialGuruYearsExperience={guruProfile.years_experience ?? null}
-      initialGuruCompletedBookings={guruProfile.completed_bookings ?? null}
-      initialGuruResponseRate={guruProfile.response_rate ?? null}
+      initialGuruCity={guruProfile.service_city || guruProfile.city || ""}
+      initialGuruState={guruProfile.service_state || guruProfile.state || ""}
+      initialGuruRatingAvg={guruProfile.rating_avg ?? guruProfile.rating ?? 5}
+      initialGuruReviewCount={guruProfile.review_count ?? 0}
+      initialGuruHourlyRate={
+        guruProfile.hourly_rate ?? guruProfile.rate ?? null
+      }
+      initialGuruYearsExperience={
+        guruProfile.years_experience ?? guruProfile.experience_years ?? null
+      }
+      initialGuruCompletedBookings={actualCompletedBookingCount}
+      initialGuruResponseRate={null}
     />
   );
 }
