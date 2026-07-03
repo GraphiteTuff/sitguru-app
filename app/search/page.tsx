@@ -667,8 +667,41 @@ function getGuruPhotoUrl(guru: GuruRow) {
   );
 }
 
+function slugifyPublicIdentifier(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function isLikelyUuid(value?: string | number | null) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || "").trim(),
+  );
+}
+
+function getPreferredPublicSlug(guru: GuruRow) {
+  const publicSlug = slugifyPublicIdentifier(guru.public_slug);
+  const slug = slugifyPublicIdentifier(guru.slug);
+  const nameSlug = slugifyPublicIdentifier(getGuruName(guru));
+
+  if (publicSlug && !isLikelyUuid(publicSlug)) return publicSlug;
+  if (slug && !isLikelyUuid(slug)) return slug;
+  if (nameSlug && nameSlug !== "guru" && nameSlug !== "pet-care-guru") {
+    return nameSlug;
+  }
+
+  return "";
+}
+
 function getGuruPublicIdentifier(guru: GuruRow) {
+  const preferredSlug = getPreferredPublicSlug(guru);
+
   const identifier =
+    preferredSlug ||
     guru.public_slug ||
     guru.slug ||
     guru.user_id ||
@@ -1004,23 +1037,59 @@ function enrichGuruWithDistance(
       );
 
   const normalizedServiceRadiusMiles = getGuruRadius(guru);
-  const zipFallbackCoordinates = getGuruZipFallbackCoordinates(
-    guru,
-    guruZipLookupsByZip,
-  );
+  const searchCoordinates = getGuruSearchCoordinates(guru, guruZipLookupsByZip);
+  const searchLatitude = searchCoordinates?.[0] ?? getGuruLatitude(guru);
+  const searchLongitude = searchCoordinates?.[1] ?? getGuruLongitude(guru);
 
   return {
     ...guru,
-    service_latitude:
-      getGuruLatitude(guru) ?? zipFallbackCoordinates?.[0] ?? guru.service_latitude,
-    service_longitude:
-      getGuruLongitude(guru) ??
-      zipFallbackCoordinates?.[1] ??
-      guru.service_longitude,
+    latitude: searchLatitude ?? guru.latitude,
+    longitude: searchLongitude ?? guru.longitude,
+    lat: searchLatitude ?? guru.lat,
+    lng: searchLongitude ?? guru.lng,
+    service_latitude: searchLatitude ?? guru.service_latitude,
+    service_longitude: searchLongitude ?? guru.service_longitude,
     service_radius_miles: normalizedServiceRadiusMiles,
     service_radius_display: normalizedServiceRadiusMiles,
     distance_miles: distanceMiles,
   };
+}
+
+function getProviderMapMarkerRows(
+  guruRows: GuruRow[],
+  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
+) {
+  return guruRows
+    .map((guru) => {
+      const coordinates = getGuruSearchCoordinates(guru, guruZipLookupsByZip);
+
+      if (!coordinates) return null;
+
+      const [latitude, longitude] = coordinates;
+      const guruName = getGuruName(guru);
+      const publicIdentifier = getGuruPublicIdentifier(guru);
+
+      return {
+        ...guru,
+        id: String(guru.id || guru.user_id || guru.profile_id || publicIdentifier),
+        name: guruName,
+        full_name: guru.full_name || guruName,
+        display_name: guru.display_name || guruName,
+        title: guru.title || guruName,
+        latitude,
+        longitude,
+        lat: latitude,
+        lng: longitude,
+        service_latitude: latitude,
+        service_longitude: longitude,
+        service_radius_miles: getGuruRadius(guru),
+        service_radius_display: guru.service_radius_display || getGuruRadius(guru),
+        profile_url: getGuruHref(guru),
+        href: getGuruHref(guru),
+        url: getGuruHref(guru),
+      };
+    })
+    .filter(Boolean) as Array<GuruRow & Record<string, unknown>>;
 }
 
 function GuruResultPhoto({
@@ -1881,13 +1950,12 @@ function SearchPageContent() {
     selectedGuruSlug,
   ]);
 
-  const mapReadyGuruCount = useMemo(
-    () =>
-      filteredGurus.filter((guru) =>
-        Boolean(getGuruSearchCoordinates(guru, guruZipLookupsByZip)),
-      ).length,
+  const providerMapMarkers = useMemo(
+    () => getProviderMapMarkerRows(filteredGurus, guruZipLookupsByZip),
     [filteredGurus, guruZipLookupsByZip],
   );
+
+  const mapReadyGuruCount = providerMapMarkers.length;
 
   const mapMissingLocationCount = filteredGurus.length - mapReadyGuruCount;
 
@@ -2553,7 +2621,7 @@ function SearchPageContent() {
 
                 <div className="h-[420px] sm:h-[520px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]">
                   <ProviderMap
-                    markers={filteredGurus as unknown as Record<string, unknown>[]}
+                    markers={providerMapMarkers as unknown as Record<string, unknown>[]}
                     center={
                       cleanZip(zipFilter) ||
                       cityFilter.trim() ||
