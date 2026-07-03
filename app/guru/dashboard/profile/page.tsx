@@ -36,6 +36,10 @@ type GuruProfile = {
   bio?: string | null;
   city?: string | null;
   state?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  service_zip?: string | null;
+  service_zip_code?: string | null;
   street_address?: string | null;
   service_address?: string | null;
   address?: string | null;
@@ -46,6 +50,8 @@ type GuruProfile = {
   radius_miles?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  service_latitude?: number | null;
+  service_longitude?: number | null;
   lat?: number | null;
   lng?: number | null;
   hourly_rate?: number | null;
@@ -293,15 +299,35 @@ function normalizeServices(value: GuruProfile["services"]): string[] {
   return [];
 }
 
+function normalizeExperienceValue(value: unknown) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) return "";
+
+  return String(Math.round(parsed));
+}
+
+function normalizeRateValue(value: unknown) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) return "";
+
+  return String(parsed);
+}
+
 function isRateUnit(value: unknown): value is RateUnit {
   return RATE_UNIT_OPTIONS.some((option) => option.value === value);
 }
 
 function formatRateUnitLabel(unit: RateUnit) {
-  return RATE_UNIT_OPTIONS.find((option) => option.value === unit)?.label || unit;
+  return (
+    RATE_UNIT_OPTIONS.find((option) => option.value === unit)?.label || unit
+  );
 }
 
-function buildDefaultServiceRates(enabledServices: string[] = []): ServiceRateState[] {
+function buildDefaultServiceRates(
+  enabledServices: string[] = [],
+): ServiceRateState[] {
   return SERVICE_RATE_CONFIGS.map((service) => ({
     service_key: service.service_key,
     service_label: service.service_label,
@@ -335,14 +361,16 @@ function mergeServiceRates({
       service_key: service.service_key,
       service_label: saved?.service_label || service.service_label,
       is_enabled:
-        Boolean(saved?.is_enabled) || enabledServices.includes(service.service_label),
+        Boolean(saved?.is_enabled) ||
+        enabledServices.includes(service.service_label),
       rate_amount:
         saved?.rate_amount !== null && saved?.rate_amount !== undefined
           ? String(saved.rate_amount)
           : "",
       rate_unit: isRateUnit(savedUnit) ? savedUnit : service.default_unit,
       duration_minutes:
-        saved?.duration_minutes !== null && saved?.duration_minutes !== undefined
+        saved?.duration_minutes !== null &&
+        saved?.duration_minutes !== undefined
           ? String(saved.duration_minutes)
           : service.default_duration_minutes === null
             ? ""
@@ -377,7 +405,9 @@ function getPublicReadinessItems({
   profilePhotoUrl: string;
   serviceRates: ServiceRateState[];
 }) {
-  const enabledServiceRates = serviceRates.filter((service) => service.is_enabled);
+  const enabledServiceRates = serviceRates.filter(
+    (service) => service.is_enabled,
+  );
   const hasPricedService = enabledServiceRates.some(
     (service) => service.rate_unit === "custom" || service.rate_amount.trim(),
   );
@@ -423,7 +453,9 @@ function getPublicReadinessItems({
 
   return {
     checks,
-    missingItems: checks.filter((item) => !item.complete).map((item) => item.label),
+    missingItems: checks
+      .filter((item) => !item.complete)
+      .map((item) => item.label),
     ready: checks.every((item) => item.complete),
   };
 }
@@ -444,7 +476,7 @@ async function loadGuruServiceRates(guruId: string, enabledServices: string[]) {
 
   return mergeServiceRates({
     enabledServices,
-    savedRates: ((data || []) as unknown) as GuruServiceRateRow[],
+    savedRates: (data || []) as unknown as GuruServiceRateRow[],
   });
 }
 
@@ -465,16 +497,18 @@ async function loadGuruAcademyGraduate(userId: string) {
     }
 
     const badgeStatus = String(data?.badge_status || "").toLowerCase();
-    const certificateStatus = String(data?.certificate_status || "").toLowerCase();
+    const certificateStatus = String(
+      data?.certificate_status || "",
+    ).toLowerCase();
 
     return Boolean(
       data?.issued_at ||
-        badgeStatus === "issued" ||
-        badgeStatus === "completed" ||
-        badgeStatus === "complete" ||
-        certificateStatus === "issued" ||
-        certificateStatus === "completed" ||
-        certificateStatus === "complete",
+      badgeStatus === "issued" ||
+      badgeStatus === "completed" ||
+      badgeStatus === "complete" ||
+      certificateStatus === "issued" ||
+      certificateStatus === "completed" ||
+      certificateStatus === "complete",
     );
   } catch (error) {
     console.warn("Could not load Guru Academy certification:", error);
@@ -482,7 +516,10 @@ async function loadGuruAcademyGraduate(userId: string) {
   }
 }
 
-async function saveGuruServiceRates(guruId: string, serviceRates: ServiceRateState[]) {
+async function saveGuruServiceRates(
+  guruId: string,
+  serviceRates: ServiceRateState[],
+) {
   if (!guruId) return;
 
   const now = new Date().toISOString();
@@ -602,36 +639,64 @@ async function saveGuruPayload({
     user_id: payload.user_id,
     display_name: payload.display_name,
     full_name: payload.full_name,
+    name: payload.name,
     slug: payload.slug,
+    headline: payload.headline,
     bio: payload.bio,
     city: payload.city,
     state: payload.state,
     zip_code: payload.zip_code,
+    postal_code: payload.postal_code,
+    service_city: payload.service_city,
+    service_state: payload.service_state,
+    service_zip: payload.service_zip,
+    service_zip_code: payload.service_zip_code,
     service_radius_miles: payload.service_radius_miles,
+    service_radius: payload.service_radius,
+    radius_miles: payload.radius_miles,
     latitude: payload.latitude,
     longitude: payload.longitude,
+    service_latitude: payload.service_latitude,
+    service_longitude: payload.service_longitude,
     hourly_rate: payload.hourly_rate,
     rate: payload.rate,
+    years_experience: payload.years_experience,
+    experience_years: payload.experience_years,
     profile_photo_url: payload.profile_photo_url,
     image_url: payload.image_url,
+    avatar_url: payload.avatar_url,
+    photo_url: payload.photo_url,
     services: payload.services,
     is_public: payload.is_public,
+    onboarding_completed: payload.onboarding_completed,
+    profile_completed: payload.profile_completed,
   };
 
   const latLngPayload = {
     user_id: payload.user_id,
     display_name: payload.display_name,
     full_name: payload.full_name,
+    name: payload.name,
     slug: payload.slug,
+    headline: payload.headline,
     bio: payload.bio,
     city: payload.city,
     state: payload.state,
+    zip_code: payload.zip_code,
+    service_city: payload.service_city,
+    service_state: payload.service_state,
+    service_zip: payload.service_zip,
+    service_radius_miles: payload.service_radius_miles,
     lat: payload.lat,
     lng: payload.lng,
     hourly_rate: payload.hourly_rate,
     rate: payload.rate,
+    years_experience: payload.years_experience,
+    experience_years: payload.experience_years,
     profile_photo_url: payload.profile_photo_url,
     image_url: payload.image_url,
+    avatar_url: payload.avatar_url,
+    photo_url: payload.photo_url,
     services: payload.services,
     is_public: payload.is_public,
   };
@@ -640,12 +705,21 @@ async function saveGuruPayload({
     user_id: payload.user_id,
     display_name: payload.display_name,
     full_name: payload.full_name,
+    name: payload.name,
     slug: payload.slug,
+    headline: payload.headline,
     bio: payload.bio,
     city: payload.city,
     state: payload.state,
+    zip_code: payload.zip_code,
+    service_city: payload.service_city,
+    service_state: payload.service_state,
+    service_zip: payload.service_zip,
+    service_radius_miles: payload.service_radius_miles,
     hourly_rate: payload.hourly_rate,
     rate: payload.rate,
+    years_experience: payload.years_experience,
+    experience_years: payload.experience_years,
     profile_photo_url: payload.profile_photo_url,
     image_url: payload.image_url,
     services: payload.services,
@@ -660,13 +734,24 @@ async function saveGuruPayload({
     bio: payload.bio,
     city: payload.city,
     state: payload.state,
+    zip_code: payload.zip_code,
     hourly_rate: payload.hourly_rate,
+    rate: payload.rate,
+    years_experience: payload.years_experience,
+    experience_years: payload.experience_years,
     profile_photo_url: payload.profile_photo_url,
     image_url: payload.image_url,
+    services: payload.services,
     is_public: payload.is_public,
   };
 
-  const attempts = [payload, mapPayload, latLngPayload, leanPayload, basicPayload];
+  const attempts = [
+    payload,
+    mapPayload,
+    latLngPayload,
+    leanPayload,
+    basicPayload,
+  ];
   let lastError = "Could not save your guru profile.";
 
   if (profileExists) {
@@ -692,7 +777,11 @@ async function saveGuruPayload({
   }
 
   for (const attempt of attempts) {
-    const response = await supabase.from("gurus").insert(attempt).select("*").limit(1);
+    const response = await supabase
+      .from("gurus")
+      .insert(attempt)
+      .select("*")
+      .limit(1);
 
     if (!response.error && response.data?.[0]) {
       return response.data[0] as GuruProfile;
@@ -877,15 +966,21 @@ function GuruDashboardProfilePageContent() {
         setSlug(profile.slug || fallbackSlug);
         setHeadline(profile.headline || "");
         setBio(profile.bio || "");
-        setCity(profile.city || "");
-        setStateValue(profile.state || "");
+        setCity(profile.service_city || profile.city || "");
+        setStateValue(profile.service_state || profile.state || "");
         setStreetAddress(
           profile.street_address ||
             profile.service_address ||
             profile.address ||
             "",
         );
-        setZipCode(profile.zip_code || profile.postal_code || "");
+        setZipCode(
+          profile.service_zip ||
+            profile.service_zip_code ||
+            profile.zip_code ||
+            profile.postal_code ||
+            "",
+        );
         setServiceRadius(
           profile.service_radius_miles !== null &&
             profile.service_radius_miles !== undefined
@@ -899,18 +994,24 @@ function GuruDashboardProfilePageContent() {
                 : "25",
         );
         setLatitude(
-          profile.latitude !== null && profile.latitude !== undefined
-            ? String(profile.latitude)
-            : profile.lat !== null && profile.lat !== undefined
-              ? String(profile.lat)
-              : "",
+          profile.service_latitude !== null &&
+            profile.service_latitude !== undefined
+            ? String(profile.service_latitude)
+            : profile.latitude !== null && profile.latitude !== undefined
+              ? String(profile.latitude)
+              : profile.lat !== null && profile.lat !== undefined
+                ? String(profile.lat)
+                : "",
         );
         setLongitude(
-          profile.longitude !== null && profile.longitude !== undefined
-            ? String(profile.longitude)
-            : profile.lng !== null && profile.lng !== undefined
-              ? String(profile.lng)
-              : "",
+          profile.service_longitude !== null &&
+            profile.service_longitude !== undefined
+            ? String(profile.service_longitude)
+            : profile.longitude !== null && profile.longitude !== undefined
+              ? String(profile.longitude)
+              : profile.lng !== null && profile.lng !== undefined
+                ? String(profile.lng)
+                : "",
         );
         setHourlyRate(
           profile.hourly_rate !== null && profile.hourly_rate !== undefined
@@ -920,13 +1021,9 @@ function GuruDashboardProfilePageContent() {
               : "",
         );
         setYearsExperience(
-          profile.years_experience !== null &&
-            profile.years_experience !== undefined
-            ? String(profile.years_experience)
-            : profile.experience_years !== null &&
-                profile.experience_years !== undefined
-              ? String(profile.experience_years)
-              : "",
+          normalizeExperienceValue(
+            profile.years_experience ?? profile.experience_years,
+          ),
         );
         setProfilePhotoUrl(
           firstSitGuruPhotoUrl([
@@ -939,7 +1036,10 @@ function GuruDashboardProfilePageContent() {
         const normalizedProfileServices = normalizeServices(profile.services);
         setServices(normalizedProfileServices);
         setServiceRates(
-          await loadGuruServiceRates(profile.id || "", normalizedProfileServices),
+          await loadGuruServiceRates(
+            profile.id || "",
+            normalizedProfileServices,
+          ),
         );
         setIsPublic(Boolean(profile.is_public));
         setLoading(false);
@@ -1028,7 +1128,9 @@ function GuruDashboardProfilePageContent() {
     setZipCode(cleanZip);
 
     if (cleanZip.length < 5) {
-      setZipLookupMessage("Enter a 5-digit ZIP code to auto-fill city and state.");
+      setZipLookupMessage(
+        "Enter a 5-digit ZIP code to auto-fill city and state.",
+      );
       setLatitude("");
       setLongitude("");
     }
@@ -1150,7 +1252,9 @@ function GuruDashboardProfilePageContent() {
     const parsedLatitude = latitude ? Number(latitude) : null;
     const parsedLongitude = longitude ? Number(longitude) : null;
     const cleanPhotoUrl = profilePhotoUrl.trim();
-    const enabledServiceRates = serviceRates.filter((service) => service.is_enabled);
+    const enabledServiceRates = serviceRates.filter(
+      (service) => service.is_enabled,
+    );
     const cleanServices = getEnabledServiceLabels(serviceRates);
 
     const parsedRate = hourlyRate ? Number(hourlyRate) : null;
@@ -1276,11 +1380,16 @@ function GuruDashboardProfilePageContent() {
       user_id: userId,
       display_name: cleanDisplayName,
       full_name: cleanDisplayName,
+      name: cleanDisplayName,
       slug: cleanSlug,
       headline: cleanHeadline || null,
       bio: cleanBio || null,
       city: cleanCity || null,
       state: cleanState || null,
+      service_city: cleanCity || null,
+      service_state: cleanState || null,
+      service_zip: cleanZipCode || null,
+      service_zip_code: cleanZipCode || null,
       street_address: cleanStreetAddress || null,
       service_address: cleanStreetAddress || null,
       address: cleanStreetAddress || null,
@@ -1291,6 +1400,8 @@ function GuruDashboardProfilePageContent() {
       radius_miles: parsedServiceRadius,
       latitude: parsedLatitude,
       longitude: parsedLongitude,
+      service_latitude: parsedLatitude,
+      service_longitude: parsedLongitude,
       lat: parsedLatitude,
       lng: parsedLongitude,
       location_updated_at: new Date().toISOString(),
@@ -1309,7 +1420,11 @@ function GuruDashboardProfilePageContent() {
     };
 
     try {
-      const savedProfile = await saveGuruPayload({ userId, profileExists, payload });
+      const savedProfile = await saveGuruPayload({
+        userId,
+        profileExists,
+        payload,
+      });
 
       const { data: freshRows } = await supabase
         .from("gurus")
@@ -1318,13 +1433,16 @@ function GuruDashboardProfilePageContent() {
         .limit(1);
 
       const refreshed =
-        ((freshRows?.[0] as GuruProfile | undefined) ?? savedProfile ?? null);
+        (freshRows?.[0] as GuruProfile | undefined) ?? savedProfile ?? null;
       const savedGuruId = refreshed?.id || existingProfileId;
       let savedServiceRates = serviceRates;
 
       if (savedGuruId) {
         await saveGuruServiceRates(savedGuruId, serviceRates);
-        savedServiceRates = await loadGuruServiceRates(savedGuruId, cleanServices);
+        savedServiceRates = await loadGuruServiceRates(
+          savedGuruId,
+          cleanServices,
+        );
       }
 
       if (refreshed) {
@@ -1336,15 +1454,21 @@ function GuruDashboardProfilePageContent() {
         setSlug(refreshed.slug || cleanSlug);
         setHeadline(refreshed.headline || cleanHeadline);
         setBio(refreshed.bio || "");
-        setCity(refreshed.city || "");
-        setStateValue(refreshed.state || "");
+        setCity(refreshed.service_city || refreshed.city || "");
+        setStateValue(refreshed.service_state || refreshed.state || "");
         setStreetAddress(
           refreshed.street_address ||
             refreshed.service_address ||
             refreshed.address ||
             cleanStreetAddress,
         );
-        setZipCode(refreshed.zip_code || refreshed.postal_code || cleanZipCode);
+        setZipCode(
+          refreshed.service_zip ||
+            refreshed.service_zip_code ||
+            refreshed.zip_code ||
+            refreshed.postal_code ||
+            cleanZipCode,
+        );
         setServiceRadius(
           refreshed.service_radius_miles !== null &&
             refreshed.service_radius_miles !== undefined
@@ -1358,18 +1482,24 @@ function GuruDashboardProfilePageContent() {
                 : serviceRadius,
         );
         setLatitude(
-          refreshed.latitude !== null && refreshed.latitude !== undefined
-            ? String(refreshed.latitude)
-            : refreshed.lat !== null && refreshed.lat !== undefined
-              ? String(refreshed.lat)
-              : latitude,
+          refreshed.service_latitude !== null &&
+            refreshed.service_latitude !== undefined
+            ? String(refreshed.service_latitude)
+            : refreshed.latitude !== null && refreshed.latitude !== undefined
+              ? String(refreshed.latitude)
+              : refreshed.lat !== null && refreshed.lat !== undefined
+                ? String(refreshed.lat)
+                : latitude,
         );
         setLongitude(
-          refreshed.longitude !== null && refreshed.longitude !== undefined
-            ? String(refreshed.longitude)
-            : refreshed.lng !== null && refreshed.lng !== undefined
-              ? String(refreshed.lng)
-              : longitude,
+          refreshed.service_longitude !== null &&
+            refreshed.service_longitude !== undefined
+            ? String(refreshed.service_longitude)
+            : refreshed.longitude !== null && refreshed.longitude !== undefined
+              ? String(refreshed.longitude)
+              : refreshed.lng !== null && refreshed.lng !== undefined
+                ? String(refreshed.lng)
+                : longitude,
         );
         setHourlyRate(
           refreshed.hourly_rate !== null && refreshed.hourly_rate !== undefined
@@ -1379,13 +1509,9 @@ function GuruDashboardProfilePageContent() {
               : "",
         );
         setYearsExperience(
-          refreshed.years_experience !== null &&
-            refreshed.years_experience !== undefined
-            ? String(refreshed.years_experience)
-            : refreshed.experience_years !== null &&
-                refreshed.experience_years !== undefined
-              ? String(refreshed.experience_years)
-              : "",
+          normalizeExperienceValue(
+            refreshed.years_experience ?? refreshed.experience_years,
+          ),
         );
         setProfilePhotoUrl(
           firstSitGuruPhotoUrl([
@@ -1407,7 +1533,9 @@ function GuruDashboardProfilePageContent() {
       }
 
       const destination =
-        saveIntent === "continue" && nextStepNumber ? nextStepHref : routes.dashboard;
+        saveIntent === "continue" && nextStepNumber
+          ? nextStepHref
+          : routes.dashboard;
 
       setSuccessMessage(
         saveIntent === "continue" && nextStepNumber
@@ -1508,7 +1636,9 @@ function GuruDashboardProfilePageContent() {
   const publicPreviewBio =
     bio.trim() ||
     "Your customer-facing bio will appear here once added. Share how you care for pets, what makes you trustworthy, and the kind of families you are best suited to help.";
-  const enabledServiceRates = serviceRates.filter((service) => service.is_enabled);
+  const enabledServiceRates = serviceRates.filter(
+    (service) => service.is_enabled,
+  );
   const firstPricedService = enabledServiceRates.find(
     (service) => service.rate_unit === "custom" || service.rate_amount.trim(),
   );
@@ -1524,7 +1654,8 @@ function GuruDashboardProfilePageContent() {
 
   const publicProfileHref = `/guru/${publicPreviewSlug}`;
   const hasNextStep = activeStep !== "3";
-  const nextStepNumber = activeStep === "1" ? "2" : activeStep === "2" ? "3" : "";
+  const nextStepNumber =
+    activeStep === "1" ? "2" : activeStep === "2" ? "3" : "";
   const nextStepHref = nextStepNumber
     ? `/guru/dashboard/profile?step=${nextStepNumber}`
     : routes.dashboard;
@@ -1698,7 +1829,7 @@ function GuruDashboardProfilePageContent() {
             </div>
           </div>
 
-          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-5 md:px-8">
+          <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-6 md:px-8">
             {[
               { label: "Complete", value: `${completionPercent}%`, icon: "⭐" },
               { label: "Services", value: services.length, icon: "🐾" },
@@ -1706,6 +1837,13 @@ function GuruDashboardProfilePageContent() {
                 label: "Public",
                 value: effectivePublicStatus ? "Yes" : "No",
                 icon: "👀",
+              },
+              {
+                label: "Experience",
+                value: yearsExperience.trim()
+                  ? `${yearsExperience.trim()} yr`
+                  : "Not listed",
+                icon: "🏡",
               },
               { label: "Rate", value: publicPreviewRate, icon: "💚" },
               {
@@ -1829,7 +1967,9 @@ function GuruDashboardProfilePageContent() {
                         <input
                           id="display_name"
                           value={displayName}
-                          onChange={(event) => setDisplayName(event.target.value)}
+                          onChange={(event) =>
+                            setDisplayName(event.target.value)
+                          }
                           placeholder="Your public display name"
                           className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
@@ -1882,7 +2022,7 @@ function GuruDashboardProfilePageContent() {
                           onChange={(event) =>
                             setYearsExperience(event.target.value)
                           }
-                          placeholder="3"
+                          placeholder="Leave blank if not listed yet"
                           inputMode="numeric"
                           className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold !text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                         />
@@ -1912,8 +2052,8 @@ function GuruDashboardProfilePageContent() {
                               Profile photo
                             </p>
                             <p className="mt-1 text-sm font-semibold !text-slate-600">
-                              Upload a JPG, PNG, or WEBP photo. This becomes your
-                              mini avatar across SitGuru.
+                              Upload a JPG, PNG, or WEBP photo. This becomes
+                              your mini avatar across SitGuru.
                             </p>
                           </div>
 
@@ -2112,9 +2252,9 @@ function GuruDashboardProfilePageContent() {
                             WebkitTextFillColor: "#334155",
                           }}
                         >
-                          Enter the number of miles you are comfortable traveling
-                          from your service ZIP code. Customers outside this
-                          radius will not be able to book you.
+                          Enter the number of miles you are comfortable
+                          traveling from your service ZIP code. Customers
+                          outside this radius will not be able to book you.
                         </p>
                       </div>
 
@@ -2186,7 +2326,8 @@ function GuruDashboardProfilePageContent() {
                         </p>
                         <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
                           Enable each service you offer, then choose the pricing
-                          parameter customers should see and bookings should use.
+                          parameter customers should see and bookings should
+                          use.
                         </p>
                       </div>
                       <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-800">
@@ -2200,8 +2341,9 @@ function GuruDashboardProfilePageContent() {
                         const config = SERVICE_RATE_CONFIGS.find(
                           (item) => item.service_key === service.service_key,
                         );
-                        const recommendedUnits =
-                          config?.recommended_units || [service.rate_unit];
+                        const recommendedUnits = config?.recommended_units || [
+                          service.rate_unit,
+                        ];
 
                         return (
                           <div
@@ -2215,7 +2357,9 @@ function GuruDashboardProfilePageContent() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <button
                                 type="button"
-                                onClick={() => toggleService(service.service_label)}
+                                onClick={() =>
+                                  toggleService(service.service_label)
+                                }
                                 className={`inline-flex items-center justify-center rounded-2xl border px-4 py-3 text-sm font-extrabold transition sm:min-w-[210px] ${
                                   active
                                     ? "border-emerald-500 bg-emerald-600 shadow-sm"
@@ -2389,7 +2533,9 @@ function GuruDashboardProfilePageContent() {
                         <input
                           type="checkbox"
                           checked={isPublic}
-                          onChange={(event) => setIsPublic(event.target.checked)}
+                          onChange={(event) =>
+                            setIsPublic(event.target.checked)
+                          }
                           className="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-600"
                         />
                         <span
@@ -2399,8 +2545,8 @@ function GuruDashboardProfilePageContent() {
                             WebkitTextFillColor: "#0f172a",
                           }}
                         >
-                          Request to make this Guru profile public after Steps 1,
-                          2, and 3 are complete
+                          Request to make this Guru profile public after Steps
+                          1, 2, and 3 are complete
                         </span>
                       </label>
 
@@ -2470,7 +2616,11 @@ function GuruDashboardProfilePageContent() {
                         WebkitTextFillColor: "#ffffff",
                       }}
                     >
-                      {saving ? "Saving..." : justSaved ? "Saved" : primarySaveLabel}
+                      {saving
+                        ? "Saving..."
+                        : justSaved
+                          ? "Saved"
+                          : primarySaveLabel}
                     </span>
                   </button>
 
