@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
-import { validateGuruProfileForBookability } from "@/lib/guruProfileValidation";
 
 export const dynamic = "force-dynamic";
 
@@ -559,6 +558,18 @@ function normalizeApplicationStatus(profile: GuruProfile | null) {
   return "Profile Setup";
 }
 
+function hasGuruCommunicationEmail(profile: GuruProfile | null) {
+  return Boolean(String(profile?.email || "").trim());
+}
+
+function hasGuruServiceArea(profile: GuruProfile | null) {
+  return Boolean(
+    String(profile?.service_city || profile?.city || "").trim() &&
+      String(profile?.service_state || profile?.state || "").trim() &&
+      String(profile?.zip_code || profile?.postal_code || "").trim(),
+  );
+}
+
 function isBookable(profile: GuruProfile | null) {
   if (!profile) return false;
   if (isPlaceholderGuruProfile(profile)) return false;
@@ -566,18 +577,37 @@ function isBookable(profile: GuruProfile | null) {
   const bookingStatus = String(profile.booking_status || "")
     .trim()
     .toLowerCase();
-
-  const validation = validateGuruProfileForBookability({
-    guru: profile,
-    source: "gurus",
-  });
+  const adminStatus = String(profile.admin_status || "")
+    .trim()
+    .toLowerCase();
+  const publicStatus = String(profile.public_status || "")
+    .trim()
+    .toLowerCase();
+  const qualityStatus = String(profile.profile_quality_status || "")
+    .trim()
+    .toLowerCase();
+  const applicationStatus = String(profile.application_status || "")
+    .trim()
+    .toLowerCase();
+  const status = String(profile.status || "")
+    .trim()
+    .toLowerCase();
 
   return Boolean(
-    validation.isBookable &&
+    profile.is_public === true &&
+      profile.is_active === true &&
+      profile.is_public_visible === true &&
       profile.is_bookable === true &&
       profile.is_accepting_bookings === true &&
       profile.accepting_bookings === true &&
-      bookingStatus === "bookable",
+      bookingStatus === "bookable" &&
+      adminStatus === "approved" &&
+      publicStatus === "public" &&
+      qualityStatus === "bookable" &&
+      applicationStatus === "bookable" &&
+      status === "active" &&
+      hasGuruCommunicationEmail(profile) &&
+      hasGuruServiceArea(profile),
   );
 }
 
@@ -1527,16 +1557,6 @@ async function getPublicGuruProfileFromBookingLookup(
     supabaseAdmin
       .from("gurus")
       .select("*")
-      .ilike("public_slug", cleanedIdentifier)
-      .limit(10),
-    supabaseAdmin
-      .from("gurus")
-      .select("*")
-      .ilike("public_slug", normalizedIdentifier)
-      .limit(10),
-    supabaseAdmin
-      .from("gurus")
-      .select("*")
       .ilike("display_name", displayNameFromSlug)
       .limit(10),
     supabaseAdmin
@@ -1774,11 +1794,6 @@ async function getPublicGuruProfile(
       .from("gurus")
       .select("*")
       .eq("slug", cleanedIdentifier)
-      .maybeSingle(),
-    supabaseAdmin
-      .from("gurus")
-      .select("*")
-      .eq("public_slug", cleanedIdentifier)
       .maybeSingle(),
     supabaseAdmin
       .from("gurus")
