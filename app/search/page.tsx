@@ -130,6 +130,14 @@ const SERVICE_OPTIONS = [
 
 const DEFAULT_MAP_CENTER: [number, number] = [39.9526, -75.1652];
 
+const PERMANENTLY_BLOCKED_GURU_IDS = new Set([
+  "5d132f82-6899-42cf-9690-446a25320fc6",
+  "b6c07540-0dc4-4307-91b6-46c8f5b3b816",
+  "727cc66b-24b2-477b-b2f8-0fc9911fea1c",
+  "7c6592d5-c43b-4a7d-8dbf-e3afc9c7858a",
+  "81408cd6-6d90-4b2a-a21b-236417676907",
+]);
+
 const CITY_COORDINATES: Record<string, [number, number]> = {
   "philadelphia,pa": [39.9526, -75.1652],
   "philadelphia,pennsylvania": [39.9526, -75.1652],
@@ -289,6 +297,25 @@ function serviceRateMatches(rate: GuruServiceRate, selectedService: string) {
   ]);
 
   return Array.from(selectedAliases).some((alias) => rateAliases.has(alias));
+}
+
+function getGuruIdentityValues(guru: GuruRow) {
+  return [
+    guru.id,
+    guru.user_id,
+    guru.profile_id,
+    guru.guru_id,
+    guru.slug,
+    guru.email,
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isBlockedGuruAccount(guru: GuruRow) {
+  return getGuruIdentityValues(guru).some((value) =>
+    PERMANENTLY_BLOCKED_GURU_IDS.has(value),
+  );
 }
 
 function getGuruRateLookupIds(guru: GuruRow) {
@@ -1121,6 +1148,21 @@ function getGuruDedupeKeys(guru: GuruRow) {
   const city = normalizeDedupeValue(getGuruCity(guru));
   const state = normalizeStateCode(getGuruState(guru));
   const zip = getGuruZip(guru);
+  const photo = String(getGuruPhotoUrl(guru) || "").trim().toLowerCase();
+  const source = String(guru.source || guru.profile_source || guru.search_source || "")
+    .trim()
+    .toLowerCase();
+  const qualityStatus = String(guru.profile_quality_status || "")
+    .trim()
+    .toLowerCase();
+  const shouldUseNameOnlyKey =
+    source.includes("fallback") ||
+    source.includes("orphan") ||
+    qualityStatus.includes("fallback") ||
+    qualityStatus.includes("orphan") ||
+    !city ||
+    !state ||
+    !zip;
 
   if (isValidEmail(email)) keys.add(`email:${email}`);
   if (userId) keys.add(`user:${userId}`);
@@ -1129,6 +1171,8 @@ function getGuruDedupeKeys(guru: GuruRow) {
   if (name && !isGenericGuruName(name)) {
     if (city && state) keys.add(`name-location:${name}:${city}:${state}`);
     if (zip) keys.add(`name-zip:${name}:${zip}`);
+    if (photo) keys.add(`name-photo:${name}:${photo}`);
+    if (shouldUseNameOnlyKey) keys.add(`name:${name}`);
   }
 
   if (!keys.size && guru.id) keys.add(`id:${String(guru.id)}`);
@@ -1154,6 +1198,7 @@ function getGuruQualityScore(guru: GuruRow) {
   if (getGuruZip(guru)) score += 10;
   if (getGuruCity(guru)) score += 8;
   if (getGuruState(guru)) score += 8;
+  if (!getGuruZip(guru) && (!getGuruCity(guru) || !getGuruState(guru))) score -= 40;
   if (getGuruPhotoUrl(guru)) score += 12;
   if (String(guru.bio || "").trim()) score += 12;
   if (Array.isArray(guru.services) && guru.services.length) score += guru.services.length;
@@ -1299,9 +1344,9 @@ async function loadSearchRowsFromFallbackTables() {
         .limit(250);
 
       if (!tableError) {
-        return (((data || []) as unknown) as GuruRow[]).filter(
-          shouldDisplaySearchGuru,
-        );
+        return (((data || []) as unknown) as GuruRow[])
+          .filter(shouldDisplaySearchGuru)
+          .filter((guru) => !isBlockedGuruAccount(guru));
       }
 
       console.warn(
@@ -1414,7 +1459,9 @@ function SearchPageContent() {
             : "Public Guru API could not be reached.";
       }
 
-      guruRows = guruRows.filter(shouldDisplaySearchGuru);
+      guruRows = guruRows
+        .filter(shouldDisplaySearchGuru)
+        .filter((guru) => !isBlockedGuruAccount(guru));
 
       if (gurusErrorMessage || guruRows.length === 0) {
         const fallbackGuruRows = await loadSearchRowsFromFallbackTables();
@@ -1698,6 +1745,7 @@ function SearchPageContent() {
 
     return gurus
       .filter(shouldDisplaySearchGuru)
+      .filter((guru) => !isBlockedGuruAccount(guru))
       .filter((guru) => {
         const guruName = normalizeText(getGuruName(guru));
         const guruCity = normalizeText(getGuruCity(guru));
@@ -1745,6 +1793,9 @@ function SearchPageContent() {
       })
       .map((guru) =>
         enrichGuruWithDistance(guru, zipLookup, guruZipLookupsByZip),
+      )
+      .filter((guru) =>
+        Boolean(getGuruSearchCoordinates(guru, guruZipLookupsByZip)),
       )
       .sort((a, b) => {
         const aSelected =

@@ -13,6 +13,9 @@ type GuruRow = {
   user_role?: string | null;
   account_type?: string | null;
   slug?: string | null;
+  public_slug?: string | null;
+  profile_id?: string | null;
+  guru_id?: string | number | null;
   name?: string | null;
   display_name?: string | null;
   full_name?: string | null;
@@ -101,6 +104,14 @@ const SEARCH_SOURCE_TABLES = [
   "gurus",
   "profiles",
 ];
+
+const PERMANENTLY_BLOCKED_GURU_IDS = new Set([
+  "5d132f82-6899-42cf-9690-446a25320fc6",
+  "b6c07540-0dc4-4307-91b6-46c8f5b3b816",
+  "727cc66b-24b2-477b-b2f8-0fc9911fea1c",
+  "7c6592d5-c43b-4a7d-8dbf-e3afc9c7858a",
+  "81408cd6-6d90-4b2a-a21b-236417676907",
+]);
 
 const DEMO_GURU_NAMES = new Set([
   "avery johnson",
@@ -291,6 +302,9 @@ function isDemoSearchGuru(guru: GuruRow) {
 }
 
 function shouldDisplaySearchGuru(guru: GuruRow) {
+  if (isBlockedGuruAccount(guru)) return false;
+  if (!hasBasicLocationSignal(guru)) return false;
+
   return isPublicSearchGuru(guru) || isDemoSearchGuru(guru);
 }
 
@@ -301,6 +315,33 @@ function getGuruZip(guru: GuruRow) {
 function getGuruPhotoUrl(guru: GuruRow) {
   return cleanString(
     guru.profile_photo_url || guru.photo_url || guru.avatar_url || guru.image_url,
+  );
+}
+
+function getGuruIdentityValues(guru: GuruRow) {
+  return [
+    guru.id,
+    guru.user_id,
+    guru.profile_id,
+    guru.guru_id,
+    guru.slug,
+    guru.email,
+  ]
+    .map((value) => cleanString(value).toLowerCase())
+    .filter(Boolean);
+}
+
+function isBlockedGuruAccount(guru: GuruRow) {
+  return getGuruIdentityValues(guru).some((value) =>
+    PERMANENTLY_BLOCKED_GURU_IDS.has(value),
+  );
+}
+
+function hasBasicLocationSignal(guru: GuruRow) {
+  return Boolean(
+    getGuruZip(guru) ||
+      (getGuruCity(guru) && getGuruState(guru)) ||
+      hasCoordinates(guru),
   );
 }
 
@@ -335,6 +376,17 @@ function getGuruDedupeKeys(guru: GuruRow) {
   const city = normalizeText(getGuruCity(guru));
   const state = normalizeStatus(getGuruState(guru));
   const zip = getGuruZip(guru);
+  const photo = normalizeText(getGuruPhotoUrl(guru));
+  const source = normalizeStatus(guru.source || guru.profile_source || guru.search_source);
+  const qualityStatus = normalizeStatus(guru.profile_quality_status);
+  const shouldUseNameOnlyKey =
+    source.includes("fallback") ||
+    source.includes("orphan") ||
+    qualityStatus.includes("fallback") ||
+    qualityStatus.includes("orphan") ||
+    !city ||
+    !state ||
+    !zip;
 
   if (isValidEmail(email)) keys.add(`email:${email}`);
   if (userId) keys.add(`user:${userId}`);
@@ -343,6 +395,8 @@ function getGuruDedupeKeys(guru: GuruRow) {
   if (name && !isGenericGuruName(name)) {
     if (city && state) keys.add(`name-location:${name}:${city}:${state}`);
     if (zip) keys.add(`name-zip:${name}:${zip}`);
+    if (photo) keys.add(`name-photo:${name}:${photo}`);
+    if (shouldUseNameOnlyKey) keys.add(`name:${name}`);
   }
 
   if (!keys.size && cleanString(guru.id)) keys.add(`id:${cleanString(guru.id)}`);
@@ -364,6 +418,7 @@ function getGuruQualityScore(guru: GuruRow) {
   if (getGuruZip(guru)) score += 10;
   if (getGuruCity(guru)) score += 8;
   if (getGuruState(guru)) score += 8;
+  if (!hasBasicLocationSignal(guru)) score -= 40;
   if (getGuruPhotoUrl(guru)) score += 12;
   if (cleanString(guru.bio)) score += 12;
   if (Array.isArray(guru.services) && guru.services.length > 0) score += guru.services.length;
