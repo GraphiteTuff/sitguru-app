@@ -15,18 +15,18 @@ const SITE_FONT_STYLE = {
   fontWeight: 300,
 };
 
-const FILL_IN_GURU_NAMES = new Set([
-  "avery",
-  "caleb",
-  "darius",
-  "emma",
-  "jason",
-  "maya",
-  "nina",
-  "olivia",
-  "sofia",
-  "suzy",
+const PLACEHOLDER_GURU_FULL_NAMES = new Set([
+  "avery johnson",
+  "caleb brooks",
+  "darius miller",
+  "emma walsh",
+  "maya reynolds",
+  "nina patel",
+  "olivia chen",
+  "sofia martinez",
 ]);
+
+const PLACEHOLDER_EMAIL_DOMAIN = "@placeholder.sitguru.local";
 
 type GuruProfile = {
   [key: string]: unknown;
@@ -70,7 +70,14 @@ type GuruProfile = {
   account_type?: string | null;
   is_public?: boolean | null;
   is_active?: boolean | null;
+  is_public_visible?: boolean | null;
   is_bookable?: boolean | null;
+  is_accepting_bookings?: boolean | null;
+  accepting_bookings?: boolean | null;
+  booking_status?: string | null;
+  admin_status?: string | null;
+  public_status?: string | null;
+  profile_quality_status?: string | null;
   is_verified?: boolean | null;
   stripe_account_id?: string | null;
   stripe_onboarding_complete?: boolean | null;
@@ -388,14 +395,30 @@ function getFillInNameCandidates(profile: GuruProfile | null) {
     });
 }
 
-function isFillInGuruProfile(profile: GuruProfile | null) {
-  return getFillInNameCandidates(profile).some((candidate) => {
-    if (FILL_IN_GURU_NAMES.has(candidate)) return true;
+function isPlaceholderGuruProfile(profile: GuruProfile | null) {
+  if (!profile) return false;
 
-    return Array.from(FILL_IN_GURU_NAMES).some((name) =>
-      candidate.startsWith(name),
-    );
-  });
+  const fullName = normalizeFillInMatchValue(
+    profile.full_name || profile.display_name || profile.name,
+  );
+  const email = String(profile.email || "").trim().toLowerCase();
+  const adminStatus = String(profile.admin_status || "").trim().toLowerCase();
+  const publicStatus = String(profile.public_status || "").trim().toLowerCase();
+  const qualityStatus = String(profile.profile_quality_status || "")
+    .trim()
+    .toLowerCase();
+  const bookingStatus = String(profile.booking_status || "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    PLACEHOLDER_GURU_FULL_NAMES.has(fullName) ||
+    email.endsWith(PLACEHOLDER_EMAIL_DOMAIN) ||
+    adminStatus === "placeholder" ||
+    publicStatus === "visible_placeholder" ||
+    qualityStatus === "placeholder" ||
+    bookingStatus === "listed_only"
+  );
 }
 
 function isLikelyUuid(value: string) {
@@ -537,7 +560,25 @@ function normalizeApplicationStatus(profile: GuruProfile | null) {
 }
 
 function isBookable(profile: GuruProfile | null) {
-  return validateGuruProfileForBookability({ guru: profile, source: "gurus" }).isBookable;
+  if (!profile) return false;
+  if (isPlaceholderGuruProfile(profile)) return false;
+
+  const bookingStatus = String(profile.booking_status || "")
+    .trim()
+    .toLowerCase();
+
+  const validation = validateGuruProfileForBookability({
+    guru: profile,
+    source: "gurus",
+  });
+
+  return Boolean(
+    validation.isBookable &&
+      profile.is_bookable === true &&
+      profile.is_accepting_bookings === true &&
+      profile.accepting_bookings === true &&
+      bookingStatus === "bookable",
+  );
 }
 
 function calculateProfileCompletion(profile: GuruProfile | null) {
@@ -695,10 +736,12 @@ function getGuruRadius(profile: GuruProfile | null) {
 
 function getPublicIdentifier(profile: GuruProfile | null, fallback: string) {
   const identifier =
-    profile?.slug ||
     profile?.public_slug ||
-    slugifyPublicIdentifier(getGuruName(profile)) ||
+    profile?.slug ||
+    profile?.user_id ||
+    profile?.profile_id ||
     profile?.id ||
+    slugifyPublicIdentifier(getGuruName(profile)) ||
     fallback;
 
   return encodeURIComponent(String(identifier));
@@ -710,10 +753,12 @@ function getBookHref(profile: GuruProfile | null, fallback: string) {
 
 function getMessageHref(profile: GuruProfile | null, fallback: string) {
   const identifier = String(
-    profile?.slug ||
-      profile?.public_slug ||
-      slugifyPublicIdentifier(getGuruName(profile)) ||
+    profile?.public_slug ||
+      profile?.slug ||
+      profile?.user_id ||
+      profile?.profile_id ||
       profile?.id ||
+      slugifyPublicIdentifier(getGuruName(profile)) ||
       fallback,
   );
 
@@ -921,7 +966,14 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
     account_type: "guru",
     is_public: true,
     is_active: profile.account_status === "suspended" ? false : true,
+    is_public_visible: profile.is_public_visible ?? null,
     is_bookable: false,
+    is_accepting_bookings: profile.is_accepting_bookings ?? null,
+    accepting_bookings: profile.accepting_bookings ?? null,
+    booking_status: profile.booking_status || null,
+    admin_status: profile.admin_status || null,
+    public_status: profile.public_status || null,
+    profile_quality_status: profile.profile_quality_status || null,
     is_verified: false,
     profile_completion: null,
     rating_avg: 0,
@@ -1393,7 +1445,14 @@ function normalizeGuruProfileFromBookingLookupRow(
     account_type: "guru",
     is_public: row.is_public !== false,
     is_active: row.is_active !== false,
-    is_bookable: row.is_bookable !== false,
+    is_public_visible: row.is_public_visible ?? null,
+    is_bookable: row.is_bookable === true,
+    is_accepting_bookings: row.is_accepting_bookings ?? null,
+    accepting_bookings: row.accepting_bookings ?? null,
+    booking_status: row.booking_status || null,
+    admin_status: row.admin_status || null,
+    public_status: row.public_status || null,
+    profile_quality_status: row.profile_quality_status || null,
     is_verified: Boolean(row.is_verified),
     stripe_account_id: row.stripe_account_id || null,
     stripe_onboarding_complete: row.stripe_onboarding_complete || null,
@@ -1630,7 +1689,14 @@ function buildGuruProfileFromPublicSearchRow(row: Record<string, any>): GuruProf
     account_type: "guru",
     is_public: row.is_public !== false,
     is_active: row.is_active !== false,
-    is_bookable: Boolean(row.is_bookable),
+    is_public_visible: row.is_public_visible ?? null,
+    is_bookable: row.is_bookable === true,
+    is_accepting_bookings: row.is_accepting_bookings ?? null,
+    accepting_bookings: row.accepting_bookings ?? null,
+    booking_status: row.booking_status || null,
+    admin_status: row.admin_status || null,
+    public_status: row.public_status || null,
+    profile_quality_status: row.profile_quality_status || null,
     is_verified: Boolean(row.is_verified),
     profile_completion: row.profile_completion || null,
     rating_avg: row.rating_avg || 0,
@@ -1817,7 +1883,14 @@ async function getGuruProfile(
         application_status: "profile_incomplete",
         status: "profile_incomplete",
         is_bookable: false,
+        is_accepting_bookings: false,
+        accepting_bookings: false,
+        booking_status: null,
+        admin_status: null,
+        public_status: null,
+        profile_quality_status: null,
         is_public: false,
+        is_public_visible: false,
       };
     }
   }
@@ -3012,7 +3085,7 @@ function PublicBookButton({
         aria-disabled="true"
         className={`${className} cursor-not-allowed opacity-55`}
       >
-        Book This Guru
+        Profile Preview
       </button>
     );
   }
@@ -3048,8 +3121,8 @@ function PublicGuruProfilePage({
   const bookHref = getBookHref(guruProfile, identifier);
   const messageHref = getMessageHref(guruProfile, identifier);
   const bookable = isBookable(guruProfile);
-  const isFillInGuru = isFillInGuruProfile(guruProfile);
-  const disableBooking = isFillInGuru;
+  const isPlaceholderGuru = isPlaceholderGuruProfile(guruProfile);
+  const disableBooking = isPlaceholderGuru || !bookable;
   const isAcademyGraduate = universityProgress.isComplete;
 
   return (

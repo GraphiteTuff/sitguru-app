@@ -480,6 +480,7 @@ function hasPositiveValue(value: unknown) {
       "active",
       "approved",
       "bookable",
+      "requestable",
       "public",
       "visible",
     ].includes(normalized)
@@ -528,23 +529,60 @@ function isPublicSearchGuru(guru: GuruRow) {
   );
 }
 
+function isPlaceholderSearchGuru(guru: GuruRow) {
+  const adminStatus = String(guru.admin_status || "").trim().toLowerCase();
+  const publicStatus = String(guru.public_status || "").trim().toLowerCase();
+  const qualityStatus = String(guru.profile_quality_status || "")
+    .trim()
+    .toLowerCase();
+  const bookingStatus = String(guru.booking_status || "")
+    .trim()
+    .toLowerCase();
+  const source = String(guru.source || guru.profile_source || guru.search_source || "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    adminStatus === "placeholder" ||
+    publicStatus === "visible_placeholder" ||
+    qualityStatus === "placeholder" ||
+    qualityStatus.includes("demo") ||
+    qualityStatus.includes("seed") ||
+    qualityStatus.includes("fallback") ||
+    bookingStatus === "listed_only" ||
+    source.includes("seed") ||
+    source.includes("demo") ||
+    source.includes("canonical")
+  );
+}
+
 function isBookableSearchGuru(guru: GuruRow) {
   const status = String(guru.status || "").trim().toLowerCase();
   const applicationStatus = String(guru.application_status || "")
     .trim()
     .toLowerCase();
+  const bookingStatus = String(guru.booking_status || "")
+    .trim()
+    .toLowerCase();
 
   if (!isPublicSearchGuru(guru)) return false;
+  if (isPlaceholderSearchGuru(guru)) return false;
   if (hasExplicitFalse(guru.is_bookable)) return false;
   if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
   if (hasExplicitFalse(guru.accepting_bookings)) return false;
+
+  if (["not_listed", "listed_only"].includes(bookingStatus)) return false;
 
   return (
     guru.is_bookable === true ||
     hasPositiveValue(guru.is_accepting_bookings) ||
     hasPositiveValue(guru.accepting_bookings) ||
+    bookingStatus === "bookable" ||
+    bookingStatus === "requestable" ||
     applicationStatus === "bookable" ||
-    status === "bookable"
+    applicationStatus === "requestable" ||
+    status === "bookable" ||
+    status === "requestable"
   );
 }
 
@@ -612,7 +650,11 @@ function shouldDisplaySearchGuru(guru: GuruRow) {
 }
 
 function isDisplayOnlySearchGuru(guru: GuruRow) {
-  return !isBookableSearchGuru(guru) || isDemoSearchGuru(guru);
+  return (
+    !isBookableSearchGuru(guru) ||
+    isPlaceholderSearchGuru(guru) ||
+    isDemoSearchGuru(guru)
+  );
 }
 
 function getGuruPhotoUrl(guru: GuruRow) {
@@ -626,7 +668,15 @@ function getGuruPhotoUrl(guru: GuruRow) {
 }
 
 function getGuruPublicIdentifier(guru: GuruRow) {
-  return encodeURIComponent(String(guru.slug || guru.id));
+  const identifier =
+    guru.public_slug ||
+    guru.slug ||
+    guru.user_id ||
+    guru.profile_id ||
+    guru.guru_id ||
+    guru.id;
+
+  return encodeURIComponent(String(identifier || ""));
 }
 
 function getGuruHref(guru: GuruRow) {
@@ -1793,9 +1843,6 @@ function SearchPageContent() {
       })
       .map((guru) =>
         enrichGuruWithDistance(guru, zipLookup, guruZipLookupsByZip),
-      )
-      .filter((guru) =>
-        Boolean(getGuruSearchCoordinates(guru, guruZipLookupsByZip)),
       )
       .sort((a, b) => {
         const aSelected =
