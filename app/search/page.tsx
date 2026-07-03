@@ -30,6 +30,9 @@ type GuruRow = {
   is_public_visible?: boolean | null;
   public_status?: string | null;
   slug?: string | null;
+  public_slug?: string | null;
+  profile_id?: string | null;
+  guru_id?: string | number | null;
   display_name?: string | null;
   full_name?: string | null;
   title?: string | null;
@@ -288,11 +291,40 @@ function serviceRateMatches(rate: GuruServiceRate, selectedService: string) {
   return Array.from(selectedAliases).some((alias) => rateAliases.has(alias));
 }
 
+function getGuruRateLookupIds(guru: GuruRow) {
+  return Array.from(
+    new Set(
+      [
+        guru.id,
+        guru.guru_id,
+        guru.user_id,
+        guru.profile_id,
+      ]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 function getEnabledGuruRates(
   guru: GuruRow,
   serviceRatesByGuru: Record<string, GuruServiceRate[]>,
 ) {
-  return (serviceRatesByGuru[String(guru.id)] || [])
+  const ratesByIdentity = getGuruRateLookupIds(guru).flatMap(
+    (id) => serviceRatesByGuru[id] || [],
+  );
+  const seenRates = new Set<string>();
+
+  return ratesByIdentity
+    .filter((rate) => {
+      const rateKey = String(
+        rate.id || `${rate.guru_id}-${rate.service_key}-${rate.service_label}`,
+      );
+
+      if (seenRates.has(rateKey)) return false;
+      seenRates.add(rateKey);
+      return true;
+    })
     .filter((rate) => rate.is_enabled !== false)
     .filter(
       (rate) => rate.rate_unit === "custom" || Number(rate.rate_amount) >= 0,
@@ -585,8 +617,12 @@ function getGuruRating(guru: GuruRow) {
 }
 
 function getGuruRate(guru: GuruRow) {
-  if (typeof guru.hourly_rate === "number") return guru.hourly_rate;
-  if (typeof guru.rate === "number") return guru.rate;
+  const hourlyRate = Number(guru.hourly_rate);
+  const baseRate = Number(guru.rate);
+
+  if (Number.isFinite(hourlyRate) && hourlyRate > 0) return hourlyRate;
+  if (Number.isFinite(baseRate) && baseRate > 0) return baseRate;
+
   return null;
 }
 
@@ -1391,9 +1427,9 @@ function SearchPageContent() {
 
       guruRows = dedupeGuruRows(guruRows);
 
-      const guruIds = guruRows
-        .map((guru) => String(guru.id || ""))
-        .filter(Boolean);
+      const guruIds = Array.from(
+        new Set(guruRows.flatMap((guru) => getGuruRateLookupIds(guru))),
+      );
 
       const guruUserIds = Array.from(
         new Set(
