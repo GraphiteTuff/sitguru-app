@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +9,9 @@ type GuruRow = {
   id?: string | number | null;
   user_id?: string | null;
   email?: string | null;
+  role?: string | null;
+  user_role?: string | null;
+  account_type?: string | null;
   slug?: string | null;
   name?: string | null;
   display_name?: string | null;
@@ -65,6 +68,7 @@ type PublicSearchOverrideRow = {
   email?: string | null;
   user_id?: string | null;
   source_id?: string | null;
+  slug?: string | null;
   display_name?: string | null;
   is_public_visible?: boolean | null;
   is_bookable?: boolean | null;
@@ -81,10 +85,22 @@ type PublicSearchOverrideRow = {
   service_radius_miles?: number | string | null;
   service_latitude?: number | string | null;
   service_longitude?: number | string | null;
+  services?: string[] | null;
   reason?: string | null;
 };
 
-const SEARCH_SOURCE_TABLES = ["public_guru_search_profiles", "gurus"];
+type SourceLoadResult = {
+  tableName: string;
+  loaded: number;
+  displayed: number;
+  error?: string;
+};
+
+const SEARCH_SOURCE_TABLES = [
+  "public_guru_search_profiles",
+  "gurus",
+  "profiles",
+];
 
 const DEMO_GURU_NAMES = new Set([
   "avery johnson",
@@ -104,6 +120,10 @@ function cleanString(value: unknown) {
   return String(value || "").trim();
 }
 
+function cleanZip(value: unknown) {
+  return cleanString(value).replace(/\D/g, "").slice(0, 5);
+}
+
 function normalizeText(value: unknown) {
   return cleanString(value)
     .toLowerCase()
@@ -114,6 +134,11 @@ function normalizeText(value: unknown) {
 
 function normalizeStatus(value: unknown) {
   return cleanString(value).toLowerCase();
+}
+
+function slugify(value: unknown) {
+  const slug = normalizeText(value).replace(/\s+/g, "-");
+  return slug || "guru";
 }
 
 function isNegativeGuruStatus(value: unknown) {
@@ -164,6 +189,29 @@ function getGuruState(guru: GuruRow) {
   return cleanString(guru.service_state || guru.state);
 }
 
+function getGuruRole(guru: GuruRow) {
+  return normalizeStatus(guru.role || guru.user_role || guru.account_type);
+}
+
+function sourceRowLooksLikeGuru(tableName: string, guru: GuruRow) {
+  if (tableName === "public_guru_search_profiles" || tableName === "gurus") {
+    return true;
+  }
+
+  const role = getGuruRole(guru);
+  const source = normalizeStatus(
+    guru.source || guru.profile_source || guru.search_source,
+  );
+
+  return (
+    role === "guru" ||
+    role === "sitter" ||
+    role.includes("guru") ||
+    source.includes("guru") ||
+    source.includes("sitter")
+  );
+}
+
 function isSearchSuppressedGuru(guru: GuruRow) {
   const status = normalizeStatus(guru.status);
   const applicationStatus = normalizeStatus(guru.application_status);
@@ -194,7 +242,8 @@ function isPublicSearchGuru(guru: GuruRow) {
     applicationStatus === "bookable" ||
     status === "public" ||
     status === "visible" ||
-    status === "bookable"
+    status === "bookable" ||
+    status === "active"
   );
 }
 
@@ -319,7 +368,7 @@ function findOverrideForGuru(
 function chooseOverrideString(
   overrideValue: unknown,
   currentValue: unknown,
-  fallbackValue?: string,
+  fallbackValue?: string | null,
 ) {
   const overrideText = cleanString(overrideValue);
   if (overrideText) return overrideText;
@@ -362,6 +411,7 @@ function applyOverrideToGuru(
       guru.full_name,
       getGuruName(guru),
     ),
+    slug: chooseOverrideString(override.slug, guru.slug),
     is_public: publicVisible ?? guru.is_public,
     is_public_visible: publicVisible ?? guru.is_public_visible,
     is_active: active ?? guru.is_active,
@@ -398,7 +448,65 @@ function applyOverrideToGuru(
     service_longitude: override.service_longitude ?? guru.service_longitude,
     latitude: override.service_latitude ?? guru.latitude,
     longitude: override.service_longitude ?? guru.longitude,
+    services:
+      Array.isArray(override.services) && override.services.length > 0
+        ? override.services
+        : guru.services,
     search_source: "admin_visibility_override",
+  };
+}
+
+function overrideToStandaloneGuru(override: PublicSearchOverrideRow): GuruRow {
+  const displayName = cleanString(override.display_name || "Guru");
+  const email = normalizeStatus(override.email);
+  const fallbackId = email
+    ? `override-${email.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`
+    : `override-${slugify(displayName)}`;
+  const bookable = override.is_bookable === true;
+  const publicVisible = override.is_public_visible !== false;
+
+  return {
+    id: cleanString(override.source_id) || cleanString(override.user_id) || fallbackId,
+    user_id: cleanString(override.user_id) || null,
+    email: email || null,
+    role: "guru",
+    slug: cleanString(override.slug) || slugify(displayName),
+    display_name: displayName,
+    full_name: displayName,
+    name: displayName,
+    title: "Pet Care Guru",
+    city: cleanString(override.service_city) || null,
+    state: cleanString(override.service_state) || null,
+    zip_code: cleanZip(override.service_zip) || null,
+    service_city: cleanString(override.service_city) || null,
+    service_state: cleanString(override.service_state) || null,
+    service_zip: cleanZip(override.service_zip) || null,
+    service_zip_code: cleanZip(override.service_zip) || null,
+    status: cleanString(override.status) || (bookable ? "bookable" : "active"),
+    application_status:
+      cleanString(override.application_status) || (bookable ? "bookable" : "public"),
+    admin_status: cleanString(override.admin_status) || "approved",
+    public_status: cleanString(override.public_status) || "public",
+    is_public: publicVisible,
+    is_public_visible: publicVisible,
+    is_active: override.is_active !== false,
+    is_bookable: bookable,
+    is_accepting_bookings:
+      override.is_accepting_bookings ?? override.accepting_bookings ?? bookable,
+    accepting_bookings:
+      override.accepting_bookings ?? override.is_accepting_bookings ?? bookable,
+    service_area_enabled: true,
+    service_radius_miles: override.service_radius_miles || 25,
+    radius_miles: override.service_radius_miles || 25,
+    service_latitude: override.service_latitude || null,
+    service_longitude: override.service_longitude || null,
+    latitude: override.service_latitude || null,
+    longitude: override.service_longitude || null,
+    services:
+      Array.isArray(override.services) && override.services.length > 0
+        ? override.services
+        : ["Dog Walking", "Pet Sitting", "Drop-In Visits"],
+    search_source: "admin_override_standalone",
   };
 }
 
@@ -414,14 +522,14 @@ async function loadPublicSearchOverrides() {
       error.code === "42P01" ||
       error.message.toLowerCase().includes("does not exist")
     ) {
-      return new Map<string, PublicSearchOverrideRow>();
+      return [] as PublicSearchOverrideRow[];
     }
 
     console.warn("Public Guru search override table could not be read:", error.message);
-    return new Map<string, PublicSearchOverrideRow>();
+    return [] as PublicSearchOverrideRow[];
   }
 
-  return buildOverrideMap((data || []) as PublicSearchOverrideRow[]);
+  return (data || []) as PublicSearchOverrideRow[];
 }
 
 function normalizeGuruForPublicSearch(guru: GuruRow) {
@@ -488,34 +596,64 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
 async function loadGuruRowsFromTable(
   tableName: string,
   overrideMap: Map<string, PublicSearchOverrideRow>,
-) {
+): Promise<{ rows: GuruRow[]; result: SourceLoadResult }> {
   const { data, error } = await supabaseAdmin
     .from(tableName)
     .select("*")
-    .limit(250);
+    .limit(500);
 
   if (error) {
-    console.warn(`Public Guru search could not read ${tableName}:`, error.message);
-    return [];
+    const message = error.message || `Could not read ${tableName}`;
+    console.warn(`Public Guru search could not read ${tableName}:`, message);
+    return {
+      rows: [],
+      result: {
+        tableName,
+        loaded: 0,
+        displayed: 0,
+        error: message,
+      },
+    };
   }
 
-  return ((data || []) as GuruRow[])
-    .map((guru) => applyOverrideToGuru(guru, overrideMap))
-    .filter(shouldDisplaySearchGuru);
+  const loadedRows = ((data || []) as GuruRow[])
+    .filter((guru) => sourceRowLooksLikeGuru(tableName, guru))
+    .map((guru) => applyOverrideToGuru(guru, overrideMap));
+  const displayRows = loadedRows.filter(shouldDisplaySearchGuru);
+
+  return {
+    rows: displayRows,
+    result: {
+      tableName,
+      loaded: loadedRows.length,
+      displayed: displayRows.length,
+    },
+  };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const overrideMap = await loadPublicSearchOverrides();
-    let gurus: GuruRow[] = [];
+    const url = new URL(request.url);
+    const debug = url.searchParams.get("debug") === "1";
+    const overrides = await loadPublicSearchOverrides();
+    const overrideMap = buildOverrideMap(overrides);
+    const sourceResults: SourceLoadResult[] = [];
+    let guruRows: GuruRow[] = [];
 
     for (const tableName of SEARCH_SOURCE_TABLES) {
-      gurus = await loadGuruRowsFromTable(tableName, overrideMap);
-
-      if (gurus.length > 0) break;
+      const { rows, result } = await loadGuruRowsFromTable(tableName, overrideMap);
+      sourceResults.push(result);
+      guruRows = [...guruRows, ...rows];
     }
 
-    const normalizedGurus = dedupeGuruRows(gurus)
+    const standaloneOverrideRows = overrides
+      .map(overrideToStandaloneGuru)
+      .map((guru) => applyOverrideToGuru(guru, overrideMap))
+      .filter(shouldDisplaySearchGuru);
+
+    guruRows = [...guruRows, ...standaloneOverrideRows];
+
+    const normalizedGurus = dedupeGuruRows(guruRows)
       .map(normalizeGuruForPublicSearch)
       .sort((a, b) =>
         String(a.display_name || "").localeCompare(String(b.display_name || "")),
@@ -525,6 +663,15 @@ export async function GET() {
       {
         gurus: normalizedGurus,
         count: normalizedGurus.length,
+        ...(debug
+          ? {
+              debug: {
+                overrides_loaded: overrides.length,
+                standalone_overrides_displayed: standaloneOverrideRows.length,
+                source_results: sourceResults,
+              },
+            }
+          : {}),
       },
       {
         headers: {
