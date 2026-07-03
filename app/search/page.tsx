@@ -1,6 +1,5 @@
 "use client";
 
-import { validateGuruProfileForBookability } from "@/lib/guruProfileValidation";
 import Link from "next/link";
 import {
   Suspense,
@@ -21,6 +20,15 @@ type GuruRow = {
   [key: string]: unknown;
   id: string | number;
   user_id?: string | null;
+  email?: string | null;
+  name?: string | null;
+  source?: string | null;
+  profile_source?: string | null;
+  search_source?: string | null;
+  admin_status?: string | null;
+  profile_quality_status?: string | null;
+  is_public_visible?: boolean | null;
+  public_status?: string | null;
   slug?: string | null;
   display_name?: string | null;
   full_name?: string | null;
@@ -126,6 +134,34 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
   "pittsburgh,pennsylvania": [40.4406, -79.9959],
   "quakertown,pa": [40.4418, -75.3416],
   "quakertown,pennsylvania": [40.4418, -75.3416],
+  "boyertown,pa": [40.3337, -75.6374],
+  "boyertown,pennsylvania": [40.3337, -75.6374],
+  "pennsburg,pa": [40.3909, -75.4921],
+  "pennsburg,pennsylvania": [40.3909, -75.4921],
+  "souderton,pa": [40.3118, -75.3252],
+  "souderton,pennsylvania": [40.3118, -75.3252],
+  "allentown,pa": [40.6023, -75.4714],
+  "allentown,pennsylvania": [40.6023, -75.4714],
+  "williamsport,pa": [41.2412, -77.0011],
+  "williamsport,pennsylvania": [41.2412, -77.0011],
+  "kingofprussia,pa": [40.1013, -75.3836],
+  "kingofprussia,pennsylvania": [40.1013, -75.3836],
+  "levittown,pa": [40.1551, -74.8288],
+  "levittown,pennsylvania": [40.1551, -74.8288],
+  "cherryhill,nj": [39.9268, -75.0246],
+  "cherryhill,newjersey": [39.9268, -75.0246],
+  "austin,tx": [30.2672, -97.7431],
+  "austin,texas": [30.2672, -97.7431],
+  "denver,co": [39.7392, -104.9903],
+  "denver,colorado": [39.7392, -104.9903],
+  "atlanta,ga": [33.7490, -84.3880],
+  "atlanta,georgia": [33.7490, -84.3880],
+  "boston,ma": [42.3601, -71.0589],
+  "boston,massachusetts": [42.3601, -71.0589],
+  "sandiego,ca": [32.7157, -117.1611],
+  "sandiego,california": [32.7157, -117.1611],
+  "seattle,wa": [47.6062, -122.3321],
+  "seattle,washington": [47.6062, -122.3321],
   "cromwell,mn": [46.6766, -92.8802],
   "cromwell,minnesota": [46.6766, -92.8802],
 };
@@ -135,18 +171,24 @@ const GURU_SELECT_ATTEMPTS = ["*"];
 const PUBLIC_GURU_PROFILE_BASE_PATH = "/guru";
 const BOOK_GURU_BASE_PATH = "/book";
 
-const FILL_IN_GURU_NAMES = new Set([
+const DEMO_GURU_NAMES = new Set([
   "avery",
   "caleb",
   "darius",
   "emma",
-  "jason",
+  "jordan",
+  "marcus",
   "maya",
   "nina",
   "olivia",
   "sofia",
   "suzy",
 ]);
+
+const PUBLIC_SEARCH_FALLBACK_TABLES = [
+  "public_guru_search_profiles",
+  "gurus",
+];
 
 function Card({
   children,
@@ -334,7 +376,7 @@ function getGuruRateDisplay(
 }
 
 function getGuruName(guru: GuruRow) {
-  return guru.display_name || guru.full_name || "Guru";
+  return guru.display_name || guru.full_name || guru.name || "Guru";
 }
 
 function getGuruCity(guru: GuruRow) {
@@ -364,22 +406,65 @@ function isNegativeGuruStatus(value?: string | null) {
   ].includes(normalized);
 }
 
+function hasExplicitFalse(value: unknown) {
+  return value === false || String(value || "").trim().toLowerCase() === "false";
+}
+
+function hasPositiveValue(value: unknown) {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  return (
+    value === true ||
+    [
+      "true",
+      "yes",
+      "active",
+      "approved",
+      "bookable",
+      "public",
+      "visible",
+    ].includes(normalized)
+  );
+}
+
+function isValidEmail(value?: string | null) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
 function isBookableSearchGuru(guru: GuruRow) {
   const status = String(guru.status || "").trim().toLowerCase();
   const applicationStatus = String(guru.application_status || "")
     .trim()
     .toLowerCase();
+  const adminStatus = String(guru.admin_status || "").trim().toLowerCase();
+  const publicStatus = String(guru.public_status || "").trim().toLowerCase();
 
-  if (guru.is_public === false) return false;
-  if (guru.is_active === false) return false;
-  if (guru.is_bookable === false) return false;
-  if (guru.is_accepting_bookings === false) return false;
-  if (guru.accepting_bookings === false) return false;
+  if (hasExplicitFalse(guru.is_public)) return false;
+  if (hasExplicitFalse(guru.is_public_visible)) return false;
+  if (hasExplicitFalse(guru.is_active)) return false;
+  if (hasExplicitFalse(guru.is_bookable)) return false;
+  if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
+  if (hasExplicitFalse(guru.accepting_bookings)) return false;
   if (isNegativeGuruStatus(status) || isNegativeGuruStatus(applicationStatus)) {
     return false;
   }
 
-  return validateGuruProfileForBookability({ guru, source: "gurus" }).isPublicVisible;
+  const hasPublicSignal =
+    guru.is_public === true ||
+    guru.is_public_visible === true ||
+    publicStatus === "public" ||
+    publicStatus === "visible" ||
+    adminStatus === "approved";
+
+  const hasBookableSignal =
+    guru.is_bookable === true ||
+    hasPositiveValue(guru.is_accepting_bookings) ||
+    hasPositiveValue(guru.accepting_bookings) ||
+    applicationStatus === "bookable" ||
+    status === "bookable" ||
+    status === "active";
+
+  return hasPublicSignal && hasBookableSignal;
 }
 
 function normalizeFillInMatchValue(value?: string | null) {
@@ -390,29 +475,63 @@ function normalizeFillInMatchValue(value?: string | null) {
     .replace(/\s+/g, " ");
 }
 
-function isFillInGuru(guru: GuruRow) {
-  const values = [
+function getGuruCandidateNameValues(guru: GuruRow) {
+  return [
     guru.display_name,
     guru.full_name,
+    guru.name,
     guru.slug,
     typeof guru.email === "string" ? guru.email.split("@")[0] : "",
-  ];
-
-  return values
+  ]
     .map((value) => normalizeFillInMatchValue(value))
     .filter(Boolean)
     .flatMap((value) => {
       const firstName = value.split(" ")[0] || "";
       const compact = value.replace(/\s+/g, "");
       return [value, firstName, compact].filter(Boolean);
-    })
-    .some((candidate) => {
-      if (FILL_IN_GURU_NAMES.has(candidate)) return true;
-
-      return Array.from(FILL_IN_GURU_NAMES).some((name) =>
-        candidate.startsWith(name),
-      );
     });
+}
+
+function isDemoSearchGuru(guru: GuruRow) {
+  const candidates = getGuruCandidateNameValues(guru);
+  const hasDemoName = candidates.some((candidate) => {
+    if (DEMO_GURU_NAMES.has(candidate)) return true;
+
+    return Array.from(DEMO_GURU_NAMES).some((name) =>
+      candidate.startsWith(name),
+    );
+  });
+
+  if (!hasDemoName) return false;
+  if (!getGuruCity(guru) || !getGuruState(guru)) return false;
+
+  const qualityStatus = String(guru.profile_quality_status || "")
+    .trim()
+    .toLowerCase();
+  const source = String(guru.source || guru.profile_source || guru.search_source || "")
+    .trim()
+    .toLowerCase();
+  const email = String(guru.email || "").trim().toLowerCase();
+
+  return (
+    !isValidEmail(email) ||
+    email.endsWith("@example.com") ||
+    email === "suzyq@gmail.com" ||
+    qualityStatus.includes("demo") ||
+    qualityStatus.includes("seed") ||
+    qualityStatus.includes("fallback") ||
+    source.includes("seed") ||
+    source.includes("demo") ||
+    source.includes("canonical")
+  );
+}
+
+function shouldDisplaySearchGuru(guru: GuruRow) {
+  return isBookableSearchGuru(guru) || isDemoSearchGuru(guru);
+}
+
+function isDisplayOnlySearchGuru(guru: GuruRow) {
+  return !isBookableSearchGuru(guru) || isDemoSearchGuru(guru);
 }
 
 function getGuruPhotoUrl(guru: GuruRow) {
@@ -920,6 +1039,54 @@ function detectSourceFromUrl() {
   return normalized;
 }
 
+function getGuruDedupeKey(guru: GuruRow) {
+  const email = String(guru.email || "").trim().toLowerCase();
+
+  if (email) return `email:${email}`;
+
+  const userId = String(guru.user_id || "").trim();
+  if (userId) return `user:${userId}`;
+
+  return `id:${String(guru.id || "")}`;
+}
+
+function dedupeGuruRows(guruRows: GuruRow[]) {
+  const seen = new Set<string>();
+
+  return guruRows.filter((guru) => {
+    const key = getGuruDedupeKey(guru);
+
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+    return true;
+  });
+}
+
+async function loadSearchRowsFromFallbackTables() {
+  for (const tableName of PUBLIC_SEARCH_FALLBACK_TABLES) {
+    for (const selectColumns of GURU_SELECT_ATTEMPTS) {
+      const { data, error: tableError } = await supabase
+        .from(tableName)
+        .select(selectColumns)
+        .limit(250);
+
+      if (!tableError) {
+        return (((data || []) as unknown) as GuruRow[]).filter(
+          shouldDisplaySearchGuru,
+        );
+      }
+
+      console.warn(
+        `Could not load fallback Guru search rows from ${tableName}:`,
+        tableError.message,
+      );
+    }
+  }
+
+  return [];
+}
+
 function SearchPageContent() {
   const searchParams = useSearchParams();
 
@@ -1020,27 +1187,18 @@ function SearchPageContent() {
             : "Public Guru API could not be reached.";
       }
 
-      if (gurusErrorMessage) {
-        for (const selectColumns of GURU_SELECT_ATTEMPTS) {
-          const { data, error: gurusError } = await supabase
-            .from("gurus")
-            .select(selectColumns)
-            .order("is_verified", { ascending: false })
-            .order("rating_avg", { ascending: false, nullsFirst: false });
+      guruRows = guruRows.filter(shouldDisplaySearchGuru);
 
-          if (!gurusError) {
-            guruRows = (((data || []) as unknown) as GuruRow[]).filter(
-              isBookableSearchGuru,
-            );
-            gurusErrorMessage = "";
-            break;
-          }
+      if (gurusErrorMessage || guruRows.length === 0) {
+        const fallbackGuruRows = await loadSearchRowsFromFallbackTables();
 
-          gurusErrorMessage = gurusError.message || gurusErrorMessage;
+        if (fallbackGuruRows.length > 0) {
+          guruRows = fallbackGuruRows;
+          gurusErrorMessage = "";
         }
-      } else {
-        guruRows = guruRows.filter(isBookableSearchGuru);
       }
+
+      guruRows = dedupeGuruRows(guruRows);
 
       const guruIds = guruRows
         .map((guru) => String(guru.id || ""))
@@ -1087,6 +1245,8 @@ function SearchPageContent() {
         setServiceRatesByGuru({});
       }
 
+      let loadedCertifiedGuruUserIds = new Set<string>();
+
       if (guruUserIds.length > 0) {
         const { data: certificationRows, error: certificationsError } =
           await supabase
@@ -1109,6 +1269,7 @@ function SearchPageContent() {
               .filter(Boolean),
           );
 
+          loadedCertifiedGuruUserIds = completedUserIds;
           setCertifiedGuruUserIds(completedUserIds);
         }
       } else {
@@ -1124,9 +1285,9 @@ function SearchPageContent() {
         source: detectSourceFromUrl(),
         metadata: {
           guru_count: guruRows.length,
-          guru_count_with_map_location: guruRows.filter(hasMapLocation).length,
+          guru_count_with_map_location: guruRows.filter((guru) => Boolean(getGuruSearchCoordinates(guru))).length,
           guru_count_with_academy_badge: guruRows.filter((guru) =>
-            certifiedGuruUserIds.has(getGuruCertificationUserId(guru)),
+            loadedCertifiedGuruUserIds.has(getGuruCertificationUserId(guru)),
           ).length,
           has_initial_service: Boolean(initialService),
           has_initial_zip: Boolean(initialZip),
@@ -1309,11 +1470,7 @@ function SearchPageContent() {
       .toLowerCase();
 
     return gurus
-      .filter(isBookableSearchGuru)
-      .filter((guru) => guru.is_active !== false)
-      .filter((guru) => guru.is_public !== false)
-      .filter((guru) => guru.is_accepting_bookings !== false)
-      .filter((guru) => guru.accepting_bookings !== false)
+      .filter(shouldDisplaySearchGuru)
       .filter((guru) => {
         const guruName = normalizeText(getGuruName(guru));
         const guruCity = normalizeText(getGuruCity(guru));
@@ -1400,8 +1557,11 @@ function SearchPageContent() {
   ]);
 
   const mapReadyGuruCount = useMemo(
-    () => filteredGurus.filter(hasMapLocation).length,
-    [filteredGurus],
+    () =>
+      filteredGurus.filter((guru) =>
+        Boolean(getGuruSearchCoordinates(guru, guruZipLookupsByZip)),
+      ).length,
+    [filteredGurus, guruZipLookupsByZip],
   );
 
   const mapMissingLocationCount = filteredGurus.length - mapReadyGuruCount;
@@ -1540,7 +1700,9 @@ function SearchPageContent() {
         guru_city: getGuruCity(guru),
         guru_state: getGuruState(guru),
         guru_zip: getGuruZip(guru),
-        guru_has_map_location: hasMapLocation(guru),
+        guru_has_map_location: Boolean(
+          getGuruSearchCoordinates(guru, guruZipLookupsByZip),
+        ),
         selected_service: serviceFilter,
         result_count: filteredGurus.length,
       },
@@ -1814,7 +1976,9 @@ function SearchPageContent() {
                     services.length - visibleServices.length,
                     0,
                   );
-                  const guruHasMapLocation = hasMapLocation(guru);
+                  const guruHasMapLocation = Boolean(
+                    getGuruSearchCoordinates(guru, guruZipLookupsByZip),
+                  );
                   const guruRadius = Math.round(
                     guru.service_radius_display || getGuruRadius(guru),
                   );
@@ -1828,7 +1992,7 @@ function SearchPageContent() {
                         String(guru.slug || "").toLowerCase() ===
                           selectedGuruSlug.toLowerCase()),
                   );
-                  const bookingDisabled = isFillInGuru(guru);
+                  const bookingDisabled = isDisplayOnlySearchGuru(guru);
                   const isAcademyCertified = certifiedGuruUserIds.has(
                     getGuruCertificationUserId(guru),
                   );
@@ -2009,7 +2173,7 @@ function SearchPageContent() {
                                 aria-disabled="true"
                                 className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white opacity-55"
                               >
-                                Book This Guru
+                                Profile Preview
                               </button>
                             ) : (
                               <Link
