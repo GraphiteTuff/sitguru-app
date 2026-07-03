@@ -294,26 +294,207 @@ function shouldDisplaySearchGuru(guru: GuruRow) {
   return isPublicSearchGuru(guru) || isDemoSearchGuru(guru);
 }
 
-function getGuruDedupeKey(guru: GuruRow) {
+function getGuruZip(guru: GuruRow) {
+  return cleanZip(guru.service_zip || guru.service_zip_code || guru.zip_code);
+}
+
+function getGuruPhotoUrl(guru: GuruRow) {
+  return cleanString(
+    guru.profile_photo_url || guru.photo_url || guru.avatar_url || guru.image_url,
+  );
+}
+
+function hasCoordinates(guru: GuruRow) {
+  const latitude = Number(guru.service_latitude || guru.latitude || guru.lat);
+  const longitude = Number(guru.service_longitude || guru.longitude || guru.lng);
+
+  return (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180 &&
+    latitude !== 0 &&
+    longitude !== 0
+  );
+}
+
+function isGenericGuruName(value: unknown) {
+  const normalized = normalizeText(value);
+
+  return !normalized || ["guru", "pet care guru", "sitter", "pet sitter"].includes(normalized);
+}
+
+function getGuruDedupeKeys(guru: GuruRow) {
+  const keys = new Set<string>();
   const email = normalizeStatus(guru.email);
-  if (email) return `email:${email}`;
-
   const userId = cleanString(guru.user_id);
-  if (userId) return `user:${userId}`;
+  const slug = normalizeText(guru.slug);
+  const name = normalizeText(getGuruName(guru));
+  const city = normalizeText(getGuruCity(guru));
+  const state = normalizeStatus(getGuruState(guru));
+  const zip = getGuruZip(guru);
 
-  return `id:${cleanString(guru.id)}`;
+  if (isValidEmail(email)) keys.add(`email:${email}`);
+  if (userId) keys.add(`user:${userId}`);
+  if (slug && !isGenericGuruName(slug)) keys.add(`slug:${slug}`);
+
+  if (name && !isGenericGuruName(name)) {
+    if (city && state) keys.add(`name-location:${name}:${city}:${state}`);
+    if (zip) keys.add(`name-zip:${name}:${zip}`);
+  }
+
+  if (!keys.size && cleanString(guru.id)) keys.add(`id:${cleanString(guru.id)}`);
+
+  return Array.from(keys);
+}
+
+function getGuruQualityScore(guru: GuruRow) {
+  const source = normalizeStatus(guru.source || guru.profile_source || guru.search_source);
+  const qualityStatus = normalizeStatus(guru.profile_quality_status);
+  const radius = readNumber(guru.service_radius_miles || guru.radius_miles, 0) || 0;
+
+  let score = 0;
+
+  if (isBookableSearchGuru(guru)) score += 80;
+  if (isPublicSearchGuru(guru)) score += 50;
+  if (isValidEmail(guru.email)) score += 18;
+  if (!isGenericGuruName(getGuruName(guru))) score += 12;
+  if (getGuruZip(guru)) score += 10;
+  if (getGuruCity(guru)) score += 8;
+  if (getGuruState(guru)) score += 8;
+  if (getGuruPhotoUrl(guru)) score += 12;
+  if (cleanString(guru.bio)) score += 12;
+  if (Array.isArray(guru.services) && guru.services.length > 0) score += guru.services.length;
+  if (readNumber(guru.hourly_rate || guru.rate, null) !== null) score += 8;
+  if (radius > 0) score += 4;
+  if (hasCoordinates(guru)) score += 8;
+  if (guru.is_verified) score += 6;
+  if (readNumber(guru.review_count, 0)) score += 4;
+  if (source.includes("public_search") || source.includes("override")) score += 8;
+  if (source.includes("profile fallback") || source.includes("fallback")) score -= 18;
+  if (qualityStatus.includes("orphan")) score -= 25;
+  if (qualityStatus.includes("fallback")) score -= 12;
+
+  return score;
+}
+
+function chooseTextValue(primary: unknown, secondary: unknown) {
+  const primaryText = cleanString(primary);
+  if (primaryText) return primary;
+
+  const secondaryText = cleanString(secondary);
+  return secondaryText ? secondary : primary;
+}
+
+function chooseNumberValue(primary: unknown, secondary: unknown) {
+  const primaryNumber = Number(primary);
+  if (Number.isFinite(primaryNumber) && primaryNumber > 0) return primary;
+
+  const secondaryNumber = Number(secondary);
+  return Number.isFinite(secondaryNumber) && secondaryNumber > 0
+    ? secondary
+    : primary;
+}
+
+function chooseSearchBoolean(primary: unknown, secondary: unknown): boolean | null | undefined {
+  if (primary === true || secondary === true) return true;
+  if (primary === false && secondary === false) return false;
+  if (typeof primary === "boolean") return primary;
+  if (typeof secondary === "boolean") return secondary;
+  return undefined;
+}
+
+function mergeServices(primary?: string[] | null, secondary?: string[] | null) {
+  const services = [...(primary || []), ...(secondary || [])]
+    .map((service) => cleanString(service))
+    .filter(Boolean);
+
+  return Array.from(new Set(services));
+}
+
+function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
+  const currentScore = getGuruQualityScore(current);
+  const incomingScore = getGuruQualityScore(incoming);
+  const primary = incomingScore > currentScore ? incoming : current;
+  const secondary = incomingScore > currentScore ? current : incoming;
+
+  return {
+    ...secondary,
+    ...primary,
+    id: chooseTextValue(primary.id, secondary.id) as string | number,
+    user_id: chooseTextValue(primary.user_id, secondary.user_id) as string | null,
+    email: chooseTextValue(primary.email, secondary.email) as string | null,
+    slug: chooseTextValue(primary.slug, secondary.slug) as string | null,
+    display_name: chooseTextValue(primary.display_name, secondary.display_name) as string | null,
+    full_name: chooseTextValue(primary.full_name, secondary.full_name) as string | null,
+    name: chooseTextValue(primary.name, secondary.name) as string | null,
+    title: chooseTextValue(primary.title, secondary.title) as string | null,
+    bio: chooseTextValue(primary.bio, secondary.bio) as string | null,
+    city: chooseTextValue(primary.city, secondary.city) as string | null,
+    state: chooseTextValue(primary.state, secondary.state) as string | null,
+    zip_code: chooseTextValue(primary.zip_code, secondary.zip_code) as string | null,
+    service_city: chooseTextValue(primary.service_city, secondary.service_city) as string | null,
+    service_state: chooseTextValue(primary.service_state, secondary.service_state) as string | null,
+    service_zip: chooseTextValue(primary.service_zip, secondary.service_zip) as string | null,
+    service_zip_code: chooseTextValue(primary.service_zip_code, secondary.service_zip_code) as string | null,
+    profile_photo_url: chooseTextValue(primary.profile_photo_url, secondary.profile_photo_url) as string | null,
+    photo_url: chooseTextValue(primary.photo_url, secondary.photo_url) as string | null,
+    avatar_url: chooseTextValue(primary.avatar_url, secondary.avatar_url) as string | null,
+    image_url: chooseTextValue(primary.image_url, secondary.image_url) as string | null,
+    hourly_rate: chooseNumberValue(primary.hourly_rate, secondary.hourly_rate) as number | null,
+    rate: chooseNumberValue(primary.rate, secondary.rate) as number | null,
+    service_radius_miles: chooseNumberValue(primary.service_radius_miles, secondary.service_radius_miles) as string | number | null,
+    radius_miles: chooseNumberValue(primary.radius_miles, secondary.radius_miles) as string | number | null,
+    service_latitude: chooseNumberValue(primary.service_latitude, secondary.service_latitude) as string | number | null,
+    service_longitude: chooseNumberValue(primary.service_longitude, secondary.service_longitude) as string | number | null,
+    latitude: chooseNumberValue(primary.latitude, secondary.latitude) as string | number | null,
+    longitude: chooseNumberValue(primary.longitude, secondary.longitude) as string | number | null,
+    is_public: chooseSearchBoolean(primary.is_public, secondary.is_public),
+    is_public_visible: chooseSearchBoolean(primary.is_public_visible, secondary.is_public_visible),
+    is_active: chooseSearchBoolean(primary.is_active, secondary.is_active),
+    is_bookable: chooseSearchBoolean(primary.is_bookable, secondary.is_bookable),
+    is_accepting_bookings: chooseSearchBoolean(
+      primary.is_accepting_bookings,
+      secondary.is_accepting_bookings,
+    ),
+    accepting_bookings: chooseSearchBoolean(
+      primary.accepting_bookings,
+      secondary.accepting_bookings,
+    ),
+    services: mergeServices(primary.services, secondary.services),
+  };
 }
 
 function dedupeGuruRows(gurus: GuruRow[]) {
-  const seen = new Set<string>();
+  const mergedRows: GuruRow[] = [];
+  const keyToIndex = new Map<string, number>();
 
-  return gurus.filter((guru) => {
-    const key = getGuruDedupeKey(guru);
-    if (seen.has(key)) return false;
+  gurus.forEach((guru) => {
+    const keys = getGuruDedupeKeys(guru);
+    const existingIndex = keys
+      .map((key) => keyToIndex.get(key))
+      .find((index): index is number => typeof index === "number");
 
-    seen.add(key);
-    return true;
+    if (existingIndex === undefined) {
+      const nextIndex = mergedRows.length;
+      mergedRows.push(guru);
+      keys.forEach((key) => keyToIndex.set(key, nextIndex));
+      return;
+    }
+
+    mergedRows[existingIndex] = mergeDuplicateGuruRows(
+      mergedRows[existingIndex],
+      guru,
+    );
+
+    getGuruDedupeKeys(mergedRows[existingIndex]).forEach((key) =>
+      keyToIndex.set(key, existingIndex),
+    );
   });
+
+  return mergedRows;
 }
 
 function readNumber(value: unknown, fallback: number | null = null) {
