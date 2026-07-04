@@ -12,7 +12,11 @@ type VisitUpdateType =
   | "water"
   | "food"
   | "photo"
-  | "note";
+  | "note"
+  | "medication"
+  | "walk"
+  | "play"
+  | "mood";
 
 type LocationPayload = {
   lat?: number | null;
@@ -82,6 +86,14 @@ async function getOrCreateSession(
   return newSession;
 }
 
+function revalidateVisitPaths(bookingId: string) {
+  revalidatePath(`/guru/dashboard/bookings/${bookingId}/visit-updates`);
+  revalidatePath(`/customer/dashboard/bookings/${bookingId}/visit-updates`);
+  revalidatePath(`/admin/bookings/${bookingId}/visit-updates`);
+  revalidatePath(`/guru/dashboard/bookings`);
+  revalidatePath(`/customer/dashboard/bookings`);
+}
+
 export async function startVisitAction(
   bookingId: string,
   location?: LocationPayload
@@ -124,19 +136,23 @@ export async function startVisitAction(
     return { success: false, error: "Could not start PawReport." };
   }
 
-  await supabaseAdmin.from("booking_visit_updates").insert({
-    session_id: session.id,
-    booking_id: bookingId,
-    update_type: "visit_started",
-    note: "PawReport started.",
-    lat: location?.lat ?? null,
-    lng: location?.lng ?? null,
-    accuracy: location?.accuracy ?? null,
-  });
+  const { error: insertError } = await supabaseAdmin
+    .from("booking_visit_updates")
+    .insert({
+      session_id: session.id,
+      booking_id: bookingId,
+      update_type: "visit_started",
+      note: "PawReport started.",
+      lat: location?.lat ?? null,
+      lng: location?.lng ?? null,
+      accuracy: location?.accuracy ?? null,
+    });
 
-  revalidatePath(`/guru/dashboard/bookings/${bookingId}/visit-updates`);
-  revalidatePath(`/customer/dashboard/bookings/${bookingId}/visit-updates`);
-  revalidatePath(`/admin/bookings/${bookingId}/visit-updates`);
+  if (insertError) {
+    console.error("Start PawReport timeline insert error:", insertError);
+  }
+
+  revalidateVisitPaths(bookingId);
 
   return { success: true, sessionId: session.id };
 }
@@ -165,6 +181,7 @@ export async function endVisitAction(
     return { success: false, error: "Could not find PawReport session." };
   }
 
+  const cleanFinalNote = finalNote.trim();
   const now = new Date().toISOString();
 
   const { error: updateError } = await supabaseAdmin
@@ -175,7 +192,7 @@ export async function endVisitAction(
       end_lat: location?.lat ?? null,
       end_lng: location?.lng ?? null,
       end_accuracy: location?.accuracy ?? null,
-      final_note: finalNote || null,
+      final_note: cleanFinalNote || null,
       updated_at: now,
     })
     .eq("id", session.id);
@@ -185,19 +202,23 @@ export async function endVisitAction(
     return { success: false, error: "Could not complete PawReport." };
   }
 
-  await supabaseAdmin.from("booking_visit_updates").insert({
-    session_id: session.id,
-    booking_id: bookingId,
-    update_type: "visit_ended",
-    note: finalNote || "PawReport completed.",
-    lat: location?.lat ?? null,
-    lng: location?.lng ?? null,
-    accuracy: location?.accuracy ?? null,
-  });
+  const { error: insertError } = await supabaseAdmin
+    .from("booking_visit_updates")
+    .insert({
+      session_id: session.id,
+      booking_id: bookingId,
+      update_type: "visit_ended",
+      note: cleanFinalNote || "PawReport completed.",
+      lat: location?.lat ?? null,
+      lng: location?.lng ?? null,
+      accuracy: location?.accuracy ?? null,
+    });
 
-  revalidatePath(`/guru/dashboard/bookings/${bookingId}/visit-updates`);
-  revalidatePath(`/customer/dashboard/bookings/${bookingId}/visit-updates`);
-  revalidatePath(`/admin/bookings/${bookingId}/visit-updates`);
+  if (insertError) {
+    console.error("Complete PawReport timeline insert error:", insertError);
+  }
+
+  revalidateVisitPaths(bookingId);
 
   return { success: true, sessionId: session.id };
 }
@@ -233,6 +254,10 @@ export async function addVisitUpdateAction(
     "food",
     "photo",
     "note",
+    "medication",
+    "walk",
+    "play",
+    "mood",
   ];
 
   if (!allowedTypes.includes(updateType)) {
@@ -261,9 +286,7 @@ export async function addVisitUpdateAction(
     return { success: false, error: "Could not add PawReport update." };
   }
 
-  revalidatePath(`/guru/dashboard/bookings/${bookingId}/visit-updates`);
-  revalidatePath(`/customer/dashboard/bookings/${bookingId}/visit-updates`);
-  revalidatePath(`/admin/bookings/${bookingId}/visit-updates`);
+  revalidateVisitPaths(bookingId);
 
   return { success: true, sessionId: session.id };
 }
