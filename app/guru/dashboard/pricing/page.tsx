@@ -1118,57 +1118,69 @@ export default function GuruDashboardPricingPage() {
       }}
     >
       <style>{`
-        .guru-pricing-readable h1,
-        .guru-pricing-readable h2,
-        .guru-pricing-readable h3,
-        .guru-pricing-readable h4,
-        .guru-pricing-readable p,
-        .guru-pricing-readable label,
-        .guru-pricing-readable small {
+        .guru-pricing-readable,
+        .guru-pricing-readable :where(div, section, article, aside, header, footer, h1, h2, h3, h4, h5, h6, p, span, label, small, strong, em, li, a, button) {
           color: #07132f !important;
           -webkit-text-fill-color: #07132f !important;
           opacity: 1 !important;
+          text-shadow: none !important;
         }
 
-        .guru-pricing-readable .text-white,
-        .guru-pricing-readable .\!text-white,
-        .guru-pricing-readable [class*="text-white"] {
-          color: #ffffff !important;
-          -webkit-text-fill-color: #ffffff !important;
+        .guru-pricing-readable :where(p, span, label, small, li) {
+          font-weight: 700;
+        }
+
+        .guru-pricing-readable :where(h1, h2, h3, h4, h5, h6, strong) {
+          font-weight: 900;
         }
 
         .guru-pricing-readable input,
         .guru-pricing-readable select,
-        .guru-pricing-readable textarea {
+        .guru-pricing-readable textarea,
+        .guru-pricing-readable option {
           color: #07132f !important;
           -webkit-text-fill-color: #07132f !important;
           background: #ffffff !important;
           opacity: 1 !important;
+          font-weight: 800 !important;
         }
 
         .guru-pricing-readable input::placeholder,
         .guru-pricing-readable textarea::placeholder {
-          color: #475569 !important;
-          -webkit-text-fill-color: #475569 !important;
+          color: #334155 !important;
+          -webkit-text-fill-color: #334155 !important;
           opacity: 1 !important;
+          font-weight: 700 !important;
         }
 
-        .guru-pricing-readable button:not([class*="bg-emerald-600"]):not([class*="bg-slate-950"]):not([class*="bg-rose-600"]) {
-          color: #07132f !important;
-          -webkit-text-fill-color: #07132f !important;
+        .guru-pricing-readable :where(.bg-emerald-600, .bg-emerald-700, .bg-slate-950, .bg-rose-600, .bg-rose-700, .bg-amber-600),
+        .guru-pricing-readable :where(.bg-emerald-600, .bg-emerald-700, .bg-slate-950, .bg-rose-600, .bg-rose-700, .bg-amber-600) :where(span, p, strong, svg),
+        .guru-pricing-readable button[class*="bg-emerald-600"],
+        .guru-pricing-readable button[class*="bg-emerald-700"],
+        .guru-pricing-readable button[class*="bg-slate-950"],
+        .guru-pricing-readable button[class*="bg-rose-600"],
+        .guru-pricing-readable button[class*="bg-rose-700"],
+        .guru-pricing-readable button[class*="bg-amber-600"],
+        .guru-pricing-readable a[class*="bg-emerald-600"],
+        .guru-pricing-readable a[class*="bg-emerald-700"],
+        .guru-pricing-readable a[class*="bg-slate-950"],
+        .guru-pricing-readable a[class*="bg-rose-600"],
+        .guru-pricing-readable a[class*="bg-rose-700"],
+        .guru-pricing-readable a[class*="bg-amber-600"] {
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
+
+        .guru-pricing-readable :where(.bg-emerald-600, .bg-emerald-700, .bg-slate-950, .bg-rose-600, .bg-rose-700, .bg-amber-600) * {
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
         }
 
         .guru-pricing-readable .pricing-service-card,
-        .guru-pricing-readable .pricing-service-card *:not(button):not(svg):not(path) {
+        .guru-pricing-readable .pricing-service-card *:not(button):not(button *):not(svg):not(path) {
           color: #07132f !important;
           -webkit-text-fill-color: #07132f !important;
           opacity: 1 !important;
-        }
-
-        .guru-pricing-readable .pricing-service-card button[class*="bg-emerald-600"],
-        .guru-pricing-readable .pricing-service-card button[class*="bg-emerald-600"] * {
-          color: #ffffff !important;
-          -webkit-text-fill-color: #ffffff !important;
         }
       `}</style>
       <div className="mx-auto max-w-[1480px]">
