@@ -705,6 +705,14 @@ const operatingFinance: ReportCard[] = [
     tone: "purple",
   },
   {
+    eyebrow: "Checkout Options",
+    title: "Payment Options Dashboard",
+    description:
+      "Review desktop/mobile checkout preferences, wallet options, saved methods, ACH placeholders, PawPerks, referral credits, promo codes, gift/SitGuru credits, and Guru tips.",
+    href: "/admin/payments",
+    tone: "blue",
+  },
+  {
     eyebrow: "Banking",
     title: "NFCU / Plaid Business Banking",
     description:
@@ -2061,6 +2069,104 @@ function GrowthReferralFinancialsPanel({
   );
 }
 
+function PaymentOperationsPanel() {
+  const paymentOptionRows = [
+    {
+      title: "Checkout methods",
+      value: "Card, wallets, Link, saved method, ACH",
+      helper:
+        "Admin can verify which desktop/mobile payment preference was selected before Stripe checkout.",
+      href: "/admin/payments",
+    },
+    {
+      title: "Credits and codes",
+      value: "PawPerks, referral, promo, gift credit",
+      helper:
+        "Keeps customer credit requests visible before reconciliation, support, refunds, and CPA review.",
+      href: "/admin/payments",
+    },
+    {
+      title: "Guru tips",
+      value: "100% tip visibility",
+      helper:
+        "Separates optional tips from marketplace support so Guru payout reviews stay clear.",
+      href: "/admin/financials/payouts",
+    },
+  ];
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+            Payment Options Operations
+          </p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+            Desktop and Mobile Checkout Reconciliation
+          </h2>
+          <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
+            Financials now points directly to the Admin Payments dashboard so selected
+            payment options, wallet choices, PawPerks/referral credits, promo codes,
+            gift/SitGuru credits, custom quote requests, Guru tips, refunds, disputes,
+            and payout exposure can be reviewed from one operations workflow.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/payments"
+            className="rounded-full bg-emerald-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
+          >
+            Open Admin Payments
+          </Link>
+          <Link
+            href="/admin/bookings"
+            className="rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+          >
+            Audit Bookings
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {paymentOptionRows.map((item) => (
+          <Link
+            key={item.title}
+            href={item.href}
+            className="group rounded-[1.5rem] border border-slate-100 bg-[#fbfefd] p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:bg-white hover:shadow-lg"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                  {item.title}
+                </p>
+                <h3 className="mt-2 text-xl font-black text-slate-950">
+                  {item.value}
+                </h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  {item.helper}
+                </p>
+              </div>
+              <ArrowCircle />
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-5 rounded-[1.5rem] border border-amber-100 bg-amber-50 p-5">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+          Owner note
+        </p>
+        <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+          Older bookings may show “Not selected” until the updated desktop/mobile booking
+          payload is live. New booking rows should populate selected payment option,
+          credit signals, promo/gift code signals, custom quote status, and tip data.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function ManagementAlerts({ alerts }: { alerts: ManagementAlert[] }) {
   return (
     <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
@@ -2463,6 +2569,14 @@ export default function AdminFinancialsPage() {
     "trust-safety",
   ]);
 
+  const showPaymentOperations = sectionVisible(segment, [
+    "bookings",
+    "customers",
+    "payouts",
+    "banking",
+    "growth",
+  ]);
+
   async function loadTrustSafetyFinancials() {
     try {
       const response = await fetch("/api/admin/financials/trust-safety", {
@@ -2605,7 +2719,7 @@ export default function AdminFinancialsPage() {
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                 Real-time financial performance across all SitGuru operations,
                 including Plaid/NFCU business banking, bookings, customers, gurus,
-                partners, Stripe, payouts, expenses, reporting, and CPA export readiness.
+                partners, Stripe, payment options, payouts, expenses, reporting, and CPA export readiness.
               </p>
 
               <div
@@ -2642,6 +2756,14 @@ export default function AdminFinancialsPage() {
                   className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
                 >
                   Bank Reconciliation
+                </Link>
+
+
+                <Link
+                  href="/admin/payments"
+                  className="rounded-full border border-blue-200 bg-white px-4 py-2 text-xs font-black text-blue-800 shadow-sm transition hover:bg-blue-50"
+                >
+                  Payment Options
                 </Link>
               </div>
 
@@ -2931,6 +3053,8 @@ export default function AdminFinancialsPage() {
         {showGrowthReferralFinancials ? (
           <GrowthReferralFinancialsPanel financials={growthReferralFinancials} />
         ) : null}
+
+        {showPaymentOperations ? <PaymentOperationsPanel /> : null}
 
         <ManagementAlerts alerts={overview.managementAlerts} />
 

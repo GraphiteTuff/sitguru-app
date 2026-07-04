@@ -48,6 +48,20 @@ type DisputeDisplayRow = {
   href: string;
 };
 
+type PaymentOptionSummary = {
+  label: string;
+  count: number;
+  total: number;
+  helper: string;
+};
+
+type CreditSignalSummary = {
+  label: string;
+  count: number;
+  total: number;
+  helper: string;
+};
+
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -216,6 +230,63 @@ function getBookingPaymentMethod(booking: BookingRow) {
     asTrimmedString(booking.stripe_payment_method) ||
     "Stripe"
   );
+}
+
+function normalizePaymentOptionLabel(value: unknown) {
+  const normalized = asTrimmedString(value).toLowerCase().replace(/[-_]+/g, " ");
+
+  if (!normalized) return "Not selected";
+  if (normalized.includes("apple")) return "Apple Pay";
+  if (normalized.includes("google")) return "Google Pay";
+  if (normalized.includes("link")) return "Link by Stripe";
+  if (normalized.includes("saved")) return "Saved payment method";
+  if (normalized.includes("ach") || normalized.includes("bank")) return "ACH / Bank account";
+  if (normalized.includes("card") || normalized.includes("credit") || normalized.includes("debit")) {
+    return "Credit / debit card";
+  }
+  if (normalized.includes("stripe")) return "Stripe checkout";
+
+  return asTrimmedString(value) || "Not selected";
+}
+
+function getBookingPaymentOption(booking: BookingRow) {
+  return normalizePaymentOptionLabel(
+    booking.selected_payment_option ||
+      booking.payment_option ||
+      booking.payment_option_key ||
+      booking.payment_method_choice ||
+      booking.checkout_payment_method ||
+      booking.wallet_payment_method ||
+      booking.payment_method ||
+      booking.stripe_payment_method ||
+      booking.card_brand
+  );
+}
+
+function getBookingCreditAmount(booking: BookingRow, keys: string[]) {
+  for (const key of keys) {
+    const amount = toNumber(booking[key]);
+    if (amount > 0) return amount;
+  }
+  return 0;
+}
+
+function hasBookingSignal(booking: BookingRow, keys: string[]) {
+  return keys.some((key) => {
+    const value = booking[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value > 0;
+    return Boolean(asTrimmedString(value));
+  });
+}
+
+function getBookingTipAmount(booking: BookingRow) {
+  return getBookingCreditAmount(booking, [
+    "tip_amount",
+    "guru_tip_amount",
+    "tipAmount",
+    "guruTipAmount",
+  ]);
 }
 
 function isPaidBooking(booking: BookingRow) {
@@ -504,7 +575,7 @@ async function getPaymentsData() {
       id: transactionId,
       type: isRefundBooking(booking) ? "Refund / Booking Adjustment" : "Booking Payment",
       user: getBookingCustomerName(booking),
-      method: getBookingPaymentMethod(booking),
+      method: getBookingPaymentOption(booking),
       amount: moneyCents(getBookingGrossAmount(booking) + getBookingTaxAmount(booking)),
       rawAmount: getBookingGrossAmount(booking) + getBookingTaxAmount(booking),
       status: paymentStatus,
@@ -639,6 +710,131 @@ async function getPaymentsData() {
     100 - calcPercent(openDisputes.length, Math.max(disputes.length || bookings.length, 1))
   );
 
+  const paymentOptionMap = new Map<string, { count: number; total: number }>();
+
+  bookings.forEach((booking) => {
+    const label = getBookingPaymentOption(booking);
+    const current = paymentOptionMap.get(label) || { count: 0, total: 0 };
+
+    current.count += 1;
+    current.total += getBookingGrossAmount(booking) + getBookingTaxAmount(booking);
+    paymentOptionMap.set(label, current);
+  });
+
+  const paymentOptions: PaymentOptionSummary[] = Array.from(paymentOptionMap.entries())
+    .map(([label, value]) => ({
+      label,
+      count: value.count,
+      total: value.total,
+      helper:
+        label === "Not selected"
+          ? "Older rows or quote requests may not have a saved payment option yet."
+          : "Saved from desktop/mobile booking checkout preference.",
+    }))
+    .sort((a, b) => b.total - a.total || b.count - a.count);
+
+  const quoteRequests = bookings.filter((booking) =>
+    hasBookingSignal(booking, ["custom_quote_requested", "customQuoteRequested"])
+  );
+  const checkoutPending = bookings.filter((booking) => {
+    const status = getBookingPaymentStatus(booking).toLowerCase();
+    return status.includes("pending") || status.includes("checkout") || status.includes("unpaid");
+  });
+  const promoBookings = bookings.filter((booking) =>
+    hasBookingSignal(booking, ["promo_code", "promoCode", "discount_code", "coupon_code"])
+  );
+  const pawPerksBookings = bookings.filter((booking) =>
+    hasBookingSignal(booking, [
+      "pawperks_credit_requested",
+      "pawPerksCreditRequested",
+      "petperks_credit_requested",
+      "pawperks_credit_amount",
+      "pawperksCreditAmount",
+    ])
+  );
+  const referralCreditBookings = bookings.filter((booking) =>
+    hasBookingSignal(booking, [
+      "referral_credit_requested",
+      "referralCreditRequested",
+      "referral_credit_amount",
+      "referralCreditAmount",
+      "referral_code",
+    ])
+  );
+  const giftCreditBookings = bookings.filter((booking) =>
+    hasBookingSignal(booking, [
+      "gift_card_code",
+      "giftCardCode",
+      "sitguru_credit_code",
+      "sitguruCreditCode",
+      "gift_card_amount",
+      "sitguru_credit_amount",
+    ])
+  );
+  const tipBookings = bookings.filter((booking) => getBookingTipAmount(booking) > 0);
+  const tipTotal = tipBookings.reduce((sum, booking) => sum + getBookingTipAmount(booking), 0);
+
+  const creditSignals: CreditSignalSummary[] = [
+    {
+      label: "PawPerks / PetPerks credit",
+      count: pawPerksBookings.length,
+      total: pawPerksBookings.reduce(
+        (sum, booking) =>
+          sum +
+          getBookingCreditAmount(booking, [
+            "pawperks_credit_amount",
+            "pawperksCreditAmount",
+            "petperks_credit_amount",
+          ]),
+        0
+      ),
+      helper: "Pet Parent loyalty or platform credit requested during checkout.",
+    },
+    {
+      label: "Referral credit",
+      count: referralCreditBookings.length,
+      total: referralCreditBookings.reduce(
+        (sum, booking) =>
+          sum +
+          getBookingCreditAmount(booking, ["referral_credit_amount", "referralCreditAmount"]),
+        0
+      ),
+      helper: "Referral credit or referral code attached to a booking.",
+    },
+    {
+      label: "Promo code",
+      count: promoBookings.length,
+      total: promoBookings.reduce(
+        (sum, booking) =>
+          sum + getBookingCreditAmount(booking, ["promo_discount_amount", "discount_amount"]),
+        0
+      ),
+      helper: "Promo/coupon code entered before secure checkout.",
+    },
+    {
+      label: "Gift card / SitGuru credit",
+      count: giftCreditBookings.length,
+      total: giftCreditBookings.reduce(
+        (sum, booking) =>
+          sum +
+          getBookingCreditAmount(booking, [
+            "gift_card_amount",
+            "giftCardAmount",
+            "sitguru_credit_amount",
+            "sitguruCreditAmount",
+          ]),
+        0
+      ),
+      helper: "Gift card or SitGuru account credit attached to checkout.",
+    },
+    {
+      label: "Guru tips",
+      count: tipBookings.length,
+      total: tipTotal,
+      helper: "Optional tip selected by the Pet Parent; 100% should go to the Guru.",
+    },
+  ];
+
   return {
     stats: [
       {
@@ -673,6 +869,17 @@ async function getPaymentsData() {
     recentTransactions,
     payoutRows,
     disputeRows,
+    paymentOptions,
+    creditSignals,
+    paymentOperations: {
+      quoteRequests: quoteRequests.length,
+      checkoutPending: checkoutPending.length,
+      tipTotal,
+      promoBookings: promoBookings.length,
+      pawPerksBookings: pawPerksBookings.length,
+      referralCreditBookings: referralCreditBookings.length,
+      giftCreditBookings: giftCreditBookings.length,
+    },
     totals: {
       bookings: bookings.length,
       paidBookings: paidBookings.length,
@@ -720,8 +927,9 @@ export default async function AdminPaymentsPage() {
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
                 This dashboard is wired to SitGuru booking and payment records.
-                It tracks booking volume, Stripe payment status, Guru payout
-                readiness, refunds, tax held, platform revenue, and dispute cases.
+                It tracks booking volume, Stripe payment status, selected payment
+                options, PawPerks/referral credit signals, promo codes, Guru tips,
+                Guru payout readiness, refunds, tax held, platform revenue, and dispute cases.
               </p>
             </div>
 
@@ -761,6 +969,118 @@ export default async function AdminPaymentsPage() {
           </div>
         </section>
 
+        <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                  Desktop + Mobile Checkout
+                </p>
+                <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+                  Payment option mix
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Shows the payment preference saved from the booking flow, including
+                  card, Apple Pay, Google Pay, Link by Stripe, saved methods, ACH,
+                  quote requests, and older rows that did not store a method yet.
+                </p>
+              </div>
+
+              <ActionLink href="/admin/bookings" label="Audit Bookings" />
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {payments.paymentOptions.length ? (
+                payments.paymentOptions.map((option) => (
+                  <div
+                    key={option.label}
+                    className="rounded-2xl border border-white/10 bg-slate-950/45 p-4"
+                  >
+                    <p className="text-sm font-black text-white">{option.label}</p>
+                    <p className="mt-2 text-2xl font-black text-emerald-300">
+                      {money(option.total)}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-slate-400">
+                      {option.count.toLocaleString()} booking row{option.count === 1 ? "" : "s"}
+                    </p>
+                    <p className="mt-3 text-xs leading-5 text-slate-500">
+                      {option.helper}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400 sm:col-span-2 xl:col-span-3">
+                  No booking payment option rows found yet.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-white/10 bg-slate-950/60 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                  Credits, Codes & Tips
+                </p>
+                <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
+                  Checkout signals needing admin visibility
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Keeps PawPerks, referral credit, promo codes, gift/SitGuru credit,
+                  and Guru tips visible for operations, support, and reconciliation.
+                </p>
+              </div>
+
+              <ActionLink href="/admin/financials" label="Reconcile" />
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {payments.creditSignals.map((signal) => (
+                <div
+                  key={signal.label}
+                  className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-black text-white">{signal.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-400">
+                        {signal.helper}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <p className="text-lg font-black text-emerald-300">
+                        {moneyCents(signal.total)}
+                      </p>
+                      <p className="text-xs font-semibold text-slate-500">
+                        {signal.count.toLocaleString()} booking row{signal.count === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
+                  Checkout Pending
+                </p>
+                <p className="mt-2 text-2xl font-black text-white">
+                  {payments.paymentOperations.checkoutPending.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-sky-400/20 bg-sky-400/10 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">
+                  Quote Requests
+                </p>
+                <p className="mt-2 text-2xl font-black text-white">
+                  {payments.paymentOperations.quoteRequests.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="grid gap-8 xl:grid-cols-[1.35fr_0.65fr]">
           <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -772,7 +1092,7 @@ export default async function AdminPaymentsPage() {
                   Live money movement
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Booking payments and Guru payouts from SitGuru tables.
+                  Booking payments, selected checkout option, and Guru payouts from SitGuru tables.
                 </p>
               </div>
 
