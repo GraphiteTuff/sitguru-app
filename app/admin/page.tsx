@@ -137,6 +137,9 @@ export default async function AdminOperationsDashboard() {
     payoutsReview,
     stripeIssues,
     pawPerksConflicts,
+    totalReviews,
+    publishedReviews,
+    pendingReviewModeration,
   ] = await Promise.all([
     safeCount("profiles", [
       { column: "role", operator: "eq", value: "customer" },
@@ -179,6 +182,14 @@ export default async function AdminOperationsDashboard() {
     ]),
     safeCount("referral_conflicts", [
       { column: "status", operator: "neq", value: "resolved" },
+    ]),
+    safeCount("booking_reviews"),
+    safeCount("booking_reviews", [
+      { column: "status", operator: "eq", value: "published" },
+      { column: "is_public", operator: "eq", value: true },
+    ]),
+    safeCount("booking_reviews", [
+      { column: "status", operator: "in", value: ["pending_review", "hidden", "removed"] },
     ]),
   ]);
 
@@ -224,6 +235,20 @@ export default async function AdminOperationsDashboard() {
       helper: "Open support and operations threads",
       href: "/admin/messages",
       tone: "rose",
+    },
+    {
+      label: "Reviews",
+      value: formatCount(totalReviews, "Review"),
+      helper: "Booking reviews and public trust signals",
+      href: "/admin/reviews",
+      tone: "violet",
+    },
+    {
+      label: "Review Moderation",
+      value: formatCount(pendingReviewModeration, "Review"),
+      helper: "Hidden, removed, or pending-review items",
+      href: "/admin/reviews?status=moderation",
+      tone: "amber",
     },
     {
       label: "Upcoming Bookings",
@@ -281,6 +306,13 @@ export default async function AdminOperationsDashboard() {
       priority: "High",
     },
     {
+      title: "Review ratings and reviews",
+      description:
+        "Monitor Guru reviews, public/private status, ratings, and would-book-again feedback.",
+      href: "/admin/reviews",
+      priority: "Review",
+    },
+    {
       title: "Check payouts",
       description: "Review partner and Guru payout queues before release.",
       href: "/admin/partners/payouts",
@@ -319,6 +351,7 @@ export default async function AdminOperationsDashboard() {
     ["Gurus", "/admin/gurus"],
     ["Ambassadors", "/admin/ambassadors"],
     ["Bookings", "/admin/bookings"],
+    ["Reviews", "/admin/reviews"],
     ["Messages", "/admin/messages"],
     ["Financials", "/admin/financials"],
     ["Partner Payouts", "/admin/partners/payouts"],
@@ -343,7 +376,7 @@ export default async function AdminOperationsDashboard() {
           </h1>
           <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-emerald-50 sm:text-base">
             Daily command center for marketplace operations, people queues,
-            bookings, messages, payouts, readiness, Trust & Safety, and growth
+            bookings, messages, reviews, payouts, readiness, Trust & Safety, and growth
             work.
           </p>
         </div>
@@ -403,6 +436,15 @@ export default async function AdminOperationsDashboard() {
                   helper: "Upcoming or recent booking activity",
                   href: "/admin/bookings",
                   tone: "sky",
+                }}
+              />
+              <MetricCardView
+                card={{
+                  label: "Public Reviews",
+                  value: formatCount(publishedReviews, "Review"),
+                  helper: "Published public reviews shown as trust signals",
+                  href: "/admin/reviews",
+                  tone: "violet",
                 }}
               />
               <MetricCardView
@@ -491,6 +533,7 @@ export default async function AdminOperationsDashboard() {
               ["Stripe Connect readiness", "/admin/financials/stripe"],
               ["Payout method readiness", "/admin/partners/payouts"],
               ["Profile completeness", "/admin/gurus?queue=profile-updates"],
+              ["Review moderation", "/admin/reviews?status=moderation"],
               ["Admin cleanup queues", "/admin/trust-safety"],
             ].map(([label, href]) => (
               <Link
