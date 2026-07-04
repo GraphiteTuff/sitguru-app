@@ -1044,8 +1044,8 @@ export default async function GuruBookingsPage({
     selectedPawReportStatus === "completed"
       ? "View PawReport"
       : selectedPawReportStatus === "in_progress"
-        ? "Continue PawReport"
-        : "Start PawReport";
+        ? "Continue PawReport / Live Walk"
+        : "Start PawReport / Live Walk";
 
   const upcomingCount = allBookings.filter((booking) => {
     return (
@@ -1499,38 +1499,38 @@ export default async function GuruBookingsPage({
                         <PawPrint className="h-8 w-8" />
                       </div>
                       <div className="mt-4 text-3xl font-black !text-[#061638]">
-                        No booking selected
+                        Select a booking to start PawReport Live
                       </div>
                       <p className="mt-3 text-base leading-7 !text-slate-600">
-                        Once Pet Parents book you, select a booking from the left panel
-                        to view details, start a PawReport, add photos, and share care updates.
+                        The start/stop walk controls live inside each booking's
+                        PawReport page. You currently have no bookings showing, so
+                        there is not a live walk to start yet.
                       </p>
                     </div>
                   </div>
 
                   <div className="rounded-[22px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5">
                     <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
-                      Signature Feature
+                      Where live walks start
                     </p>
                     <h3 className="mt-2 text-2xl font-black tracking-tight !text-[#061638]">
-                      SitGuru PawReport™
+                      Open a booking first
                     </h3>
                     <p className="mt-3 text-sm font-semibold leading-6 !text-slate-700">
-                      PawReports help Pet Parents feel connected with photos,
-                      potty updates, food and water confirmations, care notes,
-                      and a final summary.
+                      Live walks are tied to a real booking so the Pet Parent,
+                      Guru, and Admin all see the same PawReport record.
                     </p>
                     <div className="mt-4 grid gap-2 text-sm font-bold !text-slate-700">
-                      <div>✓ Add photos from the visit</div>
-                      <div>✓ Track potty updates</div>
-                      <div>✓ Confirm food and water</div>
-                      <div>✓ Complete a final summary</div>
+                      <div>1. Select a booking from the left panel</div>
+                      <div>2. Click Start PawReport / Live Walk</div>
+                      <div>3. Use Start Walk, Pause, Resume, and End Walk</div>
+                      <div>4. The walk recap saves to the timeline</div>
                     </div>
                     <Link
-                      href="/guru/success-center"
+                      href="/guru/dashboard"
                       className="mt-5 inline-flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-sm font-black !text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:!text-emerald-800"
                     >
-                      <span>Learn About PawReports</span>
+                      <span>Back to Guru Dashboard</span>
                       <ChevronRight className="h-4 w-4" />
                     </Link>
                   </div>
@@ -1924,7 +1924,7 @@ export default async function GuruBookingsPage({
                     Booking Rating
                   </div>
                   <div className="flex items-center gap-2 text-xl font-black !text-[#061638]">
-                    <span>{allBookings.length > 0 ? "4.9" : "—"}</span>
+                    <span>—</span>
                     <Star className="h-5 w-5 text-amber-400" />
                   </div>
                 </div>
@@ -1938,32 +1938,32 @@ export default async function GuruBookingsPage({
                 </div>
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
-                    Signature Feature
+                    Live Walk Tracking
                   </p>
                   <h2 className="mt-1 text-xl font-black tracking-tight !text-[#061638] sm:text-2xl">
-                    SitGuru PawReport™
+                    Start walks from a booking
                   </h2>
                 </div>
               </div>
 
               <p className="mt-4 text-base font-semibold leading-7 !text-slate-700">
-                Every completed booking should include a PawReport. It helps Pet
-                Parents see the care you provided and helps you earn stronger
-                reviews and repeat bookings.
+                Live walk tracking only appears after you open a specific
+                booking's PawReport. This keeps GPS walk records connected to
+                the right Pet Parent and service.
               </p>
 
               <div className="mt-5 grid gap-2 text-sm font-bold !text-slate-700">
-                <div>✓ Photos from the visit</div>
-                <div>✓ Potty updates</div>
-                <div>✓ Food and water confirmations</div>
-                <div>✓ Care notes and final summary</div>
+                <div>✓ Start Walk</div>
+                <div>✓ Pause or Resume Walk</div>
+                <div>✓ End Walk</div>
+                <div>✓ Save distance and duration recap</div>
               </div>
 
               <Link
-                href="/guru/success-center"
+                href="/guru/dashboard/bookings"
                 className="mt-5 inline-flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-sm font-black !text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:!text-emerald-800"
               >
-                <span>Learn About PawReports</span>
+                <span>Open Bookings</span>
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </div>
