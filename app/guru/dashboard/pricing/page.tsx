@@ -1103,7 +1103,7 @@ export default function GuruDashboardPricingPage() {
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-4 py-6 text-slate-950 md:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-[1480px]">
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.18fr_0.82fr] lg:items-center">
             <div>
@@ -1128,13 +1128,13 @@ export default function GuruDashboardPricingPage() {
               </div>
 
               <h1 className="max-w-4xl text-4xl font-black tracking-[-0.045em] text-slate-950 md:text-6xl lg:text-7xl">
-                Manage rates, calendar pricing, and availability.
+                Manage pricing in 3 simple steps.
               </h1>
 
               <p className="mt-5 max-w-3xl text-base font-semibold leading-8 text-slate-800 md:text-xl">
-                This page powers what Pet Parents see on your website booking
-                calendar. Enable services, set rates, block unavailable dates,
-                and preview the customer-facing pricing experience.
+                Use this page to control the prices Pet Parents see on the
+                website booking calendar. Start with service rates, confirm open
+                days, then preview the customer view before saving.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -1172,7 +1172,7 @@ export default function GuruDashboardPricingPage() {
 
             <div className="rounded-[2rem] border border-white/70 bg-white/90 p-6 shadow-xl shadow-emerald-900/10">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                Workspace summary
+                Quick status
               </p>
               <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                 {guruName}
@@ -1268,29 +1268,36 @@ export default function GuruDashboardPricingPage() {
         ) : null}
 
         {guruId ? (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <section className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1fr)_420px]">
             <div className="space-y-6">
-              <section className="rounded-[2rem] border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-                <div className="grid gap-2 sm:grid-cols-4">
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <p className="px-1 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Pricing setup flow
+                </p>
+                <div className="mt-3 grid gap-3 lg:grid-cols-4">
                   {[
                     {
                       key: "rates" as PricingTab,
-                      label: "Rates",
+                      label: "1. Services & rates",
+                      helper: "Turn services on and set prices.",
                       icon: DollarSign,
                     },
                     {
-                      key: "calendar" as PricingTab,
-                      label: "Calendar",
-                      icon: CalendarDays,
-                    },
-                    {
                       key: "availability" as PricingTab,
-                      label: "Availability",
+                      label: "2. Open days",
+                      helper: "Choose when customers can book.",
                       icon: Clock3,
                     },
                     {
+                      key: "calendar" as PricingTab,
+                      label: "3. Calendar preview",
+                      helper: "See the price shown by date.",
+                      icon: CalendarDays,
+                    },
+                    {
                       key: "preview" as PricingTab,
-                      label: "Preview",
+                      label: "4. Customer view",
+                      helper: "Review what Pet Parents see.",
                       icon: Eye,
                     },
                   ].map((tab) => {
@@ -1303,14 +1310,35 @@ export default function GuruDashboardPricingPage() {
                         type="button"
                         onClick={() => setActiveTab(tab.key)}
                         className={[
-                          "inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition",
+                          "flex min-h-[92px] items-start gap-3 rounded-2xl border px-4 py-4 text-left transition",
                           active
-                            ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"
-                            : "bg-slate-50 text-slate-700 hover:bg-emerald-50",
+                            ? "border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"
+                            : "border-slate-200 bg-slate-50 text-slate-800 hover:border-emerald-200 hover:bg-emerald-50",
                         ].join(" ")}
                       >
-                        <Icon className="h-4 w-4" />
-                        {tab.label}
+                        <span
+                          className={[
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                            active
+                              ? "bg-white/20 text-white"
+                              : "bg-white text-emerald-700",
+                          ].join(" ")}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <span>
+                          <span className="block text-sm font-black leading-5">
+                            {tab.label}
+                          </span>
+                          <span
+                            className={[
+                              "mt-1 block text-xs font-bold leading-5",
+                              active ? "text-white/85" : "text-slate-600",
+                            ].join(" ")}
+                          >
+                            {tab.helper}
+                          </span>
+                        </span>
                       </button>
                     );
                   })}
@@ -1328,10 +1356,36 @@ export default function GuruDashboardPricingPage() {
                         Set what customers see.
                       </h2>
                       <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                        Enable services, choose the pricing parameter, and use
-                        Custom quote for special cases that should stay inside
-                        SitGuru.
+                        Turn on only the services you actually offer. Each
+                        active service must have a price or Custom quote before
+                        it appears clearly on the booking calendar.
                       </p>
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                          <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                            Step 1
+                          </p>
+                          <p className="mt-1 text-sm font-black text-slate-950">
+                            Enable the service
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                          <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                            Step 2
+                          </p>
+                          <p className="mt-1 text-sm font-black text-slate-950">
+                            Enter the rate
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                          <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                            Step 3
+                          </p>
+                          <p className="mt-1 text-sm font-black text-slate-950">
+                            Save and preview
+                          </p>
+                        </div>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1362,25 +1416,32 @@ export default function GuruDashboardPricingPage() {
                         <div
                           key={service.service_key}
                           className={[
-                            "rounded-[1.5rem] border p-4 transition",
+                            "rounded-[1.75rem] border p-5 transition",
                             active
                               ? "border-emerald-200 bg-emerald-50/70 shadow-sm"
                               : "border-slate-200 bg-slate-50",
                           ].join(" ")}
                         >
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xl font-black text-slate-950">
+                                {service.service_label}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                                {service.description}
+                              </p>
+                            </div>
                             <button
                               type="button"
                               onClick={() => toggleService(service.service_key)}
                               className={[
-                                "inline-flex items-center justify-center rounded-2xl border px-4 py-3 text-sm font-black transition sm:min-w-[220px]",
+                                "inline-flex min-h-[56px] items-center justify-center rounded-2xl border px-5 py-3 text-sm font-black transition lg:min-w-[240px]",
                                 active
                                   ? "border-emerald-500 bg-emerald-600 text-white shadow-sm"
                                   : "border-slate-300 bg-white text-slate-950 shadow-sm hover:border-emerald-200 hover:bg-emerald-50",
                               ].join(" ")}
                             >
-                              {active ? "Enabled" : "Enable"} ·{" "}
-                              {service.service_label}
+                              {active ? "ON - offered" : "OFF - not offered"}
                             </button>
 
                             <div className="flex flex-wrap gap-2 text-xs font-black text-slate-600">
@@ -1395,15 +1456,11 @@ export default function GuruDashboardPricingPage() {
                             </div>
                           </div>
 
-                          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-                            {service.description}
-                          </p>
-
                           {active ? (
-                            <div className="mt-4 grid gap-3 md:grid-cols-[0.75fr_1fr_0.75fr]">
+                            <div className="mt-5 grid gap-4 rounded-[1.35rem] border border-white bg-white/80 p-4 md:grid-cols-[0.75fr_1fr_0.75fr]">
                               <div>
                                 <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-700">
-                                  Rate amount
+                                  Customer price
                                 </label>
                                 <input
                                   value={service.rate_amount}
@@ -1427,7 +1484,7 @@ export default function GuruDashboardPricingPage() {
 
                               <div>
                                 <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-700">
-                                  Rate parameter
+                                  Charged by
                                 </label>
                                 <select
                                   value={service.rate_unit}
@@ -1453,7 +1510,7 @@ export default function GuruDashboardPricingPage() {
 
                               <div>
                                 <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-700">
-                                  Duration minutes
+                                  Typical duration
                                 </label>
                                 <input
                                   value={service.duration_minutes}
@@ -1830,7 +1887,7 @@ export default function GuruDashboardPricingPage() {
               ) : null}
             </div>
 
-            <aside className="space-y-6 xl:sticky xl:top-28 xl:self-start">
+            <aside className="space-y-6 2xl:sticky 2xl:top-28 2xl:self-start">
               <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center gap-3">
                   <ShieldCheck className="h-5 w-5 text-emerald-600" />
@@ -1839,12 +1896,13 @@ export default function GuruDashboardPricingPage() {
                   </p>
                 </div>
                 <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
-                  Website pricing source
+                  What this controls
                 </h2>
                 <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
-                  The website booking page reads saved Guru service rates and
-                  displays them on the calendar. Custom quote services stay
-                  bookable through SitGuru without forcing a fake price.
+                  These saved settings feed the public booking page. Pet Parents
+                  see service prices on available calendar days, and Custom
+                  quote stays inside SitGuru instead of sending anyone
+                  off-platform.
                 </p>
 
                 <div className="mt-5 space-y-3">
@@ -1943,7 +2001,7 @@ export default function GuruDashboardPricingPage() {
                 ) : (
                   <Save className="h-5 w-5" />
                 )}
-                {saving ? "Saving..." : "Save Pricing Workspace"}
+                {saving ? "Saving..." : "Save all pricing settings"}
               </button>
             </aside>
           </section>
