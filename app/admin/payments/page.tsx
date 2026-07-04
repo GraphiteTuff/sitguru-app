@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -897,6 +898,105 @@ async function getPaymentsData() {
   };
 }
 
+function LightBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  let classes = "border-slate-200 bg-slate-50 text-slate-700";
+
+  if (
+    normalized.includes("failed") ||
+    normalized.includes("hold") ||
+    normalized.includes("respond") ||
+    normalized.includes("open") ||
+    normalized.includes("urgent") ||
+    normalized.includes("flag")
+  ) {
+    classes = "border-rose-200 bg-rose-50 text-rose-800";
+  }
+
+  if (
+    normalized.includes("pending") ||
+    normalized.includes("processing") ||
+    normalized.includes("evidence") ||
+    normalized.includes("review") ||
+    normalized.includes("checkout") ||
+    normalized.includes("unpaid")
+  ) {
+    classes = "border-amber-200 bg-amber-50 text-amber-800";
+  }
+
+  if (
+    normalized.includes("ready") ||
+    normalized.includes("succeeded") ||
+    normalized.includes("paid") ||
+    normalized.includes("complete") ||
+    normalized.includes("released")
+  ) {
+    classes = "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+
+  return (
+    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${classes}`}>
+      {status || "Pending"}
+    </span>
+  );
+}
+
+function LightActionLink({ href, label, primary = false }: { href: string; label: string; primary?: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={
+        primary
+          ? "inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
+          : "inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+      }
+    >
+      {label}
+    </Link>
+  );
+}
+
+function LightStatCard({ item }: { item: { label: string; value: string; subtext: string; href: string } }) {
+  return (
+    <Link
+      href={item.href}
+      className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-lg"
+    >
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+        {item.label}
+      </p>
+      <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+        {item.value}
+      </p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+        {item.subtext}
+      </p>
+      <p className="mt-4 text-sm font-black text-emerald-800">
+        Open records →
+      </p>
+    </Link>
+  );
+}
+
+function SectionTitle({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
+  return (
+    <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+          {eyebrow}
+        </p>
+        <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
+          {title}
+        </h2>
+        <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
+          {description}
+        </p>
+      </div>
+      {action ? <div className="flex shrink-0 flex-wrap gap-2">{action}</div> : null}
+    </div>
+  );
+}
+
 export default async function AdminPaymentsPage() {
   const supabase = await createClient();
 
@@ -912,146 +1012,101 @@ export default async function AdminPaymentsPage() {
   const payments = await getPaymentsData();
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_30%),radial-gradient(circle_at_right,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#020617,_#0f172a,_#111827)] px-4 py-6 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <section className="overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-emerald-500/15 via-slate-950 to-sky-500/10 p-6 shadow-[0_12px_60px_rgba(0,0,0,0.28)] lg:p-8">
-          <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-4xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">
+    <main className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1640px] space-y-6">
+        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr] xl:items-end">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
                 Financial Operations
               </p>
-
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+              <h1 className="mt-3 max-w-5xl text-4xl font-black leading-[0.98] tracking-tight text-slate-950 md:text-5xl xl:text-6xl">
                 Live SitGuru payments, payouts, refunds, and disputes.
               </h1>
-
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                This dashboard is wired to SitGuru booking and payment records.
-                It tracks booking volume, Stripe payment status, selected payment
-                options, PawPerks/referral credit signals, promo codes, Guru tips,
-                Guru payout readiness, refunds, tax held, platform revenue, and dispute cases.
+              <p className="mt-4 max-w-5xl text-base font-semibold leading-8 text-slate-700">
+                This dashboard is wired to SitGuru booking and payment records. It tracks booking volume,
+                Stripe payment status, selected payment options, PawPerks/referral credit signals, promo codes,
+                Guru tips, Guru payout readiness, refunds, tax held, platform revenue, and dispute cases.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <ActionLink href="/admin" label="Overview" />
-              <ActionLink href="/admin/bookings" label="Bookings" />
-              <ActionLink href="/admin/financials" label="Financials" />
-              <ActionLink href="/admin/exports" label="Export Payments" primary />
+            <div className="flex flex-wrap gap-3 xl:justify-end">
+              <LightActionLink href="/admin" label="Overview" />
+              <LightActionLink href="/admin/bookings" label="Bookings" />
+              <LightActionLink href="/admin/financials" label="Financials" />
+              <LightActionLink href="/admin/exports" label="Export Payments" primary />
             </div>
           </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {payments.stats.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`rounded-3xl border p-5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] transition hover:border-emerald-300/30 hover:bg-white/10 ${statToneClasses(
-                  item.tone
-                )}`}
-              >
-                <p className="text-sm font-semibold text-slate-300">
-                  {item.label}
-                </p>
-                <div className="mt-3 flex items-end justify-between gap-3">
-                  <h2 className="text-3xl font-black tracking-tight text-white">
-                    {item.value}
-                  </h2>
-                </div>
-                <p className="mt-3 text-xs font-semibold text-slate-400">
-                  {item.subtext}
-                </p>
-                <p className="mt-4 text-sm font-semibold text-emerald-300">
-                  Open SitGuru records →
-                </p>
-              </Link>
+              <LightStatCard key={item.label} item={item} />
             ))}
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                  Desktop + Mobile Checkout
-                </p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                  Payment option mix
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Shows the payment preference saved from the booking flow, including
-                  card, Apple Pay, Google Pay, Link by Stripe, saved methods, ACH,
-                  quote requests, and older rows that did not store a method yet.
-                </p>
-              </div>
+        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <SectionTitle
+              eyebrow="Desktop + Mobile Checkout"
+              title="Payment option mix"
+              description="Shows the payment preference saved from the booking flow, including card, Apple Pay, Google Pay, Link by Stripe, saved methods, ACH, quote requests, and older rows that did not store a method yet."
+              action={<LightActionLink href="/admin/bookings" label="Audit Bookings" />}
+            />
 
-              <ActionLink href="/admin/bookings" label="Audit Bookings" />
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {payments.paymentOptions.length ? (
                 payments.paymentOptions.map((option) => (
                   <div
                     key={option.label}
-                    className="rounded-2xl border border-white/10 bg-slate-950/45 p-4"
+                    className="rounded-[1.25rem] border border-slate-200 bg-[#fbfefd] p-4"
                   >
-                    <p className="text-sm font-black text-white">{option.label}</p>
-                    <p className="mt-2 text-2xl font-black text-emerald-300">
+                    <p className="text-sm font-black text-slate-950">{option.label}</p>
+                    <p className="mt-2 text-2xl font-black text-emerald-700">
                       {money(option.total)}
                     </p>
-                    <p className="mt-1 text-xs font-semibold text-slate-400">
+                    <p className="mt-1 text-xs font-bold text-slate-600">
                       {option.count.toLocaleString()} booking row{option.count === 1 ? "" : "s"}
                     </p>
-                    <p className="mt-3 text-xs leading-5 text-slate-500">
+                    <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">
                       {option.helper}
                     </p>
                   </div>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400 sm:col-span-2 xl:col-span-3">
+                <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-600 sm:col-span-2 xl:col-span-3">
                   No booking payment option rows found yet.
                 </div>
               )}
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-white/10 bg-slate-950/60 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                  Credits, Codes & Tips
-                </p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                  Checkout signals needing admin visibility
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Keeps PawPerks, referral credit, promo codes, gift/SitGuru credit,
-                  and Guru tips visible for operations, support, and reconciliation.
-                </p>
-              </div>
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <SectionTitle
+              eyebrow="Credits, Codes & Tips"
+              title="Checkout signals needing admin visibility"
+              description="Keeps PawPerks, referral credit, promo codes, gift/SitGuru credit, and Guru tips visible for operations, support, and reconciliation."
+              action={<LightActionLink href="/admin/financials" label="Reconcile" />}
+            />
 
-              <ActionLink href="/admin/financials" label="Reconcile" />
-            </div>
-
-            <div className="mt-5 space-y-3">
+            <div className="space-y-3">
               {payments.creditSignals.map((signal) => (
                 <div
                   key={signal.label}
-                  className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                  className="rounded-[1.25rem] border border-slate-200 bg-[#fbfefd] p-4"
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="font-black text-white">{signal.label}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-400">
+                      <p className="font-black text-slate-950">{signal.label}</p>
+                      <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
                         {signal.helper}
                       </p>
                     </div>
                     <div className="text-left sm:text-right">
-                      <p className="text-lg font-black text-emerald-300">
+                      <p className="text-lg font-black text-emerald-700">
                         {moneyCents(signal.total)}
                       </p>
-                      <p className="text-xs font-semibold text-slate-500">
+                      <p className="text-xs font-bold text-slate-500">
                         {signal.count.toLocaleString()} booking row{signal.count === 1 ? "" : "s"}
                       </p>
                     </div>
@@ -1061,19 +1116,19 @@ export default async function AdminPaymentsPage() {
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
+              <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
                   Checkout Pending
                 </p>
-                <p className="mt-2 text-2xl font-black text-white">
+                <p className="mt-2 text-2xl font-black text-slate-950">
                   {payments.paymentOperations.checkoutPending.toLocaleString()}
                 </p>
               </div>
-              <div className="rounded-2xl border border-sky-400/20 bg-sky-400/10 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">
+              <div className="rounded-[1.25rem] border border-sky-200 bg-sky-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
                   Quote Requests
                 </p>
-                <p className="mt-2 text-2xl font-black text-white">
+                <p className="mt-2 text-2xl font-black text-slate-950">
                   {payments.paymentOperations.quoteRequests.toLocaleString()}
                 </p>
               </div>
@@ -1081,97 +1136,60 @@ export default async function AdminPaymentsPage() {
           </div>
         </section>
 
-        <section className="grid gap-8 xl:grid-cols-[1.35fr_0.65fr]">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                  Recent Transactions
-                </p>
-                <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
-                  Live money movement
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Booking payments, selected checkout option, and Guru payouts from SitGuru tables.
-                </p>
-              </div>
+        <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <SectionTitle
+              eyebrow="Recent Transactions"
+              title="Live money movement"
+              description="Booking payments, selected checkout option, and Guru payouts from SitGuru tables."
+              action={<LightActionLink href="/admin/financials" label="View Ledger" />}
+            />
 
-              <ActionLink href="/admin/financials" label="View Ledger" />
-            </div>
-
-            <div className="overflow-hidden rounded-3xl border border-white/10">
+            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
-                  <thead className="bg-white/5 text-slate-400">
+                  <thead className="bg-slate-50 text-slate-600">
                     <tr>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                        Transaction
-                      </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                        User
-                      </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                        Method
-                      </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                        Amount
-                      </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">
-                        Time
-                      </th>
+                      {[
+                        "Transaction",
+                        "User",
+                        "Method",
+                        "Amount",
+                        "Status",
+                        "Time",
+                      ].map((heading) => (
+                        <th
+                          key={heading}
+                          className="px-4 py-3 text-xs font-black uppercase tracking-[0.14em]"
+                        >
+                          {heading}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-white/10 bg-slate-950/40">
+                  <tbody className="divide-y divide-slate-100 bg-white">
                     {payments.recentTransactions.length ? (
                       payments.recentTransactions.map((tx) => (
-                        <tr
-                          key={`${tx.id}-${tx.type}`}
-                          className="transition hover:bg-white/5"
-                        >
+                        <tr key={`${tx.id}-${tx.type}`} className="transition hover:bg-emerald-50/50">
                           <td className="px-4 py-4">
-                            <Link
-                              href={tx.href}
-                              className="font-semibold text-white transition hover:text-emerald-300"
-                            >
+                            <Link href={tx.href} className="font-black text-slate-950 transition hover:text-emerald-700">
                               {tx.id}
                             </Link>
-                            <div className="mt-1 text-xs text-slate-500">
+                            <div className="mt-1 text-xs font-semibold text-slate-500">
                               {tx.type}
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-slate-300">
-                            {tx.user}
-                          </td>
-                          <td className="px-4 py-4 text-slate-400">
-                            {tx.method}
-                          </td>
-                          <td className="px-4 py-4 font-semibold text-white">
-                            {tx.amount}
-                          </td>
-                          <td className="px-4 py-4">
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getStatusStyle(
-                                tx.status
-                              )}`}
-                            >
-                              {tx.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4 text-xs text-slate-500">
-                            {tx.time}
-                          </td>
+                          <td className="px-4 py-4 font-semibold text-slate-700">{tx.user}</td>
+                          <td className="px-4 py-4 font-semibold text-slate-600">{tx.method}</td>
+                          <td className="px-4 py-4 font-black text-slate-950">{tx.amount}</td>
+                          <td className="px-4 py-4"><LightBadge status={tx.status} /></td>
+                          <td className="px-4 py-4 text-xs font-semibold text-slate-500">{tx.time}</td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td
-                          colSpan={6}
-                          className="px-4 py-8 text-center text-slate-400"
-                        >
+                        <td colSpan={6} className="px-4 py-8 text-center font-semibold text-slate-600">
                           No payment transactions found yet.
                         </td>
                       </tr>
@@ -1182,107 +1200,60 @@ export default async function AdminPaymentsPage() {
             </div>
           </div>
 
-          <div className="space-y-8">
-            <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                Quick Actions
-              </p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                Payment operations
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Open the real SitGuru admin areas for payouts, held items,
-                disputes, and reporting.
-              </p>
-
-              <div className="mt-5 grid gap-3">
-                <Link
-                  href="/admin/commissions"
-                  className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-center text-sm font-bold text-emerald-100 transition hover:bg-emerald-400/15"
-                >
-                  Release / Review Guru Payouts
-                </Link>
-                <Link
-                  href="/admin/bookings?payment_status=pending"
-                  className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-center text-sm font-bold text-amber-100 transition hover:bg-amber-400/15"
-                >
+          <div className="space-y-6">
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <SectionTitle
+                eyebrow="Quick Actions"
+                title="Payment operations"
+                description="Jump directly into the admin queues that support payment review."
+              />
+              <div className="grid gap-3">
+                <Link href="/admin/bookings?payment_status=pending" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-black text-amber-800 transition hover:bg-amber-100">
                   Review Held Transactions
                 </Link>
-                <Link
-                  href="/admin/disputes"
-                  className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-center text-sm font-bold text-rose-100 transition hover:bg-rose-400/15"
-                >
+                <Link href="/admin/disputes" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-center text-sm font-black text-rose-800 transition hover:bg-rose-100">
                   Open Disputes Queue
                 </Link>
-                <Link
-                  href="/admin/exports"
-                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-900"
-                >
+                <Link href="/admin/exports" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm font-black text-slate-800 transition hover:bg-slate-100">
                   Download Settlement Report
                 </Link>
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-white/10 bg-slate-950/60 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                 Revenue Health
               </p>
-              <h3 className="mt-3 text-4xl font-black tracking-tight text-white">
+              <h3 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
                 {money(payments.totals.platformRevenue)}
               </h3>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Estimated SitGuru platform revenue from booking fee fields or
-                default marketplace take rate.
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                Estimated SitGuru platform revenue from booking fee fields or default marketplace take rate.
               </p>
 
               <div className="mt-5 space-y-4">
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-xs text-slate-300">
-                    <span>Successful Collections</span>
-                    <span>{percent(payments.totals.successfulCollectionsRate)}</span>
+                {[
+                  ["Successful Collections", payments.totals.successfulCollectionsRate, "bg-emerald-500"],
+                  ["Payout Completion", payments.totals.payoutCompletionRate, "bg-sky-500"],
+                  ["Dispute Control", payments.totals.disputeControlRate, "bg-violet-500"],
+                ].map(([label, value, color]) => (
+                  <div key={String(label)}>
+                    <div className="mb-1 flex items-center justify-between text-xs font-bold text-slate-600">
+                      <span>{label}</span>
+                      <span>{percent(Number(value))}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-100">
+                      <div className={`h-2 rounded-full ${color}`} style={{ width: `${Number(value)}%` }} />
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-white/10">
-                    <div
-                      className="h-2 rounded-full bg-emerald-400"
-                      style={{
-                        width: `${payments.totals.successfulCollectionsRate}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-xs text-slate-300">
-                    <span>Payout Completion</span>
-                    <span>{percent(payments.totals.payoutCompletionRate)}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-white/10">
-                    <div
-                      className="h-2 rounded-full bg-sky-400"
-                      style={{ width: `${payments.totals.payoutCompletionRate}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-xs text-slate-300">
-                    <span>Dispute Control</span>
-                    <span>{percent(payments.totals.disputeControlRate)}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-white/10">
-                    <div
-                      className="h-2 rounded-full bg-violet-400"
-                      style={{ width: `${payments.totals.disputeControlRate}%` }}
-                    />
-                  </div>
-                </div>
+                ))}
               </div>
 
-              <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
                   Tax Held
                 </p>
-                <p className="mt-2 text-2xl font-black text-white">
+                <p className="mt-2 text-2xl font-black text-slate-950">
                   {money(payments.totals.taxHeld)}
                 </p>
               </div>
@@ -1290,24 +1261,14 @@ export default async function AdminPaymentsPage() {
           </div>
         </section>
 
-        <section className="grid gap-8 xl:grid-cols-2">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                  Guru Payout Queue
-                </p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                  Pending transfers
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Payout rows when available, otherwise paid booking payout
-                  estimates.
-                </p>
-              </div>
-
-              <ActionLink href="/admin/commissions" label="Review All" />
-            </div>
+        <section className="grid gap-6 xl:grid-cols-2">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <SectionTitle
+              eyebrow="Guru Payout Queue"
+              title="Pending transfers"
+              description="Payout rows when available, otherwise paid booking payout estimates."
+              action={<LightActionLink href="/admin/commissions" label="Review All" />}
+            />
 
             <div className="space-y-4">
               {payments.payoutRows.length ? (
@@ -1315,55 +1276,38 @@ export default async function AdminPaymentsPage() {
                   <Link
                     key={`${payout.id}-${payout.status}`}
                     href={payout.href}
-                    className="block rounded-2xl border border-white/10 bg-slate-950/40 p-4 transition hover:border-emerald-300/30 hover:bg-white/10"
+                    className="block rounded-[1.25rem] border border-slate-200 bg-[#fbfefd] p-4 transition hover:border-emerald-300 hover:bg-emerald-50/60"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <h3 className="font-bold text-white">{payout.guru}</h3>
-                        <p className="mt-1 text-sm text-slate-400">
+                        <h3 className="font-black text-slate-950">{payout.guru}</h3>
+                        <p className="mt-1 text-sm font-semibold text-slate-600">
                           {payout.jobs} • {payout.method}
                         </p>
                       </div>
 
                       <div className="text-left sm:text-right">
-                        <p className="text-lg font-black text-white">
-                          {payout.amount}
-                        </p>
-                        <span
-                          className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getStatusStyle(
-                            payout.status
-                          )}`}
-                        >
-                          {payout.status}
-                        </span>
+                        <p className="text-lg font-black text-slate-950">{payout.amount}</p>
+                        <div className="mt-2"><LightBadge status={payout.status} /></div>
                       </div>
                     </div>
                   </Link>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-600">
                   No payout rows or paid booking payout estimates found yet.
                 </div>
               )}
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                  Refunds & Disputes
-                </p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-white">
-                  Payment issue handling
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Dispute cases and refund-related booking rows.
-                </p>
-              </div>
-
-              <ActionLink href="/admin/disputes" label="Open Cases" />
-            </div>
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <SectionTitle
+              eyebrow="Refunds & Disputes"
+              title="Payment issue handling"
+              description="Dispute cases and refund-related booking rows."
+              action={<LightActionLink href="/admin/disputes" label="Open Cases" />}
+            />
 
             <div className="space-y-4">
               {payments.disputeRows.length ? (
@@ -1371,45 +1315,35 @@ export default async function AdminPaymentsPage() {
                   <Link
                     key={`${item.id}-${item.status}`}
                     href={item.href}
-                    className="block rounded-2xl border border-white/10 bg-slate-950/40 p-4 transition hover:border-rose-300/30 hover:bg-white/10"
+                    className="block rounded-[1.25rem] border border-slate-200 bg-[#fbfefd] p-4 transition hover:border-rose-300 hover:bg-rose-50/60"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-bold text-white">{item.id}</h3>
-                          <span
-                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getStatusStyle(
-                              item.status
-                            )}`}
-                          >
-                            {item.status}
-                          </span>
+                          <h3 className="font-black text-slate-950">{item.id}</h3>
+                          <LightBadge status={item.status} />
                         </div>
-                        <p className="mt-2 text-sm text-slate-400">
+                        <p className="mt-2 text-sm font-semibold text-slate-600">
                           {item.customer} • Booking {item.booking}
                         </p>
-                        <p className="mt-2 text-sm text-slate-300">
+                        <p className="mt-2 text-sm font-semibold text-slate-700">
                           {item.reason}
                         </p>
                       </div>
 
                       <div className="text-left sm:text-right">
-                        <p className="text-lg font-black text-white">
-                          {item.amount}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Deadline {item.deadline}
-                        </p>
+                        <p className="text-lg font-black text-slate-950">{item.amount}</p>
+                        <p className="text-xs font-semibold text-slate-500">Deadline {item.deadline}</p>
                       </div>
                     </div>
 
-                    <p className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-bold text-white">
+                    <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-black text-slate-800">
                       Review Case
                     </p>
                   </Link>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-slate-400">
+                <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-600">
                   No dispute cases or refund-related bookings found yet.
                 </div>
               )}
@@ -1417,6 +1351,6 @@ export default async function AdminPaymentsPage() {
           </div>
         </section>
       </div>
-    </div>
+    </main>
   );
 }
