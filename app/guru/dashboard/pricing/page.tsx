@@ -1110,13 +1110,67 @@ export default function GuruDashboardPricingPage() {
 
   return (
     <main
-      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-4 py-6 text-slate-950 md:px-6 lg:px-8"
+      className="guru-pricing-readable min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-4 py-6 text-slate-950 md:px-6 lg:px-8"
       style={{
         fontFamily:
           '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontWeight: 600,
       }}
     >
+      <style>{`
+        .guru-pricing-readable h1,
+        .guru-pricing-readable h2,
+        .guru-pricing-readable h3,
+        .guru-pricing-readable h4,
+        .guru-pricing-readable p,
+        .guru-pricing-readable label,
+        .guru-pricing-readable small {
+          color: #07132f !important;
+          -webkit-text-fill-color: #07132f !important;
+          opacity: 1 !important;
+        }
+
+        .guru-pricing-readable .text-white,
+        .guru-pricing-readable .\!text-white,
+        .guru-pricing-readable [class*="text-white"] {
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
+
+        .guru-pricing-readable input,
+        .guru-pricing-readable select,
+        .guru-pricing-readable textarea {
+          color: #07132f !important;
+          -webkit-text-fill-color: #07132f !important;
+          background: #ffffff !important;
+          opacity: 1 !important;
+        }
+
+        .guru-pricing-readable input::placeholder,
+        .guru-pricing-readable textarea::placeholder {
+          color: #475569 !important;
+          -webkit-text-fill-color: #475569 !important;
+          opacity: 1 !important;
+        }
+
+        .guru-pricing-readable button:not([class*="bg-emerald-600"]):not([class*="bg-slate-950"]):not([class*="bg-rose-600"]) {
+          color: #07132f !important;
+          -webkit-text-fill-color: #07132f !important;
+        }
+
+        .guru-pricing-readable .pricing-service-card,
+        .guru-pricing-readable .pricing-service-card *:not(button):not(svg):not(path) {
+          color: #07132f !important;
+          -webkit-text-fill-color: #07132f !important;
+          opacity: 1 !important;
+        }
+
+        .guru-pricing-readable .pricing-service-card button[class*="bg-emerald-600"],
+        .guru-pricing-readable .pricing-service-card button[class*="bg-emerald-600"] * {
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
+      `}</style>
       <div className="mx-auto max-w-[1480px]">
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.18fr_0.82fr] lg:items-center">
@@ -1430,7 +1484,7 @@ export default function GuruDashboardPricingPage() {
                         <div
                           key={service.service_key}
                           className={[
-                            "rounded-[1.75rem] border p-5 transition",
+                            "pricing-service-card rounded-[1.75rem] border p-5 transition",
                             active
                               ? "border-emerald-200 bg-emerald-50/70 shadow-sm"
                               : "border-slate-200 bg-slate-50",
