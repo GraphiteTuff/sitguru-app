@@ -121,7 +121,6 @@ type ReferralProfile = {
   available_credit: number;
 };
 
-
 type UniversityProgress = {
   totalSteps: number;
   completedSteps: number;
@@ -167,6 +166,27 @@ type Booking = {
   total_customer_paid: number;
   stripe_session_id: string | null;
   created_at: string | null;
+};
+
+type PawReportSummary = {
+  booking_id: string;
+  status: string;
+  started_at: string | null;
+  ended_at: string | null;
+  final_note: string | null;
+  update_count: number;
+  photo_count: number;
+  potty_count: number;
+  food_water_count: number;
+  note_count: number;
+  latest_update_type: string | null;
+  latest_update_note: string | null;
+  latest_update_at: string | null;
+  active_walk_status: string | null;
+  active_walk_started_at: string | null;
+  active_walk_ended_at: string | null;
+  active_walk_distance_meters: number;
+  active_walk_duration_seconds: number;
 };
 
 type RawBookingRow = {
@@ -434,7 +454,6 @@ const ZIP_FALLBACK_LOCATIONS: Record<string, ZipLookupLocation> = {
     longitude: -75.1746,
   },
 };
-
 
 const defaultUniversityProgress: UniversityProgress = {
   totalSteps: 9,
@@ -1047,6 +1066,106 @@ function getBookingDetailHref(bookingId: string) {
   return `/customer/dashboard/bookings/${encodeURIComponent(bookingId)}`;
 }
 
+function getBookingPawReportHref(bookingId: string) {
+  return `/customer/dashboard/bookings/${encodeURIComponent(bookingId)}/visit-updates`;
+}
+
+function normalizePawReportStatus(status?: string | null) {
+  const clean = String(status || "").toLowerCase();
+
+  if (clean === "completed") return "PawReport complete";
+  if (clean === "in_progress") return "PawReport live";
+  if (clean === "not_started") return "PawReport ready";
+
+  return "PawReport ready";
+}
+
+function getLatestPawReportLabel(summary?: PawReportSummary | null) {
+  if (!summary) return "Waiting for Guru updates";
+
+  const type = String(summary.latest_update_type || "").toLowerCase();
+
+  if (summary.active_walk_status === "in_progress")
+    return "Live walk in progress";
+  if (type === "visit_started") return "Guru started the PawReport";
+  if (type === "visit_ended") return "Guru completed the PawReport";
+  if (type === "pee") return "Potty update added";
+  if (type === "poop") return "Potty update added";
+  if (type === "water") return "Water update added";
+  if (type === "food") return "Food update added";
+  if (type === "photo") return "Photo added";
+  if (type === "medication") return "Medication update added";
+  if (type === "walk") return "Walk update added";
+  if (type === "play") return "Play update added";
+  if (type === "mood") return "Mood update added";
+  if (type === "note") return "Care note added";
+
+  if (summary.status === "completed") return "PawReport completed";
+  if (summary.status === "in_progress") return "PawReport in progress";
+
+  return "Waiting for Guru updates";
+}
+
+function formatPawReportDistance(meters: number) {
+  if (!meters || meters <= 0) return "Not tracked yet";
+
+  const miles = meters / 1609.344;
+
+  if (miles < 0.1) return `${Math.round(meters)} m`;
+
+  return `${miles.toFixed(2)} mi`;
+}
+
+function formatPawReportDuration(seconds: number) {
+  if (!seconds || seconds <= 0) return "In progress";
+
+  const minutes = Math.max(1, Math.round(seconds / 60));
+
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+
+  return remaining ? `${hours} hr ${remaining} min` : `${hours} hr`;
+}
+
+function formatLiveUpdateTime(value?: string | null) {
+  if (!value) return "No updates yet";
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) return "Recently updated";
+
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+async function fetchCustomerPawReportSummaries() {
+  try {
+    const response = await fetch("/api/customer/pawreports", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) return [] as PawReportSummary[];
+
+    const payload = (await response.json()) as {
+      summaries?: PawReportSummary[];
+    };
+
+    return Array.isArray(payload.summaries) ? payload.summaries : [];
+  } catch (error) {
+    console.warn("Unable to load live PawReports:", error);
+    return [] as PawReportSummary[];
+  }
+}
+
 function getBookingLocation(booking: Booking) {
   return [booking.care_city, booking.care_state, booking.care_zip_code]
     .filter(Boolean)
@@ -1178,7 +1297,11 @@ function buildCustomerProfile(
     readString(row?.service_address) ||
     readString(row?.address) ||
     readString(row?.home_address) ||
-    readMetadataString(metadata, ["service_address", "address", "home_address"]) ||
+    readMetadataString(metadata, [
+      "service_address",
+      "address",
+      "home_address",
+    ]) ||
     null;
 
   const serviceAddress =
@@ -1208,13 +1331,20 @@ function buildCustomerProfile(
     emergency_contact:
       readString(row?.emergency_contact) ||
       readString(row?.emergency_contact_name) ||
-      readMetadataString(metadata, ["emergency_contact", "emergency_contact_name"]) ||
+      readMetadataString(metadata, [
+        "emergency_contact",
+        "emergency_contact_name",
+      ]) ||
       null,
     care_preferences:
       readString(row?.care_preferences) ||
       readString(row?.preferences) ||
       readString(row?.notes) ||
-      readMetadataString(metadata, ["care_preferences", "preferences", "notes"]) ||
+      readMetadataString(metadata, [
+        "care_preferences",
+        "preferences",
+        "notes",
+      ]) ||
       null,
     avatar_url:
       readString(row?.avatar_url) ||
@@ -1921,7 +2051,6 @@ async function getOrCreateReferralProfile(userId: string) {
   return null;
 }
 
-
 async function fetchCustomerUniversityProgress(): Promise<UniversityProgress> {
   try {
     const response = await fetch("/api/customer/university-progress", {
@@ -1934,17 +2063,23 @@ async function fetchCustomerUniversityProgress(): Promise<UniversityProgress> {
     });
 
     if (!response.ok) {
-      console.warn("Unable to load Pet Parent Academy progress:", response.status);
+      console.warn(
+        "Unable to load Pet Parent Academy progress:",
+        response.status,
+      );
       return defaultUniversityProgress;
     }
 
     const payload = await response.json();
-    const progress = payload?.progress as Partial<UniversityProgress> | undefined;
+    const progress = payload?.progress as
+      Partial<UniversityProgress> | undefined;
 
     if (!progress) return defaultUniversityProgress;
 
     return {
-      totalSteps: Number(progress.totalSteps ?? defaultUniversityProgress.totalSteps),
+      totalSteps: Number(
+        progress.totalSteps ?? defaultUniversityProgress.totalSteps,
+      ),
       completedSteps: Number(progress.completedSteps ?? 0),
       totalMaterials: Number(progress.totalMaterials ?? 0),
       acknowledgedMaterials: Number(progress.acknowledgedMaterials ?? 0),
@@ -1953,13 +2088,18 @@ async function fetchCustomerUniversityProgress(): Promise<UniversityProgress> {
       isStarted: Boolean(progress.isStarted),
       isComplete: Boolean(progress.isComplete),
       certificationLabel:
-        progress.certificationLabel || defaultUniversityProgress.certificationLabel,
-      badgeStatus: progress.badgeStatus || defaultUniversityProgress.badgeStatus,
-      progressHelper: progress.progressHelper || defaultUniversityProgress.progressHelper,
+        progress.certificationLabel ||
+        defaultUniversityProgress.certificationLabel,
+      badgeStatus:
+        progress.badgeStatus || defaultUniversityProgress.badgeStatus,
+      progressHelper:
+        progress.progressHelper || defaultUniversityProgress.progressHelper,
       universityTileHelper:
-        progress.universityTileHelper || defaultUniversityProgress.universityTileHelper,
+        progress.universityTileHelper ||
+        defaultUniversityProgress.universityTileHelper,
       academyButtonLabel:
-        progress.academyButtonLabel || defaultUniversityProgress.academyButtonLabel,
+        progress.academyButtonLabel ||
+        defaultUniversityProgress.academyButtonLabel,
     };
   } catch (error) {
     console.warn("Unable to load Pet Parent Academy progress:", error);
@@ -2177,14 +2317,23 @@ function BookingCard({
   booking,
   featured = false,
   petPhotoUrl = null,
+  pawReportSummary = null,
 }: {
   booking: Booking;
   featured?: boolean;
   petPhotoUrl?: string | null;
+  pawReportSummary?: PawReportSummary | null;
 }) {
   const displayDate = getBookingDisplayDate(booking);
   const location = getBookingLocation(booking);
   const totalAmount = booking.total_customer_paid || booking.subtotal_amount;
+  const hasPawReportActivity = Boolean(
+    pawReportSummary &&
+    (pawReportSummary.status === "in_progress" ||
+      pawReportSummary.status === "completed" ||
+      pawReportSummary.update_count > 0 ||
+      pawReportSummary.active_walk_status === "in_progress"),
+  );
 
   return (
     <article
@@ -2310,6 +2459,32 @@ function BookingCard({
               {getBookingNextStep(booking)}
             </p>
 
+            {hasPawReportActivity ? (
+              <div className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-3 text-xs font-bold leading-5 text-sky-900">
+                <div className="flex items-center justify-between gap-3">
+                  <span>{getLatestPawReportLabel(pawReportSummary)}</span>
+                  <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-800 ring-1 ring-sky-100">
+                    {formatLiveUpdateTime(pawReportSummary?.latest_update_at)}
+                  </span>
+                </div>
+                {pawReportSummary?.active_walk_status === "in_progress" ? (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <span className="rounded-xl bg-white px-2 py-1 text-slate-800 ring-1 ring-sky-100">
+                      Walk:{" "}
+                      {formatPawReportDistance(
+                        pawReportSummary.active_walk_distance_meters,
+                      )}
+                    </span>
+                    <span className="rounded-xl bg-white px-2 py-1 text-slate-800 ring-1 ring-sky-100">
+                      {formatPawReportDuration(
+                        pawReportSummary.active_walk_duration_seconds,
+                      )}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-800">
               Need to adjust timing or care notes? Message your Guru or support
               first so we can help before you cancel.
@@ -2325,12 +2500,19 @@ function BookingCard({
         </div>
       </div>
 
-      <div className="grid gap-3 border-t border-slate-100 p-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 border-t border-slate-100 p-5 sm:grid-cols-2 xl:grid-cols-5">
         <Link
           href={getBookingDetailHref(booking.id)}
           className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
         >
           View Details
+        </Link>
+
+        <Link
+          href={getBookingPawReportHref(booking.id)}
+          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-black text-sky-900 transition hover:bg-sky-100"
+        >
+          View Live PawReport
         </Link>
 
         <Link
@@ -2362,6 +2544,9 @@ export default function CustomerDashboardPage() {
   const router = useRouter();
 
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [pawReportSummaries, setPawReportSummaries] = useState<
+    PawReportSummary[]
+  >([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [referralProfile, setReferralProfile] =
     useState<ReferralProfile | null>(null);
@@ -2396,9 +2581,8 @@ export default function CustomerDashboardPage() {
   const [careLocationLabel, setCareLocationLabel] = useState("");
   const [nearbyGuruMessage, setNearbyGuruMessage] = useState("");
   const [loadingNearbyGurus, setLoadingNearbyGurus] = useState(false);
-  const [universityProgress, setUniversityProgress] = useState<UniversityProgress>(
-    defaultUniversityProgress,
-  );
+  const [universityProgress, setUniversityProgress] =
+    useState<UniversityProgress>(defaultUniversityProgress);
 
   const customerAvatarSrc =
     customerProfile?.avatar_url?.trim() || CUSTOMER_PROFILE_PHOTO_SRC;
@@ -2452,12 +2636,14 @@ export default function CustomerDashboardPage() {
       petsData,
       referralData,
       universityProgressData,
+      pawReportSummaryData,
     ] = await Promise.all([
       fetchCustomerProfile(user),
       fetchBookingsForUser(user.id, user.email),
       fetchPetsForUser(user.id),
       getOrCreateReferralProfile(user.id),
       fetchCustomerUniversityProgress(),
+      fetchCustomerPawReportSummaries(),
     ]);
 
     const dashboardCareZip = getLatestCareZip(bookingsData, profileData);
@@ -2466,6 +2652,7 @@ export default function CustomerDashboardPage() {
     setProfileForm(customerProfileToForm(profileData));
     setFirstName(getSafeFirstName(profileData, user.email));
     setBookings(bookingsData);
+    setPawReportSummaries(pawReportSummaryData);
     setPets(petsData);
     setReferralProfile(referralData);
     setUniversityProgress(universityProgressData);
@@ -2526,6 +2713,29 @@ export default function CustomerDashboardPage() {
   }, [customerAvatarSrc]);
 
   useEffect(() => {
+    if (loading) return;
+
+    let active = true;
+
+    async function refreshLiveCare() {
+      const summaries = await fetchCustomerPawReportSummaries();
+
+      if (!active) return;
+
+      setPawReportSummaries(summaries);
+    }
+
+    refreshLiveCare();
+
+    const interval = window.setInterval(refreshLiveCare, 10000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [loading]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const bookingStatus = params.get("booking");
 
@@ -2576,6 +2786,27 @@ export default function CustomerDashboardPage() {
   );
 
   const latestBooking = recentBookings[0] || null;
+
+  const pawReportMap = useMemo(() => {
+    return new Map(
+      pawReportSummaries.map((summary) => [summary.booking_id, summary]),
+    );
+  }, [pawReportSummaries]);
+
+  const liveCareBookings = useMemo(() => {
+    return recentBookings
+      .filter((booking) => {
+        const summary = pawReportMap.get(booking.id);
+
+        return Boolean(
+          summary &&
+          (summary.status === "in_progress" ||
+            summary.active_walk_status === "in_progress" ||
+            summary.update_count > 0),
+        );
+      })
+      .slice(0, 3);
+  }, [pawReportMap, recentBookings]);
 
   const stats = useMemo(() => {
     const pending = bookings.filter((booking) =>
@@ -3455,6 +3686,104 @@ export default function CustomerDashboardPage() {
             </div>
           </section>
 
+          <section className="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-white shadow-sm">
+            <div className="grid gap-5 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#ecfdf5_100%)] p-6 md:p-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.22em] text-sky-700">
+                  Live Care / PawReport
+                </p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
+                  See your Guru&apos;s updates as care happens.
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-slate-700 md:text-base">
+                  When your Guru starts a PawReport or live walk, updates appear
+                  here automatically, including potty updates, food and water,
+                  photos, notes, walk progress, and the final summary.
+                </p>
+              </div>
+
+              <div className="rounded-[1.7rem] border border-sky-100 bg-white p-5 shadow-sm">
+                {liveCareBookings.length === 0 ? (
+                  <div className="text-center">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-2xl ring-1 ring-sky-100">
+                      🐾
+                    </div>
+                    <p className="mt-3 text-lg font-black text-slate-950">
+                      No live PawReport activity yet
+                    </p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                      Once a Guru starts care, this card will update while the
+                      visit is active.
+                    </p>
+                    {stats.nextBooking ? (
+                      <Link
+                        href={getBookingPawReportHref(stats.nextBooking.id)}
+                        className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-sky-600 px-5 py-3 text-sm font-black text-white transition hover:bg-sky-700"
+                      >
+                        Open next booking PawReport
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {liveCareBookings.map((booking) => {
+                      const summary = pawReportMap.get(booking.id);
+
+                      return (
+                        <Link
+                          key={booking.id}
+                          href={getBookingPawReportHref(booking.id)}
+                          className="group rounded-[1.35rem] border border-sky-100 bg-sky-50/70 p-4 transition hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-lg"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
+                                {normalizePawReportStatus(summary?.status)}
+                              </p>
+                              <h3 className="mt-1 text-xl font-black text-slate-950">
+                                {booking.pet_name || "Your pet"}
+                              </h3>
+                              <p className="mt-1 text-sm font-bold text-slate-700">
+                                {getLatestPawReportLabel(summary)}
+                              </p>
+                            </div>
+
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-sky-800 ring-1 ring-sky-100">
+                              {formatLiveUpdateTime(summary?.latest_update_at)}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                            <span className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-800 ring-1 ring-sky-100">
+                              {summary?.update_count ?? 0} updates
+                            </span>
+                            <span className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-800 ring-1 ring-sky-100">
+                              {summary?.photo_count ?? 0} photos
+                            </span>
+                            <span className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-800 ring-1 ring-sky-100">
+                              {summary?.potty_count ?? 0} potty
+                            </span>
+                            <span className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-800 ring-1 ring-sky-100">
+                              {summary?.active_walk_status === "in_progress"
+                                ? formatPawReportDistance(
+                                    summary.active_walk_distance_meters,
+                                  )
+                                : "Walk ready"}
+                            </span>
+                          </div>
+
+                          <p className="mt-3 text-sm font-black text-sky-800 group-hover:text-sky-900">
+                            View Live PawReport →
+                          </p>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
           <NearbyGurusCarousel
             gurus={nearbyGurus}
             careZip={careZip}
@@ -3956,6 +4285,9 @@ export default function CustomerDashboardPage() {
                           booking={booking}
                           featured={index === 0}
                           petPhotoUrl={matchedPet?.photo_url || null}
+                          pawReportSummary={
+                            pawReportMap.get(booking.id) || null
+                          }
                         />
                       );
                     })}
@@ -4133,7 +4465,8 @@ export default function CustomerDashboardPage() {
                       Add your first pet when ready.
                     </p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Pet profiles help Gurus understand routines, care notes, photos, and preferences before a booking.
+                      Pet profiles help Gurus understand routines, care notes,
+                      photos, and preferences before a booking.
                     </p>
                   </div>
                 ) : (
