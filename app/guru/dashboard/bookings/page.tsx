@@ -1678,34 +1678,60 @@ export default async function GuruBookingsPage({
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-[24px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="mt-6 overflow-hidden rounded-[28px] border border-emerald-300 bg-gradient-to-br from-emerald-700 via-emerald-600 to-sky-500 shadow-[0_18px_45px_rgba(16,185,129,0.18)]">
+                  <div className="grid gap-5 p-5 md:grid-cols-[minmax(0,1fr)_320px] md:items-center sm:p-6">
                     <div className="flex items-start gap-4">
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white !text-emerald-700 shadow-sm">
-                        <PawPrint className="h-7 w-7" />
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-white !text-emerald-700 shadow-sm">
+                        <PawPrint className="h-8 w-8" />
                       </div>
                       <div>
-                        <p className="text-sm font-black uppercase tracking-[0.16em] !text-emerald-700">
-                          SitGuru PawReport™
+                        <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-50">
+                          Live Care Command Center
                         </p>
-                        <h3 className="mt-1 text-2xl font-black tracking-tight !text-[#061638]">
+                        <h3 className="mt-1 text-3xl font-black tracking-tight !text-white">
                           {selectedPawReportLabel}
                         </h3>
-                        <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 !text-slate-700">
-                          PawReports help Pet Parents feel connected with photos,
-                          potty updates, food and water updates, care notes, and a
-                          final summary after each booking.
+                        <p className="mt-2 max-w-3xl text-sm font-bold leading-6 !text-emerald-50">
+                          Start the PawReport, start or stop live walks, add
+                          potty, food, water, medication, photo, and care-note
+                          updates, then complete the final summary for the Pet
+                          Parent.
                         </p>
                       </div>
                     </div>
 
-                    <Link
-                      href={`/guru/dashboard/bookings/${selectedBooking.id}/visit-updates`}
-                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
-                    >
-                      <PawPrint className="h-4 w-4" />
-                      {selectedPawReportActionLabel}
-                    </Link>
+                    <div className="grid gap-3">
+                      <Link
+                        href={`/guru/dashboard/bookings/${selectedBooking.id}/visit-updates`}
+                        className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 text-base font-black !text-emerald-800 shadow-lg transition hover:bg-emerald-50 hover:!text-emerald-900"
+                      >
+                        <PawPrint className="h-5 w-5" />
+                        {selectedPawReportActionLabel}
+                      </Link>
+
+                      <Link
+                        href={buildMessagePetParentHref(selectedBooking)}
+                        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/40 bg-white/15 px-5 py-3 text-sm font-black !text-white transition hover:bg-white/20"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Message Pet Parent
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 border-t border-white/20 bg-emerald-950/10 p-4 text-xs font-black uppercase tracking-[0.12em] !text-white sm:grid-cols-4">
+                    <div className="rounded-2xl bg-white/15 px-3 py-3 text-center">
+                      Start PawReport
+                    </div>
+                    <div className="rounded-2xl bg-white/15 px-3 py-3 text-center">
+                      Start / Stop Walk
+                    </div>
+                    <div className="rounded-2xl bg-white/15 px-3 py-3 text-center">
+                      Add Updates
+                    </div>
+                    <div className="rounded-2xl bg-white/15 px-3 py-3 text-center">
+                      Complete Summary
+                    </div>
                   </div>
                 </div>
 
@@ -1725,7 +1751,7 @@ export default async function GuruBookingsPage({
                     className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black !text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 hover:!text-emerald-800"
                   >
                     <PawPrint className="h-4 w-4" />
-                    {selectedPawReportActionLabel}
+                    Open Live Walk / Updates
                   </Link>
 
                   <Link
