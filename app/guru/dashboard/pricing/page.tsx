@@ -114,6 +114,43 @@ type BlackoutDateRow = {
   note?: string | null;
 };
 
+type CalendarPricingRow = {
+  id?: string | null;
+  guru_id?: string | null;
+  user_id?: string | null;
+  service_key?: string | null;
+  pricing_date?: string | null;
+  rate_amount?: number | string | null;
+  note?: string | null;
+};
+
+type PricingSettingsRow = {
+  id?: string | null;
+  guru_id?: string | null;
+  user_id?: string | null;
+  additional_pet_fee?: number | string | null;
+  multi_pet_discount_percent?: number | string | null;
+  multi_day_discount_percent?: number | string | null;
+  multi_day_min_days?: number | string | null;
+  peak_time_enabled?: boolean | null;
+  peak_time_start?: string | null;
+  peak_time_end?: string | null;
+  peak_time_surcharge_percent?: number | string | null;
+  pricing_notes?: string | null;
+};
+
+type PricingSettingsState = {
+  additional_pet_fee: string;
+  multi_pet_discount_percent: string;
+  multi_day_discount_percent: string;
+  multi_day_min_days: string;
+  peak_time_enabled: boolean;
+  peak_time_start: string;
+  peak_time_end: string;
+  peak_time_surcharge_percent: string;
+  pricing_notes: string;
+};
+
 type CalendarCell = {
   date: Date;
   iso: string;
@@ -310,6 +347,17 @@ const routes = {
   bookings: "/guru/dashboard/bookings",
   messages: "/guru/dashboard/messages",
   login: "/guru/login",
+};
+const defaultPricingSettings: PricingSettingsState = {
+  additional_pet_fee: "",
+  multi_pet_discount_percent: "",
+  multi_day_discount_percent: "",
+  multi_day_min_days: "3",
+  peak_time_enabled: false,
+  peak_time_start: "17:00",
+  peak_time_end: "20:00",
+  peak_time_surcharge_percent: "",
+  pricing_notes: "",
 };
 
 function stringifyError(error: unknown) {
@@ -573,6 +621,150 @@ function buildCalendarCells({
   });
 }
 
+function normalizePricingSettingsRow(
+  row?: PricingSettingsRow | null,
+): PricingSettingsState {
+  return {
+    additional_pet_fee:
+      row?.additional_pet_fee !== null && row?.additional_pet_fee !== undefined
+        ? String(row.additional_pet_fee)
+        : "",
+    multi_pet_discount_percent:
+      row?.multi_pet_discount_percent !== null &&
+      row?.multi_pet_discount_percent !== undefined
+        ? String(row.multi_pet_discount_percent)
+        : "",
+    multi_day_discount_percent:
+      row?.multi_day_discount_percent !== null &&
+      row?.multi_day_discount_percent !== undefined
+        ? String(row.multi_day_discount_percent)
+        : "",
+    multi_day_min_days:
+      row?.multi_day_min_days !== null && row?.multi_day_min_days !== undefined
+        ? String(row.multi_day_min_days)
+        : "3",
+    peak_time_enabled: Boolean(row?.peak_time_enabled),
+    peak_time_start: String(row?.peak_time_start || "17:00").slice(0, 5),
+    peak_time_end: String(row?.peak_time_end || "20:00").slice(0, 5),
+    peak_time_surcharge_percent:
+      row?.peak_time_surcharge_percent !== null &&
+      row?.peak_time_surcharge_percent !== undefined
+        ? String(row.peak_time_surcharge_percent)
+        : "",
+    pricing_notes: row?.pricing_notes || "",
+  };
+}
+
+function getCalendarOverrideForDate(
+  date: string,
+  serviceKey: string,
+  overrides: CalendarPricingRow[],
+) {
+  return (
+    overrides.find(
+      (override) =>
+        override.pricing_date === date &&
+        (override.service_key === serviceKey ||
+          override.service_key === "all_services"),
+    ) || null
+  );
+}
+
+function getCalendarDisplayAmount({
+  date,
+  service,
+  overrides,
+}: {
+  date: string;
+  service: ServiceRateState | undefined;
+  overrides: CalendarPricingRow[];
+}) {
+  const override = getCalendarOverrideForDate(
+    date,
+    service?.service_key || "",
+    overrides,
+  );
+  const overrideAmount = toNullableNumber(override?.rate_amount);
+
+  if (overrideAmount !== null) return overrideAmount;
+  return toNullableNumber(service?.rate_amount);
+}
+
+async function loadCalendarPricing(guruId: string) {
+  if (!guruId) return [] as CalendarPricingRow[];
+
+  const { data, error } = await supabase
+    .from("guru_calendar_pricing")
+    .select("*")
+    .eq("guru_id", guruId)
+    .order("pricing_date", { ascending: true });
+
+  if (error) {
+    console.warn("Could not load daily calendar pricing:", error.message);
+    return [] as CalendarPricingRow[];
+  }
+
+  return (data || []) as CalendarPricingRow[];
+}
+
+async function loadPricingSettings(guruId: string, userId: string) {
+  if (!guruId && !userId) return defaultPricingSettings;
+
+  const { data, error } = await supabase
+    .from("guru_pricing_settings")
+    .select("*")
+    .eq("guru_id", guruId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Could not load pricing settings:", error.message);
+    return defaultPricingSettings;
+  }
+
+  return normalizePricingSettingsRow(data as PricingSettingsRow | null);
+}
+
+async function savePricingSettings({
+  guruId,
+  userId,
+  settings,
+}: {
+  guruId: string;
+  userId: string;
+  settings: PricingSettingsState;
+}) {
+  const payload = {
+    guru_id: guruId,
+    user_id: userId,
+    additional_pet_fee: settings.additional_pet_fee.trim()
+      ? Number(settings.additional_pet_fee)
+      : null,
+    multi_pet_discount_percent: settings.multi_pet_discount_percent.trim()
+      ? Number(settings.multi_pet_discount_percent)
+      : null,
+    multi_day_discount_percent: settings.multi_day_discount_percent.trim()
+      ? Number(settings.multi_day_discount_percent)
+      : null,
+    multi_day_min_days: settings.multi_day_min_days.trim()
+      ? Number(settings.multi_day_min_days)
+      : 3,
+    peak_time_enabled: settings.peak_time_enabled,
+    peak_time_start: settings.peak_time_start || null,
+    peak_time_end: settings.peak_time_end || null,
+    peak_time_surcharge_percent: settings.peak_time_surcharge_percent.trim()
+      ? Number(settings.peak_time_surcharge_percent)
+      : null,
+    pricing_notes: settings.pricing_notes.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("guru_pricing_settings")
+    .upsert(payload, { onConflict: "guru_id" });
+
+  if (error) throw error;
+}
+
 async function loadGuruServiceRates(guruId: string, enabledServices: string[]) {
   if (!guruId) return buildDefaultServiceRates(enabledServices);
 
@@ -731,6 +923,15 @@ export default function GuruDashboardPricingPage() {
   const [blackoutDate, setBlackoutDate] = useState("");
   const [blackoutServiceKey, setBlackoutServiceKey] = useState("all_services");
   const [blackoutNote, setBlackoutNote] = useState("");
+  const [calendarPricing, setCalendarPricing] = useState<CalendarPricingRow[]>(
+    [],
+  );
+  const [dailyPriceDate, setDailyPriceDate] = useState("");
+  const [dailyPriceAmount, setDailyPriceAmount] = useState("");
+  const [dailyPriceNote, setDailyPriceNote] = useState("");
+  const [pricingSettings, setPricingSettings] = useState<PricingSettingsState>(
+    defaultPricingSettings,
+  );
 
   const enabledServiceRates = useMemo(
     () => serviceRates.filter((service) => service.is_enabled),
@@ -771,6 +972,14 @@ export default function GuruDashboardPricingPage() {
   const activeDaysCount = weeklyAvailability.filter(
     (day) => day.enabled,
   ).length;
+
+  const dailyPricingCount = calendarPricing.length;
+  const hasDiscountRules = Boolean(
+    pricingSettings.additional_pet_fee.trim() ||
+    pricingSettings.multi_pet_discount_percent.trim() ||
+    pricingSettings.multi_day_discount_percent.trim() ||
+    pricingSettings.peak_time_enabled,
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -826,6 +1035,11 @@ export default function GuruDashboardPricingPage() {
         const firstEnabledService =
           loadedServiceRates.find((service) => service.is_enabled) ||
           loadedServiceRates[0];
+        const [loadedCalendarPricing, loadedPricingSettings] =
+          await Promise.all([
+            loadCalendarPricing(guruProfile.id),
+            loadPricingSettings(guruProfile.id, user.id),
+          ]);
 
         setGuruId(guruProfile.id);
         setGuruName(
@@ -843,6 +1057,8 @@ export default function GuruDashboardPricingPage() {
             .join(", "),
         );
         setServiceRates(loadedServiceRates);
+        setCalendarPricing(loadedCalendarPricing);
+        setPricingSettings(loadedPricingSettings);
         setSelectedServiceKey(
           firstEnabledService?.service_key || "drop_in_visits",
         );
@@ -978,6 +1194,7 @@ export default function GuruDashboardPricingPage() {
 
       await saveGuruServiceRates(guruId, serviceRates);
       await saveWeeklyAvailability(userId, weeklyAvailability);
+      await savePricingSettings({ guruId, userId, settings: pricingSettings });
 
       const enabledLabels = getEnabledServiceLabels(serviceRates);
       const primaryRate = serviceRates.find(
@@ -1001,7 +1218,7 @@ export default function GuruDashboardPricingPage() {
         .eq("id", guruId);
 
       setSuccessMessage(
-        "Pricing and availability saved. Website booking calendars now use these settings.",
+        "Pricing, calendar rules, discounts, and availability saved.",
       );
       router.refresh();
     } catch (error) {
@@ -1093,6 +1310,98 @@ export default function GuruDashboardPricingPage() {
       setErrorMessage(
         `Could not remove unavailable date: ${stringifyError(error)}`,
       );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updatePricingSetting(
+    field: keyof PricingSettingsState,
+    value: string | boolean,
+  ) {
+    setPricingSettings((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleAddDailyPrice() {
+    if (!userId || !guruId || !dailyPriceDate || !dailyPriceAmount.trim())
+      return;
+
+    const parsedAmount = Number(dailyPriceAmount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      setErrorMessage("Daily price must be a valid non-negative number.");
+      return;
+    }
+
+    setSaving(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const payload = {
+        guru_id: guruId,
+        user_id: userId,
+        service_key: selectedServiceKey,
+        pricing_date: dailyPriceDate,
+        rate_amount: parsedAmount,
+        note: dailyPriceNote.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from("guru_calendar_pricing")
+        .upsert(payload, { onConflict: "guru_id,service_key,pricing_date" });
+
+      if (error) throw error;
+
+      const refreshed = await loadCalendarPricing(guruId);
+      setCalendarPricing(refreshed);
+      setDailyPriceDate("");
+      setDailyPriceAmount("");
+      setDailyPriceNote("");
+      setSuccessMessage("Daily price saved to My Calendar.");
+    } catch (error) {
+      setErrorMessage(`Could not save daily price: ${stringifyError(error)}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteDailyPrice(entry: CalendarPricingRow) {
+    if (!guruId) return;
+
+    setSaving(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      let query = supabase
+        .from("guru_calendar_pricing")
+        .delete()
+        .eq("guru_id", guruId);
+
+      if (entry.id) {
+        query = query.eq("id", entry.id);
+      } else {
+        query = query
+          .eq("pricing_date", entry.pricing_date || "")
+          .eq("service_key", entry.service_key || selectedServiceKey);
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+
+      setCalendarPricing((current) =>
+        current.filter((item) => {
+          if (entry.id && item.id) return item.id !== entry.id;
+          return !(
+            item.pricing_date === entry.pricing_date &&
+            item.service_key === entry.service_key
+          );
+        }),
+      );
+      setSuccessMessage("Daily price removed from My Calendar.");
+    } catch (error) {
+      setErrorMessage(`Could not remove daily price: ${stringifyError(error)}`);
     } finally {
       setSaving(false);
     }
@@ -1204,7 +1513,7 @@ export default function GuruDashboardPricingPage() {
 
               <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.2em] text-emerald-800 shadow-sm ring-1 ring-white/70">
                 <Sparkles className="h-4 w-4" />
-                Mobile-style calendar pricing for website bookings
+                My Calendar pricing for website bookings
               </div>
 
               <h1 className="max-w-4xl text-4xl font-black tracking-[-0.045em] text-slate-950 md:text-6xl lg:text-7xl">
@@ -1213,8 +1522,9 @@ export default function GuruDashboardPricingPage() {
 
               <p className="mt-5 max-w-3xl text-base font-bold leading-8 text-slate-800 md:text-xl">
                 Use this page to control the prices Pet Parents see on the
-                website booking calendar. Start with service rates, confirm open
-                days, then preview the customer view before saving.
+                website booking calendar. Set service rates, daily prices,
+                multi-pet or multi-day discounts, peak-time rules, and open days
+                before saving.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -1370,8 +1680,8 @@ export default function GuruDashboardPricingPage() {
                     },
                     {
                       key: "calendar" as PricingTab,
-                      label: "3. Calendar preview",
-                      helper: "See the price shown by date.",
+                      label: "3. My Calendar",
+                      helper: "Set daily prices and discounts.",
                       icon: CalendarDays,
                     },
                     {
@@ -1638,14 +1948,15 @@ export default function GuruDashboardPricingPage() {
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                        Hotel-style calendar
+                        My Calendar
                       </p>
                       <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                        Preview prices by date.
+                        My Calendar
                       </h2>
                       <p className="mt-2 text-sm font-bold leading-6 text-slate-800">
-                        This mirrors the customer website booking calendar.
-                        Available dates show the selected service price.
+                        Use this calendar to preview and manage what Pet Parents
+                        see by date. Available dates show the selected service
+                        price or daily override.
                       </p>
                     </div>
                     <select
@@ -1671,7 +1982,7 @@ export default function GuruDashboardPricingPage() {
                       Selected service: {selectedService?.service_label}
                     </p>
                     <p className="mt-1 text-sm font-semibold text-slate-900">
-                      Calendar display: {selectedServicePriceLabel}
+                      Base calendar display: {selectedServicePriceLabel}
                     </p>
                   </div>
 
@@ -1680,9 +1991,11 @@ export default function GuruDashboardPricingPage() {
                       <button
                         type="button"
                         onClick={() => moveCalendar("prev")}
-                        className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-800 transition hover:bg-slate-50"
+                        className="flex min-h-[44px] items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 text-sm font-black text-slate-950 shadow-sm transition hover:bg-slate-50"
+                        aria-label="Previous month"
                       >
                         <ChevronLeft className="h-5 w-5" />
+                        Previous
                       </button>
 
                       <h3 className="text-xl font-black text-slate-950">
@@ -1692,8 +2005,10 @@ export default function GuruDashboardPricingPage() {
                       <button
                         type="button"
                         onClick={() => moveCalendar("next")}
-                        className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-800 transition hover:bg-slate-50"
+                        className="flex min-h-[44px] items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 text-sm font-black text-slate-950 shadow-sm transition hover:bg-slate-50"
+                        aria-label="Next month"
                       >
+                        Next
                         <ChevronRight className="h-5 w-5" />
                       </button>
                     </div>
@@ -1741,9 +2056,17 @@ export default function GuruDashboardPricingPage() {
                                 <span className="mt-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-emerald-800 shadow-sm">
                                   {selectedServiceIsCustom
                                     ? "Quote"
-                                    : selectedServiceAmount !== null
+                                    : getCalendarDisplayAmount({
+                                          date: cell.iso,
+                                          service: selectedService,
+                                          overrides: calendarPricing,
+                                        }) !== null
                                       ? formatMoneyNoCents(
-                                          selectedServiceAmount,
+                                          getCalendarDisplayAmount({
+                                            date: cell.iso,
+                                            service: selectedService,
+                                            overrides: calendarPricing,
+                                          }) || 0,
                                         )
                                       : "Rate"}
                                 </span>
@@ -1760,6 +2083,263 @@ export default function GuruDashboardPricingPage() {
                       </div>
                     </div>
                   </div>
+
+                  <div className="mt-6 grid gap-5 xl:grid-cols-[1fr_1fr]">
+                    <section className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-800">
+                        Daily price override
+                      </p>
+                      <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+                        Set a different price for a specific date.
+                      </h3>
+                      <p className="mt-2 text-sm font-bold leading-6 text-slate-900">
+                        Use this for holidays, busy weekends, special events, or
+                        any day that should be priced differently from the
+                        regular service rate.
+                      </p>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_0.8fr]">
+                        <input
+                          type="date"
+                          value={dailyPriceDate}
+                          onChange={(event) =>
+                            setDailyPriceDate(event.target.value)
+                          }
+                          className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                        <input
+                          value={dailyPriceAmount}
+                          onChange={(event) =>
+                            setDailyPriceAmount(
+                              cleanMoneyInput(event.target.value),
+                            )
+                          }
+                          inputMode="decimal"
+                          placeholder="Daily price"
+                          className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 placeholder:text-slate-800 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                        />
+                      </div>
+                      <input
+                        value={dailyPriceNote}
+                        onChange={(event) =>
+                          setDailyPriceNote(event.target.value)
+                        }
+                        placeholder="Optional note, example: Holiday rate or local event weekend."
+                        className="mt-3 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 placeholder:text-slate-800 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddDailyPrice}
+                        disabled={
+                          saving || !dailyPriceDate || !dailyPriceAmount.trim()
+                        }
+                        className="mt-4 inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Add daily price
+                      </button>
+                    </section>
+
+                    <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-800">
+                        Discount and peak-time rules
+                      </p>
+                      <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+                        Multi-pet, multi-day, and peak times.
+                      </h3>
+                      <p className="mt-2 text-sm font-bold leading-6 text-slate-900">
+                        These rules help calculate clearer estimates for
+                        families before they request care.
+                      </p>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-900">
+                            Additional pet fee
+                          </label>
+                          <input
+                            value={pricingSettings.additional_pet_fee}
+                            onChange={(event) =>
+                              updatePricingSetting(
+                                "additional_pet_fee",
+                                cleanMoneyInput(event.target.value),
+                              )
+                            }
+                            inputMode="decimal"
+                            placeholder="Example: 5"
+                            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 placeholder:text-slate-800 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-900">
+                            Multi-pet discount %
+                          </label>
+                          <input
+                            value={pricingSettings.multi_pet_discount_percent}
+                            onChange={(event) =>
+                              updatePricingSetting(
+                                "multi_pet_discount_percent",
+                                cleanMoneyInput(event.target.value),
+                              )
+                            }
+                            inputMode="decimal"
+                            placeholder="Example: 10"
+                            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 placeholder:text-slate-800 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-900">
+                            Multi-day discount %
+                          </label>
+                          <input
+                            value={pricingSettings.multi_day_discount_percent}
+                            onChange={(event) =>
+                              updatePricingSetting(
+                                "multi_day_discount_percent",
+                                cleanMoneyInput(event.target.value),
+                              )
+                            }
+                            inputMode="decimal"
+                            placeholder="Example: 15"
+                            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 placeholder:text-slate-800 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-900">
+                            Discount starts after days
+                          </label>
+                          <input
+                            value={pricingSettings.multi_day_min_days}
+                            onChange={(event) =>
+                              updatePricingSetting(
+                                "multi_day_min_days",
+                                cleanDurationInput(event.target.value),
+                              )
+                            }
+                            inputMode="numeric"
+                            placeholder="3"
+                            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 placeholder:text-slate-800 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
+                        </div>
+                      </div>
+
+                      <label className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-950">
+                        <input
+                          type="checkbox"
+                          checked={pricingSettings.peak_time_enabled}
+                          onChange={(event) =>
+                            updatePricingSetting(
+                              "peak_time_enabled",
+                              event.target.checked,
+                            )
+                          }
+                          className="h-5 w-5 rounded border-slate-300 accent-emerald-600"
+                        />
+                        Add peak-time pricing
+                      </label>
+
+                      {pricingSettings.peak_time_enabled ? (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                          <input
+                            type="time"
+                            value={pricingSettings.peak_time_start}
+                            onChange={(event) =>
+                              updatePricingSetting(
+                                "peak_time_start",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
+                          <input
+                            type="time"
+                            value={pricingSettings.peak_time_end}
+                            onChange={(event) =>
+                              updatePricingSetting(
+                                "peak_time_end",
+                                event.target.value,
+                              )
+                            }
+                            className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
+                          <input
+                            value={pricingSettings.peak_time_surcharge_percent}
+                            onChange={(event) =>
+                              updatePricingSetting(
+                                "peak_time_surcharge_percent",
+                                cleanMoneyInput(event.target.value),
+                              )
+                            }
+                            inputMode="decimal"
+                            placeholder="Peak %"
+                            className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 placeholder:text-slate-800 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          />
+                        </div>
+                      ) : null}
+                    </section>
+                  </div>
+
+                  <section className="mt-6 rounded-[1.5rem] border border-slate-200 bg-white p-5">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-800">
+                          Daily prices saved
+                        </p>
+                        <h3 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                          {calendarPricing.length
+                            ? `${calendarPricing.length} custom date prices`
+                            : "No custom date prices yet"}
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        Save rules
+                      </button>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {calendarPricing.length ? (
+                        calendarPricing.slice(0, 8).map((entry) => (
+                          <div
+                            key={`${entry.service_key}-${entry.pricing_date}-${entry.id || "row"}`}
+                            className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                          >
+                            <div>
+                              <p className="text-sm font-black text-slate-950">
+                                {entry.pricing_date} ·{" "}
+                                {serviceRates.find(
+                                  (service) =>
+                                    service.service_key === entry.service_key,
+                                )?.service_label ||
+                                  entry.service_key ||
+                                  "All services"}
+                              </p>
+                              <p className="mt-1 text-sm font-bold text-slate-800">
+                                {formatMoneyNoCents(
+                                  toNullableNumber(entry.rate_amount) || 0,
+                                )}{" "}
+                                {entry.note ? `· ${entry.note}` : ""}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteDailyPrice(entry)}
+                              className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-50"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-900 md:col-span-2">
+                          Add a daily price above to override the regular
+                          service rate for a specific date.
+                        </div>
+                      )}
+                    </div>
+                  </section>
                 </section>
               ) : null}
 
@@ -1994,6 +2574,8 @@ export default function GuruDashboardPricingPage() {
                     ],
                     ["Available weekdays", String(activeDaysCount)],
                     ["Unavailable dates", String(blackoutDates.length)],
+                    ["Daily prices", String(dailyPricingCount)],
+                    ["Discount rules", hasDiscountRules ? "On" : "Not set"],
                   ].map(([label, value]) => (
                     <div
                       key={label}
