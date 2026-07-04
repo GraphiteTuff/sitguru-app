@@ -16,25 +16,11 @@ const stripe = new Stripe(stripeSecretKey, {
   apiVersion: "2026-03-25.dahlia",
 });
 
-/**
- * SitGuru marketplace fee rules
- *
- * Current behavior:
- * - Default marketplace fee starts at 15%.
- * - Locality rules can move the fee between 15% and 20%.
- * - Exact ZIP rules win before radius rules.
- * - Radius rules use booking care_latitude / care_longitude.
- * - Tips are not commissionable and pass through to the Guru.
- */
 const DEFAULT_SITGURU_FEE_PERCENT = 15;
 const MIN_SITGURU_FEE_PERCENT = 15;
 const MAX_SITGURU_FEE_PERCENT = 20;
-
 const TIP_PRESET_PERCENTAGES = [0, 10, 15, 20] as const;
 const MAX_TIP_CENTS = 50_000;
-
-// Stripe Tax code for general services.
-// Confirm final tax category before live production launch.
 const SITGURU_STRIPE_TAX_CODE = "txcd_20030000";
 
 type BookingRow = Record<string, unknown>;
@@ -121,9 +107,32 @@ function firstNonEmpty(...values: unknown[]) {
     if (typeof value === "number" && Number.isFinite(value)) {
       return String(value);
     }
+
+    if (typeof value === "boolean") {
+      return String(value);
+    }
   }
 
   return "";
+}
+
+function toBoolean(value: unknown, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value > 0;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    if (["true", "yes", "y", "1", "on", "requested", "enabled"].includes(normalized)) {
+      return true;
+    }
+
+    if (["false", "no", "n", "0", "off", "none", ""].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return fallback;
 }
 
 function normalizeComparable(value: unknown) {
@@ -229,6 +238,137 @@ function getTipCentsFromBody(
 
 function centsToDollars(cents: number) {
   return Number((cents / 100).toFixed(2));
+}
+
+function getMissingColumnName(errorMessage: string) {
+  const quotedColumnMatch = errorMessage.match(/'([^']+)' column/i);
+  if (quotedColumnMatch?.[1]) return quotedColumnMatch[1];
+
+  const columnDoesNotExistMatch = errorMessage.match(/column "([^"]+)" does not exist/i);
+  if (columnDoesNotExistMatch?.[1]) return columnDoesNotExistMatch[1];
+
+  const schemaCacheMatch = errorMessage.match(/Could not find the '([^']+)' column/i);
+  if (schemaCacheMatch?.[1]) return schemaCacheMatch[1];
+
+  return null;
+}
+
+function getPaymentOptionFromBodyAndBooking(
+  body: Record<string, unknown> | null,
+  booking: BookingRow,
+) {
+  const selectedPaymentOption = firstNonEmpty(
+    body?.selectedPaymentOption,
+    body?.selected_payment_option,
+    body?.paymentOption,
+    body?.payment_option,
+    body?.paymentMethod,
+    body?.payment_method,
+    booking.selected_payment_option,
+    booking.payment_option,
+  );
+  const paymentMethodLabel = firstNonEmpty(
+    body?.paymentMethodLabel,
+    body?.payment_method_label,
+    booking.payment_method_label,
+    selectedPaymentOption,
+    "Stripe Checkout",
+  );
+
+  return {
+    selectedPaymentOption,
+    paymentMethodLabel,
+    paymentProvider: firstNonEmpty(
+      body?.paymentProvider,
+      body?.payment_provider,
+      booking.payment_provider,
+      "Stripe",
+    ),
+    paymentWalletType: firstNonEmpty(
+      body?.paymentWalletType,
+      body?.payment_wallet_type,
+      booking.payment_wallet_type,
+    ),
+    savedPaymentMethodRequested: toBoolean(
+      body?.savedPaymentMethodRequested ??
+        body?.saved_payment_method_requested ??
+        booking.saved_payment_method_requested,
+    ),
+    achBankRequested: toBoolean(
+      body?.achBankRequested ?? body?.ach_bank_requested ?? booking.ach_bank_requested,
+    ),
+    pawperksCreditRequested: toBoolean(
+      body?.pawperksCreditRequested ??
+        body?.pawperks_credit_requested ??
+        body?.petperksCreditRequested ??
+        body?.petperks_credit_requested ??
+        booking.pawperks_credit_requested ??
+        booking.petperks_credit_requested,
+    ),
+    referralCreditRequested: toBoolean(
+      body?.referralCreditRequested ??
+        body?.referral_credit_requested ??
+        booking.referral_credit_requested,
+    ),
+    sitguruCreditRequested: toBoolean(
+      body?.sitguruCreditRequested ??
+        body?.sitguru_credit_requested ??
+        body?.giftCardCreditRequested ??
+        body?.gift_card_credit_requested ??
+        booking.sitguru_credit_requested,
+    ),
+    promoCode: firstNonEmpty(
+      body?.promoCode,
+      body?.promo_code,
+      booking.promo_code,
+      booking.promo_code_entered,
+    ),
+    giftCardCode: firstNonEmpty(
+      body?.giftCardCode,
+      body?.gift_card_code,
+      body?.sitguruCreditCode,
+      body?.sitguru_credit_code,
+      booking.gift_card_code,
+      booking.sitguru_credit_code,
+    ),
+    pawperksCreditAmount: toNullableNumber(
+      body?.pawperksCreditAmount ??
+        body?.pawperks_credit_amount ??
+        body?.petperksCreditAmount ??
+        body?.petperks_credit_amount ??
+        booking.pawperks_credit_amount,
+    ) ?? 0,
+    referralCreditAmount: toNullableNumber(
+      body?.referralCreditAmount ?? body?.referral_credit_amount ?? booking.referral_credit_amount,
+    ) ?? 0,
+    sitguruCreditAmount: toNullableNumber(
+      body?.sitguruCreditAmount ??
+        body?.sitguru_credit_amount ??
+        body?.giftCardAmount ??
+        body?.gift_card_amount ??
+        booking.sitguru_credit_amount,
+    ) ?? 0,
+    paymentOptionSummary: firstNonEmpty(
+      body?.paymentOptionSummary,
+      body?.payment_option_summary,
+      body?.checkoutOptionSummary,
+      body?.checkout_option_summary,
+      booking.payment_option_summary,
+      booking.checkout_option_summary,
+      paymentMethodLabel,
+    ),
+    quoteRequestStatus: firstNonEmpty(
+      body?.quoteRequestStatus,
+      body?.quote_request_status,
+      booking.quote_request_status,
+      "not_requested",
+    ),
+    customQuoteRequested: toBoolean(
+      body?.customQuoteRequested ??
+        body?.custom_quote_requested ??
+        booking.custom_quote_requested,
+    ),
+  };
 }
 
 function getBookingOwnerId(booking: BookingRow) {
@@ -861,6 +1001,30 @@ async function getMarketplaceFeePercentForBooking(
   };
 }
 
+async function safeBookingUpdate(bookingId: string, payload: Record<string, unknown>) {
+  let updatePayload = { ...payload };
+
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const { error } = await supabaseAdmin
+      .from("bookings")
+      .update(updatePayload)
+      .eq("id", bookingId);
+
+    if (!error) return;
+
+    const missingColumn = getMissingColumnName(error.message || "");
+
+    if (missingColumn && missingColumn in updatePayload) {
+      console.warn("Removing missing checkout update column and retrying:", missingColumn);
+      delete updatePayload[missingColumn];
+      continue;
+    }
+
+    console.error("Booking checkout status update error:", error);
+    return;
+  }
+}
+
 async function updateCheckoutStarted(
   bookingId: string,
   values: {
@@ -885,107 +1049,84 @@ async function updateCheckoutStarted(
     dateSelectionMode: string;
     dateRangeLabel: string;
     selectedDates: string[];
+    selectedPaymentOption: string;
+    paymentMethodLabel: string;
+    paymentProvider: string;
+    paymentWalletType: string;
+    savedPaymentMethodRequested: boolean;
+    achBankRequested: boolean;
+    pawperksCreditRequested: boolean;
+    referralCreditRequested: boolean;
+    sitguruCreditRequested: boolean;
+    promoCode: string;
+    giftCardCode: string;
+    pawperksCreditAmount: number;
+    referralCreditAmount: number;
+    sitguruCreditAmount: number;
+    paymentOptionSummary: string;
+    quoteRequestStatus: string;
+    customQuoteRequested: boolean;
   },
 ) {
-  const primaryUpdate = await supabaseAdmin
-    .from("bookings")
-    .update({
-      payment_status: "checkout_started",
-      stripe_session_id: values.stripeSessionId,
-      stripe_checkout_session_id: values.stripeSessionId,
-      currency: "usd",
-      subtotal_amount: values.subtotalAmount,
-      sitguru_fee_amount: values.sitguruFeeAmount,
-      platform_fee: values.sitguruFeeAmount,
-      marketplace_fee_amount: values.sitguruFeeAmount,
-      marketplace_fee_percent: values.marketplaceFeePercent,
-      marketplace_fee_source: values.marketplaceFeeSource,
-      marketplace_fee_rule_id: values.marketplaceFeeRuleId || null,
-      marketplace_fee_rule_name: values.marketplaceFeeRuleName,
-      marketplace_fee_match_type: values.marketplaceFeeMatchType,
-      marketplace_fee_distance_miles: values.marketplaceFeeDistanceMiles,
-      guru_net_amount: values.guruNetAmount,
-      guru_estimated_base_payout: values.guruNetAmount,
-      guru_payout_amount: values.guruPayoutAmount,
-      guru_estimated_total_payout: values.guruPayoutAmount,
-      tip_amount: values.tipAmount,
-      guru_tip_amount: values.tipAmount,
-      total_customer_paid: values.totalCustomerPaid,
-      customer_total_amount: values.totalCustomerPaid,
-      amount_total: values.totalCustomerPaid,
-      guru_name: values.guruName || null,
-      guru_avatar_url: values.guruAvatarUrl || null,
-      guru_photo_url: values.guruAvatarUrl || null,
-      pet_photo_url: values.petPhotoUrl || null,
-      requested_start_date: values.requestedStartDate || null,
-      requested_end_date: values.requestedEndDate || null,
-      date_selection_mode: values.dateSelectionMode || null,
-      date_range_label: values.dateRangeLabel || null,
-      selected_dates: values.selectedDates,
-      tax_status: "stripe_automatic_tax_enabled",
-      payout_status: "pending",
-    })
-    .eq("id", bookingId);
-
-  if (!primaryUpdate.error) {
-    return;
-  }
-
-  const message = primaryUpdate.error.message || "";
-
-  if (
-    message.includes("stripe_session_id") ||
-    message.includes("stripe_checkout_session_id") ||
-    message.includes("subtotal_amount") ||
-    message.includes("sitguru_fee_amount") ||
-    message.includes("platform_fee") ||
-    message.includes("marketplace_fee_amount") ||
-    message.includes("marketplace_fee_percent") ||
-    message.includes("marketplace_fee_source") ||
-    message.includes("marketplace_fee_rule_id") ||
-    message.includes("marketplace_fee_rule_name") ||
-    message.includes("marketplace_fee_match_type") ||
-    message.includes("marketplace_fee_distance_miles") ||
-    message.includes("guru_net_amount") ||
-    message.includes("guru_estimated_base_payout") ||
-    message.includes("guru_payout_amount") ||
-    message.includes("guru_estimated_total_payout") ||
-    message.includes("tip_amount") ||
-    message.includes("guru_tip_amount") ||
-    message.includes("total_customer_paid") ||
-    message.includes("customer_total_amount") ||
-    message.includes("amount_total") ||
-    message.includes("guru_name") ||
-    message.includes("guru_avatar_url") ||
-    message.includes("guru_photo_url") ||
-    message.includes("pet_photo_url") ||
-    message.includes("requested_start_date") ||
-    message.includes("requested_end_date") ||
-    message.includes("date_selection_mode") ||
-    message.includes("date_range_label") ||
-    message.includes("selected_dates") ||
-    message.includes("tax_status") ||
-    message.includes("column") ||
-    message.includes("schema cache")
-  ) {
-    const fallbackUpdate = await supabaseAdmin
-      .from("bookings")
-      .update({
-        payment_status: "checkout_started",
-      })
-      .eq("id", bookingId);
-
-    if (fallbackUpdate.error) {
-      console.error(
-        "Booking checkout fallback status update error:",
-        fallbackUpdate.error,
-      );
-    }
-
-    return;
-  }
-
-  console.error("Booking checkout status update error:", primaryUpdate.error);
+  await safeBookingUpdate(bookingId, {
+    payment_status: "checkout_started",
+    stripe_session_id: values.stripeSessionId,
+    stripe_checkout_session_id: values.stripeSessionId,
+    currency: "usd",
+    subtotal_amount: values.subtotalAmount,
+    sitguru_fee_amount: values.sitguruFeeAmount,
+    platform_fee: values.sitguruFeeAmount,
+    marketplace_fee_amount: values.sitguruFeeAmount,
+    marketplace_fee_percent: values.marketplaceFeePercent,
+    marketplace_fee_source: values.marketplaceFeeSource,
+    marketplace_fee_rule_id: values.marketplaceFeeRuleId || null,
+    marketplace_fee_rule_name: values.marketplaceFeeRuleName,
+    marketplace_fee_match_type: values.marketplaceFeeMatchType,
+    marketplace_fee_distance_miles: values.marketplaceFeeDistanceMiles,
+    guru_net_amount: values.guruNetAmount,
+    guru_estimated_base_payout: values.guruNetAmount,
+    guru_payout_amount: values.guruPayoutAmount,
+    guru_estimated_total_payout: values.guruPayoutAmount,
+    tip_amount: values.tipAmount,
+    guru_tip_amount: values.tipAmount,
+    total_customer_paid: values.totalCustomerPaid,
+    customer_total_amount: values.totalCustomerPaid,
+    amount_total: values.totalCustomerPaid,
+    selected_payment_option: values.selectedPaymentOption || null,
+    payment_option: values.selectedPaymentOption || null,
+    payment_method_label: values.paymentMethodLabel,
+    payment_provider: values.paymentProvider,
+    payment_wallet_type: values.paymentWalletType || null,
+    saved_payment_method_requested: values.savedPaymentMethodRequested,
+    ach_bank_requested: values.achBankRequested,
+    pawperks_credit_requested: values.pawperksCreditRequested,
+    petperks_credit_requested: values.pawperksCreditRequested,
+    referral_credit_requested: values.referralCreditRequested,
+    sitguru_credit_requested: values.sitguruCreditRequested,
+    promo_code: values.promoCode || null,
+    promo_code_entered: values.promoCode || null,
+    gift_card_code: values.giftCardCode || null,
+    sitguru_credit_code: values.giftCardCode || null,
+    pawperks_credit_amount: values.pawperksCreditAmount,
+    referral_credit_amount: values.referralCreditAmount,
+    sitguru_credit_amount: values.sitguruCreditAmount,
+    payment_option_summary: values.paymentOptionSummary,
+    checkout_option_summary: values.paymentOptionSummary,
+    quote_request_status: values.quoteRequestStatus,
+    custom_quote_requested: values.customQuoteRequested,
+    guru_name: values.guruName || null,
+    guru_avatar_url: values.guruAvatarUrl || null,
+    guru_photo_url: values.guruAvatarUrl || null,
+    pet_photo_url: values.petPhotoUrl || null,
+    requested_start_date: values.requestedStartDate || null,
+    requested_end_date: values.requestedEndDate || null,
+    date_selection_mode: values.dateSelectionMode || null,
+    date_range_label: values.dateRangeLabel || null,
+    selected_dates: values.selectedDates,
+    tax_status: "stripe_automatic_tax_enabled",
+    payout_status: "pending",
+    updated_at: new Date().toISOString(),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -1111,6 +1252,7 @@ export async function POST(req: NextRequest) {
       feeDistanceMiles: sitguruFeeDistanceMiles,
     } = await getMarketplaceFeePercentForBooking(booking);
 
+    const paymentOptions = getPaymentOptionFromBodyAndBooking(body, booking);
     const tipCents = getTipCentsFromBody(body, subtotalCents);
     const sitguruFeeCents = Math.round(
       subtotalCents * (sitguruFeePercent / 100),
@@ -1222,6 +1364,25 @@ export async function POST(req: NextRequest) {
       guru_net_cents: String(guruNetCents),
       guru_payout_cents: String(guruPayoutCents),
       total_customer_paid_cents: String(totalCustomerPaidCents),
+      selected_payment_option: paymentOptions.selectedPaymentOption,
+      payment_method_label: paymentOptions.paymentMethodLabel,
+      payment_provider: paymentOptions.paymentProvider,
+      payment_wallet_type: paymentOptions.paymentWalletType,
+      saved_payment_method_requested: String(paymentOptions.savedPaymentMethodRequested),
+      ach_bank_requested: String(paymentOptions.achBankRequested),
+      pawperks_credit_requested: String(paymentOptions.pawperksCreditRequested),
+      petperks_credit_requested: String(paymentOptions.pawperksCreditRequested),
+      referral_credit_requested: String(paymentOptions.referralCreditRequested),
+      sitguru_credit_requested: String(paymentOptions.sitguruCreditRequested),
+      promo_code: paymentOptions.promoCode,
+      gift_card_code: paymentOptions.giftCardCode,
+      pawperks_credit_amount: String(paymentOptions.pawperksCreditAmount),
+      referral_credit_amount: String(paymentOptions.referralCreditAmount),
+      sitguru_credit_amount: String(paymentOptions.sitguruCreditAmount),
+      payment_option_summary: paymentOptions.paymentOptionSummary,
+      checkout_option_summary: paymentOptions.paymentOptionSummary,
+      quote_request_status: paymentOptions.quoteRequestStatus,
+      custom_quote_requested: String(paymentOptions.customQuoteRequested),
       tax_behavior: "exclusive",
       tax_code: SITGURU_STRIPE_TAX_CODE,
       customer_fee_message:
@@ -1231,13 +1392,6 @@ export async function POST(req: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      /*
-        Pet Parent payments must stay in SitGuru-controlled Stripe Checkout.
-        Intentionally omit payment_method_types so Checkout uses SitGuru's
-        Stripe Dashboard payment method settings and can show eligible
-        Stripe-managed options instead of locking this flow to card-only.
-        Do not add or route any direct Pet Parent-to-Guru payment options here.
-      */
       customer_email: user.email ?? undefined,
 
       automatic_tax: {
@@ -1247,22 +1401,6 @@ export async function POST(req: NextRequest) {
       line_items: checkoutLineItems,
 
       payment_intent_data: {
-        /*
-          Do not add application_fee_amount here yet.
-
-          Stripe only allows application_fee_amount for Connect direct charges
-          or destination charges. SitGuru is currently creating a normal platform
-          Checkout Session, so the SitGuru fee is tracked in Supabase and metadata
-          for now.
-
-          Later, when connected Guru Stripe accounts are wired, add:
-          transfer_data: { destination: guruStripeAccountId }
-          application_fee_amount: sitguruFeeCents
-
-          Important:
-          application_fee_amount should be calculated from the booking subtotal only.
-          Tips are not commissionable and should pass through to the Guru.
-        */
         metadata: checkoutMetadata,
       },
 
@@ -1294,6 +1432,23 @@ export async function POST(req: NextRequest) {
       dateSelectionMode,
       dateRangeLabel,
       selectedDates: normalizedSelectedDates,
+      selectedPaymentOption: paymentOptions.selectedPaymentOption,
+      paymentMethodLabel: paymentOptions.paymentMethodLabel,
+      paymentProvider: paymentOptions.paymentProvider,
+      paymentWalletType: paymentOptions.paymentWalletType,
+      savedPaymentMethodRequested: paymentOptions.savedPaymentMethodRequested,
+      achBankRequested: paymentOptions.achBankRequested,
+      pawperksCreditRequested: paymentOptions.pawperksCreditRequested,
+      referralCreditRequested: paymentOptions.referralCreditRequested,
+      sitguruCreditRequested: paymentOptions.sitguruCreditRequested,
+      promoCode: paymentOptions.promoCode,
+      giftCardCode: paymentOptions.giftCardCode,
+      pawperksCreditAmount: paymentOptions.pawperksCreditAmount,
+      referralCreditAmount: paymentOptions.referralCreditAmount,
+      sitguruCreditAmount: paymentOptions.sitguruCreditAmount,
+      paymentOptionSummary: paymentOptions.paymentOptionSummary,
+      quoteRequestStatus: paymentOptions.quoteRequestStatus,
+      customQuoteRequested: paymentOptions.customQuoteRequested,
     });
 
     if (!session.url) {
@@ -1307,6 +1462,7 @@ export async function POST(req: NextRequest) {
       url: session.url,
       checkoutUrl: session.url,
       stripeSessionId: session.id,
+      sessionId: session.id,
       financialPreview: {
         subtotalAmount: centsToDollars(subtotalCents),
         marketplaceFeePercent: sitguruFeePercent,
@@ -1322,6 +1478,16 @@ export async function POST(req: NextRequest) {
         guruPayoutAmount: centsToDollars(guruPayoutCents),
         taxAmount: 0,
         totalCustomerPaid: centsToDollars(totalCustomerPaidCents),
+        selectedPaymentOption: paymentOptions.selectedPaymentOption,
+        paymentMethodLabel: paymentOptions.paymentMethodLabel,
+        paymentProvider: paymentOptions.paymentProvider,
+        paymentWalletType: paymentOptions.paymentWalletType,
+        pawperksCreditRequested: paymentOptions.pawperksCreditRequested,
+        referralCreditRequested: paymentOptions.referralCreditRequested,
+        sitguruCreditRequested: paymentOptions.sitguruCreditRequested,
+        promoCode: paymentOptions.promoCode,
+        giftCardCode: paymentOptions.giftCardCode,
+        quoteRequestStatus: paymentOptions.quoteRequestStatus,
         careZipCode: bookingCareZipCode,
         careCity: bookingCareCity,
         careState: bookingCareState,
