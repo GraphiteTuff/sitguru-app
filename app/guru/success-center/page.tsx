@@ -44,6 +44,7 @@ type SearchIntent =
   | "bookings"
   | "earnings"
   | "profile"
+  | "reviews"
   | "care"
   | "payments"
   | "communication"
@@ -64,6 +65,18 @@ const fallbackGuruResources: GuruResource[] = [
     keywords: ["profile", "bio", "photo", "photos", "about me", "trust", "reviews", "ratings", "stand out"],
     featured: true,
     sortOrder: 10,
+  },
+  {
+    id: "reviews-trust-signals",
+    title: "Reviews, ratings, and trust signals",
+    description:
+      "Learn how completed booking reviews work, how Pet Parents rate care, how ratings appear on public Guru profiles, and how to use feedback to grow trust.",
+    category: "Reviews",
+    type: "guide",
+    tags: ["Reviews", "Ratings", "Trust", "Public Profile"],
+    keywords: ["review", "reviews", "rating", "ratings", "stars", "feedback", "would book again", "trust", "public profile", "new guru"],
+    featured: true,
+    sortOrder: 12,
   },
   {
     id: "bookings-command-center",
@@ -199,6 +212,7 @@ const fallbackGuruResources: GuruResource[] = [
 const quickSearches = [
   "How do I start a PawReport?",
   "How do I start and stop a live walk?",
+  "How do reviews and ratings work?",
   "How do Pet Parents see my updates?",
   "How do I get more bookings?",
   "How do I use My Calendar and pricing?",
@@ -216,6 +230,7 @@ const fallbackCategories = [
   "PawReport",
   "Earnings",
   "Profile Growth",
+  "Reviews",
   "Care Standards",
   "Communication",
   "Payments",
@@ -274,7 +289,11 @@ function detectIntent(query: string): SearchIntent {
     return "earnings";
   }
 
-  if (/(profile|bio|photo|photos|review|rating|trust|stand out)/.test(value)) {
+  if (/(review|reviews|rating|ratings|stars|feedback|would book again|trust signal|public review|new guru)/.test(value)) {
+    return "reviews";
+  }
+
+  if (/(profile|bio|photo|photos|trust|stand out)/.test(value)) {
     return "profile";
   }
 
@@ -315,6 +334,8 @@ function getAssistantAnswer(query: string, matches: GuruResource[]) {
       "To increase earnings, focus on reliable availability, repeat clients, strong reviews, fast replies, smart pricing, and excellent care. Use My Calendar to manage services, daily prices, peak-time pricing, multi-pet settings, and discounts so Pet Parents see clear care options.",
     profile:
       "A strong Guru profile should quickly show who you are, where you serve, what care you provide, and why pet parents can trust you. Use a clear photo, warm bio, specific services, and details that make you feel dependable.",
+    reviews:
+      "Reviews are earned after completed bookings. Pet Parents can rate the care, write feedback, and mark whether they would book again. To earn stronger reviews, communicate clearly, arrive prepared, use PawReport Live, track walks when relevant, add photos and care updates, and complete a thoughtful final summary.",
     care:
       "Before every visit, confirm access instructions, feeding, medication, routines, emergency contacts, walk expectations, and PawReport expectations. During care, use PawReport Live for photos, potty updates, food, water, play, mood, medication, notes, and live walk tracking when a walk is part of the booking.",
     payments:
@@ -380,6 +401,7 @@ function getSuggestedNextSteps(intent: SearchIntent) {
     bookings: ["Update your availability", "Improve your profile", "Reply quickly to new requests"],
     earnings: ["Review your pricing", "Encourage repeat bookings", "Improve your service quality"],
     profile: ["Add a friendly profile photo", "Rewrite your bio", "Highlight your care experience"],
+    reviews: ["Deliver five-star care", "Use PawReport Live well", "Politely remind Pet Parents to review completed bookings"],
     care: ["Confirm visit instructions", "Check emergency contacts", "Send a visit update"],
     payments: ["Review payout details", "Check pending earnings", "Review referral rewards"],
     communication: ["Confirm details before care", "Send friendly updates", "Use calm professional replies"],
@@ -661,6 +683,75 @@ export default function GuruSuccessCenterPage() {
                 Scout had a great visit today. We completed a 22-minute walk, he went pee,
                 drank fresh water, and enjoyed some playtime afterward. He seemed happy,
                 comfortable, and relaxed when I left. I saved the photos and walk summary here.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="sgsc-pawreport-card">
+          <div className="sgsc-pawreport-hero">
+            <div>
+              <p className="sgsc-pawreport-kicker">Reviews & Trust Signals</p>
+              <div role="heading" aria-level={2} className="sgsc-pawreport-title">
+                Turn completed bookings into real Guru trust.
+              </div>
+              <p className="sgsc-pawreport-copy">
+                Reviews help Pet Parents choose care and help Gurus grow their SitGuru reputation.
+                After completed bookings, Pet Parents can leave star ratings, written feedback, and
+                a would-book-again signal. Your public profile should show real reviews only, or
+                New Guru when no reviews have been submitted yet.
+              </p>
+            </div>
+
+            <div className="sgsc-pawreport-badge">⭐ Review Ready</div>
+          </div>
+
+          <div className="sgsc-pawreport-layout">
+            <div className="sgsc-pawreport-panel">
+              <p className="sgsc-muted-label">How Gurus earn better reviews</p>
+              <div className="sgsc-pawreport-steps">
+                {[
+                  ["1", "Confirm expectations", "Before care begins, confirm access, timing, feeding, medication, walking, and PawReport expectations."],
+                  ["2", "Use PawReport Live", "Start the PawReport, add updates, and track walks when walking is part of the service."],
+                  ["3", "Communicate clearly", "Keep messages warm, timely, specific, and professional before, during, and after care."],
+                  ["4", "Complete the summary", "End with a specific final note that explains what happened and how the pet did."],
+                  ["5", "Learn from feedback", "Use reviews to improve your profile, communication, timing, photos, and care routine."],
+                ].map(([number, title, copy]) => (
+                  <div key={title} className="sgsc-pawreport-step">
+                    <span>{number}</span>
+                    <div>
+                      <strong>{title}</strong>
+                      <p>{copy}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="sgsc-pawreport-panel sgsc-pawreport-panel-soft">
+              <p className="sgsc-muted-label">What Pet Parents review</p>
+              <div className="sgsc-pawreport-checks">
+                {[
+                  "Star rating for the completed booking",
+                  "Written feedback about communication and care quality",
+                  "Whether they would book again",
+                  "How useful PawReport Live updates were",
+                  "Whether walk tracking, photos, and notes matched expectations",
+                ].map((item) => (
+                  <div key={item} className="sgsc-pawreport-check">
+                    <span>✓</span>
+                    <p>{item}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="sgsc-pawreport-panel sgsc-pawreport-example">
+              <p className="sgsc-muted-label">Friendly review reminder</p>
+              <p>
+                Thank you for trusting me with Scout today. I saved the PawReport with photos,
+                updates, and the final walk summary. When you have a moment, your honest review
+                helps other Pet Parents choose care and helps me keep improving.
               </p>
             </div>
           </div>

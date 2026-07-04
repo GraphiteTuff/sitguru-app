@@ -118,6 +118,15 @@ const quickHelpCards: HelpCard[] = [
     icon: <PawPrint className="h-6 w-6" />,
   },
   {
+    title: "Reviews & Trust",
+    eyebrow: "Ratings and feedback",
+    description:
+      "Learn how Pet Parents leave reviews after completed bookings, how Gurus use feedback to build trust, and how Ambassadors explain real ratings to new users.",
+    href: "#reviews-help",
+    cta: "Review Help",
+    icon: <Medal className="h-6 w-6" />,
+  },
+  {
     title: "Account & Login",
     eyebrow: "Access your account",
     description:
@@ -337,6 +346,11 @@ const helpSections: HelpSection[] = [
           "When a Guru starts PawReport Live, your Pet Parent dashboard can show live care activity. Open the booking and choose View Live PawReport to see visit status, walk status, distance, duration, photos, potty updates, food, water, mood, play, medication notes, and the final summary.",
       },
       {
+        question: "How do I leave a review after care?",
+        answer:
+          "After the booking is completed, open the booking details from your Pet Parent dashboard. Use the review area to choose a star rating, write honest feedback about the Guru, mark whether you would book again, and submit the review so other Pet Parents can make informed decisions.",
+      },
+      {
         question: "Can I message my Guru?",
         answer:
           "Use SitGuru messaging when available so booking questions, care details, timing, access notes, and support context stay organized in one place.",
@@ -384,9 +398,52 @@ const helpSections: HelpSection[] = [
           "Start PawReport Live when care begins, add useful updates during care, upload clear photos when appropriate, track walks when relevant, and finish with a specific final summary using the pet's name and how the visit went.",
       },
       {
+        question: "How do reviews help Gurus get more bookings?",
+        answer:
+          "Reviews are public trust signals when they are connected to completed bookings. Gurus should earn them through clear communication, on-time care, thoughtful PawReport Live updates, accurate walk tracking, clean photos, and strong final summaries. New Gurus should show New until real reviews are submitted.",
+      },
+      {
         question: "Are Gurus employees of SitGuru?",
         answer:
           "Pet Gurus provide services as independent local providers through the SitGuru marketplace. More detailed onboarding, tax, and provider information is shared during approval and setup.",
+      },
+    ],
+  },
+  {
+    title: "Reviews & Trust Signals",
+    description:
+      "How Pet Parents, Gurus, and Ambassadors use reviews, ratings, written feedback, and trust signals across SitGuru.",
+    icon: <Medal className="h-5 w-5" />,
+    items: [
+      {
+        question: "When can a Pet Parent leave a review?",
+        answer:
+          "Pet Parents should leave a review after a completed booking. Open the booking details from the Pet Parent dashboard, review the care experience, choose a star rating, write clear feedback, and submit the review when the visit is finished.",
+      },
+      {
+        question: "What should Pet Parents include in a helpful review?",
+        answer:
+          "Helpful reviews mention what service was booked, how communication went, whether PawReport Live updates were useful, whether the Guru followed pet instructions, and what made the experience feel safe, friendly, or trustworthy.",
+      },
+      {
+        question: "How do Guru ratings and review counts appear?",
+        answer:
+          "Guru public profiles should show real review counts and real rating averages from completed booking reviews. When a Guru has no real reviews yet, SitGuru should show New Guru or New instead of fake ratings or fake review totals.",
+      },
+      {
+        question: "How should Gurus use reviews?",
+        answer:
+          "Gurus should read reviews as business feedback. Strong reviews can help improve trust on the public profile. If feedback mentions communication, timing, PawReport updates, photos, walk tracking, or care notes, use it to improve future bookings.",
+      },
+      {
+        question: "Can Gurus ask for reviews?",
+        answer:
+          "Gurus may politely remind Pet Parents to review the completed booking, but should not pressure them or ask for dishonest feedback. The best way to earn reviews is to communicate clearly, use PawReport Live well, complete walks and summaries, and provide reliable care.",
+      },
+      {
+        question: "How should Ambassadors explain reviews?",
+        answer:
+          "Ambassadors can tell new Pet Parents and future Gurus that SitGuru uses real booking-based reviews to build trust. They should explain that reviews help families choose care and help Gurus improve their marketplace reputation.",
       },
     ],
   },
@@ -471,6 +528,11 @@ const helpSections: HelpSection[] = [
         question: "How do Ambassador referrals work?",
         answer:
           "Use your Ambassador referral code or referral link when sharing SitGuru. Referral activity may be tracked in the Ambassador dashboard as the program grows. Contact SitGuru if your code, link, or dashboard looks incorrect.",
+      },
+      {
+        question: "How should Ambassadors talk about reviews and ratings?",
+        answer:
+          "Ambassadors should explain that reviews help SitGuru build local trust. Pet Parents can review completed bookings, Gurus can use reviews to improve and grow, and public Guru profiles should show real ratings and real review counts instead of inflated numbers.",
       },
       {
         question: "What are Student Hire, Community Hire, and Military Hire?",
@@ -895,6 +957,9 @@ export default function HelpPage() {
             <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
               SitGuru PawReport™
             </span>
+            <span className="rounded-full border border-emerald-200 bg-white px-4 py-2">
+              Reviews & Trust Signals
+            </span>
           </div>
         </div>
       </section>
@@ -907,6 +972,85 @@ export default function HelpPage() {
         </div>
       </section>
 
+
+      <section
+        id="reviews-help"
+        className="relative mx-auto max-w-7xl scroll-mt-28 px-4 pb-8 sm:px-6 lg:px-8"
+      >
+        <div className="overflow-hidden rounded-[36px] border border-amber-100 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
+          <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr] lg:items-stretch">
+            <div className="bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_48%,#ecfdf5_100%)] p-6 sm:p-8 lg:p-10">
+              <SectionEyebrow icon={<Medal className="h-4 w-4" />}>
+                Reviews & Trust Signals
+              </SectionEyebrow>
+
+              <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                Real reviews help Pet Parents choose trusted care and help Gurus grow.
+              </h2>
+
+              <p className="mt-4 text-base font-semibold leading-8 text-slate-700">
+                After a completed booking, Pet Parents can rate their Guru and leave written feedback.
+                Those reviews become real trust signals on Guru profiles. Gurus can use reviews to
+                improve communication, PawReport Live updates, walk tracking, care notes, and future
+                service quality. Ambassadors can explain reviews as one of the ways SitGuru builds
+                local confidence without fake ratings or inflated review totals.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {[
+                  ["⭐", "Real Star Ratings", "Ratings come from submitted booking reviews."],
+                  ["💬", "Written Feedback", "Pet Parents can describe the care experience in their own words."],
+                  ["🐾", "Would Book Again", "Repeat-care signals help show confidence in the Guru."],
+                  ["🛡️", "Public Trust", "Public Guru profiles show real review counts or New when no reviews exist."],
+                ].map(([icon, title, body]) => (
+                  <div
+                    key={title}
+                    className="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm"
+                  >
+                    <div className="text-2xl">{icon}</div>
+                    <h3 className="mt-2 text-base font-black text-slate-950">
+                      {title}
+                    </h3>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                      {body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-6 sm:p-8 lg:p-10">
+              <div className="grid gap-4">
+                {[
+                  ["For Pet Parents", "Open the completed booking, choose a star rating, write honest feedback, mark whether you would book again, and submit the review."],
+                  ["For Gurus", "Deliver reliable care, communicate clearly, use PawReport Live, complete live walks when relevant, and review feedback to improve future bookings."],
+                  ["For Ambassadors", "Explain that SitGuru uses real booking-based reviews to help families choose care and help strong Gurus stand out locally."],
+                ].map(([title, body]) => (
+                  <div
+                    key={title}
+                    className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-5"
+                  >
+                    <h3 className="text-xl font-black text-slate-950">{title}</h3>
+                    <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">
+                      {body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 rounded-[1.4rem] border border-emerald-200 bg-emerald-50 p-5">
+                <h3 className="text-xl font-black text-emerald-950">
+                  Review rule of thumb
+                </h3>
+                <p className="mt-2 text-sm font-semibold leading-7 text-emerald-800">
+                  Honest, specific reviews are better than generic praise. Mention communication,
+                  timeliness, PawReport quality, photos, walk tracking, and how the pet seemed after care.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section
         id="pawreport-help"
