@@ -35,6 +35,17 @@ type CalendarStatus = "available" | "blackout" | "pending" | "closed";
 
 type TipChoice = "none" | "10" | "15" | "20" | "custom";
 
+type PaymentOption =
+  | "card"
+  | "apple_pay"
+  | "google_pay"
+  | "link"
+  | "saved_method"
+  | "bank_account"
+  | "pawperks_credit"
+  | "promo_code"
+  | "gift_card";
+
 type DateSelectionMode = "single" | "range";
 
 type ServiceAreaStatus =
@@ -281,6 +292,78 @@ const tipOptions: {
     key: "custom",
     label: "Custom",
     helper: "Choose your own amount.",
+  },
+];
+
+const paymentOptions: {
+  key: PaymentOption;
+  label: string;
+  helper: string;
+  icon: string;
+  status: string;
+}[] = [
+  {
+    key: "card",
+    label: "Credit / debit card",
+    helper: "Use a card through SitGuru secure checkout.",
+    icon: "💳",
+    status: "Ready at checkout",
+  },
+  {
+    key: "apple_pay",
+    label: "Apple Pay",
+    helper: "Available when your device and Stripe checkout support it.",
+    icon: "",
+    status: "Wallet option",
+  },
+  {
+    key: "google_pay",
+    label: "Google Pay",
+    helper: "Available when your browser and Stripe checkout support it.",
+    icon: "G",
+    status: "Wallet option",
+  },
+  {
+    key: "link",
+    label: "Link by Stripe",
+    helper: "Use a saved Link account for faster checkout when available.",
+    icon: "🔗",
+    status: "Fast checkout",
+  },
+  {
+    key: "saved_method",
+    label: "Saved payment method",
+    helper: "Returning Pet Parents can use saved payment details when available.",
+    icon: "✅",
+    status: "Account option",
+  },
+  {
+    key: "bank_account",
+    label: "ACH / bank account",
+    helper: "Bank account payments are planned for larger bookings and future support.",
+    icon: "🏦",
+    status: "Coming soon",
+  },
+  {
+    key: "pawperks_credit",
+    label: "PawPerks / referral credit",
+    helper: "Credits can be applied before final payment when available on your account.",
+    icon: "🐾",
+    status: "Account credit",
+  },
+  {
+    key: "promo_code",
+    label: "Promo code",
+    helper: "Enter a SitGuru promo code before secure checkout.",
+    icon: "🏷️",
+    status: "Optional",
+  },
+  {
+    key: "gift_card",
+    label: "Gift card / SitGuru credit",
+    helper: "Use SitGuru credit or gift card balance when available.",
+    icon: "🎁",
+    status: "Optional",
   },
 ];
 
@@ -1241,6 +1324,10 @@ export default function BookGuruClient({
 
   const [tipChoice, setTipChoice] = useState<TipChoice>("none");
   const [customTipAmount, setCustomTipAmount] = useState("");
+  const [selectedPaymentOption, setSelectedPaymentOption] =
+    useState<PaymentOption>("card");
+  const [promoCode, setPromoCode] = useState("");
+  const [giftCardCode, setGiftCardCode] = useState("");
 
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -1333,6 +1420,10 @@ export default function BookGuruClient({
   }, [customTipAmount, selectedGuruServiceIsCustomQuote, servicePrice, tipChoice]);
 
   const tipCents = dollarsToCents(tipAmount);
+
+  const selectedPaymentOptionLabel =
+    paymentOptions.find((option) => option.key === selectedPaymentOption)?.label ||
+    "Credit / debit card";
 
   const guruEstimatedBasePayout = Number(servicePrice.toFixed(2));
 
@@ -2373,6 +2464,16 @@ export default function BookGuruClient({
         tip_amount: tipAmount,
         tipCents,
         tip_cents: tipCents,
+        paymentOption: selectedPaymentOption,
+        payment_option: selectedPaymentOption,
+        paymentOptionLabel: selectedPaymentOptionLabel,
+        payment_option_label: selectedPaymentOptionLabel,
+        promoCode: promoCode.trim() || null,
+        promo_code: promoCode.trim() || null,
+        giftCardCode: giftCardCode.trim() || null,
+        gift_card_code: giftCardCode.trim() || null,
+        creditPreferenceRequested: selectedPaymentOption === "pawperks_credit",
+        credit_preference_requested: selectedPaymentOption === "pawperks_credit",
         guruTipAmount: tipAmount,
         guru_tip_amount: tipAmount,
 
@@ -2433,6 +2534,14 @@ export default function BookGuruClient({
           `Marketplace Support: ${formatMoney(
             marketplaceFee,
           )}. Helps keep SitGuru running for our Pet Care Community.`,
+          `Payment option selected: ${selectedPaymentOptionLabel}`,
+          promoCode.trim() ? `Promo code entered: ${promoCode.trim()}` : "",
+          giftCardCode.trim()
+            ? `Gift card / SitGuru credit entered: ${giftCardCode.trim()}`
+            : "",
+          selectedPaymentOption === "pawperks_credit"
+            ? "Pet Parent requested available PawPerks / referral credit to be applied before final payment."
+            : "",
           `Guru tip selected: ${formatMoney(
             tipAmount,
           )}. 100% of the tip goes directly to the Guru.`,
@@ -3385,8 +3494,8 @@ export default function BookGuruClient({
                   Secure checkout
                 </h2>
                 <p className="mt-2 text-base font-semibold leading-7 text-slate-700">
-                  Review and accept the booking acknowledgements before
-                  continuing.
+                  Choose a payment option, review optional credits and tips, then
+                  accept the booking acknowledgements before continuing.
                 </p>
 
                 <div className="mt-6 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 p-5">
@@ -3395,9 +3504,126 @@ export default function BookGuruClient({
                     trusted pet care
                   </p>
                   <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">
-                    Review your booking details, choose an optional Guru tip,
-                    and continue through secure checkout when you are ready.
+                    Desktop now matches the mobile payment flow: card, digital
+                    wallet, saved method, PawPerks/referral credit, promo code,
+                    gift card/SitGuru credit, and optional Guru tip.
                   </p>
+                </div>
+
+                <div className="mt-6 rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-lg font-black text-slate-950">
+                        Payment options
+                      </p>
+                      <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-slate-700">
+                        Pick how you want to pay or apply credits. Final card,
+                        wallet, Link, and saved payment options are completed
+                        inside SitGuru secure checkout.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-950 px-4 py-3 text-right">
+                      <p className="text-xs font-black uppercase tracking-[0.12em] text-white">
+                        Selected
+                      </p>
+                      <p className="text-sm font-black text-white">
+                        {selectedPaymentOptionLabel}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {paymentOptions.map((option) => {
+                      const selected = selectedPaymentOption === option.key;
+                      const comingSoon = option.key === "bank_account";
+
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPaymentOption(option.key);
+                            setSubmitError("");
+                          }}
+                          className={[
+                            "rounded-2xl border p-4 text-left transition",
+                            selected
+                              ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.16)]"
+                              : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/70",
+                          ].join(" ")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-xl font-black text-slate-950 shadow-sm">
+                              {option.icon}
+                            </span>
+                            <span
+                              className={[
+                                "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em]",
+                                comingSoon
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-emerald-100 text-emerald-800",
+                              ].join(" ")}
+                            >
+                              {option.status}
+                            </span>
+                          </div>
+                          <p
+                            className={[
+                              "mt-3 text-base font-black",
+                              selected ? "text-emerald-800" : "text-slate-950",
+                            ].join(" ")}
+                          >
+                            {option.label}
+                          </p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                            {option.helper}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className={labelClass()} htmlFor="promo-code">
+                        Promo code
+                      </label>
+                      <input
+                        id="promo-code"
+                        value={promoCode}
+                        onChange={(event) =>
+                          setPromoCode(event.target.value.toUpperCase())
+                        }
+                        className={fieldClass()}
+                        placeholder="Optional promo code"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelClass()} htmlFor="gift-card-code">
+                        Gift card / SitGuru credit
+                      </label>
+                      <input
+                        id="gift-card-code"
+                        value={giftCardCode}
+                        onChange={(event) =>
+                          setGiftCardCode(event.target.value.toUpperCase())
+                        }
+                        className={fieldClass()}
+                        placeholder="Optional credit code"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                    <p className="text-sm font-bold leading-6 text-sky-900">
+                      Payment is kept on-platform. PawPerks, referral credit,
+                      promo codes, and SitGuru credit are recorded with the
+                      booking request and can be applied before final payment
+                      when available.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mt-6 rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-sm">
@@ -3501,7 +3727,7 @@ export default function BookGuruClient({
                     {
                       checked: paymentAccepted,
                       setChecked: setPaymentAccepted,
-                      text: "I understand SitGuru securely processes payment at checkout and that refunds or disputes follow SitGuru platform policies.",
+                      text: "I understand SitGuru securely processes payment at checkout. Any PawPerks credit, referral credit, promo code, gift card, or SitGuru credit must stay on-platform and is subject to SitGuru policies.",
                     },
                     {
                       checked: payoutAccepted,
@@ -3824,6 +4050,37 @@ export default function BookGuruClient({
                   A small support charge helps keep SitGuru running for our Pet
                   Care Community. Varies by locality.
                 </p>
+
+                <div className="mt-3 flex justify-between gap-4 text-sm">
+                  <span className="font-semibold text-slate-600">
+                    Payment option
+                  </span>
+                  <span className="text-right font-black text-slate-950">
+                    {selectedPaymentOptionLabel}
+                  </span>
+                </div>
+
+                {promoCode.trim() ? (
+                  <div className="mt-3 flex justify-between gap-4 text-sm">
+                    <span className="font-semibold text-slate-600">
+                      Promo code
+                    </span>
+                    <span className="text-right font-black text-emerald-700">
+                      {promoCode.trim()}
+                    </span>
+                  </div>
+                ) : null}
+
+                {giftCardCode.trim() ? (
+                  <div className="mt-3 flex justify-between gap-4 text-sm">
+                    <span className="font-semibold text-slate-600">
+                      Gift card / credit
+                    </span>
+                    <span className="text-right font-black text-emerald-700">
+                      {giftCardCode.trim()}
+                    </span>
+                  </div>
+                ) : null}
 
                 <div className="mt-3 flex justify-between gap-4 text-sm">
                   <span className="font-semibold text-slate-600">Guru Tip</span>
