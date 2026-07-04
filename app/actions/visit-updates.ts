@@ -290,3 +290,278 @@ export async function addVisitUpdateAction(
 
   return { success: true, sessionId: session.id };
 }
+
+
+type WalkTrackPayload = {
+  bookingId: string;
+  walkTrackId: string;
+  lat?: number | null;
+  lng?: number | null;
+  accuracy?: number | null;
+  totalDistanceMeters?: number | null;
+  totalDurationSeconds?: number | null;
+};
+
+type WalkTrackResult = ActionResult & {
+  walkTrackId?: string;
+};
+
+function formatWalkDistanceForNote(meters?: number | null) {
+  if (!meters || !Number.isFinite(meters) || meters <= 0) return "0.00 mi";
+
+  const miles = meters / 1609.344;
+  return `${miles.toFixed(miles >= 10 ? 1 : 2)} mi`;
+}
+
+function formatWalkDurationForNote(seconds?: number | null) {
+  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return "0 min";
+
+  const minutes = Math.max(1, Math.round(seconds / 60));
+
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (remainingMinutes === 0) return `${hours} hr`;
+
+  return `${hours} hr ${remainingMinutes} min`;
+}
+
+export async function startWalkTrackAction(
+  bookingId: string,
+  location?: LocationPayload
+): Promise<WalkTrackResult> {
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return {
+      success: false,
+      error: "You must be logged in to start live walk tracking.",
+    };
+  }
+
+  if (!bookingId) {
+    return { success: false, error: "Missing booking ID." };
+  }
+
+  if (location?.lat == null || location?.lng == null) {
+    return {
+      success: false,
+      error: "Location is required to start live walk tracking.",
+    };
+  }
+
+  const session = await getOrCreateSession(bookingId, userId);
+
+  if (!session?.id) {
+    return { success: false, error: "Could not find PawReport session." };
+  }
+
+  const now = new Date().toISOString();
+
+  const { data: walkTrack, error: walkError } = await supabaseAdmin
+    .from("booking_walk_tracks")
+    .insert({
+      booking_id: bookingId,
+      session_id: session.id,
+      guru_id: userId,
+      status: "in_progress",
+      started_at: now,
+      start_lat: location.lat,
+      start_lng: location.lng,
+      end_lat: null,
+      end_lng: null,
+      total_distance_meters: 0,
+      total_duration_seconds: 0,
+      updated_at: now,
+    })
+    .select("id")
+    .single();
+
+  if (walkError || !walkTrack?.id) {
+    console.error("Start live walk error:", walkError);
+    return { success: false, error: "Could not start live walk tracking." };
+  }
+
+  const { error: pointError } = await supabaseAdmin
+    .from("booking_walk_track_points")
+    .insert({
+      walk_track_id: walkTrack.id,
+      booking_id: bookingId,
+      session_id: session.id,
+      guru_id: userId,
+      lat: location.lat,
+      lng: location.lng,
+      accuracy: location.accuracy ?? null,
+      recorded_at: now,
+    });
+
+  if (pointError) {
+    console.error("Start live walk point error:", pointError);
+  }
+
+  await supabaseAdmin.from("booking_visit_updates").insert({
+    session_id: session.id,
+    booking_id: bookingId,
+    update_type: "walk",
+    note: "Live walk started.",
+    lat: location.lat,
+    lng: location.lng,
+    accuracy: location.accuracy ?? null,
+  });
+
+  revalidateVisitPaths(bookingId);
+
+  return {
+    success: true,
+    sessionId: session.id,
+    walkTrackId: walkTrack.id,
+  };
+}
+
+export async function recordWalkTrackPointAction(
+  payload: WalkTrackPayload
+): Promise<WalkTrackResult> {
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return {
+      success: false,
+      error: "You must be logged in to save live walk tracking.",
+    };
+  }
+
+  if (!payload.bookingId || !payload.walkTrackId) {
+    return { success: false, error: "Missing walk tracking details." };
+  }
+
+  if (payload.lat == null || payload.lng == null) {
+    return { success: false, error: "Missing live walk location." };
+  }
+
+  const session = await getOrCreateSession(payload.bookingId, userId);
+
+  if (!session?.id) {
+    return { success: false, error: "Could not find PawReport session." };
+  }
+
+  const now = new Date().toISOString();
+
+  const { error: pointError } = await supabaseAdmin
+    .from("booking_walk_track_points")
+    .insert({
+      walk_track_id: payload.walkTrackId,
+      booking_id: payload.bookingId,
+      session_id: session.id,
+      guru_id: userId,
+      lat: payload.lat,
+      lng: payload.lng,
+      accuracy: payload.accuracy ?? null,
+      recorded_at: now,
+    });
+
+  if (pointError) {
+    console.error("Record live walk point error:", pointError);
+    return { success: false, error: "Could not save live walk point." };
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from("booking_walk_tracks")
+    .update({
+      end_lat: payload.lat,
+      end_lng: payload.lng,
+      total_distance_meters: payload.totalDistanceMeters ?? 0,
+      total_duration_seconds: payload.totalDurationSeconds ?? 0,
+      updated_at: now,
+    })
+    .eq("id", payload.walkTrackId);
+
+  if (updateError) {
+    console.error("Update live walk summary error:", updateError);
+  }
+
+  revalidateVisitPaths(payload.bookingId);
+
+  return {
+    success: true,
+    sessionId: session.id,
+    walkTrackId: payload.walkTrackId,
+  };
+}
+
+export async function endWalkTrackAction(
+  payload: WalkTrackPayload
+): Promise<WalkTrackResult> {
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return {
+      success: false,
+      error: "You must be logged in to end live walk tracking.",
+    };
+  }
+
+  if (!payload.bookingId || !payload.walkTrackId) {
+    return { success: false, error: "Missing walk tracking details." };
+  }
+
+  const session = await getOrCreateSession(payload.bookingId, userId);
+
+  if (!session?.id) {
+    return { success: false, error: "Could not find PawReport session." };
+  }
+
+  const now = new Date().toISOString();
+  const distanceLabel = formatWalkDistanceForNote(payload.totalDistanceMeters);
+  const durationLabel = formatWalkDurationForNote(payload.totalDurationSeconds);
+
+  const { error: updateError } = await supabaseAdmin
+    .from("booking_walk_tracks")
+    .update({
+      status: "completed",
+      ended_at: now,
+      end_lat: payload.lat ?? null,
+      end_lng: payload.lng ?? null,
+      total_distance_meters: payload.totalDistanceMeters ?? 0,
+      total_duration_seconds: payload.totalDurationSeconds ?? 0,
+      updated_at: now,
+    })
+    .eq("id", payload.walkTrackId);
+
+  if (updateError) {
+    console.error("End live walk error:", updateError);
+    return { success: false, error: "Could not end live walk tracking." };
+  }
+
+  if (payload.lat != null && payload.lng != null) {
+    await supabaseAdmin.from("booking_walk_track_points").insert({
+      walk_track_id: payload.walkTrackId,
+      booking_id: payload.bookingId,
+      session_id: session.id,
+      guru_id: userId,
+      lat: payload.lat,
+      lng: payload.lng,
+      accuracy: payload.accuracy ?? null,
+      recorded_at: now,
+    });
+  }
+
+  await supabaseAdmin.from("booking_visit_updates").insert({
+    session_id: session.id,
+    booking_id: payload.bookingId,
+    update_type: "walk",
+    note: `Live walk completed. Distance: ${distanceLabel}. Duration: ${durationLabel}.`,
+    lat: payload.lat ?? null,
+    lng: payload.lng ?? null,
+    accuracy: payload.accuracy ?? null,
+  });
+
+  revalidateVisitPaths(payload.bookingId);
+
+  return {
+    success: true,
+    sessionId: session.id,
+    walkTrackId: payload.walkTrackId,
+  };
+}
