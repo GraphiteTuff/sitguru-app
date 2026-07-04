@@ -1533,11 +1533,11 @@ function GuruSetupChecklist({
     },
     {
       number: 3,
-      title: "Add services, pricing, and public request",
-      body: "Choose your care services, confirm your rates, and request public visibility after your setup is ready.",
+      title: "Add services and pricing",
+      body: "Open the dedicated Pricing Workspace to choose services, set rates, manage custom quotes, and keep the booking calendar accurate.",
       status: hasServices ? "complete" : "needs_action",
       statusLabel: hasServices ? "Complete" : "Needs Action",
-      href: "/guru/dashboard/profile?step=3",
+      href: "/guru/dashboard/pricing",
     },
     {
       number: 4,
@@ -1891,6 +1891,8 @@ export default async function GuruDashboardPage() {
   ]);
 
   const pawReportStats = await getGuruPawReportStats(bookings);
+  const enabledPricedServiceRates = serviceRates.filter(isServiceRatePriced);
+  const serviceRatesReady = enabledPricedServiceRates.length > 0;
 
   const name = getGuruName(guruProfile, user.email);
   const welcomeName = getFirstName(name);
@@ -1987,6 +1989,12 @@ export default async function GuruDashboardPage() {
                   Availability
                 </Link>
                 <Link
+                  href="/guru/dashboard/pricing"
+                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  Pricing
+                </Link>
+                <Link
                   href="/guru/dashboard/profile"
                   className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
                 >
@@ -2071,7 +2079,7 @@ export default async function GuruDashboardPage() {
             </Link>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <DashboardSnapshotCard
               eyebrow="Care Schedule"
               title="Upcoming bookings"
@@ -2107,6 +2115,20 @@ export default async function GuruDashboardPage() {
               tone="violet"
             />
             <DashboardSnapshotCard
+              eyebrow="Pricing"
+              title="Rate workspace"
+              value={enabledPricedServiceRates.length}
+              helper={
+                serviceRatesReady
+                  ? "Service rates are active and feeding the customer booking calendar."
+                  : "Add service rates so Pet Parents can see accurate calendar pricing."
+              }
+              href="/guru/dashboard/pricing"
+              actionLabel="Manage pricing"
+              icon="💚"
+              tone={serviceRatesReady ? "emerald" : "amber"}
+            />
+            <DashboardSnapshotCard
               eyebrow="Profile Health"
               title="Public profile"
               value={`${profileCompletion}%`}
@@ -2126,7 +2148,7 @@ export default async function GuruDashboardPage() {
         <GuruSetupChecklist
           profile={guruProfile}
           profileCompletion={profileCompletion}
-          serviceRatesReady={hasEnabledPricedServiceRates(serviceRates)}
+          serviceRatesReady={serviceRatesReady}
           onboardingPacket={onboardingPacket}
         />
 
@@ -2432,20 +2454,16 @@ export default async function GuruDashboardPage() {
             </div>
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-black uppercase tracking-[0.16em] !text-slate-700">
-                Rate
+                Pricing
               </p>
               <p className="mt-1 text-lg font-black !text-slate-900">
-                {guruProfile.rate ||
-                guruProfile.hourly_rate ||
-                guruProfile.price
-                  ? "Rate ready"
-                  : "Rate pending"}
+                {serviceRatesReady ? "Pricing ready" : "Pricing pending"}
               </p>
               <Link
-                href="/guru/dashboard/earnings"
+                href="/guru/dashboard/pricing"
                 className="mt-4 flex rounded-xl border border-cyan-200 px-5 py-3 text-sm font-black !text-[#07132f] hover:bg-cyan-50"
               >
-                View Earnings
+                Manage Pricing
               </Link>
             </div>
           </div>
