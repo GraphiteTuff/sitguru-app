@@ -360,13 +360,22 @@ export default async function AdminReviewsPage({ searchParams }: PageProps) {
         <div className="rounded-[2rem] bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-6 text-white shadow-xl sm:p-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-200">
+              <p
+                className="text-xs font-black uppercase tracking-[0.24em] text-emerald-100"
+                style={{ color: "#ecfdf5", WebkitTextFillColor: "#ecfdf5" }}
+              >
                 Admin Reviews
               </p>
-              <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] text-white sm:text-5xl">
+              <h1
+                className="mt-3 text-3xl font-black tracking-[-0.05em] text-white sm:text-5xl"
+                style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
+              >
                 Reviews & Trust Signals
               </h1>
-              <p className="mt-4 max-w-3xl text-sm font-bold leading-7 text-emerald-50 sm:text-base">
+              <p
+                className="mt-4 max-w-3xl text-sm font-bold leading-7 text-emerald-50 sm:text-base"
+                style={{ color: "#ecfdf5", WebkitTextFillColor: "#ecfdf5" }}
+              >
                 Review Guru ratings, Pet Parent feedback, public/private status,
                 would-book-again signals, and booking-level trust details.
               </p>

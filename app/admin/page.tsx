@@ -368,13 +368,22 @@ export default async function AdminOperationsDashboard() {
     <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <div className="rounded-[32px] bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-6 text-white shadow-xl sm:p-8">
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-200">
+          <p
+            className="text-xs font-black uppercase tracking-[0.24em] text-emerald-100"
+            style={{ color: "#ecfdf5", WebkitTextFillColor: "#ecfdf5" }}
+          >
             Admin Control
           </p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] sm:text-5xl">
+          <h1
+            className="mt-3 text-3xl font-black tracking-[-0.05em] text-white sm:text-5xl"
+            style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
+          >
             SitGuru Operations Dashboard
           </h1>
-          <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-emerald-50 sm:text-base">
+          <p
+            className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-emerald-50 sm:text-base"
+            style={{ color: "#ecfdf5", WebkitTextFillColor: "#ecfdf5" }}
+          >
             Daily command center for marketplace operations, people queues,
             bookings, messages, reviews, payouts, readiness, Trust & Safety, and growth
             work.
