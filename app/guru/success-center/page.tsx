@@ -57,7 +57,7 @@ const fallbackGuruResources: GuruResource[] = [
     id: "profile-setup",
     title: "Create a stronger Guru profile",
     description:
-      "Improve your profile photo, bio, services, service area, trust signals, and care details so pet parents feel confident booking you.",
+      "Improve your profile photo, bio, services, service area, trust signals, care details, and review-readiness so Pet Parents feel confident booking you.",
     category: "Profile Growth",
     type: "guide",
     tags: ["Profile", "Trust", "Photos", "Bio"],
@@ -66,10 +66,22 @@ const fallbackGuruResources: GuruResource[] = [
     sortOrder: 10,
   },
   {
+    id: "bookings-command-center",
+    title: "Use the Bookings & PawReports command center",
+    description:
+      "Learn how to open a booking, message the Pet Parent, start or continue a PawReport, begin a live walk, add updates, and complete the care summary.",
+    category: "Bookings",
+    type: "guide",
+    tags: ["Bookings", "PawReports", "Messages", "Live Walk"],
+    keywords: ["booking", "bookings", "pawreport", "paw report", "start pawreport", "continue pawreport", "live walk", "message pet parent"],
+    featured: true,
+    sortOrder: 15,
+  },
+  {
     id: "earn-more",
     title: "Increase bookings and earnings",
     description:
-      "Use availability, fast replies, repeat-client habits, smart pricing, and strong service quality to grow your Guru business.",
+      "Use availability, fast replies, repeat-client habits, smart pricing, My Calendar, and strong service quality to grow your Guru business.",
     category: "Earnings",
     type: "tip",
     tags: ["Bookings", "Profit", "Growth", "Repeat Clients"],
@@ -78,18 +90,17 @@ const fallbackGuruResources: GuruResource[] = [
     sortOrder: 20,
   },
   {
-    id: "visit-checklist",
-    title: "Before every visit checklist",
+    id: "pawreport-live-walk",
+    title: "PawReport Live and live walk tracking",
     description:
-      "Confirm care instructions, access details, feeding, medication, emergency contacts, routines, and update expectations before every visit.",
-    category: "Care Standards",
+      "Start PawReport Live from a booking, start or pause a walk, resume when needed, end the walk, and save distance, duration, photos, notes, and care updates for the Pet Parent.",
+    category: "PawReport",
     type: "guide",
-    tags: ["Care", "Checklist", "Visit", "Safety"],
-    keywords: ["visit", "checklist", "before", "care", "feeding", "medication", "routine", "instructions", "access", "keys"],
+    tags: ["PawReport Live", "Live Walk", "GPS", "Care Updates"],
+    keywords: ["pawreport live", "live walk", "walk tracking", "gps", "start walk", "pause walk", "resume walk", "end walk", "distance", "duration", "location"],
     featured: true,
-    sortOrder: 30,
+    sortOrder: 22,
   },
-
   {
     id: "pawreport-mastery",
     title: "SitGuru PawReport™ Mastery",
@@ -98,13 +109,37 @@ const fallbackGuruResources: GuruResource[] = [
     category: "PawReport",
     type: "guide",
     tags: ["PawReport", "Photos", "Care Notes", "Updates"],
-    keywords: ["pawreport", "paw report", "visit updates", "photos", "potty", "pee", "poop", "food", "water", "care notes", "complete report"],
+    keywords: ["pawreport", "paw report", "visit updates", "photos", "potty", "pee", "poop", "food", "water", "mood", "play", "medication", "care notes", "complete report"],
     featured: true,
     sortOrder: 25,
   },
   {
+    id: "my-calendar-pricing",
+    title: "My Calendar, pricing, and service rules",
+    description:
+      "Use My Calendar to manage service pricing, daily custom prices, peak-time pricing, multi-pet settings, multi-day discounts, and when you are available for care.",
+    category: "Earnings",
+    type: "guide",
+    tags: ["My Calendar", "Pricing", "Availability", "Services"],
+    keywords: ["calendar", "my calendar", "availability", "pricing", "daily price", "peak", "multi pet", "multi-day", "discount", "service rates"],
+    featured: true,
+    sortOrder: 28,
+  },
+  {
+    id: "visit-checklist",
+    title: "Before every visit checklist",
+    description:
+      "Confirm care instructions, access details, feeding, medication, emergency contacts, routines, walk expectations, and update expectations before every visit.",
+    category: "Care Standards",
+    type: "guide",
+    tags: ["Care", "Checklist", "Visit", "Safety"],
+    keywords: ["visit", "checklist", "before", "care", "feeding", "medication", "routine", "instructions", "access", "keys", "walk"],
+    featured: true,
+    sortOrder: 30,
+  },
+  {
     id: "communication",
-    title: "Communicating with pet parents",
+    title: "Communicating with Pet Parents",
     description:
       "Use clear, warm, professional messages before, during, and after each booking to build trust and encourage repeat clients.",
     category: "Communication",
@@ -129,11 +164,11 @@ const fallbackGuruResources: GuruResource[] = [
     id: "safety",
     title: "Pet safety and emergency basics",
     description:
-      "Know what to do when something feels unsafe, a pet seems sick, access fails, instructions are unclear, or urgent support is needed.",
+      "Know what to do when something feels unsafe, a pet seems sick, access fails, GPS permissions do not work, instructions are unclear, or urgent support is needed.",
     category: "Trust & Safety",
     type: "guide",
     tags: ["Safety", "Emergency", "Support", "Trust"],
-    keywords: ["safe", "safety", "emergency", "urgent", "hurt", "sick", "problem", "incident", "support", "danger"],
+    keywords: ["safe", "safety", "emergency", "urgent", "hurt", "sick", "problem", "incident", "support", "danger", "gps", "location"],
     sortOrder: 60,
   },
   {
@@ -151,7 +186,7 @@ const fallbackGuruResources: GuruResource[] = [
     id: "training-videos",
     title: "Guru Training Videos",
     description:
-      "A future YouTube-style library for training lessons, profile coaching, care walkthroughs, safety tips, and earnings guidance.",
+      "A future YouTube-style library for training lessons, profile coaching, PawReport Live walkthroughs, care standards, safety tips, and earnings guidance.",
     category: "Training Videos",
     type: "video",
     tags: ["Videos", "Training", "Academy", "Lessons"],
@@ -162,19 +197,23 @@ const fallbackGuruResources: GuruResource[] = [
 ];
 
 const quickSearches = [
+  "How do I start a PawReport?",
+  "How do I start and stop a live walk?",
+  "How do Pet Parents see my updates?",
   "How do I get more bookings?",
-  "How do I earn more as a Guru?",
+  "How do I use My Calendar and pricing?",
   "How can I improve my profile?",
   "What should I do before a visit?",
   "How do I create a great PawReport?",
   "How do payments work?",
-  "How should I message a pet parent?",
+  "How should I message a Pet Parent?",
   "What should I do in an emergency?",
   "Where will training videos go?",
 ];
 
 const fallbackCategories = [
   "Bookings",
+  "PawReport",
   "Earnings",
   "Profile Growth",
   "Care Standards",
@@ -271,17 +310,17 @@ function getAssistantAnswer(query: string, matches: GuruResource[]) {
 
   const answers: Record<SearchIntent, string> = {
     bookings:
-      "To get more bookings, keep your availability current, respond quickly, make your profile feel trustworthy, ask happy clients to book you again, and communicate clearly before every visit. Start with profile growth, communication, and earnings resources.",
+      "To manage bookings well, open the Bookings & PawReports page, select the booking, and use the command center to message the Pet Parent, start or continue PawReport Live, start a walk when needed, add updates, and complete the visit summary. To get more bookings, keep availability, pricing, profile details, and replies current.",
     earnings:
-      "To increase earnings, focus on reliable availability, repeat clients, strong reviews, fast replies, smart pricing, and excellent care. Small improvements in trust and communication can turn one booking into many repeat bookings.",
+      "To increase earnings, focus on reliable availability, repeat clients, strong reviews, fast replies, smart pricing, and excellent care. Use My Calendar to manage services, daily prices, peak-time pricing, multi-pet settings, and discounts so Pet Parents see clear care options.",
     profile:
       "A strong Guru profile should quickly show who you are, where you serve, what care you provide, and why pet parents can trust you. Use a clear photo, warm bio, specific services, and details that make you feel dependable.",
     care:
-      "Before every visit, confirm access instructions, feeding, medication, routines, emergency contacts, and update expectations. Great care means being prepared, following details, and communicating anything unusual right away.",
+      "Before every visit, confirm access instructions, feeding, medication, routines, emergency contacts, walk expectations, and PawReport expectations. During care, use PawReport Live for photos, potty updates, food, water, play, mood, medication, notes, and live walk tracking when a walk is part of the booking.",
     payments:
       "For payment questions, check payout timing, pending versus approved earnings, referral rewards, and booking history. Keep your profile and payout details complete so earnings can be tracked cleanly.",
     communication:
-      "Great communication is fast, friendly, and specific. Confirm details before the visit, send helpful updates during care, and stay calm and professional if a pet parent has a concern.",
+      "Great communication is fast, friendly, and specific. Confirm details before the visit, use PawReport Live during care, send helpful notes and photos, and stay calm and professional if a Pet Parent has a concern.",
     safety:
       "For safety or emergency issues, prioritize the pet’s wellbeing, follow the pet parent’s instructions, use emergency contacts when needed, and contact support when something feels unsafe, unclear, or urgent.",
     training:
@@ -558,22 +597,21 @@ export default function GuruSuccessCenterPage() {
             </div>
           ) : null}
         </Card>
-
-
         <Card className="sgsc-pawreport-card">
           <div className="sgsc-pawreport-hero">
             <div>
               <p className="sgsc-pawreport-kicker">Signature SitGuru Feature</p>
               <div role="heading" aria-level={2} className="sgsc-pawreport-title">
-                SitGuru PawReport™ Mastery
+                PawReport Live + Live Walk Tracking
               </div>
               <p className="sgsc-pawreport-copy">
-                PawReports are how Gurus show Pet Parents that care happened, how the pet did,
-                and why booking through SitGuru feels more professional than texting updates manually.
+                PawReport Live is the Guru's care command center. It lets you start a booking update,
+                track walks when walking is part of the service, add photos and care notes, and give
+                Pet Parents a clear real-time view from their dashboard.
               </p>
             </div>
 
-            <div className="sgsc-pawreport-badge">🐾 PawReport Ready</div>
+            <div className="sgsc-pawreport-badge">🐾 Live Care Ready</div>
           </div>
 
           <div className="sgsc-pawreport-layout">
@@ -581,10 +619,11 @@ export default function GuruSuccessCenterPage() {
               <p className="sgsc-muted-label">How Gurus use it</p>
               <div className="sgsc-pawreport-steps">
                 {[
-                  ["1", "Open the booking", "Use the booking card and choose PawReport."],
-                  ["2", "Start PawReport", "Start it when care begins so the Pet Parent sees the visit is active."],
-                  ["3", "Add care updates", "Use photos, pee, poop, food, water, and care notes during the visit."],
-                  ["4", "Complete PawReport", "End with a warm final note before leaving or shortly after service ends."],
+                  ["1", "Open the booking", "Go to Bookings & PawReports, select the booking, and choose Start PawReport / Live Walk."],
+                  ["2", "Start PawReport Live", "Start it when care begins so the Pet Parent can see that the visit is active."],
+                  ["3", "Start or end walks", "Use Start Walk, Pause, Resume, and End Walk when walking is part of the service."],
+                  ["4", "Add real care updates", "Log photos, pee, poop, food, water, medication, mood, play, and care notes as needed."],
+                  ["5", "Complete the summary", "End with a warm final note so the PawReport is saved to booking history."],
                 ].map(([number, title, copy]) => (
                   <div key={title} className="sgsc-pawreport-step">
                     <span>{number}</span>
@@ -598,14 +637,15 @@ export default function GuruSuccessCenterPage() {
             </div>
 
             <div className="sgsc-pawreport-panel sgsc-pawreport-panel-soft">
-              <p className="sgsc-muted-label">Five-star PawReport checklist</p>
+              <p className="sgsc-muted-label">Five-star live care checklist</p>
               <div className="sgsc-pawreport-checks">
                 {[
-                  "Use the pet’s name in the note",
+                  "Start PawReport Live when care begins",
+                  "Allow location access before starting a live walk",
+                  "Use Start Walk and End Walk for walk distance and duration",
                   "Upload at least one clear photo when appropriate",
-                  "Record potty activity when relevant",
-                  "Confirm food or fresh water when part of the service",
-                  "Write a specific final note instead of only saying everything was good",
+                  "Record potty, food, water, medication, mood, or play updates when relevant",
+                  "Write a specific final note with the pet's name and how the visit went",
                 ].map((item) => (
                   <div key={item} className="sgsc-pawreport-check">
                     <span>✓</span>
@@ -618,9 +658,9 @@ export default function GuruSuccessCenterPage() {
             <div className="sgsc-pawreport-panel sgsc-pawreport-example">
               <p className="sgsc-muted-label">Example final note</p>
               <p>
-                Scout had a great visit today. We completed a short walk, he went pee,
-                drank fresh water, and relaxed near the window afterward. He seemed happy,
-                calm, and comfortable when I left.
+                Scout had a great visit today. We completed a 22-minute walk, he went pee,
+                drank fresh water, and enjoyed some playtime afterward. He seemed happy,
+                comfortable, and relaxed when I left. I saved the photos and walk summary here.
               </p>
             </div>
           </div>

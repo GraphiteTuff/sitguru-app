@@ -67,7 +67,7 @@ const quickHelpCards: HelpCard[] = [
     title: "Pet Parent Help",
     eyebrow: "Find trusted care",
     description:
-      "Get help finding Gurus, understanding pet care details, preparing for bookings, and managing your SitGuru experience.",
+      "Find Gurus, book care, add pet details, message your Guru, and view PawReport Live updates, photos, walk status, distance, duration, and final care summaries.",
     href: "/search",
     cta: "Find Care",
     icon: <PawPrint className="h-6 w-6" />,
@@ -76,7 +76,7 @@ const quickHelpCards: HelpCard[] = [
     title: "Pet Guru Help",
     eyebrow: "Join as a local provider",
     description:
-      "Get help joining as a Pet Guru, building your profile, choosing services, setting your local area, and connecting with Pet Parents.",
+      "Build your profile, manage pricing in My Calendar, handle bookings, start PawReports, track live walks, add care updates, and complete summaries for Pet Parents.",
     href: "/become-a-guru",
     cta: "Become a Guru",
     icon: <UsersRound className="h-6 w-6" />,
@@ -109,10 +109,10 @@ const quickHelpCards: HelpCard[] = [
     icon: <CalendarCheck className="h-6 w-6" />,
   },
   {
-    title: "SitGuru PawReport™",
-    eyebrow: "Photos, notes & care updates",
+    title: "PawReport Live",
+    eyebrow: "Live walks and care updates",
     description:
-      "Learn how PawReports help Pet Parents stay connected and how Gurus share photos, potty updates, food and water confirmations, care notes, and completion summaries.",
+      "Learn how Gurus start PawReport Live, track walks, pause and resume walking, add photos and care updates, and how Pet Parents view everything from their dashboard.",
     href: "#pawreport-help",
     cta: "PawReport Help",
     icon: <PawPrint className="h-6 w-6" />,
@@ -130,7 +130,7 @@ const quickHelpCards: HelpCard[] = [
     title: "Programs & Ambassadors",
     eyebrow: "Student, Community & Military",
     description:
-      "Learn about Student Hire, Community Hire, Military Hire, and Ambassador pathways that help SitGuru grow locally.",
+      "Learn how Ambassadors use referrals, local outreach, dashboards, payout setup, and Student Hire, Community Hire, and Military Hire pathways to help SitGuru grow.",
     href: "/programs",
     cta: "View Programs",
     icon: <HeartHandshake className="h-6 w-6" />,
@@ -151,7 +151,7 @@ const paymentGuides: PaymentGuide[] = [
     title: "Guru Stripe Setup Guide",
     audience: "For Gurus",
     description:
-      "Complete Stripe payout setup so you can receive payouts for bookings, commission, and referral earnings.",
+      "Complete Stripe payout setup so eligible booking payouts, commission, and referral earnings can be routed correctly.",
     imageSrc: "/help/stripe/sitguru-guru-stripe-setup-guide.png",
     imageAlt: "SitGuru Guru Stripe Setup Guide",
     href: "#guru-stripe-setup",
@@ -183,7 +183,7 @@ const paymentGuides: PaymentGuide[] = [
     title: "Ambassador Stripe Setup Guide",
     audience: "For Ambassadors",
     description:
-      "Complete Stripe payout setup so you can receive ambassador payouts, commission, and referral earnings.",
+      "Complete Stripe payout setup so eligible ambassador payouts, commission, and referral earnings can be routed correctly.",
     imageSrc: "/help/stripe/sitguru-ambassador-stripe-setup-guide.png",
     imageAlt: "SitGuru Ambassador Stripe Setup Guide",
     href: "#ambassador-stripe-setup",
@@ -297,92 +297,54 @@ const helpSections: HelpSection[] = [
       {
         question: "How does SitGuru work?",
         answer:
-          "SitGuru helps Pet Parents discover and connect with Gurus who offer trusted local pet care services. Pet Parents can search for care, review profiles, and use SitGuru tools to support communication and booking-related details.",
-      },
-      {
-        question: "Is SitGuru free to join?",
-        answer:
-          "Yes. SitGuru is designed to keep signup simple for Pet Parents and Pet Gurus. Create an account, build your profile, and use SitGuru to find local pet care connections or local pet care opportunities.",
+          "SitGuru helps Pet Parents discover and book local Gurus for walks, sitting, boarding, drop-ins, daycare, training support, and other pet care needs. The dashboard keeps profiles, bookings, messages, PawReport Live updates, payments, and support context organized.",
       },
       {
         question: "Who is SitGuru for?",
         answer:
-          "SitGuru is for Pet Parents who need trusted care and for Pet Gurus who provide pet care services such as sitting, walking, boarding, drop-ins, grooming support, training support, and more.",
+          "SitGuru is for Pet Parents who need trusted local care, Gurus who want to offer pet care services independently, and Ambassadors who help introduce SitGuru to local communities, students, partners, and pet families.",
       },
       {
-        question: "Is SitGuru only for one city or state?",
+        question: "Is SitGuru free to join?",
         answer:
-          "No. SitGuru is built to support local pet care connections across states, cities, towns, neighborhoods, communities, and townships as the marketplace grows.",
-      },
-    ],
-  },
-  {
-    title: "Onboarding & Setup",
-    description:
-      "Help understanding SitGuru onboarding steps, submitted statuses, documents, and what happens after setup tasks are completed.",
-    icon: <ClipboardCheck className="h-5 w-5" />,
-    items: [
-      {
-        question: "What does Submitted mean on Guru Step 5?",
-        answer:
-          "Submitted means SitGuru received the Guru Onboarding Packet and it is waiting for admin review. Gurus can continue to Step 6 while SitGuru reviews Step 5.",
+          "Yes. Pet Parents can sign up free, Gurus can start their profile free, and Ambassadors can apply or participate through the appropriate SitGuru pathway. Booking payments, payouts, and referral activity are handled separately inside the platform when applicable.",
       },
       {
-        question: "Why is Step 5 amber instead of green?",
+        question: "What dashboards are available?",
         answer:
-          "Amber means Step 5 was submitted and is pending SitGuru review. Once SitGuru approves the packet, Step 5 turns green and shows Complete.",
-      },
-      {
-        question: "Do Gurus have to upload documents during Step 5?",
-        answer:
-          "Only upload documents if SitGuru specifically requested them. Do not upload W-9 forms, full SSNs, banking details, or sensitive payment information through the onboarding packet page.",
-      },
-      {
-        question: "Can a Guru continue to Step 6 before Step 5 is approved?",
-        answer:
-          "Yes. Gurus can save Step 5 and continue to Step 6 to connect Stripe payouts while SitGuru reviews the submitted onboarding packet.",
-      },
-      {
-        question: "What happens after all Guru onboarding steps are complete?",
-        answer:
-          "SitGuru reviews profile readiness, onboarding packet status, trust and safety status, services, pricing, public visibility, and payout readiness before a Guru becomes fully bookable.",
-      },
-      {
-        question: "Where can users get help during onboarding?",
-        answer:
-          "Users can review the Help Center, open the relevant dashboard section, or contact SitGuru support at support@sitguru.com for onboarding, payment, profile, or booking questions.",
+          "Pet Parents use the customer dashboard for pets, bookings, messages, PawReports, PawPerks, and SitGuru University. Gurus use their dashboard as a workstation for profile setup, pricing, My Calendar, bookings, PawReports, live walks, reviews, messages, and payouts. Ambassadors use their dashboard for referrals, outreach, and program activity.",
       },
     ],
   },
   {
     title: "Pet Parents",
-    description: "Help for families looking for trusted local pet care.",
+    description: "Help for families booking trusted local pet care.",
     icon: <PawPrint className="h-5 w-5" />,
     items: [
       {
         question: "How do I find the right Guru?",
         answer:
-          "Review Guru profiles, services, experience, location, care style, and other details. Choose someone who feels like a good fit for your pet’s needs, routine, personality, and care expectations.",
+          "Search by service and location, review Guru profiles, services, service area, pricing, photos, care style, and any available reviews. Choose the Guru who feels like the best match for your pet's routine, personality, and care needs.",
       },
       {
-        question: "What details should I share about my pet?",
+        question: "What should I add to my pet profile?",
         answer:
-          "Helpful details include feeding routines, medication or health notes you choose to provide, behavior notes, walking preferences, emergency contacts, veterinarian information, access instructions, and anything a Guru should know to provide thoughtful care.",
+          "Add routines, feeding details, walking preferences, medication notes, temperament, health details you choose to share, emergency contacts, access instructions, photos, and anything a Guru should know before care begins.",
       },
       {
-        question: "Can I ask questions before booking?",
+        question: "Where do I see live care updates?",
         answer:
-          "Yes. Clear communication helps everyone. Pet Parents should ask questions early so they feel comfortable with the Pet Guru, the service, timing, care expectations, and any special instructions.",
+          "When a Guru starts PawReport Live, your Pet Parent dashboard can show live care activity. Open the booking and choose View Live PawReport to see visit status, walk status, distance, duration, photos, potty updates, food, water, mood, play, medication notes, and the final summary.",
+      },
+      {
+        question: "Can I message my Guru?",
+        answer:
+          "Use SitGuru messaging when available so booking questions, care details, timing, access notes, and support context stay organized in one place.",
       },
       {
         question: "How do Pet Parents pay for services?",
         answer:
-          "Pet Parents can use SitGuru’s secure checkout to review booking details, add a payment method, confirm billing details, submit payment, and manage bookings, receipts, and messages from their dashboard.",
-      },
-      {
-        question: "Why should I keep care details organized through SitGuru?",
-        answer:
-          "Keeping care details organized through SitGuru helps preserve service notes, pet instructions, message history, booking records, and support context if anyone needs to review what was discussed.",
+          "Pet Parents use SitGuru checkout to review booking details, service totals, tips when available, payment status, receipts, and booking records from the dashboard.",
       },
       {
         question: "What if I have an urgent pet safety issue?",
@@ -393,110 +355,132 @@ const helpSections: HelpSection[] = [
   },
   {
     title: "Gurus",
-    description: "Help for expert pet care providers using SitGuru.",
+    description: "Help for pet care providers using SitGuru as a marketplace workstation.",
     icon: <UsersRound className="h-5 w-5" />,
     items: [
       {
-        question: "How do I become a Pet Guru?",
+        question: "What should a Guru do first?",
         answer:
-          "Visit the Become a Guru page, create your profile, choose the services you are interested in offering, share your local service area, and begin building a profile that helps Pet Parents understand your care style.",
+          "Complete your profile, service area, ZIP/location details, services, pricing, onboarding packet, trust and safety steps when required, and Stripe payout setup. Then keep your dashboard current so Pet Parents know what care you offer.",
       },
       {
-        question: "What should I include in my Pet Guru profile?",
+        question: "How do Gurus manage pricing and availability?",
         answer:
-          "Include your services, experience, general service area, availability preferences, photos, care approach, pet types you support, and anything that helps Pet Parents feel confident choosing you.",
+          "Use My Calendar and pricing tools to manage service rates, daily custom prices, multi-pet settings, multi-day discounts, peak-time pricing, availability, and service rules. Clear pricing makes the booking experience easier for Pet Parents.",
       },
       {
-        question: "Do Pet Gurus choose their own services and availability?",
+        question: "Where do Gurus start PawReports and walks?",
         answer:
-          "Yes. Pet Gurus can choose the services they are interested in offering, the areas they prefer to serve, and the requests that fit their availability as SitGuru grows.",
+          "Go to Guru Dashboard, then Bookings & PawReports. Select the booking and use the Live Care command center to Start PawReport, Start Walk, Pause Walk, Resume Walk, End Walk, Add Updates, Complete PawReport, or Message the Pet Parent.",
       },
       {
-        question: "How do Gurus set up Stripe payouts?",
+        question: "What updates should a Guru add during care?",
         answer:
-          "Gurus can use the Guru Stripe Setup Guide to select Individual as the business type, enter personal details, add business details, connect a bank account, choose a payout account, review the setup, and return to the Earnings tab to track payout activity.",
+          "Add updates that match the service: photos, pee, poop, food, water, walk activity, play, mood, medication notes, and care notes. For dog walks, use the live walk controls so distance and duration can be saved to the PawReport.",
       },
       {
-        question: "Is SitGuru only for new pet care providers?",
+        question: "How do Gurus complete a strong PawReport?",
         answer:
-          "No. SitGuru is also for existing sitters, walkers, trainers, groomers, boarding providers, and trusted caregivers who want another way to connect with Pet Parents.",
+          "Start PawReport Live when care begins, add useful updates during care, upload clear photos when appropriate, track walks when relevant, and finish with a specific final summary using the pet's name and how the visit went.",
       },
       {
-        question: "Are Pet Gurus employees of SitGuru?",
+        question: "Are Gurus employees of SitGuru?",
         answer:
-          "Pet Gurus provide services as independent local providers through the SitGuru marketplace. More detailed onboarding, tax, and provider information is shared during the approval and setup process.",
+          "Pet Gurus provide services as independent local providers through the SitGuru marketplace. More detailed onboarding, tax, and provider information is shared during approval and setup.",
+      },
+    ],
+  },
+  {
+    title: "PawReport Live",
+    description:
+      "Help for Pet Parents and Gurus using live care updates, live walks, photos, notes, and summaries.",
+    icon: <PawPrint className="h-5 w-5" />,
+    items: [
+      {
+        question: "What is PawReport Live?",
+        answer:
+          "PawReport Live is the care update system connected to a booking. It can show when care starts, live walk activity, distance and duration, photos, potty updates, food and water confirmations, medication, play, mood, notes, and a final summary.",
       },
       {
-        question: "What are trust and safety steps?",
+        question: "How does live walk tracking work?",
         answer:
-          "Trust and safety steps are simple review or verification steps designed to help protect pets, Pet Parents, Gurus, and the SitGuru community. These steps may vary depending on role, location, services, and platform needs.",
+          "When walking is part of the service, the Guru opens the booking's PawReport, allows browser location access, taps Start Walk, keeps the page open while walking, and taps End Walk when finished. SitGuru saves the walk summary and location points for the booking record.",
+      },
+      {
+        question: "What should Pet Parents expect to see?",
+        answer:
+          "Pet Parents may see the current PawReport status, walk in progress, last update, distance, duration, photos, potty updates, care notes, and completion summary from their dashboard or booking page.",
+      },
+      {
+        question: "Why does location permission matter?",
+        answer:
+          "Live walk tracking uses the browser or phone's location permission. If the Guru blocks location access, closes the page, or uses a device without location support, walk tracking may not update correctly.",
+      },
+      {
+        question: "Are PawReports only for dog walks?",
+        answer:
+          "No. PawReports support dog walks, drop-ins, pet sitting, boarding, daycare, house sitting, and other services. Walk tracking is used when walking is part of the booking, while other updates support many care types.",
       },
     ],
   },
   {
     title: "Bookings & Communication",
     description:
-      "Help with requests, schedules, messages, and care details.",
+      "Help with requests, schedules, messages, care details, and booking records.",
     icon: <CalendarCheck className="h-5 w-5" />,
     items: [
       {
         question: "How do bookings work on SitGuru?",
         answer:
-          "SitGuru may support booking requests, service details, scheduling, communication, confirmations, care notes, and related care information. Exact booking workflows may evolve as SitGuru grows.",
-      },
-      {
-        question: "Why use SitGuru for repeat care?",
-        answer:
-          "Using SitGuru for repeat care helps keep pet instructions, service history, reviews, communication, and support context in one place. That makes future care easier for both Pet Parents and Pet Gurus.",
+          "Bookings organize the service, date, time, location, pet, Guru, payment status, messages, PawReport activity, and support context. Pet Parents use bookings to follow care, and Gurus use bookings as their work queue.",
       },
       {
         question: "What should be confirmed before care starts?",
         answer:
-          "Pet Parents and Gurus should confirm service type, date, time, location, pet details, care instructions, access details, emergency contacts, and expectations before care begins.",
+          "Confirm service type, date, time window, location, access instructions, pet details, feeding, medication, walking preferences, emergency contacts, payment status, and PawReport expectations before care begins.",
       },
       {
-        question: "Can Pet Parents and Gurus message each other?",
+        question: "Why use SitGuru for repeat care?",
         answer:
-          "Where messaging features are available, SitGuru is designed to support clearer communication between Pet Parents and Gurus. Good communication helps avoid confusion and supports better care.",
+          "Using SitGuru for repeat care helps keep pet instructions, service history, reviews, communication, receipts, PawReports, and support context in one place.",
       },
       {
         question: "What if something changes after a booking is requested?",
         answer:
-          "Communicate as early as possible. If timing, location, pet needs, or service details change, Pet Parents and Gurus should clarify those details before care happens.",
+          "Message early. If timing, location, pet needs, walk expectations, access details, or service details change, Pet Parents and Gurus should clarify those details before care happens.",
       },
     ],
   },
-
   {
-    title: "SitGuru PawReport™",
+    title: "Ambassadors & Programs",
     description:
-      "Help for Pet Parents and Gurus using PawReport photos, potty updates, food and water confirmations, care notes, and completion summaries.",
-    icon: <PawPrint className="h-5 w-5" />,
+      "Help for Ambassadors and program participants supporting SitGuru growth.",
+    icon: <HeartHandshake className="h-5 w-5" />,
     items: [
       {
-        question: "What is a SitGuru PawReport™?",
+        question: "What does an Ambassador do?",
         answer:
-          "A SitGuru PawReport™ is the care summary connected to a booking. It can include visit start and completion timing, photos, potty updates, food and water updates, care notes, and a final summary from the Guru.",
+          "Ambassadors help introduce SitGuru to Pet Parents, future Gurus, local partners, students, community groups, and military-connected networks. They support growth by sharing referral links, answering basic questions, and routing people to the correct signup path.",
       },
       {
-        question: "How do Pet Parents use PawReports?",
+        question: "What should Ambassadors focus on?",
         answer:
-          "Pet Parents can open the booking from their dashboard and choose View PawReport. The PawReport helps them see what happened during care, review photos and notes, and keep the visit history organized inside SitGuru.",
+          "Focus on clear local outreach: explain that SitGuru helps Pet Parents find trusted local care and helps independent Gurus manage profiles, bookings, PawReports, live walks, messages, pricing, and payouts.",
       },
       {
-        question: "How do Gurus complete a strong PawReport?",
+        question: "How do Ambassador referrals work?",
         answer:
-          "Gurus should open the booking, start the PawReport when care begins, add useful updates during the visit, upload clear photos when appropriate, record potty and food or water updates, write a personal note, and complete the PawReport before leaving or shortly after the service ends.",
+          "Use your Ambassador referral code or referral link when sharing SitGuru. Referral activity may be tracked in the Ambassador dashboard as the program grows. Contact SitGuru if your code, link, or dashboard looks incorrect.",
       },
       {
-        question: "What makes a PawReport feel professional?",
+        question: "What are Student Hire, Community Hire, and Military Hire?",
         answer:
-          "A strong PawReport includes the pet’s name, at least one clear photo when possible, potty or care updates, food and water confirmations when relevant, and a warm final note that tells the Pet Parent how their pet did.",
+          "These are SitGuru program pathways for students and recent grads, local community members, and military-connected applicants such as veterans, spouses, and eligible dependents. Program applications do not guarantee approval, placement, bookings, or payouts.",
       },
       {
-        question: "Are PawReports only for dog walks?",
+        question: "Do Ambassadors need Stripe?",
         answer:
-          "No. PawReports are useful for dog walking, drop-in visits, pet sitting, daycare, boarding, and house sitting. The exact updates may vary by service, pet needs, and booking details.",
+          "Ambassadors may need Stripe payout setup before eligible referral, commission, or ambassador payouts can be sent. Use the Ambassador Stripe Setup Guide if payout setup applies to your role.",
       },
     ],
   },
@@ -509,7 +493,7 @@ const helpSections: HelpSection[] = [
       {
         question: "How do I create a SitGuru account?",
         answer:
-          "Use the signup page and choose whether you are joining as a Pet Parent, Future Guru, or both. You may be able to continue with phone or email depending on the account flow.",
+          "Use the signup page and choose whether you are joining as a Pet Parent, Future Guru, Ambassador, or more than one role. SitGuru One Access lets users move between the dashboards connected to their account.",
       },
       {
         question: "How do phone login codes work?",
@@ -524,49 +508,7 @@ const helpSections: HelpSection[] = [
       {
         question: "Can I update my profile later?",
         answer:
-          "Yes, where profile tools are available, users should be able to update account details, profile information, and certain preferences through their dashboard or profile area.",
-      },
-    ],
-  },
-  {
-    title: "Programs",
-    description: "Help with SitGuru program pathways and applications.",
-    icon: <GraduationCap className="h-5 w-5" />,
-    items: [
-      {
-        question: "What programs does SitGuru offer?",
-        answer:
-          "SitGuru program pathways include Student Hire, Community Hire, and Military Hire. These programs help qualified students, local community members, veterans, military spouses, and military-connected applicants explore ways to grow with SitGuru.",
-      },
-      {
-        question: "What order are the programs listed in?",
-        answer:
-          "SitGuru lists programs in this order: Student Hire, Community Hire, and Military Hire.",
-      },
-      {
-        question: "What is the Ambassador Program?",
-        answer:
-          "The Ambassador Program is for trusted local supporters, students, pet professionals, community partners, and military-connected advocates who want to help introduce Pet Parents and Pet Gurus to SitGuru.",
-      },
-      {
-        question: "Can PA CareerLink, colleges, or community partners refer applicants?",
-        answer:
-          "Yes. SitGuru welcomes referrals from workforce partners, schools, colleges, community groups, local organizations, veteran representatives, and trusted pet-care networks. Applicants should apply through SitGuru so their information is routed correctly.",
-      },
-      {
-        question: "How do Ambassadors set up Stripe payouts?",
-        answer:
-          "Ambassadors can use the Ambassador Stripe Setup Guide to complete Stripe setup, connect a bank account, choose a payout account, and return to the SitGuru dashboard to track referral activity, ambassador earnings, and payout status.",
-      },
-      {
-        question: "Does applying to a program guarantee approval?",
-        answer:
-          "No. Applying to a program does not guarantee acceptance, approval, Guru activation, bookings, rewards, or placement. Applications may be reviewed based on program fit, eligibility, onboarding needs, and trust and safety steps.",
-      },
-      {
-        question: "Where do I apply?",
-        answer:
-          "Use the programs application page to apply for Student Hire, Community Hire, Military Hire, or Ambassador consideration.",
+          "Yes. Users should update account details, profile information, pet details, Guru service area, pricing, Ambassador contact information, and notification preferences from the proper dashboard area when tools are available.",
       },
     ],
   },
@@ -584,27 +526,22 @@ const helpSections: HelpSection[] = [
       {
         question: "Why do Gurus need to set up Stripe?",
         answer:
-          "Gurus need Stripe setup to receive payouts for bookings, commission, and referral earnings. The Guru Stripe Setup Guide walks through choosing business type, entering personal details, connecting a bank, choosing a payout account, and returning to the Earnings tab.",
+          "Gurus need Stripe setup before eligible booking payouts, commission, or referral earnings can be sent. The Guru Stripe Setup Guide walks through business type, personal details, bank account connection, payout account choice, and returning to the Earnings tab.",
       },
       {
         question: "Why do Ambassadors need to set up Stripe?",
         answer:
-          "Ambassadors need Stripe setup to receive ambassador payouts, commission, and referral earnings. The Ambassador Stripe Setup Guide explains how to connect a payout account and track referral-related earnings in SitGuru.",
+          "Ambassadors may need Stripe setup before eligible ambassador payouts, commission, or referral earnings can be sent. The Ambassador Stripe Setup Guide explains how to connect a payout account and track referral-related activity.",
       },
       {
         question: "How do Pet Parents pay for services?",
         answer:
-          "Pet Parents can use SitGuru’s secure checkout to review booking details, add a payment method, confirm billing information, submit payment, receive confirmation, and manage bookings and receipts from their dashboard.",
-      },
-      {
-        question: "Is payment information secure?",
-        answer:
-          "SitGuru may use trusted third-party payment providers such as Stripe to support secure checkout, payout setup, and payment processing. Users should only enter payment details through the official SitGuru or Stripe checkout flow.",
+          "Pet Parents can use SitGuru checkout to review booking details, add a payment method, confirm billing information, submit payment, receive confirmation, and manage bookings and receipts from their dashboard.",
       },
       {
         question: "Who do I contact for payment or payout help?",
         answer:
-          "Email support@sitguru.com or use the contact page. Include your name, account email, role, booking details if applicable, and a clear description of the issue.",
+          "Use the contact page or email support@sitguru.com. Include your name, account email, role, booking details if applicable, and a clear description of the issue.",
       },
     ],
   },
@@ -617,27 +554,22 @@ const helpSections: HelpSection[] = [
       {
         question: "How does SitGuru support trust and safety?",
         answer:
-          "SitGuru may use profile reviews, trust and safety steps, communication tools, support records, user reports, and platform rules to help protect pets, Pet Parents, Gurus, and the community.",
+          "SitGuru may use profile reviews, trust and safety steps, communication tools, support records, user reports, PawReport history, and platform rules to help protect pets, Pet Parents, Gurus, Ambassadors, and the community.",
       },
       {
-        question: "Why does SitGuru encourage organized communication and records?",
+        question: "Why does SitGuru encourage organized records?",
         answer:
-          "Organized communication, care details, service notes, and support records help everyone understand what was requested, what was confirmed, and what happened if a question comes up later.",
+          "Organized communication, booking details, care notes, service records, PawReports, walk summaries, and support records help everyone understand what was requested, what was confirmed, and what happened if a question comes up later.",
       },
       {
         question: "Does trust and safety remove all risk?",
         answer:
-          "No online marketplace can remove every risk. Pet care involves real people, real pets, and real-world circumstances. SitGuru’s goal is to support better information, clearer communication, and safer decisions.",
+          "No online marketplace can remove every risk. Pet care involves real people, real pets, and real-world circumstances. SitGuru's goal is to support better information, clearer communication, and safer decisions.",
       },
       {
         question: "How do I report a concern?",
         answer:
           "Use the contact page and include as much detail as possible. For urgent pet safety, medical, or emergency concerns, contact your veterinarian, local emergency services, or the proper local authority first.",
-      },
-      {
-        question: "What should users do to help keep SitGuru safe?",
-        answer:
-          "Be honest, communicate clearly, keep account information secure, share accurate pet care details, respect homes and property, follow platform rules, and report concerns when needed.",
       },
     ],
   },
