@@ -910,29 +910,36 @@ export default function HelpPage() {
 
       <section
         id="pawreport-help"
-        className="relative mx-auto max-w-7xl scroll-mt-6 px-4 pb-8 sm:px-6 lg:px-8"
+        className="relative mx-auto max-w-7xl scroll-mt-28 px-4 pb-8 sm:px-6 lg:px-8"
       >
         <div className="overflow-hidden rounded-[36px] border border-emerald-100 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
           <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr] lg:items-stretch">
-            <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_58%,#eff6ff_100%)] p-6 sm:p-8 lg:p-10">
+            <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_48%,#eff6ff_100%)] p-6 sm:p-8 lg:p-10">
               <SectionEyebrow icon={<PawPrint className="h-4 w-4" />}>
-                SitGuru PawReport™
+                SitGuru PawReport Live™
               </SectionEyebrow>
 
               <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-                Photos, care notes, and visit updates in one warm summary.
+                Live walks, real-time care updates, and a complete visit summary.
               </h2>
 
               <p className="mt-4 text-base font-semibold leading-8 text-slate-700">
-                PawReports help Pet Parents feel connected while they are away and help Gurus deliver a more professional, trustworthy experience after every booking.
+                PawReport Live helps Pet Parents follow what is happening during
+                care and gives Gurus a simple command center for updates,
+                photos, notes, walk tracking, and final summaries. When walking
+                is part of the service, Gurus can start, pause, resume, and end a
+                live walk while SitGuru saves distance, duration, and walk
+                activity to the booking record.
               </p>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 {[
-                  ["📸", "Photos", "Clear photo updates from the visit."],
-                  ["🐾", "Potty Updates", "Pee and poop updates when relevant."],
-                  ["🥣", "Food & Water", "Feeding and fresh water confirmations."],
-                  ["📝", "Care Notes", "Personal notes about how the pet did."],
+                  ["🚶", "Live Walk Tracking", "Start, pause, resume, and end walks from the booking PawReport."],
+                  ["📍", "Distance & Duration", "Track walk timing and distance when browser location is allowed."],
+                  ["📸", "Photos & Captions", "Upload visit photos with helpful notes for Pet Parents."],
+                  ["🐾", "Potty Updates", "Log pee and poop updates when relevant."],
+                  ["🥣", "Food & Water", "Confirm feeding and fresh water during care."],
+                  ["💊", "Medication & Care Notes", "Add medication, mood, play, and custom care notes."],
                 ].map(([icon, title, body]) => (
                   <div
                     key={title}
@@ -957,9 +964,10 @@ export default function HelpPage() {
                     For Pet Parents
                   </h3>
                   <ol className="mt-4 grid gap-3 text-sm font-semibold leading-6 text-slate-700">
-                    <li><span className="font-black text-emerald-700">1.</span> Open your dashboard and choose the booking.</li>
-                    <li><span className="font-black text-emerald-700">2.</span> Select View PawReport when updates are available.</li>
-                    <li><span className="font-black text-emerald-700">3.</span> Review photos, potty updates, food and water notes, visit timing, and the Guru’s final summary.</li>
+                    <li><span className="font-black text-emerald-700">1.</span> Open your Pet Parent dashboard and choose the active booking.</li>
+                    <li><span className="font-black text-emerald-700">2.</span> Select <span className="font-black">View Live PawReport</span> when your Guru starts care or adds updates.</li>
+                    <li><span className="font-black text-emerald-700">3.</span> Follow live walk status, distance, duration, photos, potty updates, food, water, medication, mood, play, care notes, and the final summary.</li>
+                    <li><span className="font-black text-emerald-700">4.</span> Use Messages if you need to ask your Guru or SitGuru support a question during the booking.</li>
                   </ol>
                 </div>
 
@@ -968,10 +976,23 @@ export default function HelpPage() {
                     For Gurus
                   </h3>
                   <ol className="mt-4 grid gap-3 text-sm font-semibold leading-6 text-slate-700">
-                    <li><span className="font-black text-sky-700">1.</span> Open the booking and start the PawReport when care begins.</li>
-                    <li><span className="font-black text-sky-700">2.</span> Add meaningful updates during care: photos, potty, food, water, and notes.</li>
-                    <li><span className="font-black text-sky-700">3.</span> Complete the PawReport with a warm final note before leaving or shortly after service ends.</li>
+                    <li><span className="font-black text-sky-700">1.</span> Open <span className="font-black">Guru Dashboard → Bookings & PawReports</span>, then select the booking.</li>
+                    <li><span className="font-black text-sky-700">2.</span> Tap <span className="font-black">Start PawReport</span> when care begins so Pet Parents can follow updates.</li>
+                    <li><span className="font-black text-sky-700">3.</span> For dog walks, use <span className="font-black">Start Walk</span>, <span className="font-black">Pause Walk</span>, <span className="font-black">Resume Walk</span>, and <span className="font-black">End Walk</span>. Keep the page open and allow location access.</li>
+                    <li><span className="font-black text-sky-700">4.</span> Add photos, potty, food, water, medication, play, mood, and care notes during the visit.</li>
+                    <li><span className="font-black text-sky-700">5.</span> Complete the PawReport with a clear final summary before leaving or shortly after service ends.</li>
                   </ol>
+                </div>
+
+                <div className="rounded-[28px] border border-amber-100 bg-amber-50 p-5">
+                  <h3 className="text-xl font-black text-slate-950">
+                    Good to know
+                  </h3>
+                  <ul className="mt-4 grid gap-3 text-sm font-semibold leading-6 text-slate-700">
+                    <li>• Live walk tracking works best on a phone with location permission allowed.</li>
+                    <li>• PawReports are not only for dog walks. They also support drop-ins, pet sitting, boarding, daycare, and other care visits.</li>
+                    <li>• Final PawReport summaries stay connected to the booking history so Pet Parents and Gurus have a clear care record.</li>
+                  </ul>
                 </div>
               </div>
             </div>
