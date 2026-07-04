@@ -1281,36 +1281,56 @@ export default function BookGuruClient({
     selectedGuruServiceRate?.rate_unit || "visit",
   );
 
-  const servicePrice = useMemo(
+  const selectedDates = useMemo(
+    () =>
+      dateSelectionMode === "range"
+        ? getDatesInRange(bookingDate, bookingEndDate)
+        : bookingDate
+          ? [bookingDate]
+          : [],
+    [bookingDate, bookingEndDate, dateSelectionMode],
+  );
+
+  const serviceUnitPrice = useMemo(
     () =>
       selectedGuruServiceRateAmount ??
       getServicePrice(selectedService, visitLength),
     [selectedGuruServiceRateAmount, selectedService, visitLength],
   );
 
+  const billableCareDays = useMemo(() => {
+    if (dateSelectionMode !== "range") return 1;
+    return Math.max(1, selectedDates.length);
+  }, [dateSelectionMode, selectedDates.length]);
+
+  const servicePrice = useMemo(() => {
+    if (selectedGuruServiceIsCustomQuote) return 0;
+    return Number((serviceUnitPrice * billableCareDays).toFixed(2));
+  }, [billableCareDays, selectedGuruServiceIsCustomQuote, serviceUnitPrice]);
+
   const marketplaceFeePercent = useMemo(
     () => getMarketplaceSupportPercentByLocality(careState),
     [careState],
   );
 
-  const marketplaceFee = useMemo(
-    () =>
-      getMarketplaceSupportAmount({
-        servicePrice,
-        marketplaceSupportPercent: marketplaceFeePercent,
-      }),
-    [servicePrice, marketplaceFeePercent],
-  );
+  const marketplaceFee = useMemo(() => {
+    if (selectedGuruServiceIsCustomQuote) return 0;
 
-  const tipAmount = useMemo(
-    () =>
-      getTipAmount({
-        tipChoice,
-        customTipAmount,
-        servicePrice,
-      }),
-    [tipChoice, customTipAmount, servicePrice],
-  );
+    return getMarketplaceSupportAmount({
+      servicePrice,
+      marketplaceSupportPercent: marketplaceFeePercent,
+    });
+  }, [marketplaceFeePercent, selectedGuruServiceIsCustomQuote, servicePrice]);
+
+  const tipAmount = useMemo(() => {
+    if (selectedGuruServiceIsCustomQuote) return 0;
+
+    return getTipAmount({
+      tipChoice,
+      customTipAmount,
+      servicePrice,
+    });
+  }, [customTipAmount, selectedGuruServiceIsCustomQuote, servicePrice, tipChoice]);
 
   const tipCents = dollarsToCents(tipAmount);
 
@@ -1321,6 +1341,19 @@ export default function BookGuruClient({
   );
 
   const total = Number((servicePrice + marketplaceFee + tipAmount).toFixed(2));
+
+  const calendarPriceLabel = selectedGuruServiceIsCustomQuote
+    ? "Quote"
+    : formatMoneyNoCents(serviceUnitPrice);
+
+  const selectedServiceRateSummary = selectedGuruServiceIsCustomQuote
+    ? "Custom quote"
+    : `${formatMoney(serviceUnitPrice)} / ${selectedGuruServiceRateUnit}`;
+
+  const pricingQuantityLabel =
+    dateSelectionMode === "range" && billableCareDays > 1
+      ? `${billableCareDays} care days × ${formatMoney(serviceUnitPrice)}`
+      : `1 care day × ${formatMoney(serviceUnitPrice)}`;
 
   const displayPreferredTime =
     timeWindow === "Specific time needed"
@@ -1558,16 +1591,6 @@ export default function BookGuruClient({
   const selectedEndDateCell = useMemo(
     () => calendarCells.find((cell) => cell.iso === bookingEndDate),
     [calendarCells, bookingEndDate],
-  );
-
-  const selectedDates = useMemo(
-    () =>
-      dateSelectionMode === "range"
-        ? getDatesInRange(bookingDate, bookingEndDate)
-        : bookingDate
-          ? [bookingDate]
-          : [],
-    [bookingDate, bookingEndDate, dateSelectionMode],
   );
 
   const dateRangeLabel = useMemo(
@@ -2264,6 +2287,22 @@ export default function BookGuruClient({
         serviceType: serviceLabel,
         service_type: serviceLabel,
         service_key: selectedService,
+        serviceRateId: selectedGuruServiceRate?.id || null,
+        service_rate_id: selectedGuruServiceRate?.id || null,
+        serviceRateUnit: selectedGuruServiceRateUnit,
+        service_rate_unit: selectedGuruServiceRateUnit,
+        serviceUnitPrice,
+        service_unit_price: serviceUnitPrice,
+        billableCareDays,
+        billable_care_days: billableCareDays,
+        pricingSummary: selectedGuruServiceIsCustomQuote
+          ? "Custom quote requested"
+          : pricingQuantityLabel,
+        pricing_summary: selectedGuruServiceIsCustomQuote
+          ? "Custom quote requested"
+          : pricingQuantityLabel,
+        customQuoteRequested: selectedGuruServiceIsCustomQuote,
+        custom_quote_requested: selectedGuruServiceIsCustomQuote,
         requestedDate: bookingDate,
         requested_date: bookingDate,
         requestedStartDate: bookingDate,
@@ -2354,6 +2393,9 @@ export default function BookGuruClient({
         terms_accepted: true,
         notes: [
           `Service: ${serviceLabel}`,
+          selectedGuruServiceIsCustomQuote
+            ? "Pricing: Custom quote requested through SitGuru"
+            : `Pricing: ${pricingQuantityLabel} = ${formatMoney(servicePrice)}`,
           dateSelectionMode === "range"
             ? `Requested dates: ${dateRangeLabel}`
             : `Requested date: ${bookingDate}`,
@@ -2916,10 +2958,11 @@ export default function BookGuruClient({
                       Check Availability
                     </p>
                     <p className="mt-1 text-sm font-semibold text-slate-600">
-                      Green dates are available. Red dates are unavailable.
-                      Yellow dates are pending/request. For date ranges, click
-                      the first green date, hover to preview, then click the
-                      final green date.
+                      Green dates are available and show the current selected
+                      service price like a hotel booking calendar. Red dates are
+                      unavailable. Yellow dates are pending/request. For date
+                      ranges, click the first green date, hover to preview, then
+                      click the final green date.
                     </p>
 
                     <div className="mt-3 inline-flex max-w-full items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800">
@@ -3053,7 +3096,7 @@ export default function BookGuruClient({
                                 }}
                                 disabled={!cell.inMonth || unavailable}
                                 className={[
-                                  "relative flex min-h-[52px] items-center justify-center overflow-hidden rounded-xl border text-sm font-black transition md:min-h-[58px]",
+                                  "relative flex min-h-[60px] flex-col items-center justify-center overflow-hidden rounded-xl border px-1 text-sm font-black transition md:min-h-[66px]",
                                   !cell.inMonth
                                     ? "border-slate-100 bg-slate-50 text-slate-300"
                                     : cell.status === "blackout"
@@ -3090,9 +3133,22 @@ export default function BookGuruClient({
                                   <span className="absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 bg-emerald-200/30" />
                                 ) : null}
 
-                                <span className="relative z-10">
+                                <span className="relative z-10 leading-none">
                                   {cell.dayNumber}
                                 </span>
+
+                                {cell.inMonth && !unavailable ? (
+                                  <span
+                                    className={[
+                                      "relative z-10 mt-1 rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none",
+                                      selected
+                                        ? "bg-white/20 text-white"
+                                        : "bg-white/80 text-emerald-800",
+                                    ].join(" ")}
+                                  >
+                                    {calendarPriceLabel}
+                                  </span>
+                                ) : null}
 
                                 {selectedStart &&
                                 dateSelectionMode === "range" ? (
@@ -3512,6 +3568,8 @@ export default function BookGuruClient({
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         Creating secure checkout...
                       </>
+                    ) : selectedGuruServiceIsCustomQuote ? (
+                      "Submit Quote Request"
                     ) : (
                       "Continue to Secure Checkout"
                     )}
@@ -3674,6 +3732,10 @@ export default function BookGuruClient({
               <div className="mt-5 space-y-3 text-sm">
                 {[
                   ["Service", serviceShortLabelFromKey(selectedService)],
+                  ["Rate", selectedServiceRateSummary],
+                  ...(selectedGuruServiceIsCustomQuote
+                    ? [["Pricing", "Final price confirmed after quote"]]
+                    : [["Pricing", pricingQuantityLabel]]),
                   ["Pet", petName || "Not selected"],
                   [
                     dateSelectionMode === "range" ? "Dates" : "Date",
@@ -3723,12 +3785,26 @@ export default function BookGuruClient({
               </div>
 
               <div className="mt-5 border-t border-slate-100 pt-5">
+                {selectedGuruServiceIsCustomQuote ? (
+                  <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-black text-amber-900">
+                      Custom quote request
+                    </p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-slate-700">
+                      This service stays inside SitGuru. Submit the request now;
+                      the final price can be confirmed before payment.
+                    </p>
+                  </div>
+                ) : null}
+
                 <div className="flex justify-between gap-4 text-sm">
                   <span className="font-semibold text-slate-600">
                     Estimated Subtotal
                   </span>
                   <span className="font-black text-slate-950">
-                    {formatMoney(servicePrice)}
+                    {selectedGuruServiceIsCustomQuote
+                      ? "Custom quote"
+                      : formatMoney(servicePrice)}
                   </span>
                 </div>
 
@@ -3738,7 +3814,9 @@ export default function BookGuruClient({
                     <CircleHelp className="h-3.5 w-3.5" />
                   </span>
                   <span className="font-black text-slate-950">
-                    {formatMoney(marketplaceFee)}
+                    {selectedGuruServiceIsCustomQuote
+                      ? "After quote"
+                      : formatMoney(marketplaceFee)}
                   </span>
                 </div>
 
@@ -3763,7 +3841,9 @@ export default function BookGuruClient({
                     Estimated Total
                   </span>
                   <span className="text-xl font-black text-emerald-600">
-                    {formatMoney(total)}
+                    {selectedGuruServiceIsCustomQuote
+                      ? "Quote request"
+                      : formatMoney(total)}
                   </span>
                 </div>
               </div>
@@ -3787,7 +3867,9 @@ export default function BookGuruClient({
                       Service earnings
                     </span>
                     <span className="font-black text-slate-950">
-                      {formatMoney(guruEstimatedBasePayout)}
+                      {selectedGuruServiceIsCustomQuote
+                        ? "After quote"
+                        : formatMoney(guruEstimatedBasePayout)}
                     </span>
                   </div>
                   <div className="flex justify-between gap-4">
@@ -3803,7 +3885,9 @@ export default function BookGuruClient({
                       Guru estimated earnings
                     </span>
                     <span className="font-black text-slate-950">
-                      {formatMoney(guruEstimatedTotalPayout)}
+                      {selectedGuruServiceIsCustomQuote
+                        ? "After quote"
+                        : formatMoney(guruEstimatedTotalPayout)}
                     </span>
                   </div>
                 </div>
@@ -3880,7 +3964,9 @@ export default function BookGuruClient({
                 </>
               ) : (
                 <>
-                  Secure Checkout
+                  {selectedGuruServiceIsCustomQuote
+                    ? "Submit Quote Request"
+                    : "Secure Checkout"}
                   <LockKeyhole className="h-5 w-5" />
                 </>
               )}
