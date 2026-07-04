@@ -7,7 +7,6 @@ import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
-
 const openSans = {
   className: "font-sans",
 };
@@ -80,12 +79,7 @@ const initialSearchFormState: SearchFormState = {
 };
 
 type HomepageAssistTopic =
-  | "pet-parent"
-  | "guru"
-  | "ambassador"
-  | "partner"
-  | "support"
-  | "general";
+  "pet-parent" | "guru" | "ambassador" | "partner" | "support" | "general";
 
 type HomepageAssistFormState = {
   fullName: string;
@@ -128,10 +122,7 @@ const homepageAssistTopicLabels: Record<HomepageAssistTopic, string> = {
 };
 
 function getMessengerInitials(name: string) {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  const parts = name.trim().split(/\s+/).filter(Boolean);
 
   if (!parts.length) return "V";
 
@@ -628,9 +619,7 @@ function getGuruCertificationUserId(guru: Guru) {
 async function loadCertifiedHomepageGuruUserIds(guruUserIds: string[]) {
   const safeUserIds = Array.from(
     new Set(
-      guruUserIds
-        .map((userId) => String(userId || "").trim())
-        .filter(Boolean),
+      guruUserIds.map((userId) => String(userId || "").trim()).filter(Boolean),
     ),
   );
 
@@ -653,7 +642,8 @@ async function loadCertifiedHomepageGuruUserIds(guruUserIds: string[]) {
       return new Set<string>();
     }
 
-    const payload = (await response.json()) as PublicAcademyCertificationResponse;
+    const payload =
+      (await response.json()) as PublicAcademyCertificationResponse;
 
     return new Set(
       (payload.certifiedUserIds || [])
@@ -700,7 +690,10 @@ function mapGurusToCards(
   });
 }
 
-function mergeLiveAndDemoGuruCards(liveCards: GuruCard[], demoCards: GuruCard[]) {
+function mergeLiveAndDemoGuruCards(
+  liveCards: GuruCard[],
+  demoCards: GuruCard[],
+) {
   const seenKeys = new Set<string>();
 
   return [...liveCards, ...demoCards].filter((card) => {
@@ -792,7 +785,9 @@ function HomepageAssistPopup({
     // the expected per-visitor/session chat behavior.
     window.localStorage.removeItem(messengerSessionStorageKey);
 
-    const savedSession = window.sessionStorage.getItem(messengerSessionStorageKey);
+    const savedSession = window.sessionStorage.getItem(
+      messengerSessionStorageKey,
+    );
 
     if (savedSession) {
       try {
@@ -819,7 +814,9 @@ function HomepageAssistPopup({
       }
     }
 
-    const dismissed = window.sessionStorage.getItem(messengerDismissedStorageKey);
+    const dismissed = window.sessionStorage.getItem(
+      messengerDismissedStorageKey,
+    );
 
     if (dismissed === "true") return;
 
@@ -850,7 +847,9 @@ function HomepageAssistPopup({
 
       if (shouldAutoOpenHomepageMessenger()) {
         setIsOpen(true);
-        setFormSuccess("SitGuru Admin replied. You can continue the conversation here.");
+        setFormSuccess(
+          "SitGuru Admin replied. You can continue the conversation here.",
+        );
       }
     }
 
@@ -861,7 +860,9 @@ function HomepageAssistPopup({
     setMessages(nextMessages);
   }
 
-  async function loadMessengerMessages(options: { openOnAdminReply?: boolean } = {}) {
+  async function loadMessengerMessages(
+    options: { openOnAdminReply?: boolean } = {},
+  ) {
     if (!session?.conversationId || !session.token) return;
 
     try {
@@ -870,9 +871,12 @@ function HomepageAssistPopup({
         token: session.token,
       });
 
-      const response = await fetch(`/api/homepage-messenger?${params.toString()}`, {
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/homepage-messenger?${params.toString()}`,
+        {
+          cache: "no-store",
+        },
+      );
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -891,7 +895,9 @@ function HomepageAssistPopup({
         conversationStatus?: string;
       } | null;
 
-      const conversationStatus = String(payload?.conversationStatus || "").toLowerCase();
+      const conversationStatus = String(
+        payload?.conversationStatus || "",
+      ).toLowerCase();
 
       if (["closed", "archived", "resolved"].includes(conversationStatus)) {
         clearStoredMessengerSession();
@@ -1017,7 +1023,9 @@ function HomepageAssistPopup({
     const cleanFullName = form.fullName.trim();
 
     if (!cleanFullName) {
-      setFormError("Please enter your name so SitGuru Admin knows who we are helping.");
+      setFormError(
+        "Please enter your name so SitGuru Admin knows who we are helping.",
+      );
       return;
     }
 
@@ -1082,7 +1090,9 @@ function HomepageAssistPopup({
         window.sessionStorage.removeItem(messengerDismissedStorageKey);
       }
 
-      applyMessengerMessages(payload?.messages || [], { openOnAdminReply: false });
+      applyMessengerMessages(payload?.messages || [], {
+        openOnAdminReply: false,
+      });
 
       trackEvent({
         eventName: "homepage_assist_popup_submitted",
@@ -1256,7 +1266,10 @@ function HomepageAssistPopup({
               </div>
             ) : null}
 
-            <form onSubmit={handleSubmit} className="mt-3 grid gap-2.5 sm:mt-4 sm:gap-3">
+            <form
+              onSubmit={handleSubmit}
+              className="mt-3 grid gap-2.5 sm:mt-4 sm:gap-3"
+            >
               <label className="grid gap-1.5">
                 <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
                   What can we help with?
@@ -1283,7 +1296,9 @@ function HomepageAssistPopup({
 
               <textarea
                 value={form.message}
-                onChange={(event) => updateAssistField("message", event.target.value)}
+                onChange={(event) =>
+                  updateAssistField("message", event.target.value)
+                }
                 rows={2}
                 placeholder="How can we help?"
                 className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold leading-5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:py-3"
@@ -1292,7 +1307,9 @@ function HomepageAssistPopup({
               <div className="grid gap-2 sm:grid-cols-2">
                 <input
                   value={form.fullName}
-                  onChange={(event) => updateAssistField("fullName", event.target.value)}
+                  onChange={(event) =>
+                    updateAssistField("fullName", event.target.value)
+                  }
                   placeholder="Your name"
                   required
                   className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
@@ -1300,7 +1317,9 @@ function HomepageAssistPopup({
                 <input
                   type="email"
                   value={form.email}
-                  onChange={(event) => updateAssistField("email", event.target.value)}
+                  onChange={(event) =>
+                    updateAssistField("email", event.target.value)
+                  }
                   placeholder="Email so we can reply"
                   className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
                 />
@@ -1309,7 +1328,9 @@ function HomepageAssistPopup({
               <input
                 type="tel"
                 value={form.phone}
-                onChange={(event) => updateAssistField("phone", event.target.value)}
+                onChange={(event) =>
+                  updateAssistField("phone", event.target.value)
+                }
                 placeholder="Phone optional"
                 className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:h-11"
               />
@@ -1454,7 +1475,9 @@ function HeroSignupCard({
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         <Link
           href={petParentSignupHref}
-          onClick={() => onTrack("Become a Pet Parent Hero Card", petParentSignupHref)}
+          onClick={() =>
+            onTrack("Become a Pet Parent Hero Card", petParentSignupHref)
+          }
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-100"
         >
           Become a Pet Parent
@@ -1830,7 +1853,6 @@ function HomeVideoSection({
   );
 }
 
-
 function SitGuruPawReportSection({
   onTrack,
 }: {
@@ -1840,48 +1862,50 @@ function SitGuruPawReportSection({
     <section className="bg-gradient-to-br from-sky-50 via-white to-emerald-50 py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-[0_20px_55px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-center">
+          <div className="grid gap-0 lg:grid-cols-[1.02fr_0.98fr] lg:items-stretch">
             <div className="p-6 sm:p-8 lg:p-10">
               <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-800 sm:text-xs">
                 Exclusive SitGuru Feature
               </div>
 
               <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.045em] text-slate-950 sm:text-4xl lg:text-5xl">
-                Stay connected with every visit.
+                Follow care in real time with PawReport Live.
               </h2>
 
               <p className="mt-3 text-lg font-black leading-7 text-emerald-700 sm:text-xl">
-                Every booking includes a SitGuru PawReport™
+                Live walks, visit updates, photos, and final care summaries in
+                one trusted report.
               </p>
 
               <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
-                Receive photos, potty updates, food and water confirmations,
-                care notes, visit timing, and a complete summary from your Guru.
-                It gives Pet Parents peace of mind while keeping care organized
-                inside SitGuru.
+                SitGuru PawReport™ gives Pet Parents a clearer view of what
+                happened during care. Gurus can start a PawReport, track walks,
+                add potty, food, water, photo, medication, play, and care notes,
+                then complete the visit with a final summary saved to the
+                booking.
               </p>
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 {[
                   {
+                    icon: "🚶",
+                    title: "Live Walk Tracking",
+                    body: "When location is allowed, Gurus can track walk time, distance, and route points while the walk is active.",
+                  },
+                  {
+                    icon: "📍",
+                    title: "Real-Time Care Status",
+                    body: "Pet Parents can see when the PawReport starts, when a walk is in progress, and when care is completed.",
+                  },
+                  {
                     icon: "📸",
-                    title: "Photo Updates",
-                    body: "Receive visit photos directly from your Guru.",
+                    title: "Photos & Visit Notes",
+                    body: "Gurus can add photos, captions, care notes, medication notes, mood, walk, and play updates.",
                   },
                   {
                     icon: "🐾",
-                    title: "Potty Updates",
-                    body: "Know when pee and poop updates are logged.",
-                  },
-                  {
-                    icon: "🥣",
-                    title: "Food & Water",
-                    body: "See when meals are served and water is refreshed.",
-                  },
-                  {
-                    icon: "📝",
-                    title: "Care Notes",
-                    body: "Get personalized notes and visit observations.",
+                    title: "Potty, Food & Water",
+                    body: "Pee, poop, food, and water updates are organized into one easy-to-read PawReport timeline.",
                   },
                 ].map((feature) => (
                   <div
@@ -1899,11 +1923,22 @@ function SitGuruPawReportSection({
                 ))}
               </div>
 
+              <div className="mt-7 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
+                  Built for trust
+                </p>
+                <p className="mt-2 text-sm font-bold leading-6 text-slate-800">
+                  Pet Parents get peace of mind. Gurus get a simple workflow.
+                  SitGuru keeps the booking record organized with real care
+                  actions, live walk recap, and a completed PawReport history.
+                </p>
+              </div>
+
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Link
                   href="/search"
                   onClick={() =>
-                    onTrack("Find Guru PawReport Section", "/search")
+                    onTrack("Find Guru PawReport Live Section", "/search")
                   }
                   className="inline-flex min-h-12 items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
                 >
@@ -1914,7 +1949,7 @@ function SitGuruPawReportSection({
                   href={petParentSignupHref}
                   onClick={() =>
                     onTrack(
-                      "Create Pet Parent PawReport Section",
+                      "Create Pet Parent PawReport Live Section",
                       petParentSignupHref,
                     )
                   }
@@ -1925,27 +1960,61 @@ function SitGuruPawReportSection({
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-slate-50 to-emerald-50 p-6 sm:p-8 lg:p-10">
-              <div className="mx-auto max-w-md overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_22px_55px_rgba(15,23,42,0.12)]">
+            <div className="bg-gradient-to-br from-slate-950 via-emerald-950 to-emerald-800 p-6 sm:p-8 lg:p-10">
+              <div className="mx-auto max-w-md overflow-hidden rounded-[30px] border border-white/15 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
                 <div className="border-b border-slate-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-5">
                   <p className="text-[11px] font-black uppercase tracking-[0.16em] text-sky-700">
-                    SitGuru PawReport™
+                    SitGuru PawReport Live™
                   </p>
                   <h3 className="mt-2 text-2xl font-black tracking-[-0.035em] text-slate-950">
-                    Scout&apos;s PawReport
+                    Scout&apos;s Live Care
                   </h3>
                   <p className="mt-1 text-sm font-semibold text-slate-600">
-                    Real-time care updates from your Guru
+                    Walk tracking and care updates from your Guru
                   </p>
                 </div>
 
                 <div className="space-y-3 p-5">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                          Walk in progress
+                        </p>
+                        <p className="mt-1 text-xl font-black text-slate-950">
+                          0.8 mi • 18 min
+                        </p>
+                      </div>
+                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
+                        🚶
+                      </span>
+                    </div>
+
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-3">
+                      <div className="relative h-28 rounded-xl bg-[radial-gradient(circle_at_18%_72%,#10b981_0_3px,transparent_4px),radial-gradient(circle_at_42%_48%,#38bdf8_0_3px,transparent_4px),radial-gradient(circle_at_70%_30%,#10b981_0_3px,transparent_4px),linear-gradient(135deg,#ecfdf5,#f8fafc)]">
+                        <div className="absolute left-[19%] top-[68%] h-[2px] w-[29%] -rotate-[25deg] rounded-full bg-emerald-400" />
+                        <div className="absolute left-[43%] top-[49%] h-[2px] w-[32%] -rotate-[18deg] rounded-full bg-sky-400" />
+                        <div className="absolute bottom-3 left-3 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-slate-700 shadow-sm">
+                          Route preview
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {[
-                    ["▶️", "PawReport Started", "12:02 PM"],
-                    ["📸", "Photo Added", "Scout enjoyed his walk."],
-                    ["💧", "Potty Update", "Pee completed at 12:17 PM."],
-                    ["🥣", "Water Refreshed", "Fresh water provided."],
-                    ["📝", "Guru Note", "Scout was playful, happy, and relaxed."],
+                    ["▶️", "PawReport Started", "Care began at 12:02 PM"],
+                    ["💧", "Potty Update", "Pee completed during the walk."],
+                    [
+                      "🥣",
+                      "Water Refreshed",
+                      "Fresh water provided after walk.",
+                    ],
+                    [
+                      "📸",
+                      "Photo Added",
+                      "Scout enjoyed his neighborhood walk.",
+                    ],
+                    ["📝", "Final Summary", "Happy, playful, and relaxed."],
                   ].map(([icon, title, body]) => (
                     <div
                       key={title}
@@ -1969,7 +2038,7 @@ function SitGuruPawReportSection({
                       PawReport Complete
                     </p>
                     <p className="mt-1 text-xs font-semibold text-emerald-800">
-                      Summary saved to booking history.
+                      Live walk and care summary saved to booking history.
                     </p>
                   </div>
                 </div>
@@ -2439,9 +2508,9 @@ export default function HomePage() {
               </h2>
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
                 Pet Parents can find local care, Pet Gurus can apply to offer
-                services independently, and Ambassadors can help spread the word.
-                SitGuru keeps the experience simple, welcoming, and easy to
-                start.
+                services independently, and Ambassadors can help spread the
+                word. SitGuru keeps the experience simple, welcoming, and easy
+                to start.
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 {[
@@ -2967,7 +3036,10 @@ export default function HomePage() {
               <Link
                 href="/ambassadors"
                 onClick={() =>
-                  trackHomepageClick("Explore Programs Final CTA", "/ambassadors")
+                  trackHomepageClick(
+                    "Explore Programs Final CTA",
+                    "/ambassadors",
+                  )
                 }
                 className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
               >
