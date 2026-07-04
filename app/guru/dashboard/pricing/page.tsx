@@ -681,11 +681,18 @@ async function saveWeeklyAvailability(
 
 function LoadingState() {
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 text-slate-950">
+    <main
+      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 text-slate-950"
+      style={{
+        fontFamily:
+          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontWeight: 600,
+      }}
+    >
       <div className="mx-auto flex max-w-6xl items-center justify-center">
         <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
           <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-600" />
-          <p className="mt-3 text-base font-semibold text-slate-700">
+          <p className="mt-3 text-base font-bold text-slate-900">
             Loading Guru pricing workspace...
           </p>
         </div>
@@ -1102,7 +1109,14 @@ export default function GuruDashboardPricingPage() {
   if (loading) return <LoadingState />;
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-4 py-6 text-slate-950 md:px-6 lg:px-8">
+    <main
+      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-4 py-6 text-slate-950 md:px-6 lg:px-8"
+      style={{
+        fontFamily:
+          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontWeight: 600,
+      }}
+    >
       <div className="mx-auto max-w-[1480px]">
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.18fr_0.82fr] lg:items-center">
@@ -1131,7 +1145,7 @@ export default function GuruDashboardPricingPage() {
                 Manage pricing in 3 simple steps.
               </h1>
 
-              <p className="mt-5 max-w-3xl text-base font-semibold leading-8 text-slate-800 md:text-xl">
+              <p className="mt-5 max-w-3xl text-base font-bold leading-8 text-slate-800 md:text-xl">
                 Use this page to control the prices Pet Parents see on the
                 website booking calendar. Start with service rates, confirm open
                 days, then preview the customer view before saving.
@@ -1178,7 +1192,7 @@ export default function GuruDashboardPricingPage() {
                 {guruName}
               </h2>
               {guruLocation ? (
-                <p className="mt-2 text-sm font-bold text-slate-600">
+                <p className="mt-2 text-sm font-bold text-slate-800">
                   {guruLocation}
                 </p>
               ) : null}
@@ -1193,7 +1207,7 @@ export default function GuruDashboardPricingPage() {
                   </p>
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-800">
                     Priced
                   </p>
                   <p className="mt-2 text-3xl font-black text-slate-950">
@@ -1201,7 +1215,7 @@ export default function GuruDashboardPricingPage() {
                   </p>
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-800">
                     Active days
                   </p>
                   <p className="mt-2 text-3xl font-black text-slate-950">
@@ -1227,7 +1241,7 @@ export default function GuruDashboardPricingPage() {
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
               <div>
                 <p className="font-extrabold text-rose-900">Pricing error</p>
-                <p className="mt-1 text-sm font-semibold leading-6">
+                <p className="mt-1 text-sm font-bold leading-6">
                   {errorMessage}
                 </p>
               </div>
@@ -1241,7 +1255,7 @@ export default function GuruDashboardPricingPage() {
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
               <div>
                 <p className="font-extrabold text-emerald-900">Saved</p>
-                <p className="mt-1 text-sm font-semibold leading-6">
+                <p className="mt-1 text-sm font-bold leading-6">
                   {successMessage}
                 </p>
               </div>
@@ -1333,7 +1347,7 @@ export default function GuruDashboardPricingPage() {
                           <span
                             className={[
                               "mt-1 block text-xs font-bold leading-5",
-                              active ? "text-white/85" : "text-slate-600",
+                              active ? "text-white/95" : "text-slate-800",
                             ].join(" ")}
                           >
                             {tab.helper}
@@ -1355,7 +1369,7 @@ export default function GuruDashboardPricingPage() {
                       <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
                         Set what customers see.
                       </h2>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                      <p className="mt-2 text-sm font-bold leading-6 text-slate-800">
                         Turn on only the services you actually offer. Each
                         active service must have a price or Custom quote before
                         it appears clearly on the booking calendar.
@@ -1427,7 +1441,7 @@ export default function GuruDashboardPricingPage() {
                               <p className="text-xl font-black text-slate-950">
                                 {service.service_label}
                               </p>
-                              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                              <p className="mt-1 text-sm font-bold leading-6 text-slate-800">
                                 {service.description}
                               </p>
                             </div>
@@ -1444,7 +1458,7 @@ export default function GuruDashboardPricingPage() {
                               {active ? "ON - offered" : "OFF - not offered"}
                             </button>
 
-                            <div className="flex flex-wrap gap-2 text-xs font-black text-slate-600">
+                            <div className="flex flex-wrap gap-2 text-xs font-black text-slate-800">
                               {recommendedUnits.slice(0, 3).map((unit) => (
                                 <span
                                   key={unit}
@@ -1459,7 +1473,7 @@ export default function GuruDashboardPricingPage() {
                           {active ? (
                             <div className="mt-5 grid gap-4 rounded-[1.35rem] border border-white bg-white/80 p-4 md:grid-cols-[0.75fr_1fr_0.75fr]">
                               <div>
-                                <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-700">
+                                <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-900">
                                   Customer price
                                 </label>
                                 <input
@@ -1478,12 +1492,12 @@ export default function GuruDashboardPricingPage() {
                                   }
                                   inputMode="decimal"
                                   disabled={service.rate_unit === "custom"}
-                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 placeholder:text-slate-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 placeholder:text-slate-900 outline-none transition disabled:bg-slate-50 disabled:text-slate-800 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                 />
                               </div>
 
                               <div>
-                                <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-700">
+                                <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-900">
                                   Charged by
                                 </label>
                                 <select
@@ -1495,7 +1509,7 @@ export default function GuruDashboardPricingPage() {
                                       event.target.value,
                                     )
                                   }
-                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition [color:#07132f] [-webkit-text-fill-color:#07132f] focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                 >
                                   {RATE_UNIT_OPTIONS.map((option) => (
                                     <option
@@ -1509,7 +1523,7 @@ export default function GuruDashboardPricingPage() {
                               </div>
 
                               <div>
-                                <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-700">
+                                <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-900">
                                   Typical duration
                                 </label>
                                 <input
@@ -1523,12 +1537,12 @@ export default function GuruDashboardPricingPage() {
                                   }
                                   placeholder="Optional"
                                   inputMode="numeric"
-                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 placeholder:text-slate-900 outline-none transition [color:#07132f] [-webkit-text-fill-color:#07132f] focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                 />
                               </div>
 
                               <div className="md:col-span-3">
-                                <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-700">
+                                <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-900">
                                   Customer-facing notes
                                 </label>
                                 <input
@@ -1541,7 +1555,7 @@ export default function GuruDashboardPricingPage() {
                                     )
                                   }
                                   placeholder="Example: Includes feeding, water refresh, and photo update."
-                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 placeholder:text-slate-900 outline-none transition [color:#07132f] [-webkit-text-fill-color:#07132f] focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                 />
                               </div>
                             </div>
@@ -1563,7 +1577,7 @@ export default function GuruDashboardPricingPage() {
                       <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
                         Preview prices by date.
                       </h2>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                      <p className="mt-2 text-sm font-bold leading-6 text-slate-800">
                         This mirrors the customer website booking calendar.
                         Available dates show the selected service price.
                       </p>
@@ -1590,7 +1604,7 @@ export default function GuruDashboardPricingPage() {
                     <p className="text-sm font-black text-emerald-900">
                       Selected service: {selectedService?.service_label}
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-700">
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
                       Calendar display: {selectedServicePriceLabel}
                     </p>
                   </div>
@@ -1619,7 +1633,7 @@ export default function GuruDashboardPricingPage() {
                     </div>
 
                     <div className="p-3 md:p-4">
-                      <div className="grid grid-cols-7 gap-2 text-center text-xs font-black uppercase tracking-[0.08em] text-slate-500">
+                      <div className="grid grid-cols-7 gap-2 text-center text-xs font-black uppercase tracking-[0.08em] text-slate-800">
                         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
                           (day) => (
                             <div key={day} className="py-2">
@@ -1650,7 +1664,7 @@ export default function GuruDashboardPricingPage() {
                                   : blackout
                                     ? "border-rose-100 bg-rose-50 text-rose-600"
                                     : closed
-                                      ? "border-slate-100 bg-slate-50 text-slate-400"
+                                      ? "border-slate-100 bg-slate-50 text-slate-900"
                                       : available
                                         ? "border-emerald-100 bg-emerald-50 text-emerald-800"
                                         : "border-amber-100 bg-amber-50 text-amber-700",
@@ -1693,7 +1707,7 @@ export default function GuruDashboardPricingPage() {
                       <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
                         Set open days and blocked dates.
                       </h2>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                      <p className="mt-2 text-sm font-bold leading-6 text-slate-800">
                         Weekly availability and blackout dates feed the website
                         booking calendar.
                       </p>
@@ -1745,7 +1759,7 @@ export default function GuruDashboardPricingPage() {
                             )
                           }
                           disabled={!day.enabled}
-                          className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 disabled:bg-slate-100 disabled:text-slate-400"
+                          className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 disabled:bg-slate-50 disabled:text-slate-900"
                         />
                         <input
                           type="time"
@@ -1758,7 +1772,7 @@ export default function GuruDashboardPricingPage() {
                             )
                           }
                           disabled={!day.enabled}
-                          className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 disabled:bg-slate-100 disabled:text-slate-400"
+                          className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 disabled:bg-slate-50 disabled:text-slate-900"
                         />
                       </div>
                     ))}
@@ -1859,13 +1873,13 @@ export default function GuruDashboardPricingPage() {
                                   : "Rate needed"}
                             </p>
                             {service.duration_minutes ? (
-                              <p className="mt-2 text-sm font-bold text-slate-600">
+                              <p className="mt-2 text-sm font-bold text-slate-800">
                                 Typical duration: {service.duration_minutes}{" "}
                                 minutes
                               </p>
                             ) : null}
                             {service.notes ? (
-                              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
+                              <p className="mt-3 text-sm font-bold leading-6 text-slate-900">
                                 {service.notes}
                               </p>
                             ) : null}
@@ -1877,7 +1891,7 @@ export default function GuruDashboardPricingPage() {
                         <p className="text-sm font-black text-amber-950">
                           No services enabled yet.
                         </p>
-                        <p className="mt-2 text-sm font-semibold leading-6 text-amber-900">
+                        <p className="mt-2 text-sm font-bold leading-6 text-amber-900">
                           Go to Rates and enable at least one service.
                         </p>
                       </div>
@@ -1898,7 +1912,7 @@ export default function GuruDashboardPricingPage() {
                 <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
                   What this controls
                 </h2>
-                <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
+                <p className="mt-3 text-sm font-semibold leading-7 text-slate-900">
                   These saved settings feed the public booking page. Pet Parents
                   see service prices on available calendar days, and Custom
                   quote stays inside SitGuru instead of sending anyone
@@ -1919,7 +1933,7 @@ export default function GuruDashboardPricingPage() {
                       key={label}
                       className="flex justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
                     >
-                      <span className="font-bold text-slate-600">{label}</span>
+                      <span className="font-bold text-slate-800">{label}</span>
                       <span className="font-black text-slate-950">{value}</span>
                     </div>
                   ))}
@@ -1929,14 +1943,14 @@ export default function GuruDashboardPricingPage() {
               <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-800">
                       Blocked calendar dates
                     </p>
                     <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
                       Unavailable
                     </h2>
                   </div>
-                  <LockKeyhole className="h-7 w-7 text-slate-400" />
+                  <LockKeyhole className="h-7 w-7 text-slate-900" />
                 </div>
 
                 <div className="mt-5 space-y-3">
@@ -1965,7 +1979,7 @@ export default function GuruDashboardPricingPage() {
                                 {serviceLabel}
                               </p>
                               {entry.note ? (
-                                <p className="mt-2 text-xs font-semibold leading-5 text-slate-700">
+                                <p className="mt-2 text-xs font-semibold leading-5 text-slate-900">
                                   {entry.note}
                                 </p>
                               ) : null}
@@ -1983,7 +1997,7 @@ export default function GuruDashboardPricingPage() {
                       );
                     })
                   ) : (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-600">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-800">
                       No blocked dates yet.
                     </div>
                   )}
