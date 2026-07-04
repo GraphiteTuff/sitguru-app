@@ -107,7 +107,11 @@ const activityActions: QuickAction[] = [
   },
 ];
 
-const noteTypeOptions: { value: CareNoteType; label: string; helper: string }[] = [
+const noteTypeOptions: {
+  value: CareNoteType;
+  label: string;
+  helper: string;
+}[] = [
   {
     value: "note",
     label: "Care note",
@@ -162,7 +166,7 @@ function getCurrentLocation(): Promise<BrowserLocation> {
         enableHighAccuracy: true,
         timeout: 8000,
         maximumAge: 30000,
-      }
+      },
     );
   });
 }
@@ -184,7 +188,6 @@ function statusDescription(status: string) {
 
   return "Start the PawReport when the visit begins. Location is optional and only saved when available.";
 }
-
 
 type WalkStatus = "not_started" | "walking" | "paused" | "completed";
 
@@ -208,10 +211,7 @@ function getDistanceMeters(from: WalkPoint, to: WalkPoint) {
 
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1) *
-      Math.cos(lat2) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
 
   return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
@@ -254,6 +254,75 @@ function ActionButton({
   disabled: boolean;
   onClick: () => void;
 }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-[22px] border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <span className="block text-3xl" aria-hidden="true">
+        {action.icon}
+      </span>
+      <span className="mt-3 block text-base font-black !text-[#061638]">
+        {action.title}
+      </span>
+      <span className="mt-1 block text-xs font-bold !text-slate-700">
+        {action.helper}
+      </span>
+    </button>
+  );
+}
+
+export default function GuruVisitTracker({
+  bookingId,
+  initialSession,
+}: GuruVisitTrackerProps) {
+  const router = useRouter();
+  const [sessionStatus, setSessionStatus] = useState(
+    initialSession?.status ?? "not_started",
+  );
+  const [note, setNote] = useState("");
+  const [noteType, setNoteType] = useState<CareNoteType>("note");
+  const [finalNote, setFinalNote] = useState(initialSession?.final_note ?? "");
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoNote, setPhotoNote] = useState("");
+  const [message, setMessage] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [walkStatus, setWalkStatus] = useState<WalkStatus>("not_started");
+  const [walkTrackId, setWalkTrackId] = useState("");
+  const [walkStartedAt, setWalkStartedAt] = useState<number | null>(null);
+  const [walkEndedAt, setWalkEndedAt] = useState<number | null>(null);
+  const [walkDistanceMeters, setWalkDistanceMeters] = useState(0);
+  const [walkLastLocation, setWalkLastLocation] = useState<WalkPoint | null>(
+    null,
+  );
+  const [walkLocationMessage, setWalkLocationMessage] = useState("");
+  const watchIdRef = useRef<number | null>(null);
+  const walkTrackIdRef = useRef("");
+  const walkStartedAtRef = useRef<number | null>(null);
+  const walkLastPointRef = useRef<WalkPoint | null>(null);
+  const walkLastSavedAtRef = useRef(0);
+  const walkDistanceRef = useRef(0);
+
+  const supabaseBrowser = useMemo(() => {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+    );
+  }, []);
+
+  const reportActive = sessionStatus === "in_progress";
+  const reportCompleted = sessionStatus === "completed";
+  const selectedNoteOption =
+    noteTypeOptions.find((option) => option.value === noteType) ||
+    noteTypeOptions[0];
+
+  function refreshReport() {
+    router.refresh();
+  }
 
   function clearWalkWatcher() {
     if (watchIdRef.current !== null && navigator.geolocation) {
@@ -275,7 +344,9 @@ function ActionButton({
     if (!activeWalkTrackId) return;
 
     const now = Date.now();
-    const secondsSinceLastSave = Math.round((now - walkLastSavedAtRef.current) / 1000);
+    const secondsSinceLastSave = Math.round(
+      (now - walkLastSavedAtRef.current) / 1000,
+    );
 
     if (!forceSave && secondsSinceLastSave < 15) return;
 
@@ -319,8 +390,8 @@ function ActionButton({
         {
           hour: "numeric",
           minute: "2-digit",
-        }
-      ).format(new Date(point.recordedAt))}.`
+        },
+      ).format(new Date(point.recordedAt))}.`,
     );
 
     await saveWalkPoint(point);
@@ -329,7 +400,7 @@ function ActionButton({
   function startWalkWatcher() {
     if (!navigator.geolocation) {
       setWalkLocationMessage(
-        "This browser does not support GPS tracking. You can still add walk notes."
+        "This browser does not support GPS tracking. You can still add walk notes.",
       );
       return;
     }
@@ -347,14 +418,14 @@ function ActionButton({
       },
       () => {
         setWalkLocationMessage(
-          "Location permission is needed for live walk tracking. Walk notes still work without GPS."
+          "Location permission is needed for live walk tracking. Walk notes still work without GPS.",
         );
       },
       {
         enableHighAccuracy: true,
         maximumAge: 10000,
         timeout: 15000,
-      }
+      },
     );
   }
 
@@ -369,7 +440,7 @@ function ActionButton({
 
     if (location.lat === null || location.lng === null) {
       setWalkLocationMessage(
-        "Location was not available. Allow location access to start live walk tracking."
+        "Location was not available. Allow location access to start live walk tracking.",
       );
       return;
     }
@@ -485,83 +556,12 @@ function ActionButton({
       setWalkEndedAt(endedAt);
       setWalkLocationMessage(
         `Walk completed: ${formatWalkDistance(
-          walkDistanceRef.current
-        )} in ${formatWalkDuration(durationSeconds)}.`
+          walkDistanceRef.current,
+        )} in ${formatWalkDuration(durationSeconds)}.`,
       );
       setMessage("Live walk summary added to the PawReport timeline.");
       refreshReport();
     });
-  }
-
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="rounded-[22px] border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      <span className="block text-3xl" aria-hidden="true">
-        {action.icon}
-      </span>
-      <span className="mt-3 block text-base font-black !text-[#061638]">
-        {action.title}
-      </span>
-      <span className="mt-1 block text-xs font-bold !text-slate-700">
-        {action.helper}
-      </span>
-    </button>
-  );
-}
-
-export default function GuruVisitTracker({
-  bookingId,
-  initialSession,
-}: GuruVisitTrackerProps) {
-  const router = useRouter();
-  const [sessionStatus, setSessionStatus] = useState(
-    initialSession?.status ?? "not_started"
-  );
-  const [note, setNote] = useState("");
-  const [noteType, setNoteType] = useState<CareNoteType>("note");
-  const [finalNote, setFinalNote] = useState(initialSession?.final_note ?? "");
-  const [photoUrl, setPhotoUrl] = useState("");
-  const [photoNote, setPhotoNote] = useState("");
-  const [message, setMessage] = useState("");
-  const [isPending, startTransition] = useTransition();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const [walkStatus, setWalkStatus] = useState<WalkStatus>("not_started");
-  const [walkTrackId, setWalkTrackId] = useState("");
-  const [walkStartedAt, setWalkStartedAt] = useState<number | null>(null);
-  const [walkEndedAt, setWalkEndedAt] = useState<number | null>(null);
-  const [walkDistanceMeters, setWalkDistanceMeters] = useState(0);
-  const [walkLastLocation, setWalkLastLocation] = useState<WalkPoint | null>(
-    null
-  );
-  const [walkLocationMessage, setWalkLocationMessage] = useState("");
-  const watchIdRef = useRef<number | null>(null);
-  const walkTrackIdRef = useRef("");
-  const walkStartedAtRef = useRef<number | null>(null);
-  const walkLastPointRef = useRef<WalkPoint | null>(null);
-  const walkLastSavedAtRef = useRef(0);
-  const walkDistanceRef = useRef(0);
-
-
-  const supabaseBrowser = useMemo(() => {
-    return createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-    );
-  }, []);
-
-  const reportActive = sessionStatus === "in_progress";
-  const reportCompleted = sessionStatus === "completed";
-  const selectedNoteOption =
-    noteTypeOptions.find((option) => option.value === noteType) ||
-    noteTypeOptions[0];
-
-  function refreshReport() {
-    router.refresh();
   }
 
   async function handleStartVisit() {
@@ -671,10 +671,7 @@ export default function GuruVisitTracker({
     const formData = new FormData();
     formData.append("bookingId", bookingId);
     formData.append("updateType", "photo");
-    formData.append(
-      "note",
-      photoNote.trim() || "Photo added to PawReport."
-    );
+    formData.append("note", photoNote.trim() || "Photo added to PawReport.");
     formData.append("photoUrl", cleanPhotoUrl);
 
     startTransition(async () => {
@@ -723,10 +720,7 @@ export default function GuruVisitTracker({
       const formData = new FormData();
       formData.append("bookingId", bookingId);
       formData.append("updateType", "photo");
-      formData.append(
-        "note",
-        photoNote.trim() || "Photo added to PawReport."
-      );
+      formData.append("note", photoNote.trim() || "Photo added to PawReport.");
       formData.append("photoUrl", data.publicUrl);
 
       startTransition(async () => {
@@ -826,7 +820,9 @@ export default function GuruVisitTracker({
                       key={action.type}
                       action={action}
                       disabled={isPending}
-                      onClick={() => handleQuickUpdate(action.type, action.note)}
+                      onClick={() =>
+                        handleQuickUpdate(action.type, action.note)
+                      }
                     />
                   ))}
                 </div>
@@ -845,7 +841,9 @@ export default function GuruVisitTracker({
                       key={action.type}
                       action={action}
                       disabled={isPending}
-                      onClick={() => handleQuickUpdate(action.type, action.note)}
+                      onClick={() =>
+                        handleQuickUpdate(action.type, action.note)
+                      }
                     />
                   ))}
                 </div>
@@ -864,7 +862,9 @@ export default function GuruVisitTracker({
                       key={action.type}
                       action={action}
                       disabled={isPending}
-                      onClick={() => handleQuickUpdate(action.type, action.note)}
+                      onClick={() =>
+                        handleQuickUpdate(action.type, action.note)
+                      }
                     />
                   ))}
                 </div>
@@ -991,7 +991,6 @@ export default function GuruVisitTracker({
               </div>
             </div>
 
-
             <div className="rounded-[26px] border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -1064,7 +1063,7 @@ export default function GuruVisitTracker({
                   <p className="mt-1 text-sm font-black !text-[#061638]">
                     {walkLastLocation
                       ? `${walkLastLocation.lat.toFixed(
-                          5
+                          5,
                         )}, ${walkLastLocation.lng.toFixed(5)}`
                       : "Not tracking"}
                   </p>
