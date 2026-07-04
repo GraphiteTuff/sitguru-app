@@ -109,6 +109,19 @@ type GuruServiceRateRow = {
   notes?: string | null;
 };
 
+type BookingReviewRow = {
+  id?: string | null;
+  booking_id?: string | null;
+  guru_id?: string | null;
+  customer_id?: string | null;
+  rating?: number | string | null;
+  review_text?: string | null;
+  would_rebook?: boolean | null;
+  is_public?: boolean | null;
+  status?: string | null;
+  created_at?: string | null;
+};
+
 type BookingRow = {
   id?: string | number | null;
   customer_id?: string | null;
@@ -740,6 +753,35 @@ function getGuruRating(profile: GuruProfile | null) {
 
 function getReviewCount(profile: GuruProfile | null) {
   return readNumber(profile?.review_count, 0);
+}
+
+function getVisibleReviews(reviews: BookingReviewRow[]) {
+  return reviews.filter((review) => {
+    const status = String(review.status || "published").trim().toLowerCase();
+    return review.is_public !== false && !["hidden", "removed", "rejected"].includes(status);
+  });
+}
+
+function getAverageReviewRating(reviews: BookingReviewRow[]) {
+  const visibleReviews = getVisibleReviews(reviews);
+  const ratings = visibleReviews
+    .map((review) => readNumber(review.rating, Number.NaN))
+    .filter((rating) => Number.isFinite(rating) && rating > 0);
+
+  if (!ratings.length) return 0;
+
+  return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+}
+
+function formatReviewDate(value?: string | null) {
+  if (!value) return "Recent review";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Recent review";
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function getExperienceYears(profile: GuruProfile | null) {
@@ -2075,6 +2117,29 @@ async function getGuruServiceRates(guruProfile: GuruProfile | null) {
   return data as GuruServiceRateRow[];
 }
 
+async function getPublicGuruReviews(guruProfile: GuruProfile | null) {
+  const guruIds = Array.from(
+    new Set(
+      [guruProfile?.id, guruProfile?.user_id, guruProfile?.profile_id]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (!guruIds.length) return [] as BookingReviewRow[];
+
+  const { data, error } = await supabaseAdmin
+    .from("booking_reviews")
+    .select("id, booking_id, guru_id, customer_id, rating, review_text, would_rebook, is_public, status, created_at")
+    .in("guru_id", guruIds)
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  if (error || !data) return [] as BookingReviewRow[];
+  return data as BookingReviewRow[];
+}
+
 function isServiceRatePriced(rate: GuruServiceRateRow) {
   const rateUnit = String(rate.rate_unit || "")
     .trim()
@@ -3117,11 +3182,13 @@ function PublicGuruProfilePage({
   serviceRates,
   identifier,
   universityProgress,
+  reviews,
 }: {
   guruProfile: GuruProfile;
   serviceRates: GuruServiceRateRow[];
   identifier: string;
   universityProgress: GuruUniversityProgress;
+  reviews: BookingReviewRow[];
 }) {
   const name = getGuruName(guruProfile);
   const firstName = getFirstName(name);
@@ -3129,8 +3196,10 @@ function PublicGuruProfilePage({
   const location = getGuruLocation(guruProfile);
   const services = normalizeServices(guruProfile.services);
   const baseRate = getBaseRate(guruProfile);
-  const rating = getGuruRating(guruProfile);
-  const reviewCount = getReviewCount(guruProfile);
+  const visibleReviews = getVisibleReviews(reviews);
+  const reviewAverage = getAverageReviewRating(reviews);
+  const rating = reviewAverage > 0 ? reviewAverage : getGuruRating(guruProfile);
+  const reviewCount = visibleReviews.length || getReviewCount(guruProfile);
   const experienceYears = getExperienceYears(guruProfile);
   const serviceRadius = getGuruRadius(guruProfile);
   const bookHref = getBookHref(guruProfile, identifier);
@@ -3347,6 +3416,75 @@ function PublicGuruProfilePage({
 
               <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 !text-slate-700">
                 Profile details are available while booking setup is finalized.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
+                Reviews & Trust
+              </p>
+              <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
+                Real Pet Parent feedback
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-bold leading-6 !text-slate-700">
+                SitGuru only shows real review signals when reviews exist. New Gurus stay marked as New until Pet Parents submit feedback after completed bookings.
+              </p>
+            </div>
+
+            <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-center">
+              <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
+                Current Rating
+              </p>
+              <p className="mt-1 text-3xl font-black !text-slate-950">
+                {rating > 0 ? rating.toFixed(1) : "New"}
+              </p>
+              <p className="text-xs font-bold !text-slate-600">
+                {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
+              </p>
+            </div>
+          </div>
+
+          {visibleReviews.length ? (
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {visibleReviews.slice(0, 6).map((review) => {
+                const reviewRating = Math.max(1, Math.min(5, Math.round(readNumber(review.rating, 0))));
+
+                return (
+                  <article
+                    key={String(review.id || review.booking_id || Math.random())}
+                    className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="rounded-full bg-white px-3 py-1 text-sm font-black !text-amber-600 ring-1 ring-amber-100">
+                        {"★".repeat(reviewRating)}
+                      </span>
+                      <span className="text-xs font-bold !text-slate-500">
+                        {formatReviewDate(review.created_at)}
+                      </span>
+                    </div>
+                    <p className="mt-4 line-clamp-5 text-sm font-bold leading-6 !text-slate-700">
+                      {review.review_text || "This Pet Parent shared a positive SitGuru care experience."}
+                    </p>
+                    {review.would_rebook ? (
+                      <p className="mt-4 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-800 ring-1 ring-emerald-100">
+                        Would book again
+                      </p>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <h3 className="text-xl font-black !text-slate-900">
+                New Guru review profile
+              </h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 !text-slate-700">
+                Reviews will appear here after completed SitGuru bookings. Until then, Pet Parents can review this Guru’s profile, services, pricing, service area, and SitGuru Academy badge status.
               </p>
             </div>
           )}
@@ -3862,7 +4000,7 @@ export default async function GuruSlugPage({ params }: PageProps) {
     );
   }
 
-  const [serviceRates, universityProgress] = await Promise.all([
+  const [serviceRates, universityProgress, reviews] = await Promise.all([
     getGuruServiceRates(publicGuruProfile),
     publicGuruProfile.user_id
       ? getGuruUniversityProgress(publicGuruProfile.user_id)
@@ -3881,6 +4019,7 @@ export default async function GuruSlugPage({ params }: PageProps) {
             "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion.",
           academyButtonLabel: "Start Guru Academy",
         } satisfies GuruUniversityProgress),
+    getPublicGuruReviews(publicGuruProfile),
   ]);
 
   return (
@@ -3889,6 +4028,7 @@ export default async function GuruSlugPage({ params }: PageProps) {
       serviceRates={serviceRates}
       identifier={identifier}
       universityProgress={universityProgress}
+      reviews={reviews}
     />
   );
 }

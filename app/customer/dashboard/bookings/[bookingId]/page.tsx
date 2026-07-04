@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import {
   CalendarDays,
   CheckCircle2,
@@ -22,6 +23,64 @@ type PageProps = {
 };
 
 type DbRow = Record<string, unknown>;
+
+
+type BookingReviewRow = {
+  id?: string | null;
+  booking_id?: string | null;
+  guru_id?: string | null;
+  customer_id?: string | null;
+  rating?: number | string | null;
+  review_text?: string | null;
+  would_rebook?: boolean | null;
+  is_public?: boolean | null;
+  status?: string | null;
+  created_at?: string | null;
+};
+
+function isCompletedBookingStatus(status: string) {
+  const normalized = String(status || "").trim().toLowerCase();
+  return ["completed", "complete", "finished", "done"].includes(normalized);
+}
+
+function getReviewDate(value?: string | null) {
+  if (!value) return "Recently submitted";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Recently submitted";
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function StarRatingInput() {
+  return (
+    <div className="grid gap-2">
+      <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+        Rating
+      </p>
+      <div className="grid grid-cols-5 gap-2">
+        {[1, 2, 3, 4, 5].map((rating) => (
+          <label
+            key={rating}
+            className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-emerald-200 bg-white px-2 py-3 text-center text-sm font-black text-slate-950 transition hover:bg-emerald-50"
+          >
+            <input
+              type="radio"
+              name="rating"
+              value={rating}
+              required
+              className="sr-only peer"
+            />
+            <span className="text-xl text-amber-400 peer-checked:scale-125">★</span>
+            <span className="mt-1 text-xs">{rating}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -555,6 +614,104 @@ export default async function CustomerBookingDetailsPage({ params }: PageProps) 
   const timeWindow = firstString(booking, ["time_window"], "");
   const location = getLocation(booking, guru);
   const careHighlights = buildCareHighlights(booking);
+  const completedBooking = isCompletedBookingStatus(bookingStatus);
+  const { data: existingReviewData } = await supabase
+    .from("booking_reviews")
+    .select("*")
+    .eq("booking_id", bookingId)
+    .maybeSingle();
+
+  const existingReview = (existingReviewData as BookingReviewRow | null) ?? null;
+
+  async function submitBookingReview(formData: FormData) {
+    "use server";
+
+    const nextSupabase = await createClient();
+    const {
+      data: { user: activeUser },
+    } = await nextSupabase.auth.getUser();
+
+    if (!activeUser) {
+      redirect("/login");
+    }
+
+    const { data: freshBookingData } = await nextSupabase
+      .from("bookings")
+      .select("*")
+      .eq("id", bookingId)
+      .maybeSingle();
+
+    const freshBooking = (freshBookingData as DbRow | null) ?? null;
+
+    if (!freshBooking) {
+      notFound();
+    }
+
+    const freshOwnerIds = [
+      readString(freshBooking.customer_id),
+      readString(freshBooking.pet_owner_id),
+      readString(freshBooking.user_id),
+    ].filter(Boolean);
+    const freshOwnerEmail = readString(freshBooking.customer_email)?.toLowerCase() || null;
+    const activeEmail = activeUser.email?.toLowerCase() || null;
+    const ownsFreshBooking =
+      freshOwnerIds.includes(activeUser.id) ||
+      Boolean(freshOwnerEmail && activeEmail && freshOwnerEmail === activeEmail);
+
+    if (!ownsFreshBooking) {
+      notFound();
+    }
+
+    const freshStatus = firstString(freshBooking, ["status"], "pending");
+
+    if (!isCompletedBookingStatus(freshStatus)) {
+      redirect(`/customer/dashboard/bookings/${bookingId}?review=not-ready`);
+    }
+
+    const rating = Number(formData.get("rating"));
+    const reviewText = String(formData.get("review_text") || "").trim();
+    const wouldRebook = formData.get("would_rebook") === "yes";
+    const publicReview = formData.get("is_public") !== "no";
+    const freshGuruId =
+      readString(freshBooking.guru_id) ||
+      readString(freshBooking.sitter_id) ||
+      readString(freshBooking.provider_id);
+
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      redirect(`/customer/dashboard/bookings/${bookingId}?review=invalid-rating`);
+    }
+
+    if (reviewText.length < 10) {
+      redirect(`/customer/dashboard/bookings/${bookingId}?review=needs-text`);
+    }
+
+    const { error } = await nextSupabase.from("booking_reviews").upsert(
+      {
+        booking_id: bookingId,
+        guru_id: freshGuruId,
+        customer_id: activeUser.id,
+        rating,
+        review_text: reviewText,
+        would_rebook: wouldRebook,
+        is_public: publicReview,
+        status: "published",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "booking_id" },
+    );
+
+    if (error) {
+      redirect(`/customer/dashboard/bookings/${bookingId}?review=error`);
+    }
+
+    revalidatePath(`/customer/dashboard/bookings/${bookingId}`);
+    revalidatePath("/customer/dashboard");
+    if (freshGuruId) {
+      revalidatePath(`/guru/${freshGuruId}`);
+    }
+
+    redirect(`/customer/dashboard/bookings/${bookingId}?review=saved`);
+  }
 
   return (
     <main
@@ -802,6 +959,88 @@ export default async function CustomerBookingDetailsPage({ params }: PageProps) 
                 <ActionLink href="/search" label="Book Similar Care" variant="soft" />
                 <ActionLink href="/customer/dashboard/messages?support=admin" label="Get Support" variant="secondary" />
                 <ActionLink href="/customer/dashboard" label="Return to Dashboard" variant="secondary" />
+              </div>
+
+              <div className="mt-5 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+                      Review this care
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                      Help other Pet Parents choose trusted Gurus
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-700">
+                      Reviews appear as real SitGuru trust signals after completed bookings. New Gurus stay listed as New until actual reviews are received.
+                    </p>
+                  </div>
+
+                  <Link
+                    href={`/customer/dashboard/bookings/${bookingId}/visit-updates`}
+                    className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
+                  >
+                    View PawReport
+                  </Link>
+                </div>
+
+                {existingReview ? (
+                  <div className="mt-5 rounded-[1.4rem] border border-emerald-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-lg font-black text-slate-950">
+                        Your review was submitted
+                      </p>
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-black text-amber-700 ring-1 ring-amber-100">
+                        {"★".repeat(Math.max(1, Math.min(5, Number(existingReview.rating || 0))))}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                      {existingReview.review_text || "Thanks for sharing your experience."}
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-slate-500">
+                      Submitted {getReviewDate(existingReview.created_at)}
+                    </p>
+                  </div>
+                ) : completedBooking ? (
+                  <form action={submitBookingReview} className="mt-5 grid gap-4 rounded-[1.4rem] border border-emerald-200 bg-white p-5 shadow-sm">
+                    <StarRatingInput />
+
+                    <label className="grid gap-2">
+                      <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                        Your review
+                      </span>
+                      <textarea
+                        name="review_text"
+                        required
+                        minLength={10}
+                        rows={5}
+                        placeholder={`Share how ${guruName} cared for ${petName}. Mention communication, PawReport updates, live walk details, reliability, and anything that helped you feel confident.`}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                      />
+                    </label>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700">
+                        <input type="checkbox" name="would_rebook" value="yes" className="mt-1" />
+                        I would book this Guru again
+                      </label>
+                      <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700">
+                        <input type="checkbox" name="is_public" value="yes" defaultChecked className="mt-1" />
+                        Show this review on the Guru profile
+                      </label>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
+                    >
+                      Submit Review
+                    </button>
+                  </form>
+                ) : (
+                  <div className="mt-5 rounded-[1.4rem] border border-dashed border-emerald-200 bg-white p-5 text-sm font-semibold leading-6 text-slate-700">
+                    Reviews unlock after the booking is marked completed. Once care is complete, this area becomes the Pet Parent review form.
+                  </div>
+                )}
               </div>
             </div>
 
