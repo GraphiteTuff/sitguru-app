@@ -163,10 +163,22 @@ const fallbackGuruResources: GuruResource[] = [
     sortOrder: 40,
   },
   {
+    id: "sitguru-only-payments",
+    title: "SitGuru-only payments and payout setup",
+    description:
+      "Learn how Pet Parents pay for services through SitGuru only, how Gurus set up Stripe payouts, how tips and credits are tracked, and why off-platform payments are not used for SitGuru bookings.",
+    category: "Payments",
+    type: "policy",
+    tags: ["Payments", "Stripe", "Payouts", "Tips", "Credits"],
+    keywords: ["payment", "payments", "checkout", "stripe", "payout", "tip", "tips", "credit", "promo", "gift card", "pawperks", "petperks", "off platform", "venmo", "zelle", "cash app", "paypal", "cash"],
+    featured: true,
+    sortOrder: 48,
+  },
+  {
     id: "payments",
     title: "Payments, payouts, and referral earnings",
     description:
-      "Understand payouts, booking earnings, referral rewards, pending earnings, approved commissions, and how money is tracked.",
+      "Understand SitGuru-only checkout, Stripe payout setup, booking earnings, optional tips, referral rewards, pending earnings, approved commissions, and how money is tracked.",
     category: "Payments",
     type: "policy",
     tags: ["Payments", "Payouts", "Referrals", "Commissions"],
@@ -220,6 +232,9 @@ const quickSearches = [
   "What should I do before a visit?",
   "How do I create a great PawReport?",
   "How do payments work?",
+  "How do Pet Parents pay through SitGuru only?",
+  "How do I set up Stripe payouts?",
+  "Can I accept Venmo, Zelle, PayPal, Cash App, or cash?",
   "How should I message a Pet Parent?",
   "What should I do in an emergency?",
   "Where will training videos go?",
@@ -339,7 +354,7 @@ function getAssistantAnswer(query: string, matches: GuruResource[]) {
     care:
       "Before every visit, confirm access instructions, feeding, medication, routines, emergency contacts, walk expectations, and PawReport expectations. During care, use PawReport Live for photos, potty updates, food, water, play, mood, medication, notes, and live walk tracking when a walk is part of the booking.",
     payments:
-      "For payment questions, check payout timing, pending versus approved earnings, referral rewards, and booking history. Keep your profile and payout details complete so earnings can be tracked cleanly.",
+      "For payment questions, keep everything inside SitGuru. Pet Parents should pay through SitGuru checkout only, using the available checkout options such as card, Apple Pay, Google Pay, Link by Stripe, saved methods, credits, promo codes, gift cards, or optional tips when available. Gurus should complete Stripe payout setup and should not request cash, Venmo, Zelle, Cash App, PayPal, direct bank transfer, personal card readers, or other off-platform payments for SitGuru bookings. Check payout timing, pending versus approved earnings, referral rewards, tips, and booking history from your dashboard.",
     communication:
       "Great communication is fast, friendly, and specific. Confirm details before the visit, use PawReport Live during care, send helpful notes and photos, and stay calm and professional if a Pet Parent has a concern.",
     safety:
@@ -403,7 +418,7 @@ function getSuggestedNextSteps(intent: SearchIntent) {
     profile: ["Add a friendly profile photo", "Rewrite your bio", "Highlight your care experience"],
     reviews: ["Deliver five-star care", "Use PawReport Live well", "Politely remind Pet Parents to review completed bookings"],
     care: ["Confirm visit instructions", "Check emergency contacts", "Send a visit update"],
-    payments: ["Review payout details", "Check pending earnings", "Review referral rewards"],
+    payments: ["Complete Stripe payout setup", "Keep Pet Parent payments inside SitGuru", "Review payouts, tips, credits, and referral rewards"],
     communication: ["Confirm details before care", "Send friendly updates", "Use calm professional replies"],
     safety: ["Follow pet parent instructions", "Use emergency contacts", "Contact support if urgent"],
     training: ["Watch featured lessons", "Browse training categories", "Save videos for onboarding"],
@@ -752,6 +767,75 @@ export default function GuruSuccessCenterPage() {
                 Thank you for trusting me with Scout today. I saved the PawReport with photos,
                 updates, and the final walk summary. When you have a moment, your honest review
                 helps other Pet Parents choose care and helps me keep improving.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+
+        <Card className="sgsc-pawreport-card">
+          <div className="sgsc-pawreport-hero">
+            <div>
+              <p className="sgsc-pawreport-kicker">SitGuru-Only Payments</p>
+              <div role="heading" aria-level={2} className="sgsc-pawreport-title">
+                Set up payouts and keep every SitGuru booking payment inside SitGuru.
+              </div>
+              <p className="sgsc-pawreport-copy">
+                SitGuru connects booking records, service pricing, tips, credits, PawReports,
+                reviews, support, and payout tracking. That only works correctly when Pet Parents
+                pay through SitGuru checkout and Gurus use Stripe payout setup for eligible earnings.
+              </p>
+            </div>
+
+            <div className="sgsc-pawreport-badge">💳 SitGuru Pay Ready</div>
+          </div>
+
+          <div className="sgsc-pawreport-layout">
+            <div className="sgsc-pawreport-panel">
+              <p className="sgsc-muted-label">How Pet Parents pay</p>
+              <div className="sgsc-pawreport-steps">
+                {[
+                  ["1", "Book through SitGuru", "Pet Parents choose a Guru, service, date, pet, care location, notes, and any available pricing options inside SitGuru."],
+                  ["2", "Review checkout", "The checkout summary can include service subtotal, SitGuru fees when applicable, credits, promo codes, gift cards, SitGuru credit, and optional Guru tips."],
+                  ["3", "Use SitGuru checkout only", "Payment options may include credit/debit card, Apple Pay, Google Pay, Link by Stripe, saved payment methods, ACH/bank when available, PawPerks/PetPerks credits, referral credits, promo codes, gift cards, or SitGuru credit."],
+                  ["4", "Track from dashboard", "Receipts, booking status, messages, PawReports, walk summaries, final care notes, and reviews stay connected to the Pet Parent dashboard."],
+                ].map(([number, title, copy]) => (
+                  <div key={title} className="sgsc-pawreport-step">
+                    <span>{number}</span>
+                    <div>
+                      <strong>{title}</strong>
+                      <p>{copy}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="sgsc-pawreport-panel sgsc-pawreport-panel-soft">
+              <p className="sgsc-muted-label">Guru payout setup</p>
+              <div className="sgsc-pawreport-checks">
+                {[
+                  "Complete Guru onboarding, profile, service area, services, pricing, and My Calendar setup",
+                  "Connect Stripe payout setup before eligible booking payouts, tips, commission, or referral earnings can be sent",
+                  "Keep payout account details current and watch payout status from the dashboard",
+                  "Use SitGuru booking records for earnings, tips, payout status, reviews, and support questions",
+                  "Contact SitGuru support if a booking total, tip, Stripe account, or payout looks incorrect",
+                ].map((item) => (
+                  <div key={item} className="sgsc-pawreport-check">
+                    <span>✓</span>
+                    <p>{item}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="sgsc-pawreport-panel sgsc-pawreport-example">
+              <p className="sgsc-muted-label">Important payment policy</p>
+              <p>
+                Do not ask Pet Parents to pay outside SitGuru for SitGuru bookings. That means no cash,
+                Venmo, Zelle, Cash App, PayPal, direct bank transfer, personal card reader, checks, or
+                other outside payment arrangements. Keeping payment inside SitGuru protects the booking
+                record, receipt, support history, PawReport, reviews, credits, tips, and payout tracking.
               </p>
             </div>
           </div>
