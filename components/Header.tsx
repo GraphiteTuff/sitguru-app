@@ -120,6 +120,7 @@ const customerNavLinks: NavLink[] = [
 
 const guruNavLinks: NavLink[] = [
   { label: "Dashboard", href: "/guru/dashboard" },
+  { label: "Pricing", href: "/guru/dashboard/pricing" },
   { label: "Bookings", href: "/guru/dashboard/bookings" },
   { label: "Referrals", href: "/guru/dashboard/referrals" },
   { label: "Messages", href: "/guru/dashboard/messages" },
@@ -358,6 +359,8 @@ function getActiveAliases(href: string) {
     ];
   }
   if (href === "/guru/dashboard") return ["/guru/dashboard"];
+  if (href === "/guru/dashboard/pricing")
+    return ["/guru/dashboard/pricing", "/guru/pricing"];
   if (href === "/guru/dashboard/referrals")
     return ["/guru/dashboard/referrals", "/guru/referrals"];
   if (href === "/guru/dashboard/messages")
@@ -729,6 +732,7 @@ export default function Header({ user = null }: HeaderProps) {
   const accountMenuLinks: NavLink[] = isGuru
     ? [
         { label: "Dashboard", href: "/guru/dashboard" },
+        { label: "Pricing Workspace", href: "/guru/dashboard/pricing" },
         { label: "Update Guru Profile", href: "/guru/dashboard/profile" },
         { label: "Bookings", href: "/guru/dashboard/bookings" },
         { label: "Referrals", href: "/guru/dashboard/referrals" },
