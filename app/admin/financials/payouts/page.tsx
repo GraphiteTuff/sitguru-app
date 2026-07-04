@@ -1,19 +1,17 @@
-import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
+import type { ComponentType, SVGProps } from "react";
 import {
   AlertTriangle,
-  BarChart3,
-  CalendarDays,
+  ArrowRight,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Clock3,
+  CreditCard,
+  DollarSign,
   Download,
   Eye,
-  Filter,
-  MoreHorizontal,
+  Gift,
   RefreshCw,
-  Search,
+  ShieldCheck,
   TrendingUp,
   Users,
   Wallet,
@@ -21,780 +19,229 @@ import {
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-type PayoutSource =
-  | "Guru"
-  | "Partner"
-  | "Referral"
-  | "Platform"
-  | "Adjustment"
-  | "Refund";
-type PayoutStatus = "paid" | "pending" | "review" | "failed" | "scheduled";
+export const dynamic = "force-dynamic";
 
-type PayoutRow = {
+type SafeRow = Record<string, unknown>;
+type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
+
+type PayoutStatus = "ready" | "pending" | "processing" | "paid" | "review" | "failed" | "scheduled";
+type PayoutSource = "Guru" | "Ambassador" | "Partner" | "Referral" | "PawPerks" | "Platform" | "Refund" | "Adjustment";
+
+type PayoutQueueRow = {
   id: string;
   source: PayoutSource;
-  name: string;
-  email: string;
-  city: string;
-  state: string;
-  zip: string;
+  recipientName: string;
+  recipientEmail: string;
   amount: number;
   status: PayoutStatus;
-  payoutDate: string | null;
   reference: string;
   batch: string;
+  bookingId: string;
+  paymentStatus: string;
+  payoutStatus: string;
   notes: string;
-  partnerType?: string;
-  ambassadorType?: string;
-  programType?: string;
-  isDemo?: boolean;
+  createdAt: string | null;
+  href: string;
 };
 
 type PayoutSummary = {
+  readyToPay: number;
+  manualReview: number;
+  exceptions: number;
   totalScheduled: number;
   totalPaid: number;
-  totalPending: number;
-  totalReview: number;
-  totalFailed: number;
-  totalScheduledOnly: number;
-  averagePayout: number;
-  paidCount: number;
+  pendingAmount: number;
   pendingCount: number;
-  reviewCount: number;
+  paidCount: number;
   failedCount: number;
-  scheduledCount: number;
-  totalCount: number;
+  reviewCount: number;
+  referralRewardAmount: number;
+  referralRewardCount: number;
+  guruPayoutAmount: number;
+  ambassadorPartnerAmount: number;
 };
 
-type SourceSummary = {
-  source: PayoutSource;
-  total: number;
-  count: number;
-  percent: number;
-};
+function getFirst(row: SafeRow, keys: string[], fallback = "") {
+  for (const key of keys) {
+    const value = row[key];
 
-type PayoutTypeSummary = {
-  label: string;
-  total: number;
-  count: number;
-  percent: number;
-};
+    if (value !== null && value !== undefined && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
 
-type SearchParamsShape = {
-  q?: string;
-  status?: string;
-  source?: string;
-  batch?: string;
-  location?: string;
-  range?: string;
-  sort?: string;
-  page?: string;
-  focus?: string;
-};
+  return fallback;
+}
 
-type SearchParamsInput = Promise<SearchParamsShape> | SearchParamsShape;
+function getNumber(row: SafeRow, keys: string[], fallback = 0) {
+  for (const key of keys) {
+    const value = row[key];
+    const parsed = Number(value);
 
-const demoPayoutRows: PayoutRow[] = [
-  {
-    id: "demo-guru-001",
-    source: "Guru",
-    name: "Avery Johnson",
-    email: "avery.johnson@example.com",
-    city: "Philadelphia",
-    state: "PA",
-    zip: "19103",
-    amount: 428.75,
-    status: "paid",
-    payoutDate: "2026-05-01T10:03:00",
-    reference: "tr_87fa29b1e2f9e",
-    batch: "May 2026 Batch A",
-    notes: "Weekend pet sitting booking",
-    isDemo: true,
-  },
-  {
-    id: "demo-guru-002",
-    source: "Guru",
-    name: "Maya Thompson",
-    email: "maya.thompson@example.com",
-    city: "Camden",
-    state: "NJ",
-    zip: "08102",
-    amount: 315.5,
-    status: "pending",
-    payoutDate: "2026-05-03T10:03:00",
-    reference: "tr_9c2c6e9f43c2",
-    batch: "May 2026 Batch A",
-    notes: "Overnight care booking",
-    isDemo: true,
-  },
-  {
-    id: "demo-partner-001",
-    source: "Partner",
-    name: "Happy Paws Rescue",
-    email: "payments@happypawsrescue.org",
-    city: "Cherry Hill",
-    state: "NJ",
-    zip: "08002",
-    amount: 225,
-    status: "paid",
-    payoutDate: "2026-04-29T14:15:00",
-    reference: "pc_12ab3c4ef567",
-    batch: "April 2026 Partner Batch",
-    notes: "Referral commission",
-    isDemo: true,
-  },
-  {
-    id: "demo-guru-003",
-    source: "Guru",
-    name: "Jordan Lee",
-    email: "jordan.lee@example.com",
-    city: "Wilmington",
-    state: "DE",
-    zip: "19801",
-    amount: 182.25,
-    status: "review",
-    payoutDate: "2026-05-04T10:03:00",
-    reference: "tr_79h1jk2111a2",
-    batch: "May 2026 Batch B",
-    notes: "Manual review required",
-    isDemo: true,
-  },
-  {
-    id: "demo-platform-001",
-    source: "Platform",
-    name: "Stripe Platform Transfer",
-    email: "finance@sitguru.com",
-    city: "Remote",
-    state: "US",
-    zip: "00000",
-    amount: 76.85,
-    status: "failed",
-    payoutDate: "2026-05-02T09:59:00",
-    reference: "po_4a31ed_8c1",
-    batch: "May 2026 Platform Batch",
-    notes: "Transfer failed - insufficient balance",
-    isDemo: true,
-  },
-  {
-    id: "demo-adjustment-001",
-    source: "Adjustment",
-    name: "Booking Adjustment",
-    email: "accounting@sitguru.com",
-    city: "Philadelphia",
-    state: "PA",
-    zip: "19103",
-    amount: 167.2,
-    status: "scheduled",
-    payoutDate: "2026-05-04T09:00:00",
-    reference: "adj_2026_0504",
-    batch: "May 2026 Adjustments",
-    notes: "Scheduled correction for payout batch",
-    isDemo: true,
-  },
-  {
-    id: "demo-refund-001",
-    source: "Refund",
-    name: "Customer Refund Reserve",
-    email: "refunds@sitguru.com",
-    city: "Philadelphia",
-    state: "PA",
-    zip: "19103",
-    amount: 124,
-    status: "scheduled",
-    payoutDate: "2026-05-05T09:00:00",
-    reference: "rf_2026_0505",
-    batch: "May 2026 Refund Reserve",
-    notes: "Refund reserve allocation",
-    isDemo: true,
-  },
-  {
-    id: "demo-guru-004",
-    source: "Guru",
-    name: "Sofia Martin",
-    email: "sofia.martin@example.com",
-    city: "Newark",
-    state: "NJ",
-    zip: "07102",
-    amount: 368.9,
-    status: "paid",
-    payoutDate: "2026-05-02T09:15:00",
-    reference: "tr_77hd22bb89f1",
-    batch: "May 2026 Batch A",
-    notes: "Recurring pet sitting payout",
-    isDemo: true,
-  },
-];
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  return fallback;
+}
+
+function normalizeStatus(value: unknown): PayoutStatus {
+  const status = String(value || "").toLowerCase();
+
+  if (status.includes("fail") || status.includes("exception") || status.includes("declin") || status.includes("error")) {
+    return "failed";
+  }
+
+  if (status.includes("review") || status.includes("hold") || status.includes("manual") || status.includes("dispute")) {
+    return "review";
+  }
+
+  if (status.includes("paid") || status.includes("complete") || status.includes("succeed") || status.includes("sent")) {
+    return "paid";
+  }
+
+  if (status.includes("process")) return "processing";
+  if (status.includes("schedule")) return "scheduled";
+  if (status.includes("ready")) return "ready";
+
+  return "pending";
+}
+
+function normalizeSource(value: unknown, fallback: PayoutSource = "Guru"): PayoutSource {
+  const source = String(value || "").toLowerCase();
+
+  if (source.includes("pawperks") || source.includes("petperks")) return "PawPerks";
+  if (source.includes("ambassador")) return "Ambassador";
+  if (source.includes("partner") || source.includes("affiliate")) return "Partner";
+  if (source.includes("referral") || source.includes("reward")) return "Referral";
+  if (source.includes("refund")) return "Refund";
+  if (source.includes("adjust")) return "Adjustment";
+  if (source.includes("platform") || source.includes("stripe")) return "Platform";
+
+  return fallback;
+}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value || 0);
 }
 
-function formatDate(value: string | null) {
-  if (!value) return "Not scheduled";
+function formatDateTime(value: string | null) {
+  if (!value) return "Not dated";
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Not scheduled";
+  if (Number.isNaN(date.getTime())) return "Not dated";
 
-  return date.toLocaleDateString("en-US", {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  });
-}
-
-function formatTime(value: string | null) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
-  });
+  }).format(date);
 }
 
-function normalizeAmount(value: unknown) {
-  const numberValue = Number(value);
-  return Number.isNaN(numberValue) ? 0 : numberValue;
-}
-
-function normalizeStatus(value: unknown): PayoutStatus {
-  const status = String(value || "pending").toLowerCase();
-
-  if (
-    status.includes("paid") ||
-    status.includes("complete") ||
-    status.includes("completed") ||
-    status.includes("sent") ||
-    status.includes("succeeded")
-  ) {
-    return "paid";
-  }
-
-  if (
-    status.includes("fail") ||
-    status.includes("error") ||
-    status.includes("exception") ||
-    status.includes("declined")
-  ) {
-    return "failed";
-  }
-
-  if (
-    status.includes("review") ||
-    status.includes("hold") ||
-    status.includes("manual")
-  ) {
-    return "review";
-  }
-
-  if (status.includes("schedule")) return "scheduled";
-
-  return "pending";
-}
-
-function normalizeSource(value: unknown): PayoutSource {
-  const source = String(value || "").toLowerCase();
-
-  if (
-    source.includes("pawperks") ||
-    source.includes("petperks") ||
-    source.includes("reward") ||
-    source.includes("referral")
-  ) {
-    return "Referral";
-  }
-
-  if (
-    source.includes("partner") ||
-    source.includes("affiliate") ||
-    source.includes("ambassador")
-  ) {
-    return "Partner";
-  }
-
-  if (source.includes("platform")) return "Platform";
-  if (source.includes("adjust")) return "Adjustment";
-  if (source.includes("refund")) return "Refund";
-
-  return "Guru";
-}
-function normalizeTypeLabel(value: unknown, fallback = "Unclassified") {
-  const raw = String(value || "").trim();
-
-  if (!raw) return fallback;
-
-  return raw
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function getFirstValue(row: any, keys: string[]) {
-  for (const key of keys) {
-    const value = row?.[key];
-
-    if (value !== null && value !== undefined && String(value).trim()) {
-      return value;
-    }
-  }
-
-  return "";
-}
-
-function getPartnerType(row: any) {
-  return normalizeTypeLabel(
-    getFirstValue(row, [
-      "partner_type",
-      "partnerType",
-      "participant_type",
-      "program_type",
-      "partner_category",
-      "category",
-      "type",
-      "source_type",
-      "reward_type",
-    ]),
-    "Partner / Referral",
-  );
-}
-
-function getAmbassadorType(row: any) {
-  const directValue = getFirstValue(row, [
-    "ambassador_type",
-    "ambassadorType",
-    "ambassador_category",
-    "ambassador_program_type",
-  ]);
-
-  if (directValue) return normalizeTypeLabel(directValue, "Ambassador");
-
-  const sourceText = [
-    row?.source,
-    row?.type,
-    row?.participant_type,
-    row?.partner_type,
-    row?.program_type,
-    row?.reward_type,
-    row?.notes,
-    row?.memo,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (sourceText.includes("vet tech")) return "Vet Tech";
-  if (sourceText.includes("veterinarian") || sourceText.includes("vet")) return "Veterinarian";
-  if (sourceText.includes("trainer")) return "Trainer";
-  if (sourceText.includes("student") || sourceText.includes("campus")) return "Student / Campus";
-  if (sourceText.includes("veteran") || sourceText.includes("skillbridge")) {
-    return "Veteran / SkillBridge";
-  }
-  if (sourceText.includes("family") || sourceText.includes("friend")) {
-    return "Friends & Family";
-  }
-  if (sourceText.includes("ambassador")) return "Community Ambassador";
-
-  return "Not Ambassador";
-}
-
-function getProgramType(row: any) {
-  return normalizeTypeLabel(
-    getFirstValue(row, [
-      "program_type",
-      "program",
-      "program_key",
-      "programKey",
-      "campaign_type",
-      "campaign",
-      "referral_focus",
-    ]),
-    "General Referral",
-  );
-}
-
-
-function getStatusLabel(status: PayoutStatus) {
-  if (status === "paid") return "Paid";
-  if (status === "pending") return "Pending";
-  if (status === "review") return "Review";
-  if (status === "failed") return "Failed";
-  return "Scheduled";
-}
-
-function getStatusBadgeStyles(status: PayoutStatus) {
-  if (status === "paid") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (status === "pending") return "border-blue-200 bg-blue-50 text-blue-800";
-  if (status === "review") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (status === "failed") return "border-red-200 bg-red-50 text-red-800";
-  return "border-slate-200 bg-slate-100 text-slate-700";
-}
-
-function getSourceBadgeStyles(source: PayoutSource) {
-  if (source === "Guru") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (source === "Partner") return "border-violet-200 bg-violet-50 text-violet-800";
-  if (source === "Referral") return "border-blue-200 bg-blue-50 text-blue-800";
-  if (source === "Platform") return "border-slate-200 bg-slate-100 text-slate-700";
-  if (source === "Adjustment") return "border-indigo-200 bg-indigo-50 text-indigo-800";
-  return "border-rose-200 bg-rose-50 text-rose-800";
-}
-
-function getPercent(value: number, total: number) {
-  if (!total) return 0;
-  return Math.min(100, Math.max(0, Math.round((value / total) * 100)));
-}
-
-async function safeSelect<T>(table: string, query = "*") {
+async function safeSelect(table: string, query = "*"): Promise<SafeRow[]> {
   try {
-    const { data, error } = await supabaseAdmin
-      .from(table)
-      .select(query)
-      .limit(500);
+    const { data, error } = await supabaseAdmin.from(table).select(query).limit(500);
 
-    if (error || !data) return [] as T[];
-    return data as T[];
+    if (error || !data) return [];
+
+    return Array.isArray(data) ? (data as unknown as SafeRow[]) : [];
   } catch {
-    return [] as T[];
+    return [];
   }
 }
 
-function buildGuruPayoutRows(rows: any[]): PayoutRow[] {
-  return rows.map((row, index) => ({
-    id: String(row.id || row.payout_id || `guru-${index}`),
-    source: "Guru",
-    name:
-      row.guru_name ||
-      row.full_name ||
-      row.name ||
-      row.guru?.full_name ||
-      row.guru?.name ||
-      "Guru payout",
-    email: row.email || row.guru_email || row.guru?.email || "No email on file",
-    city: row.city || row.guru_city || row.guru?.city || "Unknown",
-    state: row.state || row.guru_state || row.guru?.state || "",
-    zip: row.zip || row.zip_code || row.guru?.zip || "",
-    amount: normalizeAmount(
-      row.amount || row.payout_amount || row.net_amount || row.total_amount,
-    ),
-    status: normalizeStatus(row.status || row.payout_status),
-    payoutDate:
-      row.payout_date || row.scheduled_for || row.created_at || row.updated_at || null,
-    reference:
-      row.transaction_reference ||
-      row.stripe_transfer_id ||
-      row.reference ||
-      row.id ||
-      "No reference",
-    batch: row.batch_name || row.batch || row.payout_batch || "Unbatched",
-    notes: row.notes || row.memo || "Guru sitting payout",
-    partnerType: getPartnerType(row),
-    ambassadorType: getAmbassadorType(row),
-    programType: getProgramType(row),
-  }));
-}
-
-function buildPartnerPayoutRows(rows: any[]): PayoutRow[] {
-  return rows.map((row, index) => ({
-    id: String(row.id || row.payout_id || `partner-${index}`),
-    source: "Partner",
-    name:
-      row.partner_name ||
-      row.company_name ||
-      row.name ||
-      row.partner?.company_name ||
-      row.partner?.name ||
-      "Partner payout",
-    email: row.email || row.partner_email || row.partner?.email || "No email on file",
-    city: row.city || row.partner_city || row.partner?.city || "Unknown",
-    state: row.state || row.partner_state || row.partner?.state || "",
-    zip: row.zip || row.zip_code || row.partner?.zip || "",
-    amount: normalizeAmount(
-      row.amount || row.commission_amount || row.payout_amount || row.total_amount,
-    ),
-    status: normalizeStatus(row.status || row.payout_status),
-    payoutDate:
-      row.payout_date || row.scheduled_for || row.created_at || row.updated_at || null,
-    reference:
-      row.transaction_reference ||
-      row.stripe_transfer_id ||
-      row.reference ||
-      row.id ||
-      "No reference",
-    batch: row.batch_name || row.batch || row.payout_batch || "Unbatched",
-    notes: row.notes || row.memo || "Partner commission payout",
-    partnerType: getPartnerType(row),
-    ambassadorType: getAmbassadorType(row),
-    programType: getProgramType(row),
-  }));
-}
-
-function buildBookingPayoutRows(rows: any[]): PayoutRow[] {
+function mapBookingRows(rows: SafeRow[]): PayoutQueueRow[] {
   return rows
     .map((row, index) => {
-      const amount = normalizeAmount(
-        row.guru_payout_amount ||
-          row.guru_net_amount ||
-          row.guru_payout ||
-          row.payout_amount ||
-          row.provider_amount ||
-          row.guru_amount,
-      );
+      const amount = getNumber(row, [
+        "guru_estimated_total_payout",
+        "guru_estimated_base_payout",
+        "guru_payout_amount",
+        "guru_net_amount",
+        "provider_amount",
+        "payout_amount",
+        "guru_amount",
+      ]);
 
       if (amount <= 0) return null;
 
+      const status = normalizeStatus(getFirst(row, ["payout_status", "guru_payout_status", "payment_status", "status"], "pending"));
+      const id = getFirst(row, ["id", "booking_id", "uid"], `booking-${index}`);
+
       return {
-        id: String(row.id || row.booking_id || `booking-payout-${index}`),
+        id,
         source: "Guru" as PayoutSource,
-        name:
-          row.guru_name ||
-          row.sitter_name ||
-          row.provider_name ||
-          row.guru?.full_name ||
-          row.guru?.name ||
-          "Guru payout",
-        email:
-          row.guru_email ||
-          row.sitter_email ||
-          row.provider_email ||
-          row.guru?.email ||
-          "No email on file",
-        city: row.city || row.service_city || row.guru_city || row.guru?.city || "Unknown",
-        state: row.state || row.service_state || row.guru_state || row.guru?.state || "",
-        zip: row.zip || row.zip_code || row.service_zip || row.guru?.zip || "",
+        recipientName: getFirst(row, ["guru_name", "sitter_name", "provider_name"], "Guru payout"),
+        recipientEmail: getFirst(row, ["guru_email", "sitter_email", "provider_email"], "No email on file"),
         amount,
-        status: normalizeStatus(row.payout_status || row.payment_status || row.status),
-        payoutDate:
-          row.payout_date ||
-          row.scheduled_payout_at ||
-          row.completed_at ||
-          row.booking_date ||
-          row.start_time ||
-          row.created_at ||
-          row.updated_at ||
-          null,
-        reference:
-          row.stripe_transfer_id ||
-          row.transfer_id ||
-          row.stripe_payout_id ||
-          row.stripe_session_id ||
-          row.stripe_checkout_session_id ||
-          row.payment_intent_id ||
-          row.id ||
-          "No reference",
-        batch: row.payout_batch || row.batch_name || row.batch || "Bookings / Stripe Connect",
-        notes:
-          row.notes ||
-          row.memo ||
-          `Booking payout${row.payment_status ? ` • ${row.payment_status}` : ""}`,
-        partnerType: getPartnerType(row),
-        ambassadorType: getAmbassadorType(row),
-        programType: getProgramType(row),
+        status,
+        reference: getFirst(row, ["stripe_transfer_id", "transfer_id", "stripe_payout_id", "payment_intent_id", "stripe_session_id", "stripe_checkout_session_id", "uid", "id"], "No reference"),
+        batch: getFirst(row, ["payout_batch", "batch_name", "batch"], "Bookings / Guru payouts"),
+        bookingId: id,
+        paymentStatus: getFirst(row, ["payment_status", "stripe_status", "checkout_status"], "Not listed"),
+        payoutStatus: getFirst(row, ["payout_status", "guru_payout_status"], status),
+        notes: getFirst(row, ["payout_notes", "notes", "memo"], "Booking payout generated from completed or payable care."),
+        createdAt: getFirst(row, ["completed_at", "scheduled_payout_at", "booking_date", "created_at", "updated_at"], "") || null,
+        href: `/admin/bookings?booking=${encodeURIComponent(id)}`,
       };
     })
-    .filter(Boolean) as PayoutRow[];
+    .filter(Boolean) as PayoutQueueRow[];
 }
 
-function buildStripePayoutRows(rows: any[]): PayoutRow[] {
-  return rows.map((row, index) => ({
-    id: String(row.id || row.stripe_payout_id || row.payout_id || `stripe-payout-${index}`),
-    source: normalizeSource(row.source || row.type || "Platform"),
-    name: row.recipient_name || row.account_name || row.name || "Stripe payout batch",
-    email: row.email || row.recipient_email || "finance@sitguru.com",
-    city: row.city || row.location_city || "Remote",
-    state: row.state || row.location_state || "US",
-    zip: row.zip || row.zip_code || "",
-    amount: normalizeAmount(
-      row.net_amount ||
-        row.amount ||
-        row.payout_amount ||
-        row.transfer_amount ||
-        row.total_amount,
-    ),
-    status: normalizeStatus(row.status || row.payout_status || row.stripe_status),
-    payoutDate:
-      row.arrival_date ||
-      row.payout_date ||
-      row.scheduled_for ||
-      row.created_at ||
-      row.updated_at ||
-      null,
-    reference:
-      row.stripe_payout_id ||
-      row.payout_id ||
-      row.stripe_transfer_id ||
-      row.transfer_id ||
-      row.id ||
-      "No reference",
-    batch: row.batch_name || row.batch || row.payout_batch || "Stripe payout batch",
-    notes: row.description || row.notes || row.memo || "Stripe payout/deposit batch",
-    partnerType: getPartnerType(row),
-    ambassadorType: getAmbassadorType(row),
-    programType: getProgramType(row),
-  }));
-}
-
-function buildGenericPayoutRows(rows: any[]): PayoutRow[] {
-  return rows.map((row, index) => ({
-    id: String(row.id || row.payout_id || `generic-${index}`),
-    source: normalizeSource(row.source || row.type || row.category || "Platform"),
-    name:
-      row.recipient_name ||
-      row.name ||
-      row.account_name ||
-      row.full_name ||
-      "Payout record",
-    email: row.email || row.recipient_email || "No email on file",
-    city: row.city || row.location_city || "Remote",
-    state: row.state || row.location_state || "US",
-    zip: row.zip || row.zip_code || "",
-    amount: normalizeAmount(
-      row.amount ||
-        row.payout_amount ||
-        row.total_amount ||
-        row.commission_amount ||
-        row.net_amount,
-    ),
-    status: normalizeStatus(row.status || row.payout_status),
-    payoutDate:
-      row.payout_date || row.scheduled_for || row.created_at || row.updated_at || null,
-    reference:
-      row.transaction_reference ||
-      row.stripe_transfer_id ||
-      row.reference ||
-      row.id ||
-      "No reference",
-    batch: row.batch_name || row.batch || row.payout_batch || "Unbatched",
-    notes: row.notes || row.memo || "Platform payout",
-    partnerType: getPartnerType(row),
-    ambassadorType: getAmbassadorType(row),
-    programType: getProgramType(row),
-  }));
-}
-
-
-function normalizeRewardPayoutStatus(row: any): PayoutStatus {
-  const treatment = String(row?.financial_treatment || "").toLowerCase();
-  const status = String(
-    row?.normalized_status || row?.reward_status || row?.payout_status || row?.status || "pending",
-  ).toLowerCase();
-
-  if (treatment.includes("issued") || status.includes("paid") || status.includes("credited")) {
-    return "paid";
-  }
-
-  if (
-    treatment.includes("not_qualified") ||
-    status.includes("reject") ||
-    status.includes("cancel") ||
-    status.includes("invalid")
-  ) {
-    return "review";
-  }
-
-  if (status.includes("fail") || status.includes("error")) return "failed";
-  if (status.includes("approved") || status.includes("qualified") || status.includes("review")) {
-    return "review";
-  }
-
-  return "pending";
-}
-
-function getRewardProgramType(row: any) {
-  const category = String(row?.financial_category || row?.reward_type || row?.type || "").toLowerCase();
-
-  if (category.includes("pawperks") || category.includes("petperks")) return "PawPerks";
-  if (category.includes("ambassador")) return "Ambassador Referral";
-  if (category.includes("partner")) return "Partner Referral";
-  if (category.includes("guru")) return "Guru Referral";
-
-  return getProgramType(row);
-}
-
-function buildReferralRewardRows(rows: any[]): PayoutRow[] {
+function mapGenericRows(rows: SafeRow[], fallbackSource: PayoutSource, defaultBatch: string): PayoutQueueRow[] {
   return rows
     .map((row, index) => {
-      const amount = normalizeAmount(
-        row.normalized_amount ||
-          row.reward_amount ||
-          row.credit_amount ||
-          row.payout_amount ||
-          row.commission_amount ||
-          row.amount,
-      );
+      const amount = getNumber(row, [
+        "amount",
+        "payout_amount",
+        "commission_amount",
+        "reward_amount",
+        "credit_amount",
+        "total_amount",
+        "net_amount",
+        "normalized_amount",
+      ]);
 
       if (amount <= 0) return null;
 
-      const programType = getRewardProgramType(row);
-      const recipientName =
-        row.recipient_name ||
-        row.customer_name ||
-        row.pet_parent_name ||
-        row.guru_name ||
-        row.ambassador_name ||
-        row.partner_name ||
-        row.referrer_name ||
-        row.name ||
-        `${programType} reward`;
+      const source = normalizeSource(
+        getFirst(row, ["source", "type", "category", "reward_type", "financial_category", "program_type"], fallbackSource),
+        fallbackSource,
+      );
+      const status = normalizeStatus(getFirst(row, ["status", "payout_status", "reward_status", "normalized_status", "financial_treatment"], "pending"));
+      const id = getFirst(row, ["id", "payout_id", "referral_reward_id", "referral_code_id"], `${defaultBatch}-${index}`);
 
       return {
-        id: String(row.id || row.referral_reward_id || row.referral_code_id || `referral-reward-${index}`),
-        source: "Referral" as PayoutSource,
-        name: recipientName,
-        email:
-          row.recipient_email ||
-          row.customer_email ||
-          row.guru_email ||
-          row.ambassador_email ||
-          row.partner_email ||
-          row.referrer_email ||
-          row.email ||
-          "No email on file",
-        city: row.city || row.recipient_city || row.customer_city || "Remote",
-        state: row.state || row.recipient_state || row.customer_state || "US",
-        zip: row.zip || row.zip_code || row.recipient_zip || "",
+        id,
+        source,
+        recipientName: getFirst(row, ["recipient_name", "guru_name", "ambassador_name", "partner_name", "customer_name", "referrer_name", "name", "full_name"], `${source} payout`),
+        recipientEmail: getFirst(row, ["recipient_email", "guru_email", "ambassador_email", "partner_email", "customer_email", "referrer_email", "email"], "No email on file"),
         amount,
-        status: normalizeRewardPayoutStatus(row),
-        payoutDate:
-          row.paid_at ||
-          row.credited_at ||
-          row.payout_date ||
-          row.scheduled_for ||
-          row.created_at ||
-          row.updated_at ||
-          null,
-        reference:
-          row.reference ||
-          row.referral_code ||
-          row.referral_code_id ||
-          row.referral_reward_id ||
-          row.id ||
-          "Referral reward liability",
-        batch: row.batch_name || row.batch || row.payout_batch || "Referral Rewards / PawPerks",
-        notes:
-          row.notes ||
-          row.memo ||
-          `${row.financial_category || "Referral reward"} · ${row.financial_treatment || "pending payout review"}`,
-        partnerType: row.financial_category || getPartnerType(row),
-        ambassadorType: getAmbassadorType(row),
-        programType,
+        status,
+        reference: getFirst(row, ["transaction_reference", "stripe_transfer_id", "stripe_payout_id", "reference", "referral_code", "id"], "No reference"),
+        batch: getFirst(row, ["batch_name", "batch", "payout_batch"], defaultBatch),
+        bookingId: getFirst(row, ["booking_id", "bookingId"], ""),
+        paymentStatus: getFirst(row, ["payment_status", "stripe_status"], "Not listed"),
+        payoutStatus: getFirst(row, ["payout_status", "status", "reward_status", "normalized_status"], status),
+        notes: getFirst(row, ["notes", "memo", "description", "financial_treatment"], `${source} payout row.`),
+        createdAt: getFirst(row, ["payout_date", "scheduled_for", "paid_at", "credited_at", "created_at", "updated_at"], "") || null,
+        href: source === "Referral" || source === "PawPerks" ? "/admin/referrals" : "/admin/payouts",
       };
     })
-    .filter(Boolean) as PayoutRow[];
+    .filter(Boolean) as PayoutQueueRow[];
 }
 
-function dedupeRows(rows: PayoutRow[]) {
-  const map = new Map<string, PayoutRow>();
+function dedupeRows(rows: PayoutQueueRow[]) {
+  const map = new Map<string, PayoutQueueRow>();
 
   for (const row of rows) {
-    const key = `${row.source}-${row.id}`;
+    const key = `${row.source}-${row.id}-${row.amount}`;
     if (!map.has(key)) map.set(key, row);
   }
 
@@ -802,1406 +249,423 @@ function dedupeRows(rows: PayoutRow[]) {
 }
 
 async function getPayoutRows() {
-  const bookingRows = buildBookingPayoutRows(await safeSelect<any>("bookings"));
-  const guruRows = buildGuruPayoutRows(await safeSelect<any>("guru_payouts"));
-  const partnerRows = buildPartnerPayoutRows(await safeSelect<any>("partner_payouts"));
-  const stripePayoutRows = buildStripePayoutRows(await safeSelect<any>("stripe_payouts"));
-  const stripeTransferRows = buildStripePayoutRows(await safeSelect<any>("stripe_transfers"));
-  const payoutsRows = buildGenericPayoutRows(await safeSelect<any>("payouts"));
-  const financialPayoutRows = buildGenericPayoutRows(
-    await safeSelect<any>("financial_payouts"),
-  );
-  const adminPayoutRows = buildGenericPayoutRows(await safeSelect<any>("admin_payouts"));
-  const referralRewardRows = buildReferralRewardRows(
-    await safeSelect<any>("admin_referral_reward_liability"),
-  );
-
-  const merged = dedupeRows([
-    ...bookingRows,
-    ...guruRows,
-    ...partnerRows,
-    ...stripePayoutRows,
-    ...stripeTransferRows,
-    ...payoutsRows,
-    ...financialPayoutRows,
-    ...adminPayoutRows,
-    ...referralRewardRows,
+  const [
+    bookingRows,
+    guruPayoutRows,
+    partnerPayoutRows,
+    payoutRows,
+    financialPayoutRows,
+    adminPayoutRows,
+    referralRewardRows,
+    stripeTransferRows,
+    stripePayoutRows,
+  ] = await Promise.all([
+    safeSelect("bookings"),
+    safeSelect("guru_payouts"),
+    safeSelect("partner_payouts"),
+    safeSelect("payouts"),
+    safeSelect("financial_payouts"),
+    safeSelect("admin_payouts"),
+    safeSelect("admin_referral_reward_liability"),
+    safeSelect("stripe_transfers"),
+    safeSelect("stripe_payouts"),
   ]);
 
-  return merged.length ? merged : demoPayoutRows;
+  return dedupeRows([
+    ...mapBookingRows(bookingRows),
+    ...mapGenericRows(guruPayoutRows, "Guru", "Guru payouts"),
+    ...mapGenericRows(partnerPayoutRows, "Partner", "Partner commissions"),
+    ...mapGenericRows(payoutRows, "Platform", "Payout records"),
+    ...mapGenericRows(financialPayoutRows, "Platform", "Financial payouts"),
+    ...mapGenericRows(adminPayoutRows, "Platform", "Admin payouts"),
+    ...mapGenericRows(referralRewardRows, "Referral", "Referral Rewards / PawPerks"),
+    ...mapGenericRows(stripeTransferRows, "Platform", "Stripe transfers"),
+    ...mapGenericRows(stripePayoutRows, "Platform", "Stripe payouts"),
+  ]).sort((a, b) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return bTime - aTime;
+  });
 }
 
-function buildSummary(rows: PayoutRow[]): PayoutSummary {
-  const base = rows.reduce(
+function buildSummary(rows: PayoutQueueRow[]): PayoutSummary {
+  return rows.reduce<PayoutSummary>(
     (summary, row) => {
       summary.totalScheduled += row.amount;
-      summary.totalCount += 1;
 
       if (row.status === "paid") {
         summary.totalPaid += row.amount;
         summary.paidCount += 1;
       }
 
-      if (row.status === "pending") {
-        summary.totalPending += row.amount;
-        summary.pendingCount += 1;
-      }
-
-      if (row.status === "review") {
-        summary.totalReview += row.amount;
-        summary.reviewCount += 1;
-      }
-
       if (row.status === "failed") {
-        summary.totalFailed += row.amount;
+        summary.exceptions += 1;
         summary.failedCount += 1;
       }
 
-      if (row.status === "scheduled") {
-        summary.totalScheduledOnly += row.amount;
-        summary.scheduledCount += 1;
+      if (row.status === "review") {
+        summary.manualReview += 1;
+        summary.reviewCount += 1;
+      }
+
+      if (["ready", "pending", "processing", "scheduled"].includes(row.status)) {
+        summary.readyToPay += row.amount;
+        summary.pendingAmount += row.amount;
+        summary.pendingCount += 1;
+      }
+
+      if (row.source === "Referral" || row.source === "PawPerks") {
+        summary.referralRewardAmount += row.amount;
+        summary.referralRewardCount += 1;
+      }
+
+      if (row.source === "Guru") summary.guruPayoutAmount += row.amount;
+
+      if (row.source === "Ambassador" || row.source === "Partner") {
+        summary.ambassadorPartnerAmount += row.amount;
       }
 
       return summary;
     },
     {
+      readyToPay: 0,
+      manualReview: 0,
+      exceptions: 0,
       totalScheduled: 0,
       totalPaid: 0,
-      totalPending: 0,
-      totalReview: 0,
-      totalFailed: 0,
-      totalScheduledOnly: 0,
-      averagePayout: 0,
-      paidCount: 0,
+      pendingAmount: 0,
       pendingCount: 0,
-      reviewCount: 0,
+      paidCount: 0,
       failedCount: 0,
-      scheduledCount: 0,
-      totalCount: 0,
+      reviewCount: 0,
+      referralRewardAmount: 0,
+      referralRewardCount: 0,
+      guruPayoutAmount: 0,
+      ambassadorPartnerAmount: 0,
     },
   );
-
-  return {
-    ...base,
-    averagePayout: base.totalCount ? base.totalScheduled / base.totalCount : 0,
-  };
 }
 
-function buildSourceSummaries(rows: PayoutRow[]): SourceSummary[] {
-  const sourceOrder: PayoutSource[] = [
-    "Guru",
-    "Partner",
-    "Referral",
-    "Platform",
-    "Adjustment",
-    "Refund",
-  ];
-  const grandTotal = rows.reduce((sum, row) => sum + row.amount, 0);
-
-  return sourceOrder.map((source) => {
-    const matchingRows = rows.filter((row) => row.source === source);
-    const total = matchingRows.reduce((sum, row) => sum + row.amount, 0);
-
-    return {
-      source,
-      total,
-      count: matchingRows.length,
-      percent: getPercent(total, grandTotal),
-    };
-  });
+function statusBadgeClass(status: PayoutStatus) {
+  if (status === "paid") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "failed") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (status === "review") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (status === "processing") return "border-blue-200 bg-blue-50 text-blue-800";
+  if (status === "scheduled") return "border-slate-200 bg-slate-50 text-slate-800";
+  if (status === "ready") return "border-emerald-200 bg-white text-emerald-800";
+  return "border-blue-200 bg-blue-50 text-blue-800";
 }
 
-function buildTypeSummaries(
-  rows: PayoutRow[],
-  key: "partnerType" | "ambassadorType" | "programType",
-  fallback: string,
-): PayoutTypeSummary[] {
-  const grouped = new Map<string, { total: number; count: number }>();
-  const partnerRows = rows.filter((row) => row.source === "Partner" || row.source === "Referral");
-  const grandTotal = partnerRows.reduce((sum, row) => sum + row.amount, 0);
-
-  for (const row of partnerRows) {
-    const label = row[key] || fallback;
-    const existing = grouped.get(label) || { total: 0, count: 0 };
-
-    existing.total += row.amount;
-    existing.count += 1;
-    grouped.set(label, existing);
-  }
-
-  return Array.from(grouped.entries())
-    .map(([label, value]) => ({
-      label,
-      total: value.total,
-      count: value.count,
-      percent: getPercent(value.total, grandTotal),
-    }))
-    .sort((a, b) => b.total - a.total);
+function sourceBadgeClass(source: PayoutSource) {
+  if (source === "Guru") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (source === "Ambassador") return "border-purple-200 bg-purple-50 text-purple-800";
+  if (source === "Partner") return "border-violet-200 bg-violet-50 text-violet-800";
+  if (source === "Referral" || source === "PawPerks") return "border-blue-200 bg-blue-50 text-blue-800";
+  if (source === "Refund") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (source === "Adjustment") return "border-indigo-200 bg-indigo-50 text-indigo-800";
+  return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
-function filterRows(rows: PayoutRow[], params: SearchParamsShape) {
-  const q = String(params?.q || "").toLowerCase().trim();
-  const status = String(params?.status || "all").toLowerCase();
-  const source = String(params?.source || "all").toLowerCase();
-  const batch = String(params?.batch || "all").toLowerCase();
-  const location = String(params?.location || "all").toLowerCase();
-
-  return rows.filter((row) => {
-    const searchable = [
-      row.name,
-      row.email,
-      row.source,
-      row.status,
-      row.city,
-      row.state,
-      row.zip,
-      row.reference,
-      row.batch,
-      row.notes,
-      row.partnerType,
-      row.ambassadorType,
-      row.programType,
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    const matchesSearch = q ? searchable.includes(q) : true;
-    const matchesStatus = status === "all" ? true : row.status === status;
-    const matchesSource = source === "all" ? true : row.source.toLowerCase() === source;
-    const matchesBatch = batch === "all" ? true : row.batch.toLowerCase() === batch;
-    const rowLocation = `${row.city}, ${row.state}`.toLowerCase();
-    const matchesLocation = location === "all" ? true : rowLocation === location;
-
-    return matchesSearch && matchesStatus && matchesSource && matchesBatch && matchesLocation;
-  });
-}
-
-function sortRows(rows: PayoutRow[], sort: string | undefined) {
-  const sorted = [...rows];
-
-  if (sort === "amount_high") return sorted.sort((a, b) => b.amount - a.amount);
-  if (sort === "amount_low") return sorted.sort((a, b) => a.amount - b.amount);
-
-  if (sort === "oldest") {
-    return sorted.sort((a, b) => {
-      const aDate = a.payoutDate ? new Date(a.payoutDate).getTime() : 0;
-      const bDate = b.payoutDate ? new Date(b.payoutDate).getTime() : 0;
-      return aDate - bDate;
-    });
-  }
-
-  return sorted.sort((a, b) => {
-    const aDate = a.payoutDate ? new Date(a.payoutDate).getTime() : 0;
-    const bDate = b.payoutDate ? new Date(b.payoutDate).getTime() : 0;
-    return bDate - aDate;
-  });
-}
-
-function uniqueValues(rows: PayoutRow[], key: "batch" | "location") {
-  if (key === "location") {
-    return Array.from(
-      new Set(rows.map((row) => `${row.city}, ${row.state}`).filter(Boolean)),
-    );
-  }
-
-  return Array.from(new Set(rows.map((row) => row.batch).filter(Boolean)));
-}
-
-function getInitials(name: string) {
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((part) => part.charAt(0).toUpperCase()).join("") || "SG";
-}
-
-function getRecipientTone(source: PayoutSource) {
-  if (source === "Guru") return "bg-emerald-50 text-emerald-700";
-  if (source === "Partner") return "bg-violet-50 text-violet-700";
-  if (source === "Referral") return "bg-blue-50 text-blue-700";
-  if (source === "Platform") return "bg-slate-100 text-slate-700";
-  if (source === "Adjustment") return "bg-indigo-50 text-indigo-700";
-  return "bg-rose-50 text-rose-700";
-}
-
-function KpiCard({
+function StatCard({
   label,
   value,
-  trend,
+  helper,
   icon,
-  iconWrapClassName,
+  tone = "emerald",
 }: {
   label: string;
   value: string;
-  trend: string;
-  icon: ReactNode;
-  iconWrapClassName: string;
+  helper: string;
+  icon: React.ReactNode;
+  tone?: "emerald" | "blue" | "amber" | "rose" | "purple" | "slate";
 }) {
-  const trendUp = !trend.trim().startsWith("↘") && !trend.trim().startsWith("↓");
+  const toneClass = {
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    blue: "border-blue-100 bg-blue-50 text-blue-800",
+    amber: "border-amber-100 bg-amber-50 text-amber-800",
+    rose: "border-rose-100 bg-rose-50 text-rose-800",
+    purple: "border-purple-100 bg-purple-50 text-purple-800",
+    slate: "border-slate-100 bg-slate-50 text-slate-800",
+  }[tone];
 
   return (
-    <div className="rounded-[1.35rem] border border-[#e6eee2] bg-white px-5 py-4 shadow-sm">
+    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-500">{label}</p>
-          <p className="mt-1 text-[2rem] font-black leading-none tracking-tight text-[#111b33]">
-            {value}
-          </p>
-          <p
-            className={`mt-3 flex items-center gap-1.5 text-xs font-bold ${
-              trendUp ? "text-[#118a43]" : "text-[#e04848]"
-            }`}
-          >
-            <span>{trendUp ? "↗" : "↘"}</span>
-            {trend.replace(/^↗\s*|^↘\s*|^↑\s*|^↓\s*/, "")}
-          </p>
-        </div>
-
-        <div
-          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${iconWrapClassName}`}
-        >
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SourceBar({ item }: { item: SourceSummary }) {
-  const barColor =
-    item.source === "Guru"
-      ? "bg-[#118a43]"
-      : item.source === "Partner"
-        ? "bg-violet-500"
-        : item.source === "Referral"
-          ? "bg-blue-500"
-        : item.source === "Platform"
-          ? "bg-slate-400"
-          : item.source === "Adjustment"
-            ? "bg-indigo-500"
-            : "bg-rose-400";
-
-  const iconTone =
-    item.source === "Guru"
-      ? "bg-emerald-50 text-emerald-700"
-      : item.source === "Partner"
-        ? "bg-violet-50 text-violet-700"
-        : item.source === "Referral"
-          ? "bg-blue-50 text-blue-700"
-        : item.source === "Platform"
-          ? "bg-slate-100 text-slate-700"
-          : item.source === "Adjustment"
-            ? "bg-indigo-50 text-indigo-700"
-            : "bg-rose-50 text-rose-700";
-
-  return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div
-            className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconTone}`}
-          >
-            {item.source === "Guru" && <Users className="h-4 w-4" />}
-            {item.source === "Partner" && <Wallet className="h-4 w-4" />}
-            {item.source === "Referral" && <TrendingUp className="h-4 w-4" />}
-            {item.source === "Platform" && <CalendarDays className="h-4 w-4" />}
-            {item.source === "Adjustment" && <RefreshCw className="h-4 w-4" />}
-            {item.source === "Refund" && <AlertTriangle className="h-4 w-4" />}
-          </div>
-
-          <div className="min-w-0">
-            <p className="truncate text-sm font-black text-[#111b33]">
-              {item.source === "Guru"
-                ? "Guru Payouts"
-                : item.source === "Partner"
-                  ? "Partner Commissions"
-                  : item.source === "Referral"
-                    ? "Referral Rewards"
-                  : item.source === "Platform"
-                    ? "Platform Payouts"
-                    : item.source === "Adjustment"
-                      ? "Adjustments"
-                      : "Refunds"}
-            </p>
-          </div>
-        </div>
-
-        <div className="text-right">
-          <p className="text-sm font-black text-[#111b33]">{formatCurrency(item.total)}</p>
-          <p className="text-xs font-semibold text-slate-500">{item.percent}%</p>
-        </div>
-      </div>
-
-      <div className="h-2.5 rounded-full bg-slate-100">
-        <div
-          className={`h-2.5 rounded-full ${barColor}`}
-          style={{ width: `${item.percent}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-
-function TypeBreakdownCard({
-  title,
-  description,
-  items,
-  emptyLabel,
-}: {
-  title: string;
-  description: string;
-  items: PayoutTypeSummary[];
-  emptyLabel: string;
-}) {
-  return (
-    <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm">
-      <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-[#111b33]">{title}</h2>
-          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-            {description}
-          </p>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">{label}</p>
+          <p className="mt-2 text-3xl font-black leading-none text-slate-950">{value}</p>
+          <p className="mt-2 text-sm font-bold leading-5 text-slate-600">{helper}</p>
         </div>
-
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#118a43]">
-          {items.length} types
-        </span>
-      </div>
-
-      <div className="space-y-4">
-        {items.length ? (
-          items.slice(0, 6).map((item) => (
-            <div key={item.label} className="space-y-2.5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-black text-[#111b33]">
-                    {item.label}
-                  </p>
-                  <p className="text-xs font-semibold text-slate-500">
-                    {item.count} payout{item.count === 1 ? "" : "s"}
-                  </p>
-                </div>
-
-                <div className="text-right">
-                  <p className="text-sm font-black text-[#111b33]">
-                    {formatCurrency(item.total)}
-                  </p>
-                  <p className="text-xs font-semibold text-slate-500">
-                    {item.percent}%
-                  </p>
-                </div>
-              </div>
-
-              <div className="h-2.5 rounded-full bg-slate-100">
-                <div
-                  className="h-2.5 rounded-full bg-violet-500"
-                  style={{ width: `${item.percent}%` }}
-                />
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="rounded-2xl border border-dashed border-emerald-100 bg-[#fbfdfb] p-5 text-center">
-            <p className="text-sm font-bold text-slate-500">{emptyLabel}</p>
-          </div>
-        )}
+        <div className={`rounded-2xl border p-3 ${toneClass}`}>{icon}</div>
       </div>
     </div>
   );
 }
 
-function TableActionButton({
-  children,
-  href,
-}: {
-  children: ReactNode;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-center rounded-xl border border-[#e6eee2] bg-white px-3 py-2 text-xs font-black text-[#111b33] transition hover:border-[#cfe0c7] hover:bg-[#f7fbf5]"
-    >
-      {children}
-    </Link>
-  );
-}
-
-function PreservedFilterInputs({
-  params,
-  omit = [],
-}: {
-  params: SearchParamsShape;
-  omit?: string[];
-}) {
-  const entries: Array<[string, string]> = [
-    ["q", params.q || ""],
-    ["status", params.status || "all"],
-    ["source", params.source || "all"],
-    ["batch", params.batch || "all"],
-    ["location", params.location || "all"],
-    ["range", params.range || "last_7_days"],
-    ["sort", params.sort || "newest"],
-    ["focus", params.focus || ""],
-  ];
-
-  return (
-    <>
-      {entries
-        .filter(([name]) => !omit.includes(name))
-        .map(([name, value]) => (
-          <input key={name} type="hidden" name={name} value={value} />
-        ))}
-    </>
-  );
-}
-
-export default async function PayoutsAnalyticsPage({
-  searchParams,
-}: {
-  searchParams?: SearchParamsInput;
-}) {
-  const params = ((await searchParams) || {}) as SearchParamsShape;
+export default async function AdminFinancialPayoutsPage() {
   const rows = await getPayoutRows();
-
-  const filteredRows = filterRows(rows, params);
-  const visibleRows = sortRows(filteredRows, params?.sort);
-  const summary = buildSummary(visibleRows);
-  const sourceSummaries = buildSourceSummaries(visibleRows);
-  const ambassadorTypeSummaries = buildTypeSummaries(
-    visibleRows,
-    "ambassadorType",
-    "Not Ambassador",
-  ).filter((item) => item.label !== "Not Ambassador");
-  const partnerTypeSummaries = buildTypeSummaries(
-    visibleRows,
-    "partnerType",
-    "Partner / Referral",
-  );
-  const programTypeSummaries = buildTypeSummaries(
-    visibleRows,
-    "programType",
-    "General Referral",
-  );
-
-  const batchOptions = uniqueValues(rows, "batch");
-  const locationOptions = uniqueValues(rows, "location");
-
-  const totalForStatus = summary.totalScheduled || 1;
-  const paidPercent = getPercent(summary.totalPaid, totalForStatus);
-  const pendingPercent = getPercent(summary.totalPending, totalForStatus);
-  const reviewPercent = getPercent(summary.totalReview, totalForStatus);
-  const failedPercent = getPercent(summary.totalFailed, totalForStatus);
-  const scheduledPercent = getPercent(summary.totalScheduledOnly, totalForStatus);
-
-  const paidDegrees = Math.round((paidPercent / 100) * 360);
-  const pendingDegrees = paidDegrees + Math.round((pendingPercent / 100) * 360);
-  const reviewDegrees = pendingDegrees + Math.round((reviewPercent / 100) * 360);
-  const failedDegrees = reviewDegrees + Math.round((failedPercent / 100) * 360);
-
-  const donutStyle: CSSProperties = {
-    background: `conic-gradient(
-      #118a43 0deg ${paidDegrees}deg,
-      #3b82f6 ${paidDegrees}deg ${pendingDegrees}deg,
-      #f59e0b ${pendingDegrees}deg ${reviewDegrees}deg,
-      #ef4444 ${reviewDegrees}deg ${failedDegrees}deg,
-      #cbd5e1 ${failedDegrees}deg 360deg
-    )`,
-  };
-
-  const chartSeriesCurrent = [420, 265, 310, 284, 346, 298, 389, 455];
-  const chartSeriesPrevious = [350, 245, 160, 240, 185, 225, 260, 315];
-  const chartLabels = [
-    "Apr 25",
-    "Apr 26",
-    "Apr 27",
-    "Apr 28",
-    "Apr 29",
-    "Apr 30",
-    "May 1",
-    "May 2",
-  ];
-
-  const pointsCurrent = chartSeriesCurrent
-    .map((value, index) => {
-      const x = 40 + index * 88;
-      const y = 190 - (value / 520) * 140;
-      return `${x},${y}`;
-    })
-    .join(" ");
-
-  const pointsPrevious = chartSeriesPrevious
-    .map((value, index) => {
-      const x = 40 + index * 88;
-      const y = 190 - (value / 520) * 140;
-      return `${x},${y}`;
-    })
-    .join(" ");
-
-  const currentPage = Math.max(1, Number(params?.page || "1") || 1);
-  const pageSize = 5;
-  const totalPages = Math.max(1, Math.ceil(visibleRows.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * pageSize;
-  const paginatedRows = visibleRows.slice(startIndex, startIndex + pageSize);
-
-  const successRate = summary.totalCount
-    ? ((summary.paidCount / summary.totalCount) * 100).toFixed(1)
-    : "0.0";
-
-  const onTimeRate = summary.totalCount
-    ? (((summary.paidCount + summary.scheduledCount) / summary.totalCount) * 100).toFixed(1)
-    : "0.0";
-
-  const referralRewardRows = visibleRows.filter((row) => row.source === "Referral");
-  const pendingReferralRewards = referralRewardRows.filter((row) => row.status === "pending");
-  const issuedReferralRewards = referralRewardRows.filter((row) => row.status === "paid");
-  const reviewReferralRewards = referralRewardRows.filter((row) => row.status === "review");
-  const pendingReferralRewardTotal = pendingReferralRewards.reduce((sum, row) => sum + row.amount, 0);
-  const issuedReferralRewardTotal = issuedReferralRewards.reduce((sum, row) => sum + row.amount, 0);
-  const reviewReferralRewardTotal = reviewReferralRewards.reduce((sum, row) => sum + row.amount, 0);
-  const totalPartnersPaid = visibleRows.filter((row) => row.source === "Partner").length;
-
-  const buildHref = (overrides: Partial<SearchParamsShape> = {}) => {
-    const next: SearchParamsShape = {
-      q: params.q || "",
-      status: params.status || "all",
-      source: params.source || "all",
-      batch: params.batch || "all",
-      location: params.location || "all",
-      range: params.range || "last_7_days",
-      sort: params.sort || "newest",
-      page: params.page || "1",
-      focus: params.focus || "",
-      ...overrides,
-    };
-
-    const search = new URLSearchParams();
-
-    Object.entries(next).forEach(([key, value]) => {
-      if (value && String(value).length > 0) {
-        search.set(key, String(value));
-      }
-    });
-
-    return `/admin/financials/payouts?${search.toString()}`;
-  };
+  const summary = buildSummary(rows);
+  const pendingRows = rows.filter((row) => ["ready", "pending", "processing", "scheduled"].includes(row.status));
+  const reviewRows = rows.filter((row) => row.status === "review" || row.status === "failed");
+  const referralRows = rows.filter((row) => row.source === "Referral" || row.source === "PawPerks");
+  const recentRows = rows.slice(0, 10);
 
   return (
-    <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-10 sm:px-6 xl:px-8 2xl:px-0">
-      <section className="rounded-[1.75rem] border border-[#e6eee2] bg-white px-5 py-6 shadow-sm sm:px-6 lg:px-7">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-500">
-              <Link href="/admin" className="transition hover:text-[#118a43]">
-                Admin
-              </Link>
-              <span>›</span>
-              <Link href="/admin/financials" className="transition hover:text-[#118a43]">
-                Financials
-              </Link>
-              <span>›</span>
-              <span className="text-[#111b33]">Additional Payout Analytics</span>
+    <main className="min-h-screen bg-[#f7fbf8] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1600px] space-y-6">
+        <section className="grid gap-5 xl:grid-cols-[1.55fr_0.9fr]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm lg:p-8">
+            <div className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-600">
+              <Link href="/admin" className="text-emerald-800 hover:text-emerald-900">Admin</Link>
+              <span>/</span>
+              <span className="text-slate-950">Financials / Live Payout Analytics</span>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-black tracking-tight text-[#111b33] sm:text-4xl">
-                Additional Payout Data Analytics
-              </h1>
-              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-[#118a43]">
-                <span className="h-2 w-2 rounded-full bg-[#118a43]" />
-                Analytics view
-              </span>
-            </div>
-
-            <p className="mt-2 max-w-3xl text-sm font-medium text-slate-500 sm:text-base">
-              Drill into payout performance, trends, partner activity, batches, exceptions,
-              sources, and accounting-ready payout reporting.
-            </p>
-          </div>
-
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-            <Link
-              href="/admin/payout"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#118a43] px-5 py-3 text-sm font-black text-white transition hover:bg-[#0b6d33]"
-            >
-              Main Payout Landing
-              <BarChart3 className="h-4 w-4" />
-            </Link>
-
-            <div className="rounded-2xl border border-[#e6eee2] bg-[#fbfdfb] px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-2 text-sm font-black text-[#111b33]">
-                <CalendarDays className="h-4 w-4 text-[#118a43]" />
-                Apr 25 – May 2, 2026
-              </div>
-              <p className="mt-1 text-xs font-semibold text-slate-500">
-                vs Apr 18 – Apr 24, 2026
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[1.75rem] border border-[#e6eee2] bg-white p-5 shadow-sm sm:p-6">
-        <form action="/admin/financials/payouts" className="space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-[#118a43]">
-                <Filter className="h-5 w-5" />
-              </div>
+            <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <h2 className="text-lg font-black text-[#118a43] sm:text-xl">
-                  Organize Payout Data
-                </h2>
-                <p className="text-sm font-medium text-slate-500">
-                  Search by recipient, source, batch, location, or payout status.
+                <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
+                  Live Supabase Payout Analytics
+                </span>
+                <h1 className="mt-4 max-w-5xl text-5xl font-black tracking-[-0.05em] text-slate-950 lg:text-7xl">
+                  Live Payout Analytics
+                </h1>
+                <p className="mt-4 max-w-4xl text-base font-semibold leading-8 text-slate-700">
+                  Analyze real Guru payouts, partner commissions, Ambassador rewards, PawPerks rewards, referral liabilities, payout batches, payment exceptions, refunds, and reconciliation work from live SitGuru Supabase rows. This replaces the old static analytics view.
                 </p>
               </div>
-            </div>
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#118a43] px-4 py-3 text-sm font-black text-white transition hover:bg-[#0b6d33]"
-              >
-                <Filter className="h-4 w-4" />
-                Apply
-              </button>
-
-              <Link
-                href="/admin/financials/payouts"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#dbe8d5] bg-white px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#f7fbf5]"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Reset
-              </Link>
-
-              <Link
-                href="/api/admin/financials/payouts/export"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#dbe8d5] bg-[#f7fbf5] px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#eef7ea]"
-              >
-                <Download className="h-4 w-4" />
-                Export CSV
-              </Link>
-            </div>
-          </div>
-
-          <div className="grid gap-3 xl:grid-cols-[1.4fr_repeat(5,minmax(0,1fr))]">
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                name="q"
-                defaultValue={params?.q || ""}
-                placeholder="Search by name, email, source, city, ZIP..."
-                className="h-12 w-full rounded-2xl border border-[#e6eee2] bg-white pl-11 pr-4 text-sm font-semibold text-[#111b33] outline-none transition placeholder:text-slate-400 focus:border-[#b9d1b1] focus:ring-4 focus:ring-emerald-50"
-              />
-            </label>
-
-            <select
-              name="status"
-              defaultValue={params?.status || "all"}
-              className="h-12 w-full rounded-2xl border border-[#e6eee2] bg-white px-4 text-sm font-semibold text-[#111b33] outline-none transition focus:border-[#b9d1b1] focus:ring-4 focus:ring-emerald-50"
-            >
-              <option value="all">Status: All</option>
-              <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
-              <option value="review">Needs Review</option>
-              <option value="failed">Failed / Exceptions</option>
-              <option value="scheduled">Scheduled</option>
-            </select>
-
-            <select
-              name="source"
-              defaultValue={params?.source || "all"}
-              className="h-12 w-full rounded-2xl border border-[#e6eee2] bg-white px-4 text-sm font-semibold text-[#111b33] outline-none transition focus:border-[#b9d1b1] focus:ring-4 focus:ring-emerald-50"
-            >
-              <option value="all">Source: All</option>
-              <option value="guru">Guru</option>
-              <option value="partner">Partner</option>
-              <option value="referral">Referral Rewards</option>
-              <option value="platform">Platform</option>
-              <option value="adjustment">Adjustment</option>
-              <option value="refund">Refund</option>
-            </select>
-
-            <select
-              name="batch"
-              defaultValue={params?.batch || "all"}
-              className="h-12 w-full rounded-2xl border border-[#e6eee2] bg-white px-4 text-sm font-semibold text-[#111b33] outline-none transition focus:border-[#b9d1b1] focus:ring-4 focus:ring-emerald-50"
-            >
-              <option value="all">Batch: All</option>
-              {batchOptions.map((batch) => (
-                <option key={batch} value={batch.toLowerCase()}>
-                  {batch}
-                </option>
-              ))}
-            </select>
-
-            <select
-              name="location"
-              defaultValue={params?.location || "all"}
-              className="h-12 w-full rounded-2xl border border-[#e6eee2] bg-white px-4 text-sm font-semibold text-[#111b33] outline-none transition focus:border-[#b9d1b1] focus:ring-4 focus:ring-emerald-50"
-            >
-              <option value="all">Location: All</option>
-              {locationOptions.map((location) => (
-                <option key={location} value={location.toLowerCase()}>
-                  {location}
-                </option>
-              ))}
-            </select>
-
-            <select
-              name="range"
-              defaultValue={params?.range || "last_7_days"}
-              className="h-12 w-full rounded-2xl border border-[#e6eee2] bg-white px-4 text-sm font-semibold text-[#111b33] outline-none transition focus:border-[#b9d1b1] focus:ring-4 focus:ring-emerald-50"
-            >
-              <option value="last_7_days">Apr 25 – May 2, 2026</option>
-              <option value="last_30_days">Last 30 days</option>
-              <option value="this_month">This month</option>
-              <option value="custom">Custom range</option>
-            </select>
-          </div>
-        </form>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        <KpiCard
-          label="Total Scheduled"
-          value={formatCurrency(summary.totalScheduled)}
-          trend="↗ 18.6% vs Apr 18 – Apr 24"
-          icon={<CalendarDays className="h-6 w-6" />}
-          iconWrapClassName="bg-emerald-50 text-[#118a43]"
-        />
-        <KpiCard
-          label="Total Paid"
-          value={formatCurrency(summary.totalPaid)}
-          trend="↗ 21.3% vs Apr 18 – Apr 24"
-          icon={<CheckCircle2 className="h-6 w-6" />}
-          iconWrapClassName="bg-emerald-50 text-[#118a43]"
-        />
-        <KpiCard
-          label="Pending"
-          value={formatCurrency(summary.totalPending)}
-          trend="↗ 8.4% vs Apr 18 – Apr 24"
-          icon={<Clock3 className="h-6 w-6" />}
-          iconWrapClassName="bg-blue-50 text-blue-600"
-        />
-        <KpiCard
-          label="Needs Review"
-          value={formatCurrency(summary.totalReview)}
-          trend="↗ 12.7% vs Apr 18 – Apr 24"
-          icon={<Eye className="h-6 w-6" />}
-          iconWrapClassName="bg-amber-50 text-amber-600"
-        />
-        <KpiCard
-          label="Failed / Exceptions"
-          value={formatCurrency(summary.totalFailed)}
-          trend="↘ 4.7% vs Apr 18 – Apr 24"
-          icon={<AlertTriangle className="h-6 w-6" />}
-          iconWrapClassName="bg-red-50 text-red-500"
-        />
-        <KpiCard
-          label="Avg Payout"
-          value={formatCurrency(summary.averagePayout)}
-          trend="↗ 14.2% vs Apr 18 – Apr 24"
-          icon={<TrendingUp className="h-6 w-6" />}
-          iconWrapClassName="bg-emerald-50 text-[#118a43]"
-        />
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[1.35rem] border border-blue-100 bg-blue-50 p-5 shadow-sm">
-          <p className="text-sm font-semibold text-blue-700">Referral Reward Records</p>
-          <p className="mt-2 text-3xl font-black text-[#111b33]">{referralRewardRows.length}</p>
-          <p className="mt-1 text-xs font-bold text-blue-700">
-            PawPerks, Guru, Ambassador, and Partner reward rows
-          </p>
-        </div>
-
-        <div className="rounded-[1.35rem] border border-amber-100 bg-amber-50 p-5 shadow-sm">
-          <p className="text-sm font-semibold text-amber-700">Pending Reward Liability</p>
-          <p className="mt-2 text-3xl font-black text-[#111b33]">
-            {formatCurrency(pendingReferralRewardTotal)}
-          </p>
-          <p className="mt-1 text-xs font-bold text-amber-700">
-            {pendingReferralRewards.length} rewards awaiting approval, credit, or payout
-          </p>
-        </div>
-
-        <div className="rounded-[1.35rem] border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
-          <p className="text-sm font-semibold text-emerald-700">Issued Referral Rewards</p>
-          <p className="mt-2 text-3xl font-black text-[#111b33]">
-            {formatCurrency(issuedReferralRewardTotal)}
-          </p>
-          <p className="mt-1 text-xs font-bold text-emerald-700">
-            Paid, credited, or completed reward expense
-          </p>
-        </div>
-
-        <div className="rounded-[1.35rem] border border-violet-100 bg-violet-50 p-5 shadow-sm">
-          <p className="text-sm font-semibold text-violet-700">Reward Review Queue</p>
-          <p className="mt-2 text-3xl font-black text-[#111b33]">
-            {formatCurrency(reviewReferralRewardTotal)}
-          </p>
-          <p className="mt-1 text-xs font-bold text-violet-700">
-            {reviewReferralRewards.length} reward rows need payout review
-          </p>
-        </div>
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-12">
-        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-4">
-          <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-lg font-black text-[#111b33]">Payouts by Status</h2>
-            <Link
-              href={buildHref({ page: "1" })}
-              className="text-xs font-black text-[#118a43] transition hover:text-[#0b6d33]"
-            >
-              View details
-            </Link>
-          </div>
-
-          <div className="grid gap-5 md:grid-cols-[220px_1fr] xl:grid-cols-1">
-            <div
-              className="mx-auto grid h-56 w-56 place-items-center rounded-full p-8"
-              style={donutStyle}
-            >
-              <div className="grid h-full w-full place-items-center rounded-full bg-white text-center shadow-sm">
-                <div>
-                  <p className="text-xs font-bold text-slate-500">Total</p>
-                  <p className="text-xl font-black text-[#111b33]">
-                    {formatCurrency(summary.totalScheduled)}
-                  </p>
-                  <p className="text-xs font-bold text-slate-500">100%</p>
-                </div>
+              <div className="grid min-w-[260px] gap-3">
+                <Link href="/admin/payments" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800">
+                  Open Payments <CreditCard className="h-4 w-4" />
+                </Link>
+                <Link href="/admin/payouts" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50">
+                  Main Payout Center <TrendingUp className="h-4 w-4" />
+                </Link>
+                <Link href="/api/admin/financials/payouts/export" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-white">
+                  Export CSV <Download className="h-4 w-4" />
+                </Link>
               </div>
             </div>
 
-            <div className="space-y-3 text-sm">
-              {[
-                ["Paid", summary.totalPaid, paidPercent, "bg-[#118a43]"],
-                ["Pending", summary.totalPending, pendingPercent, "bg-blue-500"],
-                ["Needs Review", summary.totalReview, reviewPercent, "bg-amber-500"],
-                ["Failed / Exceptions", summary.totalFailed, failedPercent, "bg-red-500"],
-                ["Scheduled", summary.totalScheduledOnly, scheduledPercent, "bg-slate-400"],
-              ].map(([label, value, percent, color]) => (
-                <div key={String(label)} className="flex items-start gap-3">
-                  <span className={`mt-1 h-2.5 w-2.5 rounded-full ${color}`} />
-                  <div>
-                    <p className="font-black text-[#111b33]">{label}</p>
-                    <p className="font-semibold text-slate-500">
-                      {formatCurrency(Number(value))} ({percent}%)
-                    </p>
-                  </div>
+            <div className="mt-7 grid gap-4 md:grid-cols-3">
+              <div className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-5">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-800">Ready / Pending</p>
+                <p className="mt-2 text-3xl font-black text-slate-950">{formatCurrency(summary.readyToPay)}</p>
+                <p className="mt-1 text-sm font-bold text-slate-700">{summary.pendingCount} payout row(s)</p>
+              </div>
+              <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 p-5">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Manual Review</p>
+                <p className="mt-2 text-3xl font-black text-slate-950">{summary.manualReview}</p>
+                <p className="mt-1 text-sm font-bold text-slate-700">Hold, dispute, or manual review row(s)</p>
+              </div>
+              <div className="rounded-[1.25rem] border border-rose-200 bg-rose-50 p-5">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-800">Exceptions</p>
+                <p className="mt-2 text-3xl font-black text-slate-950">{summary.exceptions}</p>
+                <p className="mt-1 text-sm font-bold text-slate-700">Failed or exception payout row(s)</p>
+              </div>
+            </div>
+          </div>
+
+          <aside className="space-y-5">
+            <div className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-700">
+                  <ShieldCheck className="h-6 w-6" />
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tight text-slate-950">Payout workflow</h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                    Use this as the live payout analytics page. It reads from real Supabase payout, booking, referral, Stripe, and financial payout tables when those tables exist.
+                  </p>
+                </div>
+              </div>
 
-        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-4">
-          <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-lg font-black text-[#111b33]">
-              Payout Volume Over Time
-            </h2>
-            <div className="flex items-center gap-4 text-xs font-bold text-slate-500">
-              <span className="flex items-center gap-2">
-                <span className="h-1.5 w-6 rounded-full bg-[#118a43]" />
-                Apr 25 – May 2, 2026
-              </span>
-              <span className="hidden items-center gap-2 sm:flex">
-                <span className="h-1.5 w-6 rounded-full bg-slate-300" />
-                Apr 18 – Apr 24, 2026
-              </span>
-            </div>
-          </div>
-
-          <div className="relative h-[260px] overflow-hidden rounded-2xl bg-gradient-to-b from-white to-[#f8fbf6] p-4">
-            <svg viewBox="0 0 720 230" className="h-full w-full">
-              <line x1="40" y1="30" x2="40" y2="190" stroke="#e5e7eb" />
-              <line x1="40" y1="190" x2="700" y2="190" stroke="#e5e7eb" />
-              <line x1="40" y1="150" x2="700" y2="150" stroke="#edf2e7" />
-              <line x1="40" y1="110" x2="700" y2="110" stroke="#edf2e7" />
-              <line x1="40" y1="70" x2="700" y2="70" stroke="#edf2e7" />
-
-              <polyline
-                fill="none"
-                stroke="#cbd5e1"
-                strokeWidth="4"
-                strokeDasharray="8 8"
-                points={pointsPrevious}
-              />
-
-              <polyline
-                fill="none"
-                stroke="#118a43"
-                strokeWidth="5"
-                points={pointsCurrent}
-              />
-
-              {chartSeriesCurrent.map((value, index) => {
-                const x = 40 + index * 88;
-                const y = 190 - (value / 520) * 140;
-
-                return (
-                  <circle
-                    key={`${x}-${y}`}
-                    cx={x}
-                    cy={y}
-                    r="6"
-                    fill="#118a43"
-                    stroke="white"
-                    strokeWidth="4"
-                  />
-                );
-              })}
-
-              <rect x="282" y="48" width="118" height="58" rx="14" fill="white" stroke="#e5e7eb" />
-              <text x="300" y="70" fill="#111b33" fontSize="13" fontWeight="700">
-                Apr 28, 2026
-              </text>
-              <text x="304" y="93" fill="#118a43" fontSize="18" fontWeight="900">
-                $312.60
-              </text>
-
-              {chartLabels.map((label, index) => (
-                <text
-                  key={label}
-                  x={30 + index * 88}
-                  y="220"
-                  fill="#64748b"
-                  fontSize="12"
-                  fontWeight="700"
-                >
-                  {label}
-                </text>
-              ))}
-            </svg>
-          </div>
-        </div>
-
-        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-2">
-          <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-lg font-black text-[#111b33]">Payouts by Source</h2>
-            <Link
-              href={buildHref({ page: "1" })}
-              className="text-xs font-black text-[#118a43] transition hover:text-[#0b6d33]"
-            >
-              View all
-            </Link>
-          </div>
-
-          <div className="space-y-5">
-            {sourceSummaries.map((item) => (
-              <SourceBar key={item.source} item={item} />
-            ))}
-          </div>
-        </div>
-
-        <div className="grid gap-5 xl:col-span-4 xl:grid-cols-3">
-          <TypeBreakdownCard
-            title="Payouts by Ambassador Type"
-            description="Tracks Ambassador payouts across Vet Techs, Veterinarians, Trainers, students, Veterans, SkillBridge, Friends & Family, and community Ambassador groups."
-            items={ambassadorTypeSummaries}
-            emptyLabel="No Ambassador-type payout rows found yet."
-          />
-          <TypeBreakdownCard
-            title="Payouts by Partner Type"
-            description="Tracks partner, affiliate, referral, rescue, business, and community partner payout categories."
-            items={partnerTypeSummaries}
-            emptyLabel="No partner-type payout rows found yet."
-          />
-          <TypeBreakdownCard
-            title="Payouts by Program / Campaign"
-            description="Separates hiring-program referrals, Student Hire, Veterans Hire, SkillBridge, Ambassador campaigns, and general referral rewards when those fields are present."
-            items={programTypeSummaries}
-            emptyLabel="No program or campaign payout rows found yet."
-          />
-        </div>
-
-        <div className="rounded-[1.5rem] border border-[#e6eee2] bg-white p-5 shadow-sm xl:col-span-2">
-          <h2 className="text-lg font-black text-[#111b33]">Quick Actions & Alerts</h2>
-
-          <div className="mt-5 space-y-3">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-black text-amber-900">High Review Queue</p>
-              <p className="mt-1 text-xs font-semibold text-amber-800">
-                {summary.reviewCount} payouts need your attention
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-[#e6eee2] bg-[#f7fbf5] p-4">
-              <p className="text-sm font-black text-[#111b33]">Batch Processing</p>
-              <p className="mt-1 text-xs font-semibold text-slate-600">
-                Batch #P-2026-104 is in progress
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-[#e6eee2] bg-[#f7fbf5] p-4">
-              <p className="text-sm font-black text-[#111b33]">Upcoming Payouts</p>
-              <p className="mt-1 text-xs font-semibold text-slate-600">
-                {summary.pendingCount + summary.scheduledCount} payouts scheduled soon
-              </p>
-            </div>
-
-            <Link
-              href="/admin/payout"
-              className="flex items-center justify-center rounded-2xl bg-[#118a43] px-4 py-3 text-sm font-black text-white transition hover:bg-[#0b6d33]"
-            >
-              Back to Main Payout Landing →
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="payout-records"
-        className="overflow-hidden rounded-[1.5rem] border border-[#e6eee2] bg-white shadow-sm"
-      >
-        <div className="flex flex-col gap-4 border-b border-[#edf2e7] p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-black text-[#111b33]">Payout Records</h2>
-              <span className="text-sm font-black text-[#118a43]">
-                {visibleRows.length} records
-              </span>
-            </div>
-            <p className="mt-1 text-sm font-medium text-slate-500">
-              Accounting-ready payout records with filters, references, notes, and actions.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <form action="/admin/financials/payouts" className="flex flex-col gap-2 sm:flex-row">
-              <PreservedFilterInputs params={params} omit={["q", "page", "focus"]} />
-              <input
-                type="text"
-                name="q"
-                defaultValue={params?.q || ""}
-                placeholder="Search payouts..."
-                className="h-11 rounded-2xl border border-[#e6eee2] bg-white px-4 text-sm font-semibold text-[#111b33] outline-none transition placeholder:text-slate-400 focus:border-[#b9d1b1] focus:ring-4 focus:ring-emerald-50"
-              />
-              <button
-                type="submit"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[#dbe8d5] bg-[#f7fbf5] px-4 text-sm font-black text-[#118a43] transition hover:bg-[#eef7ea]"
-              >
-                <Search className="h-4 w-4" />
-                Search
-              </button>
-            </form>
-
-            <form action="/admin/financials/payouts" className="flex items-center gap-2">
-              <PreservedFilterInputs params={params} omit={["sort", "page", "focus"]} />
-              <select
-                name="sort"
-                defaultValue={params?.sort || "newest"}
-                className="h-11 rounded-2xl border border-[#e6eee2] bg-white px-4 text-sm font-semibold text-[#111b33] outline-none transition focus:border-[#b9d1b1] focus:ring-4 focus:ring-emerald-50"
-              >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="amount_high">Amount: High to Low</option>
-                <option value="amount_low">Amount: Low to High</option>
-              </select>
-              <button
-                type="submit"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[#dbe8d5] bg-white px-4 text-sm font-black text-[#111b33] transition hover:bg-[#f7fbf5]"
-              >
-                <Filter className="h-4 w-4" />
-                Filters
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1420px] w-full">
-            <thead className="bg-[#fbfdfb]">
-              <tr className="border-b border-[#edf2e7] text-left">
-                {[
-                  "Recipient",
-                  "Source",
-                  "Amount",
-                  "Status",
-                  "Type / Program",
-                  "Payout Date",
-                  "Reference",
-                  "Notes",
-                  "Actions",
-                ].map((label) => (
-                  <th
-                    key={label}
-                    className="px-5 py-4 text-xs font-black uppercase tracking-[0.02em] text-slate-500"
-                  >
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {paginatedRows.map((row) => {
-                const isFocused = params.focus === row.id;
-
-                return (
-                  <tr
-                    key={`${row.source}-${row.id}`}
-                    className={`border-b border-[#edf2e7] transition hover:bg-[#fbfdfb] ${
-                      isFocused ? "bg-emerald-50/40" : ""
-                    }`}
-                  >
-                    <td className="px-5 py-4 align-top">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black ${getRecipientTone(
-                            row.source,
-                          )}`}
-                        >
-                          {getInitials(row.name)}
-                        </div>
-                        <div>
-                          <p className="font-black text-[#111b33]">{row.name}</p>
-                          <p className="text-sm font-medium text-slate-500">{row.email}</p>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4 align-top">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${getSourceBadgeStyles(
-                          row.source,
-                        )}`}
-                      >
-                        {row.source}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4 align-top">
-                      <p className="font-black text-[#111b33]">{formatCurrency(row.amount)}</p>
-                    </td>
-
-                    <td className="px-5 py-4 align-top">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${getStatusBadgeStyles(
-                          row.status,
-                        )}`}
-                      >
-                        {getStatusLabel(row.status)}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4 align-top">
-                      <div className="max-w-[220px] space-y-1 text-xs font-semibold text-slate-500">
-                        {row.ambassadorType && row.ambassadorType !== "Not Ambassador" ? (
-                          <p>
-                            <span className="font-black text-[#111b33]">Ambassador:</span>{" "}
-                            {row.ambassadorType}
-                          </p>
-                        ) : null}
-                        {row.partnerType ? (
-                          <p>
-                            <span className="font-black text-[#111b33]">Partner:</span>{" "}
-                            {row.partnerType}
-                          </p>
-                        ) : null}
-                        {row.programType ? (
-                          <p>
-                            <span className="font-black text-[#111b33]">Program:</span>{" "}
-                            {row.programType}
-                          </p>
-                        ) : null}
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4 align-top">
-                      <p className="font-black text-[#111b33]">{formatDate(row.payoutDate)}</p>
-                      <p className="text-sm font-medium text-slate-500">
-                        {formatTime(row.payoutDate)}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 align-top">
-                      <p className="font-mono text-sm font-semibold text-slate-500">
-                        {row.reference}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 align-top">
-                      <p className="max-w-[220px] text-sm font-medium text-slate-500">
-                        {row.notes}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 align-top">
-                      <div className="flex items-center gap-2">
-                        <TableActionButton
-                          href={`${buildHref({
-                            focus: row.id,
-                            page: String(safePage),
-                          })}#payout-records`}
-                        >
-                          View
-                        </TableActionButton>
-                        <TableActionButton
-                          href={`${buildHref({
-                            focus: row.id,
-                            page: String(safePage),
-                          })}#payout-records`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </TableActionButton>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {paginatedRows.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-5 py-14 text-center">
-                    <p className="text-lg font-black text-[#111b33]">
-                      No payout records found
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-slate-500">
-                      Adjust your filters or reset to view all payout records.
-                    </p>
-                    <div className="mt-5">
-                      <Link
-                        href="/admin/financials/payouts"
-                        className="inline-flex items-center justify-center rounded-2xl bg-[#118a43] px-4 py-3 text-sm font-black text-white transition hover:bg-[#0b6d33]"
-                      >
-                        Reset Filters
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex flex-col gap-4 border-t border-[#edf2e7] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-semibold text-slate-500">
-            Showing{" "}
-            <span className="font-black text-[#111b33]">
-              {paginatedRows.length ? startIndex + 1 : 0}
-            </span>{" "}
-            to{" "}
-            <span className="font-black text-[#111b33]">
-              {Math.min(startIndex + pageSize, visibleRows.length)}
-            </span>{" "}
-            of <span className="font-black text-[#111b33]">{visibleRows.length}</span>{" "}
-            records
-          </p>
-
-          <div className="flex items-center gap-2">
-            <Link
-              href={`${buildHref({ page: String(Math.max(1, safePage - 1)) })}#payout-records`}
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border ${
-                safePage <= 1
-                  ? "pointer-events-none border-slate-200 bg-slate-100 text-slate-300"
-                  : "border-[#dbe8d5] bg-white text-[#111b33] hover:bg-[#f7fbf5]"
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Link>
-
-            {Array.from({ length: Math.min(totalPages, 5) }).map((_, index) => {
-              const page = index + 1;
-              const active = page === safePage;
-
-              return (
-                <Link
-                  key={page}
-                  href={`${buildHref({ page: String(page) })}#payout-records`}
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-black ${
-                    active
-                      ? "border-emerald-200 bg-emerald-50 text-[#118a43]"
-                      : "border-[#dbe8d5] bg-white text-[#111b33] hover:bg-[#f7fbf5]"
-                  }`}
-                >
-                  {page}
+              <div className="mt-5 grid gap-3">
+                <Link href="/admin/payouts" className="inline-flex items-center justify-between rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800">
+                  Open main payout center <ArrowRight className="h-4 w-4" />
                 </Link>
-              );
-            })}
-
-            {totalPages > 5 && (
-              <span className="px-1 text-sm font-black text-slate-400">…</span>
-            )}
-
-            <Link
-              href={`${buildHref({
-                page: String(Math.min(totalPages, safePage + 1)),
-              })}#payout-records`}
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border ${
-                safePage >= totalPages
-                  ? "pointer-events-none border-slate-200 bg-slate-100 text-slate-300"
-                  : "border-[#dbe8d5] bg-white text-[#111b33] hover:bg-[#f7fbf5]"
-              }`}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[1.35fr_0.7fr_0.7fr_0.7fr_1.25fr]">
-        <div className="rounded-[1.35rem] border border-[#e6eee2] bg-white p-5 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-[#118a43]">
-              <CheckCircle2 className="h-5 w-5" />
+                <Link href="/admin/referrals" className="inline-flex items-center justify-between rounded-2xl border border-purple-200 bg-purple-50 px-5 py-3 text-sm font-black text-purple-800 transition hover:bg-purple-100">
+                  Review referral rewards <Gift className="h-4 w-4" />
+                </Link>
+                <Link href="/admin/financials/reconciliation" className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-50">
+                  Reconcile deposits <RefreshCw className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
+
+            <div className="rounded-[2rem] border border-amber-100 bg-amber-50 p-6 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Live-data note</p>
+              <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                If a section shows zero, it means no matching live rows were found in Supabase for that source. This page does not fill the dashboard with fake payout recipients.
+              </p>
+            </div>
+          </aside>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <StatCard label="Total Scheduled" value={formatCurrency(summary.totalScheduled)} helper={`${rows.length} live payout row(s)`} icon={<DollarSign className="h-6 w-6" />} />
+          <StatCard label="Total Paid" value={formatCurrency(summary.totalPaid)} helper={`${summary.paidCount} paid row(s)`} icon={<CheckCircle2 className="h-6 w-6" />} />
+          <StatCard label="Pending" value={formatCurrency(summary.pendingAmount)} helper={`${summary.pendingCount} row(s) waiting`} icon={<Clock3 className="h-6 w-6" />} tone="blue" />
+          <StatCard label="Needs Review" value={String(summary.reviewCount)} helper="Manual review queue" icon={<Eye className="h-6 w-6" />} tone="amber" />
+          <StatCard label="Failed" value={String(summary.failedCount)} helper="Exception queue" icon={<AlertTriangle className="h-6 w-6" />} tone="rose" />
+          <StatCard label="Referral Rewards" value={formatCurrency(summary.referralRewardAmount)} helper={`${summary.referralRewardCount} reward row(s)`} icon={<Gift className="h-6 w-6" />} tone="purple" />
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
+          <div className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm lg:p-8">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Live payout analytics queue</p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">Payable rows by source and status</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Guru, Ambassador, partner, PawPerks, referral, Stripe transfer, and financial payout rows are merged into one admin review queue.
+                </p>
+              </div>
+              <Link href="/admin/payments" className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 hover:bg-emerald-100">
+                Payment details <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-200">
+              {pendingRows.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[980px] text-left text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Recipient</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Source</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Amount</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Status</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Reference</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Updated</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Open</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingRows.slice(0, 12).map((row) => (
+                        <tr key={`${row.source}-${row.id}`} className="border-t border-slate-100">
+                          <td className="px-5 py-4">
+                            <p className="font-black text-slate-950">{row.recipientName}</p>
+                            <p className="text-xs font-bold text-slate-500">{row.recipientEmail}</p>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${sourceBadgeClass(row.source)}`}>{row.source}</span>
+                          </td>
+                          <td className="px-5 py-4 font-black text-slate-950">{formatCurrency(row.amount)}</td>
+                          <td className="px-5 py-4">
+                            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black capitalize ${statusBadgeClass(row.status)}`}>{row.status}</span>
+                          </td>
+                          <td className="max-w-[240px] truncate px-5 py-4 font-bold text-slate-600">{row.reference}</td>
+                          <td className="px-5 py-4 font-bold text-slate-600">{formatDateTime(row.createdAt)}</td>
+                          <td className="px-5 py-4">
+                            <Link href={row.href} className="inline-flex rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 hover:bg-emerald-50">Open</Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-8 text-center">
+                  <p className="text-base font-black text-slate-950">No pending payout rows found.</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">New payable rows will appear here when Supabase has payable Guru, partner, Ambassador, PawPerks, referral, or payout records.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <aside className="space-y-5">
+            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-600">Source breakdown</p>
+              <h2 className="mt-2 text-2xl font-black text-slate-950">Real payout exposure</h2>
+              <div className="mt-5 space-y-4">
+                {(
+                  [
+                    { label: "Guru payouts", amount: summary.guruPayoutAmount, Icon: Users },
+                    { label: "Ambassador / partner", amount: summary.ambassadorPartnerAmount, Icon: Wallet },
+                    { label: "PawPerks / referrals", amount: summary.referralRewardAmount, Icon: Gift },
+                  ] satisfies Array<{ label: string; amount: number; Icon: IconComponent }>
+                ).map(({ label, amount, Icon }) => (
+                  <div key={label} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-xl bg-white p-2 text-emerald-700"><Icon className="h-5 w-5" /></div>
+                        <p className="font-black text-slate-950">{label}</p>
+                      </div>
+                      <p className="font-black text-slate-950">{formatCurrency(amount)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-rose-100 bg-white p-6 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-rose-700">Review queue</p>
+              <h2 className="mt-2 text-2xl font-black text-slate-950">Payout issues needing admin</h2>
+              <div className="mt-5 space-y-3">
+                {reviewRows.slice(0, 5).map((row) => (
+                  <Link key={`${row.source}-${row.id}-review`} href={row.href} className="block rounded-2xl border border-slate-100 bg-slate-50 p-4 hover:bg-white">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-black text-slate-950">{row.recipientName}</p>
+                        <p className="mt-1 text-xs font-bold text-slate-500">{row.notes}</p>
+                      </div>
+                      <p className="font-black text-slate-950">{formatCurrency(row.amount)}</p>
+                    </div>
+                  </Link>
+                ))}
+                {reviewRows.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
+                    <p className="text-sm font-bold text-slate-600">No payout issues found.</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm lg:p-8">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-base font-black text-[#118a43]">
-                Payout Performance Insight
-              </p>
-              <p className="mt-1 text-sm font-medium text-slate-500">
-                Your payout success rate is {successRate}%, up from last period.
-                Great job keeping the payout flow healthy.
-              </p>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Recent payout activity</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">Latest live rows</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Use this table to confirm the financial payout analytics route is reading live SitGuru data, not placeholder examples.</p>
             </div>
+            <span className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-black text-slate-700">
+              {rows.length} total live row(s)
+            </span>
           </div>
-        </div>
 
-        <div className="rounded-[1.35rem] border border-[#e6eee2] bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500">Success Rate</p>
-          <p className="mt-2 text-3xl font-black text-[#111b33]">{successRate}%</p>
-          <p className="mt-1 text-xs font-bold text-[#118a43]">↗ 3.2%</p>
-        </div>
-
-        <div className="rounded-[1.35rem] border border-[#e6eee2] bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500">On-Time Rate</p>
-          <p className="mt-2 text-3xl font-black text-[#111b33]">{onTimeRate}%</p>
-          <p className="mt-1 text-xs font-bold text-[#118a43]">↗ 4.8%</p>
-        </div>
-
-        <div className="rounded-[1.35rem] border border-[#e6eee2] bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500">Total Partners Paid</p>
-          <p className="mt-2 text-3xl font-black text-[#111b33]">{totalPartnersPaid}</p>
-          <p className="mt-1 text-xs font-bold text-[#118a43]">↗ 12</p>
-        </div>
-
-        <div className="rounded-[1.35rem] border border-[#e6eee2] bg-white p-5 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-[#118a43]">
-              <Wallet className="h-5 w-5" />
-            </div>
-            <div className="flex-1">
-              <p className="text-base font-black text-[#111b33]">
-                Optimize your payout flow
-              </p>
-              <p className="mt-1 text-sm font-medium text-slate-500">
-                Reduce failures by keeping payment methods up to date and proactively
-                reviewing holds.
-              </p>
-            </div>
-            <Link
-              href="/admin/financials/settings"
-              className="rounded-xl border border-[#dbe8d5] bg-[#f7fbf5] px-3 py-2 text-xs font-black text-[#118a43] transition hover:bg-[#eef7ea]"
-            >
-              View Recommendations
-            </Link>
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            {recentRows.length > 0 ? (
+              recentRows.map((row) => (
+                <Link key={`${row.source}-${row.id}-recent`} href={row.href} className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${sourceBadgeClass(row.source)}`}>{row.source}</span>
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black capitalize ${statusBadgeClass(row.status)}`}>{row.status}</span>
+                      </div>
+                      <h3 className="mt-3 text-lg font-black text-slate-950">{row.recipientName}</h3>
+                      <p className="mt-1 text-sm font-bold text-slate-600">{row.batch}</p>
+                      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{row.reference}</p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <p className="text-2xl font-black text-slate-950">{formatCurrency(row.amount)}</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">{formatDateTime(row.createdAt)}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-8 text-center lg:col-span-2">
+                <p className="text-lg font-black text-slate-950">No payout rows found yet.</p>
+                <p className="mt-2 text-sm font-semibold text-slate-600">When real payout rows exist in Supabase, they will appear here. No fake demo names are shown.</p>
+              </div>
+            )}
           </div>
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
+    </main>
   );
 }
