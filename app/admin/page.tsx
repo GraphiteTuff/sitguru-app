@@ -134,6 +134,9 @@ export default async function AdminOperationsDashboard() {
     unreadMessages,
     upcomingBookings,
     recentBookings,
+    paymentOptionBookings,
+    promoCreditBookings,
+    tipBookings,
     payoutsReview,
     stripeIssues,
     pawPerksConflicts,
@@ -170,6 +173,15 @@ export default async function AdminOperationsDashboard() {
       { column: "start_time", operator: "gte", value: nowIso },
     ]),
     safeCount("bookings"),
+    safeCount("bookings", [
+      { column: "selected_payment_option", operator: "neq", value: "" },
+    ]),
+    safeCount("bookings", [
+      { column: "promo_code", operator: "neq", value: "" },
+    ]),
+    safeCount("bookings", [
+      { column: "tip_amount", operator: "gte", value: 0.01 },
+    ]),
     safeCount("payouts", [
       {
         column: "status",
@@ -263,6 +275,27 @@ export default async function AdminOperationsDashboard() {
       tone: "slate",
     },
     {
+      label: "Payment Options",
+      value: formatCount(paymentOptionBookings, "Review"),
+      helper: "Bookings with selected card, wallet, Link, saved method, ACH placeholder, or checkout choice",
+      href: "/admin/payments",
+      tone: "sky",
+    },
+    {
+      label: "Credits / Promo",
+      value: formatCount(promoCreditBookings, "Review"),
+      helper: "Promo code, PawPerks, referral, gift card, or SitGuru credit review",
+      href: "/admin/payments?focus=credits",
+      tone: "violet",
+    },
+    {
+      label: "Tips",
+      value: formatCount(tipBookings, "Review"),
+      helper: "Bookings with optional Guru tip amounts",
+      href: "/admin/payments?focus=tips",
+      tone: "emerald",
+    },
+    {
       label: "Payouts Needing Review",
       value: formatCount(payoutsReview, "Review"),
       helper: "Pending, failed, or review-needed payouts",
@@ -319,6 +352,12 @@ export default async function AdminOperationsDashboard() {
       priority: "High",
     },
     {
+      title: "Review payment options",
+      description: "Audit checkout method, PawPerks/referral credit, promo codes, gift card/SitGuru credit, and Guru tips from desktop and mobile booking flows.",
+      href: "/admin/payments",
+      priority: "Review",
+    },
+    {
       title: "Check Stripe readiness",
       description: "Audit Stripe Connect and payout readiness gaps.",
       href: "/admin/financials/stripe",
@@ -354,6 +393,7 @@ export default async function AdminOperationsDashboard() {
     ["Reviews", "/admin/reviews"],
     ["Messages", "/admin/messages"],
     ["Financials", "/admin/financials"],
+    ["Payments", "/admin/payments"],
     ["Partner Payouts", "/admin/partners/payouts"],
     ["Referrals", "/admin/referrals"],
     ["Referral Inventory", "/admin/referrals/inventory"],

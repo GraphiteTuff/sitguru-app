@@ -70,6 +70,15 @@ type BookingRow = Record<string, unknown> & {
   guru_estimated_total_payout?: number | string | null;
   guru_payout_amount?: number | string | null;
   tip_amount?: number | string | null;
+  selected_payment_option?: string | null;
+  payment_option?: string | null;
+  payment_method_type?: string | null;
+  payment_method?: string | null;
+  promo_code?: string | null;
+  gift_card_code?: string | null;
+  sitguru_credit_code?: string | null;
+  pawperks_credit_requested?: boolean | string | null;
+  referral_credit_requested?: boolean | string | null;
   created_at?: string | null;
   updated_at?: string | null;
   notes?: string | null;
@@ -136,6 +145,12 @@ type BookingCard = {
   platformFee: number;
   guruPayout: number;
   tipAmount: number;
+  selectedPaymentOption: string;
+  promoCode: string;
+  giftCardCode: string;
+  sitGuruCreditCode: string;
+  pawPerksCreditRequested: boolean;
+  referralCreditRequested: boolean;
   createdAt: string | null;
   updatedAt: string | null;
   notes: string;
@@ -180,6 +195,30 @@ function asNumber(value: unknown) {
   }
 
   return 0;
+}
+
+function asBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    return ["true", "yes", "1", "on", "requested", "apply"].includes(
+      value.trim().toLowerCase(),
+    );
+  }
+  return false;
+}
+
+function getPaymentOptionLabel(value: string) {
+  const clean = value.trim().toLowerCase();
+  if (!clean) return "Not selected";
+  if (clean.includes("apple")) return "Apple Pay";
+  if (clean.includes("google")) return "Google Pay";
+  if (clean.includes("link")) return "Link by Stripe";
+  if (clean.includes("saved")) return "Saved payment method";
+  if (clean.includes("ach") || clean.includes("bank")) return "ACH / Bank placeholder";
+  if (clean.includes("card") || clean.includes("credit") || clean.includes("debit")) {
+    return "Credit / debit card";
+  }
+  return titleCase(clean);
 }
 
 function titleCase(value: string) {
@@ -496,6 +535,9 @@ function BookingRowCard({ booking }: { booking: BookingCard }) {
             <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
               Payout: {titleCase(booking.payoutStatus)}
             </span>
+            <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-black text-sky-900">
+              Method: {getPaymentOptionLabel(booking.selectedPaymentOption)}
+            </span>
             <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
               Created {formatDateTime(booking.createdAt)}
             </span>
@@ -538,7 +580,15 @@ function BookingRowCard({ booking }: { booking: BookingCard }) {
             <InfoTile label="Location" value={booking.location || "Not provided"} helper={booking.petName ? `Pet: ${booking.petName}` : "Pet not selected"} icon={<PawPrint size={17} />} />
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-700">
+                Payment Option
+              </p>
+              <p className="mt-1 text-lg font-black text-slate-950">
+                {getPaymentOptionLabel(booking.selectedPaymentOption)}
+              </p>
+            </div>
             <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
                 Platform Fee
@@ -564,6 +614,35 @@ function BookingRowCard({ booking }: { booking: BookingCard }) {
               </p>
             </div>
           </div>
+
+          {(booking.pawPerksCreditRequested ||
+            booking.referralCreditRequested ||
+            booking.promoCode ||
+            booking.giftCardCode ||
+            booking.sitGuruCreditCode) ? (
+            <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-violet-800">
+                Credits / Promo Review
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs font-black">
+                {booking.pawPerksCreditRequested ? (
+                  <span className="rounded-full border border-violet-200 bg-white px-3 py-1 text-violet-900">PawPerks requested</span>
+                ) : null}
+                {booking.referralCreditRequested ? (
+                  <span className="rounded-full border border-violet-200 bg-white px-3 py-1 text-violet-900">Referral credit requested</span>
+                ) : null}
+                {booking.promoCode ? (
+                  <span className="rounded-full border border-violet-200 bg-white px-3 py-1 text-violet-900">Promo: {booking.promoCode}</span>
+                ) : null}
+                {booking.giftCardCode ? (
+                  <span className="rounded-full border border-violet-200 bg-white px-3 py-1 text-violet-900">Gift card: {booking.giftCardCode}</span>
+                ) : null}
+                {booking.sitGuruCreditCode ? (
+                  <span className="rounded-full border border-violet-200 bg-white px-3 py-1 text-violet-900">SitGuru credit: {booking.sitGuruCreditCode}</span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {booking.notes ? (
             <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 p-4">
@@ -766,6 +845,16 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
       platformFee: getBookingPlatformFee(booking),
       guruPayout: getBookingGuruPayout(booking),
       tipAmount: asNumber(booking.tip_amount),
+      selectedPaymentOption:
+        asString(booking.selected_payment_option) ||
+        asString(booking.payment_option) ||
+        asString(booking.payment_method_type) ||
+        asString(booking.payment_method),
+      promoCode: asString(booking.promo_code),
+      giftCardCode: asString(booking.gift_card_code),
+      sitGuruCreditCode: asString(booking.sitguru_credit_code),
+      pawPerksCreditRequested: asBoolean(booking.pawperks_credit_requested),
+      referralCreditRequested: asBoolean(booking.referral_credit_requested),
       createdAt: asString(booking.created_at) || null,
       updatedAt: asString(booking.updated_at) || null,
       notes: asString(booking.notes),
@@ -799,6 +888,12 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
         booking.status,
         booking.paymentStatus,
         booking.payoutStatus,
+        booking.selectedPaymentOption,
+        booking.promoCode,
+        booking.giftCardCode,
+        booking.sitGuruCreditCode,
+        booking.pawPerksCreditRequested ? "pawperks credit" : "",
+        booking.referralCreditRequested ? "referral credit" : "",
       ]
         .filter(Boolean)
         .join(" ")
@@ -814,6 +909,16 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
   const grossBookings = bookingCards.reduce((sum, booking) => sum + booking.totalAmount, 0);
   const platformRevenue = bookingCards.reduce((sum, booking) => sum + booking.platformFee, 0);
   const guruPayouts = bookingCards.reduce((sum, booking) => sum + booking.guruPayout, 0);
+  const paymentOptionCount = bookingCards.filter((booking) => booking.selectedPaymentOption).length;
+  const creditRequestCount = bookingCards.filter(
+    (booking) =>
+      booking.pawPerksCreditRequested ||
+      booking.referralCreditRequested ||
+      booking.promoCode ||
+      booking.giftCardCode ||
+      booking.sitGuruCreditCode,
+  ).length;
+  const tipTotal = bookingCards.reduce((sum, booking) => sum + booking.tipAmount, 0);
 
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
@@ -884,6 +989,9 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
           <StatCard icon={<ShieldCheck size={22} />} label="Completed" value={String(completedBookings)} detail="Completed care records" href={filterHref("completed")} />
           <StatCard icon={<XCircle size={22} />} label="Cancelled" value={String(cancelledBookings)} detail="Cancelled or declined" href={filterHref("cancelled")} />
           <StatCard icon={<CreditCard size={22} />} label="Gross" value={formatMoney(grossBookings)} detail="Customer booking total" />
+          <StatCard icon={<CreditCard size={22} />} label="Payment Options" value={String(paymentOptionCount)} detail="Desktop/mobile checkout selections" href="/admin/payments" />
+          <StatCard icon={<DollarSign size={22} />} label="Credits / Promo" value={String(creditRequestCount)} detail="PawPerks, referral, promo, or SitGuru credit" href="/admin/payments?focus=credits" />
+          <StatCard icon={<DollarSign size={22} />} label="Tips" value={formatMoney(tipTotal)} detail="Optional Guru tip exposure" href="/admin/payments?focus=tips" />
         </section>
 
         <section className="grid gap-4 lg:grid-cols-3">
