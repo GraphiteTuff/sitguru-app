@@ -13,6 +13,7 @@ export type PublicGuruProfile = {
   state?: string | null;
   service_city?: string | null;
   service_state?: string | null;
+  service_area?: string | null;
   zip_code?: string | null;
   service_zip?: string | null;
   service_radius_miles?: number | string | null;
@@ -90,6 +91,8 @@ export function getGuruPhotoUrl(guru: PublicGuruProfile) {
 }
 
 export function getGuruLocationLabel(guru: PublicGuruProfile) {
+  const serviceArea = cleanString(guru.service_area);
+  if (serviceArea) return serviceArea;
   const city = cleanString(guru.service_city) || cleanString(guru.city);
   const state = cleanString(guru.service_state) || cleanString(guru.state);
   const zip = cleanString(guru.service_zip) || cleanString(guru.zip_code);
@@ -145,6 +148,18 @@ export function getGuruBookingLabel(guru: PublicGuruProfile) {
 
 export function getGuruSearchBadge(guru: PublicGuruProfile) {
   return isKnownPreviewGuru(guru) ? 'Profile Preview' : isGuruBookable(guru) ? 'Booking Ready' : 'Message First';
+}
+
+export function getGuruVisibilityLabel(guru: PublicGuruProfile) {
+  if (isKnownPreviewGuru(guru)) return 'Preview profile';
+  if (explicitFalse(guru.is_public_visible) || statusMeansClosed(guru.profile_quality_status)) return 'Limited visibility';
+  if (explicitTrue(guru.is_public_visible) || statusMeansBookable(guru.admin_status) || statusMeansBookable(guru.profile_quality_status)) return 'Public profile';
+  return 'Public listing';
+}
+
+export function getGuruBookingStatusLabel(guru: PublicGuruProfile) {
+  if (isKnownPreviewGuru(guru)) return 'Bookings paused';
+  return isGuruBookable(guru) ? 'Accepting requests' : 'Message to confirm';
 }
 
 export function getGuruProfileNotice(guru: PublicGuruProfile) {
